@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Http\Responses\LoginResponse;
 use App\Models\Company;
+use App\Models\Import;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -123,7 +124,11 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
+            'import' => Import::class,
         ]);
+
+        // Bind our custom Import model to the Filament Import model
+        $this->app->bind(\Filament\Actions\Imports\Models\Import::class, Import::class);
     }
 
     /**
