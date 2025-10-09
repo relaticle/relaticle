@@ -43,7 +43,7 @@ final class OpportunityImporter extends BaseImporter
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    if ($state === null || $state === '' || $state === '0') {
+                    if (in_array($state, [null, '', '0'], true)) {
                         $record->company_id = null;
 
                         return;
@@ -78,7 +78,7 @@ final class OpportunityImporter extends BaseImporter
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('John Doe')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    if ($state === null || $state === '' || $state === '0') {
+                    if (in_array($state, [null, '', '0'], true)) {
                         $record->contact_id = null;
 
                         return;
