@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -86,7 +87,7 @@ final class UpdateProfileInformationForm extends Component
     /**
      * Get the current user of the application.
      */
-    #[\Livewire\Attributes\Computed]
+    #[Computed]
     public function user(): Authenticatable
     {
         return Auth::guard('web')->user();
