@@ -45,6 +45,7 @@
     },
     "require-dev": {
         "cweagans/composer-patches": "*",
+        "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "itsgoingd/clockwork": "^5.3",
         "larastan/larastan": "^3.0",

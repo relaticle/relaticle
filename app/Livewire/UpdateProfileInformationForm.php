@@ -86,7 +86,8 @@ final class UpdateProfileInformationForm extends Component
     /**
      * Get the current user of the application.
      */
-    public function getUserProperty(): Authenticatable
+    #[\Livewire\Attributes\Computed]
+    public function user(): Authenticatable
     {
         return Auth::guard('web')->user();
     }
