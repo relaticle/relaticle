@@ -6,8 +6,11 @@ use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPrivateMethodRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Privatization\Rector\ClassMethod\PrivatizeFinalClassMethodRector;
+use RectorLaravel\Set\LaravelSetProvider;
 
 return RectorConfig::configure()
+    ->withSetProviders(LaravelSetProvider::class)
+    ->withComposerBased(laravel: true)
     ->withPaths([
         __DIR__.'/app',
         __DIR__.'/app-modules',
