@@ -84,10 +84,16 @@ it('cannot display trashed records by default', function (): void {
 it('can paginate records', function (): void {
     $records = App\Models\Company::factory(20)->for($this->user->personalTeam())->create();
 
+    // Fetch records with the same sort order as the table (created_at DESC)
+    $sortedRecords = App\Models\Company::query()
+        ->whereIn('id', $records->pluck('id'))
+        ->orderBy('created_at', 'desc')
+        ->get();
+
     livewire(App\Filament\Resources\CompanyResource\Pages\ListCompanies::class)
-        ->assertCanSeeTableRecords($records->take(10), inOrder: true)
+        ->assertCanSeeTableRecords($sortedRecords->take(10), inOrder: true)
         ->call('gotoPage', 2)
-        ->assertCanSeeTableRecords($records->skip(10)->take(10), inOrder: true);
+        ->assertCanSeeTableRecords($sortedRecords->skip(10)->take(10), inOrder: true);
 });
 
 it('can bulk delete records', function (): void {
