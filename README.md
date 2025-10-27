@@ -10,7 +10,7 @@
   <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
   <a href="https://laravel.com/docs/12.x"><img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel" alt="Laravel 12"></a>
   <a href="https://filamentphp.com"><img src="https://img.shields.io/badge/Filament-4.x-FBBC04?style=for-the-badge" alt="Filament 4"></a>
-  <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.3-777BB4?style=for-the-badge&logo=php" alt="PHP 8.3"></a>
+  <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.4-777BB4?style=for-the-badge&logo=php" alt="PHP 8.4"></a>
   <a href="https://github.com/Relaticle/relaticle/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge" alt="License"></a>
 </p>
 
@@ -38,7 +38,7 @@ Relaticle is a powerful, adaptable CRM platform built for teams who've outgrown 
 **Core Strengths:**
 - **Fully Customizable** - Create and manage custom fields without coding
 - **Multi-Team Support** - Securely manage multiple business units with isolated workspaces
-- **Modern Technology** - Built on Laravel 12, PHP 8.3, and Filament 4
+- **Modern Technology** - Built on Laravel 12, PHP 8.4, and Filament 4
 - **Privacy-Focused** - Self-host with complete data ownership
 - **Open Source** - Transparent development with AGPL-3.0 license
 
@@ -51,7 +51,7 @@ Visit our [website](https://relaticle.com) to learn more about Relaticle's capab
 
 # Requirements
 
-- PHP 8.3+,
+- PHP 8.4+,
 - PostgreSQL 15+
 - Composer 2 and Node.js 20+
 - Redis for queues (optional for development)
