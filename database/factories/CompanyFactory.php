@@ -34,8 +34,8 @@ final class CompanyFactory extends Factory
     public function configure(): Factory
     {
         return $this->sequence(fn (Sequence $sequence): array => [
-            'created_at' => now()->subSeconds($sequence->index),
-            'updated_at' => now()->subSeconds($sequence->index),
+            'created_at' => now()->addSeconds($sequence->index),
+            'updated_at' => now()->addSeconds($sequence->index),
         ]);
     }
 }
