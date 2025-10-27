@@ -23,7 +23,7 @@ test('password can be updated', function () {
         ->fillForm([
             'currentPassword' => 'password',
             'password' => 'new-password',
-            'passwordConfirmation' => 'new-password',
+            'password_confirmation' => 'new-password',
         ])
         ->call('updatePassword')
         ->assertHasNoFormErrors()
@@ -39,7 +39,7 @@ test('current password must be correct', function () {
         ->fillForm([
             'currentPassword' => 'wrong-password',
             'password' => 'new-password',
-            'passwordConfirmation' => 'new-password',
+            'password_confirmation' => 'new-password',
         ])
         ->call('updatePassword')
         ->assertHasFormErrors(['currentPassword']);
@@ -54,7 +54,7 @@ test('new passwords must match', function () {
         ->fillForm([
             'currentPassword' => 'password',
             'password' => 'new-password',
-            'passwordConfirmation' => 'wrong-password',
+            'password_confirmation' => 'wrong-password',
         ])
         ->call('updatePassword')
         ->assertHasFormErrors(['password']);

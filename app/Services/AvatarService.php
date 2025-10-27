@@ -46,8 +46,8 @@ final readonly class AvatarService
         $textColor = $this->validateColor($textColor) ? $textColor : null;
 
         // Add custom colors to cache key if provided
-        $bgColorKey = $bgColor !== null && $bgColor !== '' && $bgColor !== '0' ? "_bg{$bgColor}" : '';
-        $textColorKey = $textColor !== null && $textColor !== '' && $textColor !== '0' ? "_txt{$textColor}" : '';
+        $bgColorKey = in_array($bgColor, [null, '', '0'], true) ? '' : "_bg{$bgColor}";
+        $textColorKey = in_array($textColor, [null, '', '0'], true) ? '' : "_txt{$textColor}";
         $cacheKey = 'avatar_'.hash('sha256', "{$name}_{$size}{$bgColorKey}{$textColorKey}_initials{$initialCount}");
 
         return $this->cache->remember(

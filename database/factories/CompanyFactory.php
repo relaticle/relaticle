@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Company>
@@ -21,7 +22,6 @@ final class CompanyFactory extends Factory
      *
      * @return array<string, mixed>
      */
-    #[\Override]
     public function definition(): array
     {
         return [
@@ -29,5 +29,13 @@ final class CompanyFactory extends Factory
             'account_owner_id' => User::factory(),
             'team_id' => Team::factory(),
         ];
+    }
+
+    public function configure(): Factory
+    {
+        return $this->sequence(fn (Sequence $sequence): array => [
+            'created_at' => now()->subSeconds($sequence->index),
+            'updated_at' => now()->subSeconds($sequence->index),
+        ]);
     }
 }

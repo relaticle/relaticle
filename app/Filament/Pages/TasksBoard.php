@@ -71,7 +71,7 @@ final class TasksBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(fn (mixed $state): bool => filled($state))
+                    ->visible(filled(...))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
 
                 return $schema->components([
@@ -83,7 +83,7 @@ final class TasksBoard extends BoardPage
                         ->alignLeft()
                         ->imageHeight(24)
                         ->circular()
-                        ->visible(fn (mixed $state): bool => filled($state))
+                        ->visible(filled(...))
                         ->stacked(),
                 ]);
             })

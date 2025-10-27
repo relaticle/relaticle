@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
@@ -41,6 +42,14 @@ final class SystemAdministratorFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function configure(): Factory
+    {
+        return $this->sequence(fn (Sequence $sequence): array => [
+            'created_at' => now()->subSeconds($sequence->index),
+            'updated_at' => now()->subSeconds($sequence->index),
         ]);
     }
 }

@@ -42,7 +42,7 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
                     ->color('primary')
                     ->requiresConfirmation()
                     ->visible(fn () => Gate::check('updateTeamMember', $this->team))
-                    ->action(fn (Model $record) => $this->resendTeamInvitation($record)),
+                    ->action($this->resendTeamInvitation(...)),
                 Action::make('cancelTeamInvitation')
                     ->label(__('teams.actions.cancel_team_invitation'))
                     ->color('danger')

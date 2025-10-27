@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,7 +18,6 @@ final class TaskFactory extends Factory
 {
     protected $model = Task::class;
 
-    #[\Override]
     public function definition(): array
     {
         return [
@@ -27,5 +27,13 @@ final class TaskFactory extends Factory
             'team_id' => Team::factory(),
             'creator_id' => User::factory(),
         ];
+    }
+
+    public function configure(): Factory
+    {
+        return $this->sequence(fn (Sequence $sequence): array => [
+            'created_at' => now()->subSeconds($sequence->index),
+            'updated_at' => now()->subSeconds($sequence->index),
+        ]);
     }
 }

@@ -48,7 +48,7 @@ final class DeleteAccount extends BaseLivewireComponent
                                         ->required()
                                         ->currentPassword(),
                                 ])
-                                ->action(fn (array $data): \Illuminate\Routing\Redirector|\Illuminate\Http\RedirectResponse => $this->deleteAccount()),
+                                ->action($this->deleteAccount(...)),
                         ]),
                     ]),
             ]);

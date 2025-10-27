@@ -92,7 +92,7 @@ final class SalesAnalyticsChartWidget extends ChartWidget
     private function getSalesData(): array
     {
         $monthlyData = collect(range(5, 0))
-            ->map(fn (int $monthsAgo): array => $this->getMonthData($monthsAgo))
+            ->map($this->getMonthData(...))
             ->values();
 
         return [
