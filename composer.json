@@ -13,7 +13,7 @@
     ],
     "license": "AGPL-3.0",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "ashallendesign/favicon-fetcher": "^3.8",
         "awcodes/overlook": "^v3.0",
         "blade-ui-kit/blade-heroicons": "^2.6",
@@ -109,23 +109,23 @@
         "test:arch": "pest --filter=arch",
         "test:type-coverage": "pest --type-coverage --min=99.9",
         "test:coverage": "pest --coverage --min=80",
-        "test:unit": "pest --parallel",
-        "test:unit:shard": "pest --parallel --shard=${SHARD}",
-        "test:unit:ci": "pest --parallel --configuration phpunit.ci.xml",
-        "test:unit:ci:shard": "pest --parallel --configuration phpunit.ci.xml --shard=${SHARD}",
+        "test:pest": "pest --parallel",
+        "test:pest:shard": "pest --parallel --shard=${SHARD}",
+        "test:pest:ci": "pest --parallel --configuration phpunit.ci.xml",
+        "test:pest:ci:shard": "pest --parallel --configuration phpunit.ci.xml --shard=${SHARD}",
         "test": [
             "@test:lint",
             "@test:refactor",
             "@test:type-coverage",
             "@test:types",
-            "@test:unit"
+            "@test:pest"
         ],
         "test:ci": [
             "@test:lint",
             "@test:refactor",
             "@test:type-coverage",
             "@test:types",
-            "@test:unit:ci"
+            "@test:pest:ci"
         ]
     },
     "extra": {

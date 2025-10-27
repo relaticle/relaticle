@@ -71,7 +71,7 @@ final class OpportunitiesBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(fn (mixed $state): bool => filled($state))
+                    ->visible(filled(...))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString()),
                 CardFlex::make([
 
@@ -85,7 +85,7 @@ final class OpportunitiesBoard extends BoardPage
                     ->modalWidth(Width::Large)
                     ->slideOver(false)
                     ->model(Opportunity::class)
-                    ->schema(fn (Schema $schema): Schema => OpportunityForm::get($schema))
+                    ->schema(OpportunityForm::get(...))
                     ->using(function (array $data, array $arguments): Opportunity {
                         /** @var Team $currentTeam */
                         $currentTeam = Auth::guard('web')->user()->currentTeam;
@@ -106,7 +106,7 @@ final class OpportunitiesBoard extends BoardPage
                     ->slideOver()
                     ->modalWidth(Width::ExtraLarge)
                     ->icon('heroicon-o-pencil-square')
-                    ->schema(fn (Schema $schema): Schema => OpportunityForm::get($schema))
+                    ->schema(OpportunityForm::get(...))
                     ->fillForm(fn (Opportunity $record): array => [
                         'name' => $record->name,
                         'company_id' => $record->company_id,

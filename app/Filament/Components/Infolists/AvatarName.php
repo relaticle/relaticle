@@ -80,8 +80,8 @@ final class AvatarName extends Entry
             ];
         }
 
-        $avatarValue = $this->avatarPath !== null && $this->avatarPath !== '' && $this->avatarPath !== '0' ? $this->resolvePath($record, $this->avatarPath) : null;
-        $nameValue = $this->namePath !== null && $this->namePath !== '' && $this->namePath !== '0' ? $this->resolvePath($record, $this->namePath) : null;
+        $avatarValue = in_array($this->avatarPath, [null, '', '0'], true) ? null : $this->resolvePath($record, $this->avatarPath);
+        $nameValue = in_array($this->namePath, [null, '', '0'], true) ? null : $this->resolvePath($record, $this->namePath);
 
         return [
             'avatar' => $avatarValue,

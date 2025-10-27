@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
@@ -75,5 +76,13 @@ final class UserFactory extends Factory
             // Update the relationship
             $user->ownedTeams()->save($team);
         });
+    }
+
+    public function configure(): Factory
+    {
+        return $this->sequence(fn (Sequence $sequence): array => [
+            'created_at' => now()->addSeconds($sequence->index),
+            'updated_at' => now()->addSeconds($sequence->index),
+        ]);
     }
 }

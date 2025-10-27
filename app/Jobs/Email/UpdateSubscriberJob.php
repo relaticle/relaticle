@@ -50,7 +50,7 @@ final class UpdateSubscriberJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [(new ThrottlesExceptionsWithRedis(1, 1))->backoff(1)->report()];
+        return [new ThrottlesExceptionsWithRedis(1, 1)->backoff(1)->report()];
     }
 
     /**

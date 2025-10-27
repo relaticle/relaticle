@@ -139,6 +139,6 @@ jobs:
           php artisan key:generate
 
       - name: Tests
-        run: composer test:unit:ci:shard
+        run: composer test:pest:ci:shard
         env:
           SHARD: ${{ matrix.shard }}/7

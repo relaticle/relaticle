@@ -110,12 +110,12 @@ final class InstallCommand extends Command
     {
         /** @var array<string, callable(): bool> */
         $installationSteps = [
-            'System Requirements' => fn (): bool => $this->checkSystemRequirements(),
+            'System Requirements' => $this->checkSystemRequirements(...),
             'Environment Setup' => fn (): bool => $this->setupEnvironment($config),
-            'Dependencies' => fn (): bool => $this->installDependencies(),
-            'Database' => fn (): bool => $this->setupDatabase(),
-            'Assets' => fn (): bool => $this->buildAssets(),
-            'Storage' => fn (): bool => $this->setupStorage(),
+            'Dependencies' => $this->installDependencies(...),
+            'Database' => $this->setupDatabase(...),
+            'Assets' => $this->buildAssets(...),
+            'Storage' => $this->setupStorage(...),
             'Demo Data' => fn (): bool => $config['demo_data'] ? $this->seedDemoData() : true,
         ];
 

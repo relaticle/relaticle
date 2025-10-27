@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 
 /**
  * @extends Factory<UserSocialAccount>
@@ -20,7 +21,6 @@ final class UserSocialAccountFactory extends Factory
      */
     protected $model = UserSocialAccount::class;
 
-    #[\Override]
     public function definition(): array
     {
         return [
@@ -28,5 +28,13 @@ final class UserSocialAccountFactory extends Factory
             'provider_name' => 'facebook',
             'provider_id' => $this->faker->unique()->randomNumber(),
         ];
+    }
+
+    public function configure(): Factory
+    {
+        return $this->sequence(fn (Sequence $sequence): array => [
+            'created_at' => now()->addSeconds($sequence->index),
+            'updated_at' => now()->addSeconds($sequence->index),
+        ]);
     }
 }
