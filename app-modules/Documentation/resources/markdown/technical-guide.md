@@ -192,7 +192,7 @@ composer test:refactor
 composer test:types
 
 # Run the test suite
-composer test:unit
+composer test:pest
 
 # Run test architecture checks
 composer test:arch
