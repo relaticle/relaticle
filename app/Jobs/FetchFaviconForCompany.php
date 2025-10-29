@@ -45,17 +45,33 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $favicon = Favicon::withFallback('google-shared-stuff')->fetch($domainName);
+            $favicon = Favicon::driver('high-quality')->fetch($domainName);
             $url = $favicon?->getFaviconUrl();
 
             if ($url === null) {
                 return;
             }
 
+            $path = parse_url($url, PHP_URL_PATH);
+            $extension = $path ? pathinfo($path, PATHINFO_EXTENSION) : '';
+
+            $filename = match ($extension) {
+                'svg' => 'logo.svg',
+                'png' => 'logo.png',
+                'webp' => 'logo.webp',
+                'jpg', 'jpeg' => 'logo.jpg',
+                default => 'logo.png',
+            };
+
             $logo = $this->company
                 ->addMediaFromUrl($url)
-                ->usingFileName('favicon.png')
-                ->usingName('company_favicon')
+                ->usingFileName($filename)
+                ->usingName('company_logo')
+                ->withCustomProperties([
+                    'original_size' => $favicon->getIconSize(),
+                    'icon_type' => $favicon->getIconType(),
+                    'fetched_at' => now()->toIso8601String(),
+                ])
                 ->toMediaCollection('logo');
 
             $this->company->clearMediaCollectionExcept('logo', $logo);

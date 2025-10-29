@@ -65,6 +65,7 @@ arch('avoid mutation')
         'App\Notifications',
         'App\Providers',
         'App\View',
+        'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
     ]);
 

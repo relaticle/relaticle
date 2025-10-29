@@ -79,14 +79,14 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                             </svg>
-                            <span>app.relaticle.com/dashboard</span>
+                            <span>app.relaticle.com</span>
                         </div>
                     </div>
 
                     <!-- Browser Content Area -->
                     <div class="relative">
-                        <img id="app-preview-image"
-                             src="{{ asset('images/app-preview.png') }}"
+                        <img id="app-companies-preview-image"
+                             src="{{ asset('images/app-companies-preview.jpg') }}"
                              alt="Relaticle CRM Dashboard"
                              class="w-full h-auto"
                              width="1200"
@@ -126,9 +126,9 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const appPreviewImage = document.getElementById('app-preview-image');
-        const lightImage = "{{ asset('images/app-preview.png') }}";
-        const darkImage = "{{ asset('images/app-preview-dark.png') }}";
+        const appPreviewImage = document.getElementById('app-companies-preview-image');
+        const lightImage = "{{ asset('images/app-companies-preview.jpg') }}";
+        const darkImage = "{{ asset('images/app-companies-preview-dark.jpg') }}";
 
         // Initial setup based on current theme
         updateImageSource();

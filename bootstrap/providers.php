@@ -11,4 +11,5 @@ return [
     App\Providers\HorizonServiceProvider::class,
     App\Providers\JetstreamServiceProvider::class,
     Relaticle\Documentation\DocumentationServiceProvider::class,
+    App\Providers\FaviconServiceProvider::class,
 ];
