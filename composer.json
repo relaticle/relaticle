@@ -26,7 +26,7 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.0",
-        "relaticle/custom-fields": "@dev",
+        "relaticle/custom-fields": "^2.0",
         "relaticle/flowforge": "@dev",
         "sentry/sentry-laravel": "^4.13",
         "spatie/eloquent-sortable": "^4.4",
