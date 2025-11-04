@@ -109,7 +109,7 @@
                 </div>
                 <div class="p-3 text-center">
                     <div class="text-lg font-semibold text-black dark:text-white">Modern Stack</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">PHP 8.3, Laravel 12</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">PHP 8.4, Laravel 12</div>
                 </div>
                 <div class="p-3 text-center">
                     <div class="text-lg font-semibold text-black dark:text-white">Secure</div>

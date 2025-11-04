@@ -167,7 +167,7 @@ final class InstallCommand extends Command
     private function checkSystemRequirements(): bool
     {
         $requirements = [
-            'PHP 8.3+' => version_compare(PHP_VERSION, '8.3.0', '>='),
+            'PHP 8.4+' => version_compare(PHP_VERSION, '8.3.0', '>='),
             'Composer' => $this->commandExists('composer'),
             'Node.js' => $this->commandExists('node'),
             'NPM' => $this->commandExists('npm'),
