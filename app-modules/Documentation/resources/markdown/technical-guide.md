@@ -7,7 +7,7 @@ Livewire and Tailwind CSS to create a responsive and interactive user experience
 
 ### Tech Stack
 
-- **Backend**: PHP 8.3, Laravel 12
+- **Backend**: PHP 8.4, Laravel 12
 - **Admin UI**: Filament 4
 - **Frontend**: Livewire, Tailwind CSS, Alpine.js
 - **Database**: PostgreSQL (recommended), MySQL (supported)
@@ -60,7 +60,7 @@ Relaticle's data structure revolves around these key models:
 
 To develop Relaticle locally, you'll need:
 
-- **PHP 8.3+** with the following extensions:
+- **PHP 8.4+** with the following extensions:
     - pdo_sqlite (recommended for development) or pdo_pgsql/pdo_mysql
     - gd
     - bcmath
@@ -329,7 +329,7 @@ class CompanyResource extends Resource
 
 ### Server Requirements
 
-- PHP 8.3+ with required extensions
+- PHP 8.4+ with required extensions
 - PostgreSQL 13+ or MySQL 8.0+
 - Redis (recommended for caching and queues)
 - Nginx or Apache
