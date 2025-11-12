@@ -19,19 +19,19 @@ parameters:
 			path: app/Listeners/SwitchTeam.php
 
 		-
-			message: '#^Property App\\Models\\Opportunity\:\:\$creator_id \(int\|null\) does not accept int\|string\|null\.$#'
+			message: '#^Property App\\Models\\Opportunity\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
 			identifier: assign.propertyType
 			count: 1
 			path: app/Observers/OpportunityObserver.php
 
 		-
-			message: '#^Property App\\Models\\People\:\:\$creator_id \(int\|null\) does not accept int\|string\|null\.$#'
+			message: '#^Property App\\Models\\People\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
 			identifier: assign.propertyType
 			count: 1
 			path: app/Observers/PeopleObserver.php
 
 		-
-			message: '#^Property App\\Models\\Task\:\:\$creator_id \(int\|null\) does not accept int\|string\|null\.$#'
+			message: '#^Property App\\Models\\Task\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
 			identifier: assign.propertyType
 			count: 1
 			path: app/Observers/TaskObserver.php
