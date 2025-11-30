@@ -15,4 +15,13 @@ final readonly class PeopleObserver
             $people->team_id = auth('web')->user()->currentTeam->getKey();
         }
     }
+
+    /**
+     * Handle the People "saved" event.
+     * Invalidate AI summary when person data changes.
+     */
+    public function saved(People $people): void
+    {
+        $people->invalidateAiSummary();
+    }
 }
