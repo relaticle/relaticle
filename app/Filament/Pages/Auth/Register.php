@@ -7,12 +7,11 @@ namespace App\Filament\Pages\Auth;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\Size;
 
 final class Register extends BaseRegister
 {
-    protected function getEmailFormComponent(): Component
+    protected function getEmailFormComponent(): \Filament\Forms\Components\TextInput
     {
         return TextInput::make('email')
             ->label(__('filament-panels::auth/pages/register.form.email.label'))
