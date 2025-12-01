@@ -14,8 +14,10 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -48,9 +50,9 @@ final readonly class RecordContextBuilder
         $company->load([
             'accountOwner',
             'customFieldValues.customField',
-            'notes' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('notes.created_at')->limit(self::RELATIONSHIP_LIMIT),
-            'tasks' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('tasks.created_at')->limit(self::RELATIONSHIP_LIMIT),
-            'opportunities' => fn (\Illuminate\Database\Eloquent\Relations\HasMany $q): \Illuminate\Database\Eloquent\Relations\HasMany => $q->with('customFieldValues.customField')->latest('opportunities.created_at')->limit(self::RELATIONSHIP_LIMIT),
+            'notes' => $this->recentWithCustomFields('notes'),
+            'tasks' => $this->recentWithCustomFields('tasks'),
+            'opportunities' => $this->recentWithCustomFields('opportunities'),
         ]);
 
         return [
@@ -79,8 +81,8 @@ final readonly class RecordContextBuilder
         $person->load([
             'company',
             'customFieldValues.customField',
-            'notes' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('notes.created_at')->limit(self::RELATIONSHIP_LIMIT),
-            'tasks' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('tasks.created_at')->limit(self::RELATIONSHIP_LIMIT),
+            'notes' => $this->recentWithCustomFields('notes'),
+            'tasks' => $this->recentWithCustomFields('tasks'),
         ]);
 
         return [
@@ -106,8 +108,8 @@ final readonly class RecordContextBuilder
             'company',
             'contact',
             'customFieldValues.customField',
-            'notes' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('notes.created_at')->limit(self::RELATIONSHIP_LIMIT),
-            'tasks' => fn (\Illuminate\Database\Eloquent\Relations\MorphToMany $q): \Illuminate\Database\Eloquent\Relations\MorphToMany => $q->with('customFieldValues.customField')->latest('tasks.created_at')->limit(self::RELATIONSHIP_LIMIT),
+            'notes' => $this->recentWithCustomFields('notes'),
+            'tasks' => $this->recentWithCustomFields('tasks'),
         ]);
 
         return [
@@ -121,6 +123,14 @@ final readonly class RecordContextBuilder
             'last_updated' => $opportunity->updated_at?->diffForHumans(),
             'created' => $opportunity->created_at?->diffForHumans(),
         ];
+    }
+
+    private function recentWithCustomFields(string $table): Closure
+    {
+        return fn (Relation $query): Relation => $query
+            ->with('customFieldValues.customField')
+            ->latest("{$table}.created_at")
+            ->limit(self::RELATIONSHIP_LIMIT);
     }
 
     /**
