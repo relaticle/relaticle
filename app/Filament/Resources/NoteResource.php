@@ -54,11 +54,9 @@ final class NoteResource extends Resource
                     ->searchable(),
                 TextColumn::make('companies.name')
                     ->label('Companies')
-                    ->sortable()
                     ->toggleable(),
                 TextColumn::make('people.name')
                     ->label('People')
-                    ->sortable()
                     ->toggleable(),
                 TextColumn::make('creator.name')
                     ->label('Created By')
