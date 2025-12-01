@@ -264,6 +264,6 @@ PROMPT;
 
     private function formatLabel(string $key): string
     {
-        return ucwords(str_replace('_', ' ', $key));
+        return str($key)->replace('_', ' ')->title()->toString();
     }
 }

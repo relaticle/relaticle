@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CreationSource;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -31,6 +32,7 @@ final class Note extends Model implements HasCustomFields
     use HasFactory;
 
     use HasTeam;
+    use InvalidatesRelatedAiSummaries;
     use SoftDeletes;
     use UsesCustomFields;
 

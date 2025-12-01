@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CreationSource;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -38,6 +39,7 @@ final class Task extends Model implements HasCustomFields
     use HasFactory;
 
     use HasTeam;
+    use InvalidatesRelatedAiSummaries;
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;

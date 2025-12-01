@@ -54,8 +54,8 @@ final class GenerateRecordSummaryAction extends Action
             ->icon(Heroicon::Clipboard)
             ->color('gray')
             ->extraAttributes(function (Model $record): array {
-                $cached = $this->getCachedSummary($record);
-                $summaryText = $cached instanceof \App\Models\AiSummary ? $cached->summary : '';
+                // @phpstan-ignore nullsafe.neverNull (defensive code for models without HasAiSummary trait)
+                $summaryText = $this->getCachedSummary($record)?->summary ?? '';
 
                 return [
                     'x-on:click' => 'window.navigator.clipboard.writeText('.json_encode($summaryText).'); $tooltip(\'Copied!\')',
