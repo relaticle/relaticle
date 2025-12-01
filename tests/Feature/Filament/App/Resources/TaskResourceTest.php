@@ -51,7 +51,7 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortBy($sortingKey), inOrder: true)
         ->sortTable($column, 'desc')
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
-})->with(['assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
+})->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can search `:dataset` column', function (string $column): void {
     $records = App\Models\Task::factory(3)->for($this->user->personalTeam())->create();

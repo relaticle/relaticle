@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
@@ -28,6 +29,7 @@ use Spatie\EloquentSortable\SortableTrait;
 #[ObservedBy(OpportunityObserver::class)]
 final class Opportunity extends Model implements HasCustomFields
 {
+    use HasAiSummary;
     use HasCreator;
 
     /** @use HasFactory<OpportunityFactory> */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Enums\CustomFields\CompanyField;
+use App\Filament\Actions\GenerateRecordSummaryAction;
 use App\Filament\Components\Infolists\AvatarName;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
@@ -29,6 +30,7 @@ final class ViewCompany extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            GenerateRecordSummaryAction::make(),
             ActionGroup::make([
                 EditAction::make()
                     ->after(function (Company $record, array $data): void {

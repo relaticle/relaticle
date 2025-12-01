@@ -75,7 +75,6 @@ final class TaskResource extends Resource
                     ->badge()
                     ->color('primary')
                     ->searchable()
-                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('creator.name')
                     ->label('Created By')

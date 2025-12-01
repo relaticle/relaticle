@@ -24,10 +24,19 @@ final readonly class CompanyObserver
     }
 
     /**
-     * Handle the Company "updated" event.
+     * Handle the Company "created" event.
      */
     public function created(Company $company): void
     {
         FetchFaviconForCompany::dispatch($company)->afterCommit();
+    }
+
+    /**
+     * Handle the Company "saved" event.
+     * Invalidate AI summary when company data changes.
+     */
+    public function saved(Company $company): void
+    {
+        $company->invalidateAiSummary();
     }
 }

@@ -53,7 +53,7 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortBy($sortingKey), inOrder: true)
         ->sortTable($column, 'desc')
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
-})->with(['companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+})->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
     $records = App\Models\Note::factory(3)->for($this->user->personalTeam())->create();

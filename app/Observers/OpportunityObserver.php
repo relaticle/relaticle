@@ -15,4 +15,13 @@ final readonly class OpportunityObserver
             $opportunity->team_id = auth('web')->user()->currentTeam->getKey();
         }
     }
+
+    /**
+     * Handle the Opportunity "saved" event.
+     * Invalidate AI summary when opportunity data changes.
+     */
+    public function saved(Opportunity $opportunity): void
+    {
+        $opportunity->invalidateAiSummary();
+    }
 }
