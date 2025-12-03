@@ -31,7 +31,6 @@ final class MigrationBatch extends Model
     use HasFactory;
 
     use HasTeam;
-
     use HasUuids;
 
     public const string STATUS_PENDING = 'pending';

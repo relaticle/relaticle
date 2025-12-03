@@ -67,7 +67,7 @@ final class CompanyImporter extends BaseImporter
 
         $existing = Company::query()
             ->where('team_id', $this->import->team_id)
-            ->where('name', trim($name))
+            ->where('name', trim((string) $name))
             ->first();
 
         $strategy = $this->getDuplicateStrategy();

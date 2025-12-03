@@ -22,7 +22,7 @@ final class TaskImporter extends BaseImporter
      *
      * @var array<string, mixed>
      */
-    protected array $originalImportData = [];
+    private array $originalImportData = [];
 
     public static function getColumns(): array
     {
@@ -96,7 +96,7 @@ final class TaskImporter extends BaseImporter
 
         $existing = Task::query()
             ->where('team_id', $this->import->team_id)
-            ->where('title', trim($title))
+            ->where('title', trim((string) $title))
             ->first();
 
         $strategy = $this->getDuplicateStrategy();
@@ -117,7 +117,7 @@ final class TaskImporter extends BaseImporter
         $companyName = $this->originalImportData['company_name'] ?? null;
         if (filled($companyName)) {
             $company = $this->resolveCompanyByName($companyName);
-            if ($company !== null) {
+            if ($company instanceof \App\Models\Company) {
                 $task->companies()->syncWithoutDetaching([$company->getKey()]);
             }
         }
@@ -126,7 +126,7 @@ final class TaskImporter extends BaseImporter
         $personName = $this->originalImportData['person_name'] ?? null;
         if (filled($personName)) {
             $person = $this->resolvePersonByName($personName);
-            if ($person !== null) {
+            if ($person instanceof \App\Models\People) {
                 $task->people()->syncWithoutDetaching([$person->getKey()]);
             }
         }
@@ -135,7 +135,7 @@ final class TaskImporter extends BaseImporter
         $opportunityName = $this->originalImportData['opportunity_name'] ?? null;
         if (filled($opportunityName)) {
             $opportunity = $this->resolveOpportunityByName($opportunityName);
-            if ($opportunity !== null) {
+            if ($opportunity instanceof \App\Models\Opportunity) {
                 $task->opportunities()->syncWithoutDetaching([$opportunity->getKey()]);
             }
         }
@@ -144,7 +144,7 @@ final class TaskImporter extends BaseImporter
         $assigneeEmail = $this->originalImportData['assignee_email'] ?? null;
         if (filled($assigneeEmail)) {
             $user = $this->resolveTeamMemberByEmail($assigneeEmail);
-            if ($user !== null) {
+            if ($user instanceof \App\Models\User) {
                 $task->assignees()->syncWithoutDetaching([$user->getKey()]);
             }
         }

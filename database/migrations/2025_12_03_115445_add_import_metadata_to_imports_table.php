@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('imports', function (Blueprint $table): void {
             $table->json('column_mappings')->nullable()->after('importer');
             $table->string('duplicate_strategy')->nullable()->after('column_mappings');
             $table->uuid('migration_batch_id')->nullable()->after('duplicate_strategy');
@@ -25,7 +25,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('imports', function (Blueprint $table): void {
             $table->dropColumn(['column_mappings', 'duplicate_strategy', 'migration_batch_id']);
         });
     }

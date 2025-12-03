@@ -33,14 +33,14 @@ final class MigrationBatchFactory extends Factory
 
     public function inProgress(): static
     {
-        return $this->state(fn () => [
+        return $this->state(fn (): array => [
             'status' => MigrationBatch::STATUS_IN_PROGRESS,
         ]);
     }
 
     public function completed(): static
     {
-        return $this->state(fn () => [
+        return $this->state(fn (): array => [
             'status' => MigrationBatch::STATUS_COMPLETED,
             'completed_at' => now(),
             'stats' => [
@@ -53,7 +53,7 @@ final class MigrationBatchFactory extends Factory
 
     public function failed(): static
     {
-        return $this->state(fn () => [
+        return $this->state(fn (): array => [
             'status' => MigrationBatch::STATUS_FAILED,
         ]);
     }

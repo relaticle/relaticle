@@ -30,6 +30,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
 {
     use InteractsWithActions;
     use InteractsWithSchemas;
+
     public int $currentStep = 1;
 
     /** @var array<string, bool> */
@@ -305,7 +306,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
             }
         }
 
-        return compact('imported', 'failed', 'skipped');
+        return ['imported' => $imported, 'failed' => $failed, 'skipped' => $skipped];
     }
 
     /**
@@ -350,7 +351,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
             return null;
         }
 
-        return 'import' . ucfirst($this->currentEntity);
+        return 'import'.ucfirst($this->currentEntity);
     }
 
     /**

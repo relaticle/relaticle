@@ -32,7 +32,6 @@ abstract class BaseImporter extends Importer
 
     /**
      * Shared options form components for all importers.
-     * Duplicate handling is required with no default - user must choose.
      *
      * @return array<\Filament\Schemas\Components\Component>
      */
@@ -42,8 +41,8 @@ abstract class BaseImporter extends Importer
             Select::make('duplicate_handling')
                 ->label('When duplicates are found')
                 ->options(DuplicateHandlingStrategy::class)
+                ->default(DuplicateHandlingStrategy::SKIP)
                 ->required()
-                ->placeholder('Select how to handle duplicates...')
                 ->helperText('Choose how to handle records that already exist in the system'),
         ];
     }
@@ -103,7 +102,7 @@ abstract class BaseImporter extends Importer
     {
         $existing = $this->resolvePersonByName($name);
 
-        if ($existing !== null) {
+        if ($existing instanceof \App\Models\People) {
             return $existing;
         }
 
@@ -113,7 +112,7 @@ abstract class BaseImporter extends Importer
         $person->creator_id = $this->import->user_id;
         $person->creation_source = CreationSource::IMPORT;
 
-        if ($company !== null) {
+        if ($company instanceof \App\Models\Company) {
             $person->company_id = $company->getKey();
         }
 

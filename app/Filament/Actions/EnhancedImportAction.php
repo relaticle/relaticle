@@ -30,7 +30,7 @@ final class EnhancedImportAction extends ImportAction
     /**
      * Store converted CSV file for Excel uploads.
      */
-    protected ?UploadedFile $convertedCsvFile = null;
+    private ?UploadedFile $convertedCsvFile = null;
 
     protected function setUp(): void
     {
@@ -79,7 +79,7 @@ final class EnhancedImportAction extends ImportAction
                         $csvColumns,
                     );
 
-                    $set('columnMap', array_reduce($action->getImporter()::getColumns(), function (array $carry, ImportColumn $column) use ($lowercaseCsvColumnKeys, $lowercaseCsvColumnValues) {
+                    $set('columnMap', array_reduce($action->getImporter()::getColumns(), function (array $carry, ImportColumn $column) use ($lowercaseCsvColumnKeys, $lowercaseCsvColumnValues): array {
                         $carry[$column->getName()] = $lowercaseCsvColumnKeys[
                         Arr::first(
                             array_intersect(
@@ -124,7 +124,7 @@ final class EnhancedImportAction extends ImportAction
                     $csvColumnOptions = array_combine($csvColumns, $csvColumns);
 
                     return array_map(
-                        fn (ImportColumn $column) => $column->getSelect()->options($csvColumnOptions),
+                        fn (ImportColumn $column): \Filament\Forms\Components\Select => $column->getSelect()->options($csvColumnOptions),
                         $action->getImporter()::getColumns(),
                     );
                 })
@@ -138,7 +138,7 @@ final class EnhancedImportAction extends ImportAction
      *
      * @return resource|false
      */
-    protected function getProcessedFileStream(TemporaryUploadedFile $file): mixed
+    private function getProcessedFileStream(TemporaryUploadedFile $file): mixed
     {
         $converter = app(ExcelToCsvConverter::class);
 
@@ -169,7 +169,7 @@ final class EnhancedImportAction extends ImportAction
      *
      * @return array<string>
      */
-    protected function getAcceptedFileTypes(): array
+    private function getAcceptedFileTypes(): array
     {
         return ExcelToCsvConverter::getAcceptedMimeTypes();
     }
@@ -212,11 +212,11 @@ final class EnhancedImportAction extends ImportAction
                     $duplicateCsvColumns[] = $header;
                 }
 
-                if (empty($duplicateCsvColumns)) {
+                if ($duplicateCsvColumns === []) {
                     return;
                 }
 
-                $filledDuplicateCsvColumns = array_filter($duplicateCsvColumns, fn ($value): bool => filled($value));
+                $filledDuplicateCsvColumns = array_filter($duplicateCsvColumns, filled(...));
 
                 $fail(trans_choice('filament-actions::import.modal.form.file.rules.duplicate_columns', count($filledDuplicateCsvColumns), [
                     'columns' => implode(', ', $filledDuplicateCsvColumns),
