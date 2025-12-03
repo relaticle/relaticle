@@ -97,7 +97,8 @@ final class PeopleResource extends Resource
                     ->columns(12),
                 CustomFields::form()->forSchema($schema)
                     ->build()
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->columns(1),
             ]);
     }
 

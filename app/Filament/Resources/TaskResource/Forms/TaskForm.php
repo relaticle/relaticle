@@ -46,7 +46,7 @@ final class TaskForm
             ->relationship('assignees', 'name')
             ->nullable();
 
-        $components[] = CustomFields::form()->forSchema($schema)->except($excludeFields)->build()->columnSpanFull();
+        $components[] = CustomFields::form()->forSchema($schema)->except($excludeFields)->build()->columnSpanFull()->columns(1);
 
         return $schema
             ->components($components)

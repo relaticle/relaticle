@@ -30,7 +30,7 @@ final class OpportunityForm
                     ->searchable()
                     ->preload()
                     ->columnSpan(2),
-                CustomFields::form()->forSchema($schema)->build()->columnSpanFull(),
+                CustomFields::form()->forSchema($schema)->build()->columnSpanFull()->columns(1),
             ])
             ->columns(4);
     }
