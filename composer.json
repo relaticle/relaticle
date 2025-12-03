@@ -26,6 +26,7 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.0",
+        "phpoffice/phpspreadsheet": "^5.3",
         "prism-php/prism": "^0.98.5",
         "relaticle/custom-fields": "^2.0",
         "relaticle/flowforge": "@dev",

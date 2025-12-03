@@ -4,10 +4,152 @@ declare(strict_types=1);
 
 namespace App\Filament\Imports;
 
+use App\Enums\CreationSource;
+use App\Enums\DuplicateHandlingStrategy;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\User;
 use Filament\Actions\Imports\Importer;
+use Filament\Forms\Components\Select;
+use Illuminate\Database\Eloquent\Builder;
 
 abstract class BaseImporter extends Importer
 {
-    // Base class for all importers in the application
-    // Team ID is automatically set by ImportObserver on the Import model
+    /**
+     * Get the duplicate handling strategy from import options.
+     */
+    protected function getDuplicateStrategy(): DuplicateHandlingStrategy
+    {
+        $value = $this->options['duplicate_handling'] ?? null;
+
+        if ($value instanceof DuplicateHandlingStrategy) {
+            return $value;
+        }
+
+        return DuplicateHandlingStrategy::tryFrom((string) $value) ?? DuplicateHandlingStrategy::SKIP;
+    }
+
+    /**
+     * Shared options form components for all importers.
+     * Duplicate handling is required with no default - user must choose.
+     *
+     * @return array<\Filament\Schemas\Components\Component>
+     */
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            Select::make('duplicate_handling')
+                ->label('When duplicates are found')
+                ->options(DuplicateHandlingStrategy::class)
+                ->required()
+                ->placeholder('Select how to handle duplicates...')
+                ->helperText('Choose how to handle records that already exist in the system'),
+        ];
+    }
+
+    /**
+     * Find a company by name within the current team.
+     */
+    protected function resolveCompanyByName(?string $name): ?Company
+    {
+        if (blank($name)) {
+            return null;
+        }
+
+        return Company::query()
+            ->where('team_id', $this->import->team_id)
+            ->where('name', trim($name))
+            ->first();
+    }
+
+    /**
+     * Find or create a company by name within the current team.
+     */
+    protected function resolveOrCreateCompany(string $name): Company
+    {
+        return Company::firstOrCreate(
+            [
+                'name' => trim($name),
+                'team_id' => $this->import->team_id,
+            ],
+            [
+                'creator_id' => $this->import->user_id,
+                'creation_source' => CreationSource::IMPORT,
+            ]
+        );
+    }
+
+    /**
+     * Find a person by name within the current team.
+     */
+    protected function resolvePersonByName(?string $name): ?People
+    {
+        if (blank($name)) {
+            return null;
+        }
+
+        return People::query()
+            ->where('team_id', $this->import->team_id)
+            ->where('name', trim($name))
+            ->first();
+    }
+
+    /**
+     * Find or create a person by name within the current team.
+     * Requires a company to associate with.
+     */
+    protected function resolveOrCreatePerson(string $name, ?Company $company = null): People
+    {
+        $existing = $this->resolvePersonByName($name);
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $person = new People;
+        $person->name = trim($name);
+        $person->team_id = $this->import->team_id;
+        $person->creator_id = $this->import->user_id;
+        $person->creation_source = CreationSource::IMPORT;
+
+        if ($company !== null) {
+            $person->company_id = $company->getKey();
+        }
+
+        $person->save();
+
+        return $person;
+    }
+
+    /**
+     * Find an opportunity by name within the current team.
+     */
+    protected function resolveOpportunityByName(?string $name): ?Opportunity
+    {
+        if (blank($name)) {
+            return null;
+        }
+
+        return Opportunity::query()
+            ->where('team_id', $this->import->team_id)
+            ->where('name', trim($name))
+            ->first();
+    }
+
+    /**
+     * Find a team member by email address.
+     * Only returns users who belong to the current team.
+     */
+    protected function resolveTeamMemberByEmail(?string $email): ?User
+    {
+        if (blank($email)) {
+            return null;
+        }
+
+        return User::query()
+            ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $this->import->team_id))
+            ->where('email', trim($email))
+            ->first();
+    }
 }

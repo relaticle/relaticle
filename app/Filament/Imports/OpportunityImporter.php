@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Imports;
 
 use App\Enums\CreationSource;
+use App\Enums\DuplicateHandlingStrategy;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -118,19 +119,24 @@ final class OpportunityImporter extends BaseImporter
 
     public function resolveRecord(): Opportunity
     {
-        // Try to find existing opportunity by name and team
-        if ($this->import->team_id) {
-            $opportunity = Opportunity::query()
-                ->where('team_id', $this->import->team_id)
-                ->where('name', $this->getOriginalData()['name'] ?? '')
-                ->first();
+        $name = $this->data['name'] ?? null;
 
-            if ($opportunity) {
-                return $opportunity;
-            }
+        if (blank($name)) {
+            return new Opportunity;
         }
 
-        return new Opportunity;
+        $existing = Opportunity::query()
+            ->where('team_id', $this->import->team_id)
+            ->where('name', trim($name))
+            ->first();
+
+        $strategy = $this->getDuplicateStrategy();
+
+        return match ($strategy) {
+            DuplicateHandlingStrategy::SKIP => $existing ?? new Opportunity,
+            DuplicateHandlingStrategy::UPDATE => $existing ?? new Opportunity,
+            DuplicateHandlingStrategy::CREATE_NEW => new Opportunity,
+        };
     }
 
     protected function afterSave(): void

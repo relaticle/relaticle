@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
+use App\Filament\Actions\EnhancedImportAction;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Imports\PeopleImporter;
 use App\Filament\Resources\PeopleResource;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
-use Filament\Actions\ImportAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\Size;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
@@ -25,7 +25,7 @@ final class ListPeople extends ListRecords
     {
         return [
             ActionGroup::make([
-                ImportAction::make()->importer(PeopleImporter::class),
+                EnhancedImportAction::make()->importer(PeopleImporter::class),
                 ExportAction::make()->exporter(PeopleExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
