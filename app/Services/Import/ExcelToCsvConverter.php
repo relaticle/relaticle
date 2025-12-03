@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Csv;
 
-final class ExcelToCsvConverter
+final readonly class ExcelToCsvConverter
 {
     /**
      * MIME types that indicate an Excel file.
