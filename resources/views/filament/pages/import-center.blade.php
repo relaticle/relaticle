@@ -48,6 +48,7 @@
                             <x-filament::button
                                 wire:click="mountAction('import{{ ucfirst($key) }}')"
                                 color="primary"
+                                size="sm"
                             >
                                 Import {{ $entity['label'] }}
                             </x-filament::button>
@@ -80,17 +81,8 @@
                 </x-filament::section>
             </div>
         @elseif ($activeTab === 'history')
-            <x-filament::section>
-                <x-slot name="heading">
-                    Recent Imports
-                </x-slot>
-
-                <x-slot name="description">
-                    View the status and results of your recent imports
-                </x-slot>
 
                 {{ $this->table }}
-            </x-filament::section>
         @elseif ($activeTab === 'migration')
             <x-filament::section>
                 <x-slot name="heading">
