@@ -51,12 +51,14 @@ Visit our [website](https://relaticle.com) to learn more about Relaticle's capab
 
 # Requirements
 
-- PHP 8.4+,
+- PHP 8.4+
 - PostgreSQL 15+
 - Composer 2 and Node.js 20+
 - Redis for queues (optional for development)
 
 # Installation
+
+## Local Development
 
 For a streamlined setup experience, use the single installation command:
 
@@ -64,6 +66,63 @@ For a streamlined setup experience, use the single installation command:
 git clone https://github.com/Relaticle/relaticle.git
 cd relaticle && composer app-install
 ```
+
+## Docker Deployment
+
+Deploy Relaticle using Docker with a pre-built image:
+
+```bash
+# Generate an APP_KEY first
+docker run --rm php:8.4-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+```
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  relaticle:
+    image: ghcr.io/relaticle/relaticle:latest
+    ports:
+      - "8080:80"
+    environment:
+      APP_KEY: "base64:your-generated-key-here"
+      APP_URL: "http://localhost:8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PASSWORD: secretpassword
+      REDIS_HOST: cache
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      AUTO_MIGRATE: "true"
+    depends_on: [db, cache]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: relaticle
+      POSTGRES_USER: relaticle
+      POSTGRES_PASSWORD: secretpassword
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  cache:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:
+```
+
+```bash
+docker-compose up -d
+```
+
+Visit `http://localhost:8080` to access Relaticle.
+
+For advanced Docker configuration, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
 
 # Development
 
