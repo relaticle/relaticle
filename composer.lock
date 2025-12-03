@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "48b728a8d03382befa7a40d3f9df1ac6",
+    "content-hash": "7039c77cf264055f5e732c527918adef",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -16423,7 +16423,7 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "beta",
+    "minimum-stability": "stable",
     "stability-flags": {
         "relaticle/flowforge": 20
     },

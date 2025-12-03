@@ -11,7 +11,6 @@ use AshAllenDesign\FaviconFetcher\Concerns\ValidatesUrls;
 use AshAllenDesign\FaviconFetcher\Contracts\Fetcher;
 use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
-use Illuminate\Http\Client\Response;
 
 final class GoogleHighResDriver implements Fetcher
 {
@@ -36,7 +35,7 @@ final class GoogleHighResDriver implements Fetcher
         $faviconUrl = self::BASE_URL.'?sz='.$this->size.'&domain='.$url;
 
         $response = $this->withRequestExceptionHandling(
-            fn (): Response => $this->httpClient()->get($faviconUrl)
+            fn () => $this->httpClient()->get($faviconUrl)
         );
 
         return $response->successful()

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use Exception;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,7 @@ final readonly class GitHubService
 
         $cachedValue = Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo): int {
             try {
+                /** @var Response $response */
                 $response = Http::withHeaders([
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->get("https://api.github.com/repos/{$owner}/{$repo}");

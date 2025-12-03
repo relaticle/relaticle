@@ -65,7 +65,7 @@ final class HighQualityDriver implements Fetcher
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn (): Response => $this->httpClient()->get($url)
+                fn () => $this->httpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -86,6 +86,7 @@ final class HighQualityDriver implements Fetcher
             }
 
             $iconUrl = $this->stripPathFromUrl($url).'/apple-touch-icon.png';
+            /** @var Response $testResponse */
             $testResponse = $this->httpClient()->head($iconUrl);
 
             if ($testResponse->successful()) {
@@ -108,7 +109,7 @@ final class HighQualityDriver implements Fetcher
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn (): Response => $this->httpClient()->get($url)
+                fn () => $this->httpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -162,7 +163,7 @@ final class HighQualityDriver implements Fetcher
             $faviconUrl = 'https://www.google.com/s2/favicons?sz=256&domain='.$urlWithoutProtocol;
 
             $response = $this->withRequestExceptionHandling(
-                fn (): Response => $this->httpClient()->get($faviconUrl)
+                fn () => $this->httpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -187,7 +188,7 @@ final class HighQualityDriver implements Fetcher
 
         try {
             $response = $this->withRequestExceptionHandling(
-                fn (): Response => $this->httpClient()->get($faviconUrl)
+                fn () => $this->httpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -208,6 +209,7 @@ final class HighQualityDriver implements Fetcher
     private function faviconIsAccessible(Favicon $favicon): bool
     {
         try {
+            /** @var Response $response */
             $response = $this->httpClient()->head($favicon->getFaviconUrl());
 
             return $response->successful();
