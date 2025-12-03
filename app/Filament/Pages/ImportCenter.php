@@ -34,9 +34,9 @@ final class ImportCenter extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Import Center';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Settings';
+    protected static string|null|UnitEnum $navigationGroup = 'Data Management';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 2;
 
     public string $activeTab = 'quick-import';
 
