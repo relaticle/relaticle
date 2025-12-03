@@ -107,24 +107,34 @@ The Import Center is a data migration system that allows users to import records
 ## Entity Dependencies
 
 ```
-Companies (no dependencies)
-    │
-    ▼
-People (depends on Companies)
-    │
-    ▼
-Opportunities (depends on Companies + People)
-    │
-    ├────────────────────┐
-    ▼                    ▼
-Tasks                  Notes
-(depends on all)      (depends on all)
+┌─────────────────────────────────────────────────────────────────┐
+│                    Entities with Dependencies                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Companies (no dependencies) ◄── Root entity                   │
+│      │                                                          │
+│      ├──────────────────┐                                       │
+│      ▼                  ▼                                       │
+│  People             Opportunities                               │
+│  (depends on        (depends on Companies)                      │
+│   Companies)                                                    │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                Independent Entities (no dependencies)           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Tasks ──────┐                                                  │
+│              │── Can optionally link to Companies,              │
+│  Notes ──────┘   People, or Opportunities via polymorphic      │
+│                  relationships, but don't require them          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **Why these dependencies?**
-- People belong to Companies (company_id foreign key)
-- Opportunities reference Companies and People (company_id, contact_id)
-- Tasks/Notes can link to any entity via polymorphic relationships
+- **People** belong to Companies (company_id foreign key) - UI requires a company
+- **Opportunities** reference Companies (company_id) - contact_id is optional
+- **Tasks/Notes** are independent - they use polymorphic many-to-many relationships (`taskables`, `noteables` pivot tables) which are optional attachments, not required dependencies
 
 ---
 

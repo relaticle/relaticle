@@ -60,13 +60,12 @@ test('people entity depends on companies', function () {
     expect($entities['people']['dependencies'])->toContain('companies');
 });
 
-test('opportunities entity depends on companies and people', function () {
+test('opportunities entity depends on companies only', function () {
     $component = Livewire::test(MigrationWizard::class);
     $entities = $component->instance()->getEntities();
 
     expect($entities['opportunities']['dependencies'])
-        ->toContain('companies')
-        ->toContain('people');
+        ->toBe(['companies']);
 });
 
 test('can select company entity without dependencies', function () {
@@ -242,16 +241,50 @@ test('get missing dependencies returns correct list', function () {
 
     $missing = $component->instance()->getMissingDependencies('opportunities');
 
-    expect($missing)->toContain('companies')
-        ->and($missing)->toContain('people');
+    expect($missing)->toBe(['companies']);
 });
 
 test('get missing dependencies returns empty when all met', function () {
     $component = Livewire::test(MigrationWizard::class)
-        ->call('toggleEntity', 'companies')
-        ->call('toggleEntity', 'people');
+        ->call('toggleEntity', 'companies');
 
     $missing = $component->instance()->getMissingDependencies('opportunities');
 
     expect($missing)->toBeEmpty();
+});
+
+test('tasks entity has no dependencies', function () {
+    $component = Livewire::test(MigrationWizard::class);
+    $entities = $component->instance()->getEntities();
+
+    expect($entities['tasks']['dependencies'])->toBeEmpty();
+});
+
+test('notes entity has no dependencies', function () {
+    $component = Livewire::test(MigrationWizard::class);
+    $entities = $component->instance()->getEntities();
+
+    expect($entities['notes']['dependencies'])->toBeEmpty();
+});
+
+test('can select tasks without selecting other entities', function () {
+    Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'tasks')
+        ->assertSet('selectedEntities.tasks', true);
+});
+
+test('can select notes without selecting other entities', function () {
+    Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'notes')
+        ->assertSet('selectedEntities.notes', true);
+});
+
+test('can import only tasks and notes without core entities', function () {
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'tasks')
+        ->call('toggleEntity', 'notes');
+
+    $order = $component->instance()->getImportOrder();
+
+    expect($order)->toBe(['tasks', 'notes']);
 });
