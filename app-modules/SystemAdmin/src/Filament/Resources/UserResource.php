@@ -81,18 +81,13 @@ final class UserResource extends Resource
                 TextColumn::make('email_verified_at')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('two_factor_confirmed_at')
-                    ->dateTime()
-                    ->sortable(),
                 TextColumn::make('current_team_id')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('profile_photo_path')
-                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
