@@ -95,7 +95,7 @@ final class PeopleResource extends Resource
                             ->columnSpan(5),
                     ])
                     ->columns(12),
-                CustomFields::form()->build()->columnSpanFull()
+                CustomFields::form()->build()->columnSpanFull(),
             ]);
     }
 
