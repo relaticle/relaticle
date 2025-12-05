@@ -8,16 +8,16 @@
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.10",
         "@tailwindcss/typography": "^0.5.19",
-        "autoprefixer": "^10.4.21",
-        "chokidar": "^4.0.3",
+        "autoprefixer": "^10.4.22",
+        "chokidar": "^5.0.0",
         "laravel-vite-plugin": "^2.0",
         "postcss": "^8.5.6",
         "postcss-nesting": "^13.0.2",
-        "tailwindcss": "^4.1.13",
-        "vite": "^7.1"
+        "tailwindcss": "^4.1.17",
+        "vite": "^7.2"
     },
     "dependencies": {
-        "@tailwindcss/vite": "^4.1.13",
-        "shiki": "^3.13.0"
+        "@tailwindcss/vite": "^4.1.17",
+        "shiki": "^3.19.0"
     }
 }

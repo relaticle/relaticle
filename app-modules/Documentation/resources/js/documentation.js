@@ -3,12 +3,18 @@ function addCopyButtons() {
     const codeBlocks = document.querySelectorAll('pre code');
 
     codeBlocks.forEach((codeBlock) => {
-        // Skip if button already exists
-        if (codeBlock.parentElement.querySelector('.copy-button')) return;
-
-        // Create wrapper if needed
         const pre = codeBlock.parentElement;
-        pre.style.position = 'relative';
+
+        // Skip if already wrapped
+        if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
+
+        // Create wrapper div to hold pre and copy button
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+
+        // Insert wrapper before pre and move pre inside
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(pre);
 
         // Create copy button
         const copyButton = document.createElement('button');
@@ -70,7 +76,8 @@ function addCopyButtons() {
             }
         });
 
-        pre.appendChild(copyButton);
+        // Append button to wrapper (not pre), so it stays fixed during horizontal scroll
+        wrapper.appendChild(copyButton);
     });
 }
 

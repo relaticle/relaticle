@@ -12,6 +12,20 @@
    Pure Tailwind CSS Classes Only
    =================================== */
 
+/* App Panel Custom Layout */
+.fi-app-layout {
+    @apply flex h-screen;
+}
+
+.fi-app-main-wrapper {
+    @apply flex-1 flex flex-col min-w-0;
+
+    /* Only the content area scrolls, not the topbar */
+    > .fi-layout {
+        @apply flex-1 overflow-y-auto;
+    }
+}
+
 .fi-header-heading {
     @apply text-2xl font-bold;
 }
@@ -64,7 +78,7 @@
 
 /* Top Navigation Bar */
 .fi-topbar {
-    /*@apply backdrop-blur-md bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-800 shadow-sm;*/
+    @apply min-h-14;
 }
 
 .fi-topbar nav {
@@ -207,7 +221,14 @@
 
 /* Custom Scrollbar Styling */
 .fi-sidebar {
-    @apply h-full bg-white dark:bg-gray-900 overflow-y-auto;
+    @apply h-full bg-white dark:bg-gray-900;
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.gray.400') theme('colors.gray.100');
+}
+
+/* Sidebar scrollable content area - allow tenant menu to overflow */
+.fi-sidebar-nav {
+    @apply overflow-y-auto overflow-x-visible;
     scrollbar-width: thin;
     scrollbar-color: theme('colors.gray.400') theme('colors.gray.100');
 }
@@ -240,10 +261,19 @@
 .fi-tenant-menu-trigger {
     @apply rounded-lg;
 
-    .fi-tenant-avatar, .fi-dropdown-list-item-image {
-        @apply rounded-md w-7 h-7;
+    .fi-tenant-avatar {
+        @apply rounded-md w-6 h-6;
     }
+}
 
+/* Tenant Menu Dropdown - avatar images in the dropdown list */
+.fi-tenant-menu .fi-dropdown-list-item-image {
+    @apply rounded-md w-6 h-6 shrink-0;
+}
+
+/* Ensure tenant menu dropdown is visible above content when sidebar is collapsed */
+.fi-tenant-menu .fi-dropdown-panel {
+    @apply z-50;
 }
 
 /* Checkbox and Radio */
