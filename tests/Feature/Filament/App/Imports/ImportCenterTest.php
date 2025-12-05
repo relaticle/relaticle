@@ -142,5 +142,5 @@ test('import center throws exception for unknown entity type', function () {
 
 test('import center has correct navigation properties', function () {
     expect(ImportCenter::getNavigationLabel())->toBe('Import Center')
-        ->and(ImportCenter::getNavigationSort())->toBe(10);
+        ->and(ImportCenter::getNavigationSort())->toBe(2);
 });
