@@ -28,9 +28,11 @@ final class NoteFactory extends Factory
 
     public function configure(): Factory
     {
+        // Use minutes instead of seconds to ensure distinct timestamps
+        // and avoid flaky sorting tests in fast CI environments
         return $this->sequence(fn (Sequence $sequence): array => [
-            'created_at' => now()->subSeconds($sequence->index),
-            'updated_at' => now()->subSeconds($sequence->index),
+            'created_at' => now()->subMinutes($sequence->index),
+            'updated_at' => now()->subMinutes($sequence->index),
         ]);
     }
 }
