@@ -5,12 +5,15 @@ declare(strict_types=1);
 use App\Services\Import\ExcelToCsvConverter;
 use Illuminate\Http\UploadedFile;
 
+// Use dirname to get reliable path regardless of parallel test workers
+const FIXTURES_PATH = __DIR__.'/../../fixtures/imports';
+
 describe('ExcelToCsvConverter', function (): void {
     it('detects xlsx files as excel', function (): void {
         $converter = app(ExcelToCsvConverter::class);
 
         $file = new UploadedFile(
-            base_path('tests/fixtures/imports/companies.xlsx'),
+            FIXTURES_PATH.'/companies.xlsx',
             'companies.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             null,
@@ -24,7 +27,7 @@ describe('ExcelToCsvConverter', function (): void {
         $converter = app(ExcelToCsvConverter::class);
 
         $file = new UploadedFile(
-            base_path('tests/fixtures/imports/companies.csv'),
+            FIXTURES_PATH.'/companies.csv',
             'companies.csv',
             'text/csv',
             null,
@@ -38,7 +41,7 @@ describe('ExcelToCsvConverter', function (): void {
         $converter = app(ExcelToCsvConverter::class);
 
         $file = new UploadedFile(
-            base_path('tests/fixtures/imports/companies.xlsx'),
+            FIXTURES_PATH.'/companies.xlsx',
             'companies.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             null,
@@ -62,7 +65,7 @@ describe('ExcelToCsvConverter', function (): void {
         $converter = app(ExcelToCsvConverter::class);
 
         $file = new UploadedFile(
-            base_path('tests/fixtures/imports/companies.xlsx'),
+            FIXTURES_PATH.'/companies.xlsx',
             'companies.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             null,
@@ -81,7 +84,7 @@ describe('ExcelToCsvConverter', function (): void {
         $converter = app(ExcelToCsvConverter::class);
 
         $file = new UploadedFile(
-            base_path('tests/fixtures/imports/people.xlsx'),
+            FIXTURES_PATH.'/people.xlsx',
             'people.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             null,
