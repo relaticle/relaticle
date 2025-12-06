@@ -133,13 +133,6 @@ test('import center can mount import action for entity type', function () {
         ->assertSuccessful();
 });
 
-test('import center throws exception for unknown entity type', function () {
-    $component = Livewire::test(ImportCenter::class);
-
-    expect(fn () => $component->instance()->getImportAction('unknown'))
-        ->toThrow(\InvalidArgumentException::class);
-});
-
 test('import center has correct navigation properties', function () {
     expect(ImportCenter::getNavigationLabel())->toBe('Import Center')
         ->and(ImportCenter::getNavigationSort())->toBe(2);

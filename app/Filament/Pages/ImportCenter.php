@@ -135,32 +135,6 @@ final class ImportCenter extends Page implements HasTable
             ->color('primary');
     }
 
-    /**
-     * Get import action for a specific entity type.
-     */
-    public function getImportAction(string $entityType): EnhancedImportAction
-    {
-        $config = $this->getEntityTypes()[$entityType] ?? null;
-
-        if ($config === null) {
-            throw new \InvalidArgumentException("Unknown entity type: {$entityType}");
-        }
-
-        return EnhancedImportAction::make("import_{$entityType}")
-            ->importer($config['importer'])
-            ->label("Import {$config['label']}")
-            ->modalHeading("Import {$config['label']}")
-            ->color('primary');
-    }
-
-    /**
-     * @return array<EnhancedImportAction>
-     */
-    protected function getHeaderActions(): array
-    {
-        return [];
-    }
-
     public function table(Table $table): Table
     {
         $team = Filament::getTenant();
@@ -290,21 +264,11 @@ final class ImportCenter extends Page implements HasTable
 
     /**
      * Check if the import job has failed by looking at the failed_jobs table.
-     *
-     * Filament import jobs are tagged with "import{id}" so we can search for them
-     * in the failed_jobs payload.
      */
     private function hasImportJobFailed(Import $import): bool
     {
-        $importId = $import->getKey();
-
-        // Search for failed jobs that contain this import's ID in the payload
-        // The ImportCsv job serializes the Import model, so we look for its ID
         return DB::table('failed_jobs')
-            ->where('payload', 'like', '%"import'.$importId.'"%')
-            ->orWhere('payload', 'like', '%\\"id\\":'.$importId.'%')
-            ->orWhere('payload', 'like', '%"commandName":"Filament\\\\Actions\\\\Imports\\\\Jobs\\\\ImportCsv"%')
-            ->where('payload', 'like', '%'.$importId.'%')
+            ->where('payload', 'like', '%'.$import->getKey().'%')
             ->exists();
     }
 

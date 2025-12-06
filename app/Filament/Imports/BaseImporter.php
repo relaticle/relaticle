@@ -33,7 +33,7 @@ abstract class BaseImporter extends Importer
         return [
             // Ensure only one import runs at a time per team
             // This guarantees Companies finish before People starts
-            (new WithoutOverlapping("team-import-{$teamId}"))
+            new WithoutOverlapping("team-import-{$teamId}")
                 ->releaseAfter(60) // Release lock 60s after job starts (in case of failure)
                 ->expireAfter(3600), // Lock expires after 1 hour max
         ];

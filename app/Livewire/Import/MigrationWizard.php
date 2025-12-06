@@ -10,11 +10,8 @@ use App\Filament\Imports\NoteImporter;
 use App\Filament\Imports\OpportunityImporter;
 use App\Filament\Imports\PeopleImporter;
 use App\Filament\Imports\TaskImporter;
-use App\Models\MigrationBatch;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Actions\Imports\Models\Import;
-use Filament\Facades\Filament;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\View\View;
@@ -41,8 +38,6 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
         'tasks' => false,
         'notes' => false,
     ];
-
-    public ?string $batchId = null;
 
     public ?string $currentEntity = null;
 
@@ -180,7 +175,6 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     public function nextStep(): void
     {
         if ($this->currentStep === 1 && $this->hasSelectedEntities()) {
-            $this->startMigrationBatch();
             $this->currentStep = 2;
             $this->currentEntity = $this->getImportOrder()[0] ?? null;
         } elseif ($this->currentStep === 2) {
@@ -199,47 +193,11 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Start or reuse a migration batch.
-     *
-     * If an existing in-progress batch exists for this user/team,
-     * it will be reset and reused instead of creating a new one.
-     */
-    private function startMigrationBatch(): void
-    {
-        $team = Filament::getTenant();
-
-        $batch = MigrationBatch::getOrCreateForMigration(
-            userId: (int) auth()->id(),
-            teamId: $team?->getKey(),
-            entityOrder: $this->getImportOrder(),
-        );
-
-        $this->batchId = $batch->id;
-    }
-
-    /**
      * Cancel the current migration and reset the wizard.
-     *
-     * The batch remains in_progress and will be reused on next migration start.
      */
     public function cancelMigration(): void
     {
         $this->resetWizard();
-    }
-
-    /**
-     * Record import completion for current entity and move to next.
-     */
-    public function recordImportComplete(int $importedCount, int $failedCount): void
-    {
-        if ($this->currentEntity) {
-            $this->importResults[$this->currentEntity] = [
-                'imported' => $importedCount,
-                'failed' => $failedCount,
-            ];
-        }
-
-        $this->moveToNextEntity();
     }
 
     /**
@@ -279,21 +237,10 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Finish the migration batch.
+     * Finish the migration and move to completion step.
      */
     private function finishMigration(): void
     {
-        if ($this->batchId) {
-            $batch = MigrationBatch::find($this->batchId);
-            if ($batch) {
-                $batch->update([
-                    'status' => MigrationBatch::STATUS_COMPLETED,
-                    'stats' => $this->importResults,
-                    'completed_at' => now(),
-                ]);
-            }
-        }
-
         $this->currentStep = 3;
         $this->currentEntity = null;
     }
@@ -321,21 +268,6 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Get recent imports for current batch.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Import>
-     */
-    public function getRecentImports(): \Illuminate\Database\Eloquent\Collection
-    {
-        $team = Filament::getTenant();
-
-        return Import::where('team_id', $team?->getKey())
-            ->where('migration_batch_id', $this->batchId)
-            ->latest()
-            ->get();
-    }
-
-    /**
      * Reset the wizard to start over.
      */
     public function resetWizard(): void
@@ -348,7 +280,6 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
             'tasks' => false,
             'notes' => false,
         ];
-        $this->batchId = null;
         $this->currentEntity = null;
         $this->importResults = [];
     }
@@ -422,27 +353,13 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
             ->modalHeading("Import {$config['label']}")
             ->color('primary')
             ->after(function () use ($entityType): void {
-                // Get the latest import for this entity type to record results
-                $team = Filament::getTenant();
-                $latestImport = Import::where('team_id', $team?->getKey())
-                    ->where('importer', $this->getEntities()[$entityType]['importer'])
-                    ->latest()
-                    ->first();
-
-                if ($latestImport) {
-                    // Link import to migration batch
-                    if ($this->batchId) {
-                        $latestImport->update(['migration_batch_id' => $this->batchId]);
-                    }
-
-                    // Record that import was queued - will be processed in order
-                    // The queue's WithoutOverlapping middleware ensures sequential processing
-                    $this->importResults[$entityType] = [
-                        'imported' => 0,
-                        'failed' => 0,
-                        'processing' => true,
-                    ];
-                }
+                // Record that import was queued - will be processed in order
+                // The queue's WithoutOverlapping middleware ensures sequential processing
+                $this->importResults[$entityType] = [
+                    'imported' => 0,
+                    'failed' => 0,
+                    'processing' => true,
+                ];
 
                 // Immediately advance to next entity - imports will process in order via queue
                 $this->moveToNextEntity();
