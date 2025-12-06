@@ -226,9 +226,9 @@
     scrollbar-color: theme('colors.gray.400') theme('colors.gray.100');
 }
 
-/* Sidebar scrollable content area - allow tenant menu to overflow */
+/* Sidebar scrollable content area */
 .fi-sidebar-nav {
-    @apply overflow-y-auto overflow-x-visible;
+    @apply overflow-y-auto overflow-x-hidden;
     scrollbar-width: thin;
     scrollbar-color: theme('colors.gray.400') theme('colors.gray.100');
 }

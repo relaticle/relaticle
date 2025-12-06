@@ -76,7 +76,9 @@ final class AppPanelProvider extends PanelProvider
             ->id('app')
             ->domain('app.'.parse_url((string) config('app.url'))['host'])
             ->homeUrl(fn (): string => CompanyResource::getUrl())
-            ->brandName('Relaticle')
+            ->brandName(fn (): string => Auth::check() ? '' : 'Relaticle')
+            ->brandLogo(fn (): View|Factory|string => Auth::check() ? '' : view('filament.app.logo'))
+            ->brandLogoHeight('2.6rem')
             ->login(Login::class)
             ->registration(Register::class)
             ->authGuard('web')
@@ -85,8 +87,6 @@ final class AppPanelProvider extends PanelProvider
             ->emailVerification()
             ->strictAuthorization()
             ->databaseNotifications()
-            ->brandLogoHeight('2.6rem')
-            ->brandLogo(fn (): View|Factory => view('filament.app.logo'))
             ->viteTheme('resources/css/app.css')
             ->colors([
                 'primary' => [
