@@ -144,6 +144,10 @@
                     @php
                         $result = $importResults[$entityKey] ?? null;
                         $isCurrent = $entityKey === $currentEntity;
+                        $isProcessing = $result && ($result['processing'] ?? false);
+                        $isJobFailed = $result && ($result['job_failed'] ?? false);
+                        $isCompleted = $result && !($result['skipped'] ?? false) && !$isProcessing && !$isJobFailed;
+                        $isSkipped = $result && ($result['skipped'] ?? false);
                     @endphp
                     <div @class([
                         'flex flex-col items-center gap-1',
@@ -151,8 +155,10 @@
                         <div @class([
                             'h-2 w-12 rounded-full',
                             'bg-primary-500' => $isCurrent,
-                            'bg-green-500' => $result && !($result['skipped'] ?? false),
-                            'bg-gray-300 dark:bg-gray-600' => $result && ($result['skipped'] ?? false),
+                            'bg-green-500' => $isCompleted,
+                            'bg-red-500' => $isJobFailed,
+                            'bg-amber-500 animate-pulse' => $isProcessing,
+                            'bg-gray-300 dark:bg-gray-600' => $isSkipped,
                             'bg-gray-200 dark:bg-gray-700' => !$result && !$isCurrent,
                         ])></div>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
@@ -201,6 +207,16 @@
                                 </span>
                                 @if ($result['skipped'] ?? false)
                                     <span class="text-sm text-gray-500">Skipped</span>
+                                @elseif ($result['job_failed'] ?? false)
+                                    <span class="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                                        <x-filament::icon icon="heroicon-s-x-circle" class="h-4 w-4" />
+                                        Job Failed
+                                    </span>
+                                @elseif ($result['processing'] ?? false)
+                                    <span class="inline-flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
+                                        <x-filament::loading-indicator class="h-4 w-4" />
+                                        Processing...
+                                    </span>
                                 @else
                                     <div class="flex items-center gap-3 text-sm">
                                         <span class="text-green-600 dark:text-green-400">
@@ -218,80 +234,80 @@
                     </div>
                 </x-filament::section>
             @endif
+
+            {{-- Cancel button --}}
+            <div class="flex justify-start pt-4 border-t dark:border-gray-700">
+                <x-filament::button
+                    color="danger"
+                    outlined
+                    wire:click="cancelMigration"
+                    wire:confirm="Are you sure you want to cancel this migration? Any imports already completed will remain."
+                >
+                    Cancel Migration
+                </x-filament::button>
+            </div>
         </div>
     @endif
 
     {{-- Step 3: Complete --}}
     @if ($currentStep === 3)
         @php
-            $totals = $this->getTotalCounts();
+            $queuedCount = collect($importResults)->filter(fn ($r) => ($r['processing'] ?? false))->count();
+            $skippedCount = collect($importResults)->filter(fn ($r) => ($r['skipped'] ?? false))->count();
         @endphp
 
         <div class="text-center space-y-6">
-            <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 dark:bg-green-500/20">
-                <x-filament::icon icon="heroicon-o-check-circle" class="h-10 w-10 text-green-600 dark:text-green-400" />
+            <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary-100 dark:bg-primary-500/20">
+                <x-filament::icon icon="heroicon-o-arrow-up-tray" class="h-10 w-10 text-primary-600 dark:text-primary-400" />
             </div>
 
             <div>
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Migration Complete!</h3>
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Imports Queued</h3>
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Your data has been successfully imported into Relaticle.
+                    @if ($queuedCount > 0)
+                        {{ $queuedCount }} {{ Str::plural('import', $queuedCount) }} {{ $queuedCount === 1 ? 'has' : 'have' }} been queued and will be processed in order.
+                    @endif
+                    @if ($skippedCount > 0)
+                        {{ $skippedCount }} {{ Str::plural('entity', $skippedCount) }} {{ $skippedCount === 1 ? 'was' : 'were' }} skipped.
+                    @endif
                 </p>
             </div>
 
-            {{-- Summary stats --}}
-            <div class="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                <div class="rounded-lg bg-green-50 dark:bg-green-500/10 p-4">
-                    <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $totals['imported'] }}</div>
-                    <div class="text-sm text-green-700 dark:text-green-300">Imported</div>
-                </div>
-                <div class="rounded-lg bg-red-50 dark:bg-red-500/10 p-4">
-                    <div class="text-2xl font-bold text-red-600 dark:text-red-400">{{ $totals['failed'] }}</div>
-                    <div class="text-sm text-red-700 dark:text-red-300">Failed</div>
-                </div>
-                <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-                    <div class="text-2xl font-bold text-gray-600 dark:text-gray-400">{{ $totals['skipped'] }}</div>
-                    <div class="text-sm text-gray-700 dark:text-gray-300">Skipped</div>
-                </div>
-            </div>
-
-            {{-- Results per entity --}}
-            <x-filament::section>
-                <x-slot name="heading">Results by Entity</x-slot>
-
-                <div class="divide-y dark:divide-gray-700">
+            {{-- Queued entities list --}}
+            <div class="max-w-md mx-auto">
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
                     @foreach ($importResults as $entityKey => $result)
-                        <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center justify-between px-4 py-3">
                             <div class="flex items-center gap-3">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">
-                                    <x-filament::icon :icon="$this->getEntities()[$entityKey]['icon']" class="h-4 w-4 text-gray-500" />
-                                </div>
-                                <span class="font-medium text-gray-900 dark:text-white">
+                                <x-filament::icon :icon="$this->getEntities()[$entityKey]['icon']" class="h-5 w-5 text-gray-400" />
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">
                                     {{ $this->getEntities()[$entityKey]['label'] }}
                                 </span>
                             </div>
                             @if ($result['skipped'] ?? false)
-                                <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-                                    Skipped
-                                </span>
+                                <span class="text-xs text-gray-500">Skipped</span>
                             @else
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full bg-green-100 dark:bg-green-500/20 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-                                        {{ $result['imported'] }} imported
-                                    </span>
-                                    @if ($result['failed'] > 0)
-                                        <span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-500/20 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                                            {{ $result['failed'] }} failed
-                                        </span>
-                                    @endif
-                                </div>
+                                <span class="inline-flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+                                    <x-filament::icon icon="heroicon-s-clock" class="h-3.5 w-3.5" />
+                                    Queued
+                                </span>
                             @endif
                         </div>
                     @endforeach
                 </div>
-            </x-filament::section>
+            </div>
+
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                You can track progress in the <strong>Import History</strong> tab.
+            </p>
 
             <div class="flex justify-center gap-3 pt-4">
+                <x-filament::button
+                    wire:click="$parent.setActiveTab('history')"
+                    color="primary"
+                >
+                    View Import History
+                </x-filament::button>
                 <x-filament::button
                     wire:click="resetWizard"
                     color="gray"

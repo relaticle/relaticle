@@ -46,7 +46,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
 
     public ?string $currentEntity = null;
 
-    /** @var array<string, array{imported: int, failed: int, skipped?: bool}> */
+    /** @var array<string, array{imported: int, failed: int, skipped?: bool, processing?: bool, job_failed?: bool}> */
     public array $importResults = [];
 
     /**
@@ -199,21 +199,32 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Start a new migration batch.
+     * Start or reuse a migration batch.
+     *
+     * If an existing in-progress batch exists for this user/team,
+     * it will be reset and reused instead of creating a new one.
      */
     private function startMigrationBatch(): void
     {
         $team = Filament::getTenant();
 
-        $batch = MigrationBatch::create([
-            'team_id' => $team?->getKey(),
-            'user_id' => auth()->id(),
-            'status' => MigrationBatch::STATUS_IN_PROGRESS,
-            'entity_order' => $this->getImportOrder(),
-            'stats' => [],
-        ]);
+        $batch = MigrationBatch::getOrCreateForMigration(
+            userId: (int) auth()->id(),
+            teamId: $team?->getKey(),
+            entityOrder: $this->getImportOrder(),
+        );
 
         $this->batchId = $batch->id;
+    }
+
+    /**
+     * Cancel the current migration and reset the wizard.
+     *
+     * The batch remains in_progress and will be reused on next migration start.
+     */
+    public function cancelMigration(): void
+    {
+        $this->resetWizard();
     }
 
     /**
@@ -396,6 +407,10 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
 
     /**
      * Create an import action for a specific entity type.
+     *
+     * Imports are queued and processed sequentially per team via WithoutOverlapping
+     * middleware in BaseImporter. This ensures dependent entities (People, Opportunities)
+     * wait for their dependencies (Companies) to complete before processing.
      */
     private function makeImportAction(string $entityType): EnhancedImportAction
     {
@@ -415,17 +430,21 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
                     ->first();
 
                 if ($latestImport) {
-                    $this->importResults[$entityType] = [
-                        'imported' => $latestImport->successful_rows ?? 0,
-                        'failed' => $latestImport->getFailedRowsCount(),
-                    ];
-
-                    // Update batch with migration_batch_id
+                    // Link import to migration batch
                     if ($this->batchId) {
                         $latestImport->update(['migration_batch_id' => $this->batchId]);
                     }
+
+                    // Record that import was queued - will be processed in order
+                    // The queue's WithoutOverlapping middleware ensures sequential processing
+                    $this->importResults[$entityType] = [
+                        'imported' => 0,
+                        'failed' => 0,
+                        'processing' => true,
+                    ];
                 }
 
+                // Immediately advance to next entity - imports will process in order via queue
                 $this->moveToNextEntity();
             });
     }
