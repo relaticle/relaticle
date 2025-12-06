@@ -56,8 +56,6 @@ final readonly class ExcelToCsvConverter
         }
 
         $spreadsheet = IOFactory::load($file->getRealPath());
-        $spreadsheet->getActiveSheet();
-
         $csvPath = $this->generateTempPath();
 
         $writer = new Csv($spreadsheet);

@@ -9,6 +9,7 @@ use Closure;
 use Filament\Actions\ImportAction;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -24,24 +25,21 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  * Enhanced Import Action that supports both CSV and Excel files.
  *
  * Excel files are automatically converted to CSV before processing.
+ * This is achieved by overriding getUploadedFileStream() to intercept
+ * Excel files and convert them to CSV transparently.
  */
 final class EnhancedImportAction extends ImportAction
 {
-    /**
-     * Store converted CSV file for Excel uploads.
-     */
-    private ?UploadedFile $convertedCsvFile = null;
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Override the schema to use our enhanced file upload
+        // Override the schema with extended file type support
         $this->schema(fn (EnhancedImportAction $action): array => array_merge([
             FileUpload::make('file')
                 ->label(__('filament-actions::import.modal.form.file.label'))
                 ->placeholder('Upload a CSV or Excel file (.csv, .xlsx, .xls)')
-                ->acceptedFileTypes($this->getAcceptedFileTypes())
+                ->acceptedFileTypes(ExcelToCsvConverter::getAcceptedMimeTypes())
                 ->rules($action->getFileValidationRules())
                 ->afterStateUpdated(function (FileUpload $component, Component $livewire, Set $set, ?TemporaryUploadedFile $state) use ($action): void {
                     if (! $state instanceof TemporaryUploadedFile) {
@@ -56,8 +54,7 @@ final class EnhancedImportAction extends ImportAction
                         throw $exception;
                     }
 
-                    // Convert Excel to CSV if needed
-                    $csvStream = $this->getProcessedFileStream($state);
+                    $csvStream = $this->getUploadedFileStream($state);
 
                     if (! $csvStream) {
                         return;
@@ -106,7 +103,7 @@ final class EnhancedImportAction extends ImportAction
                         return [];
                     }
 
-                    $csvStream = $this->getProcessedFileStream($file);
+                    $csvStream = $this->getUploadedFileStream($file);
 
                     if (! $csvStream) {
                         return [];
@@ -124,7 +121,7 @@ final class EnhancedImportAction extends ImportAction
                     $csvColumnOptions = array_combine($csvColumns, $csvColumns);
 
                     return array_map(
-                        fn (ImportColumn $column): \Filament\Forms\Components\Select => $column->getSelect()->options($csvColumnOptions),
+                        fn (ImportColumn $column): Select => $column->getSelect()->options($csvColumnOptions),
                         $action->getImporter()::getColumns(),
                     );
                 })
@@ -134,15 +131,14 @@ final class EnhancedImportAction extends ImportAction
     }
 
     /**
-     * Get the processed file stream, converting Excel to CSV if needed.
+     * Override parent's file stream method to convert Excel files to CSV.
      *
      * @return resource|false
      */
-    private function getProcessedFileStream(TemporaryUploadedFile $file): mixed
+    public function getUploadedFileStream(TemporaryUploadedFile $file): mixed
     {
         $converter = app(ExcelToCsvConverter::class);
 
-        // Create an UploadedFile from the TemporaryUploadedFile
         $uploadedFile = new UploadedFile(
             $file->getRealPath(),
             $file->getClientOriginalName(),
@@ -151,9 +147,9 @@ final class EnhancedImportAction extends ImportAction
 
         if ($converter->isExcelFile($uploadedFile)) {
             try {
-                $this->convertedCsvFile = $converter->convert($uploadedFile);
+                $csvFile = $converter->convert($uploadedFile);
 
-                return fopen($this->convertedCsvFile->getRealPath(), 'r');
+                return fopen($csvFile->getRealPath(), 'r');
             } catch (\Exception $e) {
                 report($e);
 
@@ -161,17 +157,7 @@ final class EnhancedImportAction extends ImportAction
             }
         }
 
-        return $this->getUploadedFileStream($file);
-    }
-
-    /**
-     * Get all accepted file types including Excel formats.
-     *
-     * @return array<string>
-     */
-    private function getAcceptedFileTypes(): array
-    {
-        return ExcelToCsvConverter::getAcceptedMimeTypes();
+        return parent::getUploadedFileStream($file);
     }
 
     /**
@@ -184,7 +170,7 @@ final class EnhancedImportAction extends ImportAction
         $fileRules = [
             "extensions:{$acceptedExtensions}",
             fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                $csvStream = $this->getProcessedFileStream($value);
+                $csvStream = $this->getUploadedFileStream($value);
 
                 if (! $csvStream) {
                     $fail('Unable to process the uploaded file. Please ensure it is a valid CSV or Excel file.');

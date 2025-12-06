@@ -44,7 +44,7 @@ final class OpportunityImporter extends BaseImporter
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    if (in_array($state, [null, '', '0'], true)) {
+                    if (blank($state)) {
                         $record->company_id = null;
 
                         return;
@@ -79,7 +79,7 @@ final class OpportunityImporter extends BaseImporter
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('John Doe')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    if (in_array($state, [null, '', '0'], true)) {
+                    if (blank($state)) {
                         $record->contact_id = null;
 
                         return;
@@ -90,26 +90,21 @@ final class OpportunityImporter extends BaseImporter
                     }
 
                     try {
-                        // First try to find existing contact
-                        $contact = People::query()
-                            ->where('team_id', $importer->import->team_id)
-                            ->where('name', trim($state))
-                            ->first();
-
-                        if (! $contact) {
-                            // Create new contact if not found
-                            $contact = People::create([
+                        $contact = People::firstOrCreate(
+                            [
                                 'name' => trim($state),
                                 'team_id' => $importer->import->team_id,
+                            ],
+                            [
                                 'creator_id' => $importer->import->user_id,
                                 'creation_source' => CreationSource::IMPORT,
-                            ]);
-                        }
+                            ]
+                        );
 
                         $record->contact_id = $contact->getKey();
                     } catch (\Exception $e) {
                         report($e);
-                        throw $e; // Re-throw to fail the import for this row
+                        throw $e;
                     }
                 }),
 
