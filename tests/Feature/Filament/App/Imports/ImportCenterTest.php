@@ -278,7 +278,7 @@ test('import status shows failed when job is in failed_jobs table', function () 
         ->assertSee('Failed');
 });
 
-test('import status shows failed when created long ago but never processed', function () {
+test('import status shows pending when created long ago but never processed', function () {
     $import = Import::create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
@@ -291,7 +291,8 @@ test('import status shows failed when created long ago but never processed', fun
         'completed_at' => null,
     ]);
 
-    // Manually update the timestamps to simulate stuck import
+    // Manually update the timestamps to simulate old import
+    // This should still be "Pending" - queue worker might not be running
     $import->update([
         'created_at' => now()->subMinutes(15),
         'updated_at' => now()->subMinutes(15),
@@ -299,5 +300,5 @@ test('import status shows failed when created long ago but never processed', fun
 
     Livewire::test(ImportCenter::class)
         ->call('setActiveTab', 'history')
-        ->assertSee('Failed');
+        ->assertSee('Pending');
 });

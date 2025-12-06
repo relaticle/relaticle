@@ -268,8 +268,8 @@ final class ImportCenter extends Page implements HasTable
             return 'Failed';
         }
 
-        // Import hasn't started processing yet
-        if ($import->processed_rows === 0 && $import->total_rows === 0) {
+        // Import hasn't started processing yet (queue worker may not be running)
+        if ($import->processed_rows === 0) {
             return 'Pending';
         }
 
@@ -309,12 +309,15 @@ final class ImportCenter extends Page implements HasTable
     }
 
     /**
-     * Check if an import appears to be stuck (no progress for extended period).
+     * Check if an import appears to be stuck (started processing but no progress).
      *
-     * An import is considered stuck if:
-     * - It's not completed
+     * An import is considered stuck only if:
+     * - It started processing (processed_rows > 0)
      * - It has been more than 10 minutes since last update
      * - It still has rows to process
+     *
+     * Note: We do NOT mark as stuck if processing never started - that's "Pending",
+     * not "Failed". The queue worker might just not be running.
      */
     private function isImportStuck(Import $import): bool
     {
@@ -328,20 +331,16 @@ final class ImportCenter extends Page implements HasTable
             return false;
         }
 
+        // Only consider stuck if processing actually started but then stopped
+        if ($import->processed_rows === 0) {
+            return false;
+        }
+
         // Check if updated recently (within last 10 minutes)
         $stuckThreshold = now()->subMinutes(10);
 
         // If updated_at is older than threshold and we have unprocessed rows, it's stuck
-        if ($import->updated_at < $stuckThreshold && $import->total_rows > 0) {
-            return true;
-        }
-
-        // If created more than 10 minutes ago but never started processing, likely failed
-        if ($import->created_at < $stuckThreshold && $import->processed_rows === 0 && $import->total_rows > 0) {
-            return true;
-        }
-
-        return false;
+        return $import->updated_at < $stuckThreshold && $import->total_rows > 0;
     }
 
     public function setActiveTab(string $tab): void
