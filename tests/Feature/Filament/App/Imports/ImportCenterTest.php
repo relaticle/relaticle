@@ -51,7 +51,7 @@ test('import center can switch to migration tab', function () {
 
 test('import center has all entity types defined', function () {
     $component = Livewire::test(ImportCenter::class);
-    $entityTypes = $component->instance()->getEntityTypes();
+    $entityTypes = $component->instance()->getEntities();
 
     expect($entityTypes)
         ->toHaveKey('companies')
@@ -63,7 +63,7 @@ test('import center has all entity types defined', function () {
 
 test('entity types have correct structure', function () {
     $component = Livewire::test(ImportCenter::class);
-    $entityTypes = $component->instance()->getEntityTypes();
+    $entityTypes = $component->instance()->getEntities();
 
     foreach ($entityTypes as $key => $entity) {
         expect($entity)

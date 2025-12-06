@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Imports;
 
-use App\Enums\CreationSource;
 use App\Enums\DuplicateHandlingStrategy;
 use App\Models\Company;
 use App\Models\Opportunity;
@@ -86,23 +85,6 @@ abstract class BaseImporter extends Importer
     }
 
     /**
-     * Find or create a company by name within the current team.
-     */
-    protected function resolveOrCreateCompany(string $name): Company
-    {
-        return Company::firstOrCreate(
-            [
-                'name' => trim($name),
-                'team_id' => $this->import->team_id,
-            ],
-            [
-                'creator_id' => $this->import->user_id,
-                'creation_source' => CreationSource::IMPORT,
-            ]
-        );
-    }
-
-    /**
      * Find a person by name within the current team.
      */
     protected function resolvePersonByName(?string $name): ?People
@@ -115,33 +97,6 @@ abstract class BaseImporter extends Importer
             ->where('team_id', $this->import->team_id)
             ->where('name', trim($name))
             ->first();
-    }
-
-    /**
-     * Find or create a person by name within the current team.
-     * Requires a company to associate with.
-     */
-    protected function resolveOrCreatePerson(string $name, ?Company $company = null): People
-    {
-        $existing = $this->resolvePersonByName($name);
-
-        if ($existing instanceof \App\Models\People) {
-            return $existing;
-        }
-
-        $person = new People;
-        $person->name = trim($name);
-        $person->team_id = $this->import->team_id;
-        $person->creator_id = $this->import->user_id;
-        $person->creation_source = CreationSource::IMPORT;
-
-        if ($company instanceof \App\Models\Company) {
-            $person->company_id = $company->getKey();
-        }
-
-        $person->save();
-
-        return $person;
     }
 
     /**

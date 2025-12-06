@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Imports;
 
 use App\Enums\CreationSource;
+use App\Enums\DuplicateHandlingStrategy;
 use App\Models\Company;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
@@ -74,9 +75,15 @@ final class PeopleImporter extends BaseImporter
 
     public function resolveRecord(): People
     {
-        $person = $this->findByEmail();
+        $existing = $this->findByEmail();
 
-        return $person ?? new People;
+        $strategy = $this->getDuplicateStrategy();
+
+        return match ($strategy) {
+            DuplicateHandlingStrategy::SKIP => $existing ?? new People,
+            DuplicateHandlingStrategy::UPDATE => $existing ?? new People,
+            DuplicateHandlingStrategy::CREATE_NEW => new People,
+        };
     }
 
     private function findByEmail(): ?People

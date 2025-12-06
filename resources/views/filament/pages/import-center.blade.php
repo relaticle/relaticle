@@ -30,7 +30,7 @@
             <div class="space-y-6">
                 {{-- Entity Cards Grid --}}
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach ($this->getEntityTypes() as $key => $entity)
+                    @foreach ($this->getEntities() as $key => $entity)
                         <div class="group relative rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:border-gray-300 hover:shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700">
                             <div class="flex items-start gap-4">
                                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors group-hover:bg-primary-50 group-hover:text-primary-600 dark:bg-gray-800 dark:text-gray-400 dark:group-hover:bg-primary-500/10 dark:group-hover:text-primary-400 pointer-events-none">

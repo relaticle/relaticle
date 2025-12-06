@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Import;
 
 use App\Filament\Actions\EnhancedImportAction;
-use App\Filament\Imports\CompanyImporter;
-use App\Filament\Imports\NoteImporter;
-use App\Filament\Imports\OpportunityImporter;
-use App\Filament\Imports\PeopleImporter;
-use App\Filament\Imports\TaskImporter;
+use App\Filament\Concerns\HasImportEntities;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
@@ -25,6 +21,7 @@ use Livewire\Component;
  */
 final class MigrationWizard extends Component implements HasActions, HasSchemas
 {
+    use HasImportEntities;
     use InteractsWithActions;
     use InteractsWithSchemas;
 
@@ -45,52 +42,6 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     public array $importResults = [];
 
     /**
-     * Entity configuration with dependencies and importers.
-     *
-     * @return array<string, array{label: string, icon: string, description: string, dependencies: array<string>, importer: class-string<\Filament\Actions\Imports\Importer>}>
-     */
-    public function getEntities(): array
-    {
-        return [
-            'companies' => [
-                'label' => 'Companies',
-                'icon' => 'heroicon-o-building-office-2',
-                'description' => 'Import company records first - they have no dependencies',
-                'dependencies' => [],
-                'importer' => CompanyImporter::class,
-            ],
-            'people' => [
-                'label' => 'People',
-                'icon' => 'heroicon-o-users',
-                'description' => 'Import contacts - can be linked to companies',
-                'dependencies' => ['companies'],
-                'importer' => PeopleImporter::class,
-            ],
-            'opportunities' => [
-                'label' => 'Opportunities',
-                'icon' => 'heroicon-o-currency-dollar',
-                'description' => 'Import deals - can reference companies and people',
-                'dependencies' => ['companies'],
-                'importer' => OpportunityImporter::class,
-            ],
-            'tasks' => [
-                'label' => 'Tasks',
-                'icon' => 'heroicon-o-clipboard-document-check',
-                'description' => 'Import tasks - can optionally link to companies, people, or opportunities',
-                'dependencies' => [],
-                'importer' => TaskImporter::class,
-            ],
-            'notes' => [
-                'label' => 'Notes',
-                'icon' => 'heroicon-o-document-text',
-                'description' => 'Import notes - can optionally link to companies, people, or opportunities',
-                'dependencies' => [],
-                'importer' => NoteImporter::class,
-            ],
-        ];
-    }
-
-    /**
      * Get the ordered list of entities to import based on dependencies.
      *
      * @return array<string>
@@ -107,16 +58,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
      */
     public function canSelectEntity(string $entity): bool
     {
-        $entities = $this->getEntities();
-        $dependencies = $entities[$entity]['dependencies'] ?? [];
-
-        foreach ($dependencies as $dependency) {
-            if (! ($this->selectedEntities[$dependency] ?? false)) {
-                return false;
-            }
-        }
-
-        return true;
+        return collect($this->getMissingDependencies($entity))->isEmpty();
     }
 
     /**
@@ -126,8 +68,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
      */
     public function getMissingDependencies(string $entity): array
     {
-        $entities = $this->getEntities();
-        $dependencies = $entities[$entity]['dependencies'] ?? [];
+        $dependencies = $this->getEntities()[$entity]['dependencies'] ?? [];
 
         return array_filter($dependencies, fn (string $dep): bool => ! ($this->selectedEntities[$dep] ?? false));
     }
@@ -166,7 +107,7 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
      */
     public function hasSelectedEntities(): bool
     {
-        return count($this->getImportOrder()) > 0;
+        return in_array(true, $this->selectedEntities, true);
     }
 
     /**
@@ -252,19 +193,13 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
      */
     public function getTotalCounts(): array
     {
-        $imported = 0;
-        $failed = 0;
-        $skipped = 0;
+        $results = collect($this->importResults);
 
-        foreach ($this->importResults as $result) {
-            $imported += $result['imported'];
-            $failed += $result['failed'];
-            if (isset($result['skipped']) && $result['skipped']) {
-                $skipped++;
-            }
-        }
-
-        return ['imported' => $imported, 'failed' => $failed, 'skipped' => $skipped];
+        return [
+            'imported' => $results->sum('imported'),
+            'failed' => $results->sum('failed'),
+            'skipped' => $results->where('skipped', true)->count(),
+        ];
     }
 
     /**
@@ -297,53 +232,13 @@ final class MigrationWizard extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Import action for companies.
-     */
-    public function importCompaniesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('companies');
-    }
-
-    /**
-     * Import action for people.
-     */
-    public function importPeopleAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('people');
-    }
-
-    /**
-     * Import action for opportunities.
-     */
-    public function importOpportunitiesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('opportunities');
-    }
-
-    /**
-     * Import action for tasks.
-     */
-    public function importTasksAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('tasks');
-    }
-
-    /**
-     * Import action for notes.
-     */
-    public function importNotesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('notes');
-    }
-
-    /**
-     * Create an import action for a specific entity type.
+     * Override makeImportAction to add wizard-specific behavior.
      *
      * Imports are queued and processed sequentially per team via WithoutOverlapping
      * middleware in BaseImporter. This ensures dependent entities (People, Opportunities)
      * wait for their dependencies (Companies) to complete before processing.
      */
-    private function makeImportAction(string $entityType): EnhancedImportAction
+    protected function makeImportAction(string $entityType): EnhancedImportAction
     {
         $config = $this->getEntities()[$entityType];
 

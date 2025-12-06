@@ -4,13 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
-use App\Filament\Actions\EnhancedImportAction;
-use App\Filament\Imports\BaseImporter;
-use App\Filament\Imports\CompanyImporter;
-use App\Filament\Imports\NoteImporter;
-use App\Filament\Imports\OpportunityImporter;
-use App\Filament\Imports\PeopleImporter;
-use App\Filament\Imports\TaskImporter;
+use App\Filament\Concerns\HasImportEntities;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\Imports\Models\Import;
@@ -27,6 +21,7 @@ use UnitEnum;
 
 final class ImportCenter extends Page implements HasTable
 {
+    use HasImportEntities;
     use InteractsWithTable;
 
     protected string $view = 'filament.pages.import-center';
@@ -52,88 +47,6 @@ final class ImportCenter extends Page implements HasTable
     public function getSubheading(): string
     {
         return 'Import data from CSV or Excel files, or migrate from another CRM';
-    }
-
-    /**
-     * @return array<string, array{label: string, icon: string, description: string, importer: class-string<BaseImporter>}>
-     */
-    public function getEntityTypes(): array
-    {
-        return [
-            'companies' => [
-                'label' => 'Companies',
-                'icon' => 'heroicon-o-building-office-2',
-                'description' => 'Import company records with addresses, phone numbers, and custom fields',
-                'importer' => CompanyImporter::class,
-            ],
-            'people' => [
-                'label' => 'People',
-                'icon' => 'heroicon-o-users',
-                'description' => 'Import contacts with their company associations and custom fields',
-                'importer' => PeopleImporter::class,
-            ],
-            'opportunities' => [
-                'label' => 'Opportunities',
-                'icon' => 'heroicon-o-currency-dollar',
-                'description' => 'Import deals and opportunities with values, stages, and dates',
-                'importer' => OpportunityImporter::class,
-            ],
-            'tasks' => [
-                'label' => 'Tasks',
-                'icon' => 'heroicon-o-clipboard-document-check',
-                'description' => 'Import tasks with priorities, statuses, and entity associations',
-                'importer' => TaskImporter::class,
-            ],
-            'notes' => [
-                'label' => 'Notes',
-                'icon' => 'heroicon-o-document-text',
-                'description' => 'Import notes linked to companies, people, or opportunities',
-                'importer' => NoteImporter::class,
-            ],
-        ];
-    }
-
-    /**
-     * Register import actions for each entity type.
-     * These are defined as action methods so Filament properly registers them.
-     */
-    public function importCompaniesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('companies');
-    }
-
-    public function importPeopleAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('people');
-    }
-
-    public function importOpportunitiesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('opportunities');
-    }
-
-    public function importTasksAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('tasks');
-    }
-
-    public function importNotesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('notes');
-    }
-
-    /**
-     * Create an import action for a specific entity type.
-     */
-    private function makeImportAction(string $entityType): EnhancedImportAction
-    {
-        $config = $this->getEntityTypes()[$entityType];
-
-        return EnhancedImportAction::make("import_{$entityType}")
-            ->importer($config['importer'])
-            ->label("Import {$config['label']}")
-            ->modalHeading("Import {$config['label']}")
-            ->color('primary');
     }
 
     public function table(Table $table): Table
