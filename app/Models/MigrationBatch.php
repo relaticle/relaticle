@@ -105,6 +105,42 @@ final class MigrationBatch extends Model
         return $this->status === self::STATUS_FAILED;
     }
 
+    /**
+     * Get an existing in-progress batch for this user/team, resetting it for reuse,
+     * or create a new one if none exists.
+     *
+     * @param  array<string>  $entityOrder
+     */
+    public static function getOrCreateForMigration(
+        int $userId,
+        ?int $teamId,
+        array $entityOrder
+    ): self {
+        $existingBatch = self::query()
+            ->where('user_id', $userId)
+            ->where('team_id', $teamId)
+            ->where('status', self::STATUS_IN_PROGRESS)
+            ->first();
+
+        if ($existingBatch instanceof self) {
+            $existingBatch->update([
+                'entity_order' => $entityOrder,
+                'stats' => [],
+                'completed_at' => null,
+            ]);
+
+            return $existingBatch;
+        }
+
+        return self::create([
+            'team_id' => $teamId,
+            'user_id' => $userId,
+            'status' => self::STATUS_IN_PROGRESS,
+            'entity_order' => $entityOrder,
+            'stats' => [],
+        ]);
+    }
+
     public function markAsInProgress(): void
     {
         $this->update(['status' => self::STATUS_IN_PROGRESS]);
