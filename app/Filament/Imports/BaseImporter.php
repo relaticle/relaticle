@@ -13,9 +13,32 @@ use App\Models\User;
 use Filament\Actions\Imports\Importer;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 
 abstract class BaseImporter extends Importer
 {
+    /**
+     * Get job middleware to ensure imports run sequentially per team.
+     *
+     * This prevents race conditions when importing dependent entities
+     * (e.g., People that reference Companies). All imports for the same
+     * team will be processed one at a time in the order they were queued.
+     *
+     * @return array<object>
+     */
+    public function getJobMiddleware(): array
+    {
+        $teamId = $this->import->team_id ?? 'global';
+
+        return [
+            // Ensure only one import runs at a time per team
+            // This guarantees Companies finish before People starts
+            (new WithoutOverlapping("team-import-{$teamId}"))
+                ->releaseAfter(60) // Release lock 60s after job starts (in case of failure)
+                ->expireAfter(3600), // Lock expires after 1 hour max
+        ];
+    }
+
     /**
      * Get the duplicate handling strategy from import options.
      */
