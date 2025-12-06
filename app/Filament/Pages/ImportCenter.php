@@ -144,7 +144,6 @@ final class ImportCenter extends Page implements HasTable
             ->query(
                 Import::query()
                     ->where('team_id', $team?->getKey())
-                    ->latest()
             )
             ->columns([
                 TextColumn::make('created_at')
