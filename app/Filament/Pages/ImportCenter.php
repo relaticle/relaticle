@@ -21,6 +21,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 use Override;
 use UnitEnum;
 
@@ -190,7 +191,10 @@ final class ImportCenter extends Page implements HasTable
                     ->color('success'),
                 TextColumn::make('failed_rows_count')
                     ->label('Failed')
-                    ->state(fn (Import $record): int => $record->getFailedRowsCount())
+                    ->state(fn (Import $record): int => $this->isImportCompleted($record)
+                        ? $record->getFailedRowsCount()
+                        : 0
+                    )
                     ->numeric()
                     ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray'),
                 TextColumn::make('status')
@@ -200,6 +204,7 @@ final class ImportCenter extends Page implements HasTable
                     ->color(fn (string $state): string => match ($state) {
                         'Completed' => 'success',
                         'Processing' => 'warning',
+                        'Pending' => 'info',
                         'Failed' => 'danger',
                         default => 'gray',
                     }),
@@ -213,7 +218,7 @@ final class ImportCenter extends Page implements HasTable
                     ->url(fn (Import $record): string => route('filament.imports.failed-rows.download', [
                         'import' => $record,
                     ]))
-                    ->visible(fn (Import $record): bool => $record->getFailedRowsCount() > 0),
+                    ->visible(fn (Import $record): bool => $this->isImportCompleted($record) && $record->getFailedRowsCount() > 0),
             ])
             ->emptyStateHeading('No imports yet')
             ->emptyStateDescription('Import your first batch of data using the Quick Import section above.')
@@ -232,17 +237,111 @@ final class ImportCenter extends Page implements HasTable
             ->toString();
     }
 
+    /**
+     * Determine the display status for an import.
+     *
+     * Possible statuses:
+     * - "Completed": Import finished successfully (may have row-level validation failures)
+     * - "Failed": Import job failed entirely (exception thrown, stuck, or no progress)
+     * - "Processing": Import is actively being processed
+     * - "Pending": Import was created but processing hasn't started
+     */
     private function getImportStatus(Import $import): string
     {
+        // Check if fully completed (batch finished callback was called)
         if ($import->completed_at !== null) {
             return 'Completed';
         }
 
-        if ($import->processed_rows >= $import->total_rows) {
+        // Check if all rows have been processed (completed but completed_at not set yet)
+        if ($import->total_rows > 0 && $import->processed_rows >= $import->total_rows) {
             return 'Completed';
         }
 
+        // Check if import job failed entirely
+        if ($this->hasImportJobFailed($import)) {
+            return 'Failed';
+        }
+
+        // Check if import is stuck (no progress for too long)
+        if ($this->isImportStuck($import)) {
+            return 'Failed';
+        }
+
+        // Import hasn't started processing yet
+        if ($import->processed_rows === 0 && $import->total_rows === 0) {
+            return 'Pending';
+        }
+
         return 'Processing';
+    }
+
+    /**
+     * Check if an import has completed (either successfully or with the batch finishing).
+     */
+    private function isImportCompleted(Import $import): bool
+    {
+        if ($import->completed_at !== null) {
+            return true;
+        }
+
+        return $import->total_rows > 0 && $import->processed_rows >= $import->total_rows;
+    }
+
+    /**
+     * Check if the import job has failed by looking at the failed_jobs table.
+     *
+     * Filament import jobs are tagged with "import{id}" so we can search for them
+     * in the failed_jobs payload.
+     */
+    private function hasImportJobFailed(Import $import): bool
+    {
+        $importId = $import->getKey();
+
+        // Search for failed jobs that contain this import's ID in the payload
+        // The ImportCsv job serializes the Import model, so we look for its ID
+        return DB::table('failed_jobs')
+            ->where('payload', 'like', '%"import'.$importId.'"%')
+            ->orWhere('payload', 'like', '%\\"id\\":'.$importId.'%')
+            ->orWhere('payload', 'like', '%"commandName":"Filament\\\\Actions\\\\Imports\\\\Jobs\\\\ImportCsv"%')
+            ->where('payload', 'like', '%'.$importId.'%')
+            ->exists();
+    }
+
+    /**
+     * Check if an import appears to be stuck (no progress for extended period).
+     *
+     * An import is considered stuck if:
+     * - It's not completed
+     * - It has been more than 10 minutes since last update
+     * - It still has rows to process
+     */
+    private function isImportStuck(Import $import): bool
+    {
+        // If completed, not stuck
+        if ($import->completed_at !== null) {
+            return false;
+        }
+
+        // If all rows processed, not stuck
+        if ($import->total_rows > 0 && $import->processed_rows >= $import->total_rows) {
+            return false;
+        }
+
+        // Check if updated recently (within last 10 minutes)
+        $stuckThreshold = now()->subMinutes(10);
+
+        // If updated_at is older than threshold and we have unprocessed rows, it's stuck
+        if ($import->updated_at < $stuckThreshold && $import->total_rows > 0) {
+            return true;
+        }
+
+        // If created more than 10 minutes ago but never started processing, likely failed
+        if ($import->created_at < $stuckThreshold && $import->processed_rows === 0 && $import->total_rows > 0) {
+            return true;
+        }
+
+        return false;
     }
 
     public function setActiveTab(string $tab): void
