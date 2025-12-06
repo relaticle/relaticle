@@ -144,3 +144,160 @@ test('import center has correct navigation properties', function () {
     expect(ImportCenter::getNavigationLabel())->toBe('Import Center')
         ->and(ImportCenter::getNavigationSort())->toBe(2);
 });
+
+test('import status shows completed when completed_at is set', function () {
+    Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 10,
+        'total_rows' => 10,
+        'processed_rows' => 10,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => now(),
+    ]);
+
+    // Switch to history tab to see the table with status
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Completed');
+});
+
+test('import status shows completed when all rows are processed', function () {
+    Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 10,
+        'total_rows' => 10,
+        'processed_rows' => 10,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Completed');
+});
+
+test('import status shows processing for active imports', function () {
+    Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 5,
+        'total_rows' => 10,
+        'processed_rows' => 5,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Processing');
+});
+
+test('import status shows pending when import has not started', function () {
+    Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 0,
+        'total_rows' => 0,
+        'processed_rows' => 0,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Pending');
+});
+
+test('import status shows failed when import is stuck', function () {
+    // Create an import that has been stuck for more than 10 minutes
+    $import = Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 5,
+        'total_rows' => 10,
+        'processed_rows' => 5,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    // Manually update the timestamps to simulate stuck import
+    $import->update([
+        'updated_at' => now()->subMinutes(15),
+        'created_at' => now()->subMinutes(20),
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Failed');
+});
+
+test('import status shows failed when job is in failed_jobs table', function () {
+    $import = Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 0,
+        'total_rows' => 10,
+        'processed_rows' => 0,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    // Insert a failed job record that references this import
+    \Illuminate\Support\Facades\DB::table('failed_jobs')->insert([
+        'uuid' => \Illuminate\Support\Str::uuid()->toString(),
+        'connection' => 'database',
+        'queue' => 'default',
+        'payload' => json_encode([
+            'displayName' => 'Filament\\Actions\\Imports\\Jobs\\ImportCsv',
+            'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+            'data' => [
+                'commandName' => 'Filament\\Actions\\Imports\\Jobs\\ImportCsv',
+                'command' => serialize(['import' => $import->id]),
+            ],
+        ]),
+        'exception' => 'Test exception',
+        'failed_at' => now(),
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Failed');
+});
+
+test('import status shows failed when created long ago but never processed', function () {
+    $import = Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'successful_rows' => 0,
+        'total_rows' => 10,
+        'processed_rows' => 0,
+        'importer' => 'App\\Filament\\Imports\\CompanyImporter',
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'completed_at' => null,
+    ]);
+
+    // Manually update the timestamps to simulate stuck import
+    $import->update([
+        'created_at' => now()->subMinutes(15),
+        'updated_at' => now()->subMinutes(15),
+    ]);
+
+    Livewire::test(ImportCenter::class)
+        ->call('setActiveTab', 'history')
+        ->assertSee('Failed');
+});

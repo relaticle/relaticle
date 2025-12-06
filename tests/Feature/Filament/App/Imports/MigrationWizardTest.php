@@ -163,12 +163,12 @@ test('skipping all entities goes to completion step', function () {
         ->assertSet('currentStep', 3);
 });
 
-test('completion step shows summary', function () {
+test('completion step shows imports queued message', function () {
     Livewire::test(MigrationWizard::class)
         ->call('toggleEntity', 'companies')
         ->call('nextStep')
         ->call('skipCurrentEntity')
-        ->assertSee('Migration Complete!');
+        ->assertSee('Imports Queued');
 });
 
 test('can reset wizard after completion', function () {
@@ -287,4 +287,130 @@ test('can import only tasks and notes without core entities', function () {
     $order = $component->instance()->getImportOrder();
 
     expect($order)->toBe(['tasks', 'notes']);
+});
+
+test('reuses existing in-progress batch when starting new migration', function () {
+    // Create an old in-progress batch with old entity order
+    $oldBatch = MigrationBatch::factory()->inProgress()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'entity_order' => ['tasks', 'notes'],
+        'stats' => ['tasks' => ['imported' => 5, 'failed' => 0]],
+    ]);
+
+    // Start new migration with different entities (moves to step 2)
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'companies')
+        ->call('toggleEntity', 'people')
+        ->call('nextStep');
+
+    // Same batch should be reused
+    expect($component->get('batchId'))->toBe($oldBatch->id);
+
+    // Batch should have new entity order and cleared stats
+    $batch = MigrationBatch::find($oldBatch->id);
+    expect($batch->entity_order)->toBe(['companies', 'people'])
+        ->and($batch->stats)->toBe([]);
+
+    // Only one in-progress batch should exist
+    expect(MigrationBatch::where('user_id', $this->user->id)
+        ->where('status', MigrationBatch::STATUS_IN_PROGRESS)
+        ->count()
+    )->toBe(1);
+});
+
+test('creates new batch when no in-progress batch exists', function () {
+    // Ensure no existing batches
+    expect(MigrationBatch::where('user_id', $this->user->id)->count())->toBe(0);
+
+    // Start migration
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'companies')
+        ->call('nextStep');
+
+    // New batch should be created
+    expect($component->get('batchId'))->not->toBeNull();
+    expect(MigrationBatch::where('user_id', $this->user->id)
+        ->where('status', MigrationBatch::STATUS_IN_PROGRESS)
+        ->count()
+    )->toBe(1);
+});
+
+test('can cancel active migration and resets wizard', function () {
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'companies')
+        ->call('nextStep');
+
+    $batchId = $component->get('batchId');
+    expect(MigrationBatch::find($batchId))->not->toBeNull();
+
+    $component->call('cancelMigration');
+
+    // Wizard should be reset
+    expect($component->get('currentStep'))->toBe(1)
+        ->and($component->get('batchId'))->toBeNull();
+
+    // Batch stays in_progress and will be reused on next migration start
+    $batch = MigrationBatch::find($batchId);
+    expect($batch->status)->toBe(MigrationBatch::STATUS_IN_PROGRESS);
+});
+
+test('does not reuse completed batch', function () {
+    // Create a completed batch
+    $completedBatch = MigrationBatch::factory()->completed()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]);
+
+    // Start new migration
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'companies')
+        ->call('nextStep');
+
+    // Should create a new batch, not reuse the completed one
+    expect($component->get('batchId'))->not->toBe($completedBatch->id);
+});
+
+test('does not reuse batch from different user', function () {
+    // Create an in-progress batch for a different user
+    $otherUser = User::factory()->create();
+    $otherBatch = MigrationBatch::factory()->inProgress()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherUser->id,
+    ]);
+
+    // Start migration as current user
+    $component = Livewire::test(MigrationWizard::class)
+        ->call('toggleEntity', 'companies')
+        ->call('nextStep');
+
+    // Should create a new batch, not reuse the other user's batch
+    expect($component->get('batchId'))->not->toBe($otherBatch->id);
+});
+
+test('imports are processed sequentially via queue middleware', function () {
+    // This test verifies that BaseImporter has the WithoutOverlapping middleware
+    // which ensures imports for the same team run one at a time
+    $import = \Filament\Actions\Imports\Models\Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'importer' => \App\Filament\Imports\CompanyImporter::class,
+        'file_name' => 'test.csv',
+        'file_path' => 'imports/test.csv',
+        'total_rows' => 0,
+        'processed_rows' => 0,
+        'successful_rows' => 0,
+    ]);
+
+    // Instantiate the importer with required constructor arguments
+    $importer = new \App\Filament\Imports\CompanyImporter(
+        import: $import,
+        columnMap: [],
+        options: [],
+    );
+
+    $middleware = $importer->getJobMiddleware();
+
+    expect($middleware)->toHaveCount(1)
+        ->and($middleware[0])->toBeInstanceOf(\Illuminate\Queue\Middleware\WithoutOverlapping::class);
 });
