@@ -5,8 +5,8 @@
         x-on:dragover.prevent="dragging = true"
         x-on:dragleave.prevent="dragging = false"
         x-on:drop.prevent="dragging = false"
-        class="relative rounded-xl border-2 border-dashed p-8 text-center transition-colors border-gray-300 dark:border-gray-600"
-        :class="{ 'border-primary-500 bg-primary-50 dark:bg-primary-950': dragging }"
+        x-bind:class="dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-gray-300 dark:border-gray-600'"
+        class="relative rounded-xl border-2 border-dashed p-8 text-center transition-colors"
     >
         <input
             type="file"
