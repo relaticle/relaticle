@@ -55,7 +55,16 @@
                 </div>
 
                 {{-- Values List with Fixed Height Scroll --}}
-                <div class="overflow-y-auto flex-1 max-h-[400px]">
+                <div
+                    x-data="{ loading: false }"
+                    x-on:scroll.debounce.100ms="
+                        if (!loading && $el.scrollTop + $el.clientHeight >= $el.scrollHeight - 100) {
+                            loading = true;
+                            $wire.loadMoreValues().then(() => { loading = false; });
+                        }
+                    "
+                    class="overflow-y-auto flex-1 max-h-[400px]"
+                >
                     @forelse ($values as $value => $count)
                         @php
                             $isSkipped = $this->isValueSkipped($selectedAnalysis->mappedToField, $value);
@@ -123,17 +132,16 @@
                         </div>
                     @endforelse
 
-                    {{-- Load More (auto-triggered on scroll via wire:intersect) --}}
+                    {{-- Load More indicator --}}
                     @if ($hasMore)
                         <div
-                            wire:intersect.margin.100px="loadMoreValues"
                             wire:key="load-more-{{ $reviewPage }}"
                             class="px-3 py-3 text-center border-t border-gray-100 dark:border-gray-800"
                         >
-                            <span wire:loading.remove wire:target="loadMoreValues" class="text-sm text-gray-400">
+                            <span x-show="!loading" class="text-sm text-gray-400">
                                 Scroll for more...
                             </span>
-                            <span wire:loading wire:target="loadMoreValues" class="text-sm text-gray-400">
+                            <span x-show="loading" x-cloak class="text-sm text-gray-400">
                                 <x-filament::loading-indicator class="h-4 w-4 inline-block" /> Loading...
                             </span>
                         </div>
