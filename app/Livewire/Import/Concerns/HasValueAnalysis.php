@@ -79,6 +79,31 @@ trait HasValueAnalysis
     }
 
     /**
+     * Skip a value (mark it to be excluded from import).
+     */
+    public function skipValue(string $fieldName, string $oldValue): void
+    {
+        // If already skipped, unskip it
+        if ($this->isValueSkipped($fieldName, $oldValue)) {
+            $this->removeCorrectionForValue($fieldName, $oldValue);
+
+            return;
+        }
+
+        // Skip by setting correction to empty string
+        $this->correctValue($fieldName, $oldValue, '');
+    }
+
+    /**
+     * Check if a value is skipped.
+     */
+    public function isValueSkipped(string $fieldName, string $value): bool
+    {
+        return $this->hasCorrectionForValue($fieldName, $value)
+            && $this->getCorrectedValue($fieldName, $value) === '';
+    }
+
+    /**
      * Remove a value correction.
      */
     public function removeCorrectionForValue(string $fieldName, string $oldValue): void

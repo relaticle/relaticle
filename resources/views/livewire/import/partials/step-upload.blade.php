@@ -69,20 +69,28 @@
                 id="file-upload"
                 wire:model="uploadedFile"
                 accept=".csv,.xlsx,.xls,.ods,.txt"
-                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             >
 
             <div class="flex flex-col items-center">
                 <x-filament::icon
                     icon="heroicon-o-arrow-up-tray"
-                    class="h-12 w-12 text-gray-400 dark:text-gray-500"
+                    class="h-12 w-12 text-gray-300 dark:text-gray-600"
                 />
-                <p class="mt-4 text-sm font-medium text-gray-950 dark:text-white">
-                    Drop your file here or click to browse
+                <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                    Drop your .CSV or .XLSX file onto this area to upload
                 </p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    CSV, Excel (.xlsx, .xls), OpenDocument (.ods)
-                </p>
+                <div class="flex items-center gap-4 mt-6 w-full max-w-xs">
+                    <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
+                    <span class="text-sm text-gray-400 dark:text-gray-500">or</span>
+                    <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
+                </div>
+                <x-filament::button
+                    color="gray"
+                    class="mt-6 pointer-events-none"
+                >
+                    Choose a file
+                </x-filament::button>
             </div>
 
             @error('uploadedFile')

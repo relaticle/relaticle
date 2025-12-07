@@ -192,6 +192,10 @@ final class ImportWizard extends Component
         $this->analyzeColumns();
         $this->reviewPage = 1;
         $this->reviewSearch = '';
+
+        // Select first column by default
+        $firstAnalysis = $this->columnAnalyses->first();
+        $this->expandedColumn = $firstAnalysis?->mappedToField;
     }
 
     /**
