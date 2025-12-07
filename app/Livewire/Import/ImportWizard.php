@@ -98,18 +98,6 @@ final class ImportWizard extends Component
     /** @var array<int, array<string, mixed>> All rows for preview/editing */
     public array $previewRows = [];
 
-    /** @var array<int, bool> Rows to exclude from import (index => true) */
-    public array $excludedRows = [];
-
-    // Value correction modal
-    public bool $showCorrectionModal = false;
-
-    public string $correctionField = '';
-
-    public string $correctionOldValue = '';
-
-    public string $correctionNewValue = '';
-
     /**
      * Handle file upload.
      */
@@ -388,30 +376,17 @@ final class ImportWizard extends Component
         $this->valueCorrections = [];
         $this->previewResultData = null;
         $this->previewRows = [];
-        $this->excludedRows = [];
         $this->reviewSearch = '';
         $this->reviewPage = 1;
         $this->expandedColumn = null;
     }
 
     /**
-     * Get the count of rows that will be imported (excluding skipped rows).
+     * Get the count of rows that will be imported.
      */
     public function getActiveRowCount(): int
     {
-        return count($this->previewRows) - count(array_filter($this->excludedRows));
-    }
-
-    /**
-     * Toggle exclusion of a specific row.
-     */
-    public function toggleRowExclusion(int $index): void
-    {
-        if (isset($this->excludedRows[$index]) && $this->excludedRows[$index]) {
-            unset($this->excludedRows[$index]);
-        } else {
-            $this->excludedRows[$index] = true;
-        }
+        return count($this->previewRows);
     }
 
     /**
@@ -434,45 +409,6 @@ final class ImportWizard extends Component
         $entities = $this->getEntities();
 
         return $entities[$this->entityType]['label'] ?? str($this->entityType)->title()->toString();
-    }
-
-    /**
-     * Open the correction modal for a specific value.
-     */
-    public function openCorrectionModal(string $fieldName, string $oldValue): void
-    {
-        $this->correctionField = $fieldName;
-        $this->correctionOldValue = $oldValue;
-        $this->correctionNewValue = $this->getCorrectedValue($fieldName, $oldValue) ?? '';
-        $this->showCorrectionModal = true;
-    }
-
-    /**
-     * Save the current correction.
-     */
-    public function saveCorrection(): void
-    {
-        if ($this->correctionNewValue !== '') {
-            $this->correctValue($this->correctionField, $this->correctionOldValue, $this->correctionNewValue);
-        } else {
-            $this->removeCorrectionForValue($this->correctionField, $this->correctionOldValue);
-        }
-
-        $this->showCorrectionModal = false;
-        $this->correctionField = '';
-        $this->correctionOldValue = '';
-        $this->correctionNewValue = '';
-    }
-
-    /**
-     * Cancel the correction modal.
-     */
-    public function cancelCorrection(): void
-    {
-        $this->showCorrectionModal = false;
-        $this->correctionField = '';
-        $this->correctionOldValue = '';
-        $this->correctionNewValue = '';
     }
 
     /**

@@ -51,22 +51,6 @@ trait HasValueAnalysis
     }
 
     /**
-     * Get total issue count across all columns.
-     */
-    public function getTotalIssueCount(): int
-    {
-        return $this->columnAnalyses->sum(fn (ColumnAnalysis $analysis): int => $analysis->issueCount());
-    }
-
-    /**
-     * Check if any columns have issues.
-     */
-    public function hasValidationIssues(): bool
-    {
-        return $this->getTotalIssueCount() > 0;
-    }
-
-    /**
      * Apply a value correction.
      */
     public function correctValue(string $fieldName, string $oldValue, string $newValue): void
@@ -131,18 +115,5 @@ trait HasValueAnalysis
     public function hasCorrectionForValue(string $fieldName, string $value): bool
     {
         return isset($this->valueCorrections[$fieldName][$value]);
-    }
-
-    /**
-     * Get all corrections count.
-     */
-    public function getTotalCorrectionsCount(): int
-    {
-        $count = 0;
-        foreach ($this->valueCorrections as $fieldCorrections) {
-            $count += count($fieldCorrections);
-        }
-
-        return $count;
     }
 }

@@ -1,11 +1,4 @@
-@php
-    $firstColumn = $this->columnAnalyses->first()?->mappedToField;
-@endphp
-
-<div
-    class="space-y-6"
-    x-data="{ activeColumn: '{{ $expandedColumn ?? $firstColumn }}' }"
->
+<div class="space-y-6">
     <div class="flex gap-6">
         {{-- Columns List --}}
         <div class="w-56 shrink-0 space-y-1">
@@ -15,7 +8,6 @@
                     type="button"
                     wire:click="toggleColumn('{{ $analysis->mappedToField }}')"
                     wire:key="col-{{ $analysis->mappedToField }}"
-                    x-on:mouseenter="activeColumn = '{{ $analysis->mappedToField }}'"
                     @class([
                         'w-full text-left px-2.5 py-2 rounded-lg transition-colors',
                         'bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' => $expandedColumn === $analysis->mappedToField,

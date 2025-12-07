@@ -6,7 +6,6 @@ namespace App\Livewire\Import\Concerns;
 
 use App\Filament\Imports\BaseImporter;
 use Filament\Actions\Imports\ImportColumn;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 
@@ -39,33 +38,22 @@ trait HasColumnMapping
      */
     protected function autoMapColumns(): void
     {
-        $columns = $this->importerColumns;
-
-        if ($this->csvHeaders === [] || $columns === []) {
+        if ($this->csvHeaders === [] || $this->importerColumns === []) {
             return;
         }
 
-        $lowercaseCsvHeaders = array_map(Str::lower(...), $this->csvHeaders);
-        $csvHeadersLookup = array_combine($lowercaseCsvHeaders, $this->csvHeaders);
+        $csvHeadersLower = collect($this->csvHeaders)->mapWithKeys(
+            fn (string $header): array => [Str::lower($header) => $header]
+        );
 
-        $this->columnMap = [];
+        $this->columnMap = collect($this->importerColumns)
+            ->mapWithKeys(function (ImportColumn $column) use ($csvHeadersLower): array {
+                $guesses = collect($column->getGuesses())->map(fn (string $g): string => Str::lower($g));
+                $match = $guesses->first(fn (string $guess): bool => $csvHeadersLower->has($guess));
 
-        foreach ($columns as $column) {
-            /** @var ImportColumn $column */
-            $columnName = $column->getName();
-            $guesses = array_map(Str::lower(...), $column->getGuesses());
-
-            // Find the first matching guess
-            $match = Arr::first(
-                array_intersect($lowercaseCsvHeaders, $guesses),
-            );
-
-            if ($match !== null && isset($csvHeadersLookup[$match])) {
-                $this->columnMap[$columnName] = $csvHeadersLookup[$match];
-            } else {
-                $this->columnMap[$columnName] = '';
-            }
-        }
+                return [$column->getName() => $match !== null ? $csvHeadersLower->get($match) : ''];
+            })
+            ->toArray();
     }
 
     /**
@@ -85,42 +73,9 @@ trait HasColumnMapping
      */
     public function hasAllRequiredMappings(): bool
     {
-        $columns = $this->importerColumns;
-
-        foreach ($columns as $column) {
-            /** @var ImportColumn $column */
-            if ($column->isMappingRequired()) {
-                $mappedValue = $this->columnMap[$column->getName()] ?? '';
-                if ($mappedValue === '') {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Get missing required column names.
-     *
-     * @return array<string>
-     */
-    public function getMissingRequiredMappings(): array
-    {
-        $missing = [];
-        $columns = $this->importerColumns;
-
-        foreach ($columns as $column) {
-            /** @var ImportColumn $column */
-            if ($column->isMappingRequired()) {
-                $mappedValue = $this->columnMap[$column->getName()] ?? '';
-                if ($mappedValue === '') {
-                    $missing[] = $column->getLabel();
-                }
-            }
-        }
-
-        return $missing;
+        return collect($this->importerColumns)
+            ->filter(fn (ImportColumn $column): bool => $column->isMappingRequired())
+            ->every(fn (ImportColumn $column): bool => ($this->columnMap[$column->getName()] ?? '') !== '');
     }
 
     /**
@@ -151,15 +106,9 @@ trait HasColumnMapping
      */
     public function getFieldLabel(string $fieldName): string
     {
-        $columns = $this->importerColumns;
+        $column = collect($this->importerColumns)
+            ->first(fn (ImportColumn $column): bool => $column->getName() === $fieldName);
 
-        foreach ($columns as $column) {
-            /** @var ImportColumn $column */
-            if ($column->getName() === $fieldName) {
-                return $column->getLabel();
-            }
-        }
-
-        return Str::title(str_replace('_', ' ', $fieldName));
+        return $column?->getLabel() ?? Str::title(str_replace('_', ' ', $fieldName));
     }
 }

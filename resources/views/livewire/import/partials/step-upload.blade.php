@@ -4,16 +4,7 @@
         @php
             $fileName = $uploadedFile?->getClientOriginalName() ?? 'import.csv';
             $fileExtension = strtoupper(pathinfo($fileName, PATHINFO_EXTENSION));
-            $fileSize = $uploadedFile ? $uploadedFile->getSize() : 0;
-
-            // Format file size
-            if ($fileSize < 1024) {
-                $fileSizeFormatted = $fileSize . ' B';
-            } elseif ($fileSize < 1048576) {
-                $fileSizeFormatted = round($fileSize / 1024, 1) . ' KB';
-            } else {
-                $fileSizeFormatted = round($fileSize / 1048576, 1) . ' MB';
-            }
+            $fileSizeFormatted = Number::fileSize($uploadedFile?->getSize() ?? 0, precision: 1);
         @endphp
         <div class="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-12 flex items-center justify-center min-h-[400px]">
             {{-- File Info Card --}}

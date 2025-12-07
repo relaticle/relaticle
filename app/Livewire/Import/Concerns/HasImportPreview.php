@@ -54,9 +54,8 @@ trait HasImportPreview
         // Store as serializable array data
         $this->previewResultData = $result->toArray();
 
-        // Store all rows for editing
+        // Store all rows for preview
         $this->previewRows = $result->rows;
-        $this->excludedRows = [];
     }
 
     /**
@@ -81,32 +80,22 @@ trait HasImportPreview
     }
 
     /**
-     * Get the count of new records to be created (excluding excluded rows).
+     * Get the count of new records to be created.
      */
     public function getCreateCount(): int
     {
-        $count = 0;
-        foreach ($this->previewRows as $index => $row) {
-            if (! ($this->excludedRows[$index] ?? false) && ($row['_is_new'] ?? true)) {
-                $count++;
-            }
-        }
-
-        return $count;
+        return collect($this->previewRows)
+            ->filter(fn (array $row): bool => $row['_is_new'] ?? true)
+            ->count();
     }
 
     /**
-     * Get the count of existing records to be updated (excluding excluded rows).
+     * Get the count of existing records to be updated.
      */
     public function getUpdateCount(): int
     {
-        $count = 0;
-        foreach ($this->previewRows as $index => $row) {
-            if (! ($this->excludedRows[$index] ?? false) && ! ($row['_is_new'] ?? true)) {
-                $count++;
-            }
-        }
-
-        return $count;
+        return collect($this->previewRows)
+            ->reject(fn (array $row): bool => $row['_is_new'] ?? true)
+            ->count();
     }
 }

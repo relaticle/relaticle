@@ -63,7 +63,7 @@ trait HasCsvParsing
             }
 
             // Persist to storage
-            $storagePath = 'temp-imports/' . Str::uuid()->toString() . '.csv';
+            $storagePath = 'temp-imports/'.Str::uuid()->toString().'.csv';
             $content = file_get_contents($sourcePath);
             if ($content === false) {
                 throw new \RuntimeException('Failed to read file content');
@@ -73,7 +73,7 @@ trait HasCsvParsing
             return Storage::disk('local')->path($storagePath);
         } catch (\Exception $e) {
             report($e);
-            $this->addError('uploadedFile', 'Failed to process file: ' . $e->getMessage());
+            $this->addError('uploadedFile', 'Failed to process file: '.$e->getMessage());
 
             return null;
         }
@@ -122,32 +122,6 @@ trait HasCsvParsing
     }
 
     /**
-     * Get sample rows from the CSV for preview.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function getSampleRows(int $limit = 5): array
-    {
-        if ($this->persistedFilePath === null) {
-            return [];
-        }
-
-        $csvReader = $this->createCsvReader($this->persistedFilePath);
-        $records = [];
-        $count = 0;
-
-        foreach ($csvReader->getRecords() as $record) {
-            $records[] = $record;
-            $count++;
-            if ($count >= $limit) {
-                break;
-            }
-        }
-
-        return $records;
-    }
-
-    /**
      * Clean up temporary files.
      */
     protected function cleanupTempFile(): void
@@ -174,19 +148,12 @@ trait HasCsvParsing
         }
 
         $csvReader = $this->createCsvReader($this->persistedFilePath);
-        $values = [];
-        $count = 0;
 
-        foreach ($csvReader->getRecords() as $record) {
-            if (isset($record[$csvColumn])) {
-                $values[] = (string) $record[$csvColumn];
-            }
-            $count++;
-            if ($count >= $limit) {
-                break;
-            }
-        }
-
-        return $values;
+        return collect($csvReader->getRecords())
+            ->take($limit)
+            ->pluck($csvColumn)
+            ->map(fn (mixed $value): string => (string) $value)
+            ->values()
+            ->toArray();
     }
 }
