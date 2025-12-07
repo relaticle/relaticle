@@ -112,7 +112,7 @@ final readonly class CsvAnalyzer
      */
     private function determineFieldType(?ImportColumn $column): string
     {
-        if ($column === null) {
+        if (! $column instanceof \Filament\Actions\Imports\ImportColumn) {
             return 'string';
         }
 
@@ -126,7 +126,7 @@ final readonly class CsvAnalyzer
 
         // Check validation rules for type hints
         $rules = $column->getDataValidationRules();
-        $rulesString = implode('|', array_map('strval', $rules));
+        $rulesString = implode('|', array_map(strval(...), $rules));
 
         if (str_contains($rulesString, 'email')) {
             return 'email';
@@ -178,7 +178,7 @@ final readonly class CsvAnalyzer
             }
 
             $issue = $this->validateValue((string) $value, $fieldType, $count);
-            if ($issue !== null) {
+            if ($issue instanceof \App\Data\Import\ValueIssue) {
                 $issues[] = $issue;
             }
         }

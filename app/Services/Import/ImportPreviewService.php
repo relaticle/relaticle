@@ -170,7 +170,10 @@ final readonly class ImportPreviewService
     {
         foreach ($corrections as $fieldName => $valueMappings) {
             $csvColumn = $columnMap[$fieldName] ?? null;
-            if ($csvColumn === null || ! isset($record[$csvColumn])) {
+            if ($csvColumn === null) {
+                continue;
+            }
+            if (! isset($record[$csvColumn])) {
                 continue;
             }
 

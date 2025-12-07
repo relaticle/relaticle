@@ -236,7 +236,7 @@ final class ImportWizard extends Component
         ]);
 
         // Dispatch import jobs
-        $this->dispatchImportJobs($import, $importerClass);
+        $this->dispatchImportJobs($import);
 
         Notification::make()
             ->title('Import Started')
@@ -285,7 +285,7 @@ final class ImportWizard extends Component
             return '';
         }
 
-        fputcsv($output, $headers);
+        fputcsv($output, $headers, escape: '\\');
 
         foreach ($csvReader->getRecords() as $record) {
             foreach ($this->valueCorrections as $fieldName => $valueMappings) {
@@ -298,7 +298,7 @@ final class ImportWizard extends Component
                 }
             }
 
-            fputcsv($output, array_values($record));
+            fputcsv($output, array_values($record), escape: '\\');
         }
 
         rewind($output);
@@ -310,10 +310,8 @@ final class ImportWizard extends Component
 
     /**
      * Dispatch import jobs using Filament's job batching.
-     *
-     * @param  class-string<\App\Filament\Imports\BaseImporter>  $importerClass
      */
-    private function dispatchImportJobs(Import $import, string $importerClass): void
+    private function dispatchImportJobs(Import $import): void
     {
         $csvReader = $this->createCsvReader(
             Storage::disk('local')->path($import->file_path)

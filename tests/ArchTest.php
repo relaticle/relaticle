@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
+use App\Filament\Pages\Import\ImportPage;
 use App\Livewire\BaseLivewireComponent;
 
 arch()->preset()->php();
@@ -34,6 +35,7 @@ arch('avoid open for extension')
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
+        ImportPage::class,
     ]);
 
 arch('ensure no extends')
@@ -45,6 +47,7 @@ arch('ensure no extends')
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
+        ImportPage::class,
     ]);
 
 arch('avoid mutation')
