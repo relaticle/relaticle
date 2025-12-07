@@ -13,7 +13,7 @@
             </div>
 
             {{-- Mapping Rows --}}
-            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            <div class="space-y-1">
                 @foreach ($csvHeaders as $header)
                     @php
                         $mappedField = array_search($header, $columnMap);
@@ -21,8 +21,8 @@
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
-                        class="flex items-center py-2 transition-colors"
-                        :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-primary-50 dark:bg-primary-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'"
+                        class="flex items-center py-2 px-2 -mx-2 rounded-lg transition-colors"
+                        :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-primary-50 dark:bg-primary-950/30' : ''"
                         x-on:mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                     >
                         {{-- CSV Column Name --}}
