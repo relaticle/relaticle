@@ -122,4 +122,44 @@ trait HasColumnMapping
 
         return $missing;
     }
+
+    /**
+     * Map a CSV column to a field.
+     */
+    public function mapCsvColumnToField(string $csvColumn, string $fieldName): void
+    {
+        if ($fieldName === '') {
+            return;
+        }
+
+        // Remove any existing mapping for this field
+        $this->columnMap[$fieldName] = $csvColumn;
+    }
+
+    /**
+     * Unmap a column.
+     */
+    public function unmapColumn(string $fieldName): void
+    {
+        if (isset($this->columnMap[$fieldName])) {
+            $this->columnMap[$fieldName] = '';
+        }
+    }
+
+    /**
+     * Get the label for a field name.
+     */
+    public function getFieldLabel(string $fieldName): string
+    {
+        $columns = $this->importerColumns;
+
+        foreach ($columns as $column) {
+            /** @var ImportColumn $column */
+            if ($column->getName() === $fieldName) {
+                return $column->getLabel();
+            }
+        }
+
+        return Str::title(str_replace('_', ' ', $fieldName));
+    }
 }

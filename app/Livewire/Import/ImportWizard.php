@@ -84,6 +84,9 @@ final class ImportWizard extends Component
     /** @var array<string, array<string, string>> */
     public array $valueCorrections = [];
 
+    // Step 2: Map columns UI state
+    public ?string $selectedCsvColumn = null;
+
     // Review values UI state
     public string $reviewSearch = '';
 
@@ -384,6 +387,7 @@ final class ImportWizard extends Component
         $this->rowCount = 0;
         $this->csvHeaders = [];
         $this->columnMap = [];
+        $this->selectedCsvColumn = null;
         $this->columnAnalysesData = [];
         $this->valueCorrections = [];
         $this->previewResultData = null;
@@ -473,6 +477,14 @@ final class ImportWizard extends Component
         $this->correctionField = '';
         $this->correctionOldValue = '';
         $this->correctionNewValue = '';
+    }
+
+    /**
+     * Select a CSV column for preview in map step.
+     */
+    public function selectCsvColumn(string $csvColumn): void
+    {
+        $this->selectedCsvColumn = $csvColumn;
     }
 
     /**

@@ -161,4 +161,32 @@ trait HasCsvParsing
             Storage::disk('local')->delete($storagePath);
         }
     }
+
+    /**
+     * Get preview values for a specific CSV column.
+     *
+     * @return array<int, string>
+     */
+    public function getColumnPreviewValues(string $csvColumn, int $limit = 5): array
+    {
+        if ($this->persistedFilePath === null) {
+            return [];
+        }
+
+        $csvReader = $this->createCsvReader($this->persistedFilePath);
+        $values = [];
+        $count = 0;
+
+        foreach ($csvReader->getRecords() as $record) {
+            if (isset($record[$csvColumn])) {
+                $values[] = (string) $record[$csvColumn];
+            }
+            $count++;
+            if ($count >= $limit) {
+                break;
+            }
+        }
+
+        return $values;
+    }
 }

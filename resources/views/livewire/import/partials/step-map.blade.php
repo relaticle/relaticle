@@ -1,142 +1,138 @@
 <div class="space-y-6">
-    {{-- Column Mapping Table --}}
-    <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Field
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        CSV Column
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-16">
-                        Status
-                    </th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                @foreach ($this->importerColumns as $column)
-                    @php
-                        $columnName = $column->getName();
-                        $isRequired = $column->isMappingRequired();
-                        $isMapped = !empty($columnMap[$columnName]);
-                    @endphp
-                    <tr @class([
-                        'bg-danger-50 dark:bg-danger-950/30' => $isRequired && !$isMapped,
-                    ])>
-                        <td class="px-4 py-3 text-sm">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium text-gray-950 dark:text-white">
-                                    {{ $column->getLabel() }}
-                                </span>
-                                @if ($isRequired)
-                                    <x-filament::badge size="sm" color="danger">
-                                        Required
-                                    </x-filament::badge>
-                                @endif
-                            </div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <x-filament::input.wrapper>
-                                <x-filament::input.select wire:model.live="columnMap.{{ $columnName }}">
-                                    <option value="">Select column</option>
-                                    @foreach ($csvHeaders as $header)
-                                        <option value="{{ $header }}">{{ $header }}</option>
-                                    @endforeach
-                                </x-filament::input.select>
-                            </x-filament::input.wrapper>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            @if ($isMapped)
-                                <x-filament::icon
-                                    icon="heroicon-s-check-circle"
-                                    class="mx-auto h-5 w-5 text-success-500"
-                                />
-                            @elseif ($isRequired)
-                                <x-filament::icon
-                                    icon="heroicon-s-exclamation-circle"
-                                    class="mx-auto h-5 w-5 text-danger-500"
-                                />
-                            @else
-                                <x-filament::icon
-                                    icon="heroicon-o-minus-circle"
-                                    class="mx-auto h-5 w-5 text-gray-400 dark:text-gray-600"
-                                />
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-
-    {{-- Missing Required Fields Warning --}}
-    @if (!$this->hasAllRequiredMappings())
-        <x-filament::section compact class="bg-warning-50 dark:bg-warning-950">
-            <div class="flex items-start gap-3">
-                <x-filament::icon icon="heroicon-s-exclamation-triangle" class="h-5 w-5 text-warning-500 shrink-0" />
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-warning-800 dark:text-warning-200">Missing Required Mappings</p>
-                    <p class="text-sm text-warning-700 dark:text-warning-300">
-                        {{ implode(', ', $this->getMissingRequiredMappings()) }}
-                    </p>
+    <div class="flex gap-6 min-h-[500px]">
+        {{-- Column Mapping Table --}}
+        <div class="flex-1">
+            {{-- Header --}}
+            <div class="flex items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-1">
+                <div class="flex-1 text-sm font-medium text-gray-500 dark:text-gray-400">File column</div>
+                <div class="w-8"></div>
+                <div class="flex-1 flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <span>Attributes</span>
+                    <x-filament::icon-button
+                        icon="heroicon-o-information-circle"
+                        color="gray"
+                        size="sm"
+                        label="Map unique attributes"
+                    />
+                    <span class="text-xs text-gray-400 dark:text-gray-500">Map unique attributes</span>
                 </div>
             </div>
-        </x-filament::section>
-    @endif
 
-    {{-- Sample Data Preview --}}
-    @if ($this->hasAllRequiredMappings())
-        <x-filament::section compact>
-            <x-slot name="heading">Sample Data Preview</x-slot>
-            <div class="overflow-x-auto -mx-4 sm:-mx-6">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 dark:border-gray-700">
-                            @foreach ($columnMap as $fieldName => $csvColumn)
-                                @if ($csvColumn)
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        {{ $fieldName }}
-                                    </th>
-                                @endif
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        @foreach ($this->getSampleRows(3) as $row)
-                            <tr>
-                                @foreach ($columnMap as $fieldName => $csvColumn)
-                                    @if ($csvColumn)
-                                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
-                                            {{ $row[$csvColumn] ?? '' }}
-                                        </td>
-                                    @endif
-                                @endforeach
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            {{-- Mapping Rows --}}
+            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                @foreach ($csvHeaders as $header)
+                    @php
+                        $mappedField = array_search($header, $columnMap);
+                        $isMapped = $mappedField !== false;
+                    @endphp
+                    <div
+                        wire:key="map-{{ md5($header) }}"
+                        @class([
+                            'flex items-center py-3 cursor-pointer transition-colors',
+                            'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+                            'bg-primary-50 dark:bg-primary-950/30' => $selectedCsvColumn === $header,
+                        ])
+                        wire:click="selectCsvColumn('{{ addslashes($header) }}')"
+                    >
+                        {{-- CSV Column Name --}}
+                        <div class="flex-1 text-sm font-medium text-gray-950 dark:text-white">
+                            {{ $header }}
+                        </div>
+
+                        {{-- Arrow --}}
+                        <div class="w-8 flex justify-center">
+                            <x-filament::icon icon="heroicon-m-arrow-right" class="h-4 w-4 text-gray-400" />
+                        </div>
+
+                        {{-- Attribute Select --}}
+                        <div class="flex-1" x-data x-on:click.stop>
+                            @if ($isMapped)
+                                <div class="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                    <div class="flex items-center gap-2">
+                                        <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400" />
+                                        <span class="text-sm text-gray-950 dark:text-white">
+                                            {{ $this->getFieldLabel($mappedField) }}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click="unmapColumn('{{ $mappedField }}')"
+                                        class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    >
+                                        <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            @else
+                                <x-filament::input.wrapper>
+                                    <x-filament::input.select
+                                        wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
+                                    >
+                                        <option value="">Select attribute</option>
+                                        @foreach ($this->importerColumns as $column)
+                                            @php
+                                                $columnName = $column->getName();
+                                                $isAlreadyMapped = !empty($columnMap[$columnName]);
+                                            @endphp
+                                            @unless ($isAlreadyMapped)
+                                                <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
+                                            @endunless
+                                        @endforeach
+                                    </x-filament::input.select>
+                                </x-filament::input.wrapper>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
             </div>
-        </x-filament::section>
-    @endif
+        </div>
+
+        {{-- Data Preview Panel --}}
+        <div class="w-80 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col">
+            @php
+                $previewColumn = $selectedCsvColumn ?? $csvHeaders[0] ?? null;
+                $previewValues = $previewColumn ? $this->getColumnPreviewValues($previewColumn, 5) : [];
+            @endphp
+
+            @if ($previewColumn)
+                {{-- Preview Header --}}
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-950 dark:text-white">{{ $previewColumn }}</span>
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <x-filament::icon icon="heroicon-o-eye" class="h-3.5 w-3.5" />
+                        <span>Data preview</span>
+                    </div>
+                </div>
+
+                {{-- Preview Values --}}
+                <div class="flex-1 overflow-y-auto">
+                    @forelse ($previewValues as $value)
+                        <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300">
+                            {{ $value ?: '(blank)' }}
+                        </div>
+                    @empty
+                        <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                            No data available
+                        </div>
+                    @endforelse
+                </div>
+
+                {{-- Preview Footer --}}
+                <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        This preview shows only a portion of the column values
+                    </p>
+                </div>
+            @else
+                <div class="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                    Select a column to preview values
+                </div>
+            @endif
+        </div>
+    </div>
 
     {{-- Navigation --}}
     <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-        <x-filament::button
-            wire:click="previousStep"
-            color="gray"
-            icon="heroicon-m-arrow-left"
-        >
-            Back
-        </x-filament::button>
-        <x-filament::button
-            wire:click="nextStep"
-            :disabled="!$this->canProceedToNextStep()"
-            icon="heroicon-m-arrow-right"
-            icon-position="after"
-        >
-            Continue
-        </x-filament::button>
+        <x-filament::button wire:click="resetWizard" color="gray">Start over</x-filament::button>
+        <x-filament::button wire:click="nextStep" :disabled="!$this->canProceedToNextStep()">Continue</x-filament::button>
     </div>
 </div>
