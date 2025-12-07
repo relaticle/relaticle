@@ -45,13 +45,14 @@
                                         @php
                                             $columnName = $column->getName();
                                             $isAlreadyMapped = !empty($columnMap[$columnName]) && $columnMap[$columnName] !== $header;
+                                            $isRequired = $column->isMappingRequired();
                                         @endphp
                                         <option
                                             value="{{ $columnName }}"
                                             @selected($selectedValue === $columnName)
                                             @disabled($isAlreadyMapped)
                                         >
-                                            {{ $column->getLabel() }}
+                                            {{ $column->getLabel() }}{{ $isRequired ? ' *' : '' }}
                                         </option>
                                     @endforeach
                                 </x-filament::input.select>
@@ -92,6 +93,23 @@
             </div>
         </div>
     </div>
+
+    {{-- Required Fields Warning --}}
+    @php
+        $unmappedRequired = collect($this->importerColumns)
+            ->filter(fn ($col) => $col->isMappingRequired() && empty($columnMap[$col->getName()]))
+            ->map(fn ($col) => $col->getLabel())
+            ->values();
+    @endphp
+    @if ($unmappedRequired->isNotEmpty())
+        <div class="flex items-start gap-2 p-3 rounded-lg bg-warning-50 dark:bg-warning-950/50 border border-warning-200 dark:border-warning-800">
+            <x-filament::icon icon="heroicon-o-exclamation-triangle" class="h-5 w-5 text-warning-500 shrink-0 mt-0.5" />
+            <div class="text-sm">
+                <span class="font-medium text-warning-800 dark:text-warning-200">Required fields not mapped:</span>
+                <span class="text-warning-700 dark:text-warning-300">{{ $unmappedRequired->join(', ') }}</span>
+            </div>
+        </div>
+    @endif
 
     {{-- Navigation --}}
     <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
