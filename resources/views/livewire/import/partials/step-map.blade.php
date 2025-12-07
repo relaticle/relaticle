@@ -18,6 +18,9 @@
                     @php
                         $mappedField = array_search($header, $columnMap);
                         $isMapped = $mappedField !== false;
+                        $availableColumns = collect($this->importerColumns)
+                            ->filter(fn ($col) => empty($columnMap[$col->getName()]))
+                            ->values();
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
@@ -34,40 +37,78 @@
                         </div>
 
                         {{-- Attribute Select --}}
-                        <div class="flex-1">
+                        <div class="flex-1" x-data="{ open: false, search: '' }" x-on:click.outside="open = false">
                             @if ($isMapped)
-                                <x-filament::input.wrapper>
-                                    <div class="fi-input-wrp flex items-center justify-between gap-2 pe-3">
-                                        <div class="flex items-center gap-2 min-w-0 py-1.5 ps-3">
-                                            <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400 shrink-0" />
-                                            <span class="text-sm text-gray-950 dark:text-white truncate">{{ $this->getFieldLabel($mappedField) }}</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            wire:click="unmapColumn('{{ $mappedField }}')"
-                                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-                                        >
-                                            <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4" />
-                                        </button>
+                                {{-- Selected State --}}
+                                <button
+                                    type="button"
+                                    wire:click="unmapColumn('{{ $mappedField }}')"
+                                    class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400 shrink-0" />
+                                        <span class="text-gray-950 dark:text-white truncate">{{ $this->getFieldLabel($mappedField) }}</span>
                                     </div>
-                                </x-filament::input.wrapper>
+                                    <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4 text-gray-400 shrink-0" />
+                                </button>
                             @else
-                                <x-filament::input.wrapper>
-                                    <x-filament::input.select
-                                        wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
+                                {{-- Searchable Select --}}
+                                <div class="relative">
+                                    <button
+                                        type="button"
+                                        x-on:click="open = !open; $nextTick(() => open && $refs.search.focus())"
+                                        class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                                     >
-                                        <option value="">Select attribute</option>
-                                        @foreach ($this->importerColumns as $column)
-                                            @php
-                                                $columnName = $column->getName();
-                                                $isAlreadyMapped = !empty($columnMap[$columnName]);
-                                            @endphp
-                                            @unless ($isAlreadyMapped)
-                                                <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
-                                            @endunless
-                                        @endforeach
-                                    </x-filament::input.select>
-                                </x-filament::input.wrapper>
+                                        <span class="text-gray-400">Select attribute</span>
+                                        <x-filament::icon icon="heroicon-m-chevron-down" class="h-4 w-4 text-gray-400 shrink-0" />
+                                    </button>
+
+                                    {{-- Dropdown --}}
+                                    <div
+                                        x-show="open"
+                                        x-transition:enter="transition ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 scale-95"
+                                        x-transition:enter-end="opacity-100 scale-100"
+                                        x-transition:leave="transition ease-in duration-75"
+                                        x-transition:leave-start="opacity-100 scale-100"
+                                        x-transition:leave-end="opacity-0 scale-95"
+                                        x-cloak
+                                        class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
+                                    >
+                                        {{-- Search Input --}}
+                                        <div class="p-2 border-b border-gray-200 dark:border-gray-700">
+                                            <input
+                                                type="text"
+                                                x-ref="search"
+                                                x-model="search"
+                                                placeholder="Search..."
+                                                class="w-full px-2 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-950 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                            />
+                                        </div>
+
+                                        {{-- Options --}}
+                                        <div class="max-h-48 overflow-y-auto py-1">
+                                            @foreach ($availableColumns as $column)
+                                                <button
+                                                    type="button"
+                                                    x-show="!search || '{{ strtolower($column->getLabel()) }}'.includes(search.toLowerCase())"
+                                                    wire:click="mapCsvColumnToField('{{ addslashes($header) }}', '{{ $column->getName() }}')"
+                                                    x-on:click="open = false; search = ''"
+                                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                >
+                                                    <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400 shrink-0" />
+                                                    {{ $column->getLabel() }}
+                                                </button>
+                                            @endforeach
+                                            <div
+                                                x-show="search && ![{{ $availableColumns->map(fn ($c) => "'" . strtolower($c->getLabel()) . "'")->implode(',') }}].some(l => l.includes(search.toLowerCase()))"
+                                                class="px-3 py-2 text-sm text-gray-400"
+                                            >
+                                                No results found
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             @endif
                         </div>
                     </div>
