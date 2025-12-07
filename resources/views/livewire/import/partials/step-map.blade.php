@@ -36,35 +36,38 @@
                         {{-- Attribute Select --}}
                         <div class="flex-1">
                             @if ($isMapped)
-                                <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                                    <div class="flex items-center gap-1.5">
-                                        <x-filament::icon icon="heroicon-o-squares-2x2" class="h-3.5 w-3.5 text-gray-400" />
-                                        <span class="text-sm text-gray-950 dark:text-white">{{ $this->getFieldLabel($mappedField) }}</span>
+                                <x-filament::input.wrapper>
+                                    <div class="fi-input-wrp flex items-center justify-between gap-2 pe-3">
+                                        <div class="flex items-center gap-2 min-w-0 py-1.5 ps-3">
+                                            <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400 shrink-0" />
+                                            <span class="text-sm text-gray-950 dark:text-white truncate">{{ $this->getFieldLabel($mappedField) }}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            wire:click="unmapColumn('{{ $mappedField }}')"
+                                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                                        >
+                                            <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4" />
+                                        </button>
                                     </div>
-                                    <button
-                                        type="button"
-                                        wire:click="unmapColumn('{{ $mappedField }}')"
-                                        class="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                    >
-                                        <x-filament::icon icon="heroicon-m-x-mark" class="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
+                                </x-filament::input.wrapper>
                             @else
-                                <select
-                                    wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
-                                    class="w-full text-sm px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                >
-                                    <option value="">Select attribute</option>
-                                    @foreach ($this->importerColumns as $column)
-                                        @php
-                                            $columnName = $column->getName();
-                                            $isAlreadyMapped = !empty($columnMap[$columnName]);
-                                        @endphp
-                                        @unless ($isAlreadyMapped)
-                                            <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
-                                        @endunless
-                                    @endforeach
-                                </select>
+                                <x-filament::input.wrapper>
+                                    <x-filament::input.select
+                                        wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
+                                    >
+                                        <option value="">Select attribute</option>
+                                        @foreach ($this->importerColumns as $column)
+                                            @php
+                                                $columnName = $column->getName();
+                                                $isAlreadyMapped = !empty($columnMap[$columnName]);
+                                            @endphp
+                                            @unless ($isAlreadyMapped)
+                                                <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
+                                            @endunless
+                                        @endforeach
+                                    </x-filament::input.select>
+                                </x-filament::input.wrapper>
                             @endif
                         </div>
                     </div>
