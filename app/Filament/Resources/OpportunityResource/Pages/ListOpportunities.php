@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
-use App\Filament\Actions\EnhancedImportAction;
 use App\Filament\Exports\OpportunityExporter;
-use App\Filament\Imports\OpportunityImporter;
+use App\Filament\Pages\Import\ImportOpportunities;
 use App\Filament\Resources\OpportunityResource;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
@@ -27,7 +27,10 @@ final class ListOpportunities extends ListRecords
     {
         return [
             ActionGroup::make([
-                EnhancedImportAction::make()->importer(OpportunityImporter::class),
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->url(ImportOpportunities::getUrl()),
                 ExportAction::make()->exporter(OpportunityExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
-use App\Filament\Actions\EnhancedImportAction;
 use App\Filament\Exports\CompanyExporter;
-use App\Filament\Imports\CompanyImporter;
+use App\Filament\Pages\Import\ImportCompanies;
 use App\Filament\Resources\CompanyResource;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
@@ -31,7 +31,10 @@ final class ListCompanies extends ListRecords
     {
         return [
             ActionGroup::make([
-                EnhancedImportAction::make()->importer(CompanyImporter::class),
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->url(ImportCompanies::getUrl()),
                 ExportAction::make()->exporter(CompanyExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')

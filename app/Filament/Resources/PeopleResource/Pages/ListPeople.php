@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
-use App\Filament\Actions\EnhancedImportAction;
 use App\Filament\Exports\PeopleExporter;
-use App\Filament\Imports\PeopleImporter;
+use App\Filament\Pages\Import\ImportPeople;
 use App\Filament\Resources\PeopleResource;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\Size;
+use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
 
 final class ListPeople extends ListRecords
@@ -21,11 +22,15 @@ final class ListPeople extends ListRecords
 
     protected static string $resource = PeopleResource::class;
 
+    #[Override]
     protected function getHeaderActions(): array
     {
         return [
             ActionGroup::make([
-                EnhancedImportAction::make()->importer(PeopleImporter::class),
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->url(ImportPeople::getUrl()),
                 ExportAction::make()->exporter(PeopleExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')

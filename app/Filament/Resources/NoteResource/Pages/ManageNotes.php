@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\NoteResource\Pages;
 
-use App\Filament\Actions\EnhancedImportAction;
 use App\Filament\Exports\NoteExporter;
-use App\Filament\Imports\NoteImporter;
+use App\Filament\Pages\Import\ImportNotes;
 use App\Filament\Resources\NoteResource;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
@@ -27,7 +27,10 @@ final class ManageNotes extends ManageRecords
     {
         return [
             ActionGroup::make([
-                EnhancedImportAction::make()->importer(NoteImporter::class),
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->url(ImportNotes::getUrl()),
                 ExportAction::make()->exporter(NoteExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
