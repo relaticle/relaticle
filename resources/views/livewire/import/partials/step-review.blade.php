@@ -123,15 +123,13 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-2">
-                                            @if ($hasIssue || $hasCorrection)
-                                                <x-filament::link
-                                                    wire:click="openCorrectionModal('{{ $analysis->mappedToField }}', '{{ addslashes($value) }}')"
-                                                    tag="button"
-                                                    size="sm"
-                                                >
-                                                    {{ $hasCorrection ? 'Edit' : 'Fix' }}
-                                                </x-filament::link>
-                                            @endif
+                                            <x-filament::link
+                                                wire:click="openCorrectionModal('{{ $analysis->mappedToField }}', '{{ addslashes($value) }}')"
+                                                tag="button"
+                                                size="sm"
+                                            >
+                                                {{ $hasCorrection ? 'Edit' : ($hasIssue ? 'Fix' : 'Edit') }}
+                                            </x-filament::link>
                                         </td>
                                     </tr>
                                 @empty

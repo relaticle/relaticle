@@ -1,29 +1,48 @@
 <div>
-    {{-- Step Progress --}}
+    {{-- Step Progress (Clickable) --}}
     <nav class="mb-8" aria-label="Progress">
         <ol role="list" class="flex items-center">
             @foreach ($this->getStepLabels() as $step => $label)
+                @php
+                    $isClickable = $step <= $currentStep;
+                @endphp
                 <li @class(['relative', 'flex-1' => $step < 4])>
                     <div class="flex items-center">
-                        <span @class([
-                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
-                            'bg-primary-600 text-white ring-2 ring-primary-600' => $currentStep === $step,
-                            'bg-primary-600 text-white' => $currentStep > $step,
-                            'border-2 border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400' => $currentStep < $step,
-                        ])>
+                        <button
+                            type="button"
+                            @if($isClickable)
+                                wire:click="goToStep({{ $step }})"
+                            @endif
+                            @class([
+                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
+                                'bg-primary-600 text-white ring-2 ring-primary-600' => $currentStep === $step,
+                                'bg-primary-600 text-white hover:bg-primary-700 cursor-pointer' => $currentStep > $step,
+                                'border-2 border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400 cursor-default' => $currentStep < $step,
+                            ])
+                            @disabled(!$isClickable)
+                        >
                             @if ($currentStep > $step)
                                 <x-filament::icon icon="heroicon-s-check" class="h-4 w-4" />
                             @else
                                 {{ $step }}
                             @endif
-                        </span>
-                        <span @class([
-                            'ml-3 text-sm font-medium hidden sm:block',
-                            'text-gray-950 dark:text-white' => $currentStep >= $step,
-                            'text-gray-500 dark:text-gray-400' => $currentStep < $step,
-                        ])>
+                        </button>
+                        <button
+                            type="button"
+                            @if($isClickable)
+                                wire:click="goToStep({{ $step }})"
+                            @endif
+                            @class([
+                                'ml-3 text-sm font-medium hidden sm:block',
+                                'text-gray-950 dark:text-white' => $currentStep >= $step,
+                                'text-gray-500 dark:text-gray-400' => $currentStep < $step,
+                                'hover:underline cursor-pointer' => $isClickable,
+                                'cursor-default' => !$isClickable,
+                            ])
+                            @disabled(!$isClickable)
+                        >
                             {{ $label }}
-                        </span>
+                        </button>
                         @if ($step < 4)
                             <div @class([
                                 'ml-4 h-0.5 flex-1',

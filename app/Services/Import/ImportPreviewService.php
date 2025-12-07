@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Import;
 
 use App\Data\Import\ImportPreviewResult;
-use App\Enums\DuplicateHandlingStrategy;
 use App\Models\Import;
 use Filament\Actions\Imports\Importer;
 use Illuminate\Database\Eloquent\Model;
@@ -21,14 +20,12 @@ use League\Csv\Statement;
  */
 final readonly class ImportPreviewService
 {
-    private const int SAMPLE_LIMIT = 5;
-
     /**
      * Generate a preview of what an import will do.
      *
      * @param  class-string<Importer>  $importerClass
      * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
-     * @param  array<string, mixed>  $options  Import options (e.g., duplicate_handling)
+     * @param  array<string, mixed>  $options  Import options
      * @param  array<string, array<string, string>>  $valueCorrections  User-defined value corrections
      */
     public function preview(
@@ -54,11 +51,7 @@ final readonly class ImportPreviewService
 
         $willCreate = 0;
         $willUpdate = 0;
-        $willSkip = 0;
-        $willFail = 0;
-        $sampleCreates = [];
-        $sampleUpdates = [];
-        $errors = [];
+        $rows = [];
 
         $rowNumber = 0;
         foreach ($records as $record) {
@@ -76,27 +69,25 @@ final readonly class ImportPreviewService
                     rowData: $record,
                 );
 
-                if ($result['action'] === 'create') {
+                $isNew = $result['action'] === 'create';
+
+                if ($isNew) {
                     $willCreate++;
-                    if (count($sampleCreates) < self::SAMPLE_LIMIT) {
-                        $sampleCreates[] = $this->formatSampleRecord($record, $columnMap);
-                    }
-                } elseif ($result['action'] === 'update') {
+                } else {
                     $willUpdate++;
-                    if (count($sampleUpdates) < self::SAMPLE_LIMIT) {
-                        $sampleUpdates[] = $this->formatSampleRecord($record, $columnMap);
-                    }
-                } elseif ($result['action'] === 'skip') {
-                    $willSkip++;
                 }
-            } catch (\Throwable $e) {
-                $willFail++;
-                if (count($errors) < 20) {
-                    $errors[] = [
-                        'row' => $rowNumber,
-                        'message' => $e->getMessage(),
-                    ];
-                }
+
+                // Store row data with metadata
+                $rows[] = array_merge(
+                    $this->formatRowRecord($record, $columnMap),
+                    [
+                        '_row_index' => $rowNumber,
+                        '_is_new' => $isNew,
+                    ]
+                );
+            } catch (\Throwable) {
+                // Skip errored rows in preview - they'll be handled during actual import
+                continue;
             }
         }
 
@@ -104,11 +95,7 @@ final readonly class ImportPreviewService
             totalRows: $totalRows,
             createCount: $willCreate,
             updateCount: $willUpdate,
-            skipCount: $willSkip,
-            errorCount: $willFail,
-            sampleCreates: $sampleCreates,
-            sampleUpdates: $sampleUpdates,
-            errors: $errors,
+            rows: $rows,
         );
     }
 
@@ -160,25 +147,14 @@ final readonly class ImportPreviewService
         $record = $resolveMethod->invoke($importer);
 
         if ($record === null) {
-            return ['action' => 'skip', 'record' => null];
+            return ['action' => 'create', 'record' => null];
         }
 
-        // Check duplicate handling strategy
-        $duplicateStrategy = $options['duplicate_handling'] ?? DuplicateHandlingStrategy::SKIP;
-        if (is_string($duplicateStrategy)) {
-            $duplicateStrategy = DuplicateHandlingStrategy::tryFrom($duplicateStrategy) ?? DuplicateHandlingStrategy::SKIP;
-        }
-
+        // If record exists in DB, it's an update; otherwise it's a create
         if ($record->exists) {
-            // Record exists in database
-            if ($duplicateStrategy === DuplicateHandlingStrategy::SKIP) {
-                return ['action' => 'skip', 'record' => $record];
-            }
-
             return ['action' => 'update', 'record' => $record];
         }
 
-        // New record would be created
         return ['action' => 'create', 'record' => $record];
     }
 
@@ -208,13 +184,13 @@ final readonly class ImportPreviewService
     }
 
     /**
-     * Format a sample record for preview display.
+     * Format a row record with mapped field names.
      *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $columnMap
      * @return array<string, mixed>
      */
-    private function formatSampleRecord(array $record, array $columnMap): array
+    private function formatRowRecord(array $record, array $columnMap): array
     {
         $formatted = [];
 

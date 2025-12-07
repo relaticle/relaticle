@@ -95,7 +95,11 @@ final class ImportWizard extends Component
     /** @var array<string, mixed>|null */
     public ?array $previewResultData = null;
 
-    public string $duplicateHandling = 'skip';
+    /** @var array<int, array<string, mixed>> All rows for preview/editing */
+    public array $previewRows = [];
+
+    /** @var array<int, bool> Rows to exclude from import (index => true) */
+    public array $excludedRows = [];
 
     // Value correction modal
     public bool $showCorrectionModal = false;
@@ -114,7 +118,6 @@ final class ImportWizard extends Component
         $this->resetErrorBag('uploadedFile');
         $this->parseUploadedFile();
     }
-
 
     /**
      * Move to the next step.
@@ -144,6 +147,19 @@ final class ImportWizard extends Component
         if ($this->currentStep > self::STEP_UPLOAD) {
             $this->currentStep--;
         }
+    }
+
+    /**
+     * Navigate directly to a specific step (for clickable step navigation).
+     */
+    public function goToStep(int $step): void
+    {
+        // Only allow navigating to completed steps or current step
+        if ($step < self::STEP_UPLOAD || $step > $this->currentStep) {
+            return;
+        }
+
+        $this->currentStep = $step;
     }
 
     /**
@@ -249,7 +265,7 @@ final class ImportWizard extends Component
      */
     private function moveFileToPermanentStorage(): string
     {
-        $permanentPath = 'imports/' . Str::uuid()->toString() . '.csv';
+        $permanentPath = 'imports/'.Str::uuid()->toString().'.csv';
 
         // If we have corrections, apply them
         if ($this->valueCorrections !== []) {
@@ -324,7 +340,7 @@ final class ImportWizard extends Component
                 rows: base64_encode(serialize($chunk)),
                 columnMap: $this->columnMap,
                 options: [
-                    'duplicate_handling' => DuplicateHandlingStrategy::tryFrom($this->duplicateHandling) ?? DuplicateHandlingStrategy::SKIP,
+                    'duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW,
                 ],
             );
         }
@@ -335,6 +351,19 @@ final class ImportWizard extends Component
                 $import->update(['completed_at' => now()]);
             })
             ->dispatch();
+    }
+
+    /**
+     * Remove the current file and allow selecting a new one.
+     */
+    public function removeFile(): void
+    {
+        $this->cleanupTempFile();
+        $this->uploadedFile = null;
+        $this->persistedFilePath = null;
+        $this->rowCount = 0;
+        $this->csvHeaders = [];
+        $this->columnMap = [];
     }
 
     /**
@@ -354,10 +383,31 @@ final class ImportWizard extends Component
         $this->columnAnalysesData = [];
         $this->valueCorrections = [];
         $this->previewResultData = null;
-        $this->duplicateHandling = 'skip';
+        $this->previewRows = [];
+        $this->excludedRows = [];
         $this->reviewSearch = '';
         $this->reviewPage = 1;
         $this->expandedColumn = null;
+    }
+
+    /**
+     * Get the count of rows that will be imported (excluding skipped rows).
+     */
+    public function getActiveRowCount(): int
+    {
+        return count($this->previewRows) - count(array_filter($this->excludedRows));
+    }
+
+    /**
+     * Toggle exclusion of a specific row.
+     */
+    public function toggleRowExclusion(int $index): void
+    {
+        if (isset($this->excludedRows[$index]) && $this->excludedRows[$index]) {
+            unset($this->excludedRows[$index]);
+        } else {
+            $this->excludedRows[$index] = true;
+        }
     }
 
     /**

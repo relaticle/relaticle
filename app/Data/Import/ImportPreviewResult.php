@@ -12,34 +12,14 @@ use Spatie\LaravelData\Data;
 final class ImportPreviewResult extends Data
 {
     /**
-     * @param  array<int, array<string, mixed>>  $sampleCreates  First N records that will be created
-     * @param  array<int, array<string, mixed>>  $sampleUpdates  First N records that will be updated
-     * @param  array<int, array{row: int, message: string}>  $errors  Validation errors by row
+     * @param  array<int, array<string, mixed>>  $rows  All rows with mapped field values and _is_new flag
      */
     public function __construct(
         public int $totalRows,
         public int $createCount,
         public int $updateCount,
-        public int $skipCount,
-        public int $errorCount,
-        public array $sampleCreates = [],
-        public array $sampleUpdates = [],
-        public array $errors = [],
+        public array $rows = [],
     ) {}
-
-    public function hasErrors(): bool
-    {
-        return $this->errorCount > 0;
-    }
-
-    public function successRate(): float
-    {
-        if ($this->totalRows === 0) {
-            return 0.0;
-        }
-
-        return (($this->createCount + $this->updateCount) / $this->totalRows) * 100;
-    }
 
     public function summary(): string
     {
@@ -51,14 +31,6 @@ final class ImportPreviewResult extends Data
 
         if ($this->updateCount > 0) {
             $parts[] = "{$this->updateCount} will be updated";
-        }
-
-        if ($this->skipCount > 0) {
-            $parts[] = "{$this->skipCount} will be skipped";
-        }
-
-        if ($this->errorCount > 0) {
-            $parts[] = "{$this->errorCount} will fail";
         }
 
         return implode(', ', $parts);

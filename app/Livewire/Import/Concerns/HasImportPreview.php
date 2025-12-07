@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Import\Concerns;
 
 use App\Data\Import\ImportPreviewResult;
-use App\Enums\DuplicateHandlingStrategy;
 use App\Services\Import\ImportPreviewService;
 use Filament\Facades\Filament;
 use Livewire\Attributes\Computed;
@@ -25,6 +24,7 @@ trait HasImportPreview
         $importerClass = $this->getImporterClass();
         if ($importerClass === null || $this->persistedFilePath === null) {
             $this->previewResultData = null;
+            $this->previewRows = [];
 
             return;
         }
@@ -34,6 +34,7 @@ trait HasImportPreview
 
         if ($team === null || $user === null) {
             $this->previewResultData = null;
+            $this->previewRows = [];
 
             return;
         }
@@ -44,9 +45,7 @@ trait HasImportPreview
             importerClass: $importerClass,
             csvPath: $this->persistedFilePath,
             columnMap: $this->columnMap,
-            options: [
-                'duplicate_handling' => $this->duplicateHandling,
-            ],
+            options: [],
             teamId: $team->getKey(),
             userId: $user->getAuthIdentifier(),
             valueCorrections: $this->valueCorrections,
@@ -54,6 +53,10 @@ trait HasImportPreview
 
         // Store as serializable array data
         $this->previewResultData = $result->toArray();
+
+        // Store all rows for editing
+        $this->previewRows = $result->rows;
+        $this->excludedRows = [];
     }
 
     /**
@@ -74,26 +77,36 @@ trait HasImportPreview
      */
     public function hasRecordsToImport(): bool
     {
-        $preview = $this->previewResult;
-        if ($preview === null) {
-            return false;
-        }
-
-        return $preview->createCount > 0 || $preview->updateCount > 0;
+        return $this->getActiveRowCount() > 0;
     }
 
     /**
-     * Get duplicate handling options.
-     *
-     * @return array<string, string>
+     * Get the count of new records to be created (excluding excluded rows).
      */
-    public function getDuplicateHandlingOptions(): array
+    public function getCreateCount(): int
     {
-        $options = [];
-        foreach (DuplicateHandlingStrategy::cases() as $strategy) {
-            $options[$strategy->value] = $strategy->getLabel();
+        $count = 0;
+        foreach ($this->previewRows as $index => $row) {
+            if (! ($this->excludedRows[$index] ?? false) && ($row['_is_new'] ?? true)) {
+                $count++;
+            }
         }
 
-        return $options;
+        return $count;
+    }
+
+    /**
+     * Get the count of existing records to be updated (excluding excluded rows).
+     */
+    public function getUpdateCount(): int
+    {
+        $count = 0;
+        foreach ($this->previewRows as $index => $row) {
+            if (! ($this->excludedRows[$index] ?? false) && ! ($row['_is_new'] ?? true)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }
