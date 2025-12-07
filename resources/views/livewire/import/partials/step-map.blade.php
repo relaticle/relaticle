@@ -1,21 +1,15 @@
-<div class="space-y-6">
-    <div class="flex gap-6 min-h-[500px]">
-        {{-- Column Mapping Table --}}
+<div
+    class="space-y-6"
+    x-data="{ hoveredColumn: '{{ $csvHeaders[0] ?? '' }}' }"
+>
+    <div class="flex gap-6">
+        {{-- Column Mapping List --}}
         <div class="flex-1">
             {{-- Header --}}
-            <div class="flex items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-1">
-                <div class="flex-1 text-sm font-medium text-gray-500 dark:text-gray-400">File column</div>
-                <div class="w-8"></div>
-                <div class="flex-1 flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    <span>Attributes</span>
-                    <x-filament::icon-button
-                        icon="heroicon-o-information-circle"
-                        color="gray"
-                        size="sm"
-                        label="Map unique attributes"
-                    />
-                    <span class="text-xs text-gray-400 dark:text-gray-500">Map unique attributes</span>
-                </div>
+            <div class="flex items-center pb-2 mb-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div class="flex-1">File column</div>
+                <div class="w-6"></div>
+                <div class="flex-1">Attributes</div>
             </div>
 
             {{-- Mapping Rows --}}
@@ -27,58 +21,49 @@
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
-                        @class([
-                            'flex items-center py-3 cursor-pointer transition-colors',
-                            'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-                            'bg-primary-50 dark:bg-primary-950/30' => $selectedCsvColumn === $header,
-                        ])
-                        wire:click="selectCsvColumn('{{ addslashes($header) }}')"
+                        class="flex items-center py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        x-on:mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                     >
                         {{-- CSV Column Name --}}
-                        <div class="flex-1 text-sm font-medium text-gray-950 dark:text-white">
-                            {{ $header }}
-                        </div>
+                        <div class="flex-1 text-sm text-gray-950 dark:text-white">{{ $header }}</div>
 
                         {{-- Arrow --}}
-                        <div class="w-8 flex justify-center">
-                            <x-filament::icon icon="heroicon-m-arrow-right" class="h-4 w-4 text-gray-400" />
+                        <div class="w-6 flex justify-center">
+                            <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5 text-gray-300 dark:text-gray-600" />
                         </div>
 
                         {{-- Attribute Select --}}
-                        <div class="flex-1" x-data x-on:click.stop>
+                        <div class="flex-1">
                             @if ($isMapped)
-                                <div class="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                                    <div class="flex items-center gap-2">
-                                        <x-filament::icon icon="heroicon-o-squares-2x2" class="h-4 w-4 text-gray-400" />
-                                        <span class="text-sm text-gray-950 dark:text-white">
-                                            {{ $this->getFieldLabel($mappedField) }}
-                                        </span>
+                                <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                    <div class="flex items-center gap-1.5">
+                                        <x-filament::icon icon="heroicon-o-squares-2x2" class="h-3.5 w-3.5 text-gray-400" />
+                                        <span class="text-sm text-gray-950 dark:text-white">{{ $this->getFieldLabel($mappedField) }}</span>
                                     </div>
                                     <button
                                         type="button"
                                         wire:click="unmapColumn('{{ $mappedField }}')"
-                                        class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        class="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                                     >
-                                        <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4" />
+                                        <x-filament::icon icon="heroicon-m-x-mark" class="h-3.5 w-3.5" />
                                     </button>
                                 </div>
                             @else
-                                <x-filament::input.wrapper>
-                                    <x-filament::input.select
-                                        wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
-                                    >
-                                        <option value="">Select attribute</option>
-                                        @foreach ($this->importerColumns as $column)
-                                            @php
-                                                $columnName = $column->getName();
-                                                $isAlreadyMapped = !empty($columnMap[$columnName]);
-                                            @endphp
-                                            @unless ($isAlreadyMapped)
-                                                <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
-                                            @endunless
-                                        @endforeach
-                                    </x-filament::input.select>
-                                </x-filament::input.wrapper>
+                                <select
+                                    wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
+                                    class="w-full text-sm px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                >
+                                    <option value="">Select attribute</option>
+                                    @foreach ($this->importerColumns as $column)
+                                        @php
+                                            $columnName = $column->getName();
+                                            $isAlreadyMapped = !empty($columnMap[$columnName]);
+                                        @endphp
+                                        @unless ($isAlreadyMapped)
+                                            <option value="{{ $columnName }}">{{ $column->getLabel() }}</option>
+                                        @endunless
+                                    @endforeach
+                                </select>
                             @endif
                         </div>
                     </div>
@@ -87,46 +72,33 @@
         </div>
 
         {{-- Data Preview Panel --}}
-        <div class="w-80 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col">
-            @php
-                $previewColumn = $selectedCsvColumn ?? $csvHeaders[0] ?? null;
-                $previewValues = $previewColumn ? $this->getColumnPreviewValues($previewColumn, 5) : [];
-            @endphp
+        <div class="w-72 shrink-0 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
+            {{-- Preview Header --}}
+            <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-950 dark:text-white" x-text="hoveredColumn"></span>
+                <div class="flex items-center gap-1 text-xs text-gray-400">
+                    <x-filament::icon icon="heroicon-o-eye" class="h-3 w-3" />
+                    <span>Data preview</span>
+                </div>
+            </div>
 
-            @if ($previewColumn)
-                {{-- Preview Header --}}
-                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-950 dark:text-white">{{ $previewColumn }}</span>
-                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <x-filament::icon icon="heroicon-o-eye" class="h-3.5 w-3.5" />
-                        <span>Data preview</span>
+            {{-- Preview Values (Alpine-driven) --}}
+            <div class="flex-1 overflow-y-auto">
+                @foreach ($csvHeaders as $header)
+                    <div x-show="hoveredColumn === '{{ addslashes($header) }}'" x-cloak>
+                        @foreach ($this->getColumnPreviewValues($header, 5) as $value)
+                            <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300">
+                                {{ $value ?: '(blank)' }}
+                            </div>
+                        @endforeach
                     </div>
-                </div>
+                @endforeach
+            </div>
 
-                {{-- Preview Values --}}
-                <div class="flex-1 overflow-y-auto">
-                    @forelse ($previewValues as $value)
-                        <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300">
-                            {{ $value ?: '(blank)' }}
-                        </div>
-                    @empty
-                        <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                            No data available
-                        </div>
-                    @endforelse
-                </div>
-
-                {{-- Preview Footer --}}
-                <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                        This preview shows only a portion of the column values
-                    </p>
-                </div>
-            @else
-                <div class="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                    Select a column to preview values
-                </div>
-            @endif
+            {{-- Preview Footer --}}
+            <div class="px-3 py-1.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                <p class="text-xs text-gray-400">This preview shows only a portion of the column values</p>
+            </div>
         </div>
     </div>
 
