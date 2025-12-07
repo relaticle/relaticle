@@ -38,19 +38,22 @@ final readonly class CsvAnalyzer
         $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
         $records = (new Statement)->process($csvReader);
 
+        // Convert iterator to array so it can be reused across multiple columns
+        $recordsArray = iterator_to_array($records);
+
         // Build lookup for importer columns by name
         $columnLookup = collect($importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
 
         return collect($columnMap)
             ->filter(fn (?string $csvColumn): bool => $csvColumn !== null && $csvColumn !== '')
-            ->map(function (string $csvColumn, string $fieldName) use ($records, $columnLookup): ColumnAnalysis {
+            ->map(function (string $csvColumn, string $fieldName) use ($recordsArray, $columnLookup): ColumnAnalysis {
                 /** @var ImportColumn|null $importerColumn */
                 $importerColumn = $columnLookup->get($fieldName);
 
                 return $this->analyzeColumn(
                     csvColumnName: $csvColumn,
                     mappedToField: $fieldName,
-                    records: $records,
+                    records: $recordsArray,
                     importerColumn: $importerColumn,
                 );
             })
