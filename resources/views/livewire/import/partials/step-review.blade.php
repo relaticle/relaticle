@@ -1,23 +1,25 @@
 <div class="space-y-6">
-    <div class="flex gap-6">
+    <div class="flex gap-6 min-h-[500px]">
         {{-- Columns List --}}
-        <div class="w-56 shrink-0 space-y-1">
+        <div class="w-56 shrink-0 flex flex-col">
             <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 mb-2">Columns</div>
-            @foreach ($this->columnAnalyses as $analysis)
-                <button
-                    type="button"
-                    wire:click="toggleColumn('{{ $analysis->mappedToField }}')"
-                    wire:key="col-{{ $analysis->mappedToField }}"
-                    @class([
-                        'w-full text-left px-2.5 py-2 rounded-lg transition-colors',
-                        'bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' => $expandedColumn === $analysis->mappedToField,
-                        'hover:bg-gray-50 dark:hover:bg-gray-800' => $expandedColumn !== $analysis->mappedToField,
-                    ])
-                >
-                    <div class="text-sm text-gray-950 dark:text-white">{{ $analysis->csvColumnName }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $analysis->mappedToField }}</div>
-                </button>
-            @endforeach
+            <div class="space-y-1 overflow-y-auto flex-1">
+                @foreach ($this->columnAnalyses as $analysis)
+                    <button
+                        type="button"
+                        wire:click="toggleColumn('{{ $analysis->mappedToField }}')"
+                        wire:key="col-{{ $analysis->mappedToField }}"
+                        @class([
+                            'w-full text-left px-2.5 py-2 rounded-lg transition-colors',
+                            'bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' => $expandedColumn === $analysis->mappedToField,
+                            'hover:bg-gray-50 dark:hover:bg-gray-800' => $expandedColumn !== $analysis->mappedToField,
+                        ])
+                    >
+                        <div class="text-sm text-gray-950 dark:text-white">{{ $analysis->csvColumnName }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $analysis->mappedToField }}</div>
+                    </button>
+                @endforeach
+            </div>
         </div>
 
         {{-- Values Panel --}}
@@ -26,10 +28,25 @@
                 $selectedAnalysis = $expandedColumn
                     ? $this->columnAnalyses->firstWhere('mappedToField', $expandedColumn)
                     : $this->columnAnalyses->first();
+                $perPage = 100;
+                $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage, $reviewSearch) ?? [];
+                $totalUnique = $selectedAnalysis?->uniqueCount ?? 0;
+                $showing = min($reviewPage * $perPage, $totalUnique);
+                $hasMore = $showing < $totalUnique;
             @endphp
 
             @if ($selectedAnalysis)
-                {{-- Column Header --}}
+                {{-- Column Header with Stats --}}
+                <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($totalUnique) }}</span> unique values
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        Showing {{ number_format($showing) }} of {{ number_format($totalUnique) }}
+                    </div>
+                </div>
+
+                {{-- Column Labels --}}
                 <div class="flex items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div class="flex-1">Raw data</div>
                     <div class="w-8"></div>
@@ -37,9 +54,9 @@
                     <div class="w-10"></div>
                 </div>
 
-                {{-- Values List --}}
-                <div class="overflow-y-auto flex-1">
-                    @forelse ($selectedAnalysis->paginatedValues($reviewPage, 50, $reviewSearch) as $value => $count)
+                {{-- Values List with Fixed Height Scroll --}}
+                <div class="overflow-y-auto flex-1 max-h-[400px]">
+                    @forelse ($values as $value => $count)
                         @php
                             $isSkipped = $this->isValueSkipped($selectedAnalysis->mappedToField, $value);
                             $hasCorrection = $this->hasCorrectionForValue($selectedAnalysis->mappedToField, $value);
@@ -57,7 +74,7 @@
                                     'text-gray-400 line-through' => $isSkipped,
                                     'text-gray-950 dark:text-white' => !$isSkipped,
                                 ])>{{ $displayValue }}</span>
-                                <span class="text-xs text-gray-400 shrink-0">{{ $count }}</span>
+                                <span class="text-xs text-gray-400 shrink-0">{{ $count }}×</span>
                             </div>
 
                             {{-- Arrow --}}
@@ -105,6 +122,22 @@
                             No values found
                         </div>
                     @endforelse
+
+                    {{-- Load More (auto-triggered on scroll via wire:intersect) --}}
+                    @if ($hasMore)
+                        <div
+                            wire:intersect.margin.100px="loadMoreValues"
+                            wire:key="load-more-{{ $reviewPage }}"
+                            class="px-3 py-3 text-center border-t border-gray-100 dark:border-gray-800"
+                        >
+                            <span wire:loading.remove wire:target="loadMoreValues" class="text-sm text-gray-400">
+                                Scroll for more...
+                            </span>
+                            <span wire:loading wire:target="loadMoreValues" class="text-sm text-gray-400">
+                                <x-filament::loading-indicator class="h-4 w-4 inline-block" /> Loading...
+                            </span>
+                        </div>
+                    @endif
                 </div>
             @else
                 <div class="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">

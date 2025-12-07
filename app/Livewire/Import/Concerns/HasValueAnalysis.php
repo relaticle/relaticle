@@ -116,4 +116,31 @@ trait HasValueAnalysis
     {
         return isset($this->valueCorrections[$fieldName][$value]);
     }
+
+    /**
+     * Load more values for the current column (infinite scroll).
+     */
+    public function loadMoreValues(): void
+    {
+        $this->reviewPage++;
+    }
+
+    /**
+     * Check if there are more values to load for the current column.
+     */
+    public function hasMoreValues(): bool
+    {
+        $selectedAnalysis = $this->expandedColumn !== null
+            ? $this->columnAnalyses->firstWhere('mappedToField', $this->expandedColumn)
+            : $this->columnAnalyses->first();
+
+        if ($selectedAnalysis === null) {
+            return false;
+        }
+
+        $perPage = 100;
+        $showing = $this->reviewPage * $perPage;
+
+        return $showing < $selectedAnalysis->uniqueCount;
+    }
 }

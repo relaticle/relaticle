@@ -31,11 +31,12 @@ final class ColumnAnalysis extends Data
     ) {}
 
     /**
-     * Get paginated unique values for display.
+     * Get unique values for display with "load more" pattern.
+     * Returns first (page * perPage) items cumulatively.
      *
      * @return array<string, int>
      */
-    public function paginatedValues(int $page = 1, int $perPage = 50, ?string $search = null): array
+    public function paginatedValues(int $page = 1, int $perPage = 100, ?string $search = null): array
     {
         $values = $this->uniqueValues;
 
@@ -50,8 +51,9 @@ final class ColumnAnalysis extends Data
             );
         }
 
-        $offset = ($page - 1) * $perPage;
+        // Cumulative: show all items up to page * perPage
+        $limit = $page * $perPage;
 
-        return array_slice($values, $offset, $perPage, preserve_keys: true);
+        return array_slice($values, 0, $limit, preserve_keys: true);
     }
 }
