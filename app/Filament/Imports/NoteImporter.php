@@ -28,6 +28,7 @@ final class NoteImporter extends BaseImporter
     {
         return [
             ImportColumn::make('title')
+                ->label('Title')
                 ->requiredMapping()
                 ->guess(['title', 'note_title', 'subject', 'name', 'heading'])
                 ->rules(['required', 'string', 'max:255'])

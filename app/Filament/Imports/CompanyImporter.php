@@ -21,6 +21,7 @@ final class CompanyImporter extends BaseImporter
     {
         return [
             ImportColumn::make('name')
+                ->label('Name')
                 ->requiredMapping()
                 ->guess(['name', 'company_name', 'company', 'organization', 'account', 'account_name'])
                 ->rules(['required', 'string', 'max:255'])

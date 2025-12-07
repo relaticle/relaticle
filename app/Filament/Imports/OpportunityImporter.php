@@ -23,6 +23,7 @@ final class OpportunityImporter extends BaseImporter
     {
         return [
             ImportColumn::make('name')
+                ->label('Name')
                 ->requiredMapping()
                 ->guess(['name', 'opportunity_name', 'title'])
                 ->rules(['required', 'string', 'max:255'])

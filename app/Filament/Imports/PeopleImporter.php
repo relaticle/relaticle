@@ -23,6 +23,7 @@ final class PeopleImporter extends BaseImporter
     {
         return [
             ImportColumn::make('name')
+                ->label('Name')
                 ->requiredMapping()
                 ->guess(['name', 'full_name', 'person_name'])
                 ->rules(['required', 'string', 'max:255'])

@@ -28,6 +28,7 @@ final class TaskImporter extends BaseImporter
     {
         return [
             ImportColumn::make('title')
+                ->label('Title')
                 ->requiredMapping()
                 ->guess(['title', 'task_title', 'task_name', 'name', 'subject'])
                 ->rules(['required', 'string', 'max:255'])
