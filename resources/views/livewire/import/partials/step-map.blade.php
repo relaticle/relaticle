@@ -21,7 +21,8 @@
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
-                        class="flex items-center py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        class="flex items-center py-2 transition-colors"
+                        :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-primary-50 dark:bg-primary-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'"
                         x-on:mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                     >
                         {{-- CSV Column Name --}}
