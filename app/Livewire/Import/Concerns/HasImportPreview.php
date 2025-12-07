@@ -16,6 +16,8 @@ use Livewire\Attributes\Computed;
  */
 trait HasImportPreview
 {
+    private const int PREVIEW_SAMPLE_SIZE = 50;
+
     /**
      * Generate a preview of what the import will do.
      */
@@ -51,11 +53,16 @@ trait HasImportPreview
             valueCorrections: $this->valueCorrections,
         );
 
-        // Store as serializable array data
-        $this->previewResultData = $result->toArray();
+        // Store counts (without rows to keep state small)
+        $this->previewResultData = [
+            'totalRows' => $result->totalRows,
+            'createCount' => $result->createCount,
+            'updateCount' => $result->updateCount,
+            'rows' => [],
+        ];
 
-        // Store all rows for preview
-        $this->previewRows = $result->rows;
+        // Store only sample rows for preview display (not all 5000+)
+        $this->previewRows = array_slice($result->rows, 0, self::PREVIEW_SAMPLE_SIZE);
     }
 
     /**
@@ -76,7 +83,7 @@ trait HasImportPreview
      */
     public function hasRecordsToImport(): bool
     {
-        return $this->getActiveRowCount() > 0;
+        return ($this->previewResultData['totalRows'] ?? 0) > 0;
     }
 
     /**
@@ -84,9 +91,7 @@ trait HasImportPreview
      */
     public function getCreateCount(): int
     {
-        return collect($this->previewRows)
-            ->filter(fn (array $row): bool => $row['_is_new'] ?? true)
-            ->count();
+        return $this->previewResultData['createCount'] ?? 0;
     }
 
     /**
@@ -94,8 +99,6 @@ trait HasImportPreview
      */
     public function getUpdateCount(): int
     {
-        return collect($this->previewRows)
-            ->reject(fn (array $row): bool => $row['_is_new'] ?? true)
-            ->count();
+        return $this->previewResultData['updateCount'] ?? 0;
     }
 }

@@ -380,7 +380,7 @@ final class ImportWizard extends Component
      */
     public function getActiveRowCount(): int
     {
-        return count($this->previewRows);
+        return $this->previewResultData['totalRows'] ?? 0;
     }
 
     /**
