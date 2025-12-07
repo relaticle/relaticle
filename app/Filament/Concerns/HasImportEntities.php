@@ -15,7 +15,7 @@ use App\Filament\Imports\TaskImporter;
 /**
  * Shared entity configuration for import functionality.
  *
- * Used by both ImportCenter (quick imports) and MigrationWizard (multi-entity migrations).
+ * Used by ImportWizard and MigrationWizard.
  */
 trait HasImportEntities
 {
@@ -77,30 +77,5 @@ trait HasImportEntities
             ->label("Import {$config['label']}")
             ->modalHeading("Import {$config['label']}")
             ->color('primary');
-    }
-
-    public function importCompaniesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('companies');
-    }
-
-    public function importPeopleAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('people');
-    }
-
-    public function importOpportunitiesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('opportunities');
-    }
-
-    public function importTasksAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('tasks');
-    }
-
-    public function importNotesAction(): EnhancedImportAction
-    {
-        return $this->makeImportAction('notes');
     }
 }
