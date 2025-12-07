@@ -79,16 +79,21 @@ trait HasColumnMapping
     }
 
     /**
-     * Map a CSV column to a field.
+     * Map a CSV column to a field, or unmap if fieldName is empty.
      */
     public function mapCsvColumnToField(string $csvColumn, string $fieldName): void
     {
-        if ($fieldName === '') {
-            return;
+        // First, find and clear any existing mapping for this CSV column
+        foreach ($this->columnMap as $field => $mappedCsv) {
+            if ($mappedCsv === $csvColumn) {
+                $this->columnMap[$field] = '';
+            }
         }
 
-        // Remove any existing mapping for this field
-        $this->columnMap[$fieldName] = $csvColumn;
+        // If a field was selected, map it
+        if ($fieldName !== '') {
+            $this->columnMap[$fieldName] = $csvColumn;
+        }
     }
 
     /**

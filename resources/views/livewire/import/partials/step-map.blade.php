@@ -1,6 +1,7 @@
 <div
     class="space-y-6"
     x-data="{ hoveredColumn: '{{ $csvHeaders[0] ?? '' }}' }"
+    wire:ignore.self
 >
     <div class="flex gap-6">
         {{-- Column Mapping List --}}
@@ -17,13 +18,13 @@
                 @foreach ($csvHeaders as $header)
                     @php
                         $mappedField = array_search($header, $columnMap);
-                        $isMapped = $mappedField !== false;
+                        $selectedValue = $mappedField !== false ? $mappedField : '';
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
                         class="flex items-center py-2 px-2 -mx-2 rounded-lg transition-colors"
                         :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-primary-50 dark:bg-primary-950/30' : ''"
-                        x-on:mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
+                        @mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                     >
                         {{-- CSV Column Name --}}
                         <div class="flex-1 text-sm text-gray-950 dark:text-white">{{ $header }}</div>
@@ -37,10 +38,9 @@
                         <div class="flex-1">
                             <x-filament::input.wrapper>
                                 <x-filament::input.select
-                                    wire:model.live="columnMap.{{ $isMapped ? $mappedField : '_new_' . md5($header) }}"
                                     wire:change="mapCsvColumnToField('{{ addslashes($header) }}', $event.target.value)"
                                 >
-                                    <option value="">Select attribute</option>
+                                    <option value="" @selected($selectedValue === '')>Select attribute</option>
                                     @foreach ($this->importerColumns as $column)
                                         @php
                                             $columnName = $column->getName();
@@ -48,7 +48,7 @@
                                         @endphp
                                         <option
                                             value="{{ $columnName }}"
-                                            @selected($isMapped && $mappedField === $columnName)
+                                            @selected($selectedValue === $columnName)
                                             @disabled($isAlreadyMapped)
                                         >
                                             {{ $column->getLabel() }}
