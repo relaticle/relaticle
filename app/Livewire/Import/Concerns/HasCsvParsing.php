@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Import\Concerns;
 
+use App\Services\Import\CsvReaderFactory;
 use App\Services\Import\ExcelToCsvConverter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use League\Csv\Reader as CsvReader;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
@@ -34,7 +34,7 @@ trait HasCsvParsing
         $this->persistedFilePath = $csvPath;
 
         // Parse the CSV
-        $csvReader = $this->createCsvReader($csvPath);
+        $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
         $this->csvHeaders = $csvReader->getHeader();
         $this->rowCount = iterator_count($csvReader->getRecords());
     }
@@ -80,48 +80,6 @@ trait HasCsvParsing
     }
 
     /**
-     * Create a CSV reader with auto-detected delimiter.
-     *
-     * @return CsvReader<array<string, mixed>>
-     */
-    protected function createCsvReader(string $csvPath): CsvReader
-    {
-        $csvReader = CsvReader::createFromPath($csvPath);
-        $csvReader->setHeaderOffset(0);
-
-        // Auto-detect delimiter
-        $delimiter = $this->detectCsvDelimiter($csvPath);
-        if ($delimiter !== null) {
-            $csvReader->setDelimiter($delimiter);
-        }
-
-        return $csvReader;
-    }
-
-    /**
-     * Auto-detect CSV delimiter.
-     */
-    protected function detectCsvDelimiter(string $csvPath): ?string
-    {
-        $content = file_get_contents($csvPath, length: 1024);
-        if ($content === false) {
-            return null;
-        }
-
-        $delimiters = [',', ';', "\t", '|'];
-        $counts = [];
-
-        foreach ($delimiters as $delimiter) {
-            $counts[$delimiter] = substr_count($content, $delimiter);
-        }
-
-        arsort($counts);
-        $detected = array_key_first($counts);
-
-        return $counts[$detected] > 0 ? $detected : null;
-    }
-
-    /**
      * Clean up temporary files.
      */
     protected function cleanupTempFile(): void
@@ -147,7 +105,7 @@ trait HasCsvParsing
             return [];
         }
 
-        $csvReader = $this->createCsvReader($this->persistedFilePath);
+        $csvReader = app(CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
 
         return collect($csvReader->getRecords())
             ->take($limit)

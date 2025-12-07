@@ -277,7 +277,7 @@ final class ImportWizard extends Component
      */
     private function applyCorrectionsToCsv(): string
     {
-        $csvReader = $this->createCsvReader($this->persistedFilePath);
+        $csvReader = app(\App\Services\Import\CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
         $headers = $csvReader->getHeader();
 
         $output = fopen('php://temp', 'r+');
@@ -313,7 +313,7 @@ final class ImportWizard extends Component
      */
     private function dispatchImportJobs(Import $import): void
     {
-        $csvReader = $this->createCsvReader(
+        $csvReader = app(\App\Services\Import\CsvReaderFactory::class)->createFromPath(
             Storage::disk('local')->path($import->file_path)
         );
 

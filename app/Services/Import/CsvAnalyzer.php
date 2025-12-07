@@ -8,7 +8,6 @@ use App\Data\Import\ColumnAnalysis;
 use App\Data\Import\ValueIssue;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Collection;
-use League\Csv\Reader as CsvReader;
 use League\Csv\Statement;
 use Spatie\LaravelData\DataCollection;
 
@@ -20,6 +19,10 @@ use Spatie\LaravelData\DataCollection;
  */
 final readonly class CsvAnalyzer
 {
+    public function __construct(
+        private CsvReaderFactory $csvReaderFactory,
+    ) {}
+
     /**
      * Analyze all mapped columns in a CSV file.
      *
@@ -32,7 +35,7 @@ final readonly class CsvAnalyzer
         array $columnMap,
         array $importerColumns,
     ): Collection {
-        $csvReader = $this->createReader($csvPath);
+        $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
         $records = (new Statement)->process($csvReader);
 
         // Build lookup for importer columns by name
@@ -287,83 +290,5 @@ final readonly class CsvAnalyzer
     private function isBlank(mixed $value): bool
     {
         return $value === null || $value === '';
-    }
-
-    /**
-     * Create a CSV reader with auto-detected delimiter.
-     *
-     * @return CsvReader<array<string, mixed>>
-     */
-    private function createReader(string $csvPath): CsvReader
-    {
-        $csvReader = CsvReader::createFromPath($csvPath);
-        $csvReader->setHeaderOffset(0);
-
-        // Auto-detect delimiter
-        $delimiter = $this->detectDelimiter($csvPath);
-        if ($delimiter !== null) {
-            $csvReader->setDelimiter($delimiter);
-        }
-
-        return $csvReader;
-    }
-
-    /**
-     * Auto-detect CSV delimiter.
-     */
-    private function detectDelimiter(string $csvPath): ?string
-    {
-        $content = file_get_contents($csvPath, length: 1024);
-        if ($content === false) {
-            return null;
-        }
-
-        $delimiters = [',', ';', "\t", '|'];
-        $counts = [];
-
-        foreach ($delimiters as $delimiter) {
-            $counts[$delimiter] = substr_count($content, $delimiter);
-        }
-
-        arsort($counts);
-        $detected = array_key_first($counts);
-
-        return $counts[$detected] > 0 ? $detected : null;
-    }
-
-    /**
-     * Get the total row count from a CSV file.
-     */
-    public function getRowCount(string $csvPath): int
-    {
-        $csvReader = $this->createReader($csvPath);
-
-        return iterator_count($csvReader->getRecords());
-    }
-
-    /**
-     * Get column headers from a CSV file.
-     *
-     * @return array<string>
-     */
-    public function getHeaders(string $csvPath): array
-    {
-        $csvReader = $this->createReader($csvPath);
-
-        return $csvReader->getHeader();
-    }
-
-    /**
-     * Get sample rows for preview.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public function getSampleRows(string $csvPath, int $limit = 5): array
-    {
-        $csvReader = $this->createReader($csvPath);
-        $statement = (new Statement)->limit($limit);
-        $records = $statement->process($csvReader);
-
-        return iterator_to_array($records);
     }
 }

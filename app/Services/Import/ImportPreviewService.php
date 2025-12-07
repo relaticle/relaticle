@@ -9,7 +9,6 @@ use App\Models\Import;
 use Filament\Actions\Imports\Importer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
-use League\Csv\Reader as CsvReader;
 use League\Csv\Statement;
 
 /**
@@ -20,6 +19,10 @@ use League\Csv\Statement;
  */
 final readonly class ImportPreviewService
 {
+    public function __construct(
+        private CsvReaderFactory $csvReaderFactory,
+    ) {}
+
     /**
      * Generate a preview of what an import will do.
      *
@@ -42,7 +45,7 @@ final readonly class ImportPreviewService
         $import->setAttribute('team_id', $teamId);
         $import->setAttribute('user_id', $userId);
 
-        $csvReader = $this->createReader($csvPath);
+        $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
         $records = (new Statement)->process($csvReader);
         $totalRows = iterator_count($records);
 
@@ -204,47 +207,5 @@ final readonly class ImportPreviewService
         }
 
         return $formatted;
-    }
-
-    /**
-     * Create a CSV reader with auto-detected delimiter.
-     *
-     * @return CsvReader<array<string, mixed>>
-     */
-    private function createReader(string $csvPath): CsvReader
-    {
-        $csvReader = CsvReader::createFromPath($csvPath);
-        $csvReader->setHeaderOffset(0);
-
-        // Auto-detect delimiter
-        $delimiter = $this->detectDelimiter($csvPath);
-        if ($delimiter !== null) {
-            $csvReader->setDelimiter($delimiter);
-        }
-
-        return $csvReader;
-    }
-
-    /**
-     * Auto-detect CSV delimiter.
-     */
-    private function detectDelimiter(string $csvPath): ?string
-    {
-        $content = file_get_contents($csvPath, length: 1024);
-        if ($content === false) {
-            return null;
-        }
-
-        $delimiters = [',', ';', "\t", '|'];
-        $counts = [];
-
-        foreach ($delimiters as $delimiter) {
-            $counts[$delimiter] = substr_count($content, $delimiter);
-        }
-
-        arsort($counts);
-        $detected = array_key_first($counts);
-
-        return $counts[$detected] > 0 ? $detected : null;
     }
 }

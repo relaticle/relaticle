@@ -20,19 +20,4 @@ final class ImportPreviewResult extends Data
         public int $updateCount,
         public array $rows = [],
     ) {}
-
-    public function summary(): string
-    {
-        $parts = [];
-
-        if ($this->createCount > 0) {
-            $parts[] = "{$this->createCount} will be created";
-        }
-
-        if ($this->updateCount > 0) {
-            $parts[] = "{$this->updateCount} will be updated";
-        }
-
-        return implode(', ', $parts);
-    }
 }

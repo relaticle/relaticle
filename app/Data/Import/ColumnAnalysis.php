@@ -30,26 +30,6 @@ final class ColumnAnalysis extends Data
         public bool $isRequired = false,
     ) {}
 
-    public function hasIssues(): bool
-    {
-        return $this->issues->count() > 0;
-    }
-
-    public function issueCount(): int
-    {
-        return $this->issues->count();
-    }
-
-    /**
-     * Get all issue values as an array.
-     *
-     * @return array<string>
-     */
-    public function issueValues(): array
-    {
-        return $this->issues->toCollection()->pluck('value')->all();
-    }
-
     /**
      * Get paginated unique values for display.
      *
@@ -73,18 +53,5 @@ final class ColumnAnalysis extends Data
         $offset = ($page - 1) * $perPage;
 
         return array_slice($values, $offset, $perPage, preserve_keys: true);
-    }
-
-    public function totalPages(int $perPage = 50, ?string $search = null): int
-    {
-        $count = $search !== null && $search !== ''
-            ? count(array_filter(
-                $this->uniqueValues,
-                fn (int $c, string $v): bool => str_contains(strtolower($v), strtolower($search)),
-                ARRAY_FILTER_USE_BOTH
-            ))
-            : $this->uniqueCount;
-
-        return (int) ceil($count / $perPage);
     }
 }
