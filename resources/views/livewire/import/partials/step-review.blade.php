@@ -29,7 +29,7 @@
                     ? $this->columnAnalyses->firstWhere('mappedToField', $expandedColumn)
                     : $this->columnAnalyses->first();
                 $perPage = 100;
-                $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage, $reviewSearch) ?? [];
+                $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage) ?? [];
                 $totalUnique = $selectedAnalysis?->uniqueCount ?? 0;
                 $showing = min($reviewPage * $perPage, $totalUnique);
                 $hasMore = $showing < $totalUnique;

@@ -85,8 +85,6 @@ final class ImportWizard extends Component
     public array $valueCorrections = [];
 
     // Review values UI state
-    public string $reviewSearch = '';
-
     public int $reviewPage = 1;
 
     public ?string $expandedColumn = null;
@@ -179,7 +177,6 @@ final class ImportWizard extends Component
     {
         $this->analyzeColumns();
         $this->reviewPage = 1;
-        $this->reviewSearch = '';
 
         // Select first column by default
         $firstAnalysis = $this->columnAnalyses->first();
@@ -374,7 +371,6 @@ final class ImportWizard extends Component
         $this->valueCorrections = [];
         $this->previewResultData = null;
         $this->previewRows = [];
-        $this->reviewSearch = '';
         $this->reviewPage = 1;
         $this->expandedColumn = null;
     }
@@ -416,7 +412,6 @@ final class ImportWizard extends Component
     {
         $this->expandedColumn = $this->expandedColumn === $columnName ? null : $columnName;
         $this->reviewPage = 1;
-        $this->reviewSearch = '';
     }
 
     /**
