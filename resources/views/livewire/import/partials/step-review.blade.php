@@ -25,12 +25,20 @@
     {{-- Column Analysis Cards --}}
     <div class="space-y-3">
         @foreach ($this->columnAnalyses as $analysis)
-            <x-filament::section :compact="$expandedColumn !== $analysis->mappedToField" collapsible :collapsed="$expandedColumn !== $analysis->mappedToField">
+            @php
+                $isExpanded = $expandedColumn === $analysis->mappedToField;
+            @endphp
+            <x-filament::section wire:key="column-{{ $analysis->mappedToField }}" :compact="!$isExpanded">
                 <x-slot name="heading">
                     <button
+                        type="button"
                         wire:click="toggleColumn('{{ $analysis->mappedToField }}')"
-                        class="flex items-center gap-2 text-left"
+                        class="flex items-center gap-2 text-left w-full"
                     >
+                        <x-filament::icon
+                            :icon="$isExpanded ? 'heroicon-m-chevron-down' : 'heroicon-m-chevron-right'"
+                            class="h-4 w-4 text-gray-400 shrink-0"
+                        />
                         <span class="font-medium text-gray-950 dark:text-white">{{ $analysis->csvColumnName }}</span>
                         <x-filament::icon icon="heroicon-m-arrow-right" class="h-4 w-4 text-gray-400" />
                         <span class="text-gray-500 dark:text-gray-400">{{ $analysis->mappedToField }}</span>
@@ -55,7 +63,7 @@
                 </x-slot>
 
                 {{-- Expanded Content --}}
-                @if ($expandedColumn === $analysis->mappedToField)
+                @if ($isExpanded)
                     {{-- Search --}}
                     <div class="mb-4">
                         <x-filament::input.wrapper>
@@ -88,9 +96,9 @@
                                     @php
                                         $hasIssue = in_array($value, $issueValues, true);
                                         $hasCorrection = $this->hasCorrectionForValue($analysis->mappedToField, $value);
-                                        $correctedValue = $this->getCorrectedValue($analysis->mappedToField, $value);
+                                        $correctedValue = $hasCorrection ? $this->getCorrectedValue($analysis->mappedToField, $value) : null;
                                     @endphp
-                                    <tr @class([
+                                    <tr wire:key="row-{{ $analysis->mappedToField }}-{{ md5((string) $value) }}" @class([
                                         'bg-danger-50 dark:bg-danger-950/50' => $hasIssue && !$hasCorrection,
                                         'bg-success-50 dark:bg-success-950/50' => $hasCorrection,
                                     ])>
