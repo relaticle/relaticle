@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Imports;
 
-use App\Filament\Pages\Import\ImportCompanies;
-use App\Filament\Pages\Import\ImportNotes;
-use App\Filament\Pages\Import\ImportOpportunities;
-use App\Filament\Pages\Import\ImportPeople;
-use App\Filament\Pages\Import\ImportTasks;
-use App\Livewire\Import\ImportWizard;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
+use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
+use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
+use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
+use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
+use Relaticle\ImportWizard\Livewire\ImportWizard;
 
 uses(RefreshDatabase::class);
 

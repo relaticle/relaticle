@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Imports;
 
-use App\Filament\Imports\TaskImporter;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Team;
 use App\Models\User;
@@ -13,6 +12,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Filament\Imports\TaskImporter;
 
 uses(RefreshDatabase::class);
 

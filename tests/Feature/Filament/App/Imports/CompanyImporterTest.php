@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Imports;
 
-use App\Enums\DuplicateHandlingStrategy;
-use App\Filament\Imports\CompanyImporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Models\Team;
 use App\Models\User;
@@ -14,6 +12,8 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 
 uses(RefreshDatabase::class);
 

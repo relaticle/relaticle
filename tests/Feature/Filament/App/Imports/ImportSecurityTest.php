@@ -2,14 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\DuplicateHandlingStrategy;
-use App\Filament\Imports\CompanyImporter;
-use App\Filament\Imports\NoteImporter;
-use App\Filament\Imports\OpportunityImporter;
-use App\Filament\Imports\PeopleImporter;
-use App\Filament\Imports\TaskImporter;
 use App\Models\Company;
-use App\Models\Import;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -17,6 +10,13 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
+use Relaticle\ImportWizard\Filament\Imports\NoteImporter;
+use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
+use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
+use Relaticle\ImportWizard\Filament\Imports\TaskImporter;
+use Relaticle\ImportWizard\Models\Import;
 
 /**
  * Helper function to create an Import record for testing.

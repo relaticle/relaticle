@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Resources\NoteResource\Pages;
 
 use App\Filament\Exports\NoteExporter;
-use App\Filament\Pages\Import\ImportNotes;
 use App\Filament\Resources\NoteResource;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -15,6 +14,7 @@ use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
+use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 
 final class ManageNotes extends ManageRecords
 {

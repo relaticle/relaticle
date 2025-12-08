@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\TaskResource\Pages;
 
-use App\Filament\Pages\Import\ImportTasks;
 use App\Filament\Resources\TaskResource;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -12,6 +11,7 @@ use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
+use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class ManageTasks extends ManageRecords
 {

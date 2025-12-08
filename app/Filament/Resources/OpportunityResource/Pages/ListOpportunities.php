@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Filament\Exports\OpportunityExporter;
-use App\Filament\Pages\Import\ImportOpportunities;
 use App\Filament\Resources\OpportunityResource;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -15,6 +14,7 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\Size;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
+use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 
 final class ListOpportunities extends ListRecords
 {

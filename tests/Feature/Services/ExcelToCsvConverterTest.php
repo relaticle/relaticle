@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Services\Import\ExcelToCsvConverter;
 use Illuminate\Http\UploadedFile;
+use Relaticle\ImportWizard\Services\ExcelToCsvConverter;
 
 // Use dirname to get reliable path regardless of parallel test workers
 const FIXTURES_PATH = __DIR__.'/../../fixtures/imports';

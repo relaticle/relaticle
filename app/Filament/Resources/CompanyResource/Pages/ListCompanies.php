@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Exports\CompanyExporter;
-use App\Filament\Pages\Import\ImportCompanies;
 use App\Filament\Resources\CompanyResource;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -15,6 +14,7 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\Size;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
+use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 
 final class ListCompanies extends ListRecords
 {

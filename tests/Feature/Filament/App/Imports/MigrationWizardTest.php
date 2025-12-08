@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Imports;
 
-use App\Livewire\Import\MigrationWizard;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Livewire\MigrationWizard;
 
 uses(RefreshDatabase::class);
 
@@ -270,7 +270,7 @@ test('imports are processed sequentially via queue middleware', function () {
     $import = \Filament\Actions\Imports\Models\Import::create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
-        'importer' => \App\Filament\Imports\CompanyImporter::class,
+        'importer' => \Relaticle\ImportWizard\Filament\Imports\CompanyImporter::class,
         'file_name' => 'test.csv',
         'file_path' => 'imports/test.csv',
         'total_rows' => 0,
@@ -279,7 +279,7 @@ test('imports are processed sequentially via queue middleware', function () {
     ]);
 
     // Instantiate the importer with required constructor arguments
-    $importer = new \App\Filament\Imports\CompanyImporter(
+    $importer = new \Relaticle\ImportWizard\Filament\Imports\CompanyImporter(
         import: $import,
         columnMap: [],
         options: [],
