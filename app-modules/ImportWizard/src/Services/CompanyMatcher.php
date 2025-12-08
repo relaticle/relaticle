@@ -128,8 +128,14 @@ final readonly class CompanyMatcher
     {
         return Company::query()
             ->where('team_id', $teamId)
-            ->whereHas('customFieldValues', function (Builder $query) use ($domains): void {
-                $query->whereRelation('customField', 'code', 'domain_name')
+            ->whereHas('customFieldValues', function (Builder $query) use ($domains, $teamId): void {
+                // Use withoutGlobalScopes to bypass TenantScope since we explicitly filter by team_id
+                $query->withoutGlobalScopes()
+                    ->where('tenant_id', $teamId)
+                    ->whereRelation('customField', fn (Builder $q) => $q
+                        ->withoutGlobalScopes()
+                        ->where('code', 'domain_name')
+                        ->where('tenant_id', $teamId))
                     ->whereIn('string_value', $domains);
             })
             ->get();

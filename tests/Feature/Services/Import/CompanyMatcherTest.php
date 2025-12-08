@@ -26,13 +26,13 @@ beforeEach(function () {
     Filament::setTenant($this->team);
     TenantContextService::setTenantId($this->team->id);
 
-    // Create the domain_name custom field for Company
-    // Uses tenant_id per custom-fields config
-    $this->domainNameField = CustomField::create([
+    // Create the domain_name custom field for Company (without section - query uses withoutGlobalScopes)
+    // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
+    CustomField::withoutGlobalScopes()->create([
         'code' => 'domain_name',
         'name' => 'Domain Name',
         'type' => 'text',
-        'entity_type' => Company::class,
+        'entity_type' => 'company',
         'tenant_id' => $this->team->id,
         'sort_order' => 1,
         'active' => true,
@@ -42,16 +42,17 @@ beforeEach(function () {
     $this->matcher = app(CompanyMatcher::class);
 
     // Helper to set domain_name custom field value directly
+    // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
     $this->setCompanyDomain = function (Company $company, string $domain, ?Team $team = null): void {
         $team = $team ?? $this->team;
         $field = CustomField::withoutGlobalScopes()
             ->where('code', 'domain_name')
-            ->where('entity_type', Company::class)
+            ->where('entity_type', 'company')
             ->where('tenant_id', $team->id)
             ->first();
 
         CustomFieldValue::withoutGlobalScopes()->create([
-            'entity_type' => Company::class,
+            'entity_type' => 'company',
             'entity_id' => $company->id,
             'custom_field_id' => $field->id,
             'tenant_id' => $team->id,
@@ -101,10 +102,10 @@ test('returns ambiguous when multiple companies match by name', function () {
 
 test('returns ambiguous when multiple companies match by domain', function () {
     $company1 = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
-    $company1->saveCustomFieldValue($this->domainNameField, 'acme.com', $this->team);
+    ($this->setCompanyDomain)($company1, 'acme.com');
 
     $company2 = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corp']);
-    $company2->saveCustomFieldValue($this->domainNameField, 'acme.com', $this->team);
+    ($this->setCompanyDomain)($company2, 'acme.com');
 
     $result = $this->matcher->match('Something Else', ['john@acme.com'], $this->team->id);
 
@@ -121,7 +122,7 @@ test('prioritizes domain match over name match', function () {
 
     // Company that matches by domain but has different name
     $domainCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corporation']);
-    $domainCompany->saveCustomFieldValue($this->domainNameField, 'acme.com', $this->team);
+    ($this->setCompanyDomain)($domainCompany, 'acme.com');
 
     $result = $this->matcher->match('Acme Inc', ['john@acme.com'], $this->team->id);
 
@@ -139,18 +140,19 @@ test('does not match companies from other teams', function () {
     // Create company in other team
     $otherCompany = Company::factory()->for($otherTeam, 'team')->create(['name' => 'Acme Inc']);
 
-    // Create domain_name field for the other team
-    $otherDomainField = CustomField::create([
+    // Create domain_name field for the other team (without section - query uses withoutGlobalScopes)
+    // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
+    CustomField::withoutGlobalScopes()->create([
         'code' => 'domain_name',
         'name' => 'Domain Name',
         'type' => 'text',
-        'entity_type' => Company::class,
+        'entity_type' => 'company',
         'tenant_id' => $otherTeam->id,
         'sort_order' => 1,
         'active' => true,
         'system_defined' => true,
     ]);
-    $otherCompany->saveCustomFieldValue($otherDomainField, 'acme.com', $otherTeam);
+    ($this->setCompanyDomain)($otherCompany, 'acme.com', $otherTeam);
 
     $result = $this->matcher->match('Acme Inc', ['john@acme.com'], $this->team->id);
 
@@ -197,7 +199,7 @@ test('returns new for empty company name', function () {
 
 test('extracts domain correctly from multiple emails', function () {
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
-    $company->saveCustomFieldValue($this->domainNameField, 'acme.com', $this->team);
+    ($this->setCompanyDomain)($company, 'acme.com');
 
     // Multiple emails, one with the matching domain
     $result = $this->matcher->match('Some Company', ['john@gmail.com', 'jane@acme.com', 'bob@hotmail.com'], $this->team->id);
@@ -222,7 +224,7 @@ test('handles invalid email formats gracefully', function () {
 
 test('normalizes email domains to lowercase', function () {
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
-    $company->saveCustomFieldValue($this->domainNameField, 'acme.com', $this->team);
+    ($this->setCompanyDomain)($company, 'acme.com');
 
     // Email with uppercase domain
     $result = $this->matcher->match('Acme Inc', ['JOHN@ACME.COM'], $this->team->id);

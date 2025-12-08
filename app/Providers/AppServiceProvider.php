@@ -6,7 +6,6 @@ namespace App\Providers;
 
 use App\Http\Responses\LoginResponse;
 use App\Models\Company;
-use App\Models\Import;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -22,6 +21,7 @@ use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class AppServiceProvider extends ServiceProvider
