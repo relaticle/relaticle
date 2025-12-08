@@ -3,6 +3,9 @@
 @source '../../../../app/Filament';
 @source '../../../../resources/views';
 
+/* ImportWizard */
+@source '../../../../app-modules/ImportWizard/resources';
+
 /* Custom Fields */
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';
 @source '../../../../vendor/relaticle/custom-fields/resources';
