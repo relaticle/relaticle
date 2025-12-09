@@ -32,6 +32,7 @@
 /.phpunit.cache
 /phpunit.xml
 /phpunit.ci.xml
+/tests
 
 # Development tools
 .editorconfig
@@ -42,6 +43,7 @@ Makefile
 # Documentation
 *.md
 !README.md
+CLAUDE.md
 
 # Cache and logs
 /storage/app/*

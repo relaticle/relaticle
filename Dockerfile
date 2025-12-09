@@ -7,31 +7,42 @@ FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
-# Copy package files
 COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 
-# Install dependencies
-RUN npm ci
-
-# Copy source files needed for build
-COPY vite.config.js ./
+COPY vite.config.js tailwind.config.js postcss.config.js ./
 COPY resources ./resources
 COPY public ./public
 
-# Build assets
 RUN npm run build
 
 ###########################################
-# Stage 2: Install PHP dependencies
+# Stage 2: Production image
 ###########################################
-FROM composer:2 AS composer
+FROM serversideup/php:8.4-fpm-nginx AS production
 
-WORKDIR /app
+LABEL org.opencontainers.image.title="Relaticle CRM"
+LABEL org.opencontainers.image.description="Modern, open-source CRM platform"
+LABEL org.opencontainers.image.source="https://github.com/Relaticle/relaticle"
 
-# Copy composer files
-COPY composer.json composer.lock ./
+# Switch to root to install dependencies
+USER root
 
-# Install dependencies without dev dependencies
+# Install PostgreSQL client for health checks
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to www-data
+USER www-data
+
+WORKDIR /var/www/html
+
+# Copy composer files first for better caching
+COPY --chown=www-data:www-data composer.json composer.lock ./
+
+# Install PHP dependencies
 RUN composer install \
     --no-dev \
     --no-interaction \
@@ -40,106 +51,34 @@ RUN composer install \
     --prefer-dist
 
 # Copy application source
-COPY . .
-
-# Generate optimized autoloader
-RUN composer dump-autoload --optimize --no-dev
-
-###########################################
-# Stage 3: Production image
-###########################################
-FROM php:8.4-fpm-alpine AS production
-
-LABEL maintainer="Relaticle"
-LABEL description="Relaticle CRM - Production Image"
-
-# Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    curl \
-    zip \
-    unzip \
-    git \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    libwebp-dev \
-    freetype-dev \
-    libzip-dev \
-    icu-dev \
-    oniguruma-dev \
-    postgresql-dev \
-    linux-headers \
-    $PHPIZE_DEPS
-
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j$(nproc) \
-    pdo_pgsql \
-    pgsql \
-    pdo_mysql \
-    mysqli \
-    gd \
-    zip \
-    intl \
-    opcache \
-    pcntl \
-    bcmath \
-    mbstring \
-    exif
-
-# Install Redis extension
-RUN pecl install redis \
-    && docker-php-ext-enable redis
-
-# Clean up
-RUN apk del $PHPIZE_DEPS linux-headers \
-    && rm -rf /var/cache/apk/* /tmp/*
-
-# Configure PHP
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-relaticle.ini
-COPY docker/php/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Configure Nginx
-COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
-
-# Configure Supervisor
-COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Create application directory
-WORKDIR /var/www/html
-
-# Copy application from composer stage
-COPY --from=composer /app .
+COPY --chown=www-data:www-data . .
 
 # Copy built frontend assets
-COPY --from=frontend /app/public/build ./public/build
+COPY --chown=www-data:www-data --from=frontend /app/public/build ./public/build
 
-# Create required directories and set permissions
+# Generate optimized autoloader and run post-install scripts
+RUN composer dump-autoload --optimize --no-dev
+
+# Create storage directories
 RUN mkdir -p \
     storage/app/public \
     storage/framework/cache/data \
     storage/framework/sessions \
     storage/framework/views \
     storage/logs \
-    bootstrap/cache \
-    && chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 storage bootstrap/cache
+    bootstrap/cache
 
-# Copy and set up entrypoint script
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Default environment for serversideup/php Laravel automations
+ENV AUTORUN_ENABLED=true
+ENV AUTORUN_LARAVEL_STORAGE_LINK=true
+ENV AUTORUN_LARAVEL_MIGRATION=true
+ENV AUTORUN_LARAVEL_MIGRATION_ISOLATION=true
+ENV AUTORUN_LARAVEL_CONFIG_CACHE=true
+ENV AUTORUN_LARAVEL_ROUTE_CACHE=true
+ENV AUTORUN_LARAVEL_VIEW_CACHE=true
+ENV AUTORUN_LARAVEL_EVENT_CACHE=true
+ENV AUTORUN_LARAVEL_OPTIMIZE=false
+ENV PHP_OPCACHE_ENABLE=1
+ENV SSL_MODE=off
 
-# Expose port
-EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost/up || exit 1
-
-# Set entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Default command
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8080
