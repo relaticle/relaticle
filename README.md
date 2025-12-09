@@ -69,93 +69,15 @@ cd relaticle && composer app-install
 
 ## Docker Deployment
 
-Deploy Relaticle using Docker with a pre-built image. The image uses [serversideup/php](https://serversideup.net/open-source/docker-php) for production-ready PHP with built-in health checks and Laravel automations.
+Deploy Relaticle using Docker with the production-ready configuration:
 
 ```bash
-# Generate an APP_KEY first
-docker run --rm php:8.4-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
-```
-
-Create a `docker-compose.yml`:
-
-```yaml
-services:
-  app:
-    image: ghcr.io/relaticle/relaticle:latest
-    ports:
-      - "8080:8080"
-    environment:
-      APP_KEY: "base64:your-generated-key-here"
-      APP_URL: "http://localhost:8080"
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_DATABASE: relaticle
-      DB_USERNAME: relaticle
-      DB_PASSWORD: secretpassword
-      REDIS_HOST: redis
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
-      QUEUE_CONNECTION: redis
-      AUTORUN_ENABLED: "true"
-      AUTORUN_LARAVEL_MIGRATION: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  horizon:
-    image: ghcr.io/relaticle/relaticle:latest
-    command: ["php", "/var/www/html/artisan", "horizon"]
-    environment:
-      APP_KEY: "base64:your-generated-key-here"
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_DATABASE: relaticle
-      DB_USERNAME: relaticle
-      DB_PASSWORD: secretpassword
-      REDIS_HOST: redis
-      QUEUE_CONNECTION: redis
-      AUTORUN_ENABLED: "false"
-    depends_on: [app]
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: relaticle
-      POSTGRES_USER: relaticle
-      POSTGRES_PASSWORD: secretpassword
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U relaticle"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres-data:
-  redis-data:
-```
-
-```bash
+cp docker-compose.prod.yml docker-compose.yml
+# Edit .env with your APP_KEY and DB_PASSWORD
 docker compose up -d
 ```
 
-Visit `http://localhost:8080` to access Relaticle.
-
-For production deployment with scheduler and full configuration, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
+See [`docker-compose.prod.yml`](docker-compose.prod.yml) for the full configuration.
 
 # Development
 
