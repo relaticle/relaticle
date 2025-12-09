@@ -13,7 +13,8 @@ RUN composer install \
     --no-interaction \
     --no-scripts \
     --no-autoloader \
-    --prefer-dist
+    --prefer-dist \
+    --ignore-platform-reqs
 
 ###########################################
 # Stage 2: Build frontend assets
