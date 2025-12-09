@@ -19,7 +19,12 @@ auth.json
 npm-debug.log
 yarn-error.log
 CLAUDE.md
+AGENTS.md
+boost.json
+/.ai
 /.fleet
 /.idea
 /.vscode
 /.claude
+/.cursor
+/.junie
