@@ -58,26 +58,10 @@ Visit our [website](https://relaticle.com) to learn more about Relaticle's capab
 
 # Installation
 
-## Local Development
-
-For a streamlined setup experience, use the single installation command:
-
 ```bash
 git clone https://github.com/Relaticle/relaticle.git
 cd relaticle && composer app-install
 ```
-
-## Docker Deployment
-
-Deploy Relaticle using Docker with the production-ready configuration:
-
-```bash
-cp docker-compose.prod.yml docker-compose.yml
-# Edit .env with your APP_KEY and DB_PASSWORD
-docker compose up -d
-```
-
-See [`docker-compose.prod.yml`](docker-compose.prod.yml) for the full configuration.
 
 # Development
 
@@ -91,6 +75,10 @@ composer test
 # Format code
 composer lint
 ```
+
+# Docker Deployment
+
+For production deployment using Docker, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
 
 # Documentation
 
