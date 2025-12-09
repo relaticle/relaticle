@@ -1,23 +1,43 @@
 # syntax=docker/dockerfile:1
 
 ###########################################
-# Stage 1: Build frontend assets
+# Stage 1: Composer dependencies
+###########################################
+FROM composer:2 AS composer
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-scripts \
+    --no-autoloader \
+    --prefer-dist
+
+###########################################
+# Stage 2: Build frontend assets
 ###########################################
 FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
+# Copy package files and install
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
+# Copy source files needed for build
 COPY vite.config.js ./
 COPY resources ./resources
 COPY public ./public
 
+# Copy vendor for Filament theme CSS
+COPY --from=composer /app/vendor ./vendor
+
 RUN npm run build
 
 ###########################################
-# Stage 2: Production image
+# Stage 3: Production image
 ###########################################
 FROM serversideup/php:8.4-fpm-nginx AS production
 
@@ -39,24 +59,16 @@ USER www-data
 
 WORKDIR /var/www/html
 
-# Copy composer files first for better caching
-COPY --chown=www-data:www-data composer.json composer.lock ./
-
-# Install PHP dependencies
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --no-scripts \
-    --no-autoloader \
-    --prefer-dist
-
 # Copy application source
 COPY --chown=www-data:www-data . .
+
+# Copy vendor from composer stage
+COPY --chown=www-data:www-data --from=composer /app/vendor ./vendor
 
 # Copy built frontend assets
 COPY --chown=www-data:www-data --from=frontend /app/public/build ./public/build
 
-# Generate optimized autoloader and run post-install scripts
+# Generate optimized autoloader
 RUN composer dump-autoload --optimize --no-dev
 
 # Create storage directories
