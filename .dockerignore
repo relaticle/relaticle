@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.githooks
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Dependencies (will be installed during build)
+/vendor
+/node_modules
+
+# Build artifacts
+/public/build
+/public/hot
+/public/storage
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+.env.backup
+
+# Testing
+.env.testing
+.env.ci
+/coverage
+/.phpunit.cache
+/phpunit.xml
+/phpunit.ci.xml
+/tests
+
+# Development tools
+.editorconfig
+.styleci.yml
+docker-compose.yml
+Makefile
+
+# Documentation
+*.md
+!README.md
+CLAUDE.md
+
+# Cache and logs
+/storage/app/*
+!/storage/app/.gitignore
+!/storage/app/public
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/clockwork
+/storage/pail
+
+# Laravel specific
+/bootstrap/cache/*.php
+
+# Other
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db

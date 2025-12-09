@@ -307,7 +307,51 @@ class CompanyResource extends Resource
 
 ## Deployment
 
-### Production Deployment Checklist
+### Docker Deployment (Recommended)
+
+The easiest way to deploy Relaticle is using Docker. Pre-built images are available on GitHub Container Registry.
+
+**Pull the image:**
+
+```bash
+# Latest stable release
+docker pull ghcr.io/relaticle/relaticle:latest
+
+# Specific version
+docker pull ghcr.io/relaticle/relaticle:1.0.0
+
+# Latest from main branch (for staging)
+docker pull ghcr.io/relaticle/relaticle:main
+```
+
+**Quick start with Docker Compose:**
+
+```bash
+# Copy and configure the production compose file
+cp docker-compose.prod.yml docker-compose.yml
+
+# Create your .env file
+cp .env.example .env
+# Edit .env with your production settings
+
+# Start all services
+docker compose up -d
+```
+
+The Docker setup includes:
+- **app** - Web server (nginx + php-fpm) on port 8080
+- **horizon** - Queue processing with Laravel Horizon
+- **scheduler** - Cron jobs (schedule:work)
+- **postgres** - Database
+- **redis** - Cache, sessions, and queues
+
+Migrations, caching, and storage linking run automatically on container startup.
+
+### Manual Deployment
+
+For manual server deployment without Docker:
+
+#### Production Deployment Checklist
 
 1. Configure environment-specific variables
 2. Set up a production database with proper credentials
@@ -318,7 +362,7 @@ class CompanyResource extends Resource
 7. Configure proper backups
 8. Set up monitoring tools
 
-### Deployment Process
+#### Deployment Process
 
 1. Pull latest code from the repository
 2. Install production dependencies: `composer install --no-dev --optimize-autoloader`
@@ -327,7 +371,7 @@ class CompanyResource extends Resource
 5. Clear and rebuild caches: `php artisan optimize`
 6. Restart queue workers: `php artisan queue:restart`
 
-### Server Requirements
+#### Server Requirements
 
 - PHP 8.4+ with required extensions
 - PostgreSQL 13+ or MySQL 8.0+
