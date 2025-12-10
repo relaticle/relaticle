@@ -51,14 +51,12 @@ Visit our [website](https://relaticle.com) to learn more about Relaticle's capab
 
 # Requirements
 
-- PHP 8.4+,
+- PHP 8.4+
 - PostgreSQL 15+
 - Composer 2 and Node.js 20+
 - Redis for queues (optional for development)
 
 # Installation
-
-For a streamlined setup experience, use the single installation command:
 
 ```bash
 git clone https://github.com/Relaticle/relaticle.git
@@ -77,6 +75,10 @@ composer test
 # Format code
 composer lint
 ```
+
+# Docker Deployment
+
+For production deployment using Docker, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
 
 # Documentation
 
