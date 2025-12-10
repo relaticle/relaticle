@@ -28,7 +28,7 @@
         "livewire/livewire": "^3.0",
         "phpoffice/phpspreadsheet": "^5.3",
         "prism-php/prism": "^0.98.5",
-        "relaticle/custom-fields": "^2.0",
+        "relaticle/custom-fields": "@dev",
         "relaticle/flowforge": "@dev",
         "sentry/sentry-laravel": "^4.13",
         "spatie/eloquent-sortable": "^4.4",
@@ -147,5 +147,11 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../custom-fields"
+        }
+    ]
 }
