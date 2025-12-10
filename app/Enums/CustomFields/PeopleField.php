@@ -21,7 +21,7 @@ enum PeopleField: string
     public function getFieldType(): string
     {
         return match ($this) {
-            self::EMAILS => CustomFieldType::TAGS_INPUT->value,
+            self::EMAILS => CustomFieldType::EMAIL->value,
             self::PHONE_NUMBER, self::JOB_TITLE => CustomFieldType::TEXT->value,
             self::LINKEDIN => CustomFieldType::LINK->value,
         };
