@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\TaskResource\Pages;
 
+use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
 use Override;
@@ -23,13 +26,18 @@ final class ManageTasks extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('import')
-                ->label('Import tasks')
-                ->icon('heroicon-o-arrow-up-tray')
+            ActionGroup::make([
+                Action::make('import')
+                    ->label('Import tasks')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->url(ImportTasks::getUrl()),
+                ExportAction::make()->exporter(TaskExporter::class),
+            ])
+                ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
-                ->size(Size::Small)
-                ->url(ImportTasks::getUrl()),
+                ->label('Import / Export')
+                ->size(Size::Small),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small)->slideOver(),
         ];
     }
