@@ -70,7 +70,7 @@ final class PeopleResource extends Resource
                             ->suffixAction(
                                 Action::make('Create Company')
                                     ->model(Company::class)
-                                    ->schema(fn (Schema $schema): \Filament\Schemas\Schema => $schema->components([
+                                    ->schema(fn (Schema $schema): Schema => $schema->components([
                                         TextInput::make('name')
                                             ->required(),
                                         Select::make('account_owner_id')
@@ -79,7 +79,7 @@ final class PeopleResource extends Resource
                                             ->label('Account Owner')
                                             ->preload()
                                             ->searchable(),
-                                        CustomFields::form()->forSchema($schema)->build()->columns(1),
+                                        CustomFields::form()->forModel(Company::class)->build()->columns(1),
                                     ]))
                                     ->modalWidth(Width::Large)
                                     ->slideOver()
