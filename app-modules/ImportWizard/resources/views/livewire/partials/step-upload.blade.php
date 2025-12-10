@@ -52,7 +52,7 @@
             x-on:dragover.prevent="dragging = true"
             x-on:dragleave.prevent="dragging = false"
             x-on:drop.prevent="dragging = false"
-            x-bind:class="dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-gray-300 bg-gray-100 dark:border-gray-700'"
+            x-bind:class="dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-gray-300 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 dark:border-gray-700'"
             class="relative  rounded-xl border border-dashed p-12 text-center transition-colors flex flex-col items-center justify-center min-h-[400px]"
         >
             <input
@@ -66,14 +66,14 @@
             <div class="flex flex-col items-center">
                 <x-filament::icon
                     icon="heroicon-o-arrow-up-tray"
-                    class="h-12 w-12 text-gray-300 dark:text-gray-600"
+                    class="h-12 w-12 text-gray-400 dark:text-gray-600"
                 />
-                <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-6 text-sm text-gray-700 dark:text-gray-400">
                     Drop your .CSV or .XLSX file onto this area to upload
                 </p>
                 <div class="flex items-center gap-4 mt-6 w-full max-w-xs">
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
-                    <span class="text-sm text-gray-400 dark:text-gray-500">or</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-500">or</span>
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
                 </div>
                 <x-filament::button
