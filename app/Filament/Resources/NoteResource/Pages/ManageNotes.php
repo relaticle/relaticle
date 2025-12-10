@@ -28,7 +28,7 @@ final class ManageNotes extends ManageRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import')
+                    ->label('Import notes')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportNotes::getUrl()),
                 ExportAction::make()->exporter(NoteExporter::class),

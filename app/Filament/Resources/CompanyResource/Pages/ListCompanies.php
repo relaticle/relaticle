@@ -32,7 +32,7 @@ final class ListCompanies extends ListRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import')
+                    ->label('Import companies')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportCompanies::getUrl()),
                 ExportAction::make()->exporter(CompanyExporter::class),

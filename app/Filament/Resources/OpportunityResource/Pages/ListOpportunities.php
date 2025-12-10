@@ -28,7 +28,7 @@ final class ListOpportunities extends ListRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import')
+                    ->label('Import opportunities')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportOpportunities::getUrl()),
                 ExportAction::make()->exporter(OpportunityExporter::class),

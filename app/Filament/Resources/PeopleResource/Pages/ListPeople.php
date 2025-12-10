@@ -28,7 +28,7 @@ final class ListPeople extends ListRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import')
+                    ->label('Import people')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportPeople::getUrl()),
                 ExportAction::make()->exporter(PeopleExporter::class),

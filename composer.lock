@@ -7189,7 +7189,7 @@
             "dist": {
                 "type": "path",
                 "url": "../custom-fields",
-                "reference": "67297c0c4b41ef62994a0f3054ca3ded3c812dee"
+                "reference": "b116ecef9813ed8ab1878c0bdb495e2fa7d9fe87"
             },
             "require": {
                 "filament/filament": "^4.0",

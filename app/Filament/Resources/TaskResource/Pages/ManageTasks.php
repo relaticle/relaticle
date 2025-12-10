@@ -24,7 +24,7 @@ final class ManageTasks extends ManageRecords
     {
         return [
             Action::make('import')
-                ->label('Import')
+                ->label('Import tasks')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('gray')
                 ->button()
