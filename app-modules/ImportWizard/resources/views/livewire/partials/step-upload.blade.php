@@ -52,8 +52,8 @@
             x-on:dragover.prevent="dragging = true"
             x-on:dragleave.prevent="dragging = false"
             x-on:drop.prevent="dragging = false"
-            x-bind:class="dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-gray-200 dark:border-gray-700'"
-            class="relative rounded-xl border border-dashed p-12 text-center transition-colors flex flex-col items-center justify-center min-h-[400px]"
+            x-bind:class="dragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' : 'border-gray-300 bg-gray-100 dark:border-gray-700'"
+            class="relative  rounded-xl border border-dashed p-12 text-center transition-colors flex flex-col items-center justify-center min-h-[400px]"
         >
             <input
                 type="file"
