@@ -118,7 +118,9 @@ trait HasValueAnalysis
         }
 
         // Remove old issue for this value
-        $issues = collect($this->columnAnalysesData[$analysisIndex]['issues'])
+        /** @var array<int, array<string, mixed>> $existingIssues */
+        $existingIssues = $this->columnAnalysesData[$analysisIndex]['issues'];
+        $issues = collect($existingIssues)
             ->reject(fn (array $issue): bool => $issue['value'] === $oldValue)
             ->values()
             ->toArray();

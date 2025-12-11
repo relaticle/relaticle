@@ -44,13 +44,13 @@ use Relaticle\ImportWizard\Services\CsvReaderFactory;
  */
 final class ImportWizard extends Component implements HasActions, HasForms
 {
-    use InteractsWithActions;
-    use InteractsWithForms;
     use HasColumnMapping;
     use HasCsvParsing;
     use HasImportEntities;
     use HasImportPreview;
     use HasValueAnalysis;
+    use InteractsWithActions;
+    use InteractsWithForms;
     use WithFileUploads;
 
     // Step constants

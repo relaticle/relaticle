@@ -299,7 +299,7 @@ final readonly class CsvAnalyzer
             // For multi-value fields with item rules, split and validate each item
             if ($rulesData['isMultiValue'] && $rulesData['itemRules'] !== []) {
                 $issue = $this->validateMultiValueField($value, $rulesData['itemRules'], $count);
-                if ($issue !== null) {
+                if ($issue instanceof \Relaticle\ImportWizard\Data\ValueIssue) {
                     $issues[] = $issue;
                 }
 
@@ -339,7 +339,7 @@ final readonly class CsvAnalyzer
     private function validateMultiValueField(string $value, array $itemRules, int $count): ?ValueIssue
     {
         // Split by comma and trim each item
-        $items = array_map('trim', explode(',', $value));
+        $items = array_map(trim(...), explode(',', $value));
         $errors = [];
 
         foreach ($items as $item) {
