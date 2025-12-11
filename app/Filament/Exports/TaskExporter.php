@@ -24,12 +24,8 @@ final class TaskExporter extends BaseExporter
             ExportColumn::make('creation_source')
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
             ExportColumn::make('title'),
-            ExportColumn::make('description'),
-            ExportColumn::make('status'),
-            ExportColumn::make('priority'),
             ExportColumn::make('created_at'),
             ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
 
             ...CustomFields::exporter()->forModel(self::getModel())->columns(),
         ];
