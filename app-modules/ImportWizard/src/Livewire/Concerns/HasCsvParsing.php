@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Livewire\Concerns;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
 use Relaticle\ImportWizard\Services\ExcelToCsvConverter;
@@ -33,10 +34,22 @@ trait HasCsvParsing
 
         $this->persistedFilePath = $csvPath;
 
-        // Parse the CSV
-        $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
-        $this->csvHeaders = $csvReader->getHeader();
-        $this->rowCount = iterator_count($csvReader->getRecords());
+        try {
+            // Parse the CSV
+            $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
+            $this->csvHeaders = $csvReader->getHeader();
+            $this->rowCount = iterator_count($csvReader->getRecords());
+        } catch (SyntaxError $e) {
+            // Handle duplicate column names
+            $duplicates = $e->duplicateColumnNames();
+            if ($duplicates !== []) {
+                $this->addError('uploadedFile', 'Your CSV has duplicate column names: '.implode(', ', $duplicates).'. Please rename them to be unique.');
+            } else {
+                $this->addError('uploadedFile', 'CSV syntax error: '.$e->getMessage());
+            }
+            $this->cleanupTempFile();
+            $this->persistedFilePath = null;
+        }
     }
 
     /**
