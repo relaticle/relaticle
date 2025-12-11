@@ -340,7 +340,7 @@ final readonly class CsvAnalyzer
     {
         // Split by comma and trim each item
         $items = array_map('trim', explode(',', $value));
-        $invalidItems = [];
+        $errors = [];
 
         foreach ($items as $item) {
             // Skip empty items
@@ -354,14 +354,17 @@ final readonly class CsvAnalyzer
             );
 
             if ($validator->fails()) {
-                $invalidItems[] = $item;
+                $errors[] = $validator->errors()->first('item');
             }
         }
 
-        if ($invalidItems !== []) {
+        if ($errors !== []) {
+            // Use first unique error message (avoid duplicates for same rule)
+            $uniqueErrors = array_unique($errors);
+
             return new ValueIssue(
                 value: $value,
-                message: 'Invalid: ' . implode(', ', $invalidItems),
+                message: implode('; ', $uniqueErrors),
                 rowCount: $count,
                 severity: 'error',
             );
