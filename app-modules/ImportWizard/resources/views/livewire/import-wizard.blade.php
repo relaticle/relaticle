@@ -53,4 +53,6 @@
             @break
     @endswitch
 
+    {{-- Filament Action Modals --}}
+    <x-filament-actions::modals />
 </div>

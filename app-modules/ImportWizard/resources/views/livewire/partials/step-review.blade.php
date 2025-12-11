@@ -17,7 +17,6 @@
                             'w-full text-left px-2.5 py-2 rounded-lg transition-colors',
                             'bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' => $expandedColumn === $analysis->mappedToField,
                             'hover:bg-gray-50 dark:hover:bg-gray-800' => $expandedColumn !== $analysis->mappedToField,
-                            'ring-1 ring-danger-500/50' => $hasErrors,
                         ])
                     >
                         <div class="flex items-center justify-between gap-2">
@@ -88,10 +87,7 @@
                         @endphp
                         <div
                             wire:key="val-{{ md5($selectedAnalysis->mappedToField . $value) }}"
-                            @class([
-                                'px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50',
-                                'bg-danger-50/50 dark:bg-danger-950/30' => $hasError,
-                            ])
+                            class="px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                         >
                             <div class="flex items-center">
                                 {{-- Raw Value --}}
@@ -99,8 +95,7 @@
                                     <span @class([
                                         'text-sm truncate',
                                         'text-gray-400 line-through' => $isSkipped,
-                                        'text-danger-700 dark:text-danger-400' => $hasError,
-                                        'text-gray-950 dark:text-white' => !$isSkipped && !$hasError,
+                                        'text-gray-950 dark:text-white' => !$isSkipped,
                                     ])>{{ $displayValue }}</span>
                                     <span class="text-xs text-gray-400 shrink-0">{{ $count }}×</span>
                                 </div>
@@ -122,9 +117,8 @@
                                             x-on:keydown.enter="$event.target.blur()"
                                             @class([
                                                 'w-full px-2 py-1 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-primary-500',
-                                                'border-danger-300 dark:border-danger-700 bg-danger-50 dark:bg-danger-950' => $hasError,
                                                 'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950' => $hasCorrection && !$hasError,
-                                                'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' => !$hasCorrection && !$hasError,
+                                                'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' => !$hasCorrection || $hasError,
                                             ])
                                         />
                                     @endif
@@ -196,10 +190,7 @@
                 </div>
             @endif
 
-            <x-filament::button
-                wire:click="nextStep"
-                :disabled="!$this->canProceedToNextStep()"
-            >
+            <x-filament::button wire:click="nextStep">
                 Continue
             </x-filament::button>
         </div>

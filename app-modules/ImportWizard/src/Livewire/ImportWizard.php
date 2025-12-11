@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire;
 
+use Filament\Actions\Action;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Actions\Imports\Jobs\ImportCsv;
 use Filament\Facades\Filament;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Support\ChunkIterator;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,6 +23,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Concerns\HasImportEntities;
 use Relaticle\ImportWizard\Livewire\Concerns\HasColumnMapping;
@@ -35,8 +42,10 @@ use Relaticle\ImportWizard\Services\CsvReaderFactory;
  * 3. Review Values - See unique values, fix invalid data
  * 4. Preview Import - Summary of creates/updates/skips before committing
  */
-final class ImportWizard extends Component
+final class ImportWizard extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
+    use InteractsWithForms;
     use HasColumnMapping;
     use HasCsvParsing;
     use HasImportEntities;
@@ -112,9 +121,22 @@ final class ImportWizard extends Component
     public function nextStep(): void
     {
         if (! $this->canProceedToNextStep()) {
+            // If on review step with validation errors, show confirmation dialog
+            if ($this->currentStep === self::STEP_REVIEW && $this->hasValidationErrors()) {
+                $this->mountAction('proceedWithErrors');
+            }
+
             return;
         }
 
+        $this->advanceToNextStep();
+    }
+
+    /**
+     * Actually advance to the next step (called directly or after confirmation).
+     */
+    public function advanceToNextStep(): void
+    {
         // Perform step-specific actions before advancing
         match ($this->currentStep) {
             self::STEP_UPLOAD => $this->prepareForMapping(),
@@ -428,6 +450,65 @@ final class ImportWizard extends Component
             self::STEP_REVIEW => 'Review Values',
             self::STEP_PREVIEW => 'Preview',
         ];
+    }
+
+    /**
+     * Action for confirming to proceed with validation errors.
+     */
+    public function proceedWithErrorsAction(): Action
+    {
+        $errorCount = $this->getTotalErrorCount();
+        $affectedRowCount = $this->getAffectedRowCount();
+
+        return Action::make('proceedWithErrors')
+            ->label('Continue with errors')
+            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Continue with validation errors?')
+            ->modalDescription(
+                "{$affectedRowCount} rows have values with validation errors. " .
+                'These rows will be skipped during import.'
+            )
+            ->modalSubmitActionLabel('Skip errors and continue')
+            ->action(function (): void {
+                $this->skipAllErrorValues();
+                $this->advanceToNextStep();
+            });
+    }
+
+    /**
+     * Skip all values that have validation errors.
+     */
+    private function skipAllErrorValues(): void
+    {
+        /** @var ColumnAnalysis $analysis */
+        foreach ($this->columnAnalyses as $analysis) {
+            foreach ($analysis->issues as $issue) {
+                if ($issue->severity === 'error') {
+                    $this->skipValue($analysis->mappedToField, $issue->value);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get the total number of rows affected by validation errors.
+     */
+    private function getAffectedRowCount(): int
+    {
+        $affectedRows = 0;
+
+        /** @var ColumnAnalysis $analysis */
+        foreach ($this->columnAnalyses as $analysis) {
+            foreach ($analysis->issues as $issue) {
+                if ($issue->severity === 'error') {
+                    $affectedRows += $issue->rowCount;
+                }
+            }
+        }
+
+        return $affectedRows;
     }
 
     public function render(): View

@@ -90,7 +90,7 @@ trait HasValueAnalysis
     }
 
     /**
-     * Apply a value correction.
+     * Apply a value correction and revalidate.
      */
     public function correctValue(string $fieldName, string $oldValue, string $newValue): void
     {
@@ -99,6 +99,54 @@ trait HasValueAnalysis
         }
 
         $this->valueCorrections[$fieldName][$oldValue] = $newValue;
+
+        // Revalidate the corrected value
+        $this->revalidateCorrectedValue($fieldName, $oldValue, $newValue);
+    }
+
+    /**
+     * Revalidate a corrected value and update the issues list.
+     */
+    private function revalidateCorrectedValue(string $fieldName, string $oldValue, string $newValue): void
+    {
+        // Find the column analysis for this field
+        $analysisIndex = collect($this->columnAnalysesData)
+            ->search(fn (array $data): bool => $data['mappedToField'] === $fieldName);
+
+        if ($analysisIndex === false) {
+            return;
+        }
+
+        // Remove old issue for this value
+        $issues = collect($this->columnAnalysesData[$analysisIndex]['issues'])
+            ->reject(fn (array $issue): bool => $issue['value'] === $oldValue)
+            ->values()
+            ->toArray();
+
+        // Validate the new value (if not blank/skipped)
+        if ($newValue !== '') {
+            $analyzer = app(CsvAnalyzer::class);
+            $entityType = $this->getEntityTypeForAnalysis();
+
+            $errorMessage = $analyzer->validateSingleValue(
+                value: $newValue,
+                fieldName: $fieldName,
+                importerColumns: $this->importerColumns,
+                entityType: $entityType,
+            );
+
+            if ($errorMessage !== null) {
+                $issues[] = [
+                    'value' => $oldValue,
+                    'message' => $errorMessage,
+                    'rowCount' => $this->columnAnalysesData[$analysisIndex]['uniqueValues'][$oldValue] ?? 1,
+                    'severity' => 'error',
+                ];
+            }
+        }
+
+        // Update the analysis data
+        $this->columnAnalysesData[$analysisIndex]['issues'] = $issues;
     }
 
     /**

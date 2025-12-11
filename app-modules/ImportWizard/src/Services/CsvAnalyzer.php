@@ -141,12 +141,12 @@ final readonly class CsvAnalyzer
         $isRequired = $importerColumn?->isMappingRequired() ?? false;
 
         // Get validation rules from ImportColumn and/or CustomField
-        $validationRules = $this->getValidationRulesForColumn($importerColumn, $customField);
+        $rulesData = $this->getValidationRulesForColumn($importerColumn, $customField);
 
         // Detect issues using Laravel Validator with full validation rules
         $issues = $this->detectIssuesWithValidator(
             values: $values,
-            validationRules: $validationRules,
+            rulesData: $rulesData,
             fieldName: $mappedToField,
             isRequired: $isRequired,
         );
@@ -167,13 +167,15 @@ final readonly class CsvAnalyzer
     /**
      * Get validation rules for a column from ImportColumn and/or CustomField.
      *
-     * @return array<int|string, mixed>
+     * @return array{rules: array<int|string, mixed>, itemRules: array<int|string, mixed>, isMultiValue: bool}
      */
     private function getValidationRulesForColumn(
         ?ImportColumn $importerColumn,
         ?CustomField $customField,
     ): array {
         $rules = [];
+        $itemRules = [];
+        $isMultiValue = false;
 
         // Get rules from ImportColumn
         if ($importerColumn instanceof \Filament\Actions\Imports\ImportColumn) {
@@ -190,10 +192,14 @@ final readonly class CsvAnalyzer
 
             // Get item-level validation rules for multi-value fields (e.g., email format)
             $itemRules = $this->validationService->getItemValidationRules($customField);
-            $rules = $this->mergeValidationRules($rules, $itemRules);
+            $isMultiValue = $this->validationService->isMultiValueField($customField);
         }
 
-        return $rules;
+        return [
+            'rules' => $rules,
+            'itemRules' => $itemRules,
+            'isMultiValue' => $isMultiValue,
+        ];
     }
 
     /**
@@ -262,12 +268,12 @@ final readonly class CsvAnalyzer
      * Detect validation issues using Laravel Validator.
      *
      * @param  array<string, int>  $values
-     * @param  array<int|string, mixed>  $validationRules
+     * @param  array{rules: array<int|string, mixed>, itemRules: array<int|string, mixed>, isMultiValue: bool}  $rulesData
      * @return array<ValueIssue>
      */
     private function detectIssuesWithValidator(
         array $values,
-        array $validationRules,
+        array $rulesData,
         string $fieldName,
         bool $isRequired,
     ): array {
@@ -290,15 +296,25 @@ final readonly class CsvAnalyzer
                 continue;
             }
 
-            // Skip validation if no rules
-            if ($validationRules === []) {
+            // For multi-value fields with item rules, split and validate each item
+            if ($rulesData['isMultiValue'] && $rulesData['itemRules'] !== []) {
+                $issue = $this->validateMultiValueField($value, $rulesData['itemRules'], $count);
+                if ($issue !== null) {
+                    $issues[] = $issue;
+                }
+
                 continue;
             }
 
-            // Run Laravel Validator
+            // Skip validation if no rules
+            if ($rulesData['rules'] === []) {
+                continue;
+            }
+
+            // Run Laravel Validator for single-value fields
             $validator = Validator::make(
                 [$fieldName => $value],
-                [$fieldName => $validationRules]
+                [$fieldName => $rulesData['rules']]
             );
 
             if ($validator->fails()) {
@@ -313,6 +329,45 @@ final readonly class CsvAnalyzer
         }
 
         return $issues;
+    }
+
+    /**
+     * Validate a multi-value field by splitting and validating each item.
+     *
+     * @param  array<int|string, mixed>  $itemRules
+     */
+    private function validateMultiValueField(string $value, array $itemRules, int $count): ?ValueIssue
+    {
+        // Split by comma and trim each item
+        $items = array_map('trim', explode(',', $value));
+        $invalidItems = [];
+
+        foreach ($items as $item) {
+            // Skip empty items
+            if ($item === '') {
+                continue;
+            }
+
+            $validator = Validator::make(
+                ['item' => $item],
+                ['item' => $itemRules]
+            );
+
+            if ($validator->fails()) {
+                $invalidItems[] = $item;
+            }
+        }
+
+        if ($invalidItems !== []) {
+            return new ValueIssue(
+                value: $value,
+                message: 'Invalid: ' . implode(', ', $invalidItems),
+                rowCount: $count,
+                severity: 'error',
+            );
+        }
+
+        return null;
     }
 
     /**
@@ -358,5 +413,64 @@ final readonly class CsvAnalyzer
     private function isBlank(mixed $value): bool
     {
         return $value === null || $value === '';
+    }
+
+    /**
+     * Validate a single value against the rules for a field.
+     * Returns error message if validation fails, null if valid.
+     *
+     * @param  array<ImportColumn>  $importerColumns
+     */
+    public function validateSingleValue(
+        string $value,
+        string $fieldName,
+        array $importerColumns,
+        ?string $entityType = null,
+    ): ?string {
+        // Get the importer column
+        $columnLookup = collect($importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
+        $importerColumn = $columnLookup->get($fieldName);
+
+        // Get custom field if applicable
+        $customField = null;
+        if ($entityType !== null && str_starts_with($fieldName, 'custom_fields_')) {
+            $code = str_replace('custom_fields_', '', $fieldName);
+            $customField = CustomField::query()
+                ->where('entity_type', $entityType)
+                ->where('code', $code)
+                ->first();
+        }
+
+        // Get validation rules
+        $rulesData = $this->getValidationRulesForColumn($importerColumn, $customField);
+
+        // Skip validation if blank value
+        if ($this->isBlank($value)) {
+            return null;
+        }
+
+        // For multi-value fields with item rules, split and validate each item
+        if ($rulesData['isMultiValue'] && $rulesData['itemRules'] !== []) {
+            $issue = $this->validateMultiValueField($value, $rulesData['itemRules'], 1);
+
+            return $issue?->message;
+        }
+
+        // Skip validation if no rules
+        if ($rulesData['rules'] === []) {
+            return null;
+        }
+
+        // Run validator for single-value fields
+        $validator = Validator::make(
+            [$fieldName => $value],
+            [$fieldName => $rulesData['rules']]
+        );
+
+        if ($validator->fails()) {
+            return $validator->errors()->first($fieldName);
+        }
+
+        return null;
     }
 }
