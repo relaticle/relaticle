@@ -29,14 +29,53 @@ trait HasValueAnalysis
 
         $analyzer = app(CsvAnalyzer::class);
 
+        // Get the model class from the importer for custom field lookup
+        $entityType = $this->getEntityTypeForAnalysis();
+
         $analyses = $analyzer->analyze(
             csvPath: $this->persistedFilePath,
             columnMap: $this->columnMap,
             importerColumns: $this->importerColumns,
+            entityType: $entityType,
         );
 
         // Store as serializable array data
         $this->columnAnalysesData = $analyses->map(fn (ColumnAnalysis $analysis): array => $analysis->toArray())->toArray();
+    }
+
+    /**
+     * Get the entity type (model class) for custom field validation lookup.
+     */
+    protected function getEntityTypeForAnalysis(): ?string
+    {
+        $importerClass = $this->getImporterClass();
+
+        if ($importerClass === null) {
+            return null;
+        }
+
+        // Get the model class from the importer
+        return $importerClass::getModel();
+    }
+
+    /**
+     * Check if there are any validation errors in the analyzed columns.
+     */
+    public function hasValidationErrors(): bool
+    {
+        return $this->columnAnalyses->contains(
+            fn (ColumnAnalysis $analysis): bool => $analysis->hasErrors()
+        );
+    }
+
+    /**
+     * Get the total count of validation errors across all columns.
+     */
+    public function getTotalErrorCount(): int
+    {
+        return $this->columnAnalyses->sum(
+            fn (ColumnAnalysis $analysis): int => $analysis->getErrorCount()
+        );
     }
 
     /**

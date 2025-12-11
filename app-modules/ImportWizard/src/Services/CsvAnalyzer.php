@@ -6,7 +6,10 @@ namespace Relaticle\ImportWizard\Services;
 
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use League\Csv\Statement;
+use Relaticle\CustomFields\Models\CustomField;
+use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
 use Spatie\LaravelData\DataCollection;
@@ -21,6 +24,7 @@ final readonly class CsvAnalyzer
 {
     public function __construct(
         private CsvReaderFactory $csvReaderFactory,
+        private ValidationService $validationService,
     ) {}
 
     /**
@@ -28,12 +32,14 @@ final readonly class CsvAnalyzer
      *
      * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
      * @param  array<ImportColumn>  $importerColumns  Column definitions from the importer
+     * @param  string|null  $entityType  Entity model class for custom field lookup
      * @return Collection<int, ColumnAnalysis>
      */
     public function analyze(
         string $csvPath,
         array $columnMap,
         array $importerColumns,
+        ?string $entityType = null,
     ): Collection {
         $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
         $records = (new Statement)->process($csvReader);
@@ -44,20 +50,60 @@ final readonly class CsvAnalyzer
         // Build lookup for importer columns by name
         $columnLookup = collect($importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
 
+        // Pre-load custom fields for this entity type to avoid N+1 queries
+        $customFields = $this->loadCustomFieldsForEntity($entityType);
+
         return collect($columnMap)
             ->filter(fn (?string $csvColumn): bool => $csvColumn !== null && $csvColumn !== '')
-            ->map(function (string $csvColumn, string $fieldName) use ($recordsArray, $columnLookup): ColumnAnalysis {
+            ->map(function (string $csvColumn, string $fieldName) use ($recordsArray, $columnLookup, $customFields): ColumnAnalysis {
                 /** @var ImportColumn|null $importerColumn */
                 $importerColumn = $columnLookup->get($fieldName);
+
+                // Get custom field if this is a custom field column
+                $customField = $this->getCustomFieldForColumn($fieldName, $customFields);
 
                 return $this->analyzeColumn(
                     csvColumnName: $csvColumn,
                     mappedToField: $fieldName,
                     records: $recordsArray,
                     importerColumn: $importerColumn,
+                    customField: $customField,
                 );
             })
             ->values();
+    }
+
+    /**
+     * Load all custom fields for an entity type.
+     *
+     * @return Collection<int, CustomField>
+     */
+    private function loadCustomFieldsForEntity(?string $entityType): Collection
+    {
+        if ($entityType === null) {
+            return collect();
+        }
+
+        return CustomField::query()
+            ->where('entity_type', $entityType)
+            ->with('options')
+            ->get();
+    }
+
+    /**
+     * Get the custom field for a column if it's a custom field column.
+     *
+     * @param  Collection<int, CustomField>  $customFields
+     */
+    private function getCustomFieldForColumn(string $fieldName, Collection $customFields): ?CustomField
+    {
+        if (! str_starts_with($fieldName, 'custom_fields_')) {
+            return null;
+        }
+
+        $code = str_replace('custom_fields_', '', $fieldName);
+
+        return $customFields->firstWhere('code', $code);
     }
 
     /**
@@ -70,6 +116,7 @@ final readonly class CsvAnalyzer
         string $mappedToField,
         iterable $records,
         ?ImportColumn $importerColumn,
+        ?CustomField $customField = null,
     ): ColumnAnalysis {
         $values = [];
         $blankCount = 0;
@@ -93,11 +140,15 @@ final readonly class CsvAnalyzer
         $fieldType = $this->determineFieldType($importerColumn);
         $isRequired = $importerColumn?->isMappingRequired() ?? false;
 
-        $issues = $this->detectIssues(
+        // Get validation rules from ImportColumn and/or CustomField
+        $validationRules = $this->getValidationRulesForColumn($importerColumn, $customField);
+
+        // Detect issues using Laravel Validator with full validation rules
+        $issues = $this->detectIssuesWithValidator(
             values: $values,
-            fieldType: $fieldType,
+            validationRules: $validationRules,
+            fieldName: $mappedToField,
             isRequired: $isRequired,
-            blankCount: $blankCount,
         );
 
         return new ColumnAnalysis(
@@ -111,6 +162,157 @@ final readonly class CsvAnalyzer
             issues: new DataCollection(ValueIssue::class, $issues),
             isRequired: $isRequired,
         );
+    }
+
+    /**
+     * Get validation rules for a column from ImportColumn and/or CustomField.
+     *
+     * @return array<int|string, mixed>
+     */
+    private function getValidationRulesForColumn(
+        ?ImportColumn $importerColumn,
+        ?CustomField $customField,
+    ): array {
+        $rules = [];
+
+        // Get rules from ImportColumn
+        if ($importerColumn instanceof \Filament\Actions\Imports\ImportColumn) {
+            $rules = $this->filterValidatableRules($importerColumn->getDataValidationRules());
+        }
+
+        // For custom fields, use ValidationService to get complete rules
+        if ($customField instanceof \Relaticle\CustomFields\Models\CustomField) {
+            $customFieldRules = $this->validationService->getValidationRules($customField);
+            $customFieldRules = $this->filterValidatableRules($customFieldRules);
+
+            // Merge rules, preferring custom field rules for overlapping rule types
+            $rules = $this->mergeValidationRules($rules, $customFieldRules);
+
+            // Get item-level validation rules for multi-value fields (e.g., email format)
+            $itemRules = $this->validationService->getItemValidationRules($customField);
+            $rules = $this->mergeValidationRules($rules, $itemRules);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Filter out validation rules that shouldn't be applied to individual values.
+     *
+     * Some rules like 'array', closure-based rules, or object rules
+     * don't make sense for validating individual CSV values.
+     *
+     * @param  array<int|string, mixed>  $rules
+     * @return array<int|string, mixed>
+     */
+    private function filterValidatableRules(array $rules): array
+    {
+        return array_filter($rules, function (mixed $rule): bool {
+            // Skip closures and objects (like UniqueCustomFieldValue)
+            if (! is_string($rule)) {
+                return false;
+            }
+
+            // Skip array rule (CSV values are strings, not arrays)
+            if ($rule === 'array' || str_starts_with($rule, 'array:')) {
+                return false;
+            }
+
+            // Skip rules that require context we don't have
+            $skipRules = ['confirmed', 'same', 'different', 'current_password'];
+            $ruleName = explode(':', $rule, 2)[0];
+
+            return ! in_array($ruleName, $skipRules, true);
+        });
+    }
+
+    /**
+     * Merge two sets of validation rules, preferring rules from the second set
+     * when rule types overlap.
+     *
+     * @param  array<int|string, mixed>  $baseRules
+     * @param  array<int|string, mixed>  $overrideRules
+     * @return array<int|string, mixed>
+     */
+    private function mergeValidationRules(array $baseRules, array $overrideRules): array
+    {
+        // Extract rule names from override rules
+        $overrideRuleNames = array_map(function (mixed $rule): string {
+            if (! is_string($rule)) {
+                return '';
+            }
+
+            return explode(':', $rule, 2)[0];
+        }, $overrideRules);
+
+        // Filter base rules that don't conflict with override rules
+        $filteredBaseRules = array_filter($baseRules, function (mixed $rule) use ($overrideRuleNames): bool {
+            if (! is_string($rule)) {
+                return true;
+            }
+            $ruleName = explode(':', $rule, 2)[0];
+
+            return ! in_array($ruleName, $overrideRuleNames, true);
+        });
+
+        return array_merge(array_values($filteredBaseRules), array_values($overrideRules));
+    }
+
+    /**
+     * Detect validation issues using Laravel Validator.
+     *
+     * @param  array<string, int>  $values
+     * @param  array<int|string, mixed>  $validationRules
+     * @return array<ValueIssue>
+     */
+    private function detectIssuesWithValidator(
+        array $values,
+        array $validationRules,
+        string $fieldName,
+        bool $isRequired,
+    ): array {
+        $issues = [];
+
+        foreach ($values as $value => $count) {
+            $value = (string) $value;
+
+            // Skip blank values unless required
+            if ($this->isBlank($value)) {
+                if ($isRequired) {
+                    $issues[] = new ValueIssue(
+                        value: $value,
+                        message: 'This field is required',
+                        rowCount: $count,
+                        severity: 'error',
+                    );
+                }
+
+                continue;
+            }
+
+            // Skip validation if no rules
+            if ($validationRules === []) {
+                continue;
+            }
+
+            // Run Laravel Validator
+            $validator = Validator::make(
+                [$fieldName => $value],
+                [$fieldName => $validationRules]
+            );
+
+            if ($validator->fails()) {
+                $message = $validator->errors()->first($fieldName);
+                $issues[] = new ValueIssue(
+                    value: $value,
+                    message: $message,
+                    rowCount: $count,
+                    severity: 'error',
+                );
+            }
+        }
+
+        return $issues;
     }
 
     /**
@@ -151,143 +353,6 @@ final readonly class CsvAnalyzer
         }
 
         return 'string';
-    }
-
-    /**
-     * Detect validation issues in the column values.
-     *
-     * @param  array<string, int>  $values
-     * @return array<ValueIssue>
-     */
-    private function detectIssues(
-        array $values,
-        string $fieldType,
-        bool $isRequired,
-        int $blankCount,
-    ): array {
-        $issues = [];
-
-        // Check for blank values in required field
-        if ($isRequired && $blankCount > 0) {
-            $issues[] = new ValueIssue(
-                value: '',
-                message: 'Required field has blank values',
-                rowCount: $blankCount,
-                severity: 'error',
-            );
-        }
-
-        // Validate based on field type
-        foreach ($values as $value => $count) {
-            if ($this->isBlank($value)) {
-                continue; // Already handled above
-            }
-
-            $issue = $this->validateValue((string) $value, $fieldType, $count);
-            if ($issue instanceof ValueIssue) {
-                $issues[] = $issue;
-            }
-        }
-
-        return $issues;
-    }
-
-    /**
-     * Validate a single value based on field type.
-     */
-    private function validateValue(string $value, string $fieldType, int $count): ?ValueIssue
-    {
-        return match ($fieldType) {
-            'email' => $this->validateEmail($value, $count),
-            'numeric' => $this->validateNumeric($value, $count),
-            'boolean' => $this->validateBoolean($value, $count),
-            'date' => $this->validateDate($value, $count),
-            'url' => $this->validateUrl($value, $count),
-            default => null,
-        };
-    }
-
-    private function validateEmail(string $value, int $count): ?ValueIssue
-    {
-        if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
-            return new ValueIssue(
-                value: $value,
-                message: 'Invalid email format',
-                rowCount: $count,
-                severity: 'error',
-            );
-        }
-
-        return null;
-    }
-
-    private function validateNumeric(string $value, int $count): ?ValueIssue
-    {
-        if (! is_numeric($value)) {
-            return new ValueIssue(
-                value: $value,
-                message: 'Expected numeric value',
-                rowCount: $count,
-                severity: 'error',
-            );
-        }
-
-        return null;
-    }
-
-    private function validateBoolean(string $value, int $count): ?ValueIssue
-    {
-        $booleanValues = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off', ''];
-
-        if (! in_array(strtolower($value), $booleanValues, true)) {
-            return new ValueIssue(
-                value: $value,
-                message: 'Expected boolean value (true/false, yes/no, 1/0)',
-                rowCount: $count,
-                severity: 'error',
-            );
-        }
-
-        return null;
-    }
-
-    private function validateDate(string $value, int $count): ?ValueIssue
-    {
-        // Try common date formats
-        $formats = ['Y-m-d', 'm/d/Y', 'd/m/Y', 'Y/m/d', 'M d, Y', 'F d, Y'];
-
-        foreach ($formats as $format) {
-            $parsed = \DateTime::createFromFormat($format, $value);
-            if ($parsed !== false && $parsed->format($format) === $value) {
-                return null;
-            }
-        }
-
-        // Try strtotime as fallback
-        if (strtotime($value) !== false) {
-            return null;
-        }
-
-        return new ValueIssue(
-            value: $value,
-            message: 'Unable to parse date format',
-            rowCount: $count,
-            severity: 'warning',
-        );
-    }
-
-    private function validateUrl(string $value, int $count): ?ValueIssue
-    {
-        if (filter_var($value, FILTER_VALIDATE_URL) === false) {
-            return new ValueIssue(
-                value: $value,
-                message: 'Invalid URL format',
-                rowCount: $count,
-                severity: 'error',
-            );
-        }
-
-        return null;
     }
 
     private function isBlank(mixed $value): bool

@@ -56,4 +56,31 @@ final class ColumnAnalysis extends Data
 
         return array_slice($values, 0, $limit, preserve_keys: true);
     }
+
+    /**
+     * Check if this column has any validation errors.
+     */
+    public function hasErrors(): bool
+    {
+        return $this->issues->toCollection()
+            ->contains('severity', 'error');
+    }
+
+    /**
+     * Get the count of validation errors in this column.
+     */
+    public function getErrorCount(): int
+    {
+        return $this->issues->toCollection()
+            ->where('severity', 'error')
+            ->count();
+    }
+
+    /**
+     * Get the validation issue for a specific value, if any.
+     */
+    public function getIssueForValue(string $value): ?ValueIssue
+    {
+        return $this->issues->toCollection()->firstWhere('value', $value);
+    }
 }

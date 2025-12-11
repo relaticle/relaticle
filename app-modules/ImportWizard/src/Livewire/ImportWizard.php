@@ -157,7 +157,7 @@ final class ImportWizard extends Component
         return match ($this->currentStep) {
             self::STEP_UPLOAD => $this->persistedFilePath !== null && $this->csvHeaders !== [],
             self::STEP_MAP => $this->hasAllRequiredMappings(),
-            self::STEP_REVIEW => true, // Always allow proceeding (issues are warnings)
+            self::STEP_REVIEW => ! $this->hasValidationErrors(),
             self::STEP_PREVIEW => $this->hasRecordsToImport(),
             default => false,
         };
