@@ -192,7 +192,7 @@ final readonly class CsvAnalyzer
 
             // Get item-level validation rules for multi-value fields (e.g., email format)
             $itemRules = $this->validationService->getItemValidationRules($customField);
-            $isMultiValue = $this->validationService->isMultiValueField($customField);
+            $isMultiValue = $customField->isMultiChoiceField();
         }
 
         return [
