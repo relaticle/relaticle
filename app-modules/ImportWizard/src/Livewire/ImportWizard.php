@@ -457,19 +457,13 @@ final class ImportWizard extends Component implements HasActions, HasForms
      */
     public function proceedWithErrorsAction(): Action
     {
-        $errorCount = $this->getTotalErrorCount();
-        $affectedRowCount = $this->getAffectedRowCount();
-
         return Action::make('proceedWithErrors')
             ->label('Continue with errors')
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->color('warning')
             ->requiresConfirmation()
             ->modalHeading('Continue with validation errors?')
-            ->modalDescription(
-                "{$affectedRowCount} rows have values with validation errors. " .
-                'These rows will be skipped during import.'
-            )
+            ->modalDescription(fn (): string => $this->getAffectedRowCount().' rows have validation errors and will be skipped.')
             ->modalSubmitActionLabel('Skip errors and continue')
             ->action(function (): void {
                 $this->skipAllErrorValues();
@@ -497,18 +491,18 @@ final class ImportWizard extends Component implements HasActions, HasForms
      */
     private function getAffectedRowCount(): int
     {
-        $affectedRows = 0;
+        $count = 0;
 
         /** @var ColumnAnalysis $analysis */
         foreach ($this->columnAnalyses as $analysis) {
             foreach ($analysis->issues as $issue) {
                 if ($issue->severity === 'error') {
-                    $affectedRows += $issue->rowCount;
+                    $count += $issue->rowCount;
                 }
             }
         }
 
-        return $affectedRows;
+        return $count;
     }
 
     public function render(): View
