@@ -85,7 +85,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                     }),
                 Action::make('removeTeamMember')
                     ->visible(
-                        fn (Membership $record): bool => $this->authUser()->id !== $record->user_id && Gate::check(
+                        fn (Membership $record): bool => (string) $this->authUser()->id !== (string) $record->user_id && Gate::check(
                             'removeTeamMember',
                             $this->team
                         )
@@ -97,7 +97,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                         $this->removeTeamMember($this->team, $record);
                     }),
                 Action::make('leaveTeam')
-                    ->visible(fn (Membership $record): bool => $this->authUser()->id === $record->user_id)
+                    ->visible(fn (Membership $record): bool => (string) $this->authUser()->id === (string) $record->user_id)
                     ->icon('heroicon-o-arrow-right-start-on-rectangle')
                     ->color('danger')
                     ->label(__('teams.actions.leave_team'))

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\HasTeam;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 final class AiSummary extends Model
 {
     use HasTeam;
+    use HasUlids;
 
     /**
      * @var list<string>

@@ -13,6 +13,7 @@ use Filament\Models\Contracts\HasDefaultTenant;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -45,6 +46,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     use HasProfilePhoto;
     use HasTeams;
+    use HasUlids;
     use Notifiable;
     use TwoFactorAuthenticatable;
 

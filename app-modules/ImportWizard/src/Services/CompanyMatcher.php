@@ -25,7 +25,7 @@ final readonly class CompanyMatcher
      *
      * @param  array<string>  $emails  Person's email addresses
      */
-    public function match(string $companyName, array $emails, int $teamId): CompanyMatchResult
+    public function match(string $companyName, array $emails, string $teamId): CompanyMatchResult
     {
         $companyName = trim($companyName);
 
@@ -50,7 +50,7 @@ final readonly class CompanyMatcher
                     companyName: $company->name,
                     matchType: 'domain',
                     matchCount: 1,
-                    companyId: $company->id,
+                    companyId: (string) $company->id,
                 );
             }
 
@@ -75,7 +75,7 @@ final readonly class CompanyMatcher
                 companyName: $company->name,
                 matchType: 'name',
                 matchCount: 1,
-                companyId: $company->id,
+                companyId: (string) $company->id,
             );
         }
 
@@ -124,7 +124,7 @@ final readonly class CompanyMatcher
      * @param  array<string>  $domains
      * @return Collection<int, Company>
      */
-    private function findByDomain(array $domains, int $teamId): Collection
+    private function findByDomain(array $domains, string $teamId): Collection
     {
         return Company::query()
             ->where('team_id', $teamId)
@@ -146,7 +146,7 @@ final readonly class CompanyMatcher
      *
      * @return Collection<int, Company>
      */
-    private function findByName(string $name, int $teamId): Collection
+    private function findByName(string $name, string $teamId): Collection
     {
         return Company::query()
             ->where('team_id', $teamId)

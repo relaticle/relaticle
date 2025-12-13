@@ -15,6 +15,7 @@ test('login screen can be rendered', function () {
 
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->withPersonalTeam()->create();
+    $teamId = $user->ownedTeams()->first()->id;
 
     livewire(Login::class)
         ->fillForm([
@@ -22,7 +23,7 @@ test('users can authenticate using the login screen', function () {
             'password' => 'password',
         ])
         ->call('authenticate')
-        ->assertRedirect(url()->getAppUrl('1/companies'));
+        ->assertRedirect(url()->getAppUrl($teamId.'/companies'));
 
     $this->assertAuthenticated();
 });

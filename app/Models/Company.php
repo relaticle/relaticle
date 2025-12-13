@@ -13,6 +13,7 @@ use App\Observers\CompanyObserver;
 use App\Services\AvatarService;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +46,7 @@ final class Company extends Model implements HasCustomFields, HasMedia
 
     use HasNotes;
     use HasTeam;
+    use HasUlids;
     use InteractsWithMedia;
     use SoftDeletes;
     use UsesCustomFields;

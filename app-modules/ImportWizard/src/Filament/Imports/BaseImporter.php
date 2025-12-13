@@ -104,10 +104,10 @@ abstract class BaseImporter extends Importer
 
         $id = trim((string) $this->data['id']);
 
-        // Validate UUID format
-        if (! Str::isUuid($id)) {
+        // Validate ULID format
+        if (! Str::isUlid($id)) {
             throw new RowImportFailedException(
-                "Invalid ID format: {$id}. Must be a valid UUID."
+                "Invalid ID format: {$id}. Must be a valid ULID."
             );
         }
 

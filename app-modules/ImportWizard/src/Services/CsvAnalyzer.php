@@ -297,18 +297,16 @@ final readonly class CsvAnalyzer
                 continue;
             }
 
-            // Special validation for ID field - must be valid UUID
-            if ($fieldName === 'id') {
-                if (! Str::isUuid($value)) {
-                    $issues[] = new ValueIssue(
-                        value: $value,
-                        message: 'Invalid ID format. Must be a valid UUID (e.g., 9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g)',
-                        rowCount: $count,
-                        severity: 'error',
-                    );
+            // Special validation for ID field - must be valid ULID
+            if ($fieldName === 'id' && ! Str::isUlid($value)) {
+                $issues[] = new ValueIssue(
+                    value: $value,
+                    message: 'Invalid ID format. Must be a valid ULID (e.g., 01KCCFMZ52QWZSQZWVG0AP704V)',
+                    rowCount: $count,
+                    severity: 'error',
+                );
 
-                    continue;
-                }
+                continue;
             }
 
             // For multi-value fields with item rules, split and validate each item

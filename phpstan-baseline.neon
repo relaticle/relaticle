@@ -19,24 +19,6 @@ parameters:
 			path: app/Listeners/SwitchTeam.php
 
 		-
-			message: '#^Property App\\Models\\Opportunity\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Observers/OpportunityObserver.php
-
-		-
-			message: '#^Property App\\Models\\People\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Observers/PeopleObserver.php
-
-		-
-			message: '#^Property App\\Models\\Task\:\:\$creator_id \(int\<0, max\>\|null\) does not accept int\|string\|null\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Observers/TaskObserver.php
-
-		-
 			message: '#^Cannot access offset ''host'' on array\{scheme\?\: string, host\?\: string, port\?\: int\<0, 65535\>, user\?\: string, pass\?\: string, path\?\: string, query\?\: string, fragment\?\: string\}\|false\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1

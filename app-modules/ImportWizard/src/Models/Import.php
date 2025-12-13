@@ -7,10 +7,12 @@ namespace Relaticle\ImportWizard\Models;
 use App\Models\Concerns\HasTeam;
 use App\Models\User;
 use Filament\Actions\Imports\Models\Import as BaseImport;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 final class Import extends BaseImport
 {
     use HasTeam;
+    use HasUlids;
 
     /**
      * Bootstrap the model and its traits.

@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Services\AvatarService;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -21,6 +22,8 @@ final class Team extends JetstreamTeam implements HasAvatar
 {
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
+
+    use HasUlids;
 
     /**
      * The attributes that are mass assignable.

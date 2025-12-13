@@ -13,6 +13,7 @@ use App\Observers\PeopleObserver;
 use App\Services\AvatarService;
 use Database\Factories\PeopleFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,6 +38,7 @@ final class People extends Model implements HasCustomFields
 
     use HasNotes;
     use HasTeam;
+    use HasUlids;
     use SoftDeletes;
     use UsesCustomFields;
 

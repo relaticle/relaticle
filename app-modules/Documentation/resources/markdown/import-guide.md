@@ -10,10 +10,7 @@ Relaticle's import feature allows you to quickly populate your CRM with data fro
 - **Tasks** - To-dos and action items
 - **Notes** - Meeting notes and observations
 
-### When to Use Import vs Migration Wizard
-
-- **Single Import**: Use the standard import wizard when importing one entity type (e.g., just companies or just people)
-- **Migration Wizard**: Use when importing multiple related entities at once (e.g., companies + people + opportunities together)
+Each entity type is imported separately using the same 4-step import wizard. When importing people or opportunities, the system automatically creates or links related companies and contacts.
 
 ### Before You Start
 
@@ -96,7 +93,7 @@ The wizard analyzes your data and highlights potential issues before importing.
 - Invalid email addresses
 - Dates in unrecognized formats (use YYYY-MM-DD)
 - Required fields left blank
-- Invalid UUIDs for ID-based updates
+- Invalid ULIDs for ID-based updates
 
 ### Step 4: Preview Import
 
@@ -211,13 +208,13 @@ Get the Record IDs you need to update:
 1. Navigate to entity list (Companies, People, etc.)
 2. Select records to update (or export all)
 3. Click **Export to CSV**
-4. CSV will include an `id` column with UUIDs
+4. CSV will include an `id` column with ULIDs
 
 Example export:
 ```csv
 id,name,custom_fields_industry
-9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g,Acme Corp,Technology
-a1f2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o,TechStart Inc,Technology
+01KCCFMZ52QWZSQZWVG0AP704V,Acme Corp,Technology
+01KCCFN1A8XVQR4ZFWB3KC5M7P,TechStart Inc,Technology
 ```
 
 #### Step 2: Modify Your Data
@@ -226,8 +223,8 @@ Keep the `id` column and update other fields:
 
 ```csv
 id,name,custom_fields_industry
-9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g,Acme Corporation,Software
-a1f2b3c4-5d6e-7f8g-9h0i-1j2k3l4m5n6o,TechStart Inc,Hardware
+01KCCFMZ52QWZSQZWVG0AP704V,Acme Corporation,Software
+01KCCFN1A8XVQR4ZFWB3KC5M7P,TechStart Inc,Hardware
 ```
 
 #### Step 3: Re-Import
@@ -244,9 +241,9 @@ You can create new records and update existing ones in the same import:
 
 ```csv
 id,name
-9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g,Update This Company
+01KCCFMZ52QWZSQZWVG0AP704V,Update This Company
 ,Create New Company (no ID = new record)
-b2f3c4d5-6e7f-8g9h-0i1j-2k3l4m5n6o7p,Update Another Company
+01KCCFN1A8XVQR4ZFWB3KC5M7P,Update Another Company
 ```
 
 **Preview will show**:
@@ -257,14 +254,14 @@ b2f3c4d5-6e7f-8g9h-0i1j-2k3l4m5n6o7p,Update Another Company
 ### Security & Validation
 
 **ID Validation** (happens in Step 3: Review Values):
-- ✅ Must be valid UUID format
+- ✅ Must be valid ULID format
 - ✅ Record must exist in your workspace
 - ✅ You must have permission to edit it
 
 **Error Messages**:
-- `"Invalid ID format"`: Not a valid UUID - check for typos
+- `"Invalid ID format"`: Not a valid ULID - check for typos
 - `"Record not found"`: ID doesn't exist or belongs to another workspace
-- `"Invalid UUID"`: Format is wrong (should be 36 characters: 8-4-4-4-12)
+- `"Invalid ULID"`: Format is wrong (should be 26 characters)
 
 **Team Isolation**:
 - IDs from other workspaces are automatically rejected
@@ -281,7 +278,7 @@ b2f3c4d5-6e7f-8g9h-0i1j-2k3l4m5n6o7p,Update Another Company
 - Back up data before large updates
 
 ❌ **DON'T**:
-- Manually type UUIDs (always copy from export)
+- Manually type ULIDs (always copy from export)
 - Mix IDs from different workspaces
 - Delete the ID column accidentally
 - Share CSV files with IDs across teams
@@ -396,66 +393,6 @@ id,title,company_name,assignee_email,custom_fields_due_date,custom_fields_priori
 id,title,company_name,custom_fields_content,custom_fields_created_date
 ,Meeting Notes - Q1 Review,Acme Corporation,Discussed expansion plans,2024-02-01
 ,Call Summary,TechStart Inc,Technical requirements gathering,2024-02-05
-```
-
----
-
-## Migration Wizard
-
-The Migration Wizard is designed for importing multiple entity types with complex relationships.
-
-### When to Use
-
-- Migrating from another CRM system
-- Initial data load with companies + people + opportunities
-- Bulk import with many interdependencies
-
-### How It Works
-
-**3-Step Process**:
-
-1. **Upload Files**: Upload separate CSV files for each entity type
-2. **Map All Columns**: Map fields for all entity types at once
-3. **Import in Order**: System imports in dependency order:
-   - Companies first
-   - People second (links to companies)
-   - Opportunities third (links to companies and people)
-   - Tasks and Notes last
-
-### Dependency Handling
-
-The wizard automatically:
-- Creates companies before people
-- Links people to companies by name
-- Links opportunities to companies and contacts
-- Handles circular references safely
-
-**Sequential Processing**:
-- All imports for a workspace run one at a time
-- Prevents race conditions when creating related records
-- Ensures data integrity across entity types
-
-### Example Migration
-
-**companies.csv**:
-```csv
-name,custom_fields_industry
-Acme Corp,Technology
-TechStart Inc,Software
-```
-
-**people.csv**:
-```csv
-name,company_name,custom_fields_emails
-John Doe,Acme Corp,john@acme.com
-Jane Smith,TechStart Inc,jane@techstart.io
-```
-
-**opportunities.csv**:
-```csv
-name,company_name,contact_name,custom_fields_amount
-Enterprise Deal,Acme Corp,John Doe,50000
-Startup Package,TechStart Inc,Jane Smith,25000
 ```
 
 ---
@@ -636,8 +573,8 @@ Custom fields maintain their validation rules during import:
 - **Solution**: Convert dates to YYYY-MM-DD format
 - **Excel formula**: `=TEXT(A1,"YYYY-MM-DD")`
 
-**Problem**: "Invalid UUID"
-- **Solution**: Check ID column, must be valid UUID
+**Problem**: "Invalid ULID"
+- **Solution**: Check ID column, must be valid ULID (26 characters)
 - **Tip**: Re-export to get fresh IDs
 
 **Problem**: "Unknown option for select field"
@@ -665,7 +602,7 @@ Custom fields maintain their validation rules during import:
 ## FAQ
 
 ### Can I import more than one entity type at once?
-Yes, use the Migration Wizard. It handles multiple entity types with proper dependency ordering.
+Each entity type is imported separately. When importing people or opportunities, related companies and contacts are automatically created or linked based on the name fields in your CSV.
 
 ### What happens if my import fails halfway?
 Successfully imported rows remain in the system. Failed rows can be downloaded, corrected, and re-imported.
@@ -675,7 +612,7 @@ No automatic undo. Recommendation: Test with small sample first, backup data bef
 
 ### How do I update existing records?
 Two methods:
-1. **ID-based** (recommended): Include `id` column with record UUIDs
+1. **ID-based** (recommended): Include `id` column with record ULIDs
 2. **Name/email-based**: Set duplicate strategy to "Update"
 
 ### Can I import custom fields?

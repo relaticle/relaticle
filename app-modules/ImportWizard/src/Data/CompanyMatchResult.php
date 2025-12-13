@@ -21,7 +21,7 @@ final class CompanyMatchResult extends Data
         public string $companyName,
         public string $matchType,
         public int $matchCount,
-        public ?int $companyId = null,
+        public ?string $companyId = null,
     ) {}
 
     public function isAmbiguous(): bool

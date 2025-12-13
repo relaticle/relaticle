@@ -39,8 +39,8 @@ final readonly class ImportPreviewService
         string $csvPath,
         array $columnMap,
         array $options,
-        int $teamId,
-        int $userId,
+        string $teamId,
+        string $userId,
         array $valueCorrections = [],
     ): ImportPreviewResult {
         // Create a non-persisted Import model for the importer
@@ -250,7 +250,7 @@ final readonly class ImportPreviewService
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    private function enrichRowWithCompanyMatch(array $row, int $teamId): array
+    private function enrichRowWithCompanyMatch(array $row, string $teamId): array
     {
         $companyName = (string) ($row['company_name'] ?? '');
         $emails = $this->extractEmailsFromRow($row);

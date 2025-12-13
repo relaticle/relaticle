@@ -241,11 +241,11 @@ test('CompanyMatchResult helper methods work correctly', function () {
         ->and($newResult->isDomainMatch())->toBeFalse()
         ->and($newResult->isNameMatch())->toBeFalse();
 
-    $domainResult = new CompanyMatchResult(companyName: 'Test', matchType: 'domain', matchCount: 1, companyId: 1);
+    $domainResult = new CompanyMatchResult(companyName: 'Test', matchType: 'domain', matchCount: 1, companyId: '01kccnz9t2x1r00369k6wm6wk2');
     expect($domainResult->isDomainMatch())->toBeTrue()
         ->and($domainResult->isNew())->toBeFalse();
 
-    $nameResult = new CompanyMatchResult(companyName: 'Test', matchType: 'name', matchCount: 1, companyId: 1);
+    $nameResult = new CompanyMatchResult(companyName: 'Test', matchType: 'name', matchCount: 1, companyId: '01kccnz9t2x1r00369k6wm6wk2');
     expect($nameResult->isNameMatch())->toBeTrue()
         ->and($nameResult->isDomainMatch())->toBeFalse();
 

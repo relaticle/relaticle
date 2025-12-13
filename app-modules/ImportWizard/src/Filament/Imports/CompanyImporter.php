@@ -23,9 +23,9 @@ final class CompanyImporter extends BaseImporter
         return [
             ImportColumn::make('id')
                 ->label('Record ID')
-                ->guess(['id', 'record_id', 'uuid', 'record id'])
-                ->rules(['nullable', 'uuid'])
-                ->example('9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g')
+                ->guess(['id', 'record_id', 'ulid', 'record id'])
+                ->rules(['nullable', 'ulid'])
+                ->example('01KCCFMZ52QWZSQZWVG0AP704V')
                 ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
                 ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
                     // ID handled in resolveRecord(), skip here
@@ -73,7 +73,10 @@ final class CompanyImporter extends BaseImporter
     {
         // ID-based resolution takes absolute precedence
         if ($this->hasIdValue()) {
-            return $this->resolveById() ?? new Company;
+            /** @var Company|null $record */
+            $record = $this->resolveById();
+
+            return $record ?? new Company;
         }
 
         // Fall back to name-based duplicate detection
