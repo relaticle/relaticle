@@ -81,4 +81,25 @@ abstract class BaseImporter extends Importer
             ->where('email', trim($email))
             ->first();
     }
+
+    /**
+     * Save custom field values after the record is saved to the database.
+     *
+     * This hook ensures custom field data stored in ImportDataStorage during
+     * the import process is persisted to the database with proper team context.
+     */
+    protected function afterSave(): void
+    {
+        $team = \App\Models\Team::find($this->import->team_id);
+
+        if (! $team) {
+            throw new \RuntimeException(
+                "Team {$this->import->team_id} not found for import {$this->import->getKey()}"
+            );
+        }
+
+        \Relaticle\CustomFields\Facades\CustomFields::importer()
+            ->forModel($this->record)
+            ->saveValues($team);
+    }
 }
