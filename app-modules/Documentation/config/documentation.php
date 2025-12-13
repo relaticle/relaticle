@@ -59,6 +59,11 @@ return [
             'file' => 'api-guide.md',
             'description' => 'API reference and integration documentation.',
         ],
+        'import' => [
+            'title' => 'Import Guide',
+            'file' => 'import-guide.md',
+            'description' => 'Complete guide for importing companies, people, opportunities, tasks, and notes into Relaticle.',
+        ],
     ],
 
     /*

@@ -91,11 +91,23 @@ final readonly class ImportPreviewService
                     $formattedRow = $this->enrichRowWithCompanyMatch($formattedRow, $teamId);
                 }
 
+                // Detect update method (ID-based or attribute-based)
+                $hasId = ! blank($formattedRow['id'] ?? null);
+                $updateMethod = null;
+                $recordId = null;
+
+                if (! $isNew) {
+                    $updateMethod = $hasId ? 'id' : 'attribute';
+                    $recordId = $result['record']?->getKey();
+                }
+
                 $rows[] = array_merge(
                     $formattedRow,
                     [
                         '_row_index' => $rowNumber,
                         '_is_new' => $isNew,
+                        '_update_method' => $updateMethod,
+                        '_record_id' => $recordId,
                     ]
                 );
             } catch (\Throwable) {

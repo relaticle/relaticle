@@ -4,6 +4,10 @@
     $hasMore = $totalRows > count($sampleRows);
     $showCompanyMatch = in_array($entityType, ['people', 'opportunities']);
 
+    // Calculate update method statistics
+    $idBasedUpdates = collect($sampleRows)->where('_update_method', 'id')->count();
+    $attributeBasedUpdates = collect($sampleRows)->where('_update_method', 'attribute')->count();
+
     // Calculate company match statistics
     $companyMatchStats = [];
     if ($showCompanyMatch) {
@@ -35,6 +39,25 @@
             <span class="text-gray-500 dark:text-gray-400">updates</span>
         </div>
     </div>
+
+    {{-- Update Method Statistics --}}
+    @if ($idBasedUpdates > 0 || $attributeBasedUpdates > 0)
+        <div class="flex items-center gap-4 text-sm pt-2 border-t border-gray-100 dark:border-gray-800">
+            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Update Method:</span>
+            @if ($idBasedUpdates > 0)
+                <div class="flex items-center gap-1.5">
+                    <x-filament::badge color="info" size="sm">{{ $idBasedUpdates }}</x-filament::badge>
+                    <span class="text-gray-500 dark:text-gray-400">by ID</span>
+                </div>
+            @endif
+            @if ($attributeBasedUpdates > 0)
+                <div class="flex items-center gap-1.5">
+                    <x-filament::badge color="warning" size="sm">{{ $attributeBasedUpdates }}</x-filament::badge>
+                    <span class="text-gray-500 dark:text-gray-400">by name/email</span>
+                </div>
+            @endif
+        </div>
+    @endif
 
     {{-- Company Match Statistics (for People/Opportunities) --}}
     @if ($showCompanyMatch && array_sum($companyMatchStats) > 0)
@@ -144,9 +167,23 @@
                                     </td>
                                 @endif
                                 <td class="px-3 py-2">
-                                    <x-filament::badge :color="($row['_is_new'] ?? true) ? 'success' : 'info'" size="sm">
-                                        {{ ($row['_is_new'] ?? true) ? 'New' : 'Update' }}
-                                    </x-filament::badge>
+                                    @php
+                                        $isNew = $row['_is_new'] ?? true;
+                                        $updateMethod = $row['_update_method'] ?? null;
+                                    @endphp
+                                    @if ($isNew)
+                                        <x-filament::badge color="success" size="sm" icon="heroicon-m-plus">
+                                            New
+                                        </x-filament::badge>
+                                    @elseif ($updateMethod === 'id')
+                                        <x-filament::badge color="info" size="sm" icon="heroicon-m-arrow-path">
+                                            Update by ID
+                                        </x-filament::badge>
+                                    @else
+                                        <x-filament::badge color="warning" size="sm" icon="heroicon-m-arrow-path">
+                                            Update
+                                        </x-filament::badge>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

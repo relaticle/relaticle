@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Filament\Imports;
 
 use App\Models\User;
+use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\Importer;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 
 abstract class BaseImporter extends Importer
@@ -80,6 +83,50 @@ abstract class BaseImporter extends Importer
             ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $this->import->team_id))
             ->where('email', trim($email))
             ->first();
+    }
+
+    /**
+     * Check if current row has an ID value for matching.
+     */
+    protected function hasIdValue(): bool
+    {
+        return ! blank($this->data['id'] ?? null);
+    }
+
+    /**
+     * Resolve record by ID with team isolation.
+     */
+    protected function resolveById(): ?Model
+    {
+        if (! $this->hasIdValue()) {
+            return null;
+        }
+
+        $id = trim((string) $this->data['id']);
+
+        // Validate UUID format
+        if (! Str::isUuid($id)) {
+            throw new RowImportFailedException(
+                "Invalid ID format: {$id}. Must be a valid UUID."
+            );
+        }
+
+        /** @var class-string<Model> $modelClass */
+        $modelClass = static::getModel();
+
+        // Query with strict team isolation
+        $record = $modelClass::query()
+            ->where('id', $id)
+            ->where('team_id', $this->import->team_id)
+            ->first();
+
+        if (! $record) {
+            throw new RowImportFailedException(
+                "Record with ID {$id} not found or does not belong to your workspace."
+            );
+        }
+
+        return $record;
     }
 
     /**
