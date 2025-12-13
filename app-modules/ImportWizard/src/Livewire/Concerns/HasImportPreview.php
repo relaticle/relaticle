@@ -47,7 +47,9 @@ trait HasImportPreview
             importerClass: $importerClass,
             csvPath: $this->persistedFilePath,
             columnMap: $this->columnMap,
-            options: [],
+            options: [
+                'duplicate_handling' => \Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy::SKIP,
+            ],
             teamId: $team->getKey(),
             userId: $user->getAuthIdentifier(),
             valueCorrections: $this->valueCorrections,

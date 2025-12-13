@@ -25,9 +25,9 @@ final class PeopleImporter extends BaseImporter
         return [
             ImportColumn::make('id')
                 ->label('Record ID')
-                ->guess(['id', 'record_id', 'uuid', 'record id'])
-                ->rules(['nullable', 'uuid'])
-                ->example('9d3a5f8e-8c7b-4d9e-a1f2-3b4c5d6e7f8g')
+                ->guess(['id', 'record_id', 'ulid', 'record id'])
+                ->rules(['nullable', 'ulid'])
+                ->example('01KCCFMZ52QWZSQZWVG0AP704V')
                 ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
                 ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
                     // ID handled in resolveRecord(), skip here
@@ -89,7 +89,10 @@ final class PeopleImporter extends BaseImporter
     {
         // ID-based resolution takes absolute precedence
         if ($this->hasIdValue()) {
-            return $this->resolveById() ?? new People;
+            /** @var People|null $record */
+            $record = $this->resolveById();
+
+            return $record ?? new People;
         }
 
         // Fall back to email-based duplicate detection
@@ -117,13 +120,38 @@ final class PeopleImporter extends BaseImporter
             return null;
         }
 
+        // Find the emails custom field for this team
+        $emailsField = \Relaticle\CustomFields\Models\CustomField::withoutGlobalScopes()
+            ->where('code', 'emails')
+            ->where('entity_type', People::class)
+            ->where('tenant_id', $this->import->team_id)
+            ->first();
+
+        if (! $emailsField) {
+            return null;
+        }
+
+        // Get the correct value column for this field type
+        $valueColumn = $emailsField->getValueColumn();
+
         return People::query()
             ->where('team_id', $this->import->team_id)
-            ->whereHas('customFieldValues', function (Builder $query) use ($emails): void {
-                $query->whereRelation('customField', 'code', 'emails')
-                    ->where(function (Builder $query) use ($emails): void {
+            ->whereHas('customFieldValues', function (Builder $query) use ($emails, $emailsField, $valueColumn): void {
+                $query->withoutGlobalScopes()
+                    ->where('custom_field_id', $emailsField->id)
+                    ->where('tenant_id', $this->import->team_id)
+                    ->where(function (Builder $query) use ($emails, $valueColumn): void {
                         foreach ($emails as $email) {
-                            $query->orWhereJsonContains('json_value', $email);
+                            // For json_value (collection type), need to check if array contains email
+                            // For other value types, use direct match
+                            if ($valueColumn === 'json_value') {
+                                // SQLite-compatible JSON search
+                                // JSON value is stored as: ["email@example.com"]
+                                // So we search for: "email@example.com" (with quotes)
+                                $query->orWhere($valueColumn, 'LIKE', '%"'.str_replace('"', '\"', $email).'"%');
+                            } else {
+                                $query->orWhere($valueColumn, $email);
+                            }
                         }
                     });
             })
@@ -131,13 +159,13 @@ final class PeopleImporter extends BaseImporter
     }
 
     /**
-     * Extract and validate emails from original data
+     * Extract and validate emails from import data
      *
      * @return array<int, string>
      */
     private function extractEmails(): array
     {
-        $emailsField = $this->getOriginalData()['custom_fields_emails'] ?? null;
+        $emailsField = $this->data['custom_fields_emails'] ?? null;
 
         if (empty($emailsField)) {
             return [];

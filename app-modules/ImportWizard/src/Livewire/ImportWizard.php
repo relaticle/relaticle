@@ -350,7 +350,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
                 rows: base64_encode(serialize($chunk)),
                 columnMap: $this->columnMap,
                 options: [
-                    'duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW,
+                    'duplicate_handling' => DuplicateHandlingStrategy::SKIP,
                 ],
             );
         }
