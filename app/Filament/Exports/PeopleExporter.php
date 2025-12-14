@@ -36,7 +36,8 @@ final class PeopleExporter extends BaseExporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your people export has completed and '.Number::format($export->successful_rows).' '.str('row')->plural($export->successful_rows).' exported.';
+        $successfulRows = $export->successful_rows ?? 0;
+        $body = 'Your people export has completed and '.Number::format($successfulRows).' '.str('row')->plural($successfulRows).' exported.';
 
         if (($failedRowsCount = $export->getFailedRowsCount()) !== 0) {
             $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to export.';
