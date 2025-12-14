@@ -14,12 +14,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('opportunities', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
 
-            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
-            $table->foreignId('creator_id')->nullable()->constrained('users')->onDelete('set null');
-            $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('contact_id')->nullable()->constrained('people')->onDelete('set null');
+            $table->foreignUlid('team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignUlid('creator_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignUlid('company_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignUlid('contact_id')->nullable()->constrained('people')->onDelete('set null');
 
             $table->string('name');
 

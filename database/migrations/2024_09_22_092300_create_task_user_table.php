@@ -16,8 +16,8 @@ return new class extends Migration
         Schema::create('task_user', function (Blueprint $table): void {
             $table->id();
 
-            $table->foreignId('task_id')->constrained('tasks')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUlid('task_id')->constrained('tasks')->cascadeOnDelete();
+            $table->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
 
             $table->timestamps();
         });
