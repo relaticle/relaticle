@@ -30,11 +30,7 @@
                     Analyzing your import...
                 </p>
                 <p class="text-xs text-primary-600 dark:text-primary-300 mt-1">
-                    @if ($rowCount > 1000)
-                        Sampling {{ number_format(min($rowCount, 1000)) }} of {{ number_format($rowCount) }} rows for preview.
-                    @else
-                        Processing {{ number_format($rowCount) }} rows. This should only take a moment.
-                    @endif
+                    Processing {{ number_format($rowCount) }} rows. This should only take a moment.
                 </p>
             </div>
         </div>
@@ -61,11 +57,6 @@
                 <span class="text-gray-500 dark:text-gray-400">updates</span>
             </div>
         </div>
-        @if ($this->previewResultData['isSampled'] ?? false)
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Preview based on {{ number_format($this->previewResultData['sampleSize'] ?? 0) }} sample rows. Actual counts may vary.
-            </p>
-        @endif
     </div>
 
     {{-- Update Method Statistics --}}

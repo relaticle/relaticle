@@ -15,13 +15,13 @@ return new class extends Migration
     public function up(): void
     {
         // Skip if already using ULID (fresh install)
-        if ($this->isAlreadyUlid('ai_summaries', 'summarizable_id')) {
+        if ($this->isAlreadyUlid('media', 'model_id')) {
             return;
         }
 
-        // Add new ULID column for summarizable_id
-        Schema::table('ai_summaries', function (Blueprint $table): void {
-            $table->char('summarizable_ulid', 26)->nullable()->after('summarizable_id');
+        // Add new ULID column for model_id
+        Schema::table('media', function (Blueprint $table): void {
+            $table->char('model_ulid', 26)->nullable()->after('model_id');
         });
 
         // Populate ULID values by joining with ULID tables
@@ -37,27 +37,35 @@ return new class extends Migration
 
         foreach ($ulidTables as $table => $modelClass) {
             DB::statement("
-                UPDATE ai_summaries a
-                SET summarizable_ulid = t.id
+                UPDATE media m
+                SET model_ulid = t.id
                 FROM {$table} t
-                WHERE a.summarizable_id = t.id::bigint
-                AND a.summarizable_type = '{$modelClass}'
+                WHERE m.model_id = t.id::bigint
+                AND m.model_type = '{$modelClass}'
             ");
         }
 
         // Drop old column and rename ULID column
-        Schema::table('ai_summaries', function (Blueprint $table): void {
-            $table->dropColumn('summarizable_id');
+        Schema::table('media', function (Blueprint $table): void {
+            $table->dropColumn('model_id');
         });
 
-        Schema::table('ai_summaries', function (Blueprint $table): void {
-            $table->renameColumn('summarizable_ulid', 'summarizable_id');
+        Schema::table('media', function (Blueprint $table): void {
+            $table->renameColumn('model_ulid', 'model_id');
         });
 
         // Add index for morphable lookup
-        Schema::table('ai_summaries', function (Blueprint $table): void {
-            $table->index(['summarizable_type', 'summarizable_id']);
+        Schema::table('media', function (Blueprint $table): void {
+            $table->index(['model_type', 'model_id']);
         });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        // Not reversible
     }
 
     /**
