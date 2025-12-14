@@ -30,7 +30,11 @@
                     Analyzing your import...
                 </p>
                 <p class="text-xs text-primary-600 dark:text-primary-300 mt-1">
-                    Processing {{ number_format($rowCount) }} rows. This should only take a moment.
+                    @if ($rowCount > 1000)
+                        Sampling {{ number_format(min($rowCount, 1000)) }} of {{ number_format($rowCount) }} rows for preview.
+                    @else
+                        Processing {{ number_format($rowCount) }} rows. This should only take a moment.
+                    @endif
                 </p>
             </div>
         </div>
@@ -39,22 +43,29 @@
 
 <div class="space-y-6">
     {{-- Summary Stats --}}
-    <div class="flex items-center gap-6 text-sm">
-        <div class="flex items-center gap-1.5">
-            <x-filament::icon icon="heroicon-o-document-text" class="h-4 w-4 text-gray-400" />
-            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($totalRows) }}</span>
-            <span class="text-gray-500 dark:text-gray-400">total rows</span>
+    <div>
+        <div class="flex items-center gap-6 text-sm">
+            <div class="flex items-center gap-1.5">
+                <x-filament::icon icon="heroicon-o-document-text" class="h-4 w-4 text-gray-400" />
+                <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($totalRows) }}</span>
+                <span class="text-gray-500 dark:text-gray-400">total rows</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <x-filament::icon icon="heroicon-o-plus-circle" class="h-4 w-4 text-success-500" />
+                <span class="font-medium text-success-600 dark:text-success-400">{{ number_format($this->getCreateCount()) }}</span>
+                <span class="text-gray-500 dark:text-gray-400">new</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <x-filament::icon icon="heroicon-o-arrow-path" class="h-4 w-4 text-info-500" />
+                <span class="font-medium text-info-600 dark:text-info-400">{{ number_format($this->getUpdateCount()) }}</span>
+                <span class="text-gray-500 dark:text-gray-400">updates</span>
+            </div>
         </div>
-        <div class="flex items-center gap-1.5">
-            <x-filament::icon icon="heroicon-o-plus-circle" class="h-4 w-4 text-success-500" />
-            <span class="font-medium text-success-600 dark:text-success-400">{{ number_format($this->getCreateCount()) }}</span>
-            <span class="text-gray-500 dark:text-gray-400">new</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <x-filament::icon icon="heroicon-o-arrow-path" class="h-4 w-4 text-info-500" />
-            <span class="font-medium text-info-600 dark:text-info-400">{{ number_format($this->getUpdateCount()) }}</span>
-            <span class="text-gray-500 dark:text-gray-400">updates</span>
-        </div>
+        @if ($this->previewResultData['isSampled'] ?? false)
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Preview based on {{ number_format($this->previewResultData['sampleSize'] ?? 0) }} sample rows. Actual counts may vary.
+            </p>
+        @endif
     </div>
 
     {{-- Update Method Statistics --}}
