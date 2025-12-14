@@ -19,11 +19,22 @@ use Relaticle\ImportWizard\Models\Import;
  * Performs a dry-run of the import by calling each importer's resolveRecord()
  * method to determine whether records would be created or updated.
  */
-final readonly class ImportPreviewService
+final class ImportPreviewService
 {
+    /** @var \ReflectionClass<Importer>|null */
+    private ?\ReflectionClass $cachedReflectionClass = null;
+
+    /** @var array<string, \ReflectionProperty> */
+    private array $cachedReflectionProperties = [];
+
+    /** @var array<string, \ReflectionMethod> */
+    private array $cachedReflectionMethods = [];
+
+    private ?string $cachedImporterClass = null;
+
     public function __construct(
-        private CsvReaderFactory $csvReaderFactory,
-        private CompanyMatcher $companyMatcher,
+        private readonly CsvReaderFactory $csvReaderFactory,
+        private readonly CompanyMatcher $companyMatcher,
     ) {}
 
     /**
@@ -33,6 +44,7 @@ final readonly class ImportPreviewService
      * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
      * @param  array<string, mixed>  $options  Import options
      * @param  array<string, array<string, string>>  $valueCorrections  User-defined value corrections
+     * @param  int  $sampleSize  Maximum number of rows to process for preview (default 1,000)
      */
     public function preview(
         string $importerClass,
@@ -42,6 +54,7 @@ final readonly class ImportPreviewService
         string $teamId,
         string $userId,
         array $valueCorrections = [],
+        int $sampleSize = 1000,
     ): ImportPreviewResult {
         // Create a non-persisted Import model for the importer
         $import = new Import;
@@ -49,11 +62,10 @@ final readonly class ImportPreviewService
         $import->setAttribute('user_id', $userId);
 
         $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
-        $records = (new Statement)->process($csvReader);
-        $totalRows = iterator_count($records);
+        $totalRows = $this->fastRowCount($csvPath, $csvReader);
 
-        // Reset iterator
-        $records = (new Statement)->process($csvReader);
+        // Process only sampled rows for preview
+        $records = (new Statement)->limit($sampleSize)->process($csvReader);
 
         $willCreate = 0;
         $willUpdate = 0;
@@ -116,11 +128,15 @@ final readonly class ImportPreviewService
             }
         }
 
+        $actualSampleSize = min($totalRows, $sampleSize);
+
         return new ImportPreviewResult(
             totalRows: $totalRows,
             createCount: $willCreate,
             updateCount: $willUpdate,
             rows: $rows,
+            isSampled: $totalRows > $sampleSize,
+            sampleSize: $actualSampleSize,
         );
     }
 
@@ -181,24 +197,25 @@ final readonly class ImportPreviewService
     private function invokeImporterResolution(Importer $importer, array $rowData): ?Model
     {
         try {
-            $reflection = new \ReflectionClass($importer);
+            // Use cached reflection objects for performance
+            $reflection = $this->getCachedReflectionClass($importer);
 
             // Set row data on the importer
-            $originalDataProp = $reflection->getProperty('originalData');
+            $originalDataProp = $this->getCachedReflectionProperty($reflection, 'originalData');
             $originalDataProp->setValue($importer, $rowData);
 
-            $dataProp = $reflection->getProperty('data');
+            $dataProp = $this->getCachedReflectionProperty($reflection, 'data');
             $dataProp->setValue($importer, $rowData);
 
             // Process the row through importer's pipeline
-            $remapMethod = $reflection->getMethod('remapData');
+            $remapMethod = $this->getCachedReflectionMethod($reflection, 'remapData');
             $remapMethod->invoke($importer);
 
-            $castMethod = $reflection->getMethod('castData');
+            $castMethod = $this->getCachedReflectionMethod($reflection, 'castData');
             $castMethod->invoke($importer);
 
             // Resolve record (queries DB but doesn't save)
-            $resolveMethod = $reflection->getMethod('resolveRecord');
+            $resolveMethod = $this->getCachedReflectionMethod($reflection, 'resolveRecord');
 
             /** @var Model|null */
             return $resolveMethod->invoke($importer);
@@ -207,6 +224,56 @@ final readonly class ImportPreviewService
             .'Please check ImportPreviewService::invokeImporterResolution() and update reflection calls. '
             .'Original error: '.$e->getMessage(), $e->getCode(), previous: $e);
         }
+    }
+
+    /**
+     * Get or create cached reflection class.
+     *
+     * @return \ReflectionClass<Importer>
+     */
+    private function getCachedReflectionClass(Importer $importer): \ReflectionClass
+    {
+        $importerClass = $importer::class;
+
+        if ($this->cachedImporterClass !== $importerClass || $this->cachedReflectionClass === null) {
+            /** @var \ReflectionClass<Importer> $reflection */
+            $reflection = new \ReflectionClass($importer);
+            $this->cachedReflectionClass = $reflection;
+            $this->cachedImporterClass = $importerClass;
+            // Clear property and method caches when class changes
+            $this->cachedReflectionProperties = [];
+            $this->cachedReflectionMethods = [];
+        }
+
+        return $this->cachedReflectionClass;
+    }
+
+    /**
+     * Get or create cached reflection property.
+     *
+     * @param  \ReflectionClass<Importer>  $reflection
+     */
+    private function getCachedReflectionProperty(\ReflectionClass $reflection, string $propertyName): \ReflectionProperty
+    {
+        if (! isset($this->cachedReflectionProperties[$propertyName])) {
+            $this->cachedReflectionProperties[$propertyName] = $reflection->getProperty($propertyName);
+        }
+
+        return $this->cachedReflectionProperties[$propertyName];
+    }
+
+    /**
+     * Get or create cached reflection method.
+     *
+     * @param  \ReflectionClass<Importer>  $reflection
+     */
+    private function getCachedReflectionMethod(\ReflectionClass $reflection, string $methodName): \ReflectionMethod
+    {
+        if (! isset($this->cachedReflectionMethods[$methodName])) {
+            $this->cachedReflectionMethods[$methodName] = $reflection->getMethod($methodName);
+        }
+
+        return $this->cachedReflectionMethods[$methodName];
     }
 
     /**
@@ -313,5 +380,71 @@ final readonly class ImportPreviewService
             $emails,
             static fn (mixed $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false
         ));
+    }
+
+    /**
+     * Fast row counting with file size estimation for large files.
+     *
+     * For small files (< 1MB), uses exact counting.
+     * For large files, samples rows and estimates based on average row size.
+     *
+     * @param  \League\Csv\Reader<array<string, mixed>>  $csvReader
+     */
+    private function fastRowCount(string $csvPath, $csvReader): int
+    {
+        $fileSize = filesize($csvPath);
+        if ($fileSize === false) {
+            // Fallback to exact count if filesize fails
+            return iterator_count($csvReader->getRecords());
+        }
+
+        // For small files (< 1MB), exact count is fast
+        if ($fileSize < 1_048_576) {
+            return iterator_count($csvReader->getRecords());
+        }
+
+        // For large files, sample 100 rows and estimate
+        $sampleSize = 100;
+        $sample = [];
+        $iterator = $csvReader->getRecords();
+        $count = 0;
+
+        foreach ($iterator as $record) {
+            $sample[] = $record;
+            $count++;
+            if ($count >= $sampleSize) {
+                break;
+            }
+        }
+
+        if ($count === 0) {
+            return 0;
+        }
+
+        // Get header size (first line)
+        $headerContent = '';
+        $file = fopen($csvPath, 'r');
+        if ($file !== false) {
+            $headerContent = fgets($file) ?: '';
+            fclose($file);
+        }
+        $headerBytes = strlen($headerContent);
+
+        // Calculate average row size from sample
+        $sampleStartPos = $headerBytes;
+        $sampleContent = file_get_contents($csvPath, offset: $sampleStartPos, length: 8192);
+        if ($sampleContent === false) {
+            // Fallback to exact count if reading fails
+            return iterator_count($csvReader->getRecords());
+        }
+
+        $sampleLines = explode("\n", trim($sampleContent));
+        $avgRowSize = strlen($sampleContent) / max(1, count($sampleLines));
+
+        // Estimate total rows
+        $dataSize = $fileSize - $headerBytes;
+        $estimatedRows = (int) ceil($dataSize / max(1, $avgRowSize));
+
+        return $estimatedRows;
     }
 }

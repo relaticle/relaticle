@@ -31,6 +31,8 @@ final readonly class CsvAnalyzer
     /**
      * Analyze all mapped columns in a CSV file.
      *
+     * Uses single-pass analysis to read CSV once and collect stats for all columns simultaneously.
+     *
      * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
      * @param  array<ImportColumn>  $importerColumns  Column definitions from the importer
      * @param  string|null  $entityType  Entity model class for custom field lookup
@@ -48,28 +50,87 @@ final readonly class CsvAnalyzer
         // Pre-load custom fields for this entity type to avoid N+1 queries
         $customFields = $this->loadCustomFieldsForEntity($entityType);
 
-        return collect($columnMap)
+        // Filter out empty column mappings
+        $filteredColumnMap = collect($columnMap)
             ->filter(fn (?string $csvColumn): bool => $csvColumn !== null && $csvColumn !== '')
-            ->map(function (string $csvColumn, string $fieldName) use ($csvPath, $columnLookup, $customFields): ColumnAnalysis {
-                /** @var ImportColumn|null $importerColumn */
-                $importerColumn = $columnLookup->get($fieldName);
+            ->all();
 
-                // Get custom field if this is a custom field column
-                $customField = $this->getCustomFieldForColumn($fieldName, $customFields);
+        if ($filteredColumnMap === []) {
+            return collect();
+        }
 
-                // Create fresh CSV reader for each column to avoid loading entire file into memory
-                $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
-                $records = (new Statement)->process($csvReader);
+        // Initialize collectors for ALL columns before iteration
+        /** @var array<string, array{csvColumnName: string, mappedToField: string, values: array<string, int>, blankCount: int, totalCount: int, importerColumn: ImportColumn|null, customField: CustomField|null}> $collectors */
+        $collectors = [];
+        foreach ($filteredColumnMap as $fieldName => $csvColumn) {
+            /** @var ImportColumn|null $importerColumn */
+            $importerColumn = $columnLookup->get($fieldName);
+            $customField = $this->getCustomFieldForColumn($fieldName, $customFields);
 
-                return $this->analyzeColumn(
-                    csvColumnName: $csvColumn,
-                    mappedToField: $fieldName,
-                    records: $records,
-                    importerColumn: $importerColumn,
-                    customField: $customField,
-                );
-            })
-            ->values();
+            $collectors[$csvColumn] = [
+                'csvColumnName' => $csvColumn,
+                'mappedToField' => $fieldName,
+                'values' => [],
+                'blankCount' => 0,
+                'totalCount' => 0,
+                'importerColumn' => $importerColumn,
+                'customField' => $customField,
+            ];
+        }
+
+        // SINGLE PASS through CSV - update all collectors simultaneously
+        $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
+        $records = (new Statement)->process($csvReader);
+
+        foreach ($records as $record) {
+            foreach ($collectors as $csvColumn => &$collector) {
+                $collector['totalCount']++;
+                $value = $record[$csvColumn] ?? '';
+
+                if ($this->isBlank($value)) {
+                    $collector['blankCount']++;
+                    $collector['values'][''] = ($collector['values'][''] ?? 0) + 1;
+                } else {
+                    $valueStr = (string) $value;
+                    $collector['values'][$valueStr] = ($collector['values'][$valueStr] ?? 0) + 1;
+                }
+            }
+        }
+
+        // Build ColumnAnalysis objects from collected data
+        return collect($collectors)->map(function (array $collector): ColumnAnalysis {
+            // Sort values by count descending
+            arsort($collector['values']);
+
+            $fieldType = $this->determineFieldType($collector['importerColumn']);
+            $isRequired = $collector['importerColumn']?->isMappingRequired() ?? false;
+
+            // Get validation rules
+            $rulesData = $this->getValidationRulesForColumn(
+                $collector['importerColumn'],
+                $collector['customField']
+            );
+
+            // Detect issues
+            $issues = $this->detectIssuesWithValidator(
+                values: $collector['values'],
+                rulesData: $rulesData,
+                fieldName: $collector['mappedToField'],
+                isRequired: $isRequired,
+            );
+
+            return new ColumnAnalysis(
+                csvColumnName: $collector['csvColumnName'],
+                mappedToField: $collector['mappedToField'],
+                fieldType: $fieldType,
+                totalValues: $collector['totalCount'],
+                uniqueCount: count($collector['values']),
+                blankCount: $collector['blankCount'],
+                uniqueValues: $collector['values'],
+                issues: new DataCollection(ValueIssue::class, $issues),
+                isRequired: $isRequired,
+            );
+        })->values();
     }
 
     /**
@@ -103,64 +164,6 @@ final readonly class CsvAnalyzer
         $code = str_replace('custom_fields_', '', $fieldName);
 
         return $customFields->firstWhere('code', $code);
-    }
-
-    /**
-     * Analyze a single column to extract statistics and detect issues.
-     *
-     * @param  iterable<array<string, mixed>>  $records
-     */
-    private function analyzeColumn(
-        string $csvColumnName,
-        string $mappedToField,
-        iterable $records,
-        ?ImportColumn $importerColumn,
-        ?CustomField $customField = null,
-    ): ColumnAnalysis {
-        $values = [];
-        $blankCount = 0;
-        $totalCount = 0;
-
-        foreach ($records as $record) {
-            $totalCount++;
-            $value = $record[$csvColumnName] ?? '';
-
-            if ($this->isBlank($value)) {
-                $blankCount++;
-                $values[''] = ($values[''] ?? 0) + 1;
-            } else {
-                $values[$value] = ($values[$value] ?? 0) + 1;
-            }
-        }
-
-        // Sort by count descending, then alphabetically
-        arsort($values);
-
-        $fieldType = $this->determineFieldType($importerColumn);
-        $isRequired = $importerColumn?->isMappingRequired() ?? false;
-
-        // Get validation rules from ImportColumn and/or CustomField
-        $rulesData = $this->getValidationRulesForColumn($importerColumn, $customField);
-
-        // Detect issues using Laravel Validator with full validation rules
-        $issues = $this->detectIssuesWithValidator(
-            values: $values,
-            rulesData: $rulesData,
-            fieldName: $mappedToField,
-            isRequired: $isRequired,
-        );
-
-        return new ColumnAnalysis(
-            csvColumnName: $csvColumnName,
-            mappedToField: $mappedToField,
-            fieldType: $fieldType,
-            totalValues: $totalCount,
-            uniqueCount: count($values),
-            blankCount: $blankCount,
-            uniqueValues: $values,
-            issues: new DataCollection(ValueIssue::class, $issues),
-            isRequired: $isRequired,
-        );
     }
 
     /**

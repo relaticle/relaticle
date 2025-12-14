@@ -21,7 +21,7 @@
 @endphp
 
 {{-- Loading indicator for preview generation --}}
-<div wire:loading.delay wire:target="advanceToNextStep,generateImportPreview" class="mb-6">
+<div wire:loading.delay wire:target="advanceToNextStep" class="mb-6">
     <div class="rounded-lg bg-primary-50 dark:bg-primary-900/20 p-4 border border-primary-200 dark:border-primary-700">
         <div class="flex items-center gap-3">
             <x-filament::loading-indicator class="h-5 w-5 text-primary-600" />

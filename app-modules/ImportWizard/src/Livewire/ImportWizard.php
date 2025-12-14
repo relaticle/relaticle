@@ -7,19 +7,16 @@ namespace Relaticle\ImportWizard\Livewire;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Actions\Imports\Jobs\ImportCsv;
 use Filament\Facades\Filament;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
-use Filament\Support\ChunkIterator;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use League\Csv\Statement;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -27,6 +24,7 @@ use Livewire\WithFileUploads;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Concerns\HasImportEntities;
+use Relaticle\ImportWizard\Jobs\StreamingImportCsv;
 use Relaticle\ImportWizard\Livewire\Concerns\HasColumnMapping;
 use Relaticle\ImportWizard\Livewire\Concerns\HasCsvParsing;
 use Relaticle\ImportWizard\Livewire\Concerns\HasImportPreview;
@@ -281,6 +279,51 @@ final class ImportWizard extends Component implements HasActions, HasForms
     }
 
     /**
+     * Calculate optimal chunk size based on import complexity.
+     *
+     * Factors considered:
+     * - Column count (more columns = smaller chunks)
+     * - Custom fields presence (penalty for custom field processing)
+     * - Entity type (different entities have different overhead)
+     */
+    private function calculateOptimalChunkSize(): int
+    {
+        $columnCount = count($this->columnMap);
+
+        // Base chunk size by column count
+        $chunkSize = match (true) {
+            $columnCount <= 5 => 500,   // Simple imports (few fields)
+            $columnCount <= 10 => 250,  // Medium complexity
+            $columnCount <= 20 => 150,  // Complex (many fields)
+            default => 75,              // Very complex (20+ fields)
+        };
+
+        // Apply penalty for custom fields (they require extra processing)
+        $customFieldCount = collect($this->columnMap)
+            ->keys()
+            ->filter(fn (string $field): bool => str_starts_with($field, 'custom_fields_'))
+            ->count();
+
+        if ($customFieldCount > 0) {
+            // Reduce chunk size by 20% for each 5 custom fields
+            $customFieldPenalty = 1 - (min($customFieldCount, 15) / 5 * 0.20);
+            $chunkSize = (int) ($chunkSize * $customFieldPenalty);
+        }
+
+        // Entity-specific adjustments
+        $entityPenalty = match ($this->entityType) {
+            'opportunities' => 0.8,  // Opportunities are more complex (company matching, etc.)
+            'people' => 0.9,         // People have moderate complexity
+            default => 1.0,          // Companies and others are simpler
+        };
+
+        $chunkSize = (int) ($chunkSize * $entityPenalty);
+
+        // Clamp to safe range: 50-1000 rows per chunk
+        return max(50, min(1000, $chunkSize));
+    }
+
+    /**
      * Move the temporary file to permanent storage.
      */
     private function moveFileToPermanentStorage(): string
@@ -337,30 +380,34 @@ final class ImportWizard extends Component implements HasActions, HasForms
     }
 
     /**
-     * Dispatch import jobs using Filament's job batching.
+     * Dispatch import jobs using streaming approach.
+     *
+     * Instead of serializing row data, we pass row offset/limit ranges
+     * to reduce queue payload size from ~100KB to ~500 bytes per job.
      */
     private function dispatchImportJobs(Import $import): void
     {
-        $csvReader = app(CsvReaderFactory::class)->createFromPath(
-            Storage::disk('local')->path($import->file_path)
-        );
-
-        $statement = new Statement;
-        $records = $statement->process($csvReader);
-
-        $chunkSize = 100;
-        $chunkIterator = new ChunkIterator($records->getIterator(), $chunkSize);
+        $chunkSize = $this->calculateOptimalChunkSize();
+        $totalRows = $this->rowCount;
 
         $jobs = [];
-        foreach ($chunkIterator->get() as $chunk) {
-            $jobs[] = new ImportCsv(
+        $currentOffset = 0;
+
+        // Create streaming jobs with row ranges instead of data
+        while ($currentOffset < $totalRows) {
+            $rowsInThisChunk = min($chunkSize, $totalRows - $currentOffset);
+
+            $jobs[] = new StreamingImportCsv(
                 import: $import,
-                rows: base64_encode(serialize($chunk)),
+                startRow: $currentOffset,
+                rowCount: $rowsInThisChunk,
                 columnMap: $this->columnMap,
                 options: [
                     'duplicate_handling' => DuplicateHandlingStrategy::SKIP,
                 ],
             );
+
+            $currentOffset += $rowsInThisChunk;
         }
 
         Bus::batch($jobs)

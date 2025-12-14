@@ -28,14 +28,32 @@ abstract class BaseImporter extends Importer
     public function getJobMiddleware(): array
     {
         $teamId = $this->import->team_id ?? 'global';
+        $timeout = $this->calculateJobTimeout();
 
         return [
             // Ensure only one import runs at a time per team
             // This guarantees Companies finish before People starts
             new WithoutOverlapping("team-import-{$teamId}")
-                ->releaseAfter(60) // Release lock 60s after job starts (in case of failure)
-                ->expireAfter(3600), // Lock expires after 1 hour max
+                ->releaseAfter($timeout) // Dynamic timeout based on chunk size
+                ->expireAfter($timeout * 2), // Lock expires after 2x timeout
         ];
+    }
+
+    /**
+     * Calculate job timeout based on chunk size.
+     *
+     * Larger chunks need more time to process safely.
+     * Smaller chunks can recover faster if they fail.
+     */
+    protected function calculateJobTimeout(): int
+    {
+        // Get chunk size from options (passed by StreamingImportCsv)
+        $chunkSize = $this->options['_chunk_size'] ?? 100;
+
+        // Base timeout: 1 second per row, minimum 60s, maximum 600s (10 minutes)
+        $timeout = (int) ($chunkSize * 1);
+
+        return max(60, min(600, $timeout));
     }
 
     /**

@@ -43,6 +43,9 @@ trait HasImportPreview
 
         $previewService = app(ImportPreviewService::class);
 
+        // Calculate optimal sample size (min of rowCount and 1,000)
+        $sampleSize = min($this->rowCount, 1000);
+
         $result = $previewService->preview(
             importerClass: $importerClass,
             csvPath: $this->persistedFilePath,
@@ -53,14 +56,17 @@ trait HasImportPreview
             teamId: $team->getKey(),
             userId: $user->getAuthIdentifier(),
             valueCorrections: $this->valueCorrections,
+            sampleSize: $sampleSize,
         );
 
-        // Store counts (without rows to keep state small)
+        // Store counts and sampling metadata (without rows to keep state small)
         $this->previewResultData = [
             'totalRows' => $result->totalRows,
             'createCount' => $result->createCount,
             'updateCount' => $result->updateCount,
             'rows' => [],
+            'isSampled' => $result->isSampled,
+            'sampleSize' => $result->sampleSize,
         ];
 
         // Store only sample rows for preview display (not all 5000+)
