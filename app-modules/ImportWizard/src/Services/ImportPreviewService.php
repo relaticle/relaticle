@@ -147,29 +147,9 @@ final readonly class ImportPreviewService
             'options' => $options,
         ]);
 
-        // Use reflection to call protected methods without triggering side effects
-        $reflection = new \ReflectionClass($importer);
-
-        // Set the data on the importer
-        $originalDataProp = $reflection->getProperty('originalData');
-        $originalDataProp->setValue($importer, $rowData);
-
-        $dataProp = $reflection->getProperty('data');
-        $dataProp->setValue($importer, $rowData);
-
-        // Call remapData to map CSV columns to importer columns
-        $remapMethod = $reflection->getMethod('remapData');
-        $remapMethod->invoke($importer);
-
-        // Call castData to apply type casting
-        $castMethod = $reflection->getMethod('castData');
-        $castMethod->invoke($importer);
-
-        // Call resolveRecord to determine create vs update
-        // This queries the database but doesn't save anything
-        $resolveMethod = $reflection->getMethod('resolveRecord');
+        // Invoke importer's resolution logic using reflection
         /** @var Model|null $record */
-        $record = $resolveMethod->invoke($importer);
+        $record = $this->invokeImporterResolution($importer, $rowData);
 
         if ($record === null) {
             return ['action' => 'create', 'record' => null];
@@ -181,6 +161,52 @@ final readonly class ImportPreviewService
         }
 
         return ['action' => 'create', 'record' => $record];
+    }
+
+    /**
+     * Invoke Filament importer's record resolution logic via reflection.
+     *
+     * WARNING: This method uses reflection to access Filament's internal APIs.
+     * If Filament's internal structure changes, this may break.
+     *
+     * Maintenance: If this breaks after a Filament upgrade, check:
+     * 1. Property names: originalData, data
+     * 2. Method names: remapData, castData, resolveRecord
+     * 3. Consider requesting a public API from Filament for dry-run imports
+     *
+     * @param  array<string, mixed>  $rowData
+     *
+     * @throws \RuntimeException If reflection fails (Filament internals changed)
+     */
+    private function invokeImporterResolution(Importer $importer, array $rowData): ?Model
+    {
+        try {
+            $reflection = new \ReflectionClass($importer);
+
+            // Set row data on the importer
+            $originalDataProp = $reflection->getProperty('originalData');
+            $originalDataProp->setValue($importer, $rowData);
+
+            $dataProp = $reflection->getProperty('data');
+            $dataProp->setValue($importer, $rowData);
+
+            // Process the row through importer's pipeline
+            $remapMethod = $reflection->getMethod('remapData');
+            $remapMethod->invoke($importer);
+
+            $castMethod = $reflection->getMethod('castData');
+            $castMethod->invoke($importer);
+
+            // Resolve record (queries DB but doesn't save)
+            $resolveMethod = $reflection->getMethod('resolveRecord');
+
+            /** @var Model|null */
+            return $resolveMethod->invoke($importer);
+        } catch (\ReflectionException $e) {
+            throw new \RuntimeException('Failed to invoke Filament importer via reflection. This likely means Filament\'s internal API has changed. '
+            .'Please check ImportPreviewService::invokeImporterResolution() and update reflection calls. '
+            .'Original error: '.$e->getMessage(), $e->getCode(), previous: $e);
+        }
     }
 
     /**

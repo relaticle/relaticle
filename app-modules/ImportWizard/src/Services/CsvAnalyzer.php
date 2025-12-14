@@ -42,12 +42,6 @@ final readonly class CsvAnalyzer
         array $importerColumns,
         ?string $entityType = null,
     ): Collection {
-        $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
-        $records = (new Statement)->process($csvReader);
-
-        // Convert iterator to array so it can be reused across multiple columns
-        $recordsArray = iterator_to_array($records);
-
         // Build lookup for importer columns by name
         $columnLookup = collect($importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
 
@@ -56,17 +50,21 @@ final readonly class CsvAnalyzer
 
         return collect($columnMap)
             ->filter(fn (?string $csvColumn): bool => $csvColumn !== null && $csvColumn !== '')
-            ->map(function (string $csvColumn, string $fieldName) use ($recordsArray, $columnLookup, $customFields): ColumnAnalysis {
+            ->map(function (string $csvColumn, string $fieldName) use ($csvPath, $columnLookup, $customFields): ColumnAnalysis {
                 /** @var ImportColumn|null $importerColumn */
                 $importerColumn = $columnLookup->get($fieldName);
 
                 // Get custom field if this is a custom field column
                 $customField = $this->getCustomFieldForColumn($fieldName, $customFields);
 
+                // Create fresh CSV reader for each column to avoid loading entire file into memory
+                $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
+                $records = (new Statement)->process($csvReader);
+
                 return $this->analyzeColumn(
                     csvColumnName: $csvColumn,
                     mappedToField: $fieldName,
-                    records: $recordsArray,
+                    records: $records,
                     importerColumn: $importerColumn,
                     customField: $customField,
                 );

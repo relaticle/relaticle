@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Services;
 
 use App\Models\Company;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 
 /**
@@ -17,9 +15,20 @@ use Relaticle\ImportWizard\Data\CompanyMatchResult;
  * 2. Name match: exact company name match
  *
  * Returns match type for transparent preview display.
+ *
+ * Performance: Pre-loads all companies for a team into memory to avoid N+1 queries.
  */
-final readonly class CompanyMatcher
+final class CompanyMatcher
 {
+    /**
+     * Cached companies indexed by name and domain for fast lookup.
+     *
+     * @var array{byName: array<string, array<int, Company>>, byDomain: array<string, array<int, Company>>}|null
+     */
+    private ?array $companyCache = null;
+
+    private ?string $cachedTeamId = null;
+
     /**
      * Match a company by domain (from emails) or name.
      *
@@ -37,14 +46,16 @@ final readonly class CompanyMatcher
             );
         }
 
+        // Load companies into cache on first call
+        $this->ensureCompaniesLoaded($teamId);
+
         // Step 1: Try domain matching (highest confidence)
         $domains = $this->extractEmailDomains($emails);
         if ($domains !== []) {
-            $domainMatches = $this->findByDomain($domains, $teamId);
+            $domainMatches = $this->findInCacheByDomain($domains);
 
-            if ($domainMatches->count() === 1) {
-                /** @var Company $company */
-                $company = $domainMatches->first();
+            if (count($domainMatches) === 1) {
+                $company = reset($domainMatches);
 
                 return new CompanyMatchResult(
                     companyName: $company->name,
@@ -55,21 +66,20 @@ final readonly class CompanyMatcher
             }
 
             // Multiple domain matches - ambiguous
-            if ($domainMatches->count() > 1) {
+            if (count($domainMatches) > 1) {
                 return new CompanyMatchResult(
                     companyName: $companyName,
                     matchType: 'ambiguous',
-                    matchCount: $domainMatches->count(),
+                    matchCount: count($domainMatches),
                 );
             }
         }
 
         // Step 2: Try exact name matching
-        $nameMatches = $this->findByName($companyName, $teamId);
+        $nameMatches = $this->findInCacheByName($companyName);
 
-        if ($nameMatches->count() === 1) {
-            /** @var Company $company */
-            $company = $nameMatches->first();
+        if (count($nameMatches) === 1) {
+            $company = reset($nameMatches);
 
             return new CompanyMatchResult(
                 companyName: $company->name,
@@ -79,11 +89,11 @@ final readonly class CompanyMatcher
             );
         }
 
-        if ($nameMatches->count() > 1) {
+        if (count($nameMatches) > 1) {
             return new CompanyMatchResult(
                 companyName: $companyName,
                 matchType: 'ambiguous',
-                matchCount: $nameMatches->count(),
+                matchCount: count($nameMatches),
             );
         }
 
@@ -93,6 +103,87 @@ final readonly class CompanyMatcher
             matchType: 'new',
             matchCount: 0,
         );
+    }
+
+    /**
+     * Load all companies for team into memory cache.
+     */
+    private function ensureCompaniesLoaded(string $teamId): void
+    {
+        // Cache already loaded for this team
+        if ($this->companyCache !== null && $this->cachedTeamId === $teamId) {
+            return;
+        }
+
+        $this->cachedTeamId = $teamId;
+        $this->companyCache = ['byName' => [], 'byDomain' => []];
+
+        // Load all companies with custom field values
+        // Use withoutGlobalScopes on the relationship to ensure we get all custom field data
+        $companies = Company::query()
+            ->where('team_id', $teamId)
+            ->with([
+                'customFieldValues' => fn ($query) => $query->withoutGlobalScopes()->with([
+                    'customField' => fn ($q) => $q->withoutGlobalScopes(),
+                ]),
+            ])
+            ->get();
+
+        // Index by name
+        foreach ($companies as $company) {
+            $name = $company->name;
+            if (! isset($this->companyCache['byName'][$name])) {
+                $this->companyCache['byName'][$name] = [];
+            }
+            $this->companyCache['byName'][$name][] = $company;
+        }
+
+        // Index by domain_name custom field
+        foreach ($companies as $company) {
+            $domainValue = $company->customFieldValues
+                // @phpstan-ignore notIdentical.alwaysTrue (defensive check for safety)
+                ->filter(fn ($cfv): bool => $cfv->customField !== null)
+                ->first(fn ($cfv): bool => $cfv->customField->code === 'domain_name');
+
+            if ($domainValue !== null && $domainValue->string_value !== null) {
+                $domain = strtolower(trim($domainValue->string_value));
+                if (! isset($this->companyCache['byDomain'][$domain])) {
+                    $this->companyCache['byDomain'][$domain] = [];
+                }
+                $this->companyCache['byDomain'][$domain][] = $company;
+            }
+        }
+    }
+
+    /**
+     * Find companies in cache by domain.
+     *
+     * @param  array<string>  $domains
+     * @return array<int, Company>
+     */
+    private function findInCacheByDomain(array $domains): array
+    {
+        $matches = [];
+
+        foreach ($domains as $domain) {
+            if (isset($this->companyCache['byDomain'][$domain])) {
+                foreach ($this->companyCache['byDomain'][$domain] as $company) {
+                    $matches[$company->id] = $company;
+                }
+            }
+        }
+
+        return array_values($matches);
+    }
+
+    /**
+     * Find companies in cache by name.
+     *
+     * @return array<int, Company>
+     */
+    private function findInCacheByName(string $name): array
+    {
+        return $this->companyCache['byName'][$name] ?? [];
     }
 
     /**
@@ -116,41 +207,5 @@ final readonly class CompanyMatcher
             ->unique()
             ->values()
             ->toArray();
-    }
-
-    /**
-     * Find companies by domain_name custom field.
-     *
-     * @param  array<string>  $domains
-     * @return Collection<int, Company>
-     */
-    private function findByDomain(array $domains, string $teamId): Collection
-    {
-        return Company::query()
-            ->where('team_id', $teamId)
-            ->whereHas('customFieldValues', function (Builder $query) use ($domains, $teamId): void {
-                // Use withoutGlobalScopes to bypass TenantScope since we explicitly filter by team_id
-                $query->withoutGlobalScopes()
-                    ->where('tenant_id', $teamId)
-                    ->whereRelation('customField', fn (Builder $q) => $q
-                        ->withoutGlobalScopes()
-                        ->where('code', 'domain_name')
-                        ->where('tenant_id', $teamId))
-                    ->whereIn('string_value', $domains);
-            })
-            ->get();
-    }
-
-    /**
-     * Find companies by exact name match.
-     *
-     * @return Collection<int, Company>
-     */
-    private function findByName(string $name, string $teamId): Collection
-    {
-        return Company::query()
-            ->where('team_id', $teamId)
-            ->where('name', $name)
-            ->get();
     }
 }

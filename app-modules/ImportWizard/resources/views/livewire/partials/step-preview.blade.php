@@ -20,6 +20,23 @@
     }
 @endphp
 
+{{-- Loading indicator for preview generation --}}
+<div wire:loading.delay wire:target="advanceToNextStep,generateImportPreview" class="mb-6">
+    <div class="rounded-lg bg-primary-50 dark:bg-primary-900/20 p-4 border border-primary-200 dark:border-primary-700">
+        <div class="flex items-center gap-3">
+            <x-filament::loading-indicator class="h-5 w-5 text-primary-600" />
+            <div>
+                <p class="text-sm font-medium text-primary-800 dark:text-primary-200">
+                    Analyzing your import...
+                </p>
+                <p class="text-xs text-primary-600 dark:text-primary-300 mt-1">
+                    Processing {{ number_format($rowCount) }} rows. This should only take a moment.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="space-y-6">
     {{-- Summary Stats --}}
     <div class="flex items-center gap-6 text-sm">

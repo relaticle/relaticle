@@ -74,7 +74,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     #[Locked]
     public ?string $returnUrl = null;
 
-    #[Validate('required|file|max:102400')]
+    #[Validate('required|file|max:51200')]
     public mixed $uploadedFile = null;
 
     public ?string $persistedFilePath = null;

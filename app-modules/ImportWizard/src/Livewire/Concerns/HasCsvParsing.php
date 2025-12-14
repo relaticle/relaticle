@@ -39,6 +39,21 @@ trait HasCsvParsing
             $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
             $this->csvHeaders = $csvReader->getHeader();
             $this->rowCount = iterator_count($csvReader->getRecords());
+
+            // Validate row count (max 10,000 rows for performance)
+            if ($this->rowCount > 10000) {
+                $this->addError(
+                    'uploadedFile',
+                    'This file contains '.number_format($this->rowCount).' rows. '.
+                    'The maximum is 10,000 rows per import. '.
+                    'Please split your file into smaller chunks, or contact support for assistance with bulk imports.'
+                );
+                $this->cleanupTempFile();
+                $this->persistedFilePath = null;
+                $this->rowCount = 0;
+
+                return;
+            }
         } catch (SyntaxError $e) {
             // Handle duplicate column names
             $duplicates = $e->duplicateColumnNames();
@@ -49,6 +64,7 @@ trait HasCsvParsing
             }
             $this->cleanupTempFile();
             $this->persistedFilePath = null;
+            $this->rowCount = 0;
         }
     }
 
