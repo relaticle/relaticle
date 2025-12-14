@@ -34,11 +34,6 @@ final class StreamingImportCsv implements ShouldQueue
     use SerializesModels;
 
     /**
-     * The queue this job should be dispatched to.
-     */
-    public string $queue = 'imports';
-
-    /**
      * @param  Import  $import  The import model
      * @param  int  $startRow  Row offset to start reading from (0-indexed)
      * @param  int  $rowCount  Number of rows to process in this chunk
@@ -51,7 +46,9 @@ final class StreamingImportCsv implements ShouldQueue
         protected int $rowCount,
         protected array $columnMap,
         protected array $options = [],
-    ) {}
+    ) {
+        $this->onQueue('imports');
+    }
 
     /**
      * Execute the job.
@@ -62,53 +59,81 @@ final class StreamingImportCsv implements ShouldQueue
             return;
         }
 
-        // Stream rows from file on-demand
-        $csvPath = Storage::disk('local')->path($this->import->file_path);
-        $csvReader = App::make(CsvReaderFactory::class)->createFromPath($csvPath);
+        try {
+            // Stream rows from file on-demand
+            $csvPath = Storage::disk('local')->path($this->import->file_path);
 
-        $records = (new Statement)
-            ->offset($this->startRow)
-            ->limit($this->rowCount)
-            ->process($csvReader);
-
-        // Create importer instance
-        /** @var Importer $importer */
-        $importer = App::make($this->import->importer, [
-            'import' => $this->import,
-            'columnMap' => $this->columnMap,
-            'options' => $this->options,
-        ]);
-
-        $processedCount = 0;
-        $successCount = 0;
-        $failureCount = 0;
-
-        // Process each row
-        foreach ($records as $record) {
-            try {
-                // Use Filament's complete import pipeline
-                ($importer)($record);
-
-                $successCount++;
-            } catch (\Throwable $e) {
-                $failureCount++;
-                report($e);
+            if (! file_exists($csvPath)) {
+                throw new \RuntimeException("Import file not found: {$csvPath}");
             }
 
-            $processedCount++;
+            $csvReader = App::make(CsvReaderFactory::class)->createFromPath($csvPath);
+
+            $records = (new Statement)
+                ->offset($this->startRow)
+                ->limit($this->rowCount)
+                ->process($csvReader);
+
+            // Create importer instance
+            /** @var Importer $importer */
+            $importer = App::make($this->import->importer, [
+                'import' => $this->import,
+                'columnMap' => $this->columnMap,
+                'options' => $this->options,
+            ]);
+
+            $processedCount = 0;
+            $successCount = 0;
+            $failureCount = 0;
+
+            // Process each row
+            foreach ($records as $record) {
+                try {
+                    // Use Filament's complete import pipeline
+                    ($importer)($record);
+
+                    $successCount++;
+                } catch (\Throwable $e) {
+                    $failureCount++;
+
+                    // Log individual row failures with context
+                    \Log::error('Import row failed', [
+                        'import_id' => $this->import->id,
+                        'row_offset' => $this->startRow + $processedCount,
+                        'error' => $e->getMessage(),
+                        'exception' => get_class($e),
+                    ]);
+
+                    report($e);
+                }
+
+                $processedCount++;
+            }
+
+            // Update import model stats
+            $this->import->increment('processed_rows', $processedCount);
+            $this->import->increment('successful_rows', $successCount);
+
+            // Fire event for progress tracking
+            event(new ImportChunkProcessed(
+                import: $this->import,
+                processedRows: $processedCount,
+                successfulRows: $successCount,
+                failedRows: $failureCount,
+            ));
+        } catch (\Throwable $e) {
+            // Log job-level failures
+            \Log::error('StreamingImportCsv job failed', [
+                'import_id' => $this->import->id,
+                'start_row' => $this->startRow,
+                'row_count' => $this->rowCount,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
-
-        // Update import model stats
-        $this->import->increment('processed_rows', $processedCount);
-        $this->import->increment('successful_rows', $successCount);
-
-        // Fire event for progress tracking
-        event(new ImportChunkProcessed(
-            import: $this->import,
-            processedRows: $processedCount,
-            successfulRows: $successCount,
-            failedRows: $failureCount,
-        ));
     }
 
     /**
