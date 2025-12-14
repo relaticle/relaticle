@@ -34,6 +34,11 @@ final class StreamingImportCsv implements ShouldQueue
     use SerializesModels;
 
     /**
+     * The queue this job should be dispatched to.
+     */
+    public string $queue = 'imports';
+
+    /**
      * @param  Import  $import  The import model
      * @param  int  $startRow  Row offset to start reading from (0-indexed)
      * @param  int  $rowCount  Number of rows to process in this chunk

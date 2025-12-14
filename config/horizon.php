@@ -87,6 +87,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:imports' => 120,
     ],
 
     /*
@@ -221,6 +222,19 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+        'supervisor-imports' => [
+            'connection' => 'redis',
+            'queue' => ['imports'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 2,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -261,6 +275,19 @@ return [
                 'tries' => 1,
                 'nice' => 0,
             ],
+            'supervisor-imports' => [
+                'connection' => 'redis',
+                'queue' => ['imports'],
+                'balance' => 'auto',
+                'maxProcesses' => 5,
+                'minProcesses' => 1,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 3,
+                'memory' => 256,
+                'tries' => 2,
+                'timeout' => 300,
+                'nice' => 0,
+            ],
         ],
 
         'local' => [
@@ -272,6 +299,9 @@ return [
             ],
             'supervisor-3' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-imports' => [
+                'maxProcesses' => 2,
             ],
         ],
     ],
