@@ -149,4 +149,32 @@ abstract class BaseImporter extends Importer
             ->forModel($this->record)
             ->saveValues($team);
     }
+
+    /**
+     * Get the list of unique identifier columns for this importer.
+     * These columns can be used to match and update existing records.
+     *
+     * @return array<string>
+     */
+    public static function getUniqueIdentifierColumns(): array
+    {
+        return ['id']; // Default: just the ID column
+    }
+
+    /**
+     * Get the user-friendly message for missing unique identifiers.
+     */
+    public static function getMissingUniqueIdentifiersMessage(): string
+    {
+        return 'Map a Record ID column';
+    }
+
+    /**
+     * Whether to skip the unique identifier warning for this importer.
+     * Override this to return true for entity types that don't support updates.
+     */
+    public static function skipUniqueIdentifierWarning(): bool
+    {
+        return false;
+    }
 }

@@ -116,4 +116,14 @@ final class TaskImporter extends BaseImporter
 
         return $body;
     }
+
+    public static function getUniqueIdentifierColumns(): array
+    {
+        return ['id', 'title'];
+    }
+
+    public static function getMissingUniqueIdentifiersMessage(): string
+    {
+        return 'For Tasks, map a Title or Record ID column';
+    }
 }

@@ -116,4 +116,45 @@ trait HasColumnMapping
 
         return $column?->getLabel() ?? Str::title(str_replace('_', ' ', $fieldName));
     }
+
+    /**
+     * Check if any unique identifier column is mapped.
+     */
+    protected function hasUniqueIdentifierMapped(): bool
+    {
+        $importerClass = $this->getImporterClass();
+
+        if ($importerClass === null) {
+            return true; // No importer means skip check
+        }
+
+        // Skip check if importer doesn't want the warning
+        if ($importerClass::skipUniqueIdentifierWarning()) {
+            return true; // Return true to skip warning
+        }
+
+        $uniqueColumns = $importerClass::getUniqueIdentifierColumns();
+
+        foreach ($uniqueColumns as $column) {
+            if (isset($this->columnMap[$column]) && $this->columnMap[$column] !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the user-friendly message for missing unique identifiers.
+     */
+    protected function getMissingUniqueIdentifiersMessage(): string
+    {
+        $importerClass = $this->getImporterClass();
+
+        if ($importerClass === null) {
+            return 'Map a Record ID column';
+        }
+
+        return $importerClass::getMissingUniqueIdentifiersMessage();
+    }
 }

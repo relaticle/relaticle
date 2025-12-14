@@ -165,4 +165,14 @@ final class OpportunityImporter extends BaseImporter
 
         return $body;
     }
+
+    public static function getUniqueIdentifierColumns(): array
+    {
+        return ['id', 'name'];
+    }
+
+    public static function getMissingUniqueIdentifiersMessage(): string
+    {
+        return 'For Opportunities, map an Opportunity name or Record ID column';
+    }
 }

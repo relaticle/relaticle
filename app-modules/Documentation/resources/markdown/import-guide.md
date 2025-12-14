@@ -74,6 +74,24 @@ The import wizard will automatically attempt to match your CSV columns to Relati
 - Select "Don't Import" to skip a column
 - Custom fields appear with "custom_fields_" prefix
 
+**Unique Identifiers for Updates**:
+
+When you want to update existing records instead of creating duplicates, you must map at least one unique identifier column:
+
+- **Record ID**: The unique ULID identifier from Relaticle. Include this column if you exported data from Relaticle.
+- **Entity-specific identifier**:
+  - **People**: Email addresses - Matches existing people by email
+  - **Companies**: Company name - Matches existing companies by name
+  - **Opportunities**: Opportunity name - Matches existing opportunities by name
+  - **Tasks**: Task title - Matches existing tasks by title
+
+**How it works**:
+1. If you map the Record ID column, the importer will look up existing records by ID and update them
+2. If you don't map Record ID but map an entity-specific identifier (like email), the importer will try to match by that field
+3. If you don't map any unique identifier, all rows will create new records (which may result in duplicates)
+
+**Best Practice**: Always include either the Record ID or an entity-specific identifier when re-importing data to avoid duplicates.
+
 ### Step 3: Review & Fix Values
 
 The wizard analyzes your data and highlights potential issues before importing.

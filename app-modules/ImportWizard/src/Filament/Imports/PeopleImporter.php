@@ -192,4 +192,14 @@ final class PeopleImporter extends BaseImporter
 
         return $body;
     }
+
+    public static function getUniqueIdentifierColumns(): array
+    {
+        return ['id', 'custom_fields_emails'];
+    }
+
+    public static function getMissingUniqueIdentifiersMessage(): string
+    {
+        return 'For People, map an Email addresses or Record ID column';
+    }
 }

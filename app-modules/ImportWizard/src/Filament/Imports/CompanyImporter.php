@@ -110,4 +110,14 @@ final class CompanyImporter extends BaseImporter
 
         return $body;
     }
+
+    public static function getUniqueIdentifierColumns(): array
+    {
+        return ['id', 'name'];
+    }
+
+    public static function getMissingUniqueIdentifiersMessage(): string
+    {
+        return 'For Companies, map a Company name or Record ID column';
+    }
 }

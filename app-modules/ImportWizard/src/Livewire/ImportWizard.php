@@ -16,6 +16,7 @@ use Filament\Support\ChunkIterator;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use League\Csv\Statement;
@@ -125,6 +126,13 @@ final class ImportWizard extends Component implements HasActions, HasForms
             if ($this->currentStep === self::STEP_REVIEW && $this->hasValidationErrors()) {
                 $this->mountAction('proceedWithErrors');
             }
+
+            return;
+        }
+
+        // Check for unique identifier mapping when leaving MAP step
+        if ($this->currentStep === self::STEP_MAP && ! $this->hasUniqueIdentifierMapped()) {
+            $this->mountAction('proceedWithoutUniqueIdentifiers');
 
             return;
         }
@@ -467,6 +475,28 @@ final class ImportWizard extends Component implements HasActions, HasForms
             ->modalSubmitActionLabel('Skip errors and continue')
             ->action(function (): void {
                 $this->skipAllErrorValues();
+                $this->advanceToNextStep();
+            });
+    }
+
+    public function proceedWithoutUniqueIdentifiersAction(): Action
+    {
+        $docsUrl = route('documentation.show', 'import').'#unique-identifiers';
+
+        return Action::make('proceedWithoutUniqueIdentifiers')
+            ->label('Continue without mapping')
+            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Avoid creating duplicate records')
+            ->modalDescription(fn (): HtmlString => new HtmlString(
+                'To avoid creating duplicate records, make sure you include and map the following columns:<br><br>'.
+                '<strong>'.$this->getMissingUniqueIdentifiersMessage().'</strong><br><br>'.
+                '<a href="'.$docsUrl.'" target="_blank" class="text-primary-600 hover:underline">Learn more about unique identifiers</a>'
+            ))
+            ->modalSubmitActionLabel('Continue without mapping')
+            ->modalCancelActionLabel('Go back')
+            ->action(function (): void {
                 $this->advanceToNextStep();
             });
     }

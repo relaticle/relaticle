@@ -110,4 +110,9 @@ final class NoteImporter extends BaseImporter
 
         return $body;
     }
+
+    public static function skipUniqueIdentifierWarning(): bool
+    {
+        return true; // Notes don't support attribute-based matching, skip warning
+    }
 }
