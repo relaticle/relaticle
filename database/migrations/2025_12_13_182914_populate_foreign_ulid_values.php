@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,6 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if already using ULID (fresh install)
+        if ($this->isAlreadyUlid('users', 'id')) {
+            return;
+        }
+
         // Populate Companies foreign ULIDs
         DB::statement('
             UPDATE companies
@@ -114,5 +120,19 @@ return new class extends Migration
             SET user_ulid = (SELECT ulid FROM users WHERE users.id = teams.user_id)
             WHERE user_id IS NOT NULL
         ');
+    }
+
+    /**
+     * Check if a column is already using ULID (char/string type).
+     */
+    private function isAlreadyUlid(string $table, string $column): bool
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        $columnType = Schema::getColumnType($table, $column);
+
+        return in_array($columnType, ['string', 'char', 'varchar', 'bpchar']);
     }
 };

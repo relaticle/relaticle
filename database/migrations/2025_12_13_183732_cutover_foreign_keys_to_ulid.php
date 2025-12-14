@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if already using ULID (fresh install)
+        if ($this->isAlreadyUlid('users', 'id')) {
+            return;
+        }
+
         Schema::disableForeignKeyConstraints();
 
         // Companies: team_id, creator_id, account_owner_id -> ULIDs
@@ -81,5 +86,19 @@ return new class extends Migration
         });
 
         Schema::enableForeignKeyConstraints();
+    }
+
+    /**
+     * Check if a column is already using ULID (char/string type).
+     */
+    private function isAlreadyUlid(string $table, string $column): bool
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        $columnType = Schema::getColumnType($table, $column);
+
+        return in_array($columnType, ['string', 'char', 'varchar', 'bpchar']);
     }
 };

@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if already using ULID (fresh install)
+        if ($this->isAlreadyUlid('users', 'id')) {
+            return;
+        }
+
         // Add ULID foreign key columns to core entity tables
         Schema::table('companies', function (Blueprint $table): void {
             $table->foreignUlid('team_ulid')->after('team_id')->nullable();
@@ -52,5 +57,19 @@ return new class extends Migration
         Schema::table('teams', function (Blueprint $table): void {
             $table->foreignUlid('user_ulid')->after('user_id')->nullable();
         });
+    }
+
+    /**
+     * Check if a column is already using ULID (char/string type).
+     */
+    private function isAlreadyUlid(string $table, string $column): bool
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        $columnType = Schema::getColumnType($table, $column);
+
+        return in_array($columnType, ['string', 'char', 'varchar', 'bpchar']);
     }
 };

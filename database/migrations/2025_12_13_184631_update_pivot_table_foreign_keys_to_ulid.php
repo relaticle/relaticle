@@ -14,6 +14,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if already using ULID (fresh install)
+        if ($this->isAlreadyUlid('users', 'id')) {
+            return;
+        }
+
         $driver = Schema::getConnection()->getDriverName();
 
         if ($driver === 'sqlite') {
@@ -125,5 +130,19 @@ return new class extends Migration
         }
 
         DB::statement('PRAGMA foreign_keys = ON');
+    }
+
+    /**
+     * Check if a column is already using ULID (char/string type).
+     */
+    private function isAlreadyUlid(string $table, string $column): bool
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        $columnType = Schema::getColumnType($table, $column);
+
+        return in_array($columnType, ['string', 'char', 'varchar', 'bpchar']);
     }
 };

@@ -13,6 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if already using ULID (fresh install)
+        if ($this->isAlreadyUlid('users', 'id')) {
+            return;
+        }
+
         // Add ULID column to each table (keeping old integer ID for now)
         Schema::table('users', function (Blueprint $table): void {
             $table->ulid('ulid')->after('id')->nullable()->unique();
@@ -41,5 +46,19 @@ return new class extends Migration
         Schema::table('notes', function (Blueprint $table): void {
             $table->ulid('ulid')->after('id')->nullable()->unique();
         });
+    }
+
+    /**
+     * Check if a column is already using ULID (char/string type).
+     */
+    private function isAlreadyUlid(string $table, string $column): bool
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        $columnType = Schema::getColumnType($table, $column);
+
+        return in_array($columnType, ['string', 'char', 'varchar', 'bpchar']);
     }
 };
