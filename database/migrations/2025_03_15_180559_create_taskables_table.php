@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('taskables', function (Blueprint $table): void {
             $table->id();
 
-            $table->foreignId('task_id');
+            $table->foreignUlid('task_id');
 
             $table->morphs('taskable');
 

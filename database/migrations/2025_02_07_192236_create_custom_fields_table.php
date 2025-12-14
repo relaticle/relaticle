@@ -23,7 +23,7 @@ return new class extends Migration
             $table->id();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
-                $table->foreignId(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
+                $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
                 $uniqueColumns[] = config('custom-fields.database.column_names.tenant_foreign_key');
             }
 
@@ -65,7 +65,7 @@ return new class extends Migration
             $table->string('width')->nullable();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
-                $table->foreignId(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
+                $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
                 $uniqueColumns[] = config('custom-fields.database.column_names.tenant_foreign_key');
             }
 
@@ -102,7 +102,7 @@ return new class extends Migration
             $table->id();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
-                $table->foreignId(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
+                $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
                 $uniqueColumns[] = config('custom-fields.database.column_names.tenant_foreign_key');
             }
 
@@ -128,11 +128,11 @@ return new class extends Migration
             $table->id();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
-                $table->foreignId(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
+                $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
                 $uniqueColumns[] = config('custom-fields.database.column_names.tenant_foreign_key');
             }
 
-            $table->morphs('entity');
+            $table->ulidMorphs('entity');
             $table->foreignIdFor(CustomField::class)
                 ->constrained()
                 ->cascadeOnDelete();
