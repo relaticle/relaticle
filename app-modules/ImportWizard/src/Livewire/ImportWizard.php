@@ -412,6 +412,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
         Bus::batch($jobs)
             ->name("import-{$import->getKey()}")
+            ->onQueue('imports')
             ->finally(function () use ($import): void {
                 $import->update(['completed_at' => now()]);
             })

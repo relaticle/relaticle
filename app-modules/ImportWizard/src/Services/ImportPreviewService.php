@@ -129,13 +129,24 @@ final class ImportPreviewService
         }
 
         $actualSampleSize = min($totalRows, $sampleSize);
+        $isSampled = $totalRows > $sampleSize;
+
+        // Scale counts to full dataset if sampled
+        $scaledCreateCount = $willCreate;
+        $scaledUpdateCount = $willUpdate;
+
+        if ($isSampled && $actualSampleSize > 0) {
+            $scaleFactor = $totalRows / $actualSampleSize;
+            $scaledCreateCount = (int) round($willCreate * $scaleFactor);
+            $scaledUpdateCount = (int) round($willUpdate * $scaleFactor);
+        }
 
         return new ImportPreviewResult(
             totalRows: $totalRows,
-            createCount: $willCreate,
-            updateCount: $willUpdate,
+            createCount: $scaledCreateCount,
+            updateCount: $scaledUpdateCount,
             rows: $rows,
-            isSampled: $totalRows > $sampleSize,
+            isSampled: $isSampled,
             sampleSize: $actualSampleSize,
         );
     }

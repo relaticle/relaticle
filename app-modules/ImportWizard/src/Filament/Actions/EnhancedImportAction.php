@@ -169,6 +169,7 @@ final class EnhancedImportAction extends ImportAction
 
         $fileRules = [
             "extensions:{$acceptedExtensions}",
+            'max:102400', // 100MB in kilobytes
             fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
                 $csvStream = $this->getUploadedFileStream($value);
 
@@ -207,6 +208,27 @@ final class EnhancedImportAction extends ImportAction
                 $fail(trans_choice('filament-actions::import.modal.form.file.rules.duplicate_columns', count($filledDuplicateCsvColumns), [
                     'columns' => implode(', ', $filledDuplicateCsvColumns),
                 ]));
+            },
+            fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                $csvStream = $this->getUploadedFileStream($value);
+
+                if (! $csvStream) {
+                    return;
+                }
+
+                $csvReader = CsvReader::createFromStream($csvStream);
+
+                if (filled($csvDelimiter = $this->getCsvDelimiter($csvReader))) {
+                    $csvReader->setDelimiter($csvDelimiter);
+                }
+
+                $csvReader->setHeaderOffset($this->getHeaderOffset() ?? 0);
+
+                $rowCount = iterator_count($csvReader);
+
+                if ($rowCount > 10000) {
+                    $fail('The file contains '.number_format($rowCount).' rows, but the maximum allowed is 10,000 rows. Please reduce the file size and try again.');
+                }
             },
         ];
 

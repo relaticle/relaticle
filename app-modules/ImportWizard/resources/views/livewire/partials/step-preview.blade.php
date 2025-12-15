@@ -20,23 +20,6 @@
     }
 @endphp
 
-{{-- Loading indicator for preview generation --}}
-<div wire:loading.delay wire:target="advanceToNextStep" class="mb-6">
-    <div class="rounded-lg bg-primary-50 dark:bg-primary-900/20 p-4 border border-primary-200 dark:border-primary-700">
-        <div class="flex items-center gap-3">
-            <x-filament::loading-indicator class="h-5 w-5 text-primary-600" />
-            <div>
-                <p class="text-sm font-medium text-primary-800 dark:text-primary-200">
-                    Analyzing your import...
-                </p>
-                <p class="text-xs text-primary-600 dark:text-primary-300 mt-1">
-                    Processing {{ number_format($rowCount) }} rows. This should only take a moment.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="space-y-6">
     {{-- Summary Stats --}}
     <div>
@@ -48,12 +31,12 @@
             </div>
             <div class="flex items-center gap-1.5">
                 <x-filament::icon icon="heroicon-o-plus-circle" class="h-4 w-4 text-success-500" />
-                <span class="font-medium text-success-600 dark:text-success-400">{{ number_format($this->getCreateCount()) }}</span>
+                <span class="font-medium text-success-600 dark:text-success-400">~{{ number_format($this->getCreateCount()) }}</span>
                 <span class="text-gray-500 dark:text-gray-400">new</span>
             </div>
             <div class="flex items-center gap-1.5">
                 <x-filament::icon icon="heroicon-o-arrow-path" class="h-4 w-4 text-info-500" />
-                <span class="font-medium text-info-600 dark:text-info-400">{{ number_format($this->getUpdateCount()) }}</span>
+                <span class="font-medium text-info-600 dark:text-info-400">~{{ number_format($this->getUpdateCount()) }}</span>
                 <span class="text-gray-500 dark:text-gray-400">updates</span>
             </div>
         </div>

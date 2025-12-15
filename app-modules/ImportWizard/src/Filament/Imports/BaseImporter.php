@@ -27,16 +27,12 @@ abstract class BaseImporter extends Importer
      */
     public function getJobMiddleware(): array
     {
-        $teamId = $this->import->team_id ?? 'global';
-        $timeout = $this->calculateJobTimeout();
-
-        return [
-            // Ensure only one import runs at a time per team
-            // This guarantees Companies finish before People starts
-            new WithoutOverlapping("team-import-{$teamId}")
-                ->releaseAfter($timeout) // Dynamic timeout based on chunk size
-                ->expireAfter($timeout * 2), // Lock expires after 2x timeout
-        ];
+        // No middleware needed - import jobs can run in parallel
+        // Race conditions are handled by:
+        // 1. Database unique constraints
+        // 2. Duplicate detection logic in importers
+        // 3. Transaction isolation in StreamingImportCsv
+        return [];
     }
 
     /**
