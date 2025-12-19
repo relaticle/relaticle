@@ -86,10 +86,19 @@ final class CompanyImporter extends BaseImporter
             return new Company;
         }
 
-        $existing = Company::query()
-            ->where('team_id', $this->import->team_id)
-            ->where('name', trim((string) $name))
-            ->first();
+        // Fast path: Use pre-loaded resolver (preview mode)
+        if ($this->hasRecordResolver()) {
+            $existing = $this->getRecordResolver()->resolveCompanyByName(
+                trim((string) $name),
+                $this->import->team_id
+            );
+        } else {
+            // Slow path: Query database (actual import execution)
+            $existing = Company::query()
+                ->where('team_id', $this->import->team_id)
+                ->where('name', trim((string) $name))
+                ->first();
+        }
 
         $strategy = $this->getDuplicateStrategy();
 

@@ -141,10 +141,19 @@ final class OpportunityImporter extends BaseImporter
             return new Opportunity;
         }
 
-        $existing = Opportunity::query()
-            ->where('team_id', $this->import->team_id)
-            ->where('name', trim((string) $name))
-            ->first();
+        // Fast path: Use pre-loaded resolver (preview mode)
+        if ($this->hasRecordResolver()) {
+            $existing = $this->getRecordResolver()->resolveOpportunityByName(
+                trim((string) $name),
+                $this->import->team_id
+            );
+        } else {
+            // Slow path: Query database (actual import execution)
+            $existing = Opportunity::query()
+                ->where('team_id', $this->import->team_id)
+                ->where('name', trim((string) $name))
+                ->first();
+        }
 
         $strategy = $this->getDuplicateStrategy();
 

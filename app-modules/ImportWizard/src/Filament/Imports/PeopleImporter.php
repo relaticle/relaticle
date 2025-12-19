@@ -120,6 +120,15 @@ final class PeopleImporter extends BaseImporter
             return null;
         }
 
+        // Fast path: Use pre-loaded resolver (preview mode)
+        if ($this->hasRecordResolver()) {
+            return $this->getRecordResolver()->resolvePeopleByEmail(
+                $emails,
+                $this->import->team_id
+            );
+        }
+
+        // Slow path: Query database (actual import execution)
         // Find the emails custom field for this team
         $emailsField = \Relaticle\CustomFields\Models\CustomField::withoutGlobalScopes()
             ->where('code', 'emails')

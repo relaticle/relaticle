@@ -7,7 +7,6 @@ namespace Relaticle\ImportWizard;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
-use Relaticle\ImportWizard\Livewire\MigrationWizard;
 
 final class ImportWizardServiceProvider extends ServiceProvider
 {
@@ -22,6 +21,5 @@ final class ImportWizardServiceProvider extends ServiceProvider
 
         // Register Livewire components
         Livewire::component('import-wizard', ImportWizard::class);
-        Livewire::component('migration-wizard', MigrationWizard::class);
     }
 }

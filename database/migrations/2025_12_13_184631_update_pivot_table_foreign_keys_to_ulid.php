@@ -30,58 +30,105 @@ return new class extends Migration
 
     private function updatePivotTablesStandard(): void
     {
+        // Note: We need to preserve data, so we add new ULID columns,
+        // populate them from the existing columns, then drop the old ones.
+
         // team_user pivot table
+        Schema::table('team_user', function (Blueprint $table): void {
+            $table->char('team_ulid', 26)->nullable()->after('team_id');
+            $table->char('user_ulid', 26)->nullable()->after('user_id');
+        });
+        DB::statement('UPDATE team_user SET team_ulid = (SELECT ulid FROM teams WHERE teams.id = team_user.team_id)');
+        DB::statement('UPDATE team_user SET user_ulid = (SELECT ulid FROM users WHERE users.id = team_user.user_id)');
         Schema::table('team_user', function (Blueprint $table): void {
             $table->dropColumn(['team_id', 'user_id']);
         });
         Schema::table('team_user', function (Blueprint $table): void {
-            $table->ulid('team_id')->first();
-            $table->ulid('user_id')->after('team_id');
+            $table->renameColumn('team_ulid', 'team_id');
+            $table->renameColumn('user_ulid', 'user_id');
         });
 
         // task_user pivot table
         Schema::table('task_user', function (Blueprint $table): void {
+            $table->char('task_ulid', 26)->nullable()->after('task_id');
+            $table->char('user_ulid', 26)->nullable()->after('user_id');
+        });
+        DB::statement('UPDATE task_user SET task_ulid = (SELECT ulid FROM tasks WHERE tasks.id = task_user.task_id)');
+        DB::statement('UPDATE task_user SET user_ulid = (SELECT ulid FROM users WHERE users.id = task_user.user_id)');
+        Schema::table('task_user', function (Blueprint $table): void {
             $table->dropColumn(['task_id', 'user_id']);
         });
         Schema::table('task_user', function (Blueprint $table): void {
-            $table->ulid('task_id')->first();
-            $table->ulid('user_id')->after('task_id');
+            $table->renameColumn('task_ulid', 'task_id');
+            $table->renameColumn('user_ulid', 'user_id');
         });
 
         // taskables polymorphic pivot table
         Schema::table('taskables', function (Blueprint $table): void {
+            $table->char('task_ulid', 26)->nullable()->after('task_id');
+            $table->char('taskable_ulid', 26)->nullable()->after('taskable_id');
+        });
+        DB::statement('UPDATE taskables SET task_ulid = (SELECT ulid FROM tasks WHERE tasks.id = taskables.task_id)');
+        DB::statement('UPDATE taskables SET taskable_ulid = CASE taskable_type
+            WHEN \'App\\\\Models\\\\Company\' THEN (SELECT ulid FROM companies WHERE companies.id = taskables.taskable_id)
+            WHEN \'App\\\\Models\\\\People\' THEN (SELECT ulid FROM people WHERE people.id = taskables.taskable_id)
+            WHEN \'App\\\\Models\\\\Opportunity\' THEN (SELECT ulid FROM opportunities WHERE opportunities.id = taskables.taskable_id)
+        END');
+        Schema::table('taskables', function (Blueprint $table): void {
             $table->dropColumn(['task_id', 'taskable_id']);
         });
         Schema::table('taskables', function (Blueprint $table): void {
-            $table->ulid('task_id')->after('id');
-            $table->ulid('taskable_id')->after('task_id');
+            $table->renameColumn('task_ulid', 'task_id');
+            $table->renameColumn('taskable_ulid', 'taskable_id');
         });
 
         // noteables polymorphic pivot table
         Schema::table('noteables', function (Blueprint $table): void {
+            $table->char('note_ulid', 26)->nullable()->after('note_id');
+            $table->char('noteable_ulid', 26)->nullable()->after('noteable_id');
+        });
+        DB::statement('UPDATE noteables SET note_ulid = (SELECT ulid FROM notes WHERE notes.id = noteables.note_id)');
+        DB::statement('UPDATE noteables SET noteable_ulid = CASE noteable_type
+            WHEN \'App\\\\Models\\\\Company\' THEN (SELECT ulid FROM companies WHERE companies.id = noteables.noteable_id)
+            WHEN \'App\\\\Models\\\\People\' THEN (SELECT ulid FROM people WHERE people.id = noteables.noteable_id)
+            WHEN \'App\\\\Models\\\\Opportunity\' THEN (SELECT ulid FROM opportunities WHERE opportunities.id = noteables.noteable_id)
+        END');
+        Schema::table('noteables', function (Blueprint $table): void {
             $table->dropColumn(['note_id', 'noteable_id']);
         });
         Schema::table('noteables', function (Blueprint $table): void {
-            $table->ulid('note_id')->after('id');
-            $table->ulid('noteable_id')->after('note_id');
+            $table->renameColumn('note_ulid', 'note_id');
+            $table->renameColumn('noteable_ulid', 'noteable_id');
         });
 
         // imports table
         Schema::table('imports', function (Blueprint $table): void {
+            $table->char('team_ulid', 26)->nullable()->after('team_id');
+            $table->char('user_ulid', 26)->nullable()->after('user_id');
+        });
+        DB::statement('UPDATE imports SET team_ulid = (SELECT ulid FROM teams WHERE teams.id = imports.team_id)');
+        DB::statement('UPDATE imports SET user_ulid = (SELECT ulid FROM users WHERE users.id = imports.user_id)');
+        Schema::table('imports', function (Blueprint $table): void {
             $table->dropColumn(['team_id', 'user_id']);
         });
         Schema::table('imports', function (Blueprint $table): void {
-            $table->ulid('team_id')->after('id');
-            $table->ulid('user_id')->after('team_id');
+            $table->renameColumn('team_ulid', 'team_id');
+            $table->renameColumn('user_ulid', 'user_id');
         });
 
         // exports table
         Schema::table('exports', function (Blueprint $table): void {
+            $table->char('team_ulid', 26)->nullable()->after('team_id');
+            $table->char('user_ulid', 26)->nullable()->after('user_id');
+        });
+        DB::statement('UPDATE exports SET team_ulid = (SELECT ulid FROM teams WHERE teams.id = exports.team_id)');
+        DB::statement('UPDATE exports SET user_ulid = (SELECT ulid FROM users WHERE users.id = exports.user_id)');
+        Schema::table('exports', function (Blueprint $table): void {
             $table->dropColumn(['team_id', 'user_id']);
         });
         Schema::table('exports', function (Blueprint $table): void {
-            $table->ulid('team_id')->after('id');
-            $table->ulid('user_id')->after('team_id');
+            $table->renameColumn('team_ulid', 'team_id');
+            $table->renameColumn('user_ulid', 'user_id');
         });
     }
 
@@ -137,7 +184,7 @@ return new class extends Migration
      */
     private function isAlreadyUlid(string $table, string $column): bool
     {
-        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
             return false;
         }
 

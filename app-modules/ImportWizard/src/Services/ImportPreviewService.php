@@ -67,6 +67,10 @@ final class ImportPreviewService
         // Process only sampled rows for preview
         $records = (new Statement)->limit($sampleSize)->process($csvReader);
 
+        // Pre-load all records for fast O(1) lookups (avoids N+1 queries)
+        $recordResolver = app(ImportRecordResolver::class);
+        $recordResolver->loadForTeam($teamId, $importerClass);
+
         $willCreate = 0;
         $willUpdate = 0;
         $rows = [];
@@ -85,6 +89,7 @@ final class ImportPreviewService
                     columnMap: $columnMap,
                     options: $options,
                     rowData: $record,
+                    recordResolver: $recordResolver,
                 );
 
                 $isNew = $result['action'] === 'create';
@@ -166,6 +171,7 @@ final class ImportPreviewService
         array $columnMap,
         array $options,
         array $rowData,
+        ImportRecordResolver $recordResolver,
     ): array {
         /** @var Importer $importer */
         $importer = App::make($importerClass, [
@@ -173,6 +179,11 @@ final class ImportPreviewService
             'columnMap' => $columnMap,
             'options' => $options,
         ]);
+
+        // Set resolver for fast preview lookups (avoids per-row database queries)
+        if (method_exists($importer, 'setRecordResolver')) {
+            $importer->setRecordResolver($recordResolver);
+        }
 
         // Invoke importer's resolution logic using reflection
         /** @var Model|null $record */

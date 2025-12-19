@@ -10,12 +10,33 @@ use Filament\Actions\Imports\Importer;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Services\ImportRecordResolver;
 
 abstract class BaseImporter extends Importer
 {
+    /**
+     * Optional record resolver for fast preview lookups.
+     * When set, importers should use this instead of database queries.
+     */
+    private ?ImportRecordResolver $recordResolver = null;
+
+    public function setRecordResolver(ImportRecordResolver $resolver): void
+    {
+        $this->recordResolver = $resolver;
+    }
+
+    protected function hasRecordResolver(): bool
+    {
+        return $this->recordResolver !== null;
+    }
+
+    protected function getRecordResolver(): ?ImportRecordResolver
+    {
+        return $this->recordResolver;
+    }
+
     /**
      * Get job middleware to ensure imports run sequentially per team.
      *

@@ -15,7 +15,7 @@ use Relaticle\ImportWizard\Filament\Imports\TaskImporter;
 /**
  * Shared entity configuration for import functionality.
  *
- * Used by ImportWizard and MigrationWizard.
+ * Used by ImportWizard.
  */
 trait HasImportEntities
 {
