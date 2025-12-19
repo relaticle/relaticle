@@ -257,7 +257,7 @@ final class ImportPreviewService
     {
         $importerClass = $importer::class;
 
-        if ($this->cachedImporterClass !== $importerClass || $this->cachedReflectionClass === null) {
+        if ($this->cachedImporterClass !== $importerClass || ! $this->cachedReflectionClass instanceof \ReflectionClass) {
             /** @var \ReflectionClass<Importer> $reflection */
             $reflection = new \ReflectionClass($importer);
             $this->cachedReflectionClass = $reflection;
@@ -412,7 +412,7 @@ final class ImportPreviewService
      *
      * @param  \League\Csv\Reader<array<string, mixed>>  $csvReader
      */
-    private function fastRowCount(string $csvPath, $csvReader): int
+    private function fastRowCount(string $csvPath, \League\Csv\Reader $csvReader): int
     {
         $fileSize = filesize($csvPath);
         if ($fileSize === false) {
@@ -465,8 +465,7 @@ final class ImportPreviewService
 
         // Estimate total rows
         $dataSize = $fileSize - $headerBytes;
-        $estimatedRows = (int) ceil($dataSize / max(1, $avgRowSize));
 
-        return $estimatedRows;
+        return (int) ceil($dataSize / max(1, $avgRowSize));
     }
 }

@@ -7,8 +7,6 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;

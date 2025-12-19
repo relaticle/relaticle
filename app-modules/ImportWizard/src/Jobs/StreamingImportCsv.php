@@ -41,11 +41,11 @@ final class StreamingImportCsv implements ShouldQueue
      * @param  array<string, mixed>  $options  Import options
      */
     public function __construct(
-        protected Import $import,
-        protected int $startRow,
-        protected int $rowCount,
-        protected array $columnMap,
-        protected array $options = [],
+        private Import $import,
+        private int $startRow,
+        private int $rowCount,
+        private array $columnMap,
+        private array $options = [],
     ) {
         $this->onQueue('imports');
     }
@@ -101,7 +101,7 @@ final class StreamingImportCsv implements ShouldQueue
                         'import_id' => $this->import->id,
                         'row_offset' => $this->startRow + $processedCount,
                         'error' => $e->getMessage(),
-                        'exception' => get_class($e),
+                        'exception' => $e::class,
                     ]);
 
                     report($e);
@@ -128,7 +128,7 @@ final class StreamingImportCsv implements ShouldQueue
                 'start_row' => $this->startRow,
                 'row_count' => $this->rowCount,
                 'error' => $e->getMessage(),
-                'exception' => get_class($e),
+                'exception' => $e::class,
                 'trace' => $e->getTraceAsString(),
             ]);
 

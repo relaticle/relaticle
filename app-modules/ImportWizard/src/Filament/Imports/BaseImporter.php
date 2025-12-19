@@ -29,7 +29,7 @@ abstract class BaseImporter extends Importer
 
     protected function hasRecordResolver(): bool
     {
-        return $this->recordResolver !== null;
+        return $this->recordResolver instanceof ImportRecordResolver;
     }
 
     protected function getRecordResolver(): ?ImportRecordResolver

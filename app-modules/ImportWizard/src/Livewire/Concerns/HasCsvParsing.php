@@ -205,8 +205,7 @@ trait HasCsvParsing
 
         // Estimate total rows
         $dataSize = $fileSize - $headerBytes;
-        $estimatedRows = (int) ceil($dataSize / max(1, $avgRowSize));
 
-        return $estimatedRows;
+        return (int) ceil($dataSize / max(1, $avgRowSize));
     }
 }

@@ -145,12 +145,10 @@ final class ImportRecordResolver
             if ($emailCustomFieldValue) {
                 $emails = $emailCustomFieldValue->json_value ?? [];
                 foreach ($emails as $email) {
-                    $email = strtolower(trim($email));
-                    if ($email !== '') {
-                        // First match wins (same as current behavior)
-                        if (! isset($this->cache['people']['byEmail'][$email])) {
-                            $this->cache['people']['byEmail'][$email] = $person;
-                        }
+                    $email = strtolower(trim((string) $email));
+                    // First match wins (same as current behavior)
+                    if ($email !== '' && ! isset($this->cache['people']['byEmail'][$email])) {
+                        $this->cache['people']['byEmail'][$email] = $person;
                     }
                 }
             }
@@ -174,11 +172,9 @@ final class ImportRecordResolver
 
             // Index by name (exact match)
             $name = trim($company->name);
-            if ($name !== '') {
-                // First match wins (same as current behavior)
-                if (! isset($this->cache['companies']['byName'][$name])) {
-                    $this->cache['companies']['byName'][$name] = $company;
-                }
+            // First match wins (same as current behavior)
+            if ($name !== '' && ! isset($this->cache['companies']['byName'][$name])) {
+                $this->cache['companies']['byName'][$name] = $company;
             }
         }
     }
@@ -199,12 +195,10 @@ final class ImportRecordResolver
             $this->cache['opportunities']['byId'][$opportunity->id] = $opportunity;
 
             // Index by name (exact match)
-            $name = trim($opportunity->name);
-            if ($name !== '') {
-                // First match wins (same as current behavior)
-                if (! isset($this->cache['opportunities']['byName'][$name])) {
-                    $this->cache['opportunities']['byName'][$name] = $opportunity;
-                }
+            $name = trim((string) $opportunity->name);
+            // First match wins (same as current behavior)
+            if ($name !== '' && ! isset($this->cache['opportunities']['byName'][$name])) {
+                $this->cache['opportunities']['byName'][$name] = $opportunity;
             }
         }
     }
