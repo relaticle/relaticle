@@ -20,7 +20,7 @@ return new class extends Migration
         Schema::create(config('custom-fields.database.table_names.custom_field_sections'), function (Blueprint $table): void {
             $uniqueColumns = ['entity_type', 'code'];
 
-            $table->id();
+            $table->ulid('id')->primary();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
                 $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
@@ -59,9 +59,9 @@ return new class extends Migration
         Schema::create(config('custom-fields.database.table_names.custom_fields'), function (Blueprint $table): void {
             $uniqueColumns = ['code', 'entity_type'];
 
-            $table->id();
+            $table->ulid('id')->primary();
 
-            $table->unsignedBigInteger('custom_field_section_id')->nullable();
+            $table->foreignUlid('custom_field_section_id')->nullable();
             $table->string('width')->nullable();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
@@ -99,15 +99,15 @@ return new class extends Migration
         Schema::create(config('custom-fields.database.table_names.custom_field_options'), function (Blueprint $table): void {
             $uniqueColumns = ['custom_field_id', 'name'];
 
-            $table->id();
+            $table->ulid('id')->primary();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
                 $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
                 $uniqueColumns[] = config('custom-fields.database.column_names.tenant_foreign_key');
             }
 
-            $table->foreignIdFor(CustomFields::customFieldModel())
-                ->constrained()
+            $table->foreignUlid('custom_field_id')
+                ->constrained(config('custom-fields.database.table_names.custom_fields'))
                 ->cascadeOnDelete();
 
             $table->string('name')->nullable();
@@ -125,7 +125,7 @@ return new class extends Migration
         Schema::create(config('custom-fields.database.table_names.custom_field_values'), function (Blueprint $table): void {
             $uniqueColumns = ['entity_type', 'entity_id', 'custom_field_id'];
 
-            $table->id();
+            $table->ulid('id')->primary();
 
             if (FeatureManager::isEnabled(CustomFieldsFeature::SYSTEM_MULTI_TENANCY)) {
                 $table->foreignUlid(config('custom-fields.database.column_names.tenant_foreign_key'))->nullable()->index();
@@ -133,8 +133,8 @@ return new class extends Migration
             }
 
             $table->ulidMorphs('entity');
-            $table->foreignIdFor(CustomField::class)
-                ->constrained()
+            $table->foreignUlid('custom_field_id')
+                ->constrained(config('custom-fields.database.table_names.custom_fields'))
                 ->cascadeOnDelete();
 
             $table->text('string_value')->nullable();

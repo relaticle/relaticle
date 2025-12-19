@@ -10,6 +10,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -30,6 +31,7 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
  */
 final class SystemAdministrator extends Authenticatable implements FilamentUser, HasAvatar, MustVerifyEmail
 {
+    use HasUlids;
     use HasApiTokens;
 
     /** @use HasFactory<SystemAdministratorFactory> */
