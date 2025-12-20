@@ -19,10 +19,11 @@ use Illuminate\Support\Str;
  * - Pivot tables (team_user, task_user, taskables, noteables) - keep int id, convert foreign keys
  * - Polymorphic tables (notifications, media, ai_summaries, personal_access_tokens, custom_field_values)
  * - Tenant-scoped tables (custom_fields, custom_field_options, custom_field_sections, sessions)
+ * - Email field data migration (string_value → json_value conversion for EmailFieldType)
  *
  * Migration Strategy:
  * PHASE A: Add ULID columns to ALL tables and populate values (while old integer IDs still exist)
- * PHASE B: Cutover - drop old columns and rename ULID columns
+ * PHASE B: Cutover - drop old columns, rename ULID columns, recreate foreign key constraints
  *
  * IMPORTANT: This migration is idempotent - it skips if tables already use ULIDs.
  */
@@ -87,6 +88,8 @@ return new class extends Migration
         'task' => 'tasks',
         'note' => 'notes',
         'system_administrator' => 'system_administrators',
+        'import' => 'imports',
+        'export' => 'exports',
     ];
 
     /**
@@ -96,7 +99,7 @@ return new class extends Migration
     {
         // Allow long-running migration
         set_time_limit(0);
-        ini_set('memory_limit', '1024M');
+        ini_set('memory_limit', '2048M');
 
         // Disable query log to save memory on large datasets
         DB::disableQueryLog();
@@ -153,6 +156,9 @@ return new class extends Migration
         // A7: Custom field tables - add ulid and foreign ULID columns, populate
         $this->phaseA_addUlidsToCustomFieldTables();
 
+        // A8: Migrate email field data format (string_value → json_value)
+        $this->phaseA8_migrateEmailFieldValues();
+
         // =====================================================================
         // PHASE B: Cutover - drop old columns, rename ULID columns
         // =====================================================================
@@ -184,6 +190,9 @@ return new class extends Migration
 
         // B8: Recreate composite unique indexes with new ULID columns
         $this->phaseB_recreateUniqueIndexes();
+
+        // B9: Recreate foreign key constraints with ULID references
+        $this->phaseB9_recreateForeignKeyConstraints();
 
         Schema::enableForeignKeyConstraints();
     }
@@ -373,6 +382,58 @@ return new class extends Migration
 
         // custom_field_values: custom_field_id references custom_fields
         $this->addAndPopulateForeignUlid('custom_field_values', 'custom_field_id', 'custom_fields');
+    }
+
+    /**
+     * A8: Migrate email field values from string_value to json_value format.
+     *
+     * EmailFieldType was changed from STRING data type (string_value) to
+     * MULTI_CHOICE (json_value array format) to support multiple emails.
+     *
+     * IDEMPOTENT: Only migrates values with non-empty string_value and empty json_value.
+     */
+    private function phaseA8_migrateEmailFieldValues(): void
+    {
+        $fieldTable = 'custom_fields';
+        $valueTable = 'custom_field_values';
+
+        // Find all email type custom fields (using integer id, we're in Phase A)
+        $emailFieldIds = DB::table($fieldTable)
+            ->where('type', 'email')
+            ->pluck('id');
+
+        if ($emailFieldIds->isEmpty()) {
+            return; // No email fields
+        }
+
+        // Find values needing migration: has string_value, empty/null json_value
+        $valuesToMigrate = DB::table($valueTable)
+            ->whereIn('custom_field_id', $emailFieldIds)
+            ->whereNotNull('string_value')
+            ->where('string_value', '!=', '')
+            ->where(function ($query): void {
+                $query->whereNull('json_value')
+                    ->orWhere('json_value', '=', '[]')
+                    ->orWhere('json_value', '=', 'null');
+            })
+            ->select(['id', 'string_value'])
+            ->get();
+
+        if ($valuesToMigrate->isEmpty()) {
+            return; // Already migrated
+        }
+
+        // Migrate in chunks to avoid memory issues
+        foreach ($valuesToMigrate->chunk(100) as $chunk) {
+            foreach ($chunk as $value) {
+                DB::table($valueTable)
+                    ->where('id', $value->id)
+                    ->update([
+                        'json_value' => json_encode([$value->string_value]),
+                        'string_value' => null,
+                    ]);
+            }
+        }
     }
 
     // =========================================================================
@@ -669,6 +730,127 @@ return new class extends Migration
         });
     }
 
+    /**
+     * B9: Recreate foreign key constraints with ULID references.
+     *
+     * CRITICAL: Foreign keys were dropped in B0, must be recreated
+     * to restore referential integrity.
+     */
+    private function phaseB9_recreateForeignKeyConstraints(): void
+    {
+        // Core entity foreign keys
+        Schema::table('companies', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('account_owner_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('people', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
+        });
+
+        Schema::table('opportunities', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
+            $table->foreign('contact_id')->references('id')->on('people')->onDelete('set null');
+        });
+
+        Schema::table('tasks', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('notes', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('users', function (Blueprint $table): void {
+            $table->foreign('current_team_id')->references('id')->on('teams')->onDelete('set null');
+        });
+
+        Schema::table('teams', function (Blueprint $table): void {
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+        });
+
+        // Related entity foreign keys
+        Schema::table('imports', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('exports', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('team_invitations', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+        });
+
+        Schema::table('user_social_accounts', function (Blueprint $table): void {
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+        });
+
+        Schema::table('failed_import_rows', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('import_id')->references('id')->on('imports')->onDelete('cascade');
+        });
+
+        Schema::table('ai_summaries', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+        });
+
+        // Pivot table foreign keys
+        Schema::table('team_user', function (Blueprint $table): void {
+            $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+        });
+
+        Schema::table('task_user', function (Blueprint $table): void {
+            $table->foreign('task_id')->references('id')->on('tasks')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+        });
+
+        Schema::table('taskables', function (Blueprint $table): void {
+            $table->foreign('task_id')->references('id')->on('tasks')->onDelete('cascade');
+            // taskable_id is polymorphic, no FK constraint
+        });
+
+        Schema::table('noteables', function (Blueprint $table): void {
+            $table->foreign('note_id')->references('id')->on('notes')->onDelete('cascade');
+            // noteable_id is polymorphic, no FK constraint
+        });
+
+        // Tenant-scoped table foreign keys
+        Schema::table('sessions', function (Blueprint $table): void {
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+        });
+
+        Schema::table('custom_fields', function (Blueprint $table): void {
+            $table->foreign('tenant_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('custom_field_section_id')->references('id')->on('custom_field_sections')->onDelete('cascade');
+        });
+
+        Schema::table('custom_field_options', function (Blueprint $table): void {
+            $table->foreign('tenant_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('custom_field_id')->references('id')->on('custom_fields')->onDelete('cascade');
+        });
+
+        Schema::table('custom_field_sections', function (Blueprint $table): void {
+            $table->foreign('tenant_id')->references('id')->on('teams')->onDelete('cascade');
+        });
+
+        Schema::table('custom_field_values', function (Blueprint $table): void {
+            $table->foreign('tenant_id')->references('id')->on('teams')->onDelete('cascade');
+            $table->foreign('custom_field_id')->references('id')->on('custom_fields')->onDelete('cascade');
+            // entity_id is polymorphic, no FK constraint
+        });
+    }
+
     // =========================================================================
     // Helper Methods - Phase A (Add and Populate)
     // =========================================================================
@@ -717,6 +899,7 @@ return new class extends Migration
 
     /**
      * Add a ULID morph column and populate by looking up each morph type.
+     * Handles both morph aliases ('company') and full class names ('App\Models\Company').
      */
     private function addAndPopulateMorphUlid(string $tableName, string $morphName): void
     {
@@ -741,6 +924,40 @@ return new class extends Migration
                 WHERE {$morphTypeColumn} = '{$morphAlias}'
                 AND {$morphIdColumn} IS NOT NULL
             ");
+        }
+
+        // SPECIAL CASE: Handle full class names (e.g., Spatie Media Library)
+        // Check if any rows still have NULL after alias-based population
+        $nullCount = DB::table($tableName)
+            ->whereNull($morphUlidColumn)
+            ->whereNotNull($morphIdColumn)
+            ->count();
+
+        if ($nullCount > 0) {
+            // Populate using full class name mapping
+            $fullClassMap = [
+                'App\\Models\\User' => 'users',
+                'App\\Models\\Team' => 'teams',
+                'App\\Models\\Company' => 'companies',
+                'App\\Models\\People' => 'people',
+                'App\\Models\\Opportunity' => 'opportunities',
+                'App\\Models\\Task' => 'tasks',
+                'App\\Models\\Note' => 'notes',
+                'App\\Models\\Import' => 'imports',
+                'App\\Models\\Export' => 'exports',
+                'App\\Models\\SystemAdministrator' => 'system_administrators',
+            ];
+
+            foreach ($fullClassMap as $fullClass => $refTable) {
+                DB::statement("
+                    UPDATE {$tableName}
+                    SET {$morphUlidColumn} = (
+                        SELECT ulid FROM {$refTable} WHERE {$refTable}.id = {$tableName}.{$morphIdColumn}
+                    )
+                    WHERE {$morphTypeColumn} = '{$fullClass}'
+                    AND {$morphIdColumn} IS NOT NULL
+                ");
+            }
         }
     }
 
