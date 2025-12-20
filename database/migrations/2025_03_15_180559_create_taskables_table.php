@@ -18,7 +18,7 @@ return new class extends Migration
 
             $table->foreignUlid('task_id');
 
-            $table->morphs('taskable');
+            $table->ulidMorphs('taskable');
 
             $table->timestamps();
         });
