@@ -55,16 +55,18 @@ return [
     */
     'features' => FeatureConfigurator::configure()
         ->enable(
-            CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_ENCRYPTION,
             CustomFieldsFeature::FIELD_OPTION_COLORS,
             CustomFieldsFeature::FIELD_MULTI_VALUE,
             CustomFieldsFeature::FIELD_UNIQUE_VALUE,
+            CustomFieldsFeature::FIELD_CODE_AUTO_GENERATE,
             CustomFieldsFeature::UI_TABLE_COLUMNS,
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY
+        )->disable(
+            CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
         ),
 
     /*
