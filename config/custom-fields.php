@@ -67,6 +67,7 @@ return [
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY
         )->disable(
             CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
+            CustomFieldsFeature::FIELD_VALIDATION_RULES,
         ),
 
     /*

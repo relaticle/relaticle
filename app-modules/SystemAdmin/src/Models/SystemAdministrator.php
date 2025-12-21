@@ -19,7 +19,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 
 /**
- * @property int $id
+ * @property string $id
  * @property string $name
  * @property string $email
  * @property string $password
@@ -31,12 +31,12 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
  */
 final class SystemAdministrator extends Authenticatable implements FilamentUser, HasAvatar, MustVerifyEmail
 {
-    use HasUlids;
     use HasApiTokens;
 
     /** @use HasFactory<SystemAdministratorFactory> */
     use HasFactory;
 
+    use HasUlids;
     use Notifiable;
 
     protected $table = 'system_administrators';

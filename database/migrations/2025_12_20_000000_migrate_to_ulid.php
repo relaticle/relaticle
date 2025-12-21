@@ -936,13 +936,13 @@ return new class extends Migration
         if ($nullCount > 0) {
             // Populate using full class name mapping
             $fullClassMap = [
-                'App\\Models\\User' => 'users',
-                'App\\Models\\Team' => 'teams',
-                'App\\Models\\Company' => 'companies',
-                'App\\Models\\People' => 'people',
-                'App\\Models\\Opportunity' => 'opportunities',
-                'App\\Models\\Task' => 'tasks',
-                'App\\Models\\Note' => 'notes',
+                \App\Models\User::class => 'users',
+                \App\Models\Team::class => 'teams',
+                \App\Models\Company::class => 'companies',
+                \App\Models\People::class => 'people',
+                \App\Models\Opportunity::class => 'opportunities',
+                \App\Models\Task::class => 'tasks',
+                \App\Models\Note::class => 'notes',
                 'App\\Models\\Import' => 'imports',
                 'App\\Models\\Export' => 'exports',
                 'App\\Models\\SystemAdministrator' => 'system_administrators',
