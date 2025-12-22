@@ -50,6 +50,9 @@ LABEL org.opencontainers.image.source="https://github.com/Relaticle/relaticle"
 # Switch to root to install dependencies
 USER root
 
+# Install required PHP extensions
+RUN install-php-extensions intl
+
 # Install PostgreSQL client for health checks
 RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-client \
