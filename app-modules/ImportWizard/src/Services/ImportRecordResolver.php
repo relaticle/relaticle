@@ -26,9 +26,9 @@ final class ImportRecordResolver
      * In-memory cache of records indexed for O(1) lookups.
      *
      * @var array{
-     *     people: array{byId: array<string, People>, byEmail: array<string, People>},
-     *     companies: array{byId: array<string, Company>, byName: array<string, Company>},
-     *     opportunities: array{byId: array<string, Opportunity>, byName: array<string, Opportunity>}
+     *     people: array{byId: array<int|string, People>, byEmail: array<string, People>},
+     *     companies: array{byId: array<int|string, Company>, byName: array<string, Company>},
+     *     opportunities: array{byId: array<int|string, Opportunity>, byName: array<string, Opportunity>}
      * }
      */
     private array $cache = [
@@ -137,8 +137,8 @@ final class ImportRecordResolver
 
         // Build indexes
         foreach ($people as $person) {
-            // Index by ID
-            $this->cache['people']['byId'][$person->id] = $person;
+            // Index by ID (cast to string to match array type)
+            $this->cache['people']['byId'][(string) $person->id] = $person;
 
             // Index by each email (lowercase for case-insensitive matching)
             $emailCustomFieldValue = $person->customFieldValues->first();
@@ -167,8 +167,8 @@ final class ImportRecordResolver
 
         // Build indexes
         foreach ($companies as $company) {
-            // Index by ID
-            $this->cache['companies']['byId'][$company->id] = $company;
+            // Index by ID (cast to string to match array type)
+            $this->cache['companies']['byId'][(string) $company->id] = $company;
 
             // Index by name (exact match)
             $name = trim($company->name);
@@ -191,8 +191,8 @@ final class ImportRecordResolver
 
         // Build indexes
         foreach ($opportunities as $opportunity) {
-            // Index by ID
-            $this->cache['opportunities']['byId'][$opportunity->id] = $opportunity;
+            // Index by ID (cast to string to match array type)
+            $this->cache['opportunities']['byId'][(string) $opportunity->id] = $opportunity;
 
             // Index by name (exact match)
             $name = trim((string) $opportunity->name);
