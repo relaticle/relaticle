@@ -40,7 +40,7 @@ final class ImportRecordResolver
     private ?string $cachedTeamId = null;
 
     /**
-     * Pre-load all records for a team based on importer class.
+     * Preload all records for a team based on importer class.
      *
      * @param  class-string  $importerClass
      */
@@ -129,7 +129,7 @@ final class ImportRecordResolver
         // Query 2: Load ALL people with email custom field values
         $people = People::query()
             ->where('team_id', $teamId)
-            ->with(['customFieldValues' => function ($query) use ($emailsField): void {
+            ->with(['customFieldValues' => function (\Illuminate\Database\Eloquent\Relations\Relation $query) use ($emailsField): void {
                 $query->withoutGlobalScopes()
                     ->where('custom_field_id', $emailsField->id);
             }])

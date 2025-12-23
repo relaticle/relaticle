@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\Importer;
@@ -11,6 +12,7 @@ use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Services\ImportRecordResolver;
 
@@ -35,42 +37,6 @@ abstract class BaseImporter extends Importer
     protected function getRecordResolver(): ?ImportRecordResolver
     {
         return $this->recordResolver;
-    }
-
-    /**
-     * Get job middleware to ensure imports run sequentially per team.
-     *
-     * This prevents race conditions when importing dependent entities
-     * (e.g., People that reference Companies). All imports for the same
-     * team will be processed one at a time in the order they were queued.
-     *
-     * @return array<object>
-     */
-    public function getJobMiddleware(): array
-    {
-        // No middleware needed - import jobs can run in parallel
-        // Race conditions are handled by:
-        // 1. Database unique constraints
-        // 2. Duplicate detection logic in importers
-        // 3. Transaction isolation in StreamingImportCsv
-        return [];
-    }
-
-    /**
-     * Calculate job timeout based on chunk size.
-     *
-     * Larger chunks need more time to process safely.
-     * Smaller chunks can recover faster if they fail.
-     */
-    protected function calculateJobTimeout(): int
-    {
-        // Get chunk size from options (passed by StreamingImportCsv)
-        $chunkSize = $this->options['_chunk_size'] ?? 100;
-
-        // Base timeout: 1 second per row, minimum 60s, maximum 600s (10 minutes)
-        $timeout = (int) ($chunkSize * 1);
-
-        return max(60, min(600, $timeout));
     }
 
     /**
@@ -172,7 +138,7 @@ abstract class BaseImporter extends Importer
      */
     protected function afterSave(): void
     {
-        $team = \App\Models\Team::find($this->import->team_id);
+        $team = Team::find($this->import->team_id);
 
         if (! $team) {
             throw new \RuntimeException(
@@ -180,9 +146,7 @@ abstract class BaseImporter extends Importer
             );
         }
 
-        \Relaticle\CustomFields\Facades\CustomFields::importer()
-            ->forModel($this->record)
-            ->saveValues($team);
+        CustomFields::importer()->forModel($this->record)->saveValues($team);
     }
 
     /**

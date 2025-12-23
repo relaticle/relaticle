@@ -123,8 +123,8 @@ final class CompanyMatcher
         $companies = Company::query()
             ->where('team_id', $teamId)
             ->with([
-                'customFieldValues' => fn ($query) => $query->withoutGlobalScopes()->with([
-                    'customField' => fn ($q) => $q->withoutGlobalScopes(),
+                'customFieldValues' => fn (\Illuminate\Database\Eloquent\Relations\Relation $query) => $query->withoutGlobalScopes()->with([
+                    'customField' => fn (\Illuminate\Database\Eloquent\Relations\Relation $q) => $q->withoutGlobalScopes(),
                 ]),
             ])
             ->get();
@@ -142,8 +142,8 @@ final class CompanyMatcher
         foreach ($companies as $company) {
             $domainValue = $company->customFieldValues
                 // @phpstan-ignore notIdentical.alwaysTrue (defensive check for safety)
-                ->filter(fn ($cfv): bool => $cfv->customField !== null)
-                ->first(fn ($cfv): bool => $cfv->customField->code === 'domain_name');
+                ->filter(fn (\Relaticle\CustomFields\Models\CustomFieldValue $cfv): bool => $cfv->customField !== null)
+                ->first(fn (\Relaticle\CustomFields\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === 'domain_name');
 
             if ($domainValue !== null && $domainValue->string_value !== null) {
                 $domain = strtolower(trim($domainValue->string_value));

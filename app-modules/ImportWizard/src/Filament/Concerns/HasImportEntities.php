@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Concerns;
 
-use Relaticle\ImportWizard\Filament\Actions\EnhancedImportAction;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Filament\Imports\NoteImporter;
@@ -63,19 +62,5 @@ trait HasImportEntities
                 'dependencies' => [],
             ],
         ];
-    }
-
-    /**
-     * Create an import action for a specific entity type.
-     */
-    protected function makeImportAction(string $entityType): EnhancedImportAction
-    {
-        $config = $this->getEntities()[$entityType];
-
-        return EnhancedImportAction::make("import_{$entityType}")
-            ->importer($config['importer'])
-            ->label("Import {$config['label']}")
-            ->modalHeading("Import {$config['label']}")
-            ->color('primary');
     }
 }

@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Filament\Imports;
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 
 final class PeopleImporter extends BaseImporter
@@ -28,10 +29,7 @@ final class PeopleImporter extends BaseImporter
                 ->guess(['id', 'record_id', 'ulid', 'record id'])
                 ->rules(['nullable', 'ulid'])
                 ->example('01KCCFMZ52QWZSQZWVG0AP704V')
-                ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
-                ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
-                    // ID handled in resolveRecord(), skip here
-                }),
+                ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.'),
 
             ImportColumn::make('name')
                 ->label('Name')
@@ -101,8 +99,7 @@ final class PeopleImporter extends BaseImporter
         $strategy = $this->getDuplicateStrategy();
 
         return match ($strategy) {
-            DuplicateHandlingStrategy::SKIP => $existing ?? new People,
-            DuplicateHandlingStrategy::UPDATE => $existing ?? new People,
+            DuplicateHandlingStrategy::SKIP, DuplicateHandlingStrategy::UPDATE => $existing ?? new People,
             DuplicateHandlingStrategy::CREATE_NEW => new People,
         };
     }
@@ -130,8 +127,8 @@ final class PeopleImporter extends BaseImporter
 
         // Slow path: Query database (actual import execution)
         // Find the emails custom field for this team
-        $emailsField = \Relaticle\CustomFields\Models\CustomField::withoutGlobalScopes()
-            ->where('code', 'emails')
+        $emailsField = CustomField::withoutGlobalScopes()
+            ->where('code', PeopleField::EMAILS->value)
             ->where('entity_type', People::class)
             ->where('tenant_id', $this->import->team_id)
             ->first();
