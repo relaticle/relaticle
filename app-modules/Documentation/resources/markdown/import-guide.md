@@ -17,25 +17,22 @@ Each entity type is imported separately using the same 4-step import wizard. Whe
 - ✅ Prepare your CSV file with clean, validated data
 - ✅ Ensure your file is UTF-8 encoded
 - ✅ Include column headers in the first row
-- ✅ Keep file size under 100MB
+- ✅ Keep file size under 50MB (max 10,000 rows)
 - ✅ Review the required fields for each entity type below
 
 ---
 
-## Supported File Formats
+## Supported File Format
 
 ### CSV Files
 
 - **Format**: Comma-separated values (CSV)
 - **Encoding**: UTF-8 (required)
-- **Size Limit**: 100MB maximum
+- **Size Limit**: 50MB maximum
 - **Headers**: First row must contain column names
+- **Max Rows**: 10,000 rows per import
 
-### Excel Files
-
-- **Format**: .xlsx files are automatically converted to CSV
-- **Compatibility**: Excel 2007 and later
-- **Note**: Formulas are evaluated and converted to values
+**Tip**: If you have an Excel file, export it as "CSV UTF-8" before importing.
 
 ---
 
@@ -49,7 +46,7 @@ Each entity type is imported separately using the same 4-step import wizard. Whe
 4. Click **Upload**
 
 **Troubleshooting Upload Issues**:
-- **File too large**: Split into multiple files under 100MB each
+- **File too large**: Split into multiple files under 50MB each (max 10,000 rows)
 - **Invalid format**: Ensure file is saved as CSV UTF-8
 - **Upload fails**: Check internet connection and try again
 
@@ -556,7 +553,7 @@ Custom fields maintain their validation rules during import:
 ### Upload Issues
 
 **Problem**: "File too large"
-- **Solution**: Split into multiple files under 100MB each
+- **Solution**: Split into multiple files under 50MB each (max 10,000 rows)
 - **Tip**: Import in batches of 10,000-20,000 rows
 
 **Problem**: "Invalid file format"
@@ -637,7 +634,7 @@ Two methods:
 Yes! Use `custom_fields_[code]` format. Find codes in Settings → Custom Fields.
 
 ### What's the maximum file size?
-100MB per file. For larger datasets, split into multiple imports.
+50MB per file, maximum 10,000 rows. For larger datasets, split into multiple imports.
 
 ### Do imports run in real-time?
 Large imports process in background queue. You'll receive notification when complete.
