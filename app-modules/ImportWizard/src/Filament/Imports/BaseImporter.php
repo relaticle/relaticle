@@ -40,6 +40,20 @@ abstract class BaseImporter extends Importer
     }
 
     /**
+     * Set row data for preview mode (used by ImportPreviewService).
+     *
+     * This allows the preview service to call public Filament methods
+     * (remapData, castData, resolveRecord) without using reflection.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function setRowDataForPreview(array $data): void
+    {
+        $this->originalData = $data;
+        $this->data = $data;
+    }
+
+    /**
      * Get the duplicate handling strategy from import options.
      */
     protected function getDuplicateStrategy(): DuplicateHandlingStrategy

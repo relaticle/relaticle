@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
-use Filament\Actions\Imports\Importer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use League\Csv\Statement;
 use Relaticle\ImportWizard\Data\ImportPreviewResult;
+use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
@@ -19,28 +19,17 @@ use Relaticle\ImportWizard\Models\Import;
  * Performs a dry-run of the import by calling each importer's resolveRecord()
  * method to determine whether records would be created or updated.
  */
-final class ImportPreviewService
+final readonly class ImportPreviewService
 {
-    /** @var \ReflectionClass<Importer>|null */
-    private ?\ReflectionClass $cachedReflectionClass = null;
-
-    /** @var array<string, \ReflectionProperty> */
-    private array $cachedReflectionProperties = [];
-
-    /** @var array<string, \ReflectionMethod> */
-    private array $cachedReflectionMethods = [];
-
-    private ?string $cachedImporterClass = null;
-
     public function __construct(
-        private readonly CsvReaderFactory $csvReaderFactory,
-        private readonly CompanyMatcher $companyMatcher,
+        private CsvReaderFactory $csvReaderFactory,
+        private CompanyMatcher $companyMatcher,
     ) {}
 
     /**
      * Generate a preview of what an import will do.
      *
-     * @param  class-string<Importer>  $importerClass
+     * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
      * @param  array<string, mixed>  $options  Import options
      * @param  array<string, array<string, string>>  $valueCorrections  User-defined value corrections
@@ -159,7 +148,7 @@ final class ImportPreviewService
     /**
      * Preview a single row to determine what action would be taken.
      *
-     * @param  class-string<Importer>  $importerClass
+     * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, mixed>  $rowData
@@ -173,7 +162,7 @@ final class ImportPreviewService
         array $rowData,
         ImportRecordResolver $recordResolver,
     ): array {
-        /** @var Importer $importer */
+        /** @var BaseImporter $importer */
         $importer = App::make($importerClass, [
             'import' => $import,
             'columnMap' => $columnMap,
@@ -181,15 +170,12 @@ final class ImportPreviewService
         ]);
 
         // Set resolver for fast preview lookups (avoids per-row database queries)
-        if (method_exists($importer, 'setRecordResolver')) {
-            $importer->setRecordResolver($recordResolver);
-        }
+        $importer->setRecordResolver($recordResolver);
 
-        // Invoke importer's resolution logic using reflection
-        /** @var Model|null $record */
+        // Invoke importer's resolution logic using public Filament APIs
         $record = $this->invokeImporterResolution($importer, $rowData);
 
-        if ($record === null) {
+        if (! $record instanceof \Illuminate\Database\Eloquent\Model) {
             return ['action' => 'create', 'record' => null];
         }
 
@@ -202,100 +188,24 @@ final class ImportPreviewService
     }
 
     /**
-     * Invoke Filament importer's record resolution logic via reflection.
+     * Invoke the importer's record resolution logic using public Filament APIs.
      *
-     * WARNING: This method uses reflection to access Filament's internal APIs.
-     * If Filament's internal structure changes, this may break.
-     *
-     * Maintenance: If this breaks after a Filament upgrade, check:
-     * 1. Property names: originalData, data
-     * 2. Method names: remapData, castData, resolveRecord
-     * 3. Consider requesting a public API from Filament for dry-run imports
+     * Uses BaseImporter::setRowDataForPreview() to set the row data, then calls
+     * Filament's public remapData(), castData(), and resolveRecord() methods.
      *
      * @param  array<string, mixed>  $rowData
-     *
-     * @throws \RuntimeException If reflection fails (Filament internals changed)
      */
-    private function invokeImporterResolution(Importer $importer, array $rowData): ?Model
+    private function invokeImporterResolution(BaseImporter $importer, array $rowData): ?Model
     {
-        try {
-            // Use cached reflection objects for performance
-            $reflection = $this->getCachedReflectionClass($importer);
+        // Set row data via our public method
+        $importer->setRowDataForPreview($rowData);
 
-            // Set row data on the importer
-            $originalDataProp = $this->getCachedReflectionProperty($reflection, 'originalData');
-            $originalDataProp->setValue($importer, $rowData);
+        // Process through Filament's public pipeline methods
+        $importer->remapData();
+        $importer->castData();
 
-            $dataProp = $this->getCachedReflectionProperty($reflection, 'data');
-            $dataProp->setValue($importer, $rowData);
-
-            // Process the row through importer's pipeline
-            $remapMethod = $this->getCachedReflectionMethod($reflection, 'remapData');
-            $remapMethod->invoke($importer);
-
-            $castMethod = $this->getCachedReflectionMethod($reflection, 'castData');
-            $castMethod->invoke($importer);
-
-            // Resolve record (queries DB but doesn't save)
-            $resolveMethod = $this->getCachedReflectionMethod($reflection, 'resolveRecord');
-
-            /** @var Model|null */
-            return $resolveMethod->invoke($importer);
-        } catch (\ReflectionException $e) {
-            throw new \RuntimeException('Failed to invoke Filament importer via reflection. This likely means Filament\'s internal API has changed. '
-            .'Please check ImportPreviewService::invokeImporterResolution() and update reflection calls. '
-            .'Original error: '.$e->getMessage(), $e->getCode(), previous: $e);
-        }
-    }
-
-    /**
-     * Get or create cached reflection class.
-     *
-     * @return \ReflectionClass<Importer>
-     */
-    private function getCachedReflectionClass(Importer $importer): \ReflectionClass
-    {
-        $importerClass = $importer::class;
-
-        if ($this->cachedImporterClass !== $importerClass || ! $this->cachedReflectionClass instanceof \ReflectionClass) {
-            /** @var \ReflectionClass<Importer> $reflection */
-            $reflection = new \ReflectionClass($importer);
-            $this->cachedReflectionClass = $reflection;
-            $this->cachedImporterClass = $importerClass;
-            // Clear property and method caches when class changes
-            $this->cachedReflectionProperties = [];
-            $this->cachedReflectionMethods = [];
-        }
-
-        return $this->cachedReflectionClass;
-    }
-
-    /**
-     * Get or create cached reflection property.
-     *
-     * @param  \ReflectionClass<Importer>  $reflection
-     */
-    private function getCachedReflectionProperty(\ReflectionClass $reflection, string $propertyName): \ReflectionProperty
-    {
-        if (! isset($this->cachedReflectionProperties[$propertyName])) {
-            $this->cachedReflectionProperties[$propertyName] = $reflection->getProperty($propertyName);
-        }
-
-        return $this->cachedReflectionProperties[$propertyName];
-    }
-
-    /**
-     * Get or create cached reflection method.
-     *
-     * @param  \ReflectionClass<Importer>  $reflection
-     */
-    private function getCachedReflectionMethod(\ReflectionClass $reflection, string $methodName): \ReflectionMethod
-    {
-        if (! isset($this->cachedReflectionMethods[$methodName])) {
-            $this->cachedReflectionMethods[$methodName] = $reflection->getMethod($methodName);
-        }
-
-        return $this->cachedReflectionMethods[$methodName];
+        // Resolve record (queries DB but doesn't save)
+        return $importer->resolveRecord();
     }
 
     /**
@@ -349,7 +259,7 @@ final class ImportPreviewService
     /**
      * Check if the importer should have company match enrichment.
      *
-     * @param  class-string<Importer>  $importerClass
+     * @param  class-string<BaseImporter>  $importerClass
      */
     private function shouldEnrichWithCompanyMatch(string $importerClass): bool
     {
