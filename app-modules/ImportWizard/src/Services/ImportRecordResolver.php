@@ -7,7 +7,7 @@ namespace Relaticle\ImportWizard\Services;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use Relaticle\CustomFields\Models\CustomField;
+use App\Models\CustomField;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
@@ -116,9 +116,10 @@ final class ImportRecordResolver
     private function loadPeople(string $teamId): void
     {
         // Query 1: Get emails custom field ID
+        // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
         $emailsField = CustomField::withoutGlobalScopes()
             ->where('code', 'emails')
-            ->where('entity_type', People::class)
+            ->where('entity_type', 'people')
             ->where('tenant_id', $teamId)
             ->first();
 

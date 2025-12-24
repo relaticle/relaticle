@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use League\Csv\Statement;
-use Relaticle\CustomFields\Models\CustomField;
+use App\Models\CustomField;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
