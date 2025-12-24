@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Services\Import;
 
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\CustomField;
-use App\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 use Relaticle\ImportWizard\Services\CompanyMatcher;

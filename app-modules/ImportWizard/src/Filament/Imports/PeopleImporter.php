@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Filament\Imports;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
@@ -14,7 +15,6 @@ use Filament\Actions\Imports\Models\Import;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
-use App\Models\CustomField;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 
 final class PeopleImporter extends BaseImporter

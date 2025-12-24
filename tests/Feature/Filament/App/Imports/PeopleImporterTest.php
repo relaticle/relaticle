@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
-use App\Models\CustomField;
-use App\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;

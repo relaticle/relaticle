@@ -7,12 +7,12 @@ namespace Tests\Feature\Filament\App\Imports;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Team;
 use App\Models\User;
-use Relaticle\ImportWizard\Models\Import;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Filament\Imports\TaskImporter;
+use Relaticle\ImportWizard\Models\Import;
 
 uses(RefreshDatabase::class);
 

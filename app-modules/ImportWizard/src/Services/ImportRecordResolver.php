@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Services;
 
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\CustomField;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;

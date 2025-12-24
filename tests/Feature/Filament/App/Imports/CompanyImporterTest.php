@@ -7,13 +7,13 @@ namespace Tests\Feature\Filament\App\Imports;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Models\Team;
 use App\Models\User;
-use Relaticle\ImportWizard\Models\Import;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
+use Relaticle\ImportWizard\Models\Import;
 
 uses(RefreshDatabase::class);
 
