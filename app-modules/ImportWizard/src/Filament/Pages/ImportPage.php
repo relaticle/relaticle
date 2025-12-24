@@ -51,7 +51,7 @@ abstract class ImportPage extends Page
     #[Override]
     public function getSubheading(): string
     {
-        return 'Import '.strtolower(static::getEntityLabel()).' from a CSV or Excel file';
+        return 'Import '.strtolower(static::getEntityLabel()).' from a CSV file';
     }
 
     /**

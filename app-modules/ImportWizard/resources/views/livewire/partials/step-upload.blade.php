@@ -59,7 +59,7 @@
                 type="file"
                 id="file-upload"
                 wire:model="uploadedFile"
-                accept=".csv,.xlsx,.xls,.ods,.txt"
+                accept=".csv,.txt"
                 class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             >
 
@@ -69,7 +69,7 @@
                     class="h-12 w-12 text-gray-400 dark:text-gray-600"
                 />
                 <p class="mt-6 text-sm text-gray-700 dark:text-gray-400">
-                    Drop your .CSV or .XLSX file onto this area to upload
+                    Drop your .CSV file onto this area to upload
                 </p>
                 <div class="flex items-center gap-4 mt-6 w-full max-w-xs">
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>

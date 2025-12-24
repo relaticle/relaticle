@@ -72,7 +72,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     #[Locked]
     public ?string $returnUrl = null;
 
-    #[Validate('required|file|max:51200')]
+    #[Validate('required|file|max:51200|mimes:csv,txt')]
     public mixed $uploadedFile = null;
 
     public ?string $persistedFilePath = null;
@@ -415,6 +415,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
             ->onQueue('imports')
             ->finally(function () use ($import): void {
                 $import->update(['completed_at' => now()]);
+                // Clean up the import file - no longer needed after batch completes
+                Storage::disk('local')->delete($import->file_path);
             })
             ->dispatch();
     }

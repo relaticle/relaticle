@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
-use Relaticle\ImportWizard\Services\ExcelToCsvConverter;
 
 /**
- * Provides CSV/Excel file parsing functionality for the Import Wizard.
+ * Provides CSV file parsing functionality for the Import Wizard.
  */
 trait HasCsvParsing
 {
@@ -26,8 +24,8 @@ trait HasCsvParsing
             return;
         }
 
-        // Convert Excel to CSV if needed
-        $csvPath = $this->convertAndPersistFile($this->uploadedFile);
+        // Persist the CSV file to storage
+        $csvPath = $this->persistFile($this->uploadedFile);
         if ($csvPath === null) {
             return;
         }
@@ -69,34 +67,19 @@ trait HasCsvParsing
     }
 
     /**
-     * Convert Excel to CSV if needed and persist the file.
+     * Persist the uploaded CSV file to storage.
      */
-    protected function convertAndPersistFile(TemporaryUploadedFile $file): ?string
+    protected function persistFile(TemporaryUploadedFile $file): ?string
     {
-        $converter = app(ExcelToCsvConverter::class);
-
-        // Create UploadedFile from temporary file
-        $uploadedFile = new UploadedFile(
-            $file->getRealPath(),
-            $file->getClientOriginalName(),
-            $file->getMimeType(),
-        );
-
         try {
-            // Convert Excel to CSV if needed
-            if ($converter->isExcelFile($uploadedFile)) {
-                $csvFile = $converter->convert($uploadedFile);
-                $sourcePath = $csvFile->getRealPath();
-            } else {
-                $sourcePath = $uploadedFile->getRealPath();
-            }
-
-            // Persist to storage
+            $sourcePath = $file->getRealPath();
             $storagePath = 'temp-imports/'.Str::uuid()->toString().'.csv';
+
             $content = file_get_contents($sourcePath);
             if ($content === false) {
                 throw new \RuntimeException('Failed to read file content');
             }
+
             Storage::disk('local')->put($storagePath, $content);
 
             return Storage::disk('local')->path($storagePath);
