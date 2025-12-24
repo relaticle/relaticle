@@ -7,7 +7,6 @@ namespace Relaticle\ImportWizard\Jobs;
 use Filament\Actions\Imports\Importer;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -35,6 +34,11 @@ final class StreamingImportCsv implements ShouldQueue
     use SerializesModels;
 
     /**
+     * The number of times the job may be attempted.
+     */
+    public int $tries = 1;
+
+    /**
      * @param  Import  $import  The import model
      * @param  int  $startRow  Row offset to start reading from (0-indexed)
      * @param  int  $rowCount  Number of rows to process in this chunk
@@ -60,7 +64,6 @@ final class StreamingImportCsv implements ShouldQueue
             return;
         }
 
-        // Stream rows from file on-demand
         $csvPath = Storage::disk('local')->path($this->import->file_path);
 
         if (! file_exists($csvPath)) {
@@ -74,7 +77,6 @@ final class StreamingImportCsv implements ShouldQueue
             ->limit($this->rowCount)
             ->process($csvReader);
 
-        // Create importer instance
         /** @var Importer $importer */
         $importer = App::make($this->import->importer, [
             'import' => $this->import,
@@ -86,12 +88,9 @@ final class StreamingImportCsv implements ShouldQueue
         $successCount = 0;
         $failureCount = 0;
 
-        // Process each row
         foreach ($records as $record) {
             try {
-                // Use Filament's complete import pipeline
                 ($importer)($record);
-
                 $successCount++;
             } catch (\Throwable $e) {
                 $failureCount++;
@@ -101,11 +100,9 @@ final class StreamingImportCsv implements ShouldQueue
             $processedCount++;
         }
 
-        // Update import model stats
         $this->import->increment('processed_rows', $processedCount);
         $this->import->increment('successful_rows', $successCount);
 
-        // Fire event for progress tracking
         event(new ImportChunkProcessed(
             import: $this->import,
             processedRows: $processedCount,
@@ -115,22 +112,15 @@ final class StreamingImportCsv implements ShouldQueue
     }
 
     /**
-     * Get the middleware the job should pass through.
-     *
-     * @return array<int, object>
-     *
-     * @throws BindingResolutionException
+     * Handle a job failure.
      */
-    public function middleware(): array
+    public function failed(\Throwable $exception): void
     {
-        // Get middleware from the importer
-        /** @var Importer $importer */
-        $importer = App::make($this->import->importer, [
-            'import' => $this->import,
-            'columnMap' => $this->columnMap,
-            'options' => array_merge($this->options, ['_chunk_size' => $this->rowCount]),
+        \Log::error('StreamingImportCsv failed', [
+            'import_id' => $this->import->id,
+            'start_row' => $this->startRow,
+            'row_count' => $this->rowCount,
+            'exception' => $exception->getMessage(),
         ]);
-
-        return $importer->getJobMiddleware();
     }
 }
