@@ -14,7 +14,7 @@ use Filament\Actions\Imports\Models\Import;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\Models\CustomField;
+use App\Models\CustomField;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 
 final class PeopleImporter extends BaseImporter
@@ -127,9 +127,10 @@ final class PeopleImporter extends BaseImporter
 
         // Slow path: Query database (actual import execution)
         // Find the emails custom field for this team
+        // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
         $emailsField = CustomField::withoutGlobalScopes()
             ->where('code', PeopleField::EMAILS->value)
-            ->where('entity_type', People::class)
+            ->where('entity_type', 'people')
             ->where('tenant_id', $this->import->team_id)
             ->first();
 

@@ -7,8 +7,8 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldValue;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
@@ -39,7 +39,7 @@ function createEmailsCustomField(Team $team): CustomField
         'code' => 'emails',
         'name' => 'Emails',
         'type' => 'email',
-        'entity_type' => People::class,
+        'entity_type' => 'people',
         'tenant_id' => $team->id,
         'sort_order' => 1,
         'active' => true,
@@ -233,7 +233,7 @@ describe('Email-Based Duplicate Detection', function (): void {
             'code' => 'emails',
             'name' => 'Emails',
             'type' => 'email',
-            'entity_type' => People::class,
+            'entity_type' => 'people',
             'tenant_id' => $otherTeam->id,
             'sort_order' => 1,
             'active' => true,

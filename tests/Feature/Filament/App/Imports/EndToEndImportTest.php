@@ -8,7 +8,8 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
-use Relaticle\CustomFields\Models\CustomField;
+use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Jobs\StreamingImportCsv;
 use Relaticle\ImportWizard\Models\Import;
@@ -23,11 +24,11 @@ beforeEach(function (): void {
     \Relaticle\CustomFields\Services\TenantContextService::setTenantId($this->team->id);
 
     // Create a custom field section for people
-    $section = \Relaticle\CustomFields\Models\CustomFieldSection::withoutGlobalScopes()->create([
+    $section = CustomFieldSection::withoutGlobalScopes()->create([
         'code' => 'contact_information',
         'name' => 'Contact Information',
         'type' => 'section',
-        'entity_type' => People::class,
+        'entity_type' => 'people',
         'tenant_id' => $this->team->id,
         'sort_order' => 1,
     ]);
@@ -38,7 +39,7 @@ beforeEach(function (): void {
         'code' => 'emails',
         'name' => 'Emails',
         'type' => 'email',
-        'entity_type' => People::class,
+        'entity_type' => 'people',
         'tenant_id' => $this->team->id,
         'sort_order' => 1,
         'active' => true,

@@ -7,7 +7,7 @@ namespace Tests\Feature\Filament\App\Imports;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Models\Team;
 use App\Models\User;
-use Filament\Actions\Imports\Models\Import;
+use Relaticle\ImportWizard\Models\Import;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
