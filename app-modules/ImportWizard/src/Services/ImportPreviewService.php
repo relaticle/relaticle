@@ -24,6 +24,7 @@ final readonly class ImportPreviewService
     public function __construct(
         private CsvReaderFactory $csvReaderFactory,
         private CompanyMatcher $companyMatcher,
+        private CsvRowCounter $csvRowCounter,
     ) {}
 
     /**
@@ -51,7 +52,7 @@ final readonly class ImportPreviewService
         $import->setAttribute('user_id', $userId);
 
         $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
-        $totalRows = $this->fastRowCount($csvPath, $csvReader);
+        $totalRows = $this->csvRowCounter->count($csvPath, $csvReader);
 
         // Process only sampled rows for preview
         $records = (new Statement)->limit($sampleSize)->process($csvReader);
@@ -312,70 +313,5 @@ final readonly class ImportPreviewService
             $emails,
             static fn (mixed $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false
         ));
-    }
-
-    /**
-     * Fast row counting with file size estimation for large files.
-     *
-     * For small files (< 1MB), uses exact counting.
-     * For large files, samples rows and estimates based on average row size.
-     *
-     * @param  \League\Csv\Reader<array<string, mixed>>  $csvReader
-     */
-    private function fastRowCount(string $csvPath, \League\Csv\Reader $csvReader): int
-    {
-        $fileSize = filesize($csvPath);
-        if ($fileSize === false) {
-            // Fallback to exact count if filesize fails
-            return iterator_count($csvReader->getRecords());
-        }
-
-        // For small files (< 1MB), exact count is fast
-        if ($fileSize < 1_048_576) {
-            return iterator_count($csvReader->getRecords());
-        }
-
-        // For large files, sample 100 rows and estimate
-        $sampleSize = 100;
-        $sample = [];
-        $iterator = $csvReader->getRecords();
-        $count = 0;
-
-        foreach ($iterator as $record) {
-            $sample[] = $record;
-            $count++;
-            if ($count >= $sampleSize) {
-                break;
-            }
-        }
-
-        if ($count === 0) {
-            return 0;
-        }
-
-        // Get header size (first line)
-        $headerContent = '';
-        $file = fopen($csvPath, 'r');
-        if ($file !== false) {
-            $headerContent = fgets($file) ?: '';
-            fclose($file);
-        }
-        $headerBytes = strlen($headerContent);
-
-        // Calculate average row size from sample
-        $sampleStartPos = $headerBytes;
-        $sampleContent = file_get_contents($csvPath, offset: $sampleStartPos, length: 8192);
-        if ($sampleContent === false) {
-            // Fallback to exact count if reading fails
-            return iterator_count($csvReader->getRecords());
-        }
-
-        $sampleLines = explode("\n", trim($sampleContent));
-        $avgRowSize = strlen($sampleContent) / max(1, count($sampleLines));
-
-        // Estimate total rows
-        $dataSize = $fileSize - $headerBytes;
-
-        return (int) ceil($dataSize / max(1, $avgRowSize));
     }
 }

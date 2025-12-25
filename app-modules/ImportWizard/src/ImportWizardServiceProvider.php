@@ -16,6 +16,8 @@ final class ImportWizardServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../config/import-wizard.php', 'import-wizard');
+
         $this->app->bind(BaseImport::class, Import::class);
         $this->app->bind(BaseFailedImportRow::class, FailedImportRow::class);
     }

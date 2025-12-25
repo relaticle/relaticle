@@ -11,10 +11,30 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Filament\Imports\NoteImporter;
 use Relaticle\ImportWizard\Models\Import;
 
 uses(RefreshDatabase::class);
+
+function createNoteTestImportRecord(User $user, Team $team): Import
+{
+    return Import::create([
+        'user_id' => $user->id,
+        'team_id' => $team->id,
+        'importer' => NoteImporter::class,
+        'file_name' => 'test.csv',
+        'file_path' => '/tmp/test.csv',
+        'total_rows' => 1,
+    ]);
+}
+
+function setNoteImporterData(object $importer, array $data): void
+{
+    $reflection = new \ReflectionClass($importer);
+    $dataProperty = $reflection->getProperty('data');
+    $dataProperty->setValue($importer, $data);
+}
 
 beforeEach(function () {
     Storage::fake('local');
@@ -25,6 +45,7 @@ beforeEach(function () {
 
     $this->actingAs($this->user);
     Filament::setTenant($this->team);
+    TenantContextService::setTenantId($this->team->id);
 });
 
 test('note importer has correct columns defined', function () {

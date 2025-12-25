@@ -4,32 +4,30 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
-use App\Enums\CreationSource;
 use App\Models\Task;
 use Filament\Actions\Imports\ImportColumn;
-use Filament\Actions\Imports\Importer;
-use Filament\Actions\Imports\Models\Import;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasPolymorphicEntityAttachment;
 
 final class TaskImporter extends BaseImporter
 {
+    use HasPolymorphicEntityAttachment;
+
     protected static ?string $model = Task::class;
+
+    protected static array $uniqueIdentifierColumns = ['id', 'title'];
+
+    protected static string $missingUniqueIdentifiersMessage = 'For Tasks, map a Title or Record ID column';
+
+    /**
+     * Pending assignee ID to attach in afterSave.
+     */
+    public ?string $pendingAssigneeId = null;
 
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('id')
-                ->label('Record ID')
-                ->guess(['id', 'record_id', 'ulid', 'record id'])
-                ->rules(['nullable', 'ulid'])
-                ->example('01KCCFMZ52QWZSQZWVG0AP704V')
-                ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
-                ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
-                    // ID handled in resolveRecord(), skip here
-                }),
+            self::buildIdColumn(),
 
             ImportColumn::make('title')
                 ->label('Title')
@@ -37,39 +35,55 @@ final class TaskImporter extends BaseImporter
                 ->guess(['title', 'task_title', 'task_name', 'name', 'subject'])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Follow up with client')
-                ->fillRecordUsing(function (Task $record, string $state, Importer $importer): void {
+                ->fillRecordUsing(function (Task $record, string $state, TaskImporter $importer): void {
                     $record->title = trim($state);
-
-                    if (! $record->exists) {
-                        $record->team_id = $importer->import->team_id;
-                        $record->creator_id = $importer->import->user_id;
-                        $record->creation_source = CreationSource::IMPORT;
-                    }
+                    $importer->initializeNewRecord($record);
                 }),
 
             ImportColumn::make('company_name')
                 ->label('Company Name')
                 ->guess(['company_name', 'company', 'organization', 'account'])
                 ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation'),
+                ->example('Acme Corporation')
+                ->fillRecordUsing(function (): void {
+                    // Relationship attached in afterSave()
+                }),
 
             ImportColumn::make('person_name')
                 ->label('Person Name')
                 ->guess(['person_name', 'contact_name', 'contact', 'person', 'related_to'])
                 ->rules(['nullable', 'string', 'max:255'])
-                ->example('John Doe'),
+                ->example('John Doe')
+                ->fillRecordUsing(function (): void {
+                    // Relationship attached in afterSave()
+                }),
 
             ImportColumn::make('opportunity_name')
                 ->label('Opportunity Name')
                 ->guess(['opportunity_name', 'opportunity', 'deal', 'deal_name'])
                 ->rules(['nullable', 'string', 'max:255'])
-                ->example('Enterprise License Deal'),
+                ->example('Enterprise License Deal')
+                ->fillRecordUsing(function (): void {
+                    // Relationship attached in afterSave()
+                }),
 
             ImportColumn::make('assignee_email')
                 ->label('Assignee Email')
                 ->guess(['assignee_email', 'assignee', 'assigned_to', 'owner', 'responsible'])
                 ->rules(['nullable', 'email'])
-                ->example('assignee@company.com'),
+                ->example('assignee@company.com')
+                ->fillRecordUsing(function (Task $record, ?string $state, TaskImporter $importer): void {
+                    if (blank($state)) {
+                        return;
+                    }
+
+                    $user = $importer->resolveTeamMemberByEmail($state);
+
+                    if ($user instanceof \App\Models\User) {
+                        // Store assignee to attach in afterSave (assignees is a BelongsToMany)
+                        $importer->pendingAssigneeId = $user->getKey();
+                    }
+                }),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),
         ];
@@ -97,33 +111,29 @@ final class TaskImporter extends BaseImporter
             ->where('title', trim((string) $title))
             ->first();
 
-        $strategy = $this->getDuplicateStrategy();
-
-        return match ($strategy) {
-            DuplicateHandlingStrategy::SKIP => $existing ?? new Task,
-            DuplicateHandlingStrategy::UPDATE => $existing ?? new Task,
-            DuplicateHandlingStrategy::CREATE_NEW => new Task,
-        };
+        /** @var Task */
+        return $this->applyDuplicateStrategy($existing);
     }
 
-    public static function getCompletedNotificationBody(Import $import): string
+    /**
+     * Attach polymorphic relationships and assignees after the task is saved.
+     */
+    protected function afterSave(): void
     {
-        $body = 'Your task import has completed and '.Number::format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
+        parent::afterSave();
 
-        if (($failedRowsCount = $import->getFailedRowsCount()) !== 0) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
+        $this->attachRelatedEntities();
+
+        // Attach assignee (Task-specific)
+        if ($this->pendingAssigneeId !== null) {
+            /** @var Task $task */
+            $task = $this->record;
+            $task->assignees()->syncWithoutDetaching([$this->pendingAssigneeId]);
         }
-
-        return $body;
     }
 
-    public static function getUniqueIdentifierColumns(): array
+    public static function getEntityName(): string
     {
-        return ['id', 'title'];
-    }
-
-    public static function getMissingUniqueIdentifiersMessage(): string
-    {
-        return 'For Tasks, map a Title or Record ID column';
+        return 'task';
     }
 }

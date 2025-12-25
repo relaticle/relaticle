@@ -265,3 +265,170 @@ describe('Email-Based Duplicate Detection', function (): void {
         expect($record->exists)->toBeFalse();
     });
 });
+
+describe('Email Domain → Company Auto-Linking', function (): void {
+    function createDomainNameField(Team $team): CustomField
+    {
+        return CustomField::withoutGlobalScopes()->create([
+            'code' => 'domain_name',
+            'name' => 'Domain Name',
+            'type' => 'text',
+            'entity_type' => 'company',
+            'tenant_id' => $team->id,
+            'sort_order' => 1,
+            'active' => true,
+            'system_defined' => true,
+        ]);
+    }
+
+    function setCompanyDomain(Company $company, string $domain): void
+    {
+        $field = CustomField::withoutGlobalScopes()
+            ->where('code', 'domain_name')
+            ->where('entity_type', 'company')
+            ->where('tenant_id', $company->team_id)
+            ->first();
+
+        CustomFieldValue::withoutGlobalScopes()->create([
+            'entity_type' => 'company',
+            'entity_id' => $company->id,
+            'custom_field_id' => $field->id,
+            'tenant_id' => $company->team_id,
+            'string_value' => $domain,
+        ]);
+    }
+
+    it('auto-links person to company by email domain when company_name is empty', function (): void {
+        createDomainNameField($this->team);
+        setCompanyDomain($this->company, 'acme.com');
+
+        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $importer = new PeopleImporter(
+            $import,
+            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setPeopleImporterData($importer, [
+            'name' => 'John Doe',
+            'company_name' => '', // Empty company name - should trigger domain matching
+            'custom_fields_emails' => 'john@acme.com',
+        ]);
+
+        // Run full import with empty company_name
+        ($importer)(['name' => 'John Doe', 'company_name' => '', 'custom_fields_emails' => 'john@acme.com']);
+
+        // Person should be linked to the company matched by domain
+        $person = People::query()->where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBe($this->company->id);
+    });
+
+    it('prefers explicit company_name over domain match', function (): void {
+        createDomainNameField($this->team);
+        setCompanyDomain($this->company, 'acme.com');
+
+        // Create another company
+        $otherCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Different Corp']);
+
+        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $importer = new PeopleImporter(
+            $import,
+            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setPeopleImporterData($importer, [
+            'name' => 'John Doe',
+            'company_name' => 'Different Corp', // Explicit company name
+            'custom_fields_emails' => 'john@acme.com', // Email domain matches Acme Corp
+        ]);
+
+        // Run full import
+        ($importer)(['name' => 'John Doe', 'company_name' => 'Different Corp', 'custom_fields_emails' => 'john@acme.com']);
+
+        // Should use explicit company_name, not domain match
+        $person = People::query()->where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBe($otherCompany->id);
+    });
+
+    it('creates new company when company_name provided and no match', function (): void {
+        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $importer = new PeopleImporter(
+            $import,
+            ['name' => 'name', 'company_name' => 'company_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setPeopleImporterData($importer, [
+            'name' => 'John Doe',
+            'company_name' => 'Brand New Company',
+        ]);
+
+        // Run full import
+        ($importer)(['name' => 'John Doe', 'company_name' => 'Brand New Company']);
+
+        // Company should have been created
+        $createdCompany = Company::query()->where('name', 'Brand New Company')->first();
+        $person = People::query()->where('name', 'John Doe')->first();
+        expect($createdCompany)->not->toBeNull()
+            ->and($person)->not->toBeNull()
+            ->and($person->company_id)->toBe($createdCompany->id);
+    });
+
+    it('leaves company_id null when no company_name and no domain match', function (): void {
+        createDomainNameField($this->team);
+        // Company has domain 'acme.com', but we'll use a different email domain
+
+        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $importer = new PeopleImporter(
+            $import,
+            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setPeopleImporterData($importer, [
+            'name' => 'John Doe',
+            'company_name' => '',
+            'custom_fields_emails' => 'john@unknown-company.com', // No company with this domain
+        ]);
+
+        // Run full import
+        ($importer)(['name' => 'John Doe', 'company_name' => '', 'custom_fields_emails' => 'john@unknown-company.com']);
+
+        $person = People::query()->where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBeNull();
+    });
+
+    it('handles ambiguous domain match by leaving company unlinked', function (): void {
+        createDomainNameField($this->team);
+        setCompanyDomain($this->company, 'shared.com');
+
+        // Create another company with the same domain
+        $company2 = Company::factory()->for($this->team, 'team')->create(['name' => 'Second Shared Inc']);
+        setCompanyDomain($company2, 'shared.com');
+
+        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $importer = new PeopleImporter(
+            $import,
+            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setPeopleImporterData($importer, [
+            'name' => 'Ambiguous Person',
+            'company_name' => '',
+            'custom_fields_emails' => 'user@shared.com',
+        ]);
+
+        // Run full import
+        ($importer)(['name' => 'Ambiguous Person', 'company_name' => '', 'custom_fields_emails' => 'user@shared.com']);
+
+        // Should not link to either company due to ambiguity
+        $person = People::query()->where('name', 'Ambiguous Person')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBeNull();
+    });
+});

@@ -32,19 +32,18 @@ final class CompanyMatcher
     /**
      * Match a company by domain (from emails) or name.
      *
+     * Priority:
+     * 1. Domain match (from email) - highest confidence
+     * 2. Name match - fallback
+     *
+     * When company_name is empty but emails are provided, will try domain matching.
+     * This enables auto-linking people to companies based on email domain (like Attio).
+     *
      * @param  array<string>  $emails  Person's email addresses
      */
     public function match(string $companyName, array $emails, string $teamId): CompanyMatchResult
     {
         $companyName = trim($companyName);
-
-        if ($companyName === '') {
-            return new CompanyMatchResult(
-                companyName: '',
-                matchType: 'new',
-                matchCount: 0,
-            );
-        }
 
         // Load companies into cache on first call
         $this->ensureCompaniesLoaded($teamId);
@@ -68,11 +67,20 @@ final class CompanyMatcher
             // Multiple domain matches - ambiguous
             if (count($domainMatches) > 1) {
                 return new CompanyMatchResult(
-                    companyName: $companyName,
+                    companyName: $companyName ?: 'Unknown',
                     matchType: 'ambiguous',
                     matchCount: count($domainMatches),
                 );
             }
+        }
+
+        // No company name provided and no domain match - nothing to match
+        if ($companyName === '') {
+            return new CompanyMatchResult(
+                companyName: '',
+                matchType: 'new',
+                matchCount: 0,
+            );
         }
 
         // Step 2: Try exact name matching

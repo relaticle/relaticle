@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
-use App\Models\CustomField;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use League\Csv\Statement;
+use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
@@ -144,6 +144,7 @@ final readonly class CsvAnalyzer
             return collect();
         }
 
+        /** @var Collection<int, CustomField> */
         return CustomField::query()
             ->where('entity_type', $entityType)
             ->with('options')

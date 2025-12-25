@@ -27,13 +27,13 @@ final class ImportRecordResolver
      *
      * @var array{
      *     people: array{byId: array<int|string, People>, byEmail: array<string, People>},
-     *     companies: array{byId: array<int|string, Company>, byName: array<string, Company>},
+     *     companies: array{byId: array<int|string, Company>, byName: array<string, Company>, byDomain: array<string, Company>},
      *     opportunities: array{byId: array<int|string, Opportunity>, byName: array<string, Opportunity>}
      * }
      */
     private array $cache = [
         'people' => ['byId' => [], 'byEmail' => []],
-        'companies' => ['byId' => [], 'byName' => []],
+        'companies' => ['byId' => [], 'byName' => [], 'byDomain' => []],
         'opportunities' => ['byId' => [], 'byName' => []],
     ];
 
@@ -54,7 +54,7 @@ final class ImportRecordResolver
         $this->cachedTeamId = $teamId;
         $this->cache = [
             'people' => ['byId' => [], 'byEmail' => []],
-            'companies' => ['byId' => [], 'byName' => []],
+            'companies' => ['byId' => [], 'byName' => [], 'byDomain' => []],
             'opportunities' => ['byId' => [], 'byName' => []],
         ];
 
@@ -96,6 +96,18 @@ final class ImportRecordResolver
         $name = trim($name);
 
         return $this->cache['companies']['byName'][$name] ?? null;
+    }
+
+    /**
+     * Resolve a Company record by domain_name custom field.
+     */
+    public function resolveCompanyByDomain(string $domain, string $teamId): ?Company
+    {
+        $this->ensureCacheLoaded($teamId);
+
+        $domain = strtolower(trim($domain));
+
+        return $this->cache['companies']['byDomain'][$domain] ?? null;
     }
 
     /**
@@ -157,14 +169,29 @@ final class ImportRecordResolver
     }
 
     /**
-     * Load all companies for a team.
+     * Load all companies for a team with domain_name custom field values.
      */
     private function loadCompanies(string $teamId): void
     {
-        // Query: Load ALL companies
-        $companies = Company::query()
-            ->where('team_id', $teamId)
-            ->get();
+        // Query 1: Get domain_name custom field ID
+        // Uses 'company' morph alias (from Relation::enforceMorphMap) instead of Company::class
+        $domainField = CustomField::withoutGlobalScopes()
+            ->where('code', 'domain_name')
+            ->where('entity_type', 'company')
+            ->where('tenant_id', $teamId)
+            ->first();
+
+        // Query 2: Load ALL companies with domain custom field values if field exists
+        $query = Company::query()->where('team_id', $teamId);
+
+        if ($domainField) {
+            $query->with(['customFieldValues' => function (\Illuminate\Database\Eloquent\Relations\Relation $q) use ($domainField): void {
+                $q->withoutGlobalScopes()
+                    ->where('custom_field_id', $domainField->id);
+            }]);
+        }
+
+        $companies = $query->get();
 
         // Build indexes
         foreach ($companies as $company) {
@@ -176,6 +203,18 @@ final class ImportRecordResolver
             // First match wins (same as current behavior)
             if ($name !== '' && ! isset($this->cache['companies']['byName'][$name])) {
                 $this->cache['companies']['byName'][$name] = $company;
+            }
+
+            // Index by domain_name custom field (if field exists)
+            if ($domainField) {
+                $domainValue = $company->customFieldValues->first();
+                if ($domainValue?->string_value) {
+                    $domain = strtolower(trim((string) $domainValue->string_value));
+                    // First match wins (for consistent behavior)
+                    if ($domain !== '' && ! isset($this->cache['companies']['byDomain'][$domain])) {
+                        $this->cache['companies']['byDomain'][$domain] = $company;
+                    }
+                }
             }
         }
     }

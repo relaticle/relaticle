@@ -10,26 +10,22 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
-use Filament\Actions\Imports\Importer;
-use Filament\Actions\Imports\Models\Import;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Services\CompanyMatcher;
 
 final class PeopleImporter extends BaseImporter
 {
     protected static ?string $model = People::class;
 
+    protected static array $uniqueIdentifierColumns = ['id', 'custom_fields_emails'];
+
+    protected static string $missingUniqueIdentifiersMessage = 'For People, map an Email addresses or Record ID column';
+
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('id')
-                ->label('Record ID')
-                ->guess(['id', 'record_id', 'ulid', 'record id'])
-                ->rules(['nullable', 'ulid'])
-                ->example('01KCCFMZ52QWZSQZWVG0AP704V')
-                ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.'),
+            self::buildIdColumn(),
 
             ImportColumn::make('name')
                 ->label('Name')
@@ -37,33 +33,47 @@ final class PeopleImporter extends BaseImporter
                 ->guess(['name', 'full_name', 'person_name'])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('John Doe')
-                ->fillRecordUsing(function (People $record, string $state, Importer $importer): void {
+                ->fillRecordUsing(function (People $record, string $state, PeopleImporter $importer): void {
                     $record->name = $state;
-
-                    // Set team and creator for new records
-                    if (! $record->exists) {
-                        $record->team_id = $importer->import->team_id;
-                        $record->creator_id = $importer->import->user_id;
-                        $record->creation_source = CreationSource::IMPORT;
-                    }
+                    $importer->initializeNewRecord($record);
                 }),
 
             ImportColumn::make('company_name')
-                ->requiredMapping()
                 ->label('Company Name')
                 ->guess(['company_name', 'Company'])
-                ->rules(['required', 'string', 'max:255'])
+                ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
-                ->fillRecordUsing(function (People $record, string $state, Importer $importer): void {
-                    // Since company_name is required, we should always have a value
+                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
                     if (! $importer->import->team_id) {
                         throw new \RuntimeException('Team ID is required for import');
                     }
 
+                    $companyName = $state !== null ? trim($state) : '';
+                    $emails = $importer->extractEmails();
+
+                    // Try domain-based matching first when company_name is empty but emails exist
+                    // This enables Attio-style auto-linking: person with @acme.com → Acme company
+                    if ($companyName === '' && $emails !== []) {
+                        $matcher = app(CompanyMatcher::class);
+                        $result = $matcher->match('', $emails, $importer->import->team_id);
+
+                        if ($result->isDomainMatch() && $result->companyId !== null) {
+                            $record->company_id = $result->companyId;
+
+                            return;
+                        }
+                    }
+
+                    // No company to link - person will have no company
+                    if ($companyName === '') {
+                        return;
+                    }
+
+                    // Fallback to name-based firstOrCreate
                     try {
                         $company = Company::firstOrCreate(
                             [
-                                'name' => trim($state),
+                                'name' => $companyName,
                                 'team_id' => $importer->import->team_id,
                             ],
                             [
@@ -75,7 +85,7 @@ final class PeopleImporter extends BaseImporter
                         $record->company_id = $company->getKey();
                     } catch (\Exception $e) {
                         report($e);
-                        throw $e; // Re-throw to fail the import for this row
+                        throw $e;
                     }
                 }),
 
@@ -96,12 +106,8 @@ final class PeopleImporter extends BaseImporter
         // Fall back to email-based duplicate detection
         $existing = $this->findByEmail();
 
-        $strategy = $this->getDuplicateStrategy();
-
-        return match ($strategy) {
-            DuplicateHandlingStrategy::SKIP, DuplicateHandlingStrategy::UPDATE => $existing ?? new People,
-            DuplicateHandlingStrategy::CREATE_NEW => new People,
-        };
+        /** @var People */
+        return $this->applyDuplicateStrategy($existing);
     }
 
     private function findByEmail(): ?People
@@ -170,7 +176,7 @@ final class PeopleImporter extends BaseImporter
      *
      * @return array<int, string>
      */
-    private function extractEmails(): array
+    public function extractEmails(): array
     {
         $emailsField = $this->data['custom_fields_emails'] ?? null;
 
@@ -189,24 +195,8 @@ final class PeopleImporter extends BaseImporter
             ->toArray();
     }
 
-    public static function getCompletedNotificationBody(Import $import): string
+    public static function getEntityName(): string
     {
-        $body = 'Your people import has completed and '.Number::format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
-
-        if (($failedRowsCount = $import->getFailedRowsCount()) !== 0) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
-        }
-
-        return $body;
-    }
-
-    public static function getUniqueIdentifierColumns(): array
-    {
-        return ['id', 'custom_fields_emails'];
-    }
-
-    public static function getMissingUniqueIdentifiersMessage(): string
-    {
-        return 'For People, map an Email addresses or Record ID column';
+        return 'people';
     }
 }

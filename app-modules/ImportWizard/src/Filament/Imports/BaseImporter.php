@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
+use App\Enums\CreationSource;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Imports\Exceptions\RowImportFailedException;
+use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
+use Filament\Actions\Imports\Models\Import;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
@@ -18,6 +22,26 @@ use Relaticle\ImportWizard\Services\ImportRecordResolver;
 
 abstract class BaseImporter extends Importer
 {
+    /**
+     * Columns that can uniquely identify a record for duplicate detection.
+     * Override in child classes to specify entity-specific identifiers.
+     *
+     * @var array<string>
+     */
+    protected static array $uniqueIdentifierColumns = ['id'];
+
+    /**
+     * User-friendly message shown when no unique identifier is mapped.
+     * Override in child classes to provide entity-specific guidance.
+     */
+    protected static string $missingUniqueIdentifiersMessage = 'Map a Record ID column';
+
+    /**
+     * Whether to skip the unique identifier warning for this entity type.
+     * Set to true for entities that don't support attribute-based matching.
+     */
+    protected static bool $skipUniqueIdentifierWarning = false;
+
     /**
      * Optional record resolver for fast preview lookups.
      * When set, importers should use this instead of database queries.
@@ -82,6 +106,38 @@ abstract class BaseImporter extends Importer
                 ->required()
                 ->helperText('Choose how to handle records that already exist in the system'),
         ];
+    }
+
+    /**
+     * Build the standard ID column for record matching.
+     * Use this in getColumns() to include consistent ID handling.
+     */
+    protected static function buildIdColumn(): ImportColumn
+    {
+        return ImportColumn::make('id')
+            ->label('Record ID')
+            ->guess(['id', 'record_id', 'ulid', 'record id'])
+            ->rules(['nullable', 'ulid'])
+            ->example('01KCCFMZ52QWZSQZWVG0AP704V')
+            ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
+            ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
+                // ID handled in resolveRecord(), skip here
+            });
+    }
+
+    /**
+     * Initialize a new record with team, creator, and source.
+     * Call this in fillRecordUsing for the primary field to set up new records.
+     *
+     * @param  Model&object{team_id?: string|null, creator_id?: string|null, creation_source?: CreationSource|null}  $record
+     */
+    public function initializeNewRecord(Model $record): void
+    {
+        if (! $record->exists) {
+            $record->setAttribute('team_id', $this->import->team_id);
+            $record->setAttribute('creator_id', $this->import->user_id);
+            $record->setAttribute('creation_source', CreationSource::IMPORT);
+        }
     }
 
     /**
@@ -165,13 +221,12 @@ abstract class BaseImporter extends Importer
 
     /**
      * Get the list of unique identifier columns for this importer.
-     * These columns can be used to match and update existing records.
      *
      * @return array<string>
      */
     public static function getUniqueIdentifierColumns(): array
     {
-        return ['id']; // Default: just the ID column
+        return static::$uniqueIdentifierColumns;
     }
 
     /**
@@ -179,15 +234,60 @@ abstract class BaseImporter extends Importer
      */
     public static function getMissingUniqueIdentifiersMessage(): string
     {
-        return 'Map a Record ID column';
+        return static::$missingUniqueIdentifiersMessage;
     }
 
     /**
      * Whether to skip the unique identifier warning for this importer.
-     * Override this to return true for entity types that don't support updates.
      */
     public static function skipUniqueIdentifierWarning(): bool
     {
-        return false;
+        return static::$skipUniqueIdentifierWarning;
+    }
+
+    /**
+     * Apply duplicate handling strategy to resolve which record to use.
+     */
+    protected function applyDuplicateStrategy(?Model $existing): Model
+    {
+        $strategy = $this->getDuplicateStrategy();
+
+        return match ($strategy) {
+            DuplicateHandlingStrategy::SKIP,
+            DuplicateHandlingStrategy::UPDATE => $existing ?? $this->newModelInstance(),
+            DuplicateHandlingStrategy::CREATE_NEW => $this->newModelInstance(),
+        };
+    }
+
+    /**
+     * Create a new instance of the importer's model.
+     */
+    protected function newModelInstance(): Model
+    {
+        /** @var class-string<Model> $modelClass */
+        $modelClass = static::getModel();
+
+        return new $modelClass;
+    }
+
+    /**
+     * Get the singular entity name for notification messages.
+     * Override this in each importer to provide the entity type.
+     */
+    abstract public static function getEntityName(): string;
+
+    /**
+     * Build the completed notification body for an import.
+     */
+    public static function getCompletedNotificationBody(Import $import): string
+    {
+        $entity = static::getEntityName();
+        $body = "Your {$entity} import has completed and ".Number::format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
+
+        if (($failedRowsCount = $import->getFailedRowsCount()) !== 0) {
+            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
+        }
+
+        return $body;
     }
 }

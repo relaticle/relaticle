@@ -10,28 +10,20 @@ use App\Models\Opportunity;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
-use Filament\Actions\Imports\Models\Import;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 
 final class OpportunityImporter extends BaseImporter
 {
     protected static ?string $model = Opportunity::class;
 
+    protected static array $uniqueIdentifierColumns = ['id', 'name'];
+
+    protected static string $missingUniqueIdentifiersMessage = 'For Opportunities, map an Opportunity name or Record ID column';
+
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('id')
-                ->label('Record ID')
-                ->guess(['id', 'record_id', 'ulid', 'record id'])
-                ->rules(['nullable', 'ulid'])
-                ->example('01KCCFMZ52QWZSQZWVG0AP704V')
-                ->helperText('Include existing record IDs to update specific records. Leave empty to create new records.')
-                ->fillRecordUsing(function (Model $record, ?string $state, Importer $importer): void {
-                    // ID handled in resolveRecord(), skip here
-                }),
+            self::buildIdColumn(),
 
             ImportColumn::make('name')
                 ->label('Name')
@@ -39,15 +31,9 @@ final class OpportunityImporter extends BaseImporter
                 ->guess(['name', 'opportunity_name', 'title'])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Q1 Sales Opportunity')
-                ->fillRecordUsing(function (Opportunity $record, string $state, Importer $importer): void {
+                ->fillRecordUsing(function (Opportunity $record, string $state, OpportunityImporter $importer): void {
                     $record->name = $state;
-
-                    // Set team and creator for new records
-                    if (! $record->exists) {
-                        $record->team_id = $importer->import->team_id;
-                        $record->creator_id = $importer->import->user_id;
-                        $record->creation_source = CreationSource::IMPORT;
-                    }
+                    $importer->initializeNewRecord($record);
                 }),
 
             ImportColumn::make('company_name')
@@ -155,33 +141,12 @@ final class OpportunityImporter extends BaseImporter
                 ->first();
         }
 
-        $strategy = $this->getDuplicateStrategy();
-
-        return match ($strategy) {
-            DuplicateHandlingStrategy::SKIP => $existing ?? new Opportunity,
-            DuplicateHandlingStrategy::UPDATE => $existing ?? new Opportunity,
-            DuplicateHandlingStrategy::CREATE_NEW => new Opportunity,
-        };
+        /** @var Opportunity */
+        return $this->applyDuplicateStrategy($existing);
     }
 
-    public static function getCompletedNotificationBody(Import $import): string
+    public static function getEntityName(): string
     {
-        $body = 'Your opportunities import has completed and '.Number::format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
-
-        if (($failedRowsCount = $import->getFailedRowsCount()) !== 0) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
-        }
-
-        return $body;
-    }
-
-    public static function getUniqueIdentifierColumns(): array
-    {
-        return ['id', 'name'];
-    }
-
-    public static function getMissingUniqueIdentifiersMessage(): string
-    {
-        return 'For Opportunities, map an Opportunity name or Record ID column';
+        return 'opportunities';
     }
 }

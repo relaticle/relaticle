@@ -5,17 +5,40 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\App\Imports;
 
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Models\Import;
 
 uses(RefreshDatabase::class);
+
+function createCompanyTestImportRecord(User $user, Team $team): Import
+{
+    return Import::create([
+        'user_id' => $user->id,
+        'team_id' => $team->id,
+        'importer' => CompanyImporter::class,
+        'file_name' => 'test.csv',
+        'file_path' => '/tmp/test.csv',
+        'total_rows' => 1,
+    ]);
+}
+
+function setCompanyImporterData(object $importer, array $data): void
+{
+    $reflection = new \ReflectionClass($importer);
+    $dataProperty = $reflection->getProperty('data');
+    $dataProperty->setValue($importer, $data);
+}
 
 beforeEach(function () {
     Storage::fake('local');
@@ -26,6 +49,7 @@ beforeEach(function () {
 
     $this->actingAs($this->user);
     Filament::setTenant($this->team);
+    TenantContextService::setTenantId($this->team->id);
 });
 
 test('company importer has correct columns defined', function () {
@@ -131,4 +155,172 @@ test('company importer includes failed rows in notification', function () {
     expect($body)->toContain('8')
         ->and($body)->toContain('2')
         ->and($body)->toContain('failed');
+});
+
+describe('Domain-Based Duplicate Detection', function (): void {
+    function createDomainNameFieldForCompany(Team $team): CustomField
+    {
+        return CustomField::withoutGlobalScopes()->create([
+            'code' => 'domain_name',
+            'name' => 'Domain Name',
+            'type' => 'text',
+            'entity_type' => 'company',
+            'tenant_id' => $team->id,
+            'sort_order' => 1,
+            'active' => true,
+            'system_defined' => true,
+        ]);
+    }
+
+    function setCompanyDomainValue(Company $company, string $domain, CustomField $field): void
+    {
+        CustomFieldValue::withoutGlobalScopes()->create([
+            'entity_type' => 'company',
+            'entity_id' => $company->id,
+            'custom_field_id' => $field->id,
+            'tenant_id' => $company->team_id,
+            'string_value' => $domain,
+        ]);
+    }
+
+    it('matches company by domain_name with UPDATE strategy', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+        $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+        setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'Different Name',
+            'custom_fields_domain_name' => 'acme.com',
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        expect($record->id)->toBe($existingCompany->id)
+            ->and($record->exists)->toBeTrue();
+    });
+
+    it('prioritizes domain match over name match', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+
+        // Company that matches by name only
+        $nameMatchCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+
+        // Company that matches by domain but has different name
+        $domainMatchCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corporation']);
+        setCompanyDomainValue($domainMatchCompany, 'acme.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'Acme Inc', // Matches first company by name
+            'custom_fields_domain_name' => 'acme.com', // Matches second company by domain
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        // Should match by domain (higher priority), not by name
+        expect($record->id)->toBe($domainMatchCompany->id);
+    });
+
+    it('falls back to name match when no domain provided', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+        $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+        setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'Acme Inc',
+            // No domain provided
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        expect($record->id)->toBe($existingCompany->id)
+            ->and($record->exists)->toBeTrue();
+    });
+
+    it('creates new company when domain does not match', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+        $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Existing Inc']);
+        setCompanyDomainValue($existingCompany, 'existing.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'New Company',
+            'custom_fields_domain_name' => 'newcompany.com', // Different domain
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        expect($record->exists)->toBeFalse();
+    });
+
+    it('normalizes domain to lowercase for matching', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+        $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+        setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'Acme Inc',
+            'custom_fields_domain_name' => 'ACME.COM', // Uppercase
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        expect($record->id)->toBe($existingCompany->id);
+    });
+
+    it('respects CREATE_NEW strategy even with domain match', function (): void {
+        $domainField = createDomainNameFieldForCompany($this->team);
+        $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+        setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
+
+        $import = createCompanyTestImportRecord($this->user, $this->team);
+        $importer = new CompanyImporter(
+            $import,
+            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
+        );
+
+        setCompanyImporterData($importer, [
+            'name' => 'Acme Inc',
+            'custom_fields_domain_name' => 'acme.com',
+        ]);
+
+        $record = $importer->resolveRecord();
+
+        // CREATE_NEW should always create new record
+        expect($record->exists)->toBeFalse();
+    });
 });
