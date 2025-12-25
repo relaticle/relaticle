@@ -101,7 +101,10 @@ final readonly class CreateTeamCustomFields
             width: $enum->getWidth(),
             settings: new CustomFieldSettingsData(
                 list_toggleable_hidden: $enum->isListToggleableHidden(),
-                enable_option_colors: $enum->hasColorOptions()
+                enable_option_colors: $enum->hasColorOptions(),
+                allow_multiple: $enum->allowsMultipleValues(),
+                max_values: $enum->getMaxValues(),
+                unique_per_entity_type: $enum->isUniquePerEntityType(),
             )
         );
 

@@ -107,6 +107,36 @@ trait CustomFieldTrait
     }
 
     /**
+     * Get whether this field allows multiple values
+     *
+     * @return bool True if multiple values are allowed
+     */
+    public function allowsMultipleValues(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Get the maximum number of values allowed for this field
+     *
+     * @return int Maximum values (1 for single value fields)
+     */
+    public function getMaxValues(): int
+    {
+        return $this->allowsMultipleValues() ? 5 : 1;
+    }
+
+    /**
+     * Get whether this field value must be unique per entity type
+     *
+     * @return bool True if values must be unique across all records of this entity type
+     */
+    public function isUniquePerEntityType(): bool
+    {
+        return false;
+    }
+
+    /**
      * Get complete field configuration
      *
      * @return array{
@@ -118,7 +148,8 @@ trait CustomFieldTrait
      *     options: array<int|string, string>|null,
      *     description: string|null,
      *     optionColors: array<int|string, string>|null,
-     *     hasColorOptions: bool
+     *     hasColorOptions: bool,
+     *     allowsMultipleValues: bool
      * } The complete field configuration
      */
     public function getConfiguration(): array
@@ -133,6 +164,7 @@ trait CustomFieldTrait
             'description' => $this->getDescription(),
             'optionColors' => $this->getOptionColors(),
             'hasColorOptions' => $this->hasColorOptions(),
+            'allowsMultipleValues' => $this->allowsMultipleValues(),
         ];
     }
 }

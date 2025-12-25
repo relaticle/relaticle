@@ -44,4 +44,28 @@ enum PeopleField: string
             default => true,
         };
     }
+
+    public function isSystemDefined(): bool
+    {
+        return match ($this) {
+            self::EMAILS => true,
+            default => false,
+        };
+    }
+
+    public function allowsMultipleValues(): bool
+    {
+        return match ($this) {
+            self::EMAILS => true,
+            default => false,
+        };
+    }
+
+    public function isUniquePerEntityType(): bool
+    {
+        return match ($this) {
+            self::EMAILS => true,
+            default => false,
+        };
+    }
 }

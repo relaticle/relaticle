@@ -117,7 +117,8 @@ final readonly class ImportPreviewService
                         '_record_id' => $recordId,
                     ]
                 );
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                report($e);
                 // Skip errored rows in preview - they'll be handled during actual import
                 continue;
             }

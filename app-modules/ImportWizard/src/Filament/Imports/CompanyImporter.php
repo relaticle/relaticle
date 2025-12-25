@@ -68,9 +68,12 @@ final class CompanyImporter extends BaseImporter
         }
 
         // Step 1: Try domain-based duplicate detection (highest confidence for uniqueness)
-        $domain = $this->data['custom_fields_domain_name'] ?? null;
-        if (filled($domain)) {
-            $existing = $this->findByDomain(trim((string) $domain));
+        // Domain field is array type but imported as string or comma-separated
+        $domainValue = $this->data['custom_fields_domain_name'] ?? null;
+        $domain = $this->extractFirstDomain($domainValue);
+
+        if ($domain !== null) {
+            $existing = $this->findByDomain($domain);
             if ($existing instanceof \App\Models\Company) {
                 /** @var Company */
                 return $this->applyDuplicateStrategy($existing);
@@ -138,6 +141,34 @@ final class CompanyImporter extends BaseImporter
                     ->whereRaw('LOWER(string_value) = ?', [$domain]);
             })
             ->first();
+    }
+
+    /**
+     * Extract the first domain from various input formats.
+     * Handles: string, comma-separated string, array (after cast).
+     */
+    private function extractFirstDomain(mixed $value): ?string
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return null;
+        }
+
+        // Already an array (after castData processing)
+        if (is_array($value)) {
+            $first = $value[0] ?? null;
+
+            return is_string($first) && $first !== '' ? strtolower(trim($first)) : null;
+        }
+
+        // String - could be single or comma-separated
+        if (is_string($value)) {
+            $parts = explode(',', $value);
+            $first = trim($parts[0] ?? '');
+
+            return $first !== '' ? strtolower($first) : null;
+        }
+
+        return null;
     }
 
     public static function getEntityName(): string
