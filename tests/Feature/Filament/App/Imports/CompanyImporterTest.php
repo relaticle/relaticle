@@ -189,7 +189,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
-        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
@@ -218,7 +218,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $domainMatchCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corporation']);
         setCompanyDomainValue($domainMatchCompany, 'acme.com', $domainField);
 
-        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
@@ -265,7 +265,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Existing Inc']);
         setCompanyDomainValue($existingCompany, 'existing.com', $domainField);
 
-        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
@@ -288,7 +288,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
-        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
@@ -311,7 +311,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
-        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,

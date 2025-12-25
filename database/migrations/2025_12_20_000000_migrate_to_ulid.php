@@ -156,6 +156,10 @@ return new class extends Migration
         // A7: Custom field tables - add ulid and foreign ULID columns, populate
         $this->phaseA_addUlidsToCustomFieldTables();
 
+        // A7b: Migrate SINGLE_CHOICE field value references (integer_value → string_value)
+        // CRITICAL: Must run while option table still has integer IDs for lookup!
+        $this->phaseA7b_migrateOptionValueReferences();
+
         // A8: Migrate email field data format (string_value → json_value)
         $this->phaseA8_migrateEmailFieldValues();
 
@@ -388,6 +392,52 @@ return new class extends Migration
     }
 
     /**
+     * A7b: Migrate SINGLE_CHOICE field value references from integer_value to string_value.
+     *
+     * Maps old integer option IDs to new ULID option IDs.
+     * CRITICAL: Must run while custom_field_options still has both 'id' (integer) and 'ulid' columns.
+     *
+     * IDEMPOTENT: Only migrates values with non-null integer_value.
+     */
+    private function phaseA7b_migrateOptionValueReferences(): void
+    {
+        $fieldTable = 'custom_fields';
+        $valueTable = 'custom_field_values';
+        $optionTable = 'custom_field_options';
+
+        // Find all SINGLE_CHOICE type fields (select, radio)
+        $singleChoiceFieldIds = DB::table($fieldTable)
+            ->whereIn('type', ['select', 'radio'])
+            ->pluck('id');
+
+        if ($singleChoiceFieldIds->isEmpty()) {
+            return; // No single-choice fields
+        }
+
+        // Migrate in chunks to avoid memory issues
+        DB::table($valueTable)
+            ->whereIn('custom_field_id', $singleChoiceFieldIds)
+            ->whereNotNull('integer_value')
+            ->lazyById(100)
+            ->each(function ($value) use ($valueTable, $optionTable): void {
+                // Get the option's new ULID using the old integer id stored in integer_value
+                // At this point, options still have both 'id' (original integer) and 'ulid' columns
+                $optionUlid = DB::table($optionTable)
+                    ->where('id', $value->integer_value)
+                    ->value('ulid');
+
+                if ($optionUlid) {
+                    DB::table($valueTable)
+                        ->where('id', $value->id)
+                        ->update([
+                            'string_value' => $optionUlid,
+                            'integer_value' => null,
+                        ]);
+                }
+            });
+    }
+
+    /**
      * A8: Migrate email field values from string_value to json_value format.
      *
      * EmailFieldType was changed from STRING data type (string_value) to
@@ -487,8 +537,8 @@ return new class extends Migration
             foreach ($chunk as $value) {
                 // Handle comma-separated domains
                 $domains = array_filter(
-                    array_map('trim', explode(',', $value->string_value)),
-                    fn ($d) => $d !== ''
+                    array_map(trim(...), explode(',', (string) $value->string_value)),
+                    fn ($d): bool => $d !== ''
                 );
 
                 DB::table($valueTable)

@@ -7,7 +7,7 @@ parameters:
 			path: app-modules/OnboardSeed/src/Support/BaseModelSeeder.php
 
 		-
-			message: '#^Access to an undefined property Relaticle\\CustomFields\\Models\\CustomField\:\:\$tenant_id\.$#'
+			message: '#^Access to an undefined property App\\Models\\CustomField\:\:\$tenant_id\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Console/Commands/BackfillCustomFieldColorsCommand.php

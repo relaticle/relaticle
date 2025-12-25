@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
-use Relaticle\CustomFields\Models\CustomField;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**

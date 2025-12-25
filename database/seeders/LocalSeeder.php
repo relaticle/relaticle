@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -12,7 +13,6 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
-use Relaticle\CustomFields\Models\CustomField;
 
 final class LocalSeeder extends Seeder
 {

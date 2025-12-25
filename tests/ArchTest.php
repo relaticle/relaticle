@@ -114,3 +114,24 @@ arch('SystemAdmin module must not depend on main app namespace')
         'App\Models',
         'App\Enums',
     ]);
+
+arch('must not use custom-fields package models directly')
+    ->expect([
+        'App',
+        'Relaticle\ImportWizard',
+        'Relaticle\OnboardSeed',
+        'Relaticle\Documentation',
+    ])
+    ->not
+    ->toUse([
+        'Relaticle\CustomFields\Models\CustomField',
+        'Relaticle\CustomFields\Models\CustomFieldOption',
+        'Relaticle\CustomFields\Models\CustomFieldSection',
+        'Relaticle\CustomFields\Models\CustomFieldValue',
+    ])
+    ->ignoring([
+        'App\Models\CustomField',
+        'App\Models\CustomFieldOption',
+        'App\Models\CustomFieldSection',
+        'App\Models\CustomFieldValue',
+    ]);

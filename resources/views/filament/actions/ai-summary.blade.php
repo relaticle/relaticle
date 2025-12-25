@@ -10,11 +10,5 @@
             <x-heroicon-o-clock class="h-4 w-4" />
             <span>Generated {{ $summary->created_at->diffForHumans() }}</span>
         </div>
-        <div class="flex items-center gap-4">
-            <span>Model: {{ $summary->model_used }}</span>
-            @if($summary->prompt_tokens && $summary->completion_tokens)
-                <span>{{ $summary->prompt_tokens + $summary->completion_tokens }} tokens</span>
-            @endif
-        </div>
     </div>
 </div>

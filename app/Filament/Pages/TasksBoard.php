@@ -6,6 +6,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\Team;
 use BackedEnum;
@@ -21,8 +23,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
@@ -47,17 +47,20 @@ final class TasksBoard extends BoardPage
      */
     public function board(Board $board): Board
     {
+        $statusField = $this->statusCustomField();
+        $valueColumn = $statusField->getValueColumn();
+
         return $board
             ->query(
                 Task::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join): void {
+                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join) use ($statusField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $this->statusCustomField()->getKey());
+                            ->where('cfv.custom_field_id', '=', $statusField->getKey());
                     })
-                    ->select('tasks.*', 'cfv.integer_value')
+                    ->select('tasks.*', 'cfv.'.$valueColumn)
             )
             ->recordTitleAttribute('title')
-            ->columnIdentifier('cfv.integer_value')
+            ->columnIdentifier('cfv.'.$valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['title'])
             ->columns($this->getColumns())

@@ -119,6 +119,7 @@ final readonly class ImportPreviewService
                 );
             } catch (\Throwable $e) {
                 report($e);
+
                 // Skip errored rows in preview - they'll be handled during actual import
                 continue;
             }

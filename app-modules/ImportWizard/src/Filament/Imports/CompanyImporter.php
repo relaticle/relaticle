@@ -70,7 +70,7 @@ final class CompanyImporter extends BaseImporter
 
         // Step 1: Try domain-based duplicate detection (highest confidence for uniqueness)
         // Domain field is array type but imported as string or comma-separated
-        $domainsFieldKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainsFieldKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $domainValue = $this->data[$domainsFieldKey] ?? null;
         $domain = $this->extractFirstDomain($domainValue);
 
@@ -152,7 +152,7 @@ final class CompanyImporter extends BaseImporter
      */
     private function extractFirstDomain(mixed $value): ?string
     {
-        if ($value === null || $value === '' || $value === []) {
+        if (in_array($value, [null, '', []], true)) {
             return null;
         }
 

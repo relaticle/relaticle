@@ -6,6 +6,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Team;
 use BackedEnum;
@@ -20,8 +22,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
@@ -46,18 +46,21 @@ final class OpportunitiesBoard extends BoardPage
      */
     public function board(Board $board): Board
     {
+        $stageField = $this->stageCustomField();
+        $valueColumn = $stageField->getValueColumn();
+
         return $board
             ->query(
                 Opportunity::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join): void {
+                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join) use ($stageField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $this->stageCustomField()->getKey());
+                            ->where('cfv.custom_field_id', '=', $stageField->getKey());
                     })
-                    ->select('opportunities.*', 'cfv.integer_value')
+                    ->select('opportunities.*', 'cfv.'.$valueColumn)
                     ->with(['company', 'contact'])
             )
             ->recordTitleAttribute('name')
-            ->columnIdentifier('cfv.integer_value')
+            ->columnIdentifier('cfv.'.$valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['name'])
             ->columns($this->getColumns())

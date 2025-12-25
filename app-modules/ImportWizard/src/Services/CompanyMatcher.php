@@ -151,8 +151,8 @@ final class CompanyMatcher
         foreach ($companies as $company) {
             $domainValue = $company->customFieldValues
                 // @phpstan-ignore notIdentical.alwaysTrue (defensive check for safety)
-                ->filter(fn (\Relaticle\CustomFields\Models\CustomFieldValue $cfv): bool => $cfv->customField !== null)
-                ->first(fn (\Relaticle\CustomFields\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === CompanyField::DOMAINS->value);
+                ->filter(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField !== null)
+                ->first(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === CompanyField::DOMAINS->value);
 
             if ($domainValue !== null && is_array($domainValue->json_value)) {
                 foreach ($domainValue->json_value as $domain) {

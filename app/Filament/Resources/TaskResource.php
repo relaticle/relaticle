@@ -7,6 +7,7 @@ namespace App\Filament\Resources;
 use App\Enums\CreationSource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -34,7 +35,6 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Contracts\ValueResolvers;
-use Relaticle\CustomFields\Models\CustomField;
 use Throwable;
 
 final class TaskResource extends Resource
