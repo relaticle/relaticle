@@ -136,6 +136,7 @@ final readonly class CsvAnalyzer
     /**
      * Load all custom fields for an entity type.
      *
+     * @param  string|null  $entityType  Model class (e.g., App\Models\Company)
      * @return Collection<int, CustomField>
      */
     private function loadCustomFieldsForEntity(?string $entityType): Collection
@@ -144,11 +145,29 @@ final readonly class CsvAnalyzer
             return collect();
         }
 
+        // Convert model class to morph alias (e.g., App\Models\Company -> company)
+        $morphAlias = $this->getMorphAlias($entityType);
+
         /** @var Collection<int, CustomField> */
         return CustomField::query()
-            ->where('entity_type', $entityType)
+            ->where('entity_type', $morphAlias)
             ->with('options')
             ->get();
+    }
+
+    /**
+     * Get the morph alias for a model class.
+     */
+    private function getMorphAlias(string $modelClass): string
+    {
+        if (! class_exists($modelClass)) {
+            return $modelClass;
+        }
+
+        /** @var \Illuminate\Database\Eloquent\Model $model */
+        $model = new $modelClass;
+
+        return $model->getMorphClass();
     }
 
     /**
@@ -453,8 +472,9 @@ final readonly class CsvAnalyzer
         $customField = null;
         if ($entityType !== null && str_starts_with($fieldName, 'custom_fields_')) {
             $code = str_replace('custom_fields_', '', $fieldName);
+            $morphAlias = $this->getMorphAlias($entityType);
             $customField = CustomField::query()
-                ->where('entity_type', $entityType)
+                ->where('entity_type', $morphAlias)
                 ->where('code', $code)
                 ->first();
         }
