@@ -207,16 +207,20 @@ final class ImportRecordResolver
                 $this->cache['companies']['byName'][$name] = $company;
             }
 
-            // Index by domains custom field (if field exists) - stored as json_value array
+            // Index by domains custom field (if field exists) - json_value is cast to Collection
             if ($domainField) {
                 $domainValue = $company->customFieldValues->first();
-                $domains = $domainValue?->json_value ?? [];
-                foreach ($domains as $domain) {
+                if ($domainValue === null) {
+                    continue;
+                }
+
+                foreach ($domainValue->json_value ?? collect() as $domain) {
                     $domain = strtolower(trim((string) $domain));
-                    // First match wins (for consistent behavior)
-                    if ($domain !== '' && ! isset($this->cache['companies']['byDomain'][$domain])) {
-                        $this->cache['companies']['byDomain'][$domain] = $company;
+                    if ($domain === '') {
+                        continue;
                     }
+                    // First match wins (for consistent behavior)
+                    $this->cache['companies']['byDomain'][$domain] ??= $company;
                 }
             }
         }

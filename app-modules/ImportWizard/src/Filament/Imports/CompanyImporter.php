@@ -166,7 +166,7 @@ final class CompanyImporter extends BaseImporter
         // String - could be single or comma-separated
         if (is_string($value)) {
             $parts = explode(',', $value);
-            $first = trim($parts[0] ?? '');
+            $first = trim($parts[0]);
 
             return $first !== '' ? strtolower($first) : null;
         }

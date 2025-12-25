@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Services;
 
 use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
+use App\Models\CustomFieldValue;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 
 /**
@@ -147,23 +148,26 @@ final class CompanyMatcher
             $this->companyCache['byName'][$name][] = $company;
         }
 
-        // Index by domains custom field (stored as json_value array)
+        // Index by domains custom field (stored as json_value collection)
         foreach ($companies as $company) {
+            /** @var CustomFieldValue|null $domainValue */
             $domainValue = $company->customFieldValues
-                // @phpstan-ignore notIdentical.alwaysTrue (defensive check for safety)
-                ->filter(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField !== null)
-                ->first(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === CompanyField::DOMAINS->value);
+                ->first(fn (CustomFieldValue $cfv): bool => $cfv->customField->code === CompanyField::DOMAINS->value);
 
-            if ($domainValue !== null && is_array($domainValue->json_value)) {
-                foreach ($domainValue->json_value as $domain) {
-                    $domain = strtolower(trim((string) $domain));
-                    if ($domain !== '' && ! isset($this->companyCache['byDomain'][$domain])) {
-                        $this->companyCache['byDomain'][$domain] = [];
-                    }
-                    if ($domain !== '') {
-                        $this->companyCache['byDomain'][$domain][] = $company;
-                    }
+            if ($domainValue === null) {
+                continue;
+            }
+
+            // json_value is cast to Collection in the model
+            $domains = $domainValue->json_value ?? collect();
+
+            foreach ($domains as $domain) {
+                $domain = strtolower(trim((string) $domain));
+                if ($domain === '') {
+                    continue;
                 }
+                $this->companyCache['byDomain'][$domain] ??= [];
+                $this->companyCache['byDomain'][$domain][] = $company;
             }
         }
     }

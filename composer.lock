@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "17a11708e993b23b1b9fed19c46036c7",
+    "content-hash": "0830a34c24193067fdbbb71b9e7bacba",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -7003,7 +7003,7 @@
             "dist": {
                 "type": "path",
                 "url": "../custom-fields",
-                "reference": "5375b1c3db8a4cf82e5af2d1e1cbe61580137ce1"
+                "reference": "0f78062047e5b99699ebaa67f893b6e9d23e4443"
             },
             "require": {
                 "filament/filament": "^4.0",
@@ -7135,17 +7135,11 @@
         },
         {
             "name": "relaticle/flowforge",
-            "version": "v2.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/Relaticle/flowforge.git",
-                "reference": "fc39ac8656f63a40f7f543f31ba9a171f3486759"
-            },
+            "version": "2.x-dev",
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Relaticle/flowforge/zipball/fc39ac8656f63a40f7f543f31ba9a171f3486759",
-                "reference": "fc39ac8656f63a40f7f543f31ba9a171f3486759",
-                "shasum": ""
+                "type": "path",
+                "url": "../flowforge",
+                "reference": "81f547e5553c5215383c9531665530f1d102caba"
             },
             "require": {
                 "filament/filament": "^4.0",
@@ -7169,12 +7163,12 @@
             "type": "library",
             "extra": {
                 "laravel": {
-                    "aliases": {
-                        "Flowforge": "Relaticle\\Flowforge\\Facades\\Flowforge"
-                    },
                     "providers": [
                         "Relaticle\\Flowforge\\FlowforgeServiceProvider"
-                    ]
+                    ],
+                    "aliases": {
+                        "Flowforge": "Relaticle\\Flowforge\\Facades\\Flowforge"
+                    }
                 }
             },
             "autoload": {
@@ -7183,7 +7177,33 @@
                     "Relaticle\\Flowforge\\Database\\Factories\\": "database/factories/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "Relaticle\\Flowforge\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "post-autoload-dump": [
+                    "@php ./vendor/bin/testbench package:discover --ansi"
+                ],
+                "analyse": [
+                    "vendor/bin/phpstan analyse"
+                ],
+                "pest": [
+                    "vendor/bin/pest"
+                ],
+                "test-coverage": [
+                    "vendor/bin/pest --coverage"
+                ],
+                "pint": [
+                    "vendor/bin/pint"
+                ],
+                "test": [
+                    "@pint",
+                    "@analyse",
+                    "@pest"
+                ]
+            },
             "license": [
                 "MIT"
             ],
@@ -7205,13 +7225,9 @@
                 "issues": "https://github.com/relaticle/flowforge/issues",
                 "source": "https://github.com/relaticle/flowforge"
             },
-            "funding": [
-                {
-                    "url": "https://github.com/Relaticle",
-                    "type": "github"
-                }
-            ],
-            "time": "2025-12-13T20:39:16+00:00"
+            "transport-options": {
+                "relative": true
+            }
         },
         {
             "name": "ryangjchandler/blade-capture-directive",

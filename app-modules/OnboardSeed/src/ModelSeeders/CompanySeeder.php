@@ -17,7 +17,7 @@ final class CompanySeeder extends BaseModelSeeder
     protected string $entityType = 'companies';
 
     protected array $fieldCodes = [
-        CompanyCustomField::DOMAIN_NAME->value,
+        CompanyCustomField::DOMAINS->value,
         CompanyCustomField::ICP->value,
         CompanyCustomField::LINKEDIN->value,
     ];
