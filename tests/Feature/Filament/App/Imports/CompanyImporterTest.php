@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Imports;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -158,12 +159,12 @@ test('company importer includes failed rows in notification', function () {
 });
 
 describe('Domain-Based Duplicate Detection', function (): void {
-    function createDomainNameFieldForCompany(Team $team): CustomField
+    function createDomainsFieldForCompany(Team $team): CustomField
     {
         return CustomField::withoutGlobalScopes()->create([
-            'code' => 'domain_name',
-            'name' => 'Domain Name',
-            'type' => 'text',
+            'code' => CompanyField::DOMAINS->value,
+            'name' => CompanyField::DOMAINS->getDisplayName(),
+            'type' => 'link',
             'entity_type' => 'company',
             'tenant_id' => $team->id,
             'sort_order' => 1,
@@ -179,25 +180,26 @@ describe('Domain-Based Duplicate Detection', function (): void {
             'entity_id' => $company->id,
             'custom_field_id' => $field->id,
             'tenant_id' => $company->team_id,
-            'string_value' => $domain,
+            'json_value' => [$domain],
         ]);
     }
 
-    it('matches company by domain_name with UPDATE strategy', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+    it('matches company by domains with UPDATE strategy', function (): void {
+        $domainField = createDomainsFieldForCompany($this->team);
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
+        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
-            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['name' => 'name', $domainsKey => $domainsKey],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
         setCompanyImporterData($importer, [
             'name' => 'Different Name',
-            'custom_fields_domain_name' => 'acme.com',
+            $domainsKey => 'acme.com',
         ]);
 
         $record = $importer->resolveRecord();
@@ -207,7 +209,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
     });
 
     it('prioritizes domain match over name match', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+        $domainField = createDomainsFieldForCompany($this->team);
 
         // Company that matches by name only
         $nameMatchCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
@@ -216,16 +218,17 @@ describe('Domain-Based Duplicate Detection', function (): void {
         $domainMatchCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corporation']);
         setCompanyDomainValue($domainMatchCompany, 'acme.com', $domainField);
 
+        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
-            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['name' => 'name', $domainsKey => $domainsKey],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
         setCompanyImporterData($importer, [
             'name' => 'Acme Inc', // Matches first company by name
-            'custom_fields_domain_name' => 'acme.com', // Matches second company by domain
+            $domainsKey => 'acme.com', // Matches second company by domain
         ]);
 
         $record = $importer->resolveRecord();
@@ -235,7 +238,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
     });
 
     it('falls back to name match when no domain provided', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+        $domainField = createDomainsFieldForCompany($this->team);
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
@@ -258,20 +261,21 @@ describe('Domain-Based Duplicate Detection', function (): void {
     });
 
     it('creates new company when domain does not match', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+        $domainField = createDomainsFieldForCompany($this->team);
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Existing Inc']);
         setCompanyDomainValue($existingCompany, 'existing.com', $domainField);
 
+        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
-            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['name' => 'name', $domainsKey => $domainsKey],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
         setCompanyImporterData($importer, [
             'name' => 'New Company',
-            'custom_fields_domain_name' => 'newcompany.com', // Different domain
+            $domainsKey => 'newcompany.com', // Different domain
         ]);
 
         $record = $importer->resolveRecord();
@@ -280,20 +284,21 @@ describe('Domain-Based Duplicate Detection', function (): void {
     });
 
     it('normalizes domain to lowercase for matching', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+        $domainField = createDomainsFieldForCompany($this->team);
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
+        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
-            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['name' => 'name', $domainsKey => $domainsKey],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
         setCompanyImporterData($importer, [
             'name' => 'Acme Inc',
-            'custom_fields_domain_name' => 'ACME.COM', // Uppercase
+            $domainsKey => 'ACME.COM', // Uppercase
         ]);
 
         $record = $importer->resolveRecord();
@@ -302,20 +307,21 @@ describe('Domain-Based Duplicate Detection', function (): void {
     });
 
     it('respects CREATE_NEW strategy even with domain match', function (): void {
-        $domainField = createDomainNameFieldForCompany($this->team);
+        $domainField = createDomainsFieldForCompany($this->team);
         $existingCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
         setCompanyDomainValue($existingCompany, 'acme.com', $domainField);
 
+        $domainsKey = 'custom_fields_' . CompanyField::DOMAINS->value;
         $import = createCompanyTestImportRecord($this->user, $this->team);
         $importer = new CompanyImporter(
             $import,
-            ['name' => 'name', 'custom_fields_domain_name' => 'custom_fields_domain_name'],
+            ['name' => 'name', $domainsKey => $domainsKey],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
         setCompanyImporterData($importer, [
             'name' => 'Acme Inc',
-            'custom_fields_domain_name' => 'acme.com',
+            $domainsKey => 'acme.com',
         ]);
 
         $record = $importer->resolveRecord();

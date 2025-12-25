@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\Import;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -26,12 +27,12 @@ beforeEach(function () {
     Filament::setTenant($this->team);
     TenantContextService::setTenantId($this->team->id);
 
-    // Create the domain_name custom field for Company (without section - query uses withoutGlobalScopes)
+    // Create the domains custom field for Company (without section - query uses withoutGlobalScopes)
     // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
     CustomField::withoutGlobalScopes()->create([
-        'code' => 'domain_name',
-        'name' => 'Domain Name',
-        'type' => 'text',
+        'code' => CompanyField::DOMAINS->value,
+        'name' => CompanyField::DOMAINS->getDisplayName(),
+        'type' => 'link',
         'entity_type' => 'company',
         'tenant_id' => $this->team->id,
         'sort_order' => 1,
@@ -41,12 +42,12 @@ beforeEach(function () {
 
     $this->matcher = app(CompanyMatcher::class);
 
-    // Helper to set domain_name custom field value directly
+    // Helper to set domains custom field value directly (stored as json_value array)
     // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
     $this->setCompanyDomain = function (Company $company, string $domain, ?Team $team = null): void {
         $team = $team ?? $this->team;
         $field = CustomField::withoutGlobalScopes()
-            ->where('code', 'domain_name')
+            ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $team->id)
             ->first();
@@ -56,7 +57,7 @@ beforeEach(function () {
             'entity_id' => $company->id,
             'custom_field_id' => $field->id,
             'tenant_id' => $team->id,
-            'string_value' => $domain,
+            'json_value' => [$domain],
         ]);
     };
 });
@@ -140,12 +141,12 @@ test('does not match companies from other teams', function () {
     // Create company in other team
     $otherCompany = Company::factory()->for($otherTeam, 'team')->create(['name' => 'Acme Inc']);
 
-    // Create domain_name field for the other team (without section - query uses withoutGlobalScopes)
+    // Create domains field for the other team (without section - query uses withoutGlobalScopes)
     // Uses 'company' morph alias (not Company::class) to match Laravel's morph map
     CustomField::withoutGlobalScopes()->create([
-        'code' => 'domain_name',
-        'name' => 'Domain Name',
-        'type' => 'text',
+        'code' => CompanyField::DOMAINS->value,
+        'name' => CompanyField::DOMAINS->getDisplayName(),
+        'type' => 'link',
         'entity_type' => 'company',
         'tenant_id' => $otherTeam->id,
         'sort_order' => 1,
@@ -164,7 +165,7 @@ test('does not match companies from other teams', function () {
 });
 
 test('handles personal emails by falling back to name match', function () {
-    // Gmail domain won't match any company (no company has domain_name=gmail.com)
+    // Gmail domain won't match any company (no company has domains containing gmail.com)
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
 
     $result = $this->matcher->match('Acme Inc', ['john@gmail.com'], $this->team->id);

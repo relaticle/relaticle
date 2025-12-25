@@ -159,6 +159,9 @@ return new class extends Migration
         // A8: Migrate email field data format (string_value → json_value)
         $this->phaseA8_migrateEmailFieldValues();
 
+        // A9: Migrate domain field data format (string_value → json_value)
+        $this->phaseA9_migrateDomainFieldValues();
+
         // =====================================================================
         // PHASE B: Cutover - drop old columns, rename ULID columns
         // =====================================================================
@@ -430,6 +433,68 @@ return new class extends Migration
                     ->where('id', $value->id)
                     ->update([
                         'json_value' => json_encode([$value->string_value]),
+                        'string_value' => null,
+                    ]);
+            }
+        }
+    }
+
+    /**
+     * A9: Migrate domain field values from string_value to json_value format.
+     *
+     * Domains field (company) was changed from STRING data type (string_value) to
+     * array format (json_value) to support multiple domains.
+     *
+     * IDEMPOTENT: Only migrates values with non-empty string_value and empty json_value.
+     */
+    private function phaseA9_migrateDomainFieldValues(): void
+    {
+        $fieldTable = 'custom_fields';
+        $valueTable = 'custom_field_values';
+
+        // Find all domains custom fields (code 'domains' or legacy 'domain_name')
+        $domainFieldIds = DB::table($fieldTable)
+            ->where('entity_type', 'company')
+            ->where(function ($query): void {
+                $query->where('code', 'domains')
+                    ->orWhere('code', 'domain_name');
+            })
+            ->pluck('id');
+
+        if ($domainFieldIds->isEmpty()) {
+            return; // No domain fields
+        }
+
+        // Find values needing migration: has string_value, empty/null json_value
+        $valuesToMigrate = DB::table($valueTable)
+            ->whereIn('custom_field_id', $domainFieldIds)
+            ->whereNotNull('string_value')
+            ->where('string_value', '!=', '')
+            ->where(function ($query): void {
+                $query->whereNull('json_value')
+                    ->orWhere('json_value', '=', '[]')
+                    ->orWhere('json_value', '=', 'null');
+            })
+            ->select(['id', 'string_value'])
+            ->get();
+
+        if ($valuesToMigrate->isEmpty()) {
+            return; // Already migrated
+        }
+
+        // Migrate in chunks to avoid memory issues
+        foreach ($valuesToMigrate->chunk(100) as $chunk) {
+            foreach ($chunk as $value) {
+                // Handle comma-separated domains
+                $domains = array_filter(
+                    array_map('trim', explode(',', $value->string_value)),
+                    fn ($d) => $d !== ''
+                );
+
+                DB::table($valueTable)
+                    ->where('id', $value->id)
+                    ->update([
+                        'json_value' => json_encode(array_values($domains)),
                         'string_value' => null,
                     ]);
             }

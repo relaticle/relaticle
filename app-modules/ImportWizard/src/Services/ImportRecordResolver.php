@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
+use App\Enums\CustomFields\CompanyField;
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -99,7 +101,7 @@ final class ImportRecordResolver
     }
 
     /**
-     * Resolve a Company record by domain_name custom field.
+     * Resolve a Company record by domains custom field.
      */
     public function resolveCompanyByDomain(string $domain, string $teamId): ?Company
     {
@@ -130,7 +132,7 @@ final class ImportRecordResolver
         // Query 1: Get emails custom field ID
         // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
         $emailsField = CustomField::withoutGlobalScopes()
-            ->where('code', 'emails')
+            ->where('code', PeopleField::EMAILS->value)
             ->where('entity_type', 'people')
             ->where('tenant_id', $teamId)
             ->first();
@@ -169,14 +171,14 @@ final class ImportRecordResolver
     }
 
     /**
-     * Load all companies for a team with domain_name custom field values.
+     * Load all companies for a team with domains custom field values.
      */
     private function loadCompanies(string $teamId): void
     {
-        // Query 1: Get domain_name custom field ID
+        // Query 1: Get domains custom field ID
         // Uses 'company' morph alias (from Relation::enforceMorphMap) instead of Company::class
         $domainField = CustomField::withoutGlobalScopes()
-            ->where('code', 'domain_name')
+            ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $teamId)
             ->first();
@@ -205,11 +207,12 @@ final class ImportRecordResolver
                 $this->cache['companies']['byName'][$name] = $company;
             }
 
-            // Index by domain_name custom field (if field exists)
+            // Index by domains custom field (if field exists) - stored as json_value array
             if ($domainField) {
                 $domainValue = $company->customFieldValues->first();
-                if ($domainValue?->string_value) {
-                    $domain = strtolower(trim((string) $domainValue->string_value));
+                $domains = $domainValue?->json_value ?? [];
+                foreach ($domains as $domain) {
+                    $domain = strtolower(trim((string) $domain));
                     // First match wins (for consistent behavior)
                     if ($domain !== '' && ! isset($this->cache['companies']['byDomain'][$domain])) {
                         $this->cache['companies']['byDomain'][$domain] = $company;

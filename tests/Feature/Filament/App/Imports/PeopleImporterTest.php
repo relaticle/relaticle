@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -267,12 +268,12 @@ describe('Email-Based Duplicate Detection', function (): void {
 });
 
 describe('Email Domain → Company Auto-Linking', function (): void {
-    function createDomainNameField(Team $team): CustomField
+    function createDomainsField(Team $team): CustomField
     {
         return CustomField::withoutGlobalScopes()->create([
-            'code' => 'domain_name',
-            'name' => 'Domain Name',
-            'type' => 'text',
+            'code' => CompanyField::DOMAINS->value,
+            'name' => CompanyField::DOMAINS->getDisplayName(),
+            'type' => 'link',
             'entity_type' => 'company',
             'tenant_id' => $team->id,
             'sort_order' => 1,
@@ -284,7 +285,7 @@ describe('Email Domain → Company Auto-Linking', function (): void {
     function setCompanyDomain(Company $company, string $domain): void
     {
         $field = CustomField::withoutGlobalScopes()
-            ->where('code', 'domain_name')
+            ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $company->team_id)
             ->first();
@@ -294,12 +295,12 @@ describe('Email Domain → Company Auto-Linking', function (): void {
             'entity_id' => $company->id,
             'custom_field_id' => $field->id,
             'tenant_id' => $company->team_id,
-            'string_value' => $domain,
+            'json_value' => [$domain],
         ]);
     }
 
     it('auto-links person to company by email domain when company_name is empty', function (): void {
-        createDomainNameField($this->team);
+        createDomainsField($this->team);
         setCompanyDomain($this->company, 'acme.com');
 
         $import = createPeopleTestImportRecord($this->user, $this->team);
@@ -325,7 +326,7 @@ describe('Email Domain → Company Auto-Linking', function (): void {
     });
 
     it('prefers explicit company_name over domain match', function (): void {
-        createDomainNameField($this->team);
+        createDomainsField($this->team);
         setCompanyDomain($this->company, 'acme.com');
 
         // Create another company
@@ -378,7 +379,7 @@ describe('Email Domain → Company Auto-Linking', function (): void {
     });
 
     it('leaves company_id null when no company_name and no domain match', function (): void {
-        createDomainNameField($this->team);
+        createDomainsField($this->team);
         // Company has domain 'acme.com', but we'll use a different email domain
 
         $import = createPeopleTestImportRecord($this->user, $this->team);
@@ -403,7 +404,7 @@ describe('Email Domain → Company Auto-Linking', function (): void {
     });
 
     it('handles ambiguous domain match by leaving company unlinked', function (): void {
-        createDomainNameField($this->team);
+        createDomainsField($this->team);
         setCompanyDomain($this->company, 'shared.com');
 
         // Create another company with the same domain

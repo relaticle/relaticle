@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Models\CustomField;
 use Filament\Actions\Imports\ImportColumn;
@@ -69,7 +70,8 @@ final class CompanyImporter extends BaseImporter
 
         // Step 1: Try domain-based duplicate detection (highest confidence for uniqueness)
         // Domain field is array type but imported as string or comma-separated
-        $domainValue = $this->data['custom_fields_domain_name'] ?? null;
+        $domainsFieldKey = 'custom_fields_' . CompanyField::DOMAINS->value;
+        $domainValue = $this->data[$domainsFieldKey] ?? null;
         $domain = $this->extractFirstDomain($domainValue);
 
         if ($domain !== null) {
@@ -106,7 +108,7 @@ final class CompanyImporter extends BaseImporter
     }
 
     /**
-     * Find company by domain_name custom field.
+     * Find company by domains custom field.
      */
     private function findByDomain(string $domain): ?Company
     {
@@ -123,7 +125,7 @@ final class CompanyImporter extends BaseImporter
         // Slow path: Query database (actual import execution)
         // Uses 'company' morph alias (from Relation::enforceMorphMap) instead of Company::class
         $domainField = CustomField::withoutGlobalScopes()
-            ->where('code', 'domain_name')
+            ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $this->import->team_id)
             ->first();
@@ -132,13 +134,14 @@ final class CompanyImporter extends BaseImporter
             return null;
         }
 
+        // Search in json_value array for matching domain
         return Company::query()
             ->where('team_id', $this->import->team_id)
             ->whereHas('customFieldValues', function (Builder $query) use ($domainField, $domain): void {
                 $query->withoutGlobalScopes()
                     ->where('custom_field_id', $domainField->id)
                     ->where('tenant_id', $this->import->team_id)
-                    ->whereRaw('LOWER(string_value) = ?', [$domain]);
+                    ->whereJsonContains('json_value', $domain);
             })
             ->first();
     }

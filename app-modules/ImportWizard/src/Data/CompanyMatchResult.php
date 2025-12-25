@@ -10,7 +10,7 @@ use Spatie\LaravelData\Data;
  * Result of company matching during import preview.
  *
  * Match types:
- * - 'domain': Matched via email domain → company domain_name custom field
+ * - 'domain': Matched via email domain → company domains custom field
  * - 'name': Matched via exact company name
  * - 'ambiguous': Multiple companies matched (by domain or name)
  * - 'new': No match found, will create new company

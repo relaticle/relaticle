@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Exception;
@@ -37,11 +38,14 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
         try {
             $customFieldDomain = $this->company->customFields()
                 ->whereBelongsTo($this->company->team)
-                ->where('code', 'domain_name')
+                ->where('code', CompanyField::DOMAINS->value)
                 ->first();
-            $domainName = $this->company->getCustomFieldValue($customFieldDomain);
+            $domains = $this->company->getCustomFieldValue($customFieldDomain);
 
-            if ($domainName === null) {
+            // Domains is now an array - use the first domain for favicon
+            $domainName = is_array($domains) ? ($domains[0] ?? null) : $domains;
+
+            if ($domainName === null || $domainName === '') {
                 return;
             }
 

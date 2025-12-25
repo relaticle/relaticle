@@ -42,25 +42,25 @@ final class ViewCompany extends ViewRecord
     }
 
     /**
-     * Dispatch favicon fetch job if domain_name custom field has changed.
+     * Dispatch favicon fetch job if domains custom field has changed.
      *
      * @param  array<string, mixed>  $data
      */
     private function dispatchFaviconFetchIfNeeded(Company $company, array $data): void
     {
         $customFieldsData = $data['custom_fields'] ?? [];
-        $newDomain = $customFieldsData['domain_name'] ?? null;
+        $newDomains = $customFieldsData[CompanyField::DOMAINS->value] ?? null;
 
         // Get the old domain value from the database
         $domainField = $company->customFields()
             ->whereBelongsTo($company->team)
-            ->where('code', CompanyField::DOMAIN_NAME->value)
+            ->where('code', CompanyField::DOMAINS->value)
             ->first();
 
-        $oldDomain = $domainField !== null ? $company->getCustomFieldValue($domainField) : null;
+        $oldDomains = $domainField !== null ? $company->getCustomFieldValue($domainField) : null;
 
-        // Only dispatch if domain changed and new value is not empty
-        if (! in_array($newDomain, [$oldDomain, null, '', '0'], true)) {
+        // Only dispatch if domains changed and new value is not empty
+        if ($newDomains !== $oldDomains && ! empty($newDomains)) {
             FetchFaviconForCompany::dispatch($company)->afterCommit();
         }
     }
