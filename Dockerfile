@@ -51,7 +51,7 @@ LABEL org.opencontainers.image.source="https://github.com/Relaticle/relaticle"
 USER root
 
 # Install required PHP extensions
-RUN install-php-extensions intl
+RUN install-php-extensions intl exif gd imagick bcmath
 
 # Install PostgreSQL client for health checks
 RUN apt-get update \
