@@ -59,6 +59,7 @@ final class TasksBoard extends BoardPage
                         $join->on('tasks.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $statusField->getKey());
                     })
+                    ->with(['assignees'])
                     ->select('tasks.*', 'cfv.'.$valueColumn)
             )
             ->recordTitleAttribute('title')
@@ -67,63 +68,36 @@ final class TasksBoard extends BoardPage
             ->searchable(['title'])
             ->columns($this->getColumns())
             ->cardSchema(function (Schema $schema): Schema {
-                $descriptionCustomField = CustomFields::infolist()
+                // Fetch all card fields in a single query to reduce database calls
+                $fields = CustomFields::infolist()
                     ->forSchema($schema)
-                    ->only(['description'])
+                    ->only(['description', 'priority', 'due_date'])
                     ->hiddenLabels()
                     ->visibleWhenFilled()
                     ->withoutSections()
                     ->values()
-                    ->first()
+                    ->keyBy(fn ($field) => $field->getName());
+
+                $descriptionCustomField = $fields->get('custom_fields.description')
                     ?->columnSpanFull()
                     ->visible(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
 
-                $priorityField = CustomFields::infolist()
-                    ->forSchema($schema)
-                    ->only(['priority'])
-                    ->hiddenLabels()
-                    ->visibleWhenFilled()
-                    ->withoutSections()
-                    ->values()
-                    ->first()
+                $priorityField = $fields->get('custom_fields.priority')
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->grow(false)
                     ->badge()
                     ->hiddenLabel()
                     ->icon('heroicon-o-flag');
 
-                $dueDateField = CustomFields::infolist()
-                    ->forSchema($schema)
-                    ->only(['due_date'])
-                    ->hiddenLabels()
-                    ->visibleWhenFilled()
-                    ->withoutSections()
-                    ->values()
-                    ->first()
+                $dueDateField = $fields->get('custom_fields.due_date')
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->badge()
                     ->color('gray')
                     ->icon('heroicon-o-calendar')
                     ->grow(false)
                     ->hiddenLabel()
-                    ->formatStateUsing(function ($state): string {
-                        if (! $state) {
-                            return '';
-                        }
-                        $date = Carbon::parse($state);
-                        if ($date->isPast()) {
-                            return $date->format('M j').' (Overdue)';
-                        }
-                        if ($date->isToday()) {
-                            return 'Due Today';
-                        }
-                        if ($date->isTomorrow()) {
-                            return 'Due Tomorrow';
-                        }
-
-                        return $date->format('M j, Y');
-                    });
+                    ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
 
                 return $schema
                     ->inline()
@@ -256,6 +230,28 @@ final class TasksBoard extends BoardPage
             ->color($status['color'])
             ->label($status['name'])
         )->toArray();
+    }
+
+    /**
+     * Format a due date value for badge display.
+     *
+     * Shows relative dates (Today/Tomorrow) for immediate items,
+     * and full dates with year for all other cases.
+     */
+    private function formatDueDateBadge(?string $state): string
+    {
+        if (blank($state)) {
+            return '';
+        }
+
+        $date = Carbon::parse($state);
+
+        return match (true) {
+            $date->isPast() => $date->format('M j, Y').' (Overdue)',
+            $date->isToday() => 'Due Today',
+            $date->isTomorrow() => 'Due Tomorrow',
+            default => $date->format('M j, Y'),
+        };
     }
 
     private function statusCustomField(): ?CustomField
