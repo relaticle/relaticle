@@ -7135,13 +7135,14 @@
         },
         {
             "name": "relaticle/flowforge",
-            "version": "2.x-dev",
+            "version": "3.x-dev",
             "dist": {
                 "type": "path",
                 "url": "../flowforge",
-                "reference": "81f547e5553c5215383c9531665530f1d102caba"
+                "reference": "302f6375bf0d44c219be410b001bf9d022a80662"
             },
             "require": {
+                "ext-bcmath": "*",
                 "filament/filament": "^4.0",
                 "php": "^8.3",
                 "spatie/laravel-package-tools": "^1.15.0"
@@ -7150,7 +7151,7 @@
                 "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.0",
                 "nunomaduro/collision": "^8.0",
-                "orchestra/testbench": "^9.0",
+                "orchestra/testbench": "^10.0",
                 "pestphp/pest": "^4.0",
                 "pestphp/pest-plugin-arch": "^4.0",
                 "pestphp/pest-plugin-laravel": "^4.0",
@@ -16595,6 +16596,6 @@
     "platform": {
         "php": "^8.4"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }

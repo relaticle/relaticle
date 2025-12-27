@@ -143,7 +143,10 @@ final class TasksBoard extends BoardPage
     }
 
     /**
-     * Move card to new position using Rank-based positioning.
+     * Move card to new position using DecimalPosition service.
+     *
+     * Overrides the default Flowforge implementation to properly handle
+     * custom field columns which are stored in a polymorphic table.
      *
      * @throws Throwable
      */
@@ -166,7 +169,7 @@ final class TasksBoard extends BoardPage
             throw new InvalidArgumentException("Card not found: {$cardId}");
         }
 
-        // Calculate new position using Rank service
+        // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
         // Use transaction for data consistency
