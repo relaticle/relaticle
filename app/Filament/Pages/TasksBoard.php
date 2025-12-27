@@ -52,6 +52,15 @@ final class TasksBoard extends BoardPage
         $statusField = $this->statusCustomField();
         $valueColumn = $statusField->getValueColumn();
 
+        $customFields = CustomFields::infolist()
+            ->forModel(Task::class)
+            ->only(['description', 'priority', 'due_date'])
+            ->hiddenLabels()
+            ->visibleWhenFilled()
+            ->withoutSections()
+            ->values()
+            ->keyBy(fn ($field) => $field->getName());
+
         return $board
             ->query(
                 Task::query()
@@ -67,30 +76,22 @@ final class TasksBoard extends BoardPage
             ->positionIdentifier('order_column')
             ->searchable(['title'])
             ->columns($this->getColumns())
-            ->cardSchema(function (Schema $schema): Schema {
+            ->cardSchema(function (Schema $schema) use ($customFields): Schema {
                 // Fetch all card fields in a single query to reduce database calls
-                $fields = CustomFields::infolist()
-                    ->forSchema($schema)
-                    ->only(['description', 'priority', 'due_date'])
-                    ->hiddenLabels()
-                    ->visibleWhenFilled()
-                    ->withoutSections()
-                    ->values()
-                    ->keyBy(fn ($field) => $field->getName());
 
-                $descriptionCustomField = $fields->get('custom_fields.description')
+                $descriptionCustomField = $customFields->get('custom_fields.description')
                     ?->columnSpanFull()
                     ->visible(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
 
-                $priorityField = $fields->get('custom_fields.priority')
+                $priorityField = $customFields->get('custom_fields.priority')
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->grow(false)
                     ->badge()
                     ->hiddenLabel()
                     ->icon('heroicon-o-flag');
 
-                $dueDateField = $fields->get('custom_fields.due_date')
+                $dueDateField = $customFields->get('custom_fields.due_date')
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->badge()
                     ->color('gray')
