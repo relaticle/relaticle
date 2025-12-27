@@ -44,6 +44,8 @@ final class TasksBoard extends BoardPage
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
+    protected ?CustomField $cachedStatusField = null;
+
     /**
      * Configure the board using the new Filament V4 architecture.
      */
@@ -77,8 +79,6 @@ final class TasksBoard extends BoardPage
             ->searchable(['title'])
             ->columns($this->getColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
-                // Fetch all card fields in a single query to reduce database calls
-
                 $descriptionCustomField = $customFields->get('custom_fields.description')
                     ?->columnSpanFull()
                     ->visible(fn (?string $state): bool => filled($state))
@@ -147,7 +147,9 @@ final class TasksBoard extends BoardPage
                     ->modalWidth(Width::ThreeExtraLarge)
                     ->icon('heroicon-o-pencil-square')
                     ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-                    ->fillForm(fn (Task $record): array => $record->toArray())
+                    ->fillForm(fn (Task $record): array => [
+                        'title' => $record->title,
+                    ])
                     ->action(function (Task $record, array $data): void {
                         $record->update($data);
                     }),
@@ -191,7 +193,7 @@ final class TasksBoard extends BoardPage
         }
 
         /** @var Task|null $card */
-        $card = (clone $query)->find($cardId);
+        $card = (clone $query)->with(['assignees'])->find($cardId);
         if (! $card) {
             throw new InvalidArgumentException("Card not found: {$cardId}");
         }
@@ -257,11 +259,17 @@ final class TasksBoard extends BoardPage
 
     private function statusCustomField(): ?CustomField
     {
+        if ($this->cachedStatusField !== null) {
+            return $this->cachedStatusField;
+        }
+
         /** @var CustomField|null */
-        return CustomField::query()
+        $this->cachedStatusField = CustomField::query()
             ->forEntity(Task::class)
             ->where('code', TaskCustomField::STATUS)
             ->first();
+
+        return $this->cachedStatusField;
     }
 
     /**
