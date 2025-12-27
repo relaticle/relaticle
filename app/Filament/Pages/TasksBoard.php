@@ -11,6 +11,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\Team;
 use BackedEnum;
+use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -74,21 +75,71 @@ final class TasksBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(filled(...))
+                    ->visible(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
 
-                return $schema->components([
-                    CardFlex::make([
+                $priorityField = CustomFields::infolist()
+                    ->forSchema($schema)
+                    ->only(['priority'])
+                    ->hiddenLabels()
+                    ->visibleWhenFilled()
+                    ->withoutSections()
+                    ->values()
+                    ->first()
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->grow(false)
+                    ->badge()
+                    ->hiddenLabel()
+                    ->icon('heroicon-o-flag');
+
+                $dueDateField = CustomFields::infolist()
+                    ->forSchema($schema)
+                    ->only(['due_date'])
+                    ->hiddenLabels()
+                    ->visibleWhenFilled()
+                    ->withoutSections()
+                    ->values()
+                    ->first()
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->badge()
+                    ->color('gray')
+                    ->icon('heroicon-o-calendar')
+                    ->grow(false)
+                    ->hiddenLabel()
+                    ->formatStateUsing(function ($state): string {
+                        if (! $state) {
+                            return '';
+                        }
+                        $date = Carbon::parse($state);
+                        if ($date->isPast()) {
+                            return $date->format('M j').' (Overdue)';
+                        }
+                        if ($date->isToday()) {
+                            return 'Due Today';
+                        }
+                        if ($date->isTomorrow()) {
+                            return 'Due Tomorrow';
+                        }
+
+                        return $date->format('M j, Y');
+                    });
+
+                return $schema
+                    ->inline()
+                    ->components([
                         $descriptionCustomField,
-                    ]),
-                    ImageEntry::make('assignees.profile_photo_url')
-                        ->hiddenLabel()
-                        ->alignLeft()
-                        ->imageHeight(24)
-                        ->circular()
-                        ->visible(filled(...))
-                        ->stacked(),
-                ]);
+                        CardFlex::make([
+                            $priorityField,
+                            $dueDateField,
+                            ImageEntry::make('assignees.profile_photo_url')
+                                ->hiddenLabel()
+                                ->alignLeft()
+                                ->imageHeight(24)
+                                ->circular()
+                                ->visible(fn (?string $state): bool => filled($state))
+                                ->stacked(),
+                        ])->align('center'),
+                    ]);
             })
             ->columnActions([
                 CreateAction::make()

@@ -74,11 +74,8 @@ final class OpportunitiesBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(filled(...))
+                    ->visible(fn (string|null $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString()),
-                CardFlex::make([
-
-                ]),
             ]))
             ->columnActions([
                 CreateAction::make()
