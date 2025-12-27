@@ -46,6 +46,7 @@ return new class extends Migration
     private function regenerateTaskPositions(): void
     {
         // Get all tasks with their status information, grouped by team and status
+        // CRITICAL: Preserve existing order_column (user's manual arrangement) when regenerating positions
         $tasks = DB::select("
             SELECT
                 t.id,
@@ -61,7 +62,7 @@ return new class extends Migration
                     LIMIT 1
                 )
             )
-            ORDER BY t.team_id, status_id, t.created_at, t.id
+            ORDER BY t.team_id, status_id, t.order_column IS NULL, t.order_column, t.id
         ");
 
         // Group tasks by team and status
@@ -83,6 +84,7 @@ return new class extends Migration
     private function regenerateOpportunityPositions(): void
     {
         // Get all opportunities with their stage information, grouped by team and stage
+        // CRITICAL: Preserve existing order_column (user's manual arrangement) when regenerating positions
         $opportunities = DB::select("
             SELECT
                 o.id,
@@ -98,7 +100,7 @@ return new class extends Migration
                     LIMIT 1
                 )
             )
-            ORDER BY o.team_id, stage_id, o.created_at, o.id
+            ORDER BY o.team_id, stage_id, o.order_column IS NULL, o.order_column, o.id
         ");
 
         // Group opportunities by team and stage
@@ -117,7 +119,7 @@ return new class extends Migration
     /**
      * Set positions for a group of records using DecimalPosition.
      *
-     * @param  array  $records  Array of records with id property
+     * @param  array<int, object{id: string, team_id: string}>  $records  Array of records with id property
      * @param  string  $table  Table name ('tasks' or 'opportunities')
      */
     private function setPositionsForGroup(array $records, string $table): void
