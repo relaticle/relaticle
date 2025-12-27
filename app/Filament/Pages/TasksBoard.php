@@ -44,8 +44,6 @@ final class TasksBoard extends BoardPage
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
-    private ?CustomField $cachedStatusField = null;
-
     /**
      * Configure the board using the new Filament V4 architecture.
      */
@@ -259,17 +257,10 @@ final class TasksBoard extends BoardPage
 
     private function statusCustomField(): ?CustomField
     {
-        if ($this->cachedStatusField instanceof \App\Models\CustomField) {
-            return $this->cachedStatusField;
-        }
-
-        /** @var CustomField|null */
-        $this->cachedStatusField = CustomField::query()
+        return once(fn () => CustomField::query()
             ->forEntity(Task::class)
             ->where('code', TaskCustomField::STATUS)
-            ->first();
-
-        return $this->cachedStatusField;
+            ->first());
     }
 
     /**
