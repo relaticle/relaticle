@@ -257,6 +257,7 @@ final class TasksBoard extends BoardPage
 
     private function statusCustomField(): ?CustomField
     {
+        /** @var CustomField|null */
         return once(fn () => CustomField::query()
             ->forEntity(Task::class)
             ->where('code', TaskCustomField::STATUS)
