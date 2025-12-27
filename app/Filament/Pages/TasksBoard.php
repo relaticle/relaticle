@@ -19,6 +19,7 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ final class TasksBoard extends BoardPage
         return $board
             ->query(
                 Task::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join) use ($statusField): void {
+                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($statusField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $statusField->getKey());
                     })
