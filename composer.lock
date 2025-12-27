@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0830a34c24193067fdbbb71b9e7bacba",
+    "content-hash": "e0b0a333a58e4289e7a5236f73887998",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6999,11 +6999,17 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "2.x-dev",
-            "dist": {
-                "type": "path",
-                "url": "../custom-fields",
+            "version": "3.0.0-beta1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Relaticle/custom-fields.git",
                 "reference": "0f78062047e5b99699ebaa67f893b6e9d23e4443"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Relaticle/custom-fields/zipball/0f78062047e5b99699ebaa67f893b6e9d23e4443",
+                "reference": "0f78062047e5b99699ebaa67f893b6e9d23e4443",
+                "shasum": ""
             },
             "require": {
                 "filament/filament": "^4.0",
@@ -7034,12 +7040,12 @@
             "type": "library",
             "extra": {
                 "laravel": {
-                    "providers": [
-                        "Relaticle\\CustomFields\\CustomFieldsServiceProvider"
-                    ],
                     "aliases": {
                         "CustomFields": "Relaticle\\CustomFields\\Facades\\CustomFields"
-                    }
+                    },
+                    "providers": [
+                        "Relaticle\\CustomFields\\CustomFieldsServiceProvider"
+                    ]
                 }
             },
             "autoload": {
@@ -7048,48 +7054,7 @@
                     "Relaticle\\CustomFields\\Database\\Factories\\": "database/factories/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Relaticle\\CustomFields\\Tests\\": "tests/",
-                    "Relaticle\\CustomFields\\Tests\\Database\\Factories\\": "tests/database/factories/"
-                }
-            },
-            "scripts": {
-                "post-autoload-dump": [
-                    "@php ./vendor/bin/testbench package:discover --ansi"
-                ],
-                "lint": [
-                    "rector && pint --parallel"
-                ],
-                "test:lint": [
-                    "pint --test"
-                ],
-                "test:refactor": [
-                    "rector --dry-run"
-                ],
-                "test:types": [
-                    "phpstan analyse"
-                ],
-                "test:arch": [
-                    "pest --filter=arch"
-                ],
-                "test:type-coverage": [
-                    "pest --type-coverage --min=100.0"
-                ],
-                "test:pest": [
-                    "pest --parallel"
-                ],
-                "test": [
-                    "@test:lint",
-                    "@test:refactor",
-                    "@test:types",
-                    "@test:type-coverage",
-                    "@test:pest"
-                ],
-                "test-coverage": [
-                    "vendor/bin/pest --coverage"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "AGPL-3.0"
             ],
@@ -7103,6 +7068,8 @@
             "description": "User Defined Custom Fields for Laravel Filament",
             "homepage": "https://github.com/relaticle/custom-fields",
             "keywords": [
+                "Forms",
+                "Relaticle",
                 "admin-panel",
                 "conditional-fields",
                 "csv-export",
@@ -7116,30 +7083,32 @@
                 "filamentphp",
                 "form-builder",
                 "form-fields",
-                "forms",
                 "laravel",
                 "laravel-package",
                 "manukminasyan",
                 "multi-tenancy",
                 "no-migration",
-                "relaticle",
                 "validation"
             ],
             "support": {
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "transport-options": {
-                "relative": true
-            }
+            "time": "2025-12-25T16:33:40+00:00"
         },
         {
             "name": "relaticle/flowforge",
-            "version": "3.x-dev",
+            "version": "v3.0.0-beta2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Relaticle/flowforge.git",
+                "reference": "8a69d5fada17c2987600dcbb5aa4436182cd4790"
+            },
             "dist": {
-                "type": "path",
-                "url": "../flowforge",
-                "reference": "0a41a9b388d8d0366b5ee29b993a0946fee61f54"
+                "type": "zip",
+                "url": "https://api.github.com/repos/Relaticle/flowforge/zipball/8a69d5fada17c2987600dcbb5aa4436182cd4790",
+                "reference": "8a69d5fada17c2987600dcbb5aa4436182cd4790",
+                "shasum": ""
             },
             "require": {
                 "ext-bcmath": "*",
@@ -7164,12 +7133,12 @@
             "type": "library",
             "extra": {
                 "laravel": {
-                    "providers": [
-                        "Relaticle\\Flowforge\\FlowforgeServiceProvider"
-                    ],
                     "aliases": {
                         "Flowforge": "Relaticle\\Flowforge\\Facades\\Flowforge"
-                    }
+                    },
+                    "providers": [
+                        "Relaticle\\Flowforge\\FlowforgeServiceProvider"
+                    ]
                 }
             },
             "autoload": {
@@ -7178,33 +7147,7 @@
                     "Relaticle\\Flowforge\\Database\\Factories\\": "database/factories/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Relaticle\\Flowforge\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "post-autoload-dump": [
-                    "@php ./vendor/bin/testbench package:discover --ansi"
-                ],
-                "analyse": [
-                    "vendor/bin/phpstan analyse"
-                ],
-                "pest": [
-                    "vendor/bin/pest"
-                ],
-                "test-coverage": [
-                    "vendor/bin/pest --coverage"
-                ],
-                "pint": [
-                    "vendor/bin/pint"
-                ],
-                "test": [
-                    "@pint",
-                    "@analyse",
-                    "@pest"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -7226,9 +7169,13 @@
                 "issues": "https://github.com/relaticle/flowforge/issues",
                 "source": "https://github.com/relaticle/flowforge"
             },
-            "transport-options": {
-                "relative": true
-            }
+            "funding": [
+                {
+                    "url": "https://github.com/Relaticle",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-12-27T22:21:24+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",
@@ -16588,8 +16535,8 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "relaticle/custom-fields": 20,
-        "relaticle/flowforge": 20
+        "relaticle/custom-fields": 10,
+        "relaticle/flowforge": 10
     },
     "prefer-stable": true,
     "prefer-lowest": false,
