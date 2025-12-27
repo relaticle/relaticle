@@ -94,7 +94,7 @@ final class OpportunitiesBoard extends BoardPage
 
                         $stageField = $this->stageCustomField();
                         $opportunity->saveCustomFieldValue($stageField, $arguments['column']);
-                        $opportunity->order_column = $this->getBoardPositionInColumn((string) $arguments['column']);
+                        $opportunity->order_column = (float) $this->getBoardPositionInColumn((string) $arguments['column']);
 
                         return $opportunity;
                     }),
