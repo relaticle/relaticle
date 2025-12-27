@@ -25,7 +25,6 @@ use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
-use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
 use UnitEnum;
 
@@ -74,7 +73,7 @@ final class OpportunitiesBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(fn (string|null $state): bool => filled($state))
+                    ->visible(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString()),
             ]))
             ->columnActions([
