@@ -36,12 +36,40 @@ final class OpportunityImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
+            ImportColumn::make('company_id')
+                ->label('Company Record ID')
+                ->guess(['company_id', 'company_record_id'])
+                ->rules(['nullable', 'string', 'ulid'])
+                ->example('01HQWX...')
+                ->fillRecordUsing(function (Opportunity $record, ?string $state, OpportunityImporter $importer): void {
+                    if (blank($state) || ! $importer->import->team_id) {
+                        return;
+                    }
+
+                    $companyId = trim($state);
+
+                    // Verify company exists in current team
+                    $company = Company::query()
+                        ->where('id', $companyId)
+                        ->where('team_id', $importer->import->team_id)
+                        ->first();
+
+                    if ($company) {
+                        $record->company_id = $company->getKey();
+                    }
+                }),
+
             ImportColumn::make('company_name')
                 ->label('Company Name')
                 ->guess(['company_name', 'company', 'account'])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
+                    // Skip if company already set by company_id column
+                    if ($record->company_id) {
+                        return;
+                    }
+
                     if (blank($state)) {
                         $record->company_id = null;
 
