@@ -15,9 +15,9 @@ final class TaskImporter extends BaseImporter
 
     protected static ?string $model = Task::class;
 
-    protected static array $uniqueIdentifierColumns = ['id', 'title'];
+    protected static array $uniqueIdentifierColumns = ['id'];
 
-    protected static string $missingUniqueIdentifiersMessage = 'For Tasks, map a Title or Record ID column';
+    protected static string $missingUniqueIdentifiersMessage = 'For Tasks, map a Record ID column';
 
     /**
      * Pending assignee ID to attach in afterSave.
@@ -91,7 +91,7 @@ final class TaskImporter extends BaseImporter
 
     public function resolveRecord(): Task
     {
-        // ID-based resolution takes absolute precedence
+        // ID-based matching only
         if ($this->hasIdValue()) {
             /** @var Task|null $record */
             $record = $this->resolveById();
@@ -99,20 +99,8 @@ final class TaskImporter extends BaseImporter
             return $record ?? new Task;
         }
 
-        // Fall back to title-based duplicate detection
-        $title = $this->data['title'] ?? null;
-
-        if (blank($title)) {
-            return new Task;
-        }
-
-        $existing = Task::query()
-            ->where('team_id', $this->import->team_id)
-            ->where('title', trim((string) $title))
-            ->first();
-
-        /** @var Task */
-        return $this->applyDuplicateStrategy($existing);
+        // No match found - create new task
+        return new Task;
     }
 
     /**

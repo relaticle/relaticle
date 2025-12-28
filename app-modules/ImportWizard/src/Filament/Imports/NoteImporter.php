@@ -66,7 +66,7 @@ final class NoteImporter extends BaseImporter
 
     public function resolveRecord(): Note
     {
-        // ID-based resolution takes absolute precedence
+        // ID-based matching only
         if ($this->hasIdValue()) {
             /** @var Note|null $record */
             $record = $this->resolveById();
@@ -74,20 +74,8 @@ final class NoteImporter extends BaseImporter
             return $record ?? new Note;
         }
 
-        // Fall back to title-based duplicate detection
-        $title = $this->data['title'] ?? null;
-
-        if (blank($title)) {
-            return new Note;
-        }
-
-        $existing = Note::query()
-            ->where('team_id', $this->import->team_id)
-            ->where('title', trim((string) $title))
-            ->first();
-
-        /** @var Note */
-        return $this->applyDuplicateStrategy($existing);
+        // No match found - create new note
+        return new Note;
     }
 
     /**

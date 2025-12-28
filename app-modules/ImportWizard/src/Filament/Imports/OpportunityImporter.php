@@ -16,9 +16,9 @@ final class OpportunityImporter extends BaseImporter
 {
     protected static ?string $model = Opportunity::class;
 
-    protected static array $uniqueIdentifierColumns = ['id', 'name'];
+    protected static array $uniqueIdentifierColumns = ['id'];
 
-    protected static string $missingUniqueIdentifiersMessage = 'For Opportunities, map an Opportunity name or Record ID column';
+    protected static string $missingUniqueIdentifiersMessage = 'For Opportunities, map a Record ID column';
 
     public static function getColumns(): array
     {
@@ -140,7 +140,7 @@ final class OpportunityImporter extends BaseImporter
 
     public function resolveRecord(): Opportunity
     {
-        // ID-based resolution takes absolute precedence
+        // ID-based matching only
         if ($this->hasIdValue()) {
             /** @var Opportunity|null $record */
             $record = $this->resolveById();
@@ -148,29 +148,8 @@ final class OpportunityImporter extends BaseImporter
             return $record ?? new Opportunity;
         }
 
-        // Fall back to name-based duplicate detection
-        $name = $this->data['name'] ?? null;
-
-        if (blank($name)) {
-            return new Opportunity;
-        }
-
-        // Fast path: Use pre-loaded resolver (preview mode)
-        if ($this->hasRecordResolver()) {
-            $existing = $this->getRecordResolver()->resolveOpportunityByName(
-                trim((string) $name),
-                $this->import->team_id
-            );
-        } else {
-            // Slow path: Query database (actual import execution)
-            $existing = Opportunity::query()
-                ->where('team_id', $this->import->team_id)
-                ->where('name', trim((string) $name))
-                ->first();
-        }
-
-        /** @var Opportunity */
-        return $this->applyDuplicateStrategy($existing);
+        // No match found - create new opportunity
+        return new Opportunity;
     }
 
     public static function getEntityName(): string

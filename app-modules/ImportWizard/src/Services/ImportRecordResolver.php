@@ -29,14 +29,14 @@ final class ImportRecordResolver
      *
      * @var array{
      *     people: array{byId: array<int|string, People>, byEmail: array<string, People>},
-     *     companies: array{byId: array<int|string, Company>, byName: array<string, Company>, byDomain: array<string, Company>},
-     *     opportunities: array{byId: array<int|string, Opportunity>, byName: array<string, Opportunity>}
+     *     companies: array{byId: array<int|string, Company>, byDomain: array<string, Company>},
+     *     opportunities: array{byId: array<int|string, Opportunity>}
      * }
      */
     private array $cache = [
         'people' => ['byId' => [], 'byEmail' => []],
-        'companies' => ['byId' => [], 'byName' => [], 'byDomain' => []],
-        'opportunities' => ['byId' => [], 'byName' => []],
+        'companies' => ['byId' => [], 'byDomain' => []],
+        'opportunities' => ['byId' => []],
     ];
 
     private ?string $cachedTeamId = null;
@@ -56,8 +56,8 @@ final class ImportRecordResolver
         $this->cachedTeamId = $teamId;
         $this->cache = [
             'people' => ['byId' => [], 'byEmail' => []],
-            'companies' => ['byId' => [], 'byName' => [], 'byDomain' => []],
-            'opportunities' => ['byId' => [], 'byName' => []],
+            'companies' => ['byId' => [], 'byDomain' => []],
+            'opportunities' => ['byId' => []],
         ];
 
         // Load records based on importer type
@@ -89,18 +89,6 @@ final class ImportRecordResolver
     }
 
     /**
-     * Resolve a Company record by name.
-     */
-    public function resolveCompanyByName(string $name, string $teamId): ?Company
-    {
-        $this->ensureCacheLoaded($teamId);
-
-        $name = trim($name);
-
-        return $this->cache['companies']['byName'][$name] ?? null;
-    }
-
-    /**
      * Resolve a Company record by domains custom field.
      */
     public function resolveCompanyByDomain(string $domain, string $teamId): ?Company
@@ -110,18 +98,6 @@ final class ImportRecordResolver
         $domain = strtolower(trim($domain));
 
         return $this->cache['companies']['byDomain'][$domain] ?? null;
-    }
-
-    /**
-     * Resolve an Opportunity record by name.
-     */
-    public function resolveOpportunityByName(string $name, string $teamId): ?Opportunity
-    {
-        $this->ensureCacheLoaded($teamId);
-
-        $name = trim($name);
-
-        return $this->cache['opportunities']['byName'][$name] ?? null;
     }
 
     /**
@@ -200,13 +176,6 @@ final class ImportRecordResolver
             // Index by ID (cast to string to match array type)
             $this->cache['companies']['byId'][(string) $company->id] = $company;
 
-            // Index by name (exact match)
-            $name = trim($company->name);
-            // First match wins (same as current behavior)
-            if ($name !== '' && ! isset($this->cache['companies']['byName'][$name])) {
-                $this->cache['companies']['byName'][$name] = $company;
-            }
-
             // Index by domains custom field (if field exists) - json_value is cast to Collection
             if ($domainField) {
                 $domainValue = $company->customFieldValues->first();
@@ -240,13 +209,6 @@ final class ImportRecordResolver
         foreach ($opportunities as $opportunity) {
             // Index by ID (cast to string to match array type)
             $this->cache['opportunities']['byId'][(string) $opportunity->id] = $opportunity;
-
-            // Index by name (exact match)
-            $name = trim((string) $opportunity->name);
-            // First match wins (same as current behavior)
-            if ($name !== '' && ! isset($this->cache['opportunities']['byName'][$name])) {
-                $this->cache['opportunities']['byName'][$name] = $opportunity;
-            }
         }
     }
 

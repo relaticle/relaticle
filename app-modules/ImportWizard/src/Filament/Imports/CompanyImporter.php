@@ -16,9 +16,9 @@ final class CompanyImporter extends BaseImporter
 {
     protected static ?string $model = Company::class;
 
-    protected static array $uniqueIdentifierColumns = ['id', 'name'];
+    protected static array $uniqueIdentifierColumns = ['id'];
 
-    protected static string $missingUniqueIdentifiersMessage = 'For Companies, map a Company name or Record ID column';
+    protected static string $missingUniqueIdentifiersMessage = 'For Companies, map a Record ID column';
 
     public static function getColumns(): array
     {
@@ -68,8 +68,7 @@ final class CompanyImporter extends BaseImporter
             return $record ?? new Company;
         }
 
-        // Step 1: Try domain-based duplicate detection (highest confidence for uniqueness)
-        // Domain field is array type but imported as string or comma-separated
+        // Try domain-based duplicate detection
         $domainsFieldKey = 'custom_fields_'.CompanyField::DOMAINS->value;
         $domainValue = $this->data[$domainsFieldKey] ?? null;
         $domain = $this->extractFirstDomain($domainValue);
@@ -82,29 +81,8 @@ final class CompanyImporter extends BaseImporter
             }
         }
 
-        // Step 2: Fall back to name-based duplicate detection
-        $name = $this->data['name'] ?? null;
-
-        if (blank($name)) {
-            return new Company;
-        }
-
-        // Fast path: Use pre-loaded resolver (preview mode)
-        if ($this->hasRecordResolver()) {
-            $existing = $this->getRecordResolver()->resolveCompanyByName(
-                trim((string) $name),
-                $this->import->team_id
-            );
-        } else {
-            // Slow path: Query database (actual import execution)
-            $existing = Company::query()
-                ->where('team_id', $this->import->team_id)
-                ->where('name', trim((string) $name))
-                ->first();
-        }
-
-        /** @var Company */
-        return $this->applyDuplicateStrategy($existing);
+        // No match found - create new company
+        return new Company;
     }
 
     /**
