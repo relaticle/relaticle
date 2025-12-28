@@ -12,9 +12,11 @@ use Relaticle\ImportWizard\Data\CompanyMatchResult;
 /**
  * Smart company matching service for import previews.
  *
- * Matching priority:
- * 1. Domain match: email domain → company domains custom field
- * 2. Name match: exact company name match
+ * Matching priority (Attio-style):
+ * 1. ID match: exact company ID (ULID)
+ * 2. Domain match: email domain → company domains custom field
+ * 3. Create: company_name provided → will create new company
+ * 4. None: no company data → no association
  *
  * Returns match type for transparent preview display.
  *
@@ -23,91 +25,76 @@ use Relaticle\ImportWizard\Data\CompanyMatchResult;
 final class CompanyMatcher
 {
     /**
-     * Cached companies indexed by name and domain for fast lookup.
+     * Cached companies indexed by ID and domain for fast lookup.
      *
-     * @var array{byName: array<string, array<int, Company>>, byDomain: array<string, array<int, Company>>}|null
+     * @var array{byId: array<string, Company>, byDomain: array<string, array<int, Company>>}|null
      */
     private ?array $companyCache = null;
 
     private ?string $cachedTeamId = null;
 
     /**
-     * Match a company by domain (from emails) or name.
+     * Match a company by ID (highest priority) or domain (from emails).
      *
      * Priority:
-     * 1. Domain match (from email) - highest confidence
-     * 2. Name match - fallback
+     * 1. ID match (if provided) - 100% accurate like Attio's VLOOKUP approach
+     * 2. Domain match (from email) - auto-linking like Attio
+     * 3. Create new (if company_name provided)
+     * 4. None (if no company data)
      *
-     * When company_name is empty but emails are provided, will try domain matching.
-     * This enables auto-linking people to companies based on email domain (like Attio).
-     *
+     * @param  string  $companyId  Company ULID (from 'id' column if mapped)
+     * @param  string  $companyName  Company name (from 'company_name' column if mapped)
      * @param  array<string>  $emails  Person's email addresses
      */
-    public function match(string $companyName, array $emails, string $teamId): CompanyMatchResult
+    public function match(string $companyId, string $companyName, array $emails, string $teamId): CompanyMatchResult
     {
+        $companyId = trim($companyId);
         $companyName = trim($companyName);
 
         // Load companies into cache on first call
         $this->ensureCompaniesLoaded($teamId);
 
-        // Step 1: Try domain matching (highest confidence)
+        // Priority 1: ID matching (highest confidence)
+        if ($companyId !== '' && \Illuminate\Support\Str::isUlid($companyId)) {
+            $company = $this->findInCacheById($companyId);
+            if ($company !== null) {
+                return new CompanyMatchResult(
+                    companyName: $company->name,
+                    matchType: 'id',
+                    matchCount: 1,
+                    companyId: (string) $company->id,
+                );
+            }
+        }
+
+        // Priority 2: Domain matching (second highest confidence)
         $domains = $this->extractEmailDomains($emails);
         if ($domains !== []) {
             $domainMatches = $this->findInCacheByDomain($domains);
 
-            if (count($domainMatches) === 1) {
+            if (count($domainMatches) >= 1) {
+                // Take first match (Attio-style: each domain = one company)
                 $company = reset($domainMatches);
 
                 return new CompanyMatchResult(
                     companyName: $company->name,
                     matchType: 'domain',
-                    matchCount: 1,
-                    companyId: (string) $company->id,
-                );
-            }
-
-            // Multiple domain matches - ambiguous
-            if (count($domainMatches) > 1) {
-                return new CompanyMatchResult(
-                    companyName: $companyName ?: 'Unknown',
-                    matchType: 'ambiguous',
                     matchCount: count($domainMatches),
+                    companyId: (string) $company->id,
                 );
             }
         }
 
-        // No company name provided and no domain match - nothing to match
+        // Priority 3: No company data → no association
         if ($companyName === '') {
             return new CompanyMatchResult(
                 companyName: '',
-                matchType: 'new',
+                matchType: 'none',
                 matchCount: 0,
             );
         }
 
-        // Step 2: Try exact name matching
-        $nameMatches = $this->findInCacheByName($companyName);
-
-        if (count($nameMatches) === 1) {
-            $company = reset($nameMatches);
-
-            return new CompanyMatchResult(
-                companyName: $company->name,
-                matchType: 'name',
-                matchCount: 1,
-                companyId: (string) $company->id,
-            );
-        }
-
-        if (count($nameMatches) > 1) {
-            return new CompanyMatchResult(
-                companyName: $companyName,
-                matchType: 'ambiguous',
-                matchCount: count($nameMatches),
-            );
-        }
-
-        // No matches - will create new company
+        // Priority 4: company_name provided → will create new company
         return new CompanyMatchResult(
             companyName: $companyName,
             matchType: 'new',
@@ -126,7 +113,7 @@ final class CompanyMatcher
         }
 
         $this->cachedTeamId = $teamId;
-        $this->companyCache = ['byName' => [], 'byDomain' => []];
+        $this->companyCache = ['byId' => [], 'byDomain' => []];
 
         // Load all companies with custom field values
         // Use withoutGlobalScopes on the relationship to ensure we get all custom field data
@@ -139,13 +126,9 @@ final class CompanyMatcher
             ])
             ->get();
 
-        // Index by name
+        // Index by ID
         foreach ($companies as $company) {
-            $name = $company->name;
-            if (! isset($this->companyCache['byName'][$name])) {
-                $this->companyCache['byName'][$name] = [];
-            }
-            $this->companyCache['byName'][$name][] = $company;
+            $this->companyCache['byId'][(string) $company->id] = $company;
         }
 
         // Index by domains custom field (stored as json_value collection)
@@ -173,6 +156,14 @@ final class CompanyMatcher
     }
 
     /**
+     * Find company in cache by ID.
+     */
+    private function findInCacheById(string $id): ?Company
+    {
+        return $this->companyCache['byId'][$id] ?? null;
+    }
+
+    /**
      * Find companies in cache by domain.
      *
      * @param  array<string>  $domains
@@ -191,16 +182,6 @@ final class CompanyMatcher
         }
 
         return array_values($matches);
-    }
-
-    /**
-     * Find companies in cache by name.
-     *
-     * @return array<int, Company>
-     */
-    private function findInCacheByName(string $name): array
-    {
-        return $this->companyCache['byName'][$name] ?? [];
     }
 
     /**

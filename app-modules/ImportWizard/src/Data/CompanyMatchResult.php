@@ -9,11 +9,11 @@ use Spatie\LaravelData\Data;
 /**
  * Result of company matching during import preview.
  *
- * Match types:
+ * Match types (Attio-style priority):
+ * - 'id': Matched via company ID (highest priority)
  * - 'domain': Matched via email domain → company domains custom field
- * - 'name': Matched via exact company name
- * - 'ambiguous': Multiple companies matched (by domain or name)
- * - 'new': No match found, will create new company
+ * - 'new': Will create new company (company_name provided)
+ * - 'none': No company data to link/create (company_name empty, no matches)
  */
 final class CompanyMatchResult extends Data
 {
@@ -24,14 +24,9 @@ final class CompanyMatchResult extends Data
         public ?string $companyId = null,
     ) {}
 
-    public function isAmbiguous(): bool
+    public function isIdMatch(): bool
     {
-        return $this->matchType === 'ambiguous';
-    }
-
-    public function isNew(): bool
-    {
-        return $this->matchType === 'new';
+        return $this->matchType === 'id';
     }
 
     public function isDomainMatch(): bool
@@ -39,8 +34,29 @@ final class CompanyMatchResult extends Data
         return $this->matchType === 'domain';
     }
 
+    public function isNew(): bool
+    {
+        return $this->matchType === 'new';
+    }
+
+    public function isNone(): bool
+    {
+        return $this->matchType === 'none';
+    }
+
+    /**
+     * @deprecated Name matching removed - use ID or domain matching only
+     */
     public function isNameMatch(): bool
     {
         return $this->matchType === 'name';
+    }
+
+    /**
+     * @deprecated Ambiguous handling simplified - returns 'new' instead
+     */
+    public function isAmbiguous(): bool
+    {
+        return $this->matchType === 'ambiguous';
     }
 }
