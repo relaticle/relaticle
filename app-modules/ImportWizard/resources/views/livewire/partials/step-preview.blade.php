@@ -8,14 +8,14 @@
     $idBasedUpdates = collect($sampleRows)->where('_update_method', 'id')->count();
     $attributeBasedUpdates = collect($sampleRows)->where('_update_method', 'attribute')->count();
 
-    // Calculate company match statistics
+    // Calculate company match statistics (Attio-style)
     $companyMatchStats = [];
     if ($showCompanyMatch) {
         $companyMatchStats = [
+            'id' => collect($sampleRows)->where('_company_match_type', 'id')->count(),
             'domain' => collect($sampleRows)->where('_company_match_type', 'domain')->count(),
-            'name' => collect($sampleRows)->where('_company_match_type', 'name')->count(),
-            'ambiguous' => collect($sampleRows)->where('_company_match_type', 'ambiguous')->count(),
             'new' => collect($sampleRows)->where('_company_match_type', 'new')->count(),
+            // 'none' is not counted - records with no company data
         ];
     }
 @endphp
@@ -65,22 +65,16 @@
     @if ($showCompanyMatch && array_sum($companyMatchStats) > 0)
         <div class="flex items-center gap-4 text-sm pt-2 border-t border-gray-100 dark:border-gray-800">
             <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company Matching:</span>
+            @if ($companyMatchStats['id'] > 0)
+                <div class="flex items-center gap-1.5">
+                    <x-filament::badge color="purple" size="sm">{{ $companyMatchStats['id'] }}</x-filament::badge>
+                    <span class="text-gray-500 dark:text-gray-400">by ID</span>
+                </div>
+            @endif
             @if ($companyMatchStats['domain'] > 0)
                 <div class="flex items-center gap-1.5">
                     <x-filament::badge color="success" size="sm">{{ $companyMatchStats['domain'] }}</x-filament::badge>
-                    <span class="text-gray-500 dark:text-gray-400">domain</span>
-                </div>
-            @endif
-            @if ($companyMatchStats['name'] > 0)
-                <div class="flex items-center gap-1.5">
-                    <x-filament::badge color="info" size="sm">{{ $companyMatchStats['name'] }}</x-filament::badge>
-                    <span class="text-gray-500 dark:text-gray-400">name</span>
-                </div>
-            @endif
-            @if ($companyMatchStats['ambiguous'] > 0)
-                <div class="flex items-center gap-1.5">
-                    <x-filament::badge color="warning" size="sm">{{ $companyMatchStats['ambiguous'] }}</x-filament::badge>
-                    <span class="text-gray-500 dark:text-gray-400">ambiguous</span>
+                    <span class="text-gray-500 dark:text-gray-400">by domain</span>
                 </div>
             @endif
             @if ($companyMatchStats['new'] > 0)
@@ -136,7 +130,7 @@
                                 @if ($showCompanyMatch)
                                     <td class="px-3 py-2">
                                         @php
-                                            $matchType = $row['_company_match_type'] ?? 'new';
+                                            $matchType = $row['_company_match_type'] ?? 'none';
                                             $matchCount = $row['_company_match_count'] ?? 0;
                                             $companyName = $row['_company_name'] ?? $row['company_name'] ?? '-';
                                         @endphp
@@ -145,25 +139,23 @@
                                                 {{ $companyName ?: '-' }}
                                             </span>
                                             @switch($matchType)
+                                                @case('id')
+                                                    <x-filament::badge color="purple" size="sm" icon="heroicon-m-key">
+                                                        ID
+                                                    </x-filament::badge>
+                                                    @break
                                                 @case('domain')
                                                     <x-filament::badge color="success" size="sm" icon="heroicon-m-check">
                                                         Domain
                                                     </x-filament::badge>
                                                     @break
-                                                @case('name')
-                                                    <x-filament::badge color="info" size="sm">
-                                                        Name
-                                                    </x-filament::badge>
-                                                    @break
-                                                @case('ambiguous')
-                                                    <x-filament::badge color="warning" size="sm" icon="heroicon-m-exclamation-triangle">
-                                                        {{ $matchCount }} matches
-                                                    </x-filament::badge>
-                                                    @break
-                                                @default
-                                                    <x-filament::badge color="gray" size="sm">
+                                                @case('new')
+                                                    <x-filament::badge color="gray" size="sm" icon="heroicon-m-plus">
                                                         New
                                                     </x-filament::badge>
+                                                    @break
+                                                @default {{-- none --}}
+                                                    <span class="text-xs text-gray-400">-</span>
                                             @endswitch
                                         </div>
                                     </td>
