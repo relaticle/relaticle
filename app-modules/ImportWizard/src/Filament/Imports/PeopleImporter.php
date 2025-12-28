@@ -55,7 +55,7 @@ final class PeopleImporter extends BaseImporter
                     // This enables Attio-style auto-linking: person with @acme.com → Acme company
                     if ($companyName === '' && $emails !== []) {
                         $matcher = app(CompanyMatcher::class);
-                        $result = $matcher->match('', $emails, $importer->import->team_id);
+                        $result = $matcher->match('', '', $emails, $importer->import->team_id);
 
                         if ($result->isDomainMatch() && $result->companyId !== null) {
                             $record->company_id = $result->companyId;
@@ -69,7 +69,7 @@ final class PeopleImporter extends BaseImporter
                         return;
                     }
 
-                    // Fallback to name-based firstOrCreate
+                    // Find or create company by name (prevents duplicates within import)
                     try {
                         $company = Company::firstOrCreate(
                             [

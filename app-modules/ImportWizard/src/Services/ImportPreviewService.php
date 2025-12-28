@@ -280,10 +280,11 @@ final readonly class ImportPreviewService
      */
     private function enrichRowWithCompanyMatch(array $row, string $teamId): array
     {
+        $companyId = (string) ($row['id'] ?? '');
         $companyName = (string) ($row['company_name'] ?? '');
         $emails = $this->extractEmailsFromRow($row);
 
-        $matchResult = $this->companyMatcher->match($companyName, $emails, $teamId);
+        $matchResult = $this->companyMatcher->match($companyId, $companyName, $emails, $teamId);
 
         return array_merge($row, [
             '_company_name' => $matchResult->companyName,
