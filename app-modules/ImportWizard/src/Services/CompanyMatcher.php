@@ -12,7 +12,7 @@ use Relaticle\ImportWizard\Data\CompanyMatchResult;
 /**
  * Smart company matching service for import previews.
  *
- * Matching priority (Attio-style):
+ * Matching priority:
  * 1. ID match: exact company ID (ULID)
  * 2. Domain match: email domain → company domains custom field
  * 3. Create: company_name provided → will create new company
@@ -37,8 +37,8 @@ final class CompanyMatcher
      * Match a company by ID (highest priority) or domain (from emails).
      *
      * Priority:
-     * 1. ID match (if provided) - 100% accurate like Attio's VLOOKUP approach
-     * 2. Domain match (from email) - auto-linking like Attio
+     * 1. ID match (if provided) - 100% accurate matching
+     * 2. Domain match (from email) - auto-linking
      * 3. Create new (if company_name provided)
      * 4. None (if no company data)
      *
@@ -73,7 +73,7 @@ final class CompanyMatcher
             $domainMatches = $this->findInCacheByDomain($domains);
 
             if (count($domainMatches) >= 1) {
-                // Take first match (Attio-style: each domain = one company)
+                // Take first match
                 $company = reset($domainMatches);
 
                 return new CompanyMatchResult(

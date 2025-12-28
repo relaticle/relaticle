@@ -9,7 +9,7 @@ use Spatie\LaravelData\Data;
 /**
  * Result of company matching during import preview.
  *
- * Match types (Attio-style priority):
+ * Match types:
  * - 'id': Matched via company ID (highest priority)
  * - 'domain': Matched via email domain → company domains custom field
  * - 'new': Will create new company (company_name provided)
