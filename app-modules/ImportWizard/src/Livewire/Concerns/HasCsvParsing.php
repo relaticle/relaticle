@@ -46,7 +46,7 @@ trait HasCsvParsing
                     'uploadedFile',
                     'This file contains '.number_format($this->rowCount).' rows. '.
                     'The maximum is '.number_format($maxRows).' rows per import. '.
-                    'Please split your file into smaller chunks, or contact support for assistance with bulk imports.'
+                    'Please split your file into smaller chunks.'
                 );
                 $this->cleanupTempFile();
                 $this->persistedFilePath = null;
