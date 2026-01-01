@@ -14,7 +14,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Statement;
-use Relaticle\ImportWizard\Events\ImportChunkProcessed;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
 
@@ -86,14 +85,12 @@ final class StreamingImportCsv implements ShouldQueue
 
         $processedCount = 0;
         $successCount = 0;
-        $failureCount = 0;
 
         foreach ($records as $record) {
             try {
                 ($importer)($record);
                 $successCount++;
             } catch (\Throwable $e) {
-                $failureCount++;
                 report($e);
             }
 
@@ -102,13 +99,6 @@ final class StreamingImportCsv implements ShouldQueue
 
         $this->import->increment('processed_rows', $processedCount);
         $this->import->increment('successful_rows', $successCount);
-
-        event(new ImportChunkProcessed(
-            import: $this->import,
-            processedRows: $processedCount,
-            successfulRows: $successCount,
-            failedRows: $failureCount,
-        ));
     }
 
     /**

@@ -97,23 +97,18 @@ final class PeopleImporter extends BaseImporter
                     }
 
                     // Find or create company by name (prevents duplicates within import)
-                    try {
-                        $company = Company::firstOrCreate(
-                            [
-                                'name' => $companyName,
-                                'team_id' => $importer->import->team_id,
-                            ],
-                            [
-                                'creator_id' => $importer->import->user_id,
-                                'creation_source' => CreationSource::IMPORT,
-                            ]
-                        );
+                    $company = Company::firstOrCreate(
+                        [
+                            'name' => $companyName,
+                            'team_id' => $importer->import->team_id,
+                        ],
+                        [
+                            'creator_id' => $importer->import->user_id,
+                            'creation_source' => CreationSource::IMPORT,
+                        ]
+                    );
 
-                        $record->company_id = $company->getKey();
-                    } catch (\Exception $e) {
-                        report($e);
-                        throw $e;
-                    }
+                    $record->company_id = $company->getKey();
                 }),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),

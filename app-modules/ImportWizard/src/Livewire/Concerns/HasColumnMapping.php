@@ -9,19 +9,10 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 
-/**
- * Provides column mapping functionality for the Import Wizard.
- *
- * @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns
- */
+/** @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns */
 trait HasColumnMapping
 {
-    /**
-     * Get importer columns for the selected entity type.
-     * This is a computed property to avoid storing complex objects in Livewire state.
-     *
-     * @return array<ImportColumn>
-     */
+    /** @return array<ImportColumn> */
     #[Computed]
     public function importerColumns(): array
     {
@@ -33,9 +24,6 @@ trait HasColumnMapping
         return $importerClass::getColumns();
     }
 
-    /**
-     * Auto-map CSV columns to importer columns based on guesses.
-     */
     protected function autoMapColumns(): void
     {
         if ($this->csvHeaders === [] || $this->importerColumns === []) {
@@ -56,11 +44,7 @@ trait HasColumnMapping
             ->toArray();
     }
 
-    /**
-     * Get the importer class for the selected entity type.
-     *
-     * @return class-string<BaseImporter>|null
-     */
+    /** @return class-string<BaseImporter>|null */
     protected function getImporterClass(): ?string
     {
         $entities = $this->getEntities();
@@ -68,9 +52,6 @@ trait HasColumnMapping
         return $entities[$this->entityType]['importer'] ?? null;
     }
 
-    /**
-     * Check if all required columns are mapped.
-     */
     public function hasAllRequiredMappings(): bool
     {
         return collect($this->importerColumns)
@@ -78,9 +59,6 @@ trait HasColumnMapping
             ->every(fn (ImportColumn $column): bool => ($this->columnMap[$column->getName()] ?? '') !== '');
     }
 
-    /**
-     * Map a CSV column to a field, or unmap if fieldName is empty.
-     */
     public function mapCsvColumnToField(string $csvColumn, string $fieldName): void
     {
         // First, find and clear any existing mapping for this CSV column
@@ -96,9 +74,6 @@ trait HasColumnMapping
         }
     }
 
-    /**
-     * Unmap a column.
-     */
     public function unmapColumn(string $fieldName): void
     {
         if (isset($this->columnMap[$fieldName])) {
@@ -106,9 +81,6 @@ trait HasColumnMapping
         }
     }
 
-    /**
-     * Get the label for a field name.
-     */
     public function getFieldLabel(string $fieldName): string
     {
         $column = collect($this->importerColumns)
@@ -117,9 +89,6 @@ trait HasColumnMapping
         return $column?->getLabel() ?? Str::title(str_replace('_', ' ', $fieldName));
     }
 
-    /**
-     * Check if any unique identifier column is mapped.
-     */
     protected function hasUniqueIdentifierMapped(): bool
     {
         $importerClass = $this->getImporterClass();
@@ -144,9 +113,6 @@ trait HasColumnMapping
         return false;
     }
 
-    /**
-     * Get the user-friendly message for missing unique identifiers.
-     */
     protected function getMissingUniqueIdentifiersMessage(): string
     {
         $importerClass = $this->getImporterClass();

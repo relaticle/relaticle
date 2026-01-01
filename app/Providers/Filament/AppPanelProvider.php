@@ -173,6 +173,10 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.import-preview-alpine')
             );
 
         if (Features::hasApiFeatures()) {

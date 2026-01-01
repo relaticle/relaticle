@@ -14,19 +14,9 @@ use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 
-/**
- * Fast record resolution for import previews using in-memory caching.
- *
- * Follows the CompanyMatcher pattern: pre-load all records in bulk queries,
- * then use O(1) hash table lookups instead of per-row database queries.
- *
- * Performance: Reduces 10,000 queries to 3-5 queries for 10,000 row previews.
- */
 final class ImportRecordResolver
 {
     /**
-     * In-memory cache of records indexed for O(1) lookups.
-     *
      * @var array{
      *     people: array{byId: array<int|string, People>, byEmail: array<string, People>},
      *     companies: array{byId: array<int|string, Company>, byDomain: array<string, Company>},
@@ -41,11 +31,7 @@ final class ImportRecordResolver
 
     private ?string $cachedTeamId = null;
 
-    /**
-     * Preload all records for a team based on importer class.
-     *
-     * @param  class-string  $importerClass
-     */
+    /** @param class-string $importerClass */
     public function loadForTeam(string $teamId, string $importerClass): void
     {
         // Skip if already loaded for this team
@@ -69,11 +55,7 @@ final class ImportRecordResolver
         };
     }
 
-    /**
-     * Resolve a People record by email addresses.
-     *
-     * @param  array<string>  $emails
-     */
+    /** @param array<string> $emails */
     public function resolvePeopleByEmail(array $emails, string $teamId): ?People
     {
         $this->ensureCacheLoaded($teamId);
@@ -88,9 +70,6 @@ final class ImportRecordResolver
         return null;
     }
 
-    /**
-     * Resolve a Company record by domains custom field.
-     */
     public function resolveCompanyByDomain(string $domain, string $teamId): ?Company
     {
         $this->ensureCacheLoaded($teamId);
@@ -100,9 +79,6 @@ final class ImportRecordResolver
         return $this->cache['companies']['byDomain'][$domain] ?? null;
     }
 
-    /**
-     * Load all people for a team with email custom field values.
-     */
     private function loadPeople(string $teamId): void
     {
         // Query 1: Get emails custom field ID
@@ -146,9 +122,6 @@ final class ImportRecordResolver
         }
     }
 
-    /**
-     * Load all companies for a team with domains custom field values.
-     */
     private function loadCompanies(string $teamId): void
     {
         // Query 1: Get domains custom field ID
@@ -195,9 +168,6 @@ final class ImportRecordResolver
         }
     }
 
-    /**
-     * Load all opportunities for a team.
-     */
     private function loadOpportunities(string $teamId): void
     {
         // Query: Load ALL opportunities
@@ -212,9 +182,6 @@ final class ImportRecordResolver
         }
     }
 
-    /**
-     * Ensure cache is loaded for the team.
-     */
     private function ensureCacheLoaded(string $teamId): void
     {
         if ($this->cachedTeamId !== $teamId) {

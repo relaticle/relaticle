@@ -7,65 +7,57 @@ namespace Relaticle\ImportWizard\Services;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use League\Csv\Statement;
-use Relaticle\ImportWizard\Data\ImportPreviewResult;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
 
-/**
- * Service for previewing import results without actually saving data.
- *
- * Performs a dry-run of the import by calling each importer's resolveRecord()
- * method to determine whether records would be created or updated.
- */
-final readonly class ImportPreviewService
+final readonly class PreviewChunkService
 {
     public function __construct(
         private CsvReaderFactory $csvReaderFactory,
         private CompanyMatcher $companyMatcher,
-        private CsvRowCounter $csvRowCounter,
     ) {}
 
     /**
-     * Generate a preview of what an import will do.
-     *
      * @param  class-string<BaseImporter>  $importerClass
-     * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
-     * @param  array<string, mixed>  $options  Import options
-     * @param  array<string, array<string, string>>  $valueCorrections  User-defined value corrections
-     * @param  int  $sampleSize  Maximum number of rows to process for preview (default 1,000)
+     * @param  array<string, string>  $columnMap
+     * @param  array<string, mixed>  $options
+     * @param  array<string, array<string, string>>  $valueCorrections
+     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int}
      */
-    public function preview(
+    public function processChunk(
         string $importerClass,
         string $csvPath,
+        int $startRow,
+        int $limit,
         array $columnMap,
         array $options,
         string $teamId,
         string $userId,
         array $valueCorrections = [],
-        int $sampleSize = 1000,
-    ): ImportPreviewResult {
+        ?ImportRecordResolver $recordResolver = null,
+    ): array {
         // Create a non-persisted Import model for the importer
         $import = new Import;
         $import->setAttribute('team_id', $teamId);
         $import->setAttribute('user_id', $userId);
 
         $csvReader = $this->csvReaderFactory->createFromPath($csvPath);
-        $totalRows = $this->csvRowCounter->count($csvPath, $csvReader);
 
-        // Process only sampled rows for preview
-        $records = (new Statement)->limit($sampleSize)->process($csvReader);
+        // Get the specific range of rows
+        $records = Statement::create()
+            ->offset($startRow)
+            ->limit($limit)
+            ->process($csvReader);
 
-        // Pre-load all records for fast O(1) lookups (avoids N+1 queries)
-        $recordResolver = app(ImportRecordResolver::class);
-        $recordResolver->loadForTeam($teamId, $importerClass);
+        $recordResolver ??= tap(app(ImportRecordResolver::class), fn (ImportRecordResolver $r) => $r->loadForTeam($teamId, $importerClass));
 
-        $willCreate = 0;
-        $willUpdate = 0;
+        $creates = 0;
+        $updates = 0;
         $rows = [];
 
-        $rowNumber = 0;
+        $rowNumber = $startRow;
         foreach ($records as $record) {
             $rowNumber++;
 
@@ -85,12 +77,12 @@ final readonly class ImportPreviewService
                 $isNew = $result['action'] === 'create';
 
                 if ($isNew) {
-                    $willCreate++;
+                    $creates++;
                 } else {
-                    $willUpdate++;
+                    $updates++;
                 }
 
-                // Store row data with metadata
+                // Format row data
                 $formattedRow = $this->formatRowRecord($record, $columnMap);
 
                 // Enrich with company match data for People/Opportunity imports
@@ -98,7 +90,7 @@ final readonly class ImportPreviewService
                     $formattedRow = $this->enrichRowWithCompanyMatch($formattedRow, $teamId);
                 }
 
-                // Detect update method (ID-based or attribute-based)
+                // Detect update method
                 $hasId = ! blank($formattedRow['id'] ?? null);
                 $updateMethod = null;
                 $recordId = null;
@@ -112,7 +104,7 @@ final readonly class ImportPreviewService
                     $formattedRow,
                     [
                         '_row_index' => $rowNumber,
-                        '_is_new' => $isNew,
+                        '_action' => $isNew ? 'create' : 'update',
                         '_update_method' => $updateMethod,
                         '_record_id' => $recordId,
                     ]
@@ -120,37 +112,63 @@ final readonly class ImportPreviewService
             } catch (\Throwable $e) {
                 report($e);
 
-                // Skip errored rows in preview - they'll be handled during actual import
-                continue;
+                // Include errored rows with error flag
+                $rows[] = [
+                    '_row_index' => $rowNumber,
+                    '_action' => 'error',
+                    '_error' => $e->getMessage(),
+                ];
             }
         }
 
-        $actualSampleSize = min($totalRows, $sampleSize);
-        $isSampled = $totalRows > $sampleSize;
-
-        // Scale counts to full dataset if sampled
-        $scaledCreateCount = $willCreate;
-        $scaledUpdateCount = $willUpdate;
-
-        if ($isSampled && $actualSampleSize > 0) {
-            $scaleFactor = $totalRows / $actualSampleSize;
-            $scaledCreateCount = (int) round($willCreate * $scaleFactor);
-            $scaledUpdateCount = (int) round($willUpdate * $scaleFactor);
-        }
-
-        return new ImportPreviewResult(
-            totalRows: $totalRows,
-            createCount: $scaledCreateCount,
-            updateCount: $scaledUpdateCount,
-            rows: $rows,
-            isSampled: $isSampled,
-            sampleSize: $actualSampleSize,
-        );
+        return [
+            'rows' => $rows,
+            'creates' => $creates,
+            'updates' => $updates,
+        ];
     }
 
     /**
-     * Preview a single row to determine what action would be taken.
-     *
+     * @param  array<string, string>  $columnMap
+     * @return array<int, string>
+     */
+    public function getEnrichedHeaders(array $columnMap): array
+    {
+        $headers = ['_row_index', '_action', '_update_method', '_record_id'];
+
+        foreach ($columnMap as $fieldName => $csvColumn) {
+            if ($csvColumn !== '') {
+                $headers[] = $fieldName;
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<string, string>  $columnMap
+     * @return array<int, mixed>
+     */
+    public function rowToArray(array $row, array $columnMap): array
+    {
+        $values = [
+            $row['_row_index'] ?? '',
+            $row['_action'] ?? '',
+            $row['_update_method'] ?? '',
+            $row['_record_id'] ?? '',
+        ];
+
+        foreach ($columnMap as $fieldName => $csvColumn) {
+            if ($csvColumn !== '') {
+                $values[] = $row[$fieldName] ?? '';
+            }
+        }
+
+        return $values;
+    }
+
+    /**
      * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
@@ -172,17 +190,19 @@ final readonly class ImportPreviewService
             'options' => $options,
         ]);
 
-        // Set resolver for fast preview lookups (avoids per-row database queries)
         $importer->setRecordResolver($recordResolver);
 
-        // Invoke importer's resolution logic using public Filament APIs
-        $record = $this->invokeImporterResolution($importer, $rowData);
+        // Set row data and invoke resolution
+        $importer->setRowDataForPreview($rowData);
+        $importer->remapData();
+        $importer->castData();
 
-        if (! $record instanceof \Illuminate\Database\Eloquent\Model) {
+        $record = $importer->resolveRecord();
+
+        if (! $record instanceof Model) {
             return ['action' => 'create', 'record' => null];
         }
 
-        // If record exists in DB, it's an update; otherwise it's a create
         if ($record->exists) {
             return ['action' => 'update', 'record' => $record];
         }
@@ -191,32 +211,9 @@ final readonly class ImportPreviewService
     }
 
     /**
-     * Invoke the importer's record resolution logic using public Filament APIs.
-     *
-     * Uses BaseImporter::setRowDataForPreview() to set the row data, then calls
-     * Filament's public remapData(), castData(), and resolveRecord() methods.
-     *
-     * @param  array<string, mixed>  $rowData
-     */
-    private function invokeImporterResolution(BaseImporter $importer, array $rowData): ?Model
-    {
-        // Set row data via our public method
-        $importer->setRowDataForPreview($rowData);
-
-        // Process through Filament's public pipeline methods
-        $importer->remapData();
-        $importer->castData();
-
-        // Resolve record (queries DB but doesn't save)
-        return $importer->resolveRecord();
-    }
-
-    /**
-     * Apply value corrections to a row.
-     *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $columnMap
-     * @param  array<string, array<string, string>>  $corrections  Map of field name => [old_value => new_value]
+     * @param  array<string, array<string, string>>  $corrections
      * @return array<string, mixed>
      */
     private function applyCorrections(array $record, array $columnMap, array $corrections): array
@@ -240,8 +237,6 @@ final readonly class ImportPreviewService
     }
 
     /**
-     * Format a row record with mapped field names.
-     *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $columnMap
      * @return array<string, mixed>
@@ -259,11 +254,7 @@ final readonly class ImportPreviewService
         return $formatted;
     }
 
-    /**
-     * Check if the importer should have company match enrichment.
-     *
-     * @param  class-string<BaseImporter>  $importerClass
-     */
+    /** @param class-string<BaseImporter> $importerClass */
     private function shouldEnrichWithCompanyMatch(string $importerClass): bool
     {
         return in_array($importerClass, [
@@ -273,8 +264,6 @@ final readonly class ImportPreviewService
     }
 
     /**
-     * Enrich a row with company match data for transparent preview.
-     *
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
@@ -295,26 +284,22 @@ final readonly class ImportPreviewService
     }
 
     /**
-     * Extract emails from a row for company matching.
-     *
      * @param  array<string, mixed>  $row
      * @return array<string>
      */
     private function extractEmailsFromRow(array $row): array
     {
-        $emailsRaw = $row['custom_fields_emails'] ?? null;
-
-        if ($emailsRaw === null || $emailsRaw === '') {
+        $raw = $row['custom_fields_emails'] ?? '';
+        if (blank($raw)) {
             return [];
         }
 
-        $emails = is_string($emailsRaw)
-            ? array_map(trim(...), explode(',', $emailsRaw))
-            : (array) $emailsRaw;
+        /** @var array<int, string> $emails */
+        $emails = is_string($raw) ? explode(',', $raw) : (array) $raw;
 
         return array_values(array_filter(
-            $emails,
-            static fn (mixed $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+            array_map(trim(...), $emails),
+            static fn (string $e): bool => filter_var($e, FILTER_VALIDATE_EMAIL) !== false
         ));
     }
 }

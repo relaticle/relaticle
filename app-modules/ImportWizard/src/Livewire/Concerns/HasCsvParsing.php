@@ -4,21 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
-use Relaticle\ImportWizard\Services\CsvRowCounter;
 
-/**
- * Provides CSV file parsing functionality for the Import Wizard.
- */
 trait HasCsvParsing
 {
-    /**
-     * Parse the uploaded file and extract headers and row count.
-     */
     protected function parseUploadedFile(): void
     {
         if ($this->uploadedFile === null) {
@@ -37,7 +31,7 @@ trait HasCsvParsing
             // Parse the CSV
             $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
             $this->csvHeaders = $csvReader->getHeader();
-            $this->rowCount = app(CsvRowCounter::class)->count($csvPath, $csvReader);
+            $this->rowCount = iterator_count($csvReader->getRecords());
 
             // Validate row count
             $maxRows = (int) config('import-wizard.max_rows_per_file', 10000);
@@ -68,20 +62,20 @@ trait HasCsvParsing
         }
     }
 
-    /**
-     * Persist the uploaded CSV file to storage.
-     */
     protected function persistFile(TemporaryUploadedFile $file): ?string
     {
         try {
-            $sourcePath = $file->getRealPath();
-            $storagePath = 'temp-imports/'.Str::uuid()->toString().'.csv';
+            $this->sessionId = Str::uuid()->toString();
+            $folder = "temp-imports/{$this->sessionId}";
+            $storagePath = "{$folder}/original.csv";
 
+            $sourcePath = $file->getRealPath();
             $content = file_get_contents($sourcePath);
             if ($content === false) {
                 throw new \RuntimeException('Failed to read file content');
             }
 
+            Storage::disk('local')->makeDirectory($folder);
             Storage::disk('local')->put($storagePath, $content);
 
             return Storage::disk('local')->path($storagePath);
@@ -93,26 +87,23 @@ trait HasCsvParsing
         }
     }
 
-    /**
-     * Clean up temporary files.
-     */
     protected function cleanupTempFile(): void
     {
-        if ($this->persistedFilePath === null) {
+        if ($this->sessionId === null) {
             return;
         }
 
-        $storagePath = str_replace(Storage::disk('local')->path(''), '', $this->persistedFilePath);
-        if (Storage::disk('local')->exists($storagePath)) {
-            Storage::disk('local')->delete($storagePath);
+        $folder = "temp-imports/{$this->sessionId}";
+        if (Storage::disk('local')->exists($folder)) {
+            Storage::disk('local')->deleteDirectory($folder);
         }
+
+        Cache::forget("import:{$this->sessionId}:status");
+        Cache::forget("import:{$this->sessionId}:progress");
+        Cache::forget("import:{$this->sessionId}:team");
     }
 
-    /**
-     * Get preview values for a specific CSV column.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function getColumnPreviewValues(string $csvColumn, int $limit = 5): array
     {
         if ($this->persistedFilePath === null) {

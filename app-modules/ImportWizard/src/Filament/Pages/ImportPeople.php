@@ -19,9 +19,4 @@ final class ImportPeople extends ImportPage
     {
         return PeopleResource::class;
     }
-
-    public static function getEntityLabel(): string
-    {
-        return 'People';
-    }
 }
