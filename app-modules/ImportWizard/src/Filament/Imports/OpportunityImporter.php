@@ -16,9 +16,9 @@ final class OpportunityImporter extends BaseImporter
 {
     protected static ?string $model = Opportunity::class;
 
-    protected static array $uniqueIdentifierColumns = ['id', 'name'];
+    protected static array $uniqueIdentifierColumns = ['id'];
 
-    protected static string $missingUniqueIdentifiersMessage = 'For Opportunities, map an Opportunity name or Record ID column';
+    protected static string $missingUniqueIdentifiersMessage = 'For Opportunities, map a Record ID column';
 
     public static function getColumns(): array
     {
@@ -36,12 +36,40 @@ final class OpportunityImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
+            ImportColumn::make('company_id')
+                ->label('Company Record ID')
+                ->guess(['company_id', 'company_record_id'])
+                ->rules(['nullable', 'string', 'ulid'])
+                ->example('01HQWX...')
+                ->fillRecordUsing(function (Opportunity $record, ?string $state, OpportunityImporter $importer): void {
+                    if (blank($state) || ! $importer->import->team_id) {
+                        return;
+                    }
+
+                    $companyId = trim($state);
+
+                    // Verify company exists in current team
+                    $company = Company::query()
+                        ->where('id', $companyId)
+                        ->where('team_id', $importer->import->team_id)
+                        ->first();
+
+                    if ($company) {
+                        $record->company_id = $company->getKey();
+                    }
+                }),
+
             ImportColumn::make('company_name')
                 ->label('Company Name')
                 ->guess(['company_name', 'company', 'account'])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
+                    // Skip if company already set by company_id column
+                    if ($record->company_id) {
+                        return;
+                    }
+
                     if (blank($state)) {
                         $record->company_id = null;
 
@@ -112,7 +140,7 @@ final class OpportunityImporter extends BaseImporter
 
     public function resolveRecord(): Opportunity
     {
-        // ID-based resolution takes absolute precedence
+        // ID-based matching only
         if ($this->hasIdValue()) {
             /** @var Opportunity|null $record */
             $record = $this->resolveById();
@@ -120,29 +148,8 @@ final class OpportunityImporter extends BaseImporter
             return $record ?? new Opportunity;
         }
 
-        // Fall back to name-based duplicate detection
-        $name = $this->data['name'] ?? null;
-
-        if (blank($name)) {
-            return new Opportunity;
-        }
-
-        // Fast path: Use pre-loaded resolver (preview mode)
-        if ($this->hasRecordResolver()) {
-            $existing = $this->getRecordResolver()->resolveOpportunityByName(
-                trim((string) $name),
-                $this->import->team_id
-            );
-        } else {
-            // Slow path: Query database (actual import execution)
-            $existing = Opportunity::query()
-                ->where('team_id', $this->import->team_id)
-                ->where('name', trim((string) $name))
-                ->first();
-        }
-
-        /** @var Opportunity */
-        return $this->applyDuplicateStrategy($existing);
+        // No match found - create new opportunity
+        return new Opportunity;
     }
 
     public static function getEntityName(): string

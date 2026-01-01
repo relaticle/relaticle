@@ -66,7 +66,7 @@ test('matches company by domain from email', function () {
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
     ($this->setCompanyDomain)($company, 'acme.com');
 
-    $result = $this->matcher->match('Acme Inc', ['john@acme.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['john@acme.com'], $this->team->id);
 
     expect($result)
         ->toBeInstanceOf(CompanyMatchResult::class)
@@ -76,58 +76,57 @@ test('matches company by domain from email', function () {
         ->companyId->toBe($company->id);
 });
 
-test('matches company by exact name when no domain match', function () {
+test('returns new when company name provided with no domain match', function () {
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
 
-    $result = $this->matcher->match('Acme Inc', [], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', [], $this->team->id);
 
     expect($result)
         ->companyName->toBe('Acme Inc')
-        ->matchType->toBe('name')
-        ->matchCount->toBe(1)
-        ->companyId->toBe($company->id);
-});
-
-test('returns ambiguous when multiple companies match by name', function () {
-    Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
-    Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
-
-    $result = $this->matcher->match('Acme Inc', [], $this->team->id);
-
-    expect($result)
-        ->companyName->toBe('Acme Inc')
-        ->matchType->toBe('ambiguous')
-        ->matchCount->toBe(2)
+        ->matchType->toBe('new')
+        ->matchCount->toBe(0)
         ->companyId->toBeNull();
 });
 
-test('returns ambiguous when multiple companies match by domain', function () {
+test('returns new when company name provided without ID or domain', function () {
+    Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+    Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+
+    $result = $this->matcher->match('', 'Acme Inc', [], $this->team->id);
+
+    expect($result)
+        ->companyName->toBe('Acme Inc')
+        ->matchType->toBe('new')
+        ->matchCount->toBe(0)
+        ->companyId->toBeNull();
+});
+
+test('takes first match when multiple companies match by domain', function () {
     $company1 = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
     ($this->setCompanyDomain)($company1, 'acme.com');
 
     $company2 = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corp']);
     ($this->setCompanyDomain)($company2, 'acme.com');
 
-    $result = $this->matcher->match('Something Else', ['john@acme.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Something Else', ['john@acme.com'], $this->team->id);
 
     expect($result)
-        ->companyName->toBe('Something Else')
-        ->matchType->toBe('ambiguous')
+        ->matchType->toBe('domain')
         ->matchCount->toBe(2)
-        ->companyId->toBeNull();
+        ->companyId->toBeIn([$company1->id, $company2->id]);
 });
 
-test('prioritizes domain match over name match', function () {
-    // Company that matches by name only
+test('prioritizes domain match over company name', function () {
+    // Company that would match only if name matching existed
     Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
 
-    // Company that matches by domain but has different name
+    // Company that matches by domain
     $domainCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Corporation']);
     ($this->setCompanyDomain)($domainCompany, 'acme.com');
 
-    $result = $this->matcher->match('Acme Inc', ['john@acme.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['john@acme.com'], $this->team->id);
 
-    // Should match by domain, not name
+    // Should match by domain, ignoring company_name parameter
     expect($result)
         ->companyName->toBe('Acme Corporation')
         ->matchType->toBe('domain')
@@ -155,7 +154,7 @@ test('does not match companies from other teams', function () {
     ]);
     ($this->setCompanyDomain)($otherCompany, 'acme.com', $otherTeam);
 
-    $result = $this->matcher->match('Acme Inc', ['john@acme.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['john@acme.com'], $this->team->id);
 
     // Should not find the other team's company
     expect($result)
@@ -164,22 +163,22 @@ test('does not match companies from other teams', function () {
         ->companyId->toBeNull();
 });
 
-test('handles personal emails by falling back to name match', function () {
+test('returns new for personal emails with company name provided', function () {
     // Gmail domain won't match any company (no company has domains containing gmail.com)
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
 
-    $result = $this->matcher->match('Acme Inc', ['john@gmail.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['john@gmail.com'], $this->team->id);
 
-    // Should fall back to name matching since gmail.com doesn't match any company
+    // Should return new since no domain match and name matching is removed
     expect($result)
         ->companyName->toBe('Acme Inc')
-        ->matchType->toBe('name')
-        ->matchCount->toBe(1)
-        ->companyId->toBe($company->id);
+        ->matchType->toBe('new')
+        ->matchCount->toBe(0)
+        ->companyId->toBeNull();
 });
 
 test('returns new when no company matches', function () {
-    $result = $this->matcher->match('Unknown Company', ['contact@unknown.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Unknown Company', ['contact@unknown.com'], $this->team->id);
 
     expect($result)
         ->companyName->toBe('Unknown Company')
@@ -188,12 +187,12 @@ test('returns new when no company matches', function () {
         ->companyId->toBeNull();
 });
 
-test('returns new for empty company name', function () {
-    $result = $this->matcher->match('', ['john@acme.com'], $this->team->id);
+test('returns none for empty company name', function () {
+    $result = $this->matcher->match('', '', ['john@acme.com'], $this->team->id);
 
     expect($result)
         ->companyName->toBe('')
-        ->matchType->toBe('new')
+        ->matchType->toBe('none')
         ->matchCount->toBe(0)
         ->companyId->toBeNull();
 });
@@ -203,7 +202,7 @@ test('extracts domain correctly from multiple emails', function () {
     ($this->setCompanyDomain)($company, 'acme.com');
 
     // Multiple emails, one with the matching domain
-    $result = $this->matcher->match('Some Company', ['john@gmail.com', 'jane@acme.com', 'bob@hotmail.com'], $this->team->id);
+    $result = $this->matcher->match('', 'Some Company', ['john@gmail.com', 'jane@acme.com', 'bob@hotmail.com'], $this->team->id);
 
     expect($result)
         ->companyName->toBe('Acme Inc')
@@ -214,13 +213,13 @@ test('extracts domain correctly from multiple emails', function () {
 test('handles invalid email formats gracefully', function () {
     $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
 
-    $result = $this->matcher->match('Acme Inc', ['not-an-email', 'also.not.valid', ''], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['not-an-email', 'also.not.valid', ''], $this->team->id);
 
-    // Should fall back to name matching since no valid domains extracted
+    // Should return new since no valid domains extracted and name matching is removed
     expect($result)
         ->companyName->toBe('Acme Inc')
-        ->matchType->toBe('name')
-        ->matchCount->toBe(1);
+        ->matchType->toBe('new')
+        ->matchCount->toBe(0);
 });
 
 test('normalizes email domains to lowercase', function () {
@@ -228,29 +227,90 @@ test('normalizes email domains to lowercase', function () {
     ($this->setCompanyDomain)($company, 'acme.com');
 
     // Email with uppercase domain
-    $result = $this->matcher->match('Acme Inc', ['JOHN@ACME.COM'], $this->team->id);
+    $result = $this->matcher->match('', 'Acme Inc', ['JOHN@ACME.COM'], $this->team->id);
 
     expect($result)
         ->matchType->toBe('domain')
         ->companyId->toBe($company->id);
 });
 
+test('matches company by ID with highest priority', function () {
+    $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+
+    $result = $this->matcher->match($company->id, 'Different Name', [], $this->team->id);
+
+    expect($result)
+        ->companyName->toBe('Acme Inc')
+        ->matchType->toBe('id')
+        ->matchCount->toBe(1)
+        ->companyId->toBe($company->id);
+});
+
+test('prioritizes ID match over domain match', function () {
+    // Company matched by ID
+    $idCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'ID Company']);
+
+    // Company matched by domain
+    $domainCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Domain Company']);
+    ($this->setCompanyDomain)($domainCompany, 'acme.com');
+
+    $result = $this->matcher->match($idCompany->id, 'Some Name', ['john@acme.com'], $this->team->id);
+
+    // Should match by ID, not domain
+    expect($result)
+        ->companyName->toBe('ID Company')
+        ->matchType->toBe('id')
+        ->companyId->toBe($idCompany->id);
+});
+
+test('ignores invalid company ID and falls back to domain', function () {
+    $company = Company::factory()->for($this->team, 'team')->create(['name' => 'Acme Inc']);
+    ($this->setCompanyDomain)($company, 'acme.com');
+
+    $result = $this->matcher->match('not-a-valid-ulid', 'Some Name', ['john@acme.com'], $this->team->id);
+
+    expect($result)
+        ->matchType->toBe('domain')
+        ->companyId->toBe($company->id);
+});
+
+test('returns new when ID not found and no other matches', function () {
+    $result = $this->matcher->match('01KCCNZ9T2X1R00369K6WM6WK2', 'New Company', [], $this->team->id);
+
+    expect($result)
+        ->companyName->toBe('New Company')
+        ->matchType->toBe('new')
+        ->matchCount->toBe(0)
+        ->companyId->toBeNull();
+});
+
+test('does not match company ID from other team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherCompany = Company::factory()->for($otherTeam, 'team')->create(['name' => 'Other Team Company']);
+
+    $result = $this->matcher->match($otherCompany->id, 'Some Name', [], $this->team->id);
+
+    expect($result)
+        ->matchType->toBe('new')
+        ->companyId->toBeNull();
+});
+
 test('CompanyMatchResult helper methods work correctly', function () {
     $newResult = new CompanyMatchResult(companyName: 'Test', matchType: 'new', matchCount: 0);
     expect($newResult->isNew())->toBeTrue()
-        ->and($newResult->isAmbiguous())->toBeFalse()
+        ->and($newResult->isNone())->toBeFalse()
         ->and($newResult->isDomainMatch())->toBeFalse()
-        ->and($newResult->isNameMatch())->toBeFalse();
+        ->and($newResult->isIdMatch())->toBeFalse();
 
     $domainResult = new CompanyMatchResult(companyName: 'Test', matchType: 'domain', matchCount: 1, companyId: '01kccnz9t2x1r00369k6wm6wk2');
     expect($domainResult->isDomainMatch())->toBeTrue()
         ->and($domainResult->isNew())->toBeFalse();
 
-    $nameResult = new CompanyMatchResult(companyName: 'Test', matchType: 'name', matchCount: 1, companyId: '01kccnz9t2x1r00369k6wm6wk2');
-    expect($nameResult->isNameMatch())->toBeTrue()
-        ->and($nameResult->isDomainMatch())->toBeFalse();
+    $idResult = new CompanyMatchResult(companyName: 'Test', matchType: 'id', matchCount: 1, companyId: '01kccnz9t2x1r00369k6wm6wk2');
+    expect($idResult->isIdMatch())->toBeTrue()
+        ->and($idResult->isDomainMatch())->toBeFalse();
 
-    $ambiguousResult = new CompanyMatchResult(companyName: 'Test', matchType: 'ambiguous', matchCount: 3);
-    expect($ambiguousResult->isAmbiguous())->toBeTrue()
-        ->and($ambiguousResult->isNew())->toBeFalse();
+    $noneResult = new CompanyMatchResult(companyName: '', matchType: 'none', matchCount: 0);
+    expect($noneResult->isNone())->toBeTrue()
+        ->and($noneResult->isNew())->toBeFalse();
 });

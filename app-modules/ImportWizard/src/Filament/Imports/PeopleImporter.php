@@ -38,12 +38,40 @@ final class PeopleImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
+            ImportColumn::make('company_id')
+                ->label('Company Record ID')
+                ->guess(['company_id', 'company_record_id'])
+                ->rules(['nullable', 'string', 'ulid'])
+                ->example('01HQWX...')
+                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
+                    if (blank($state) || ! $importer->import->team_id) {
+                        return;
+                    }
+
+                    $companyId = trim($state);
+
+                    // Verify company exists in current team
+                    $company = Company::query()
+                        ->where('id', $companyId)
+                        ->where('team_id', $importer->import->team_id)
+                        ->first();
+
+                    if ($company) {
+                        $record->company_id = $company->getKey();
+                    }
+                }),
+
             ImportColumn::make('company_name')
                 ->label('Company Name')
                 ->guess(['company_name', 'Company'])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
+                    // Skip if company already set by company_id column
+                    if ($record->company_id) {
+                        return;
+                    }
+
                     if (! $importer->import->team_id) {
                         throw new \RuntimeException('Team ID is required for import');
                     }
@@ -52,10 +80,9 @@ final class PeopleImporter extends BaseImporter
                     $emails = $importer->extractEmails();
 
                     // Try domain-based matching first when company_name is empty but emails exist
-                    // This enables Attio-style auto-linking: person with @acme.com → Acme company
                     if ($companyName === '' && $emails !== []) {
                         $matcher = app(CompanyMatcher::class);
-                        $result = $matcher->match('', $emails, $importer->import->team_id);
+                        $result = $matcher->match('', '', $emails, $importer->import->team_id);
 
                         if ($result->isDomainMatch() && $result->companyId !== null) {
                             $record->company_id = $result->companyId;
@@ -69,7 +96,7 @@ final class PeopleImporter extends BaseImporter
                         return;
                     }
 
-                    // Fallback to name-based firstOrCreate
+                    // Find or create company by name (prevents duplicates within import)
                     try {
                         $company = Company::firstOrCreate(
                             [
