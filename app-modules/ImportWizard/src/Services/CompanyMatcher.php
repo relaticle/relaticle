@@ -74,7 +74,7 @@ final class CompanyMatcher
             $domainMatches = $this->findInCacheByDomain($domains);
 
             if (count($domainMatches) >= 1) {
-                // Take first match
+                // Domain field is unique per company, so take first match
                 $company = reset($domainMatches);
 
                 return new CompanyMatchResult(
