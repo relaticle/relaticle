@@ -99,6 +99,6 @@ final class ColumnAnalysis extends Data
     private function errorIssues(): Collection
     {
         /** @var Collection<int, ValueIssue> */
-        return $this->issues->toCollection()->where('severity', 'error')->values();
+        return once(fn () => $this->issues->toCollection()->where('severity', 'error')->values());
     }
 }
