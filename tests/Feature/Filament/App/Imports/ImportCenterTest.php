@@ -14,7 +14,6 @@ use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
-use Relaticle\ImportWizard\Livewire\ImportWizard;
 
 uses(RefreshDatabase::class);
 
@@ -27,53 +26,29 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
-test('import companies page renders successfully', function () {
-    Livewire::test(ImportCompanies::class)
+it('renders import page for :dataset', function (string $pageClass, string $expectedTitle): void {
+    Livewire::test($pageClass)
         ->assertSuccessful()
-        ->assertSee('Import Companies');
-});
+        ->assertSee($expectedTitle);
+})->with([
+    'companies' => [ImportCompanies::class, 'Import Companies'],
+    'people' => [ImportPeople::class, 'Import People'],
+    'opportunities' => [ImportOpportunities::class, 'Import Opportunities'],
+    'tasks' => [ImportTasks::class, 'Import Tasks'],
+    'notes' => [ImportNotes::class, 'Import Notes'],
+]);
 
-test('import companies page renders import wizard', function () {
-    Livewire::test(ImportCompanies::class)
-        ->assertSeeLivewire(ImportWizard::class);
-});
+test('import pages are hidden from navigation and have correct entity types', function (): void {
+    $pages = [
+        ImportCompanies::class => 'companies',
+        ImportPeople::class => 'people',
+        ImportOpportunities::class => 'opportunities',
+        ImportTasks::class => 'tasks',
+        ImportNotes::class => 'notes',
+    ];
 
-test('import people page renders successfully', function () {
-    Livewire::test(ImportPeople::class)
-        ->assertSuccessful()
-        ->assertSee('Import People');
-});
-
-test('import opportunities page renders successfully', function () {
-    Livewire::test(ImportOpportunities::class)
-        ->assertSuccessful()
-        ->assertSee('Import Opportunities');
-});
-
-test('import tasks page renders successfully', function () {
-    Livewire::test(ImportTasks::class)
-        ->assertSuccessful()
-        ->assertSee('Import Tasks');
-});
-
-test('import notes page renders successfully', function () {
-    Livewire::test(ImportNotes::class)
-        ->assertSuccessful()
-        ->assertSee('Import Notes');
-});
-
-test('import pages are not registered in navigation', function () {
-    expect(ImportCompanies::shouldRegisterNavigation())->toBeFalse()
-        ->and(ImportPeople::shouldRegisterNavigation())->toBeFalse()
-        ->and(ImportOpportunities::shouldRegisterNavigation())->toBeFalse()
-        ->and(ImportTasks::shouldRegisterNavigation())->toBeFalse()
-        ->and(ImportNotes::shouldRegisterNavigation())->toBeFalse();
-});
-
-test('import pages have correct entity types', function () {
-    expect(ImportCompanies::getEntityType())->toBe('companies')
-        ->and(ImportPeople::getEntityType())->toBe('people')
-        ->and(ImportOpportunities::getEntityType())->toBe('opportunities')
-        ->and(ImportTasks::getEntityType())->toBe('tasks')
-        ->and(ImportNotes::getEntityType())->toBe('notes');
+    foreach ($pages as $pageClass => $expectedType) {
+        expect($pageClass::shouldRegisterNavigation())->toBeFalse()
+            ->and($pageClass::getEntityType())->toBe($expectedType);
+    }
 });

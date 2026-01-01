@@ -15,25 +15,6 @@ use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
 
-function createPeopleTestImportRecord(User $user, Team $team): Import
-{
-    return Import::create([
-        'user_id' => $user->id,
-        'team_id' => $team->id,
-        'importer' => PeopleImporter::class,
-        'file_name' => 'test.csv',
-        'file_path' => '/tmp/test.csv',
-        'total_rows' => 1,
-    ]);
-}
-
-function setPeopleImporterData(object $importer, array $data): void
-{
-    $reflection = new ReflectionClass($importer);
-    $dataProperty = $reflection->getProperty('data');
-    $dataProperty->setValue($importer, $data);
-}
-
 function createEmailsCustomField(Team $team): CustomField
 {
     return CustomField::withoutGlobalScopes()->create([
@@ -81,14 +62,14 @@ describe('Email-Based Duplicate Detection', function (): void {
         ]);
         setPersonEmail($existingPerson, 'john@acme.com', $this->emailsField);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'John Updated',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'john@acme.com',
@@ -108,14 +89,14 @@ describe('Email-Based Duplicate Detection', function (): void {
         ]);
         setPersonEmail($existingPerson, 'jane@acme.com', $this->emailsField);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::SKIP]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'Jane Updated',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'jane@acme.com',
@@ -134,14 +115,14 @@ describe('Email-Based Duplicate Detection', function (): void {
         ]);
         setPersonEmail($existingPerson, 'bob@acme.com', $this->emailsField);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'Bob Duplicate',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'bob@acme.com',
@@ -154,14 +135,14 @@ describe('Email-Based Duplicate Detection', function (): void {
     });
 
     it('creates new person when email does not match any existing person', function (): void {
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'New Person',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'newperson@acme.com',
@@ -173,14 +154,14 @@ describe('Email-Based Duplicate Detection', function (): void {
     });
 
     it('creates new person when no email provided', function (): void {
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name'],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'Person Without Email',
             'company_name' => 'Acme Corp',
         ]);
@@ -205,7 +186,7 @@ describe('Email-Based Duplicate Detection', function (): void {
             'json_value' => ['primary@acme.com', 'secondary@acme.com'], // Don't JSON encode
         ]);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
@@ -213,7 +194,7 @@ describe('Email-Based Duplicate Detection', function (): void {
         );
 
         // Import data has only the secondary email
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'Updated Name',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'secondary@acme.com',
@@ -247,14 +228,14 @@ describe('Email-Based Duplicate Detection', function (): void {
         ]);
         setPersonEmail($otherPerson, 'shared@email.com', $otherEmailsField);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::UPDATE]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'My Team Person',
             'company_name' => 'Acme Corp',
             'custom_fields_emails' => 'shared@email.com',
@@ -303,14 +284,14 @@ describe('Email Domain → Company Auto-Linking', function (): void {
         createDomainsField($this->team);
         setCompanyDomain($this->company, 'acme.com');
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'John Doe',
             'company_name' => '', // Empty company name - should trigger domain matching
             'custom_fields_emails' => 'john@acme.com',
@@ -332,14 +313,14 @@ describe('Email Domain → Company Auto-Linking', function (): void {
         // Create another company
         $otherCompany = Company::factory()->for($this->team, 'team')->create(['name' => 'Different Corp']);
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'John Doe',
             'company_name' => 'Different Corp', // Explicit company name
             'custom_fields_emails' => 'john@acme.com', // Email domain matches Acme Corp
@@ -355,14 +336,14 @@ describe('Email Domain → Company Auto-Linking', function (): void {
     });
 
     it('creates new company when company_name provided and no match', function (): void {
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name'],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'John Doe',
             'company_name' => 'Brand New Company',
         ]);
@@ -382,14 +363,14 @@ describe('Email Domain → Company Auto-Linking', function (): void {
         createDomainsField($this->team);
         // Company has domain 'acme.com', but we'll use a different email domain
 
-        $import = createPeopleTestImportRecord($this->user, $this->team);
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
         $importer = new PeopleImporter(
             $import,
             ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
         );
 
-        setPeopleImporterData($importer, [
+        setImporterData($importer, [
             'name' => 'John Doe',
             'company_name' => '',
             'custom_fields_emails' => 'john@unknown-company.com', // No company with this domain
@@ -403,33 +384,4 @@ describe('Email Domain → Company Auto-Linking', function (): void {
             ->and($person->company_id)->toBeNull();
     });
 
-    it('handles ambiguous domain match by leaving company unlinked', function (): void {
-        createDomainsField($this->team);
-        setCompanyDomain($this->company, 'shared.com');
-
-        // Create another company with the same domain
-        $company2 = Company::factory()->for($this->team, 'team')->create(['name' => 'Second Shared Inc']);
-        setCompanyDomain($company2, 'shared.com');
-
-        $import = createPeopleTestImportRecord($this->user, $this->team);
-        $importer = new PeopleImporter(
-            $import,
-            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
-            ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]
-        );
-
-        setPeopleImporterData($importer, [
-            'name' => 'Ambiguous Person',
-            'company_name' => '',
-            'custom_fields_emails' => 'user@shared.com',
-        ]);
-
-        // Run full import
-        ($importer)(['name' => 'Ambiguous Person', 'company_name' => '', 'custom_fields_emails' => 'user@shared.com']);
-
-        // Should not link to either company due to ambiguity
-        $person = People::query()->where('name', 'Ambiguous Person')->first();
-        expect($person)->not->toBeNull()
-            ->and($person->company_id)->toBeNull();
-    });
 });

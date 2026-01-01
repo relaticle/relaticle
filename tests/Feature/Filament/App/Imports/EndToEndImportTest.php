@@ -149,8 +149,8 @@ describe('End-to-End People Import', function (): void {
         ]);
 
         // Import CSV with same email but different name
-        $csvData = "name,company_name,custom_fields_emails\n";
-        $csvData .= "John Doe,New Company,john@example.com\n";
+        $csvData = "name,custom_fields_emails\n";
+        $csvData .= "John Doe,john@example.com\n";
 
         $csvPath = 'test-imports/duplicate-test.csv';
         Storage::disk('local')->put($csvPath, $csvData);
@@ -172,7 +172,6 @@ describe('End-to-End People Import', function (): void {
             rowCount: 1,
             columnMap: [
                 'name' => 'name',
-                'company_name' => 'company_name',
                 'custom_fields_emails' => 'custom_fields_emails',
             ],
             options: [],
@@ -186,7 +185,7 @@ describe('End-to-End People Import', function (): void {
         $person = People::first();
         expect($person->id)->toBe($existingPerson->id);
         expect($person->name)->toBe('John Doe'); // Name updated
-        expect($person->company->name)->toBe('New Company'); // Company updated
+        expect($person->company_id)->toBe($existingCompany->id); // Company preserved
     });
 
     it('imports large dataset efficiently', function (): void {

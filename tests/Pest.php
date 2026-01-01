@@ -50,7 +50,46 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/*
+|--------------------------------------------------------------------------
+| Import Test Helpers
+|--------------------------------------------------------------------------
+|
+| Shared helper functions for ImportWizard module tests.
+|
+*/
+
+use App\Models\Team;
+use App\Models\User;
+use Relaticle\ImportWizard\Models\Import;
+
+/**
+ * Create an Import record for testing.
+ */
+function createImportRecord(User $user, Team $team, string $importerClass = \Relaticle\ImportWizard\Filament\Imports\CompanyImporter::class): Import
 {
-    // ..
+    return Import::create([
+        'user_id' => $user->id,
+        'team_id' => $team->id,
+        'importer' => $importerClass,
+        'file_name' => 'test.csv',
+        'file_path' => '/tmp/test.csv',
+        'total_rows' => 1,
+    ]);
+}
+
+/**
+ * Set data on an importer instance via reflection.
+ */
+function setImporterData(object $importer, array $data): void
+{
+    $reflection = new ReflectionClass($importer);
+
+    $dataProperty = $reflection->getProperty('data');
+    $dataProperty->setValue($importer, $data);
+
+    if ($reflection->hasProperty('originalData')) {
+        $originalDataProperty = $reflection->getProperty('originalData');
+        $originalDataProperty->setValue($importer, $data);
+    }
 }

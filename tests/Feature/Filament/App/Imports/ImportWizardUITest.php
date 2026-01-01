@@ -340,6 +340,8 @@ describe('Review Values Step - Value Analysis and Corrections', function (): voi
             ->set('columnMap.name', 'name')
             ->set('columnMap.account_owner_email', 'account_owner_email')
             ->call('nextStep')
+            ->assertActionMounted('proceedWithoutUniqueIdentifiers')
+            ->callMountedAction()
             ->assertSet('currentStep', ImportWizard::STEP_REVIEW);
         // Should detect email validation error
     });
@@ -410,6 +412,8 @@ describe('Review Values Step - Value Analysis and Corrections', function (): voi
             ->set('columnMap.name', 'name')
             ->set('columnMap.account_owner_email', 'account_owner_email')
             ->call('nextStep')
+            ->assertActionMounted('proceedWithoutUniqueIdentifiers')
+            ->callMountedAction()
             ->assertSet('currentStep', ImportWizard::STEP_REVIEW)
             ->call('nextStep');
         // Should either stay at REVIEW or show modal to proceed with errors
@@ -585,6 +589,8 @@ describe('Complete Workflow Tests - Happy Paths', function (): void {
             ->set('columnMap.name', 'name')
             ->set('columnMap.account_owner_email', 'account_owner_email')
             ->call('nextStep')
+            ->assertActionMounted('proceedWithoutUniqueIdentifiers')
+            ->callMountedAction()
             ->assertSet('currentStep', ImportWizard::STEP_REVIEW)
             ->call('nextStep')
             ->assertSet('currentStep', ImportWizard::STEP_PREVIEW)
@@ -681,8 +687,10 @@ describe('Navigation and State Management', function (): void {
             ->call('nextStep')
             ->assertSet('currentStep', ImportWizard::STEP_MAP)
             ->set('columnMap.name', 'name')
-            ->set('columnMap.account_owner_email', 'email') // Map required field to avoid warning
+            ->set('columnMap.account_owner_email', 'email')
             ->call('nextStep')
+            ->assertActionMounted('proceedWithoutUniqueIdentifiers')
+            ->callMountedAction()
             ->assertSet('currentStep', ImportWizard::STEP_REVIEW)
             ->call('previousStep') // Back to MAP
             ->assertSet('currentStep', ImportWizard::STEP_MAP)
