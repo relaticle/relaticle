@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Http\Controllers;
 
-use Filament\Facades\Filament;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -80,7 +80,9 @@ final class PreviewController extends Controller
      */
     private function validateSession(string $sessionId): void
     {
-        $teamId = Filament::getTenant()?->getKey();
+        /** @var User|null $user */
+        $user = auth()->user();
+        $teamId = $user?->currentTeam?->getKey();
 
         if ($teamId === null || Cache::get("import:{$sessionId}:team") !== $teamId) {
             abort(404, 'Session not found');
