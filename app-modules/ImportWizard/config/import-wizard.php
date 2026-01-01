@@ -16,37 +16,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Preview Settings
+    | Session TTL
     |--------------------------------------------------------------------------
     |
-    | Configure how import previews are generated.
+    | How long import session data (cache keys and temp files) should be
+    | retained before automatic cleanup.
     |
     */
-    'preview' => [
-        // Maximum rows to process for preview generation
-        'sample_size' => 1000,
+    'session_ttl_hours' => 24,
 
-        // Maximum rows to display in the UI
-        'display_limit' => 50,
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Row Counting Settings
-    |--------------------------------------------------------------------------
-    |
-    | Configure how row counts are calculated for CSV files.
-    |
-    */
-    'row_count' => [
-        // Files smaller than this (in bytes) use exact counting
-        // Larger files use estimation for performance
-        'exact_threshold_bytes' => 1_048_576, // 1MB
-
-        // Number of rows to sample for estimation
-        'sample_size' => 100,
-
-        // Bytes to read for row size estimation
-        'sample_bytes' => 8192,
-    ],
 ];

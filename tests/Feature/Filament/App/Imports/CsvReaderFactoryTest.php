@@ -9,7 +9,6 @@ use Relaticle\ImportWizard\Services\CsvReaderFactory;
 
 beforeEach(function () {
     Storage::fake('local');
-    CsvReaderFactory::clearCache();
 });
 
 describe('Delimiter Auto-Detection', function () {
@@ -124,48 +123,6 @@ describe('Record Iteration', function () {
             ->and($records[1])->toBe(['name' => 'Alpha', 'value' => '100'])
             ->and($records[2])->toBe(['name' => 'Beta', 'value' => '200'])
             ->and($records[3])->toBe(['name' => 'Gamma', 'value' => '300']);
-    });
-});
-
-describe('Reader Caching', function () {
-    test('it caches readers when enabled', function () {
-        $csvContent = "name\nTest";
-        $csvPath = Storage::disk('local')->path('cached.csv');
-        file_put_contents($csvPath, $csvContent);
-
-        $factory = new CsvReaderFactory;
-
-        $reader1 = $factory->createFromPath($csvPath, useCache: true);
-        $reader2 = $factory->createFromPath($csvPath, useCache: true);
-
-        expect($reader1)->toBe($reader2);
-    });
-
-    test('it does not cache readers when disabled', function () {
-        $csvContent = "name\nTest";
-        $csvPath = Storage::disk('local')->path('uncached.csv');
-        file_put_contents($csvPath, $csvContent);
-
-        $factory = new CsvReaderFactory;
-
-        $reader1 = $factory->createFromPath($csvPath, useCache: false);
-        $reader2 = $factory->createFromPath($csvPath, useCache: false);
-
-        expect($reader1)->not->toBe($reader2);
-    });
-
-    test('it clears cache correctly', function () {
-        $csvContent = "name\nTest";
-        $csvPath = Storage::disk('local')->path('clear-cache.csv');
-        file_put_contents($csvPath, $csvContent);
-
-        $factory = new CsvReaderFactory;
-
-        $reader1 = $factory->createFromPath($csvPath, useCache: true);
-        CsvReaderFactory::clearCache();
-        $reader2 = $factory->createFromPath($csvPath, useCache: true);
-
-        expect($reader1)->not->toBe($reader2);
     });
 });
 

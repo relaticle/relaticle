@@ -80,23 +80,18 @@ final class OpportunityImporter extends BaseImporter
                         throw new \RuntimeException('Team ID is required for import');
                     }
 
-                    try {
-                        $company = Company::firstOrCreate(
-                            [
-                                'name' => trim($state),
-                                'team_id' => $importer->import->team_id,
-                            ],
-                            [
-                                'creator_id' => $importer->import->user_id,
-                                'creation_source' => CreationSource::IMPORT,
-                            ]
-                        );
+                    $company = Company::firstOrCreate(
+                        [
+                            'name' => trim($state),
+                            'team_id' => $importer->import->team_id,
+                        ],
+                        [
+                            'creator_id' => $importer->import->user_id,
+                            'creation_source' => CreationSource::IMPORT,
+                        ]
+                    );
 
-                        $record->company_id = $company->getKey();
-                    } catch (\Exception $e) {
-                        report($e);
-                        throw $e; // Re-throw to fail the import for this row
-                    }
+                    $record->company_id = $company->getKey();
                 }),
 
             ImportColumn::make('contact_name')
@@ -115,23 +110,18 @@ final class OpportunityImporter extends BaseImporter
                         throw new \RuntimeException('Team ID is required for import');
                     }
 
-                    try {
-                        $contact = People::firstOrCreate(
-                            [
-                                'name' => trim($state),
-                                'team_id' => $importer->import->team_id,
-                            ],
-                            [
-                                'creator_id' => $importer->import->user_id,
-                                'creation_source' => CreationSource::IMPORT,
-                            ]
-                        );
+                    $contact = People::firstOrCreate(
+                        [
+                            'name' => trim($state),
+                            'team_id' => $importer->import->team_id,
+                        ],
+                        [
+                            'creator_id' => $importer->import->user_id,
+                            'creation_source' => CreationSource::IMPORT,
+                        ]
+                    );
 
-                        $record->contact_id = $contact->getKey();
-                    } catch (\Exception $e) {
-                        report($e);
-                        throw $e;
-                    }
+                    $record->contact_id = $contact->getKey();
                 }),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),

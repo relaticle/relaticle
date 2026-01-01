@@ -8,29 +8,16 @@ use League\Csv\Reader as CsvReader;
 
 /**
  * Factory for creating CSV readers with auto-detected delimiters.
- *
- * Centralizes CSV parsing configuration to eliminate code duplication
- * across CsvAnalyzer, ImportPreviewService, and ImportWizard.
  */
 final class CsvReaderFactory
 {
-    /** @var array<string, CsvReader<array<string, mixed>>> */
-    private static array $readerCache = [];
-
     /**
      * Create a CSV reader with auto-detected delimiter.
      *
-     * @param  bool  $useCache  Whether to cache and reuse readers for the same path
      * @return CsvReader<array<string, mixed>>
      */
-    public function createFromPath(string $csvPath, int $headerOffset = 0, bool $useCache = false): CsvReader
+    public function createFromPath(string $csvPath, int $headerOffset = 0): CsvReader
     {
-        $cacheKey = $csvPath.':'.$headerOffset;
-
-        if ($useCache && isset(self::$readerCache[$cacheKey])) {
-            return self::$readerCache[$cacheKey];
-        }
-
         $csvReader = CsvReader::createFromPath($csvPath);
         $csvReader->setHeaderOffset($headerOffset);
 
@@ -39,19 +26,7 @@ final class CsvReaderFactory
             $csvReader->setDelimiter($delimiter);
         }
 
-        if ($useCache) {
-            self::$readerCache[$cacheKey] = $csvReader;
-        }
-
         return $csvReader;
-    }
-
-    /**
-     * Clear the reader cache.
-     */
-    public static function clearCache(): void
-    {
-        self::$readerCache = [];
     }
 
     /**

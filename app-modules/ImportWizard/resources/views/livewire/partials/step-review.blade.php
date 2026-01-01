@@ -41,7 +41,7 @@
                     : $this->columnAnalyses->first();
                 $perPage = 100;
                 $hasColumnErrors = $selectedAnalysis?->hasErrors() ?? false;
-                $errorValueCount = $selectedAnalysis?->getErrorValueCount() ?? 0;
+                $errorValueCount = $selectedAnalysis?->getErrorCount() ?? 0;
 
                 if ($showOnlyErrors && $hasColumnErrors) {
                     $values = $selectedAnalysis?->paginatedErrorValues($reviewPage, $perPage) ?? [];

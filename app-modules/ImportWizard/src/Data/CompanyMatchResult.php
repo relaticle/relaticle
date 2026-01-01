@@ -24,39 +24,8 @@ final class CompanyMatchResult extends Data
         public ?string $companyId = null,
     ) {}
 
-    public function isIdMatch(): bool
-    {
-        return $this->matchType === 'id';
-    }
-
     public function isDomainMatch(): bool
     {
         return $this->matchType === 'domain';
-    }
-
-    public function isNew(): bool
-    {
-        return $this->matchType === 'new';
-    }
-
-    public function isNone(): bool
-    {
-        return $this->matchType === 'none';
-    }
-
-    /**
-     * @deprecated Name matching removed - use ID or domain matching only
-     */
-    public function isNameMatch(): bool
-    {
-        return $this->matchType === 'name';
-    }
-
-    /**
-     * @deprecated Ambiguous handling simplified - returns 'new' instead
-     */
-    public function isAmbiguous(): bool
-    {
-        return $this->matchType === 'ambiguous';
     }
 }

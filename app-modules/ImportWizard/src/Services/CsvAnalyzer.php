@@ -200,19 +200,16 @@ final readonly class CsvAnalyzer
         $isMultiValue = false;
 
         // Get rules from ImportColumn
-        if ($importerColumn instanceof \Filament\Actions\Imports\ImportColumn) {
+        if ($importerColumn instanceof ImportColumn) {
             $rules = $this->filterValidatableRules($importerColumn->getDataValidationRules());
         }
 
         // For custom fields, use ValidationService to get complete rules
-        if ($customField instanceof \Relaticle\CustomFields\Models\CustomField) {
-            $customFieldRules = $this->validationService->getValidationRules($customField);
-            $customFieldRules = $this->filterValidatableRules($customFieldRules);
-
-            // Merge rules, preferring custom field rules for overlapping rule types
+        if ($customField instanceof CustomField) {
+            $customFieldRules = $this->filterValidatableRules(
+                $this->validationService->getValidationRules($customField)
+            );
             $rules = $this->mergeValidationRules($rules, $customFieldRules);
-
-            // Get item-level validation rules for multi-value fields (e.g., email format)
             $itemRules = $this->validationService->getItemValidationRules($customField);
             $isMultiValue = $customField->isMultiChoiceField();
         }
@@ -333,7 +330,7 @@ final readonly class CsvAnalyzer
             // For multi-value fields with item rules, split and validate each item
             if ($rulesData['isMultiValue'] && $rulesData['itemRules'] !== []) {
                 $issue = $this->validateMultiValueField($value, $rulesData['itemRules'], $count);
-                if ($issue instanceof \Relaticle\ImportWizard\Data\ValueIssue) {
+                if ($issue instanceof ValueIssue) {
                     $issues[] = $issue;
                 }
 

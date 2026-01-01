@@ -75,6 +75,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
     #[Validate('required|file|max:51200|mimes:csv,txt')]
     public mixed $uploadedFile = null;
 
+    public ?string $sessionId = null;
+
     public ?string $persistedFilePath = null;
 
     public int $rowCount = 0;
@@ -446,6 +448,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->currentStep = self::STEP_UPLOAD;
         // Note: entityType and returnUrl are locked, don't reset them
         $this->uploadedFile = null;
+        $this->sessionId = null;
         $this->persistedFilePath = null;
         $this->rowCount = 0;
         $this->csvHeaders = [];

@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Services;
 use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Models\CustomFieldValue;
+use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 
 /**
@@ -55,9 +56,9 @@ final class CompanyMatcher
         $this->ensureCompaniesLoaded($teamId);
 
         // Priority 1: ID matching (highest confidence)
-        if ($companyId !== '' && \Illuminate\Support\Str::isUlid($companyId)) {
+        if ($companyId !== '' && Str::isUlid($companyId)) {
             $company = $this->findInCacheById($companyId);
-            if ($company !== null) {
+            if ($company instanceof Company) {
                 return new CompanyMatchResult(
                     companyName: $company->name,
                     matchType: 'id',
@@ -128,7 +129,9 @@ final class CompanyMatcher
 
         // Index by ID
         foreach ($companies as $company) {
-            $this->companyCache['byId'][(string) $company->id] = $company;
+            /** @var string $id */
+            $id = (string) $company->id;
+            $this->companyCache['byId'][$id] = $company;
         }
 
         // Index by domains custom field (stored as json_value collection)

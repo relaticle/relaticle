@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Data;
 
+use Illuminate\Support\Collection;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\DataCollection;
@@ -32,7 +33,6 @@ final class ColumnAnalysis extends Data
 
     /**
      * Get unique values for display with "load more" pattern.
-     * Returns first (page * perPage) items cumulatively.
      *
      * @return array<string, int>
      */
@@ -43,18 +43,12 @@ final class ColumnAnalysis extends Data
         if ($search !== null && $search !== '') {
             $values = array_filter(
                 $values,
-                fn (int $count, string $value): bool => str_contains(
-                    strtolower($value),
-                    strtolower($search)
-                ),
+                fn (int $count, string $value): bool => str_contains(strtolower($value), strtolower($search)),
                 ARRAY_FILTER_USE_BOTH
             );
         }
 
-        // Cumulative: show all items up to page * perPage
-        $limit = $page * $perPage;
-
-        return array_slice($values, 0, $limit, preserve_keys: true);
+        return array_slice($values, 0, $page * $perPage, preserve_keys: true);
     }
 
     /**
@@ -62,8 +56,7 @@ final class ColumnAnalysis extends Data
      */
     public function hasErrors(): bool
     {
-        return $this->issues->toCollection()
-            ->contains('severity', 'error');
+        return $this->errorIssues()->isNotEmpty();
     }
 
     /**
@@ -71,9 +64,7 @@ final class ColumnAnalysis extends Data
      */
     public function getErrorCount(): int
     {
-        return $this->issues->toCollection()
-            ->where('severity', 'error')
-            ->count();
+        return $this->errorIssues()->count();
     }
 
     /**
@@ -91,10 +82,7 @@ final class ColumnAnalysis extends Data
      */
     public function paginatedErrorValues(int $page = 1, int $perPage = 100): array
     {
-        $errorValues = $this->issues->toCollection()
-            ->where('severity', 'error')
-            ->pluck('value')
-            ->toArray();
+        $errorValues = $this->errorIssues()->pluck('value')->all();
 
         $filteredValues = array_filter(
             $this->uniqueValues,
@@ -102,18 +90,15 @@ final class ColumnAnalysis extends Data
             ARRAY_FILTER_USE_BOTH
         );
 
-        $limit = $page * $perPage;
-
-        return array_slice($filteredValues, 0, $limit, preserve_keys: true);
+        return array_slice($filteredValues, 0, $page * $perPage, preserve_keys: true);
     }
 
     /**
-     * Get the count of unique values that have errors.
+     * @return Collection<int, ValueIssue>
      */
-    public function getErrorValueCount(): int
+    private function errorIssues(): Collection
     {
-        return $this->issues->toCollection()
-            ->where('severity', 'error')
-            ->count();
+        /** @var Collection<int, ValueIssue> */
+        return $this->issues->toCollection()->where('severity', 'error')->values();
     }
 }

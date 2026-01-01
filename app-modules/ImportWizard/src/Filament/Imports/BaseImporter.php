@@ -64,7 +64,7 @@ abstract class BaseImporter extends Importer
     }
 
     /**
-     * Set row data for preview mode (used by ImportPreviewService).
+     * Set row data for preview mode (used by PreviewChunkService).
      *
      * This allows the preview service to call public Filament methods
      * (remapData, castData, resolveRecord) without using reflection.
