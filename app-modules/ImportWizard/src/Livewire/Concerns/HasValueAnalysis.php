@@ -213,4 +213,13 @@ trait HasValueAnalysis
     {
         $this->reviewPage++;
     }
+
+    /**
+     * Toggle the "show only errors" filter.
+     */
+    public function toggleShowOnlyErrors(): void
+    {
+        $this->showOnlyErrors = ! $this->showOnlyErrors;
+        $this->reviewPage = 1;
+    }
 }

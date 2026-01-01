@@ -83,4 +83,37 @@ final class ColumnAnalysis extends Data
     {
         return $this->issues->toCollection()->firstWhere('value', $value);
     }
+
+    /**
+     * Get unique values that have errors, with "load more" pattern.
+     *
+     * @return array<string, int>
+     */
+    public function paginatedErrorValues(int $page = 1, int $perPage = 100): array
+    {
+        $errorValues = $this->issues->toCollection()
+            ->where('severity', 'error')
+            ->pluck('value')
+            ->toArray();
+
+        $filteredValues = array_filter(
+            $this->uniqueValues,
+            fn (int $count, string $value): bool => in_array($value, $errorValues, true),
+            ARRAY_FILTER_USE_BOTH
+        );
+
+        $limit = $page * $perPage;
+
+        return array_slice($filteredValues, 0, $limit, preserve_keys: true);
+    }
+
+    /**
+     * Get the count of unique values that have errors.
+     */
+    public function getErrorValueCount(): int
+    {
+        return $this->issues->toCollection()
+            ->where('severity', 'error')
+            ->count();
+    }
 }

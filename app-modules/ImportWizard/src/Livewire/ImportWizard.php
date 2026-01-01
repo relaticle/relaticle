@@ -98,6 +98,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public ?string $expandedColumn = null;
 
+    public bool $showOnlyErrors = false;
+
     // Step 4: Preview
     /** @var array<string, mixed>|null */
     public ?array $previewResultData = null;
@@ -493,6 +495,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     {
         $this->expandedColumn = $this->expandedColumn === $columnName ? null : $columnName;
         $this->reviewPage = 1;
+        $this->showOnlyErrors = false;
     }
 
     /**

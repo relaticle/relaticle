@@ -40,8 +40,17 @@
                     ? $this->columnAnalyses->firstWhere('mappedToField', $expandedColumn)
                     : $this->columnAnalyses->first();
                 $perPage = 100;
-                $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage) ?? [];
-                $totalUnique = $selectedAnalysis?->uniqueCount ?? 0;
+                $hasColumnErrors = $selectedAnalysis?->hasErrors() ?? false;
+                $errorValueCount = $selectedAnalysis?->getErrorValueCount() ?? 0;
+
+                if ($showOnlyErrors && $hasColumnErrors) {
+                    $values = $selectedAnalysis?->paginatedErrorValues($reviewPage, $perPage) ?? [];
+                    $totalUnique = $errorValueCount;
+                } else {
+                    $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage) ?? [];
+                    $totalUnique = $selectedAnalysis?->uniqueCount ?? 0;
+                }
+
                 $showing = min($reviewPage * $perPage, $totalUnique);
                 $hasMore = $showing < $totalUnique;
             @endphp
@@ -49,8 +58,24 @@
             @if ($selectedAnalysis)
                 {{-- Column Header with Stats --}}
                 <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                        <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($totalUnique) }}</span> unique values
+                    <div class="flex items-center gap-3">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($selectedAnalysis->uniqueCount) }}</span> unique values
+                        </div>
+                        @if ($hasColumnErrors)
+                            <button
+                                type="button"
+                                wire:click="toggleShowOnlyErrors"
+                                @class([
+                                    'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-colors',
+                                    'bg-danger-100 text-danger-700 dark:bg-danger-900 dark:text-danger-300' => $showOnlyErrors,
+                                    'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700' => !$showOnlyErrors,
+                                ])
+                            >
+                                <x-filament::icon icon="heroicon-m-funnel" class="h-3.5 w-3.5" />
+                                {{ $showOnlyErrors ? 'Show all' : 'Errors only (' . $errorValueCount . ')' }}
+                            </button>
+                        @endif
                     </div>
                     <div class="text-xs text-gray-400">
                         Showing {{ number_format($showing) }} of {{ number_format($totalUnique) }}
