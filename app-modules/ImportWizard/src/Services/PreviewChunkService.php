@@ -58,7 +58,7 @@ final readonly class PreviewChunkService
             ->limit($limit)
             ->process($csvReader);
 
-        $recordResolver ??= tap(app(ImportRecordResolver::class), fn ($r) => $r->loadForTeam($teamId, $importerClass));
+        $recordResolver ??= tap(app(ImportRecordResolver::class), fn (ImportRecordResolver $r) => $r->loadForTeam($teamId, $importerClass));
 
         $creates = 0;
         $updates = 0;
