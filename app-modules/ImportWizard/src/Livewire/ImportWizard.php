@@ -23,7 +23,12 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
-use Relaticle\ImportWizard\Filament\Concerns\HasImportEntities;
+use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
+use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
+use Relaticle\ImportWizard\Filament\Imports\NoteImporter;
+use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
+use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
+use Relaticle\ImportWizard\Filament\Imports\TaskImporter;
 use Relaticle\ImportWizard\Jobs\StreamingImportCsv;
 use Relaticle\ImportWizard\Livewire\Concerns\HasColumnMapping;
 use Relaticle\ImportWizard\Livewire\Concerns\HasCsvParsing;
@@ -45,7 +50,6 @@ final class ImportWizard extends Component implements HasActions, HasForms
 {
     use HasColumnMapping;
     use HasCsvParsing;
-    use HasImportEntities;
     use HasImportPreview;
     use HasValueAnalysis;
     use InteractsWithActions;
@@ -604,6 +608,47 @@ final class ImportWizard extends Component implements HasActions, HasForms
         }
 
         return $count;
+    }
+
+    /**
+     * Get entity configuration for imports.
+     *
+     * @return array<string, array{label: string, icon: string, description: string, importer: class-string<BaseImporter>}>
+     */
+    public function getEntities(): array
+    {
+        return [
+            'companies' => [
+                'label' => 'Companies',
+                'icon' => 'heroicon-o-building-office-2',
+                'description' => 'Import company records with addresses, phone numbers, and custom fields',
+                'importer' => CompanyImporter::class,
+            ],
+            'people' => [
+                'label' => 'People',
+                'icon' => 'heroicon-o-users',
+                'description' => 'Import contacts with their company associations and custom fields',
+                'importer' => PeopleImporter::class,
+            ],
+            'opportunities' => [
+                'label' => 'Opportunities',
+                'icon' => 'heroicon-o-currency-dollar',
+                'description' => 'Import deals and opportunities with values, stages, and dates',
+                'importer' => OpportunityImporter::class,
+            ],
+            'tasks' => [
+                'label' => 'Tasks',
+                'icon' => 'heroicon-o-clipboard-document-check',
+                'description' => 'Import tasks with priorities, statuses, and entity associations',
+                'importer' => TaskImporter::class,
+            ],
+            'notes' => [
+                'label' => 'Notes',
+                'icon' => 'heroicon-o-document-text',
+                'description' => 'Import notes linked to companies, people, or opportunities',
+                'importer' => NoteImporter::class,
+            ],
+        ];
     }
 
     public function render(): View
