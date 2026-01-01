@@ -16,7 +16,5 @@
 {{-- Navigation buttons outside nested component --}}
 <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
     <x-filament::button wire:click="previousStep" color="gray">Back</x-filament::button>
-    <x-filament::button wire:click="executeImport">
-        Start Import
-    </x-filament::button>
+    {{ $this->startImportAction }}
 </div>

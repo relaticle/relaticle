@@ -225,6 +225,21 @@ final class ImportWizard extends Component implements HasActions, HasForms
     }
 
     /**
+     * Start import action with confirmation modal.
+     */
+    public function startImportAction(): Action
+    {
+        return Action::make('startImport')
+            ->label('Start Import')
+            ->icon(Heroicon::OutlinedArrowUpTray)
+            ->requiresConfirmation()
+            ->modalHeading('Confirm Import')
+            ->modalDescription('Are you sure you want to start this import? This action cannot be undone.')
+            ->modalSubmitActionLabel('Start Import')
+            ->action(fn () => $this->executeImport());
+    }
+
+    /**
      * Execute the import.
      */
     public function executeImport(): void
