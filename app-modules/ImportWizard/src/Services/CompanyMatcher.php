@@ -10,43 +10,14 @@ use App\Models\CustomFieldValue;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 
-/**
- * Smart company matching service for import previews.
- *
- * Matching priority:
- * 1. ID match: exact company ID (ULID)
- * 2. Domain match: email domain → company domains custom field
- * 3. Create: company_name provided → will create new company
- * 4. None: no company data → no association
- *
- * Returns match type for transparent preview display.
- *
- * Performance: Pre-loads all companies for a team into memory to avoid N+1 queries.
- */
 final class CompanyMatcher
 {
-    /**
-     * Cached companies indexed by ID and domain for fast lookup.
-     *
-     * @var array{byId: array<string, Company>, byDomain: array<string, array<int, Company>>}|null
-     */
+    /** @var array{byId: array<string, Company>, byDomain: array<string, array<int, Company>>}|null */
     private ?array $companyCache = null;
 
     private ?string $cachedTeamId = null;
 
-    /**
-     * Match a company by ID (highest priority) or domain (from emails).
-     *
-     * Priority:
-     * 1. ID match (if provided) - 100% accurate matching
-     * 2. Domain match (from email) - auto-linking
-     * 3. Create new (if company_name provided)
-     * 4. None (if no company data)
-     *
-     * @param  string  $companyId  Company ULID (from 'id' column if mapped)
-     * @param  string  $companyName  Company name (from 'company_name' column if mapped)
-     * @param  array<string>  $emails  Person's email addresses
-     */
+    /** @param array<string> $emails */
     public function match(string $companyId, string $companyName, array $emails, string $teamId): CompanyMatchResult
     {
         $companyId = trim($companyId);
@@ -103,9 +74,6 @@ final class CompanyMatcher
         );
     }
 
-    /**
-     * Load all companies for team into memory cache.
-     */
     private function ensureCompaniesLoaded(string $teamId): void
     {
         // Cache already loaded for this team
@@ -158,17 +126,12 @@ final class CompanyMatcher
         }
     }
 
-    /**
-     * Find company in cache by ID.
-     */
     private function findInCacheById(string $id): ?Company
     {
         return $this->companyCache['byId'][$id] ?? null;
     }
 
     /**
-     * Find companies in cache by domain.
-     *
      * @param  array<string>  $domains
      * @return array<int, Company>
      */
@@ -188,8 +151,6 @@ final class CompanyMatcher
     }
 
     /**
-     * Extract unique domains from email addresses.
-     *
      * @param  array<string>  $emails
      * @return array<string>
      */

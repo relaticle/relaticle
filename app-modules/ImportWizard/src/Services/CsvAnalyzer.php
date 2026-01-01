@@ -15,12 +15,6 @@ use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
 use Spatie\LaravelData\DataCollection;
 
-/**
- * Analyzes CSV files to extract column statistics, unique values, and detect validation issues.
- *
- * Used in the Review Values step of the import wizard to help users identify
- * and fix data problems before importing.
- */
 final readonly class CsvAnalyzer
 {
     public function __construct(
@@ -29,13 +23,8 @@ final readonly class CsvAnalyzer
     ) {}
 
     /**
-     * Analyze all mapped columns in a CSV file.
-     *
-     * Uses single-pass analysis to read CSV once and collect stats for all columns simultaneously.
-     *
-     * @param  array<string, string>  $columnMap  Maps importer field name to CSV column name
-     * @param  array<ImportColumn>  $importerColumns  Column definitions from the importer
-     * @param  string|null  $entityType  Entity model class for custom field lookup
+     * @param  array<string, string>  $columnMap
+     * @param  array<ImportColumn>  $importerColumns
      * @return Collection<int, ColumnAnalysis>
      */
     public function analyze(
@@ -133,12 +122,7 @@ final readonly class CsvAnalyzer
         })->values();
     }
 
-    /**
-     * Load all custom fields for an entity type.
-     *
-     * @param  string|null  $entityType  Model class (e.g., App\Models\Company)
-     * @return Collection<int, CustomField>
-     */
+    /** @return Collection<int, CustomField> */
     private function loadCustomFieldsForEntity(?string $entityType): Collection
     {
         if ($entityType === null) {
@@ -155,9 +139,6 @@ final readonly class CsvAnalyzer
             ->get();
     }
 
-    /**
-     * Get the morph alias for a model class.
-     */
     private function getMorphAlias(string $modelClass): string
     {
         if (! class_exists($modelClass)) {
@@ -170,11 +151,7 @@ final readonly class CsvAnalyzer
         return $model->getMorphClass();
     }
 
-    /**
-     * Get the custom field for a column if it's a custom field column.
-     *
-     * @param  Collection<int, CustomField>  $customFields
-     */
+    /** @param Collection<int, CustomField> $customFields */
     private function getCustomFieldForColumn(string $fieldName, Collection $customFields): ?CustomField
     {
         if (! str_starts_with($fieldName, 'custom_fields_')) {
@@ -186,11 +163,7 @@ final readonly class CsvAnalyzer
         return $customFields->firstWhere('code', $code);
     }
 
-    /**
-     * Get validation rules for a column from ImportColumn and/or CustomField.
-     *
-     * @return array{rules: array<int|string, mixed>, itemRules: array<int|string, mixed>, isMultiValue: bool}
-     */
+    /** @return array{rules: array<int|string, mixed>, itemRules: array<int|string, mixed>, isMultiValue: bool} */
     private function getValidationRulesForColumn(
         ?ImportColumn $importerColumn,
         ?CustomField $customField,
@@ -222,11 +195,6 @@ final readonly class CsvAnalyzer
     }
 
     /**
-     * Filter out validation rules that shouldn't be applied to individual values.
-     *
-     * Some rules like 'array', closure-based rules, or object rules
-     * don't make sense for validating individual CSV values.
-     *
      * @param  array<int|string, mixed>  $rules
      * @return array<int|string, mixed>
      */
@@ -252,9 +220,6 @@ final readonly class CsvAnalyzer
     }
 
     /**
-     * Merge two sets of validation rules, preferring rules from the second set
-     * when rule types overlap.
-     *
      * @param  array<int|string, mixed>  $baseRules
      * @param  array<int|string, mixed>  $overrideRules
      * @return array<int|string, mixed>
@@ -284,8 +249,6 @@ final readonly class CsvAnalyzer
     }
 
     /**
-     * Detect validation issues using Laravel Validator.
-     *
      * @param  array<string, int>  $values
      * @param  array{rules: array<int|string, mixed>, itemRules: array<int|string, mixed>, isMultiValue: bool}  $rulesData
      * @return array<ValueIssue>
@@ -362,11 +325,7 @@ final readonly class CsvAnalyzer
         return $issues;
     }
 
-    /**
-     * Validate a multi-value field by splitting and validating each item.
-     *
-     * @param  array<int|string, mixed>  $itemRules
-     */
+    /** @param array<int|string, mixed> $itemRules */
     private function validateMultiValueField(string $value, array $itemRules, int $count): ?ValueIssue
     {
         // Split by comma and trim each item
@@ -404,9 +363,6 @@ final readonly class CsvAnalyzer
         return null;
     }
 
-    /**
-     * Determine the field type based on ImportColumn configuration.
-     */
     private function determineFieldType(?ImportColumn $column): string
     {
         if (! $column instanceof ImportColumn) {
@@ -449,12 +405,7 @@ final readonly class CsvAnalyzer
         return $value === null || $value === '';
     }
 
-    /**
-     * Validate a single value against the rules for a field.
-     * Returns error message if validation fails, null if valid.
-     *
-     * @param  array<ImportColumn>  $importerColumns
-     */
+    /** @param array<ImportColumn> $importerColumns */
     public function validateSingleValue(
         string $value,
         string $fieldName,

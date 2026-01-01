@@ -12,11 +12,6 @@ use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
 
-/**
- * Service for processing a chunk of CSV rows for preview.
- *
- * Processes exact row ranges for accurate preview of all rows.
- */
 final readonly class PreviewChunkService
 {
     public function __construct(
@@ -25,8 +20,6 @@ final readonly class PreviewChunkService
     ) {}
 
     /**
-     * Process a chunk of CSV rows and return enriched preview data.
-     *
      * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
@@ -136,8 +129,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Get CSV headers for the enriched CSV file.
-     *
      * @param  array<string, string>  $columnMap
      * @return array<int, string>
      */
@@ -155,8 +146,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Convert a row array to ordered values for CSV writing.
-     *
      * @param  array<string, mixed>  $row
      * @param  array<string, string>  $columnMap
      * @return array<int, mixed>
@@ -180,8 +169,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Preview a single row to determine what action would be taken.
-     *
      * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
@@ -224,8 +211,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Apply value corrections to a row.
-     *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $columnMap
      * @param  array<string, array<string, string>>  $corrections
@@ -252,8 +237,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Format a row record with mapped field names.
-     *
      * @param  array<string, mixed>  $record
      * @param  array<string, string>  $columnMap
      * @return array<string, mixed>
@@ -271,11 +254,7 @@ final readonly class PreviewChunkService
         return $formatted;
     }
 
-    /**
-     * Check if the importer should have company match enrichment.
-     *
-     * @param  class-string<BaseImporter>  $importerClass
-     */
+    /** @param class-string<BaseImporter> $importerClass */
     private function shouldEnrichWithCompanyMatch(string $importerClass): bool
     {
         return in_array($importerClass, [
@@ -285,8 +264,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Enrich a row with company match data.
-     *
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
@@ -307,8 +284,6 @@ final readonly class PreviewChunkService
     }
 
     /**
-     * Extract emails from a row for company matching.
-     *
      * @param  array<string, mixed>  $row
      * @return array<string>
      */

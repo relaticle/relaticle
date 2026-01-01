@@ -15,25 +15,11 @@ use Relaticle\ImportWizard\Jobs\ProcessImportPreview;
 use Relaticle\ImportWizard\Services\ImportRecordResolver;
 use Relaticle\ImportWizard\Services\PreviewChunkService;
 
-/**
- * Provides import preview functionality for the Import Wizard's Preview step.
- *
- * Uses a hybrid approach:
- * - First batch processed synchronously for instant feedback
- * - Remaining rows processed in background job
- * - Progress tracked via Cache
- *
- * @property ImportPreviewResult|null $previewResult
- */
+/** @property ImportPreviewResult|null $previewResult */
 trait HasImportPreview
 {
     private const int INITIAL_BATCH_SIZE = 50;
 
-    /**
-     * Generate a preview of what the import will do.
-     *
-     * Processes first batch synchronously, then dispatches background job for the rest.
-     */
     protected function generateImportPreview(): void
     {
         $importerClass = $this->getImporterClass();
@@ -145,11 +131,7 @@ trait HasImportPreview
         }
     }
 
-    /**
-     * Write the initial enriched CSV with header and first batch.
-     *
-     * @param  array<int, array<string, mixed>>  $rows
-     */
+    /** @param array<int, array<string, mixed>> $rows */
     private function writeInitialEnrichedCsv(string $path, array $rows, PreviewChunkService $service): void
     {
         $writer = Writer::createFromPath($path, 'w');
@@ -161,9 +143,6 @@ trait HasImportPreview
         }
     }
 
-    /**
-     * Set preview progress in cache.
-     */
     private function setPreviewProgress(int $processed, int $creates, int $updates): void
     {
         Cache::put(
@@ -178,9 +157,6 @@ trait HasImportPreview
         );
     }
 
-    /**
-     * Get the preview processing status.
-     */
     public function getPreviewStatus(): string
     {
         if ($this->sessionId === null) {
@@ -190,11 +166,7 @@ trait HasImportPreview
         return Cache::get("import:{$this->sessionId}:status", 'pending');
     }
 
-    /**
-     * Get the preview processing progress.
-     *
-     * @return array{processed: int, creates: int, updates: int, total: int}
-     */
+    /** @return array{processed: int, creates: int, updates: int, total: int} */
     public function getPreviewProgress(): array
     {
         if ($this->sessionId === null) {
@@ -214,17 +186,11 @@ trait HasImportPreview
         ]);
     }
 
-    /**
-     * Check if preview processing is complete.
-     */
     public function isPreviewReady(): bool
     {
         return $this->getPreviewStatus() === 'ready';
     }
 
-    /**
-     * Get preview result as DTO (computed from stored array data).
-     */
     #[Computed]
     public function previewResult(): ?ImportPreviewResult
     {
@@ -240,17 +206,11 @@ trait HasImportPreview
         return ImportPreviewResult::from($this->previewResultData);
     }
 
-    /**
-     * Check if the preview indicates any records will be imported.
-     */
     public function hasRecordsToImport(): bool
     {
         return ($this->previewResultData['totalRows'] ?? 0) > 0;
     }
 
-    /**
-     * Get the count of new records to be created.
-     */
     public function getCreateCount(): int
     {
         $progress = $this->getPreviewProgress();
@@ -258,9 +218,6 @@ trait HasImportPreview
         return $progress['creates'];
     }
 
-    /**
-     * Get the count of existing records to be updated.
-     */
     public function getUpdateCount(): int
     {
         $progress = $this->getPreviewProgress();

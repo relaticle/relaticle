@@ -11,14 +11,8 @@ use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
 
-/**
- * Provides CSV file parsing functionality for the Import Wizard.
- */
 trait HasCsvParsing
 {
-    /**
-     * Parse the uploaded file and extract headers and row count.
-     */
     protected function parseUploadedFile(): void
     {
         if ($this->uploadedFile === null) {
@@ -68,9 +62,6 @@ trait HasCsvParsing
         }
     }
 
-    /**
-     * Persist the uploaded CSV file to storage in a session folder.
-     */
     protected function persistFile(TemporaryUploadedFile $file): ?string
     {
         try {
@@ -96,9 +87,6 @@ trait HasCsvParsing
         }
     }
 
-    /**
-     * Clean up temporary session folder and cache keys.
-     */
     protected function cleanupTempFile(): void
     {
         if ($this->sessionId === null) {
@@ -115,11 +103,7 @@ trait HasCsvParsing
         Cache::forget("import:{$this->sessionId}:team");
     }
 
-    /**
-     * Get preview values for a specific CSV column.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function getColumnPreviewValues(string $csvColumn, int $limit = 5): array
     {
         if ($this->persistedFilePath === null) {
