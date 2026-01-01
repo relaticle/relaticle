@@ -26,13 +26,6 @@
                 <span class="font-medium text-info-600 dark:text-info-400" x-text="updates.toLocaleString()"></span>
                 <span class="text-gray-500 dark:text-gray-400">will be updated</span>
             </div>
-            <div x-show="isProcessing" x-cloak class="flex items-center gap-1.5 ml-auto text-gray-500 dark:text-gray-400">
-                <span class="text-xs" x-text="`${processed.toLocaleString()}/${totalRows.toLocaleString()} rows`"></span>
-            </div>
-            <div x-show="isReady" x-cloak class="flex items-center gap-1.5 ml-auto">
-                <x-filament::icon icon="heroicon-m-check-circle" class="h-5 w-5 text-success-500" />
-                <span class="text-sm text-success-600 dark:text-success-400">Ready to import</span>
-            </div>
         </div>
     </div>
 
