@@ -38,7 +38,7 @@
                     Showing <span x-text="currentRowCount.toLocaleString()"></span> of <span x-text="totalRows.toLocaleString()"></span> rows
                 </span>
             </div>
-            <div x-ref="scrollContainer" class="overflow-x-auto max-h-96 overflow-y-auto">
+            <div x-ref="scrollContainer" class="overflow-x-auto max-h-96 overflow-y-auto relative">
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
                         <tr>
@@ -72,9 +72,13 @@
                         </template>
                     </tbody>
                 </table>
-            </div>
-            <div x-show="loadingMore" x-cloak class="px-3 py-4 text-center text-gray-500 border-t border-gray-200 dark:border-gray-700">
-                <x-filament::loading-indicator class="h-5 w-5 mx-auto" />
+                <div
+                    x-show="loadingMore"
+                    x-cloak
+                    class="sticky bottom-0 left-0 right-0 px-3 py-3 text-center bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700"
+                >
+                    <x-filament::loading-indicator class="h-5 w-5 mx-auto" />
+                </div>
             </div>
         </div>
     </template>
