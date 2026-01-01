@@ -67,8 +67,11 @@ describe('Upload Step', function (): void {
         if (isset($expected['step'])) {
             $component->call('nextStep')->assertSet('currentStep', $expected['step']);
         }
+        if (isset($expected['hasErrors'])) {
+            $component->assertHasErrors('uploadedFile');
+        }
     })->with([
-        'duplicate columns' => ['duplicate', "name,email,name\nAcme,a@a.com,Dup", ['step' => ImportWizard::STEP_MAP]],
+        'duplicate columns rejected' => ['duplicate', "name,email,name\nAcme,a@a.com,Dup", ['hasErrors' => true, 'rowCount' => 0]],
         'empty with headers' => ['empty', 'name,email,phone', ['rowCount' => 0, 'csvHeaders' => ['name', 'email', 'phone']]],
         'special characters' => ['special', "name\n\"Company, Inc.\"\n\"Company \"\"Quoted\"\" Name\"", ['rowCount' => 2, 'step' => ImportWizard::STEP_MAP]],
         'unicode' => ['unicode', "name\n日本会社\nДоверитель\nشركة", ['rowCount' => 3, 'step' => ImportWizard::STEP_MAP]],
@@ -97,9 +100,9 @@ describe('Column Mapping Step', function (): void {
 
         $component->assertSet($mappingOps[array_key_last($mappingOps)]['field'], $expected);
     })->with([
-        'auto-maps matching' => ["name,email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'name']], 'name'],
-        'manual mapping' => ["company_name,contact_email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'company_name']], 'company_name'],
-        'unmapping' => ["name,email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'name'], ['field' => 'columnMap.name', 'value' => '']], ''],
+        'auto-maps matching' => ['auto-map', "name,email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'name']], 'name'],
+        'manual mapping' => ['manual', "company_name,contact_email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'company_name']], 'company_name'],
+        'unmapping' => ['unmap', "name,email\nAcme,a@a.com", [['field' => 'columnMap.name', 'value' => 'name'], ['field' => 'columnMap.name', 'value' => '']], ''],
     ]);
 
     it('blocks advancement when required fields not mapped', function (): void {
