@@ -44,6 +44,7 @@ final class ProcessImportPreview implements ShouldQueue
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
+     * @param  array<string>  $initialNewCompanyNames
      */
     public function __construct(
         public string $sessionId,
@@ -60,6 +61,7 @@ final class ProcessImportPreview implements ShouldQueue
         public int $initialUpdates,
         public string $inputHash,
         public array $valueCorrections = [],
+        public array $initialNewCompanyNames = [],
     ) {
         $this->onQueue('imports');
     }
@@ -69,6 +71,9 @@ final class ProcessImportPreview implements ShouldQueue
         $processed = $this->startRow;
         $creates = $this->initialCreates;
         $updates = $this->initialUpdates;
+
+        // Track unique new company names across all chunks
+        $newCompanyNames = array_flip($this->initialNewCompanyNames);
 
         // Pre-load records for fast lookups
         $recordResolver = app(ImportRecordResolver::class);
@@ -110,8 +115,13 @@ final class ProcessImportPreview implements ShouldQueue
                 $updates += $result['updates'];
                 $processed += $limit;
 
+                // Accumulate unique new company names
+                foreach ($result['newCompanyNames'] as $companyName) {
+                    $newCompanyNames[$companyName] = true;
+                }
+
                 // Update progress in consolidated cache
-                $this->updateProgress($processed, $creates, $updates);
+                $this->updateProgress($processed, $creates, $updates, count($newCompanyNames));
             }
 
             // Processing complete - status will be derived as 'ready' since processed >= total
@@ -136,12 +146,13 @@ final class ProcessImportPreview implements ShouldQueue
         return $data->inputHash !== $this->inputHash || $data->isHeartbeatStale(self::HEARTBEAT_TIMEOUT_SECONDS);
     }
 
-    private function updateProgress(int $processed, int $creates, int $updates): void
+    private function updateProgress(int $processed, int $creates, int $updates, int $newCompanies): void
     {
         ImportSessionData::update($this->sessionId, [
             'processed' => $processed,
             'creates' => $creates,
             'updates' => $updates,
+            'new_companies' => $newCompanies,
         ]);
     }
 

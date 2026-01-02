@@ -86,6 +86,9 @@ trait HasImportPreview
         // Store rows for immediate display
         $this->previewRows = $firstBatch['rows'];
 
+        // Track unique new company names from first batch
+        $newCompanyNames = $firstBatch['newCompanyNames'];
+
         // Initialize consolidated session cache
         new ImportSessionData(
             teamId: $teamId,
@@ -94,6 +97,7 @@ trait HasImportPreview
             processed: $initialBatchSize,
             creates: $firstBatch['creates'],
             updates: $firstBatch['updates'],
+            newCompanies: count($newCompanyNames),
             heartbeat: (int) now()->timestamp,
         )->save($this->sessionId);
 
@@ -124,6 +128,7 @@ trait HasImportPreview
                 initialUpdates: $firstBatch['updates'],
                 inputHash: $newHash,
                 valueCorrections: $this->valueCorrections,
+                initialNewCompanyNames: $newCompanyNames,
             );
         }
     }
@@ -147,14 +152,14 @@ trait HasImportPreview
             : PreviewStatus::Pending;
     }
 
-    /** @return array{processed: int, creates: int, updates: int, total: int} */
+    /** @return array{processed: int, creates: int, updates: int, newCompanies: int, total: int} */
     public function getPreviewProgress(): array
     {
         $data = $this->sessionId !== null ? ImportSessionData::find($this->sessionId) : null;
 
         return $data instanceof ImportSessionData
-            ? ['processed' => $data->processed, 'creates' => $data->creates, 'updates' => $data->updates, 'total' => $data->total]
-            : ['processed' => 0, 'creates' => 0, 'updates' => 0, 'total' => $this->rowCount];
+            ? ['processed' => $data->processed, 'creates' => $data->creates, 'updates' => $data->updates, 'newCompanies' => $data->newCompanies, 'total' => $data->total]
+            : ['processed' => 0, 'creates' => 0, 'updates' => 0, 'newCompanies' => 0, 'total' => $this->rowCount];
     }
 
     public function isPreviewReady(): bool

@@ -29,6 +29,7 @@ final class PreviewController extends Controller
                 'processed' => $data->processed,
                 'creates' => $data->creates,
                 'updates' => $data->updates,
+                'newCompanies' => $data->newCompanies,
                 'total' => $data->total,
             ],
             'hasEnrichedFile' => file_exists(Storage::disk('local')->path("temp-imports/{$sessionId}/enriched.csv")),

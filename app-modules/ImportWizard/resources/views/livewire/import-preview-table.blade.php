@@ -26,6 +26,18 @@
                 <span class="font-medium text-info-600 dark:text-info-400" x-text="updates.toLocaleString()"></span>
                 <span class="text-gray-500 dark:text-gray-400">will be updated</span>
             </div>
+            <template x-if="showCompanyMatch && newCompanies > 0">
+                <div class="flex items-center gap-1.5">
+                    <span x-show="isProcessing" x-cloak>
+                        <x-filament::loading-indicator class="h-5 w-5 text-warning-500" />
+                    </span>
+                    <span x-show="!isProcessing" x-cloak>
+                        <x-filament::icon icon="heroicon-m-building-office" class="h-5 w-5 text-warning-500" />
+                    </span>
+                    <span class="font-medium text-warning-600 dark:text-warning-400" x-text="newCompanies.toLocaleString()"></span>
+                    <span class="text-gray-500 dark:text-gray-400">new companies</span>
+                </div>
+            </template>
         </div>
     </div>
 
@@ -64,7 +76,6 @@
                                     <td class="px-3 py-2">
                                         <div class="flex items-center gap-2">
                                             <span class="truncate max-w-[100px] text-gray-950 dark:text-white" x-text="row._company_name || row.company_name || '-'"></span>
-                                            <span x-html="getMatchBadge(row._company_match_type || 'none')"></span>
                                         </div>
                                     </td>
                                 </template>

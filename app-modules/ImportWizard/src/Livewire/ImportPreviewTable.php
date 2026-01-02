@@ -56,6 +56,7 @@ final class ImportPreviewTable extends Component
                 'isReady' => $status === PreviewStatus::Ready,
                 'creates' => $data !== null ? $data->creates : 0,
                 'updates' => $data !== null ? $data->updates : 0,
+                'newCompanies' => $data !== null ? $data->newCompanies : 0,
                 'processed' => $data !== null ? $data->processed : 0,
                 'rows' => $this->previewRows,
             ],

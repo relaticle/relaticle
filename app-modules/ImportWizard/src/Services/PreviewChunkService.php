@@ -25,7 +25,7 @@ final readonly class PreviewChunkService
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
-     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int}
+     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int, newCompanyNames: array<string>}
      */
     public function processChunk(
         string $importerClass,
@@ -57,6 +57,7 @@ final readonly class PreviewChunkService
         $creates = 0;
         $updates = 0;
         $rows = [];
+        $newCompanyNames = [];
 
         $rowNumber = $startRow;
         foreach ($records as $record) {
@@ -89,6 +90,14 @@ final readonly class PreviewChunkService
                 // Enrich with company match data for People/Opportunity imports
                 if ($this->shouldEnrichWithCompanyMatch($importerClass)) {
                     $formattedRow = $this->enrichRowWithCompanyMatch($formattedRow, $teamId);
+
+                    // Track unique new company names
+                    if (($formattedRow['_company_match_type'] ?? null) === 'new') {
+                        $companyName = (string) ($formattedRow['_company_name'] ?? '');
+                        if ($companyName !== '') {
+                            $newCompanyNames[$companyName] = true;
+                        }
+                    }
                 }
 
                 // Detect update method
@@ -126,6 +135,7 @@ final readonly class PreviewChunkService
             'rows' => $rows,
             'creates' => $creates,
             'updates' => $updates,
+            'newCompanyNames' => array_keys($newCompanyNames),
         ];
     }
 

@@ -22,6 +22,7 @@ final class ImportSessionData extends Data
         public int $processed = 0,
         public int $creates = 0,
         public int $updates = 0,
+        public int $newCompanies = 0,
         public ?int $heartbeat = null,
         public ?string $error = null,
     ) {}
