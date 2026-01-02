@@ -229,7 +229,10 @@ final readonly class PreviewChunkService
     {
         foreach ($corrections as $fieldName => $valueMappings) {
             $csvColumn = $columnMap[$fieldName] ?? null;
-            if ($csvColumn === null || ! isset($record[$csvColumn])) {
+            if ($csvColumn === null) {
+                continue;
+            }
+            if (! isset($record[$csvColumn])) {
                 continue;
             }
 
@@ -275,7 +278,7 @@ final readonly class PreviewChunkService
      */
     private function enrichRowWithCompanyMatch(array $row, string $teamId): array
     {
-        $companyId = (string) ($row['id'] ?? '');
+        $companyId = (string) ($row['company_id'] ?? '');
         $companyName = (string) ($row['company_name'] ?? '');
         $emails = $this->extractEmailsFromRow($row);
 

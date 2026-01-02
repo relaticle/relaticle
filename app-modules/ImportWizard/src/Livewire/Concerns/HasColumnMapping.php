@@ -8,10 +8,19 @@ use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
+use Relaticle\ImportWizard\Services\ColumnMatcher;
+use Relaticle\ImportWizard\Services\DataTypeInferencer;
 
-/** @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns */
+/**
+ * @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns
+ *
+ * @phpstan-type InferredMapping array{field: string, confidence: float, type: string}
+ */
 trait HasColumnMapping
 {
+    /** @var array<string, array{field: string, confidence: float, type: string}> */
+    public array $inferredMappings = [];
+
     /** @return array<ImportColumn> */
     #[Computed]
     public function importerColumns(): array
@@ -30,18 +39,55 @@ trait HasColumnMapping
             return;
         }
 
-        $csvHeadersLower = collect($this->csvHeaders)->mapWithKeys(
-            fn (string $header): array => [Str::lower($header) => $header]
-        );
+        $matcher = app(ColumnMatcher::class);
 
+        // Phase 1: Header matching
         $this->columnMap = collect($this->importerColumns)
-            ->mapWithKeys(function (ImportColumn $column) use ($csvHeadersLower): array {
-                $guesses = collect($column->getGuesses())->map(fn (string $g): string => Str::lower($g));
-                $match = $guesses->first(fn (string $guess): bool => $csvHeadersLower->has($guess));
+            ->mapWithKeys(function (ImportColumn $column) use ($matcher): array {
+                $match = $matcher->findMatchingHeader($this->csvHeaders, $column->getGuesses());
 
-                return [$column->getName() => $match !== null ? $csvHeadersLower->get($match) : ''];
+                return [$column->getName() => $match ?? ''];
             })
             ->toArray();
+
+        // Phase 2: Data type inference for unmapped CSV columns
+        $this->applyDataTypeInference();
+    }
+
+    /**
+     * Apply data type inference for CSV columns that weren't matched by headers.
+     */
+    protected function applyDataTypeInference(): void
+    {
+        $inferencer = app(DataTypeInferencer::class);
+        $this->inferredMappings = [];
+
+        $mappedHeaders = array_filter($this->columnMap);
+        $unmappedHeaders = array_diff($this->csvHeaders, $mappedHeaders);
+
+        foreach ($unmappedHeaders as $header) {
+            $sampleValues = $this->getColumnPreviewValues($header, 20);
+            $inference = $inferencer->inferType($sampleValues);
+
+            if ($inference['type'] === null) {
+                continue;
+            }
+
+            // Find first unmapped field that matches suggested fields
+            foreach ($inference['suggestedFields'] as $suggestedField) {
+                if (isset($this->columnMap[$suggestedField]) && $this->columnMap[$suggestedField] === '') {
+                    // Auto-apply the inference
+                    $this->columnMap[$suggestedField] = $header;
+                    $this->inferredMappings[$header] = [
+                        'field' => $suggestedField,
+                        'confidence' => $inference['confidence'],
+                        'type' => $inference['type'],
+                    ];
+
+                    break;
+                }
+            }
+        }
     }
 
     /** @return class-string<BaseImporter>|null */
@@ -122,5 +168,44 @@ trait HasColumnMapping
         }
 
         return $importerClass::getMissingUniqueIdentifiersMessage();
+    }
+
+    protected function hasMappingWarnings(): bool
+    {
+        return ! $this->hasUniqueIdentifierMapped() || $this->hasCompanyNameWithoutId();
+    }
+
+    protected function hasCompanyNameWithoutId(): bool
+    {
+        $columns = collect($this->importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
+
+        if (! $columns->has('company_name') || ! $columns->has('company_id')) {
+            return false;
+        }
+
+        $hasCompanyName = isset($this->columnMap['company_name']) && $this->columnMap['company_name'] !== '';
+        $hasCompanyId = isset($this->columnMap['company_id']) && $this->columnMap['company_id'] !== '';
+
+        return $hasCompanyName && ! $hasCompanyId;
+    }
+
+    protected function getMappingWarningsHtml(): string
+    {
+        $warnings = [];
+
+        if (! $this->hasUniqueIdentifierMapped()) {
+            $warnings[] = '<strong>'.$this->getMissingUniqueIdentifiersMessage().'</strong>';
+        }
+
+        if ($this->hasCompanyNameWithoutId()) {
+            $warnings[] = '<strong>Company Name</strong> is mapped without <strong>Company Record ID</strong>. '.
+                'New companies will be created for each unique name in your CSV.';
+        }
+
+        $docsUrl = route('documentation.show', 'import').'#unique-identifiers';
+
+        return 'Please review the following before continuing:<br><br>'.
+            implode('<br><br>', $warnings).'<br><br>'.
+            '<a href="'.$docsUrl.'" target="_blank" class="text-primary-600 hover:underline">Learn more about imports</a>';
     }
 }

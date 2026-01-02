@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -140,8 +141,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
             return;
         }
 
-        // Check for unique identifier mapping when leaving MAP step
-        if ($this->currentStep === self::STEP_MAP && ! $this->hasUniqueIdentifierMapped()) {
+        // Check for mapping warnings when leaving MAP step
+        if ($this->currentStep === self::STEP_MAP && $this->hasMappingWarnings()) {
             $this->mountAction('proceedWithoutUniqueIdentifiers');
 
             return;
@@ -532,6 +533,20 @@ final class ImportWizard extends Component implements HasActions, HasForms
     }
 
     /**
+     * Get human-readable labels for all mapped fields.
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function fieldLabels(): array
+    {
+        return collect($this->columnMap)
+            ->filter()
+            ->mapWithKeys(fn ($_, string $field): array => [$field => $this->getFieldLabel($field)])
+            ->all();
+    }
+
+    /**
      * Toggle column expansion in review step.
      */
     public function toggleColumn(string $columnName): void
@@ -577,20 +592,14 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public function proceedWithoutUniqueIdentifiersAction(): Action
     {
-        $docsUrl = route('documentation.show', 'import').'#unique-identifiers';
-
         return Action::make('proceedWithoutUniqueIdentifiers')
-            ->label('Continue without mapping')
+            ->label('Continue anyway')
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Avoid creating duplicate records')
-            ->modalDescription(fn (): HtmlString => new HtmlString(
-                'To avoid creating duplicate records, make sure you include and map the following columns:<br><br>'.
-                '<strong>'.$this->getMissingUniqueIdentifiersMessage().'</strong><br><br>'.
-                '<a href="'.$docsUrl.'" target="_blank" class="text-primary-600 hover:underline">Learn more about unique identifiers</a>'
-            ))
-            ->modalSubmitActionLabel('Continue without mapping')
+            ->modalHeading('Review mapping before continuing')
+            ->modalDescription(fn (): HtmlString => new HtmlString($this->getMappingWarningsHtml()))
+            ->modalSubmitActionLabel('Continue anyway')
             ->modalCancelActionLabel('Go back')
             ->action(function (): void {
                 $this->advanceToNextStep();
