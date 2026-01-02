@@ -22,6 +22,7 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
@@ -112,6 +113,9 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     /** @var array<int, array<string, mixed>> All rows for preview/editing */
     public array $previewRows = [];
+
+    #[Locked]
+    public bool $importStarted = false;
 
     /**
      * Handle file upload.
@@ -248,6 +252,12 @@ final class ImportWizard extends Component implements HasActions, HasForms
      */
     public function executeImport(): void
     {
+        if ($this->importStarted) {
+            return;
+        }
+
+        $this->importStarted = true;
+
         if (! $this->hasRecordsToImport()) {
             Notification::make()
                 ->title('No Records to Import')
@@ -478,6 +488,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->previewRows = [];
         $this->reviewPage = 1;
         $this->expandedColumn = null;
+        $this->importStarted = false;
+        $this->previewInputHash = null;
     }
 
     /**
@@ -498,6 +510,15 @@ final class ImportWizard extends Component implements HasActions, HasForms
         if ($this->returnUrl !== null) {
             $this->redirect($this->returnUrl);
         }
+    }
+
+    public function touchHeartbeat(): void
+    {
+        if ($this->sessionId === null) {
+            return;
+        }
+
+        ImportSessionData::find($this->sessionId)?->refresh($this->sessionId);
     }
 
     /**

@@ -1,4 +1,14 @@
-<div>
+<div
+    x-data="{ heartbeatInterval: null }"
+    x-init="
+        heartbeatInterval = setInterval(() => {
+            if ($wire.sessionId) {
+                $wire.touchHeartbeat();
+            }
+        }, 15000);
+    "
+    @beforeunload.window="clearInterval(heartbeatInterval)"
+>
     {{-- Step Progress (Minimal) --}}
     <nav class="mb-8" aria-label="Progress">
         <ol role="list" class="flex items-center gap-2">

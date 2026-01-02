@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Writer;
 use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Data\ImportPreviewResult;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Enums\PreviewStatus;
 use Relaticle\ImportWizard\Jobs\ProcessImportPreview;
 use Relaticle\ImportWizard\Services\ImportRecordResolver;
 use Relaticle\ImportWizard\Services\PreviewChunkService;
@@ -19,6 +20,8 @@ use Relaticle\ImportWizard\Services\PreviewChunkService;
 trait HasImportPreview
 {
     private const int INITIAL_BATCH_SIZE = 50;
+
+    public ?string $previewInputHash = null;
 
     protected function generateImportPreview(): void
     {
@@ -40,9 +43,18 @@ trait HasImportPreview
             return;
         }
 
+        $newHash = $this->computePreviewInputHash();
+
+        // Skip if no changes since last preview
+        if ($this->previewInputHash === $newHash && $this->previewResultData !== null) {
+            return;
+        }
+
         $teamId = $team->getKey();
         $userId = $user->getAuthIdentifier();
         $options = ['duplicate_handling' => DuplicateHandlingStrategy::SKIP];
+
+        $this->previewInputHash = $newHash;
 
         // Set up the enriched CSV path
         $enrichedPath = Storage::disk('local')->path("temp-imports/{$this->sessionId}/enriched.csv");
@@ -74,21 +86,18 @@ trait HasImportPreview
         // Store rows for immediate display
         $this->previewRows = $firstBatch['rows'];
 
-        // Store team ownership for API validation
-        Cache::put(
-            "import:{$this->sessionId}:team",
-            $teamId,
-            now()->addHours($this->sessionTtlHours())
-        );
-
-        // Set initial progress
-        $this->setPreviewProgress(
+        // Initialize consolidated session cache
+        new ImportSessionData(
+            teamId: $teamId,
+            inputHash: $newHash,
+            total: $this->rowCount,
             processed: $initialBatchSize,
             creates: $firstBatch['creates'],
             updates: $firstBatch['updates'],
-        );
+            heartbeat: (int) now()->timestamp,
+        )->save($this->sessionId);
 
-        // Store metadata
+        // Store metadata for component
         $this->previewResultData = [
             'totalRows' => $this->rowCount,
             'createCount' => $firstBatch['creates'],
@@ -100,12 +109,6 @@ trait HasImportPreview
 
         // ASYNC: Dispatch job for remaining rows
         if ($this->rowCount > $initialBatchSize) {
-            Cache::put(
-                "import:{$this->sessionId}:status",
-                'processing',
-                now()->addHours($this->sessionTtlHours())
-            );
-
             ProcessImportPreview::dispatch(
                 sessionId: $this->sessionId,
                 csvPath: $this->persistedFilePath,
@@ -119,14 +122,8 @@ trait HasImportPreview
                 totalRows: $this->rowCount,
                 initialCreates: $firstBatch['creates'],
                 initialUpdates: $firstBatch['updates'],
+                inputHash: $newHash,
                 valueCorrections: $this->valueCorrections,
-            );
-        } else {
-            // Small file - already done
-            Cache::put(
-                "import:{$this->sessionId}:status",
-                'ready',
-                now()->addHours($this->sessionTtlHours())
             );
         }
     }
@@ -143,52 +140,26 @@ trait HasImportPreview
         }
     }
 
-    private function setPreviewProgress(int $processed, int $creates, int $updates): void
+    public function getPreviewStatus(): PreviewStatus
     {
-        Cache::put(
-            "import:{$this->sessionId}:progress",
-            [
-                'processed' => $processed,
-                'creates' => $creates,
-                'updates' => $updates,
-                'total' => $this->rowCount,
-            ],
-            now()->addHours($this->sessionTtlHours())
-        );
-    }
-
-    public function getPreviewStatus(): string
-    {
-        if ($this->sessionId === null) {
-            return 'pending';
-        }
-
-        return Cache::get("import:{$this->sessionId}:status", 'pending');
+        return $this->sessionId !== null
+            ? (ImportSessionData::find($this->sessionId)?->status() ?? PreviewStatus::Pending)
+            : PreviewStatus::Pending;
     }
 
     /** @return array{processed: int, creates: int, updates: int, total: int} */
     public function getPreviewProgress(): array
     {
-        if ($this->sessionId === null) {
-            return [
-                'processed' => 0,
-                'creates' => 0,
-                'updates' => 0,
-                'total' => 0,
-            ];
-        }
+        $data = $this->sessionId !== null ? ImportSessionData::find($this->sessionId) : null;
 
-        return Cache::get("import:{$this->sessionId}:progress", [
-            'processed' => 0,
-            'creates' => 0,
-            'updates' => 0,
-            'total' => $this->rowCount,
-        ]);
+        return $data instanceof ImportSessionData
+            ? ['processed' => $data->processed, 'creates' => $data->creates, 'updates' => $data->updates, 'total' => $data->total]
+            : ['processed' => 0, 'creates' => 0, 'updates' => 0, 'total' => $this->rowCount];
     }
 
     public function isPreviewReady(): bool
     {
-        return $this->getPreviewStatus() === 'ready';
+        return $this->getPreviewStatus() === PreviewStatus::Ready;
     }
 
     #[Computed]
@@ -213,20 +184,19 @@ trait HasImportPreview
 
     public function getCreateCount(): int
     {
-        $progress = $this->getPreviewProgress();
-
-        return $progress['creates'];
+        return $this->getPreviewProgress()['creates'];
     }
 
     public function getUpdateCount(): int
     {
-        $progress = $this->getPreviewProgress();
-
-        return $progress['updates'];
+        return $this->getPreviewProgress()['updates'];
     }
 
-    private function sessionTtlHours(): int
+    private function computePreviewInputHash(): string
     {
-        return (int) config('import-wizard.session_ttl_hours', 24);
+        return md5(json_encode([
+            'columnMap' => $this->columnMap,
+            'valueCorrections' => $this->valueCorrections,
+        ], JSON_THROW_ON_ERROR));
     }
 }

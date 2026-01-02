@@ -75,7 +75,7 @@ final class CompanyImporter extends BaseImporter
 
         if ($domain !== null) {
             $existing = $this->findByDomain($domain);
-            if ($existing instanceof \App\Models\Company) {
+            if ($existing instanceof Company) {
                 /** @var Company */
                 return $this->applyDuplicateStrategy($existing);
             }

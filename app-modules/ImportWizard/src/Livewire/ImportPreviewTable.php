@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Livewire;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Reactive;
 use Livewire\Component;
+use Relaticle\ImportWizard\Data\ImportSessionData;
+use Relaticle\ImportWizard\Enums\PreviewStatus;
 
 /**
  * Isolated Livewire component for the import preview table.
@@ -36,13 +37,8 @@ final class ImportPreviewTable extends Component
 
     public function render(): View
     {
-        $progress = Cache::get("import:{$this->sessionId}:progress", [
-            'processed' => 0,
-            'creates' => 0,
-            'updates' => 0,
-        ]);
-
-        $status = Cache::get("import:{$this->sessionId}:status", 'pending');
+        $data = ImportSessionData::find($this->sessionId);
+        $status = $data?->status() ?? PreviewStatus::Pending;
 
         $columns = collect($this->columnMap)
             ->filter()
@@ -56,11 +52,11 @@ final class ImportPreviewTable extends Component
                 'totalRows' => $this->totalRows,
                 'columns' => $columns,
                 'showCompanyMatch' => in_array($this->entityType, ['people', 'opportunities']),
-                'isProcessing' => $status === 'processing',
-                'isReady' => $status === 'ready',
-                'creates' => $progress['creates'],
-                'updates' => $progress['updates'],
-                'processed' => $progress['processed'],
+                'isProcessing' => $status === PreviewStatus::Processing,
+                'isReady' => $status === PreviewStatus::Ready,
+                'creates' => $data !== null ? $data->creates : 0,
+                'updates' => $data !== null ? $data->updates : 0,
+                'processed' => $data !== null ? $data->processed : 0,
                 'rows' => $this->previewRows,
             ],
         ]);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use League\Csv\Statement;
@@ -174,6 +175,8 @@ final readonly class PreviewChunkService
      * @param  array<string, mixed>  $options
      * @param  array<string, mixed>  $rowData
      * @return array{action: string, record: Model|null}
+     *
+     * @throws BindingResolutionException
      */
     private function previewRow(
         string $importerClass,
@@ -199,10 +202,6 @@ final readonly class PreviewChunkService
 
         $record = $importer->resolveRecord();
 
-        if (! $record instanceof Model) {
-            return ['action' => 'create', 'record' => null];
-        }
-
         if ($record->exists) {
             return ['action' => 'update', 'record' => $record];
         }
@@ -220,10 +219,7 @@ final readonly class PreviewChunkService
     {
         foreach ($corrections as $fieldName => $valueMappings) {
             $csvColumn = $columnMap[$fieldName] ?? null;
-            if ($csvColumn === null) {
-                continue;
-            }
-            if (! isset($record[$csvColumn])) {
+            if ($csvColumn === null || ! isset($record[$csvColumn])) {
                 continue;
             }
 

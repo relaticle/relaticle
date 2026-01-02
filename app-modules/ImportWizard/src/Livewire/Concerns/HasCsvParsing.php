@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
-use Illuminate\Support\Facades\Cache;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Services\CsvReaderFactory;
 
 trait HasCsvParsing
@@ -78,6 +79,9 @@ trait HasCsvParsing
             Storage::disk('local')->makeDirectory($folder);
             Storage::disk('local')->put($storagePath, $content);
 
+            // Initialize session tracking for cleanup
+            $this->initializeSessionTracking();
+
             return Storage::disk('local')->path($storagePath);
         } catch (\Exception $e) {
             report($e);
@@ -85,6 +89,24 @@ trait HasCsvParsing
 
             return null;
         }
+    }
+
+    private function initializeSessionTracking(): void
+    {
+        $team = Filament::getTenant();
+        if ($team === null || $this->sessionId === null) {
+            return;
+        }
+
+        new ImportSessionData(
+            teamId: $team->getKey(),
+            inputHash: '',
+            total: 0,
+            processed: 0,
+            creates: 0,
+            updates: 0,
+            heartbeat: (int) now()->timestamp,
+        )->save($this->sessionId);
     }
 
     protected function cleanupTempFile(): void
@@ -98,9 +120,7 @@ trait HasCsvParsing
             Storage::disk('local')->deleteDirectory($folder);
         }
 
-        Cache::forget("import:{$this->sessionId}:status");
-        Cache::forget("import:{$this->sessionId}:progress");
-        Cache::forget("import:{$this->sessionId}:team");
+        ImportSessionData::forget($this->sessionId);
     }
 
     /** @return array<int, string> */
