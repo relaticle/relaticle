@@ -19,6 +19,8 @@
                     @php
                         $mappedField = array_search($header, $columnMap);
                         $selectedValue = $mappedField !== false ? $mappedField : '';
+                        $isInferred = isset($this->inferredMappings[$header]);
+                        $inferenceInfo = $isInferred ? $this->inferredMappings[$header] : null;
                     @endphp
                     <div
                         wire:key="map-{{ md5($header) }}"
@@ -27,7 +29,17 @@
                         @mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                     >
                         {{-- CSV Column Name --}}
-                        <div class="flex-1 text-sm text-gray-950 dark:text-white">{{ $header }}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm text-gray-950 dark:text-white truncate">{{ $header }}</div>
+                            @if ($isInferred)
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-info-100 text-info-700 dark:bg-info-900 dark:text-info-300">
+                                        <x-filament::icon icon="heroicon-m-sparkles" class="h-3 w-3" />
+                                        Suggested ({{ number_format($inferenceInfo['confidence'] * 100) }}%)
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
 
                         {{-- Arrow --}}
                         <div class="w-6 flex justify-center">

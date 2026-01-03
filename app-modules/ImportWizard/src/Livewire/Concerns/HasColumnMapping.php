@@ -62,11 +62,15 @@ trait HasColumnMapping
         $inferencer = app(DataTypeInferencer::class);
         $this->inferredMappings = [];
 
+        /** @var array<string> */
         $mappedHeaders = array_filter($this->columnMap);
+        /** @var array<string> */
         $unmappedHeaders = array_diff($this->csvHeaders, $mappedHeaders);
 
         foreach ($unmappedHeaders as $header) {
+            /** @var array<mixed> */
             $sampleValues = $this->getColumnPreviewValues($header, 20);
+            /** @var array{type: string|null, confidence: float, suggestedFields: array<string>} */
             $inference = $inferencer->inferType($sampleValues);
 
             if ($inference['type'] === null) {
@@ -129,6 +133,7 @@ trait HasColumnMapping
 
     public function getFieldLabel(string $fieldName): string
     {
+        /** @var ImportColumn|null */
         $column = collect($this->importerColumns)
             ->first(fn (ImportColumn $column): bool => $column->getName() === $fieldName);
 
@@ -148,6 +153,7 @@ trait HasColumnMapping
             return true; // Return true to skip warning
         }
 
+        /** @var array<string> */
         $uniqueColumns = $importerClass::getUniqueIdentifierColumns();
 
         foreach ($uniqueColumns as $column) {
@@ -172,18 +178,25 @@ trait HasColumnMapping
 
     protected function hasMappingWarnings(): bool
     {
-        return ! $this->hasUniqueIdentifierMapped() || $this->hasCompanyNameWithoutId();
+        if (! $this->hasUniqueIdentifierMapped()) {
+            return true;
+        }
+
+        return (bool) $this->hasCompanyNameWithoutId();
     }
 
     protected function hasCompanyNameWithoutId(): bool
     {
+        /** @var \Illuminate\Support\Collection<string, ImportColumn> */
         $columns = collect($this->importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
 
         if (! $columns->has('company_name') || ! $columns->has('company_id')) {
             return false;
         }
 
+        /** @var bool */
         $hasCompanyName = isset($this->columnMap['company_name']) && $this->columnMap['company_name'] !== '';
+        /** @var bool */
         $hasCompanyId = isset($this->columnMap['company_id']) && $this->columnMap['company_id'] !== '';
 
         return $hasCompanyName && ! $hasCompanyId;
@@ -191,6 +204,7 @@ trait HasColumnMapping
 
     protected function getMappingWarningsHtml(): string
     {
+        /** @var array<string> */
         $warnings = [];
 
         if (! $this->hasUniqueIdentifierMapped()) {

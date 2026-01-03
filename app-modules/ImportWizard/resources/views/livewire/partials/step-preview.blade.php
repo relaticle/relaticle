@@ -8,6 +8,7 @@
         'sessionId' => $sessionId,
         'entityType' => $entityType,
         'columnMap' => $columnMap,
+        'fieldLabels' => $this->fieldLabels,
         'previewRows' => $previewRows,
         'totalRows' => $totalRows,
     ], key('preview-table-' . $sessionId))

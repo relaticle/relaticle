@@ -28,6 +28,10 @@ final class ImportPreviewTable extends Component
     #[Reactive]
     public array $columnMap;
 
+    /** @var array<string, string> */
+    #[Reactive]
+    public array $fieldLabels = [];
+
     /** @var array<int, array<string, mixed>> */
     #[Reactive]
     public array $previewRows;
@@ -37,12 +41,18 @@ final class ImportPreviewTable extends Component
 
     public function render(): View
     {
+        /** @var ImportSessionData|null */
         $data = ImportSessionData::find($this->sessionId);
+        /** @var PreviewStatus */
         $status = $data?->status() ?? PreviewStatus::Pending;
 
+        /** @var array<int, array{key: string, label: string}> */
         $columns = collect($this->columnMap)
             ->filter()
-            ->map(fn ($_, $field): array => ['key' => $field, 'label' => str($field)->headline()->toString()])
+            ->map(fn (string $_, string $field): array => [
+                'key' => $field,
+                'label' => $this->fieldLabels[$field] ?? str($field)->headline()->toString(),
+            ])
             ->values()
             ->all();
 
@@ -54,10 +64,10 @@ final class ImportPreviewTable extends Component
                 'showCompanyMatch' => in_array($this->entityType, ['people', 'opportunities']),
                 'isProcessing' => $status === PreviewStatus::Processing,
                 'isReady' => $status === PreviewStatus::Ready,
-                'creates' => $data !== null ? $data->creates : 0,
-                'updates' => $data !== null ? $data->updates : 0,
-                'newCompanies' => $data !== null ? $data->newCompanies : 0,
-                'processed' => $data !== null ? $data->processed : 0,
+                'creates' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->creates : 0,
+                'updates' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->updates : 0,
+                'newCompanies' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->newCompanies : 0,
+                'processed' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->processed : 0,
                 'rows' => $this->previewRows,
             ],
         ]);

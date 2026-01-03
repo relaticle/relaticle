@@ -199,7 +199,7 @@ trait HasImportPreview
 
     private function computePreviewInputHash(): string
     {
-        return md5(json_encode([
+        return hash('sha256', json_encode([
             'columnMap' => $this->columnMap,
             'valueCorrections' => $this->valueCorrections,
         ], JSON_THROW_ON_ERROR));

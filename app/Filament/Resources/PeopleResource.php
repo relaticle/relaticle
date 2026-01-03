@@ -91,7 +91,6 @@ final class PeopleResource extends Resource
                             )
                             ->searchable()
                             ->preload()
-                            ->required()
                             ->columnSpan(5),
                     ])
                     ->columns(12),

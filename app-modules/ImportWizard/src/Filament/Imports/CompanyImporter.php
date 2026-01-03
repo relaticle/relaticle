@@ -28,7 +28,13 @@ final class CompanyImporter extends BaseImporter
             ImportColumn::make('name')
                 ->label('Name')
                 ->requiredMapping()
-                ->guess(['name', 'company_name', 'company', 'organization', 'account', 'account_name'])
+                ->guess([
+                    'name', 'company_name', 'company', 'organization', 'account', 'account_name',
+                    'company name', 'associated company', 'company domain name',
+                    'account name', 'parent account', 'billing name',
+                    'business', 'business_name', 'org', 'org_name', 'organisation',
+                    'firm', 'client', 'customer', 'customer_name', 'vendor', 'vendor_name',
+                ])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Company $record, string $state, CompanyImporter $importer): void {
@@ -38,7 +44,11 @@ final class CompanyImporter extends BaseImporter
 
             ImportColumn::make('account_owner_email')
                 ->label('Account Owner Email')
-                ->guess(['account_owner', 'owner_email', 'owner', 'assigned_to', 'account_manager'])
+                ->guess([
+                    'account_owner', 'owner_email', 'owner', 'assigned_to', 'account_manager',
+                    'owner email', 'sales rep', 'sales_rep', 'rep', 'salesperson', 'sales_owner',
+                    'account_rep', 'assigned_user', 'manager_email', 'contact_owner',
+                ])
                 ->rules(['nullable', 'email'])
                 ->example('owner@company.com')
                 ->fillRecordUsing(function (Company $record, ?string $state, Importer $importer): void {

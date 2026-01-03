@@ -7,12 +7,9 @@ namespace Relaticle\ImportWizard\Filament\Imports;
 use App\Models\Task;
 use Filament\Actions\Imports\ImportColumn;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Filament\Imports\Concerns\HasPolymorphicEntityAttachment;
 
 final class TaskImporter extends BaseImporter
 {
-    use HasPolymorphicEntityAttachment;
-
     protected static ?string $model = Task::class;
 
     protected static array $uniqueIdentifierColumns = ['id'];
@@ -32,7 +29,11 @@ final class TaskImporter extends BaseImporter
             ImportColumn::make('title')
                 ->label('Title')
                 ->requiredMapping()
-                ->guess(['title', 'task_title', 'task_name', 'name', 'subject'])
+                ->guess([
+                    'title', 'task_title', 'task_name', 'name', 'subject',
+                    'task', 'action', 'action_item', 'to_do', 'todo', 'activity',
+                    'task subject', 'task description', 'summary', 'description',
+                ])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Follow up with client')
                 ->fillRecordUsing(function (Task $record, string $state, TaskImporter $importer): void {
@@ -40,36 +41,13 @@ final class TaskImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
-            ImportColumn::make('company_name')
-                ->label('Company Name')
-                ->guess(['company_name', 'company', 'organization', 'account'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
-                }),
-
-            ImportColumn::make('person_name')
-                ->label('Person Name')
-                ->guess(['person_name', 'contact_name', 'contact', 'person', 'related_to'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('John Doe')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
-                }),
-
-            ImportColumn::make('opportunity_name')
-                ->label('Opportunity Name')
-                ->guess(['opportunity_name', 'opportunity', 'deal', 'deal_name'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Enterprise License Deal')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
-                }),
-
             ImportColumn::make('assignee_email')
                 ->label('Assignee Email')
-                ->guess(['assignee_email', 'assignee', 'assigned_to', 'owner', 'responsible'])
+                ->guess([
+                    'assignee_email', 'assignee', 'assigned_to', 'owner', 'responsible',
+                    'assignee email', 'assigned to', 'task owner', 'task assignee',
+                    'owner_email', 'owner email', 'rep', 'representative',
+                ])
                 ->rules(['nullable', 'email'])
                 ->example('assignee@company.com')
                 ->fillRecordUsing(function (Task $record, ?string $state, TaskImporter $importer): void {
@@ -104,15 +82,12 @@ final class TaskImporter extends BaseImporter
     }
 
     /**
-     * Attach polymorphic relationships and assignees after the task is saved.
+     * Attach assignees after the task is saved.
      */
     protected function afterSave(): void
     {
         parent::afterSave();
 
-        $this->attachRelatedEntities();
-
-        // Attach assignee (Task-specific)
         if ($this->pendingAssigneeId !== null) {
             /** @var Task $task */
             $task = $this->record;
