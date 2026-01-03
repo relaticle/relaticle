@@ -54,15 +54,15 @@ return [
             'file' => 'quick-start-guide.md',
             'description' => 'Get started quickly with essential information.',
         ],
-        'api' => [
-            'title' => 'API Documentation',
-            'file' => 'api-guide.md',
-            'description' => 'API reference and integration documentation.',
-        ],
         'import' => [
             'title' => 'Import Guide',
             'file' => 'import-guide.md',
             'description' => 'Complete guide for importing companies, people, opportunities, tasks, and notes into Relaticle.',
+        ],
+        'api' => [
+            'title' => 'API Documentation',
+            'file' => 'api-guide.md',
+            'description' => 'API reference and integration documentation.',
         ],
     ],
 
