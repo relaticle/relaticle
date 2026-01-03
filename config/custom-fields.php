@@ -65,7 +65,7 @@ return [
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
-            CustomFieldsFeature::UI_SIMPLIFIED_MANAGEMENT,
+            CustomFieldsFeature::SYSTEM_SECTIONS_ENABLED,
         )->disable(
             CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_VALIDATION_RULES,
