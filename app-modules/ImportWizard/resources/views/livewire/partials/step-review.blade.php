@@ -8,6 +8,8 @@
                     @php
                         $errorCount = $analysis->getErrorCount();
                         $hasErrors = $errorCount > 0;
+                        $colIsDateField = $analysis->isDateField();
+                        $colNeedsFormatConfirm = $analysis->needsDateFormatConfirmation();
                     @endphp
                     <button
                         type="button"
@@ -20,7 +22,12 @@
                         ])
                     >
                         <div class="flex items-center justify-between gap-2">
-                            <div class="text-sm text-gray-950 dark:text-white truncate">{{ $analysis->csvColumnName }}</div>
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="text-sm text-gray-950 dark:text-white truncate">{{ $analysis->csvColumnName }}</span>
+                                @if ($colNeedsFormatConfirm)
+                                    <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-4 w-4 shrink-0 text-warning-500" title="Date format needs confirmation" />
+                                @endif
+                            </div>
                             @if ($hasErrors)
                                 <span class="shrink-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium rounded bg-danger-100 text-danger-700 dark:bg-danger-900 dark:text-danger-300">
                                     {{ $errorCount }}
@@ -56,6 +63,23 @@
             @endphp
 
             @if ($selectedAnalysis)
+                @php
+                    $isDateField = $selectedAnalysis->isDateField();
+                    $isDateOnlyField = $selectedAnalysis->isDateOnlyField();
+                    $isDateTimeField = $selectedAnalysis->isDateTimeField();
+                    $effectiveDateFormat = $selectedAnalysis->getEffectiveDateFormat();
+                    $needsFormatConfirmation = $selectedAnalysis->needsDateFormatConfirmation();
+
+                    // Use appropriate format enum based on field type
+                    $formatOptions = $isDateTimeField
+                        ? \Relaticle\ImportWizard\Enums\TimestampFormat::cases()
+                        : \Relaticle\ImportWizard\Enums\DateFormat::cases();
+
+                    // Convert DateFormat to TimestampFormat for display if datetime field
+                    $displayFormat = $isDateTimeField && $effectiveDateFormat
+                        ? \Relaticle\ImportWizard\Enums\TimestampFormat::fromDateFormat($effectiveDateFormat)
+                        : $effectiveDateFormat;
+                @endphp
                 {{-- Column Header with Stats --}}
                 <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div class="flex items-center gap-3">
@@ -77,8 +101,20 @@
                             </button>
                         @endif
                     </div>
-                    <div class="text-xs text-gray-400">
-                        Showing {{ number_format($showing) }} of {{ number_format($totalUnique) }}
+                    <div class="flex items-center gap-3">
+                        {{-- Date/Timestamp Format Dropdown (Attio-style) --}}
+                        @if ($isDateField)
+                            @include('import-wizard::components.format-select', [
+                                'formats' => $formatOptions,
+                                'selected' => $displayFormat,
+                                'label' => $isDateTimeField ? 'Timestamp format' : 'Date format',
+                                'field' => $selectedAnalysis->mappedToField,
+                                'needsConfirmation' => $needsFormatConfirmation,
+                            ])
+                        @endif
+                        <div class="text-xs text-gray-400">
+                            Showing {{ number_format($showing) }} of {{ number_format($totalUnique) }}
+                        </div>
                     </div>
                 </div>
 
@@ -101,84 +137,77 @@
                     "
                     class="overflow-y-auto flex-1 max-h-[400px]"
                 >
-                    @forelse ($values as $value => $count)
-                        @php
-                            $isSkipped = $this->isValueSkipped($selectedAnalysis->mappedToField, $value);
-                            $hasCorrection = $this->hasCorrectionForValue($selectedAnalysis->mappedToField, $value);
-                            $displayValue = $value ?: '(blank)';
-                            $mappedValue = $hasCorrection ? $this->getCorrectedValue($selectedAnalysis->mappedToField, $value) : $displayValue;
-                            $valueIssue = $selectedAnalysis->getIssueForValue($value);
-                            $hasError = $valueIssue !== null && $valueIssue->severity === 'error' && !$isSkipped;
-                        @endphp
-                        <div
-                            wire:key="val-{{ md5($selectedAnalysis->mappedToField . $value) }}"
-                            class="px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        >
-                            <div class="flex items-center">
-                                {{-- Raw Value --}}
-                                <div class="flex-1 flex items-center gap-2 min-w-0">
-                                    <span @class([
-                                        'text-sm truncate',
-                                        'text-gray-400 line-through' => $isSkipped,
-                                        'text-gray-950 dark:text-white' => !$isSkipped,
-                                    ])>{{ $displayValue }}</span>
-                                    <span class="text-xs text-gray-400 shrink-0">{{ $count }}×</span>
-                                </div>
+                    @php
+                        // For date fields, separate values into groups
+                        $needsReviewValues = [];
+                        $autoMappedValues = [];
 
-                                {{-- Arrow --}}
-                                <div class="w-8 flex justify-center">
-                                    <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5 text-gray-300 dark:text-gray-600" />
-                                </div>
+                        if ($isDateField && !$showOnlyErrors) {
+                            foreach ($values as $val => $cnt) {
+                                $issue = $selectedAnalysis->getIssueForValue($val);
+                                if ($issue !== null) {
+                                    $needsReviewValues[$val] = $cnt;
+                                } else {
+                                    $autoMappedValues[$val] = $cnt;
+                                }
+                            }
+                        }
+                        $showGroupedView = $isDateField && !$showOnlyErrors && (count($needsReviewValues) > 0 || count($autoMappedValues) > 0);
+                    @endphp
 
-                                {{-- Mapped Value / Input --}}
-                                <div class="flex-1 min-w-0">
-                                    @if ($isSkipped)
-                                        <span class="text-sm text-gray-400 italic">Skipped</span>
-                                    @else
-                                        <input
-                                            type="text"
-                                            value="{{ $mappedValue }}"
-                                            x-on:blur="if ($event.target.value !== '{{ addslashes($mappedValue) }}') $wire.correctValue('{{ $selectedAnalysis->mappedToField }}', '{{ addslashes($value) }}', $event.target.value)"
-                                            x-on:keydown.enter="$event.target.blur()"
-                                            @class([
-                                                'w-full px-2 py-1 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-primary-500',
-                                                'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950' => $hasCorrection && !$hasError,
-                                                'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' => !$hasCorrection || $hasError,
-                                            ])
-                                        />
-                                    @endif
-                                </div>
-
-                                {{-- Skip Button --}}
-                                <div class="w-10 flex justify-end">
-                                    <button
-                                        type="button"
-                                        wire:click="skipValue('{{ $selectedAnalysis->mappedToField }}', '{{ addslashes($value) }}')"
-                                        title="{{ $isSkipped ? 'Unskip' : 'Skip' }}"
-                                        @class([
-                                            'p-1 rounded transition-colors',
-                                            'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700' => !$isSkipped,
-                                            'text-primary-600 bg-primary-100 dark:bg-primary-900' => $isSkipped,
-                                        ])
-                                    >
-                                        <x-filament::icon icon="heroicon-o-no-symbol" class="h-4 w-4" />
-                                    </button>
+                    @if ($showGroupedView)
+                        {{-- Grouped View for Date Fields --}}
+                        @if (count($needsReviewValues) > 0)
+                            <div class="px-3 py-2 bg-warning-50 dark:bg-warning-950/50 border-b border-warning-200 dark:border-warning-800">
+                                <div class="flex items-center gap-1.5 text-xs font-medium text-warning-700 dark:text-warning-300 uppercase tracking-wider">
+                                    <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-3.5 w-3.5" />
+                                    Needs Review ({{ count($needsReviewValues) }})
                                 </div>
                             </div>
+                            @foreach ($needsReviewValues as $value => $count)
+                                @include('import-wizard::livewire.partials.value-row', [
+                                    'selectedAnalysis' => $selectedAnalysis,
+                                    'value' => $value,
+                                    'count' => $count,
+                                    'isDateField' => $isDateField,
+                                    'effectiveDateFormat' => $effectiveDateFormat,
+                                ])
+                            @endforeach
+                        @endif
 
-                            {{-- Validation Error Message --}}
-                            @if ($hasError)
-                                <div class="mt-1 ml-0 text-xs text-danger-600 dark:text-danger-400">
-                                    <x-filament::icon icon="heroicon-m-exclamation-circle" class="h-3.5 w-3.5 inline-block -mt-0.5 mr-0.5" />
-                                    {{ $valueIssue->message }}
+                        @if (count($autoMappedValues) > 0)
+                            <div class="px-3 py-2 bg-success-50 dark:bg-success-950/50 border-b border-success-200 dark:border-success-800 @if(count($needsReviewValues) > 0) mt-2 @endif">
+                                <div class="flex items-center gap-1.5 text-xs font-medium text-success-700 dark:text-success-300 uppercase tracking-wider">
+                                    <x-filament::icon icon="heroicon-m-check-circle" class="h-3.5 w-3.5" />
+                                    Automatically Mapped ({{ count($autoMappedValues) }})
                                 </div>
-                            @endif
-                        </div>
-                    @empty
-                        <div class="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                            No values found
-                        </div>
-                    @endforelse
+                            </div>
+                            @foreach ($autoMappedValues as $value => $count)
+                                @include('import-wizard::livewire.partials.value-row', [
+                                    'selectedAnalysis' => $selectedAnalysis,
+                                    'value' => $value,
+                                    'count' => $count,
+                                    'isDateField' => $isDateField,
+                                    'effectiveDateFormat' => $effectiveDateFormat,
+                                ])
+                            @endforeach
+                        @endif
+                    @else
+                        {{-- Standard View --}}
+                        @forelse ($values as $value => $count)
+                            @include('import-wizard::livewire.partials.value-row', [
+                                'selectedAnalysis' => $selectedAnalysis,
+                                'value' => $value,
+                                'count' => $count,
+                                'isDateField' => $isDateField,
+                                'effectiveDateFormat' => $effectiveDateFormat,
+                            ])
+                        @empty
+                            <div class="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                No values found
+                            </div>
+                        @endforelse
+                    @endif
 
                     {{-- Load More indicator --}}
                     @if ($hasMore)

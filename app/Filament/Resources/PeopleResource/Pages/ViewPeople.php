@@ -82,7 +82,7 @@ final class ViewPeople extends ViewRecord
                     TextEntry::make('company.name')
                         ->label('Company')
                         ->color('primary')
-                        ->url(fn(People $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
+                        ->url(fn (People $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
             ])->columnSpanFull(),

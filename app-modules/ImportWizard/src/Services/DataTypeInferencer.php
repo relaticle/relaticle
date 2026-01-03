@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
+use Relaticle\ImportWizard\Data\DateFormatResult;
+use Relaticle\ImportWizard\Enums\DateFormat;
+
 /**
  * Analyzes sample cell values to infer field types.
  * Used as a FALLBACK when header matching fails.
@@ -90,5 +93,212 @@ final class DataTypeInferencer
         }
 
         return ['type' => null, 'confidence' => 0.0, 'suggestedFields' => []];
+    }
+
+    /**
+     * Detect the most likely date format from sample values.
+     *
+     * Analyzes values to find unambiguous evidence:
+     * - ISO format (YYYY-MM-DD) is always unambiguous
+     * - DD > 12 indicates European (DD/MM/YYYY)
+     * - Second position > 12 indicates American (MM/DD/YYYY)
+     * - Both positions <= 12 is ambiguous
+     *
+     * @param  array<string>  $values  Unique date values from the column
+     */
+    public function detectDateFormat(array $values): DateFormatResult
+    {
+        $isoCount = 0;
+        $europeanOnlyCount = 0;
+        $americanOnlyCount = 0;
+        $ambiguousCount = 0;
+        $invalidCount = 0;
+
+        foreach ($values as $value) {
+            $value = trim((string) $value);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $classification = $this->classifyDateValue($value);
+
+            match ($classification) {
+                'iso' => $isoCount++,
+                'european_only' => $europeanOnlyCount++,
+                'american_only' => $americanOnlyCount++,
+                'ambiguous' => $ambiguousCount++,
+                'invalid' => $invalidCount++,
+            };
+        }
+
+        $totalAnalyzed = $isoCount + $europeanOnlyCount + $americanOnlyCount + $ambiguousCount + $invalidCount;
+
+        if ($totalAnalyzed === 0) {
+            return DateFormatResult::forAmbiguous(0);
+        }
+
+        // Determine the most likely format based on evidence
+        $detectedFormat = $this->determineFormat(
+            isoCount: $isoCount,
+            europeanOnlyCount: $europeanOnlyCount,
+            americanOnlyCount: $americanOnlyCount,
+        );
+
+        $confidence = $this->calculateConfidence(
+            detectedFormat: $detectedFormat,
+            isoCount: $isoCount,
+            europeanOnlyCount: $europeanOnlyCount,
+            americanOnlyCount: $americanOnlyCount,
+            ambiguousCount: $ambiguousCount,
+            totalAnalyzed: $totalAnalyzed,
+        );
+
+        return new DateFormatResult(
+            detectedFormat: $detectedFormat,
+            confidence: $confidence,
+            isoCount: $isoCount,
+            europeanOnlyCount: $europeanOnlyCount,
+            americanOnlyCount: $americanOnlyCount,
+            ambiguousCount: $ambiguousCount,
+            invalidCount: $invalidCount,
+            totalAnalyzed: $totalAnalyzed,
+        );
+    }
+
+    /**
+     * Classify a single date value.
+     *
+     * @return 'iso'|'european_only'|'american_only'|'ambiguous'|'invalid'
+     */
+    private function classifyDateValue(string $value): string
+    {
+        // Check for ISO format (YYYY-MM-DD with optional time)
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})/', $value, $matches)) {
+            $month = (int) $matches[2];
+            $day = (int) $matches[3];
+
+            if ($month >= 1 && $month <= 12 && $day >= 1 && $day <= 31) {
+                return 'iso';
+            }
+
+            return 'invalid';
+        }
+
+        // Check for slash-separated format (could be DD/MM or MM/DD)
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/', $value, $matches)) {
+            return $this->classifyDayMonthPair((int) $matches[1], (int) $matches[2]);
+        }
+
+        // Check for dash-separated format (could be DD-MM or MM-DD)
+        if (preg_match('/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/', $value, $matches)) {
+            return $this->classifyDayMonthPair((int) $matches[1], (int) $matches[2]);
+        }
+
+        return 'invalid';
+    }
+
+    /**
+     * Classify a day/month pair to determine format.
+     *
+     * @return 'european_only'|'american_only'|'ambiguous'|'invalid'
+     */
+    private function classifyDayMonthPair(int $first, int $second): string
+    {
+        $firstValidAsMonth = $first >= 1 && $first <= 12;
+        $secondValidAsMonth = $second >= 1 && $second <= 12;
+        $firstValidAsDay = $first >= 1 && $first <= 31;
+        $secondValidAsDay = $second >= 1 && $second <= 31;
+
+        // First > 12 means it must be the day (European format DD/MM)
+        if (! $firstValidAsMonth && $secondValidAsMonth && $firstValidAsDay) {
+            return 'european_only';
+        }
+
+        // Second > 12 means it must be the day (American format MM/DD)
+        if ($firstValidAsMonth && ! $secondValidAsMonth && $secondValidAsDay) {
+            return 'american_only';
+        }
+
+        // Both could be valid as months (ambiguous)
+        if ($firstValidAsMonth && $secondValidAsMonth) {
+            return 'ambiguous';
+        }
+
+        return 'invalid';
+    }
+
+    /**
+     * Determine the most likely format based on evidence.
+     */
+    private function determineFormat(
+        int $isoCount,
+        int $europeanOnlyCount,
+        int $americanOnlyCount,
+    ): DateFormat {
+        // ISO takes precedence if present and no conflicting evidence
+        if ($isoCount > 0 && $europeanOnlyCount === 0 && $americanOnlyCount === 0) {
+            return DateFormat::ISO;
+        }
+
+        // Clear European evidence
+        if ($europeanOnlyCount > 0 && $americanOnlyCount === 0) {
+            return DateFormat::EUROPEAN;
+        }
+
+        // Clear American evidence
+        if ($americanOnlyCount > 0 && $europeanOnlyCount === 0) {
+            return DateFormat::AMERICAN;
+        }
+
+        // Conflicting evidence or all ambiguous - default to ISO as safest
+        return DateFormat::ISO;
+    }
+
+    /**
+     * Calculate confidence score for the detected format.
+     */
+    private function calculateConfidence(
+        DateFormat $detectedFormat,
+        int $isoCount,
+        int $europeanOnlyCount,
+        int $americanOnlyCount,
+        int $ambiguousCount,
+        int $totalAnalyzed,
+    ): float {
+        if ($totalAnalyzed === 0) {
+            return 0.0;
+        }
+
+        // ISO-only: high confidence
+        if ($detectedFormat === DateFormat::ISO && $isoCount > 0 && $europeanOnlyCount === 0 && $americanOnlyCount === 0) {
+            return 1.0;
+        }
+
+        // Clear unambiguous evidence for European
+        if ($detectedFormat === DateFormat::EUROPEAN && $europeanOnlyCount > 0 && $americanOnlyCount === 0) {
+            $unambiguousRatio = ($isoCount + $europeanOnlyCount) / $totalAnalyzed;
+
+            return min(0.95, 0.7 + ($unambiguousRatio * 0.25));
+        }
+
+        // Clear unambiguous evidence for American
+        if ($detectedFormat === DateFormat::AMERICAN && $americanOnlyCount > 0 && $europeanOnlyCount === 0) {
+            $unambiguousRatio = ($isoCount + $americanOnlyCount) / $totalAnalyzed;
+
+            return min(0.95, 0.7 + ($unambiguousRatio * 0.25));
+        }
+
+        // Conflicting evidence
+        if ($europeanOnlyCount > 0 && $americanOnlyCount > 0) {
+            return 0.2;
+        }
+
+        // All ambiguous - low confidence
+        if ($ambiguousCount > 0 && $isoCount === 0 && $europeanOnlyCount === 0 && $americanOnlyCount === 0) {
+            return 0.3;
+        }
+
+        return 0.5;
     }
 }

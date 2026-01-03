@@ -8,6 +8,8 @@ use Spatie\LaravelData\Data;
 
 /**
  * Represents a validation issue found in a CSV column value.
+ *
+ * @property-read string|null $issueType Date issue type: 'invalid', 'ambiguous', or 'format_mismatch'
  */
 final class ValueIssue extends Data
 {
@@ -16,5 +18,14 @@ final class ValueIssue extends Data
         public string $message,
         public int $rowCount,
         public string $severity = 'error',
+        public ?string $issueType = null,
     ) {}
+
+    /**
+     * Check if this is a date-related ambiguity warning.
+     */
+    public function isDateAmbiguous(): bool
+    {
+        return $this->issueType === 'ambiguous';
+    }
 }

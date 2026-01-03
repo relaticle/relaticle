@@ -101,6 +101,9 @@ final class ImportWizard extends Component implements HasActions, HasForms
     /** @var array<string, array<string, string>> */
     public array $valueCorrections = [];
 
+    /** @var array<string, string> Selected date formats per column (fieldName => format) */
+    public array $selectedDateFormats = [];
+
     // Review values UI state
     public int $reviewPage = 1;
 
@@ -485,6 +488,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->columnMap = [];
         $this->columnAnalysesData = [];
         $this->valueCorrections = [];
+        $this->selectedDateFormats = [];
         $this->previewResultData = null;
         $this->previewRows = [];
         $this->reviewPage = 1;
