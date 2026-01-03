@@ -158,7 +158,7 @@ For precise updates, include Record IDs from a previous export.
 
 ### Example
 
-```csv
+```
 id,name,custom_fields_industry
 01KCCFMZ52QWZSQZWVG0AP704V,Acme Corporation,Software
 01KCCFN1A8XVQR4ZFWB3KC5M7P,TechStart Inc,Hardware
@@ -172,7 +172,7 @@ id,name,custom_fields_industry
 
 You can create and update in the same file:
 
-```csv
+```
 id,name
 01KCCFMZ52QWZSQZWVG0AP704V,Update This Company
 ,New Company (blank ID = create new)
@@ -191,7 +191,7 @@ id,name
 
 **Duplicate Detection**: By domain (custom_fields_domains field)
 
-```csv
+```
 name,account_owner_email,custom_fields_industry
 Acme Corporation,owner@yourcompany.com,Technology
 ```
@@ -212,7 +212,7 @@ Acme Corporation,owner@yourcompany.com,Technology
 2. Domain match - From email domain to company's domains field
 3. `company_name` - Match by name, or create new company
 
-```csv
+```
 name,company_name,custom_fields_emails,custom_fields_title
 John Doe,Acme Corporation,john@acme.com,CEO
 Jane Smith,Acme Corporation,jane@acme.com,CTO
@@ -230,7 +230,7 @@ Jane Smith,Acme Corporation,jane@acme.com,CTO
 
 **Duplicate Detection**: Record ID only
 
-```csv
+```
 name,company_name,contact_name,custom_fields_amount,custom_fields_stage
 Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
 ```
@@ -244,7 +244,7 @@ Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
 
 **Duplicate Detection**: Record ID only
 
-```csv
+```
 title,assignee_email,custom_fields_due_date,custom_fields_priority
 Follow up with client,assignee@yourcompany.com,2024-03-15,High
 ```
@@ -257,7 +257,7 @@ Follow up with client,assignee@yourcompany.com,2024-03-15,High
 
 **Duplicate Detection**: Record ID only
 
-```csv
+```
 title,custom_fields_content
 Meeting Notes - Q1 Review,Discussed expansion plans for Q2
 ```
@@ -394,31 +394,31 @@ Small imports complete immediately. Large imports process in the background with
 Export existing records to get perfectly formatted templates with all your custom fields.
 
 ### Company Template
-```csv
+```
 id,name,account_owner_email,custom_fields_industry,custom_fields_domains
 ,Acme Corporation,owner@yourcompany.com,Technology,acme.com
 ```
 
 ### People Template
-```csv
+```
 id,name,company_name,custom_fields_emails,custom_fields_title
 ,John Doe,Acme Corporation,john@acme.com,CEO
 ```
 
 ### Opportunity Template
-```csv
+```
 id,name,company_name,contact_name,custom_fields_amount,custom_fields_stage
 ,Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
 ```
 
 ### Task Template
-```csv
+```
 id,title,assignee_email,custom_fields_due_date,custom_fields_priority
 ,Follow up with client,assignee@yourcompany.com,2024-03-15,High
 ```
 
 ### Note Template
-```csv
+```
 id,title,custom_fields_content
 ,Meeting Notes,Discussed expansion plans
 ```
