@@ -26,13 +26,18 @@
                 <span class="font-medium text-info-600 dark:text-info-400" x-text="updates.toLocaleString()"></span>
                 <span class="text-gray-500 dark:text-gray-400">will be updated</span>
             </div>
-            <div x-show="isProcessing" x-cloak class="flex items-center gap-1.5 ml-auto text-gray-500 dark:text-gray-400">
-                <span class="text-xs" x-text="`${processed.toLocaleString()}/${totalRows.toLocaleString()} rows`"></span>
-            </div>
-            <div x-show="isReady" x-cloak class="flex items-center gap-1.5 ml-auto">
-                <x-filament::icon icon="heroicon-m-check-circle" class="h-5 w-5 text-success-500" />
-                <span class="text-sm text-success-600 dark:text-success-400">Ready to import</span>
-            </div>
+            <template x-if="showCompanyMatch && newCompanies > 0">
+                <div class="flex items-center gap-1.5">
+                    <span x-show="isProcessing" x-cloak>
+                        <x-filament::loading-indicator class="h-5 w-5 text-warning-500" />
+                    </span>
+                    <span x-show="!isProcessing" x-cloak>
+                        <x-filament::icon icon="heroicon-m-building-office" class="h-5 w-5 text-warning-500" />
+                    </span>
+                    <span class="font-medium text-warning-600 dark:text-warning-400" x-text="newCompanies.toLocaleString()"></span>
+                    <span class="text-gray-500 dark:text-gray-400">new companies</span>
+                </div>
+            </template>
         </div>
     </div>
 
@@ -45,7 +50,7 @@
                     Showing <span x-text="currentRowCount.toLocaleString()"></span> of <span x-text="totalRows.toLocaleString()"></span> rows
                 </span>
             </div>
-            <div x-ref="scrollContainer" class="overflow-x-auto max-h-96 overflow-y-auto">
+            <div x-ref="scrollContainer" class="overflow-x-auto max-h-96 overflow-y-auto relative">
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
                         <tr>
@@ -71,7 +76,6 @@
                                     <td class="px-3 py-2">
                                         <div class="flex items-center gap-2">
                                             <span class="truncate max-w-[100px] text-gray-950 dark:text-white" x-text="row._company_name || row.company_name || '-'"></span>
-                                            <span x-html="getMatchBadge(row._company_match_type || 'none')"></span>
                                         </div>
                                     </td>
                                 </template>
@@ -79,9 +83,13 @@
                         </template>
                     </tbody>
                 </table>
-            </div>
-            <div x-show="loadingMore" x-cloak class="px-3 py-4 text-center text-gray-500 border-t border-gray-200 dark:border-gray-700">
-                <x-filament::loading-indicator class="h-5 w-5 mx-auto" />
+                <div
+                    x-show="loadingMore"
+                    x-cloak
+                    class="sticky bottom-0 left-0 right-0 px-3 py-3 text-center bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700"
+                >
+                    <x-filament::loading-indicator class="h-5 w-5 mx-auto" />
+                </div>
             </div>
         </div>
     </template>

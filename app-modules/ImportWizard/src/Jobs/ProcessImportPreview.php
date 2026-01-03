@@ -9,8 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
 use League\Csv\Writer;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Services\ImportRecordResolver;
 use Relaticle\ImportWizard\Services\PreviewChunkService;
@@ -20,6 +20,13 @@ use Relaticle\ImportWizard\Services\PreviewChunkService;
  *
  * The first batch is processed synchronously for instant feedback.
  * This job handles the remaining rows asynchronously.
+ *
+ * Automatically stops processing (without deleting files) when:
+ * - Cache is cleared (user cancelled/reset)
+ * - input_hash changes (user regenerated preview)
+ * - heartbeat is stale (user navigated away or closed browser)
+ *
+ * File cleanup is handled by cleanupTempFile() or scheduled command.
  */
 final class ProcessImportPreview implements ShouldQueue
 {
@@ -30,11 +37,14 @@ final class ProcessImportPreview implements ShouldQueue
 
     private const int CHUNK_SIZE = 500;
 
+    private const int HEARTBEAT_TIMEOUT_SECONDS = 30;
+
     /**
      * @param  class-string<BaseImporter>  $importerClass
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
+     * @param  array<string>  $initialNewCompanyNames
      */
     public function __construct(
         public string $sessionId,
@@ -49,7 +59,9 @@ final class ProcessImportPreview implements ShouldQueue
         public int $totalRows,
         public int $initialCreates,
         public int $initialUpdates,
+        public string $inputHash,
         public array $valueCorrections = [],
+        public array $initialNewCompanyNames = [],
     ) {
         $this->onQueue('imports');
     }
@@ -60,6 +72,9 @@ final class ProcessImportPreview implements ShouldQueue
         $creates = $this->initialCreates;
         $updates = $this->initialUpdates;
 
+        // Track unique new company names across all chunks
+        $newCompanyNames = array_flip($this->initialNewCompanyNames);
+
         // Pre-load records for fast lookups
         $recordResolver = app(ImportRecordResolver::class);
         $recordResolver->loadForTeam($this->teamId, $this->importerClass);
@@ -69,6 +84,13 @@ final class ProcessImportPreview implements ShouldQueue
 
         try {
             while ($processed < $this->totalRows) {
+                // Check if we should stop before each chunk
+                // Note: We don't cleanup here - user might navigate between steps
+                // Files are cleaned up by cleanupTempFile() or scheduled command
+                if ($this->shouldStop()) {
+                    return;
+                }
+
                 $limit = min(self::CHUNK_SIZE, $this->totalRows - $processed);
 
                 $result = $service->processChunk(
@@ -93,49 +115,50 @@ final class ProcessImportPreview implements ShouldQueue
                 $updates += $result['updates'];
                 $processed += $limit;
 
-                // Update progress in cache
-                $this->updateProgress($processed, $creates, $updates);
+                // Accumulate unique new company names
+                foreach ($result['newCompanyNames'] as $companyName) {
+                    $newCompanyNames[$companyName] = true;
+                }
+
+                // Update progress in consolidated cache
+                $this->updateProgress($processed, $creates, $updates, count($newCompanyNames));
             }
 
-            // Mark as ready
-            Cache::put(
-                "import:{$this->sessionId}:status",
-                'ready',
-                now()->addHours($this->ttlHours())
-            );
+            // Processing complete - status will be derived as 'ready' since processed >= total
         } catch (\Throwable $e) {
             report($e);
 
-            Cache::put(
-                "import:{$this->sessionId}:status",
-                'failed',
-                now()->addHours($this->ttlHours())
-            );
+            // Mark as failed in cache
+            $this->markAsFailed($e->getMessage());
 
             throw $e;
         }
     }
 
-    /**
-     * Update progress in cache.
-     */
-    private function updateProgress(int $processed, int $creates, int $updates): void
+    private function shouldStop(): bool
     {
-        Cache::put(
-            "import:{$this->sessionId}:progress",
-            [
-                'processed' => $processed,
-                'creates' => $creates,
-                'updates' => $updates,
-                'total' => $this->totalRows,
-            ],
-            now()->addHours($this->ttlHours())
-        );
+        $data = ImportSessionData::find($this->sessionId);
+
+        if (! $data instanceof ImportSessionData) {
+            return true;
+        }
+
+        return $data->inputHash !== $this->inputHash || $data->isHeartbeatStale(self::HEARTBEAT_TIMEOUT_SECONDS);
     }
 
-    private function ttlHours(): int
+    private function updateProgress(int $processed, int $creates, int $updates, int $newCompanies): void
     {
-        return (int) config('import-wizard.session_ttl_hours', 24);
+        ImportSessionData::update($this->sessionId, [
+            'processed' => $processed,
+            'creates' => $creates,
+            'updates' => $updates,
+            'new_companies' => $newCompanies,
+        ]);
+    }
+
+    private function markAsFailed(string $error): void
+    {
+        ImportSessionData::update($this->sessionId, ['error' => $error]);
     }
 
     /**

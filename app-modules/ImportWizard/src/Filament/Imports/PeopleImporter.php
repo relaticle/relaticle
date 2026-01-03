@@ -30,7 +30,12 @@ final class PeopleImporter extends BaseImporter
             ImportColumn::make('name')
                 ->label('Name')
                 ->requiredMapping()
-                ->guess(['name', 'full_name', 'person_name'])
+                ->guess([
+                    'name', 'full_name', 'person_name',
+                    'contact', 'contact_name', 'person', 'individual', 'member', 'employee',
+                    'full name', 'display_name', 'displayname',
+                    'contact name', 'lead name', 'prospect name',
+                ])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('John Doe')
                 ->fillRecordUsing(function (People $record, string $state, PeopleImporter $importer): void {
@@ -63,7 +68,11 @@ final class PeopleImporter extends BaseImporter
 
             ImportColumn::make('company_name')
                 ->label('Company Name')
-                ->guess(['company_name', 'Company'])
+                ->guess([
+                    'company_name', 'Company',
+                    'company', 'employer', 'organization', 'organisation', 'works_at',
+                    'associated company', 'account', 'account_name', 'business',
+                ])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {

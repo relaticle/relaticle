@@ -8,13 +8,14 @@
         'sessionId' => $sessionId,
         'entityType' => $entityType,
         'columnMap' => $columnMap,
+        'fieldLabels' => $this->fieldLabels,
         'previewRows' => $previewRows,
         'totalRows' => $totalRows,
     ], key('preview-table-' . $sessionId))
-</div>
 
-{{-- Navigation buttons outside nested component --}}
-<div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-    <x-filament::button wire:click="previousStep" color="gray">Back</x-filament::button>
-    {{ $this->startImportAction }}
+    {{-- Navigation buttons outside nested component --}}
+    <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+        <x-filament::button wire:click="previousStep" color="gray">Back</x-filament::button>
+        {{ $this->startImportAction }}
+    </div>
 </div>

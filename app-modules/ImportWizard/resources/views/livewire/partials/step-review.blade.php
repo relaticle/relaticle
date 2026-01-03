@@ -27,7 +27,7 @@
                                 </span>
                             @endif
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $analysis->mappedToField }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $this->getFieldLabel($analysis->mappedToField) }}</div>
                     </button>
                 @endforeach
             </div>

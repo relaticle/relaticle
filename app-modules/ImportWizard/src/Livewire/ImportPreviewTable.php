@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Livewire;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Reactive;
 use Livewire\Component;
+use Relaticle\ImportWizard\Data\ImportSessionData;
+use Relaticle\ImportWizard\Enums\PreviewStatus;
 
 /**
  * Isolated Livewire component for the import preview table.
@@ -27,6 +28,10 @@ final class ImportPreviewTable extends Component
     #[Reactive]
     public array $columnMap;
 
+    /** @var array<string, string> */
+    #[Reactive]
+    public array $fieldLabels = [];
+
     /** @var array<int, array<string, mixed>> */
     #[Reactive]
     public array $previewRows;
@@ -36,17 +41,18 @@ final class ImportPreviewTable extends Component
 
     public function render(): View
     {
-        $progress = Cache::get("import:{$this->sessionId}:progress", [
-            'processed' => 0,
-            'creates' => 0,
-            'updates' => 0,
-        ]);
+        /** @var ImportSessionData|null */
+        $data = ImportSessionData::find($this->sessionId);
+        /** @var PreviewStatus */
+        $status = $data?->status() ?? PreviewStatus::Pending;
 
-        $status = Cache::get("import:{$this->sessionId}:status", 'pending');
-
+        /** @var array<int, array{key: string, label: string}> */
         $columns = collect($this->columnMap)
             ->filter()
-            ->map(fn ($_, $field): array => ['key' => $field, 'label' => str($field)->headline()->toString()])
+            ->map(fn (string $_, string $field): array => [
+                'key' => $field,
+                'label' => $this->fieldLabels[$field] ?? str($field)->headline()->toString(),
+            ])
             ->values()
             ->all();
 
@@ -56,11 +62,12 @@ final class ImportPreviewTable extends Component
                 'totalRows' => $this->totalRows,
                 'columns' => $columns,
                 'showCompanyMatch' => in_array($this->entityType, ['people', 'opportunities']),
-                'isProcessing' => $status === 'processing',
-                'isReady' => $status === 'ready',
-                'creates' => $progress['creates'],
-                'updates' => $progress['updates'],
-                'processed' => $progress['processed'],
+                'isProcessing' => $status === PreviewStatus::Processing,
+                'isReady' => $status === PreviewStatus::Ready,
+                'creates' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->creates : 0,
+                'updates' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->updates : 0,
+                'newCompanies' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->newCompanies : 0,
+                'processed' => $data instanceof \Relaticle\ImportWizard\Data\ImportSessionData ? $data->processed : 0,
                 'rows' => $this->previewRows,
             ],
         ]);

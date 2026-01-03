@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Services;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use League\Csv\Statement;
@@ -24,7 +25,7 @@ final readonly class PreviewChunkService
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
-     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int}
+     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int, newCompanyNames: array<string>}
      */
     public function processChunk(
         string $importerClass,
@@ -56,6 +57,7 @@ final readonly class PreviewChunkService
         $creates = 0;
         $updates = 0;
         $rows = [];
+        $newCompanyNames = [];
 
         $rowNumber = $startRow;
         foreach ($records as $record) {
@@ -88,6 +90,14 @@ final readonly class PreviewChunkService
                 // Enrich with company match data for People/Opportunity imports
                 if ($this->shouldEnrichWithCompanyMatch($importerClass)) {
                     $formattedRow = $this->enrichRowWithCompanyMatch($formattedRow, $teamId);
+
+                    // Track unique new company names
+                    if (($formattedRow['_company_match_type'] ?? null) === 'new') {
+                        $companyName = (string) ($formattedRow['_company_name'] ?? '');
+                        if ($companyName !== '') {
+                            $newCompanyNames[$companyName] = true;
+                        }
+                    }
                 }
 
                 // Detect update method
@@ -125,6 +135,7 @@ final readonly class PreviewChunkService
             'rows' => $rows,
             'creates' => $creates,
             'updates' => $updates,
+            'newCompanyNames' => array_keys($newCompanyNames),
         ];
     }
 
@@ -174,6 +185,8 @@ final readonly class PreviewChunkService
      * @param  array<string, mixed>  $options
      * @param  array<string, mixed>  $rowData
      * @return array{action: string, record: Model|null}
+     *
+     * @throws BindingResolutionException
      */
     private function previewRow(
         string $importerClass,
@@ -198,10 +211,6 @@ final readonly class PreviewChunkService
         $importer->castData();
 
         $record = $importer->resolveRecord();
-
-        if (! $record instanceof Model) {
-            return ['action' => 'create', 'record' => null];
-        }
 
         if ($record->exists) {
             return ['action' => 'update', 'record' => $record];
@@ -269,7 +278,7 @@ final readonly class PreviewChunkService
      */
     private function enrichRowWithCompanyMatch(array $row, string $teamId): array
     {
-        $companyId = (string) ($row['id'] ?? '');
+        $companyId = (string) ($row['company_id'] ?? '');
         $companyName = (string) ($row['company_name'] ?? '');
         $emails = $this->extractEmailsFromRow($row);
 

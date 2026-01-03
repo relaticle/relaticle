@@ -8,43 +8,38 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 use League\Csv\Statement;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 
 /**
  * API controller for import preview operations.
  */
 final class PreviewController extends Controller
 {
-    /**
-     * Get the current preview processing status.
-     */
     public function status(string $sessionId): JsonResponse
     {
-        $this->validateSession($sessionId);
-
-        $enrichedPath = Storage::disk('local')->path("temp-imports/{$sessionId}/enriched.csv");
+        $data = $this->validateSession($sessionId);
+        $data->refresh($sessionId);
 
         return response()->json([
-            'status' => Cache::get("import:{$sessionId}:status", 'pending'),
-            'progress' => Cache::get("import:{$sessionId}:progress", [
-                'processed' => 0,
-                'creates' => 0,
-                'updates' => 0,
-                'total' => 0,
-            ]),
-            'hasEnrichedFile' => file_exists($enrichedPath),
+            'status' => $data->status(),
+            'progress' => [
+                'processed' => $data->processed,
+                'creates' => $data->creates,
+                'updates' => $data->updates,
+                'newCompanies' => $data->newCompanies,
+                'total' => $data->total,
+            ],
+            'hasEnrichedFile' => file_exists(Storage::disk('local')->path("temp-imports/{$sessionId}/enriched.csv")),
         ]);
     }
 
-    /**
-     * Fetch a range of rows from the enriched CSV for virtual scroll.
-     */
     public function rows(Request $request, string $sessionId): JsonResponse
     {
-        $this->validateSession($sessionId);
+        $data = $this->validateSession($sessionId);
+        $data->refresh($sessionId);
 
         $enrichedPath = Storage::disk('local')->path("temp-imports/{$sessionId}/enriched.csv");
 
@@ -75,17 +70,18 @@ final class PreviewController extends Controller
         }
     }
 
-    /**
-     * Validate that the session belongs to the current team.
-     */
-    private function validateSession(string $sessionId): void
+    private function validateSession(string $sessionId): ImportSessionData
     {
         /** @var User|null $user */
         $user = auth()->user();
         $teamId = $user?->currentTeam?->getKey();
 
-        if ($teamId === null || Cache::get("import:{$sessionId}:team") !== $teamId) {
-            abort(404, 'Session not found');
-        }
+        abort_if($teamId === null, 404, 'Session not found');
+
+        $data = ImportSessionData::find($sessionId);
+
+        abort_if(! $data instanceof ImportSessionData || $data->teamId !== $teamId, 404, 'Session not found');
+
+        return $data;
     }
 }

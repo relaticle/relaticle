@@ -17,11 +17,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
@@ -113,6 +115,9 @@ final class ImportWizard extends Component implements HasActions, HasForms
     /** @var array<int, array<string, mixed>> All rows for preview/editing */
     public array $previewRows = [];
 
+    #[Locked]
+    public bool $importStarted = false;
+
     /**
      * Handle file upload.
      */
@@ -136,8 +141,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
             return;
         }
 
-        // Check for unique identifier mapping when leaving MAP step
-        if ($this->currentStep === self::STEP_MAP && ! $this->hasUniqueIdentifierMapped()) {
+        // Check for mapping warnings when leaving MAP step
+        if ($this->currentStep === self::STEP_MAP && $this->hasMappingWarnings()) {
             $this->mountAction('proceedWithoutUniqueIdentifiers');
 
             return;
@@ -248,6 +253,12 @@ final class ImportWizard extends Component implements HasActions, HasForms
      */
     public function executeImport(): void
     {
+        if ($this->importStarted) {
+            return;
+        }
+
+        $this->importStarted = true;
+
         if (! $this->hasRecordsToImport()) {
             Notification::make()
                 ->title('No Records to Import')
@@ -478,6 +489,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->previewRows = [];
         $this->reviewPage = 1;
         $this->expandedColumn = null;
+        $this->importStarted = false;
+        $this->previewInputHash = null;
     }
 
     /**
@@ -500,6 +513,15 @@ final class ImportWizard extends Component implements HasActions, HasForms
         }
     }
 
+    public function touchHeartbeat(): void
+    {
+        if ($this->sessionId === null) {
+            return;
+        }
+
+        ImportSessionData::find($this->sessionId)?->refresh($this->sessionId);
+    }
+
     /**
      * Get the entity label for display.
      */
@@ -508,6 +530,20 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $entities = $this->getEntities();
 
         return $entities[$this->entityType]['label'] ?? str($this->entityType)->title()->toString();
+    }
+
+    /**
+     * Get human-readable labels for all mapped fields.
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function fieldLabels(): array
+    {
+        return collect($this->columnMap)
+            ->filter()
+            ->mapWithKeys(fn ($_, string $field): array => [$field => $this->getFieldLabel($field)])
+            ->all();
     }
 
     /**
@@ -556,20 +592,14 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public function proceedWithoutUniqueIdentifiersAction(): Action
     {
-        $docsUrl = route('documentation.show', 'import').'#unique-identifiers';
-
         return Action::make('proceedWithoutUniqueIdentifiers')
-            ->label('Continue without mapping')
+            ->label('Continue anyway')
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->color('warning')
             ->requiresConfirmation()
-            ->modalHeading('Avoid creating duplicate records')
-            ->modalDescription(fn (): HtmlString => new HtmlString(
-                'To avoid creating duplicate records, make sure you include and map the following columns:<br><br>'.
-                '<strong>'.$this->getMissingUniqueIdentifiersMessage().'</strong><br><br>'.
-                '<a href="'.$docsUrl.'" target="_blank" class="text-primary-600 hover:underline">Learn more about unique identifiers</a>'
-            ))
-            ->modalSubmitActionLabel('Continue without mapping')
+            ->modalHeading('Review mapping before continuing')
+            ->modalDescription(fn (): HtmlString => new HtmlString($this->getMappingWarningsHtml()))
+            ->modalSubmitActionLabel('Continue anyway')
             ->modalCancelActionLabel('Go back')
             ->action(function (): void {
                 $this->advanceToNextStep();

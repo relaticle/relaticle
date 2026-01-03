@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Models\Company;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
@@ -243,5 +245,106 @@ describe('Navigation and State', function (): void {
             ->set('uploadedFile', createTestCsv("name\nAcme"))
             ->call('goToStep', ImportWizard::STEP_PREVIEW)
             ->assertSet('currentStep', ImportWizard::STEP_UPLOAD);
+    });
+});
+
+describe('Preview Job Cancellation', function (): void {
+    it('stores session data in consolidated cache during preview', function (): void {
+        $component = wizardTest($this->team)
+            ->set('uploadedFile', createTestCsv("name\nAcme Corp"))
+            ->call('nextStep')
+            ->set('columnMap.name', 'name')
+            ->callAction('proceedWithoutUniqueIdentifiers')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW);
+
+        $sessionId = $component->get('sessionId');
+        expect($sessionId)->not->toBeNull();
+
+        $cached = Cache::get(ImportSessionData::cacheKey($sessionId));
+        expect($cached)->not->toBeNull()
+            ->and($cached)->toHaveKeys(['team_id', 'input_hash', 'total', 'processed', 'heartbeat']);
+    });
+
+    it('skips preview regeneration when inputs unchanged', function (): void {
+        $component = wizardTest($this->team)
+            ->set('uploadedFile', createTestCsv("name\nAcme Corp"))
+            ->call('nextStep')
+            ->set('columnMap.name', 'name')
+            ->callAction('proceedWithoutUniqueIdentifiers')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW);
+
+        $initialHash = $component->get('previewInputHash');
+        expect($initialHash)->not->toBeNull();
+
+        $component
+            ->call('previousStep')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW)
+            ->assertSet('previewInputHash', $initialHash);
+    });
+
+    it('regenerates preview when column mapping changes', function (): void {
+        $component = wizardTest($this->team)
+            ->set('uploadedFile', createTestCsv("name,email\nAcme Corp,acme@test.com"))
+            ->call('nextStep')
+            ->set('columnMap.name', 'name')
+            ->callAction('proceedWithoutUniqueIdentifiers')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW);
+
+        $initialHash = $component->get('previewInputHash');
+
+        $component
+            ->call('previousStep')
+            ->assertSet('currentStep', ImportWizard::STEP_REVIEW)
+            ->call('previousStep')
+            ->assertSet('currentStep', ImportWizard::STEP_MAP)
+            ->set('columnMap.account_owner_email', 'email')
+            ->call('nextStep');
+
+        if ($component->get('mountedActions')) {
+            $component->callMountedAction();
+        }
+
+        $component->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW);
+
+        $newHash = $component->get('previewInputHash');
+        expect($newHash)->not->toBe($initialHash);
+    });
+
+    it('prevents double import execution', function (): void {
+        $component = wizardTest($this->team)
+            ->set('uploadedFile', createTestCsv("name\nAcme Corp\nTech Inc"))
+            ->call('nextStep')
+            ->set('columnMap.name', 'name')
+            ->callAction('proceedWithoutUniqueIdentifiers')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW)
+            ->assertSet('importStarted', false);
+
+        $component->call('executeImport')->assertSet('importStarted', true);
+        $component->call('executeImport');
+
+        Queue::assertPushed(StreamingImportCsv::class, 1);
+    });
+
+    it('clears session cache on reset wizard', function (): void {
+        $component = wizardTest($this->team)
+            ->set('uploadedFile', createTestCsv("name\nAcme Corp"))
+            ->call('nextStep')
+            ->set('columnMap.name', 'name')
+            ->callAction('proceedWithoutUniqueIdentifiers')
+            ->call('nextStep')
+            ->assertSet('currentStep', ImportWizard::STEP_PREVIEW);
+
+        $sessionId = $component->get('sessionId');
+        expect(Cache::has(ImportSessionData::cacheKey($sessionId)))->toBeTrue();
+
+        $component->call('resetWizard');
+
+        expect(Cache::has(ImportSessionData::cacheKey($sessionId)))->toBeFalse();
     });
 });

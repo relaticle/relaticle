@@ -22,7 +22,8 @@ enum PeopleField: string
     {
         return match ($this) {
             self::EMAILS => CustomFieldType::EMAIL->value,
-            self::PHONE_NUMBER, self::JOB_TITLE => CustomFieldType::TEXT->value,
+            self::PHONE_NUMBER => CustomFieldType::PHONE->value,
+            self::JOB_TITLE => CustomFieldType::TEXT->value,
             self::LINKEDIN => CustomFieldType::LINK->value,
         };
     }

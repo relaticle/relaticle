@@ -16,6 +16,7 @@ use App\Listeners\SwitchTeam;
 use App\Models\Team;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
@@ -60,6 +61,7 @@ final class AppPanelProvider extends PanelProvider
         );
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
+        DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label('Delete record'));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
         Table::configureUsing(fn (Table $table): Table => $table);
     }

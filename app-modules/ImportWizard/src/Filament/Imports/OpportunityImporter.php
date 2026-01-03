@@ -28,7 +28,12 @@ final class OpportunityImporter extends BaseImporter
             ImportColumn::make('name')
                 ->label('Name')
                 ->requiredMapping()
-                ->guess(['name', 'opportunity_name', 'title'])
+                ->guess([
+                    'name', 'opportunity_name', 'title',
+                    'deal name', 'deal_name', 'deal',
+                    'opportunity name', 'opp_name', 'opp name',
+                    'project', 'project_name', 'sale', 'sale_name', 'prospect',
+                ])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Q1 Sales Opportunity')
                 ->fillRecordUsing(function (Opportunity $record, string $state, OpportunityImporter $importer): void {
@@ -61,7 +66,11 @@ final class OpportunityImporter extends BaseImporter
 
             ImportColumn::make('company_name')
                 ->label('Company Name')
-                ->guess(['company_name', 'company', 'account'])
+                ->guess([
+                    'company_name', 'company', 'account',
+                    'company name', 'account_name', 'account name', 'organization',
+                    'associated company', 'business', 'client', 'customer',
+                ])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('Acme Corporation')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
@@ -96,7 +105,11 @@ final class OpportunityImporter extends BaseImporter
 
             ImportColumn::make('contact_name')
                 ->label('Contact Name')
-                ->guess(['contact_name', 'contact', 'person'])
+                ->guess([
+                    'contact_name', 'contact', 'person',
+                    'contact name', 'primary contact', 'main contact', 'lead',
+                    'prospect', 'decision maker', 'buyer',
+                ])
                 ->rules(['nullable', 'string', 'max:255'])
                 ->example('John Doe')
                 ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {

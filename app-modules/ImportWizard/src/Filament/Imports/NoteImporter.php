@@ -7,12 +7,9 @@ namespace Relaticle\ImportWizard\Filament\Imports;
 use App\Models\Note;
 use Filament\Actions\Imports\ImportColumn;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Filament\Imports\Concerns\HasPolymorphicEntityAttachment;
 
 final class NoteImporter extends BaseImporter
 {
-    use HasPolymorphicEntityAttachment;
-
     protected static ?string $model = Note::class;
 
     protected static bool $skipUniqueIdentifierWarning = true;
@@ -25,39 +22,16 @@ final class NoteImporter extends BaseImporter
             ImportColumn::make('title')
                 ->label('Title')
                 ->requiredMapping()
-                ->guess(['title', 'note_title', 'subject', 'name', 'heading'])
+                ->guess([
+                    'title', 'note_title', 'subject', 'name', 'heading',
+                    'note', 'summary', 'description', 'content_title',
+                    'note name', 'note subject', 'topic',
+                ])
                 ->rules(['required', 'string', 'max:255'])
                 ->example('Meeting Notes - Q1 Review')
                 ->fillRecordUsing(function (Note $record, string $state, NoteImporter $importer): void {
                     $record->title = trim($state);
                     $importer->initializeNewRecord($record);
-                }),
-
-            ImportColumn::make('company_name')
-                ->label('Company Name')
-                ->guess(['company_name', 'company', 'organization', 'account', 'related_company'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
-                }),
-
-            ImportColumn::make('person_name')
-                ->label('Person Name')
-                ->guess(['person_name', 'contact_name', 'contact', 'person', 'related_contact'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('John Doe')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
-                }),
-
-            ImportColumn::make('opportunity_name')
-                ->label('Opportunity Name')
-                ->guess(['opportunity_name', 'opportunity', 'deal', 'deal_name', 'related_deal'])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Enterprise License Deal')
-                ->fillRecordUsing(function (): void {
-                    // Relationship attached in afterSave()
                 }),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),
@@ -76,16 +50,6 @@ final class NoteImporter extends BaseImporter
 
         // No match found - create new note
         return new Note;
-    }
-
-    /**
-     * Attach polymorphic relationships after the note is saved.
-     */
-    protected function afterSave(): void
-    {
-        parent::afterSave();
-
-        $this->attachRelatedEntities();
     }
 
     public static function getEntityName(): string
