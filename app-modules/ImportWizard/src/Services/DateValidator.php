@@ -160,10 +160,6 @@ final class DateValidator
      */
     public function formatForPreview(?Carbon $date): string
     {
-        if (! $date instanceof \Carbon\Carbon) {
-            return '';
-        }
-
-        return $date->format('M j, Y');
+        return blank($date) ? '' : $date->format('M j, Y');
     }
 }

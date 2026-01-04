@@ -78,18 +78,19 @@ trait HasColumnMapping
             }
 
             // Find first unmapped field that matches suggested fields
-            foreach ($inference['suggestedFields'] as $suggestedField) {
-                if (isset($this->columnMap[$suggestedField]) && $this->columnMap[$suggestedField] === '') {
-                    // Auto-apply the inference
-                    $this->columnMap[$suggestedField] = $header;
-                    $this->inferredMappings[$header] = [
-                        'field' => $suggestedField,
-                        'confidence' => $inference['confidence'],
-                        'type' => $inference['type'],
-                    ];
+            // Try both original name and custom_fields_ prefixed version
+            $matchedField = collect($inference['suggestedFields'])
+                ->flatMap(fn (string $field): array => [$field, "custom_fields_{$field}"])
+                ->first(fn (string $fieldName): bool => isset($this->columnMap[$fieldName]) && $this->columnMap[$fieldName] === ''
+                );
 
-                    break;
-                }
+            if ($matchedField !== null) {
+                $this->columnMap[$matchedField] = $header;
+                $this->inferredMappings[$header] = [
+                    'field' => $matchedField,
+                    'confidence' => $inference['confidence'],
+                    'type' => $inference['type'],
+                ];
             }
         }
     }

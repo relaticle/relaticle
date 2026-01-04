@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Enums;
 
 use Carbon\Carbon;
-use Carbon\Exceptions\InvalidFormatException;
 use Filament\Support\Contracts\HasLabel;
 
 /**
  * Supported timestamp formats for CSV import parsing.
  *
- * Key difference from DateFormat:
- * - ISO: time comes LAST (2024-05-15 16:00:00)
- * - European/American: time comes FIRST (16:00 15-05-2024)
+ * IMPORTANT: Time position follows Attio's export format convention:
+ * - ISO: time LAST (2024-05-15 16:00:00) - standard ISO 8601
+ * - European/American: time FIRST (16:00 15-05-2024)
+ *
+ * The time-first convention for European/American formats differs from
+ * common regional conventions where time typically appears after the date.
+ * This design choice enables seamless migration from Attio exports.
  */
 enum TimestampFormat: string implements HasLabel
 {
@@ -139,7 +142,7 @@ enum TimestampFormat: string implements HasLabel
 
         foreach ($this->getPhpFormats() as $format) {
             $parsed = $this->tryParseWithFormat($value, $format);
-            if ($parsed instanceof Carbon) {
+            if ($parsed instanceof \Carbon\Carbon) {
                 return $parsed;
             }
         }
@@ -152,13 +155,9 @@ enum TimestampFormat: string implements HasLabel
      */
     private function tryParseWithFormat(string $value, string $format): ?Carbon
     {
-        try {
-            $parsed = Carbon::createFromFormat($format, $value);
-
-            return $parsed instanceof Carbon ? $parsed : null;
-        } catch (InvalidFormatException) {
-            return null;
-        }
+        return Carbon::canBeCreatedFromFormat($value, $format)
+            ? Carbon::createFromFormat($format, $value)
+            : null;
     }
 
     /**

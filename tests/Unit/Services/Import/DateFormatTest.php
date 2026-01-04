@@ -69,14 +69,6 @@ describe('DateFormat', function (): void {
         });
     });
 
-    describe('getPhpFormat', function (): void {
-        it('returns correct PHP format strings', function (): void {
-            expect(DateFormat::ISO->getPhpFormat())->toBe('Y-m-d');
-            expect(DateFormat::EUROPEAN->getPhpFormat())->toBe('d/m/Y');
-            expect(DateFormat::AMERICAN->getPhpFormat())->toBe('m/d/Y');
-        });
-    });
-
     describe('getLabel', function (): void {
         it('returns human-readable labels', function (): void {
             expect(DateFormat::ISO->getLabel())->toContain('ISO');
@@ -109,6 +101,11 @@ describe('DateFormat', function (): void {
             expect(DateFormat::AMERICAN->matches('01/15/2024'))->toBeTrue();
             expect(DateFormat::EUROPEAN->matches('2024-01-15'))->toBeFalse();
         });
+
+        it('matches European/American dash format', function (): void {
+            expect(DateFormat::EUROPEAN->matches('15-01-2024'))->toBeTrue();
+            expect(DateFormat::AMERICAN->matches('01-15-2024'))->toBeTrue();
+        });
     });
 
     describe('isAmbiguous', function (): void {
@@ -133,6 +130,16 @@ describe('DateFormat', function (): void {
             expect(DateFormat::isAmbiguous('2024-01-15'))->toBeFalse();
             expect(DateFormat::isAmbiguous('not-a-date'))->toBeFalse();
         });
+
+        it('identifies ambiguous dates with dashes', function (): void {
+            expect(DateFormat::isAmbiguous('01-02-2024'))->toBeTrue();
+            expect(DateFormat::isAmbiguous('05-06-2024'))->toBeTrue();
+        });
+
+        it('identifies unambiguous dates with dashes', function (): void {
+            expect(DateFormat::isAmbiguous('31-01-2024'))->toBeFalse();
+            expect(DateFormat::isAmbiguous('01-31-2024'))->toBeFalse();
+        });
     });
 
     describe('isUnambiguousFor', function (): void {
@@ -148,6 +155,14 @@ describe('DateFormat', function (): void {
         it('American is unambiguous when second position > 12', function (): void {
             expect(DateFormat::AMERICAN->isUnambiguousFor('01/31/2024'))->toBeTrue();
             expect(DateFormat::AMERICAN->isUnambiguousFor('01/02/2024'))->toBeFalse();
+        });
+
+        it('European is unambiguous when day > 12 with dashes', function (): void {
+            expect(DateFormat::EUROPEAN->isUnambiguousFor('31-01-2024'))->toBeTrue();
+        });
+
+        it('American is unambiguous when second position > 12 with dashes', function (): void {
+            expect(DateFormat::AMERICAN->isUnambiguousFor('01-31-2024'))->toBeTrue();
         });
     });
 
@@ -199,6 +214,11 @@ describe('DateFormat', function (): void {
     });
 
     describe('getPhpFormats', function (): void {
+        it('returns slash format first for formatting consistency', function (): void {
+            expect(DateFormat::EUROPEAN->getPhpFormats()[0])->toBe('d/m/Y');
+            expect(DateFormat::AMERICAN->getPhpFormats()[0])->toBe('m/d/Y');
+        });
+
         it('returns multiple PHP format strings for European', function (): void {
             $formats = DateFormat::EUROPEAN->getPhpFormats();
 

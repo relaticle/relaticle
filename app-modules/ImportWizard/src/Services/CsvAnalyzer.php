@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use League\Csv\Statement;
+use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
@@ -78,7 +79,7 @@ final readonly class CsvAnalyzer
                 $collector['totalCount']++;
                 $value = $record[$csvColumn] ?? '';
 
-                if ($this->isBlank($value)) {
+                if (blank($value)) {
                     $collector['blankCount']++;
                     $collector['values'][''] = ($collector['values'][''] ?? 0) + 1;
                 } else {
@@ -316,7 +317,7 @@ final readonly class CsvAnalyzer
             $value = (string) $value;
 
             // Skip blank values unless required
-            if ($this->isBlank($value)) {
+            if (blank($value)) {
                 if ($isRequired) {
                     $issues[] = new ValueIssue(
                         value: $value,
@@ -418,48 +419,21 @@ final readonly class CsvAnalyzer
     {
         // Check custom field type first (takes priority)
         if ($customField instanceof CustomField) {
-            $customFieldType = $customField->type;
+            return match ($customField->typeData->dataType) {
+                FieldDataType::DATE => 'date',
+                FieldDataType::DATE_TIME => 'datetime',
+                default => 'string',
+            };
+        }
 
-            // Map custom field types to our internal field types
-            if ($customFieldType === 'date') {
+        // Check ImportColumn validation rules for date hints
+        if ($column instanceof ImportColumn) {
+            $rules = $column->getDataValidationRules();
+            $rulesString = implode('|', array_map(strval(...), $rules));
+
+            if (str_contains($rulesString, 'date') || str_contains($rulesString, 'Date')) {
                 return 'date';
             }
-
-            if ($customFieldType === 'date-time') {
-                return 'datetime';
-            }
-        }
-
-        if (! $column instanceof ImportColumn) {
-            return 'string';
-        }
-
-        if ($column->isBoolean()) {
-            return 'boolean';
-        }
-
-        if ($column->isNumeric()) {
-            return 'numeric';
-        }
-
-        // Check validation rules for type hints
-        $rules = $column->getDataValidationRules();
-        $rulesString = implode('|', array_map(strval(...), $rules));
-
-        if (str_contains($rulesString, 'email')) {
-            return 'email';
-        }
-
-        if (str_contains($rulesString, 'date') || str_contains($rulesString, 'Date')) {
-            return 'date';
-        }
-
-        if (str_contains($rulesString, 'url') || str_contains($rulesString, 'URL')) {
-            return 'url';
-        }
-
-        if (str_contains($rulesString, 'numeric') || str_contains($rulesString, 'integer')) {
-            return 'numeric';
         }
 
         return 'string';
@@ -468,11 +442,6 @@ final readonly class CsvAnalyzer
     private function isDateFieldType(string $fieldType): bool
     {
         return in_array($fieldType, ['date', 'datetime'], true);
-    }
-
-    private function isBlank(mixed $value): bool
-    {
-        return $value === null || $value === '';
     }
 
     /** @param array<ImportColumn> $importerColumns */
@@ -501,7 +470,7 @@ final readonly class CsvAnalyzer
         $rulesData = $this->getValidationRulesForColumn($importerColumn, $customField);
 
         // Skip validation if blank value
-        if ($this->isBlank($value)) {
+        if (blank($value)) {
             return null;
         }
 

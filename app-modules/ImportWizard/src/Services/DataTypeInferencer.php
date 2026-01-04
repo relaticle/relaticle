@@ -108,29 +108,23 @@ final class DataTypeInferencer
      */
     public function detectDateFormat(array $values): DateFormatResult
     {
-        $isoCount = 0;
-        $europeanOnlyCount = 0;
-        $americanOnlyCount = 0;
-        $ambiguousCount = 0;
-        $invalidCount = 0;
+        $counts = collect($values)
+            ->map(fn (string $value): string => trim($value))
+            ->filter()
+            ->map(fn (string $value): string => $this->classifyDateValue($value))
+            ->countBy()
+            ->all();
 
-        foreach ($values as $value) {
-            $value = trim((string) $value);
-
-            if ($value === '') {
-                continue;
-            }
-
-            $classification = $this->classifyDateValue($value);
-
-            match ($classification) {
-                'iso' => $isoCount++,
-                'european_only' => $europeanOnlyCount++,
-                'american_only' => $americanOnlyCount++,
-                'ambiguous' => $ambiguousCount++,
-                'invalid' => $invalidCount++,
-            };
-        }
+        /** @var int */
+        $isoCount = $counts['iso'] ?? 0;
+        /** @var int */
+        $europeanOnlyCount = $counts['european_only'] ?? 0;
+        /** @var int */
+        $americanOnlyCount = $counts['american_only'] ?? 0;
+        /** @var int */
+        $ambiguousCount = $counts['ambiguous'] ?? 0;
+        /** @var int */
+        $invalidCount = $counts['invalid'] ?? 0;
 
         $totalAnalyzed = $isoCount + $europeanOnlyCount + $americanOnlyCount + $ambiguousCount + $invalidCount;
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Enums;
 
 use Carbon\Carbon;
-use Carbon\Exceptions\InvalidFormatException;
 use Filament\Support\Contracts\HasLabel;
 
 /**
@@ -74,21 +73,9 @@ enum DateFormat: string implements HasLabel
     {
         return match ($this) {
             self::ISO => ['Y-m-d'],
-            self::EUROPEAN => ['d-m-Y', 'd/m/Y', 'j F Y', 'd M Y', 'j M Y'],
-            self::AMERICAN => ['m-d-Y', 'm/d/Y', 'F jS Y', 'M d Y', 'F j Y', 'M jS Y'],
-        };
-    }
-
-    /**
-     * Get the primary PHP date format string for Carbon::createFromFormat().
-     */
-    #[\Deprecated(message: 'Use getPhpFormats() for multi-pattern support')]
-    public function getPhpFormat(): string
-    {
-        return match ($this) {
-            self::ISO => 'Y-m-d',
-            self::EUROPEAN => 'd/m/Y',
-            self::AMERICAN => 'm/d/Y',
+            // Slash formats first to maintain format() output compatibility
+            self::EUROPEAN => ['d/m/Y', 'd-m-Y', 'j F Y', 'd M Y', 'j M Y'],
+            self::AMERICAN => ['m/d/Y', 'm-d-Y', 'F jS Y', 'M d Y', 'F j Y', 'M jS Y'],
         };
     }
 
@@ -99,8 +86,8 @@ enum DateFormat: string implements HasLabel
     {
         return match ($this) {
             self::ISO => '/^(\d{4})-(\d{1,2})-(\d{1,2})$/',
-            self::EUROPEAN => '/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/',
-            self::AMERICAN => '/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/',
+            self::EUROPEAN => '/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/',
+            self::AMERICAN => '/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/',
         };
     }
 
@@ -123,7 +110,7 @@ enum DateFormat: string implements HasLabel
             if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/', $value)) {
                 $shortFormat = $this === self::EUROPEAN ? 'd/m/y' : 'm/d/y';
                 $parsed = $this->tryParseWithFormat($value, $shortFormat);
-                if ($parsed instanceof Carbon) {
+                if ($parsed instanceof \Carbon\Carbon) {
                     return $parsed->startOfDay();
                 }
             }
@@ -132,7 +119,7 @@ enum DateFormat: string implements HasLabel
             if (preg_match('/^(\d{1,2})-(\d{1,2})-(\d{2})$/', $value)) {
                 $shortFormat = $this === self::EUROPEAN ? 'd-m-y' : 'm-d-y';
                 $parsed = $this->tryParseWithFormat($value, $shortFormat);
-                if ($parsed instanceof Carbon) {
+                if ($parsed instanceof \Carbon\Carbon) {
                     return $parsed->startOfDay();
                 }
             }
@@ -141,7 +128,7 @@ enum DateFormat: string implements HasLabel
         // Try each standard format
         foreach ($this->getPhpFormats() as $format) {
             $parsed = $this->tryParseWithFormat($value, $format);
-            if ($parsed instanceof Carbon) {
+            if ($parsed instanceof \Carbon\Carbon) {
                 return $parsed->startOfDay();
             }
         }
@@ -154,13 +141,9 @@ enum DateFormat: string implements HasLabel
      */
     private function tryParseWithFormat(string $value, string $format): ?Carbon
     {
-        try {
-            $parsed = Carbon::createFromFormat($format, $value);
-
-            return $parsed instanceof Carbon ? $parsed : null;
-        } catch (InvalidFormatException) {
-            return null;
-        }
+        return Carbon::canBeCreatedFromFormat($value, $format)
+            ? Carbon::createFromFormat($format, $value)
+            : null;
     }
 
     /**
@@ -168,7 +151,7 @@ enum DateFormat: string implements HasLabel
      */
     public function format(Carbon $date): string
     {
-        return $date->format($this->getPhpFormat());
+        return $date->format($this->getPhpFormats()[0]);
     }
 
     /**
@@ -192,7 +175,7 @@ enum DateFormat: string implements HasLabel
         }
 
         // For European/American, check if the value can only work in one format
-        if (! preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/', $value, $matches)) {
+        if (! preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/', $value, $matches)) {
             return false;
         }
 
@@ -211,7 +194,7 @@ enum DateFormat: string implements HasLabel
      */
     public static function isAmbiguous(string $value): bool
     {
-        if (! preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/', $value, $matches)) {
+        if (! preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/', $value, $matches)) {
             return false;
         }
 

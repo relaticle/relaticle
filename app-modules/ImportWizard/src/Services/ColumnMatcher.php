@@ -53,15 +53,10 @@ final class ColumnMatcher
      */
     private function expandWithPluralSingular(array $guesses): array
     {
-        /** @var array<string> */
-        $expanded = [];
-
-        foreach ($guesses as $guess) {
-            $expanded[] = $guess;
-            $expanded[] = Str::plural($guess);
-            $expanded[] = Str::singular($guess);
-        }
-
-        return array_values(array_unique($expanded));
+        return collect($guesses)
+            ->flatMap(fn (string $guess): array => [$guess, Str::plural($guess), Str::singular($guess)])
+            ->unique()
+            ->values()
+            ->all();
     }
 }

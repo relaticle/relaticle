@@ -551,11 +551,15 @@ final class ImportWizard extends Component implements HasActions, HasForms
     }
 
     /**
-     * Toggle column expansion in review step.
+     * Select a column in review step.
      */
     public function toggleColumn(string $columnName): void
     {
-        $this->expandedColumn = $this->expandedColumn === $columnName ? null : $columnName;
+        if ($this->expandedColumn === $columnName) {
+            return;
+        }
+
+        $this->expandedColumn = $columnName;
         $this->reviewPage = 1;
         $this->showOnlyErrors = false;
     }
