@@ -39,30 +39,25 @@ return [
     |
     */
     'documents' => [
-        'business' => [
-            'title' => 'Business Guide',
-            'file' => 'business-guide.md',
-            'description' => 'Documentation for business users and stakeholders.',
-        ],
-        'technical' => [
-            'title' => 'Technical Guide',
-            'file' => 'technical-guide.md',
-            'description' => 'Technical documentation for developers and system administrators.',
-        ],
-        'quickstart' => [
-            'title' => 'Quick Start Guide',
-            'file' => 'quick-start-guide.md',
-            'description' => 'Get started quickly with essential information.',
-        ],
-        'api' => [
-            'title' => 'API Documentation',
-            'file' => 'api-guide.md',
-            'description' => 'API reference and integration documentation.',
+        'getting-started' => [
+            'title' => 'Getting Started',
+            'file' => 'getting-started.md',
+            'description' => 'Set up your account and learn the basics.',
         ],
         'import' => [
             'title' => 'Import Guide',
             'file' => 'import-guide.md',
-            'description' => 'Complete guide for importing companies, people, opportunities, tasks, and notes into Relaticle.',
+            'description' => 'Import data from CSV files.',
+        ],
+        'developer' => [
+            'title' => 'Developer Guide',
+            'file' => 'developer-guide.md',
+            'description' => 'Installation, architecture, and contributing.',
+        ],
+        'api' => [
+            'title' => 'API Reference',
+            'file' => 'api-guide.md',
+            'description' => 'REST API documentation (coming soon).',
         ],
     ],
 

@@ -7,7 +7,10 @@ namespace Relaticle\ImportWizard\Livewire\Concerns;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
+use Relaticle\ImportWizard\Data\ValueIssue;
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Services\CsvAnalyzer;
+use Relaticle\ImportWizard\Services\DateValidator;
 
 /** @property Collection<int, ColumnAnalysis> $columnAnalyses */
 trait HasValueAnalysis
@@ -174,5 +177,58 @@ trait HasValueAnalysis
     {
         $this->showOnlyErrors = ! $this->showOnlyErrors;
         $this->reviewPage = 1;
+    }
+
+    public function changeDateFormat(string $fieldName, string $formatValue): void
+    {
+        $format = DateFormat::tryFrom($formatValue);
+        if (! $format instanceof DateFormat) {
+            return;
+        }
+
+        // Store the selected format
+        $this->selectedDateFormats[$fieldName] = $formatValue;
+
+        // Find the column analysis for this field
+        $analysisIndex = collect($this->columnAnalysesData)
+            ->search(fn (array $data): bool => $data['mappedToField'] === $fieldName);
+
+        if ($analysisIndex === false) {
+            return;
+        }
+
+        // Get the unique values for this column
+        /** @var array<string, int> $uniqueValues */
+        $uniqueValues = $this->columnAnalysesData[$analysisIndex]['uniqueValues'];
+
+        // Re-validate with the new format
+        $dateValidator = app(DateValidator::class);
+        $validationResult = $dateValidator->validateColumn($uniqueValues, $format);
+
+        // Add required field issue if needed
+        $issues = $validationResult['issues'];
+        $blankCount = $this->columnAnalysesData[$analysisIndex]['blankCount'];
+        $isRequired = $this->columnAnalysesData[$analysisIndex]['isRequired'] ?? false;
+
+        if ($isRequired && $blankCount > 0) {
+            array_unshift($issues, new ValueIssue(
+                value: '',
+                message: 'This field is required',
+                rowCount: $blankCount,
+                severity: 'error',
+            ));
+        }
+
+        // Update the analysis data
+        $this->columnAnalysesData[$analysisIndex]['issues'] = collect($issues)
+            ->map(fn (ValueIssue $issue): array => $issue->toArray())
+            ->values()
+            ->toArray();
+        $this->columnAnalysesData[$analysisIndex]['selectedDateFormat'] = $formatValue;
+    }
+
+    public function getSelectedDateFormat(string $fieldName): ?string
+    {
+        return $this->selectedDateFormats[$fieldName] ?? null;
     }
 }

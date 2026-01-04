@@ -64,10 +64,12 @@ return [
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
-            CustomFieldsFeature::SYSTEM_MULTI_TENANCY
+            CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
         )->disable(
             CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_VALIDATION_RULES,
+            CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,
+            CustomFieldsFeature::SYSTEM_SECTIONS_ENABLED,
         ),
 
     /*

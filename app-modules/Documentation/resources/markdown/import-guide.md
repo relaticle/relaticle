@@ -1,550 +1,326 @@
 # Import Guide
 
-## Introduction
+Relaticle's import wizard lets you bulk import data from CSV files into your CRM.
 
-Relaticle's import feature allows you to quickly populate your CRM with data from CSV files. You can import:
+## Supported Entities
 
 - **Companies** - Organizations and accounts
-- **People** - Contacts and individuals
-- **Opportunities** - Deals and sales opportunities
-- **Tasks** - To-dos and action items
+- **People** - Contacts linked to companies
+- **Opportunities** - Deals and sales pipeline
+- **Tasks** - Action items and to-dos
 - **Notes** - Meeting notes and observations
 
-Each entity type is imported separately using the same 4-step import wizard. When importing people or opportunities, the system automatically creates or links related companies and contacts.
+---
 
-### Before You Start
+## Quick Start
 
-- ✅ Prepare your CSV file with clean, validated data
-- ✅ Ensure your file is UTF-8 encoded
-- ✅ Include column headers in the first row
-- ✅ Keep file size under 50MB (max 10,000 rows)
-- ✅ Review the required fields for each entity type below
+### File Requirements
+
+| Requirement | Value |
+|-------------|-------|
+| Format | CSV (comma-separated values) |
+| Encoding | UTF-8 |
+| Max Rows | 10,000 per file |
+| Max Size | 50MB |
+| Headers | Required in first row |
+
+**Tip**: In Excel, use "Save As" → "CSV UTF-8 (Comma delimited)".
+
+### Required Fields
+
+| Entity | Required |
+|--------|----------|
+| Companies | Name |
+| People | Name |
+| Opportunities | Name |
+| Tasks | Title |
+| Notes | Title |
 
 ---
 
-## Supported File Format
+## The 4-Step Process
 
-### CSV Files
+### Step 1: Upload
 
-- **Format**: Comma-separated values (CSV)
-- **Encoding**: UTF-8 (required)
-- **Size Limit**: 50MB maximum
-- **Headers**: First row must contain column names
-- **Max Rows**: 10,000 rows per import
-
-**Tip**: If you have an Excel file, export it as "CSV UTF-8" before importing.
-
----
-
-## The 4-Step Import Process
-
-### Step 1: Upload Your File
-
-1. Navigate to the entity you want to import (Companies, People, etc.)
-2. Click the **Import** button
+1. Navigate to the entity list (Companies, People, etc.)
+2. Click **Import**
 3. Select your CSV file
-4. Click **Upload**
+4. Review file info (columns found, row count)
 
-**Troubleshooting Upload Issues**:
-- **File too large**: Split into multiple files under 50MB each (max 10,000 rows)
-- **Invalid format**: Ensure file is saved as CSV UTF-8
-- **Upload fails**: Check internet connection and try again
+### Step 2: Map Columns
 
-### Step 2: Map Your Columns
+The wizard automatically matches CSV columns to Relaticle fields by comparing column names.
 
-The import wizard will automatically attempt to match your CSV columns to Relaticle fields based on column names.
+**Auto-Mapping Examples**:
+- "company_name", "Company", "Organization" → Company Name
+- "email", "Email Address", "contact_email" → Email
+- "custom_fields_industry" → Industry custom field
 
-**How Auto-Mapping Works**:
-- Exact name matches (e.g., "Email" → Email field)
-- Common variations (e.g., "Company Name", "Organization" → Company Name)
-- Custom field codes (e.g., "custom_fields_industry" → Industry custom field)
+**Manual Adjustment**: Click any dropdown to change the mapping or select "Don't Import" to skip a column.
 
-**Required Fields** (marked with red asterisk):
-- **Companies**: Name
-- **People**: Name, Company Name
-- **Opportunities**: Name
-- **Tasks**: Title
-- **Notes**: Title
+### Step 3: Review Values
 
-**Manual Adjustment**:
-- Click dropdown next to any column to change mapping
-- Select "Don't Import" to skip a column
-- Custom fields appear with "custom_fields_" prefix
+The wizard analyzes your data and shows validation issues.
 
-**Unique Identifiers for Updates**:
+**Issue Types**:
+- **Errors** (red): Must be fixed or skipped before import
+- **Warnings** (yellow): Optional to fix, won't block import
 
-When you want to update existing records instead of creating duplicates, you must map at least one unique identifier column:
+**Actions You Can Take**:
+- **Fix**: Enter a corrected value in the text field
+- **Skip**: Leave correction blank to skip these rows
+- **Change Date Format**: For date columns, select the correct format if auto-detection is uncertain
 
-- **Record ID**: The unique ULID identifier from Relaticle. Include this column if you exported data from Relaticle.
-- **Entity-specific identifier**:
-  - **People**: Email addresses - Matches existing people by email
-  - **Companies**: Company name - Matches existing companies by name
-  - **Opportunities**: Opportunity name - Matches existing opportunities by name
-  - **Tasks**: Task title - Matches existing tasks by title
+### Step 4: Preview & Import
 
-**How it works**:
-1. If you map the Record ID column, the importer will look up existing records by ID and update them
-2. If you don't map Record ID but map an entity-specific identifier (like email), the importer will try to match by that field
-3. If you don't map any unique identifier, all rows will create new records (which may result in duplicates)
-
-**Best Practice**: Always include either the Record ID or an entity-specific identifier when re-importing data to avoid duplicates.
-
-### Step 3: Review & Fix Values
-
-The wizard analyzes your data and highlights potential issues before importing.
-
-**Understanding Validation Errors**:
-- **Red errors**: Must be fixed before import
-- **Row count**: Shows how many rows have this issue
-- **Common issues**: Invalid email format, missing required fields, invalid dates
-
-**Fix, Skip, or Continue Actions**:
-1. **Fix in CSV**: Download, correct errors, and re-upload
-2. **Correct Values**: Use the inline correction tool to map values (e.g., "CA" → "California")
-3. **Skip Rows**: Rows with errors will be skipped during import
-4. **Continue Anyway**: Only if errors are acceptable (not recommended)
-
-**Common Validation Issues**:
-- Invalid email addresses
-- Dates in unrecognized formats (use YYYY-MM-DD)
-- Required fields left blank
-- Invalid ULIDs for ID-based updates
-
-### Step 4: Preview Import
-
-Review a summary of what will happen when you import.
-
-**Summary Statistics**:
-- **Total Rows**: Number of records in your file
+Review what will happen:
 - **New**: Records that will be created
-- **Updates**: Existing records that will be modified
-- **Update Method**: Shows whether updates use ID or name/email matching
+- **Update**: Existing records that will be modified
+- **New Companies**: Companies auto-created (People imports only)
 
-**Update Method Indicators**:
-- **Update by ID** (blue badge): Using Record ID for precise matching
-- **Update** (orange badge): Using name/email for matching
-- **New** (green badge): Creating a new record
-
-**Final Checks Before Execution**:
-- ✅ Verify new vs. update counts look correct
-- ✅ Check sample rows in preview table
-- ✅ Confirm company matching for People/Opportunities
-- ✅ Review duplicate handling strategy
-
-Click **Start Import** when ready.
+Click **Start Import** when ready. Large imports process in the background.
 
 ---
 
-## Handling Duplicates
+## Date Format Detection
 
-### Detection Methods by Entity
+The import wizard automatically detects date formats in your CSV and handles three common formats:
 
-**Companies**: Exact name match (case-sensitive)
-```
-"Acme Corp" = "Acme Corp" ✓
-"Acme Corp" ≠ "acme corp" ✗
-```
+### Supported Formats
 
-**People**: Email address match (from custom_fields_emails)
-```
-john@acme.com matches existing person ✓
-Different email = new person created ✗
-```
+| Format | Pattern | Example |
+|--------|---------|---------|
+| **ISO** | YYYY-MM-DD | 2024-05-15 |
+| **European** | DD/MM/YYYY or DD-MM-YYYY | 15/05/2024, 15 May 2024 |
+| **American** | MM/DD/YYYY or MM-DD-YYYY | 05/15/2024, May 15th 2024 |
 
-**Opportunities**: Exact name match
-**Tasks**: Exact title match
-**Notes**: Exact title match
+### How Detection Works
 
-### Duplicate Handling Strategies
+The wizard analyzes your date values to determine the format:
 
-Choose how to handle records that already exist:
+1. **Unambiguous dates**: When the day is > 12, the format is clear
+   - `31/01/2024` → Must be European (DD/MM)
+   - `01/31/2024` → Must be American (MM/DD)
 
-#### 1. Skip (Safest - Default)
+2. **Ambiguous dates**: When both positions are ≤ 12
+   - `01/02/2024` → Could be Jan 2 or Feb 1
+   - You'll see a warning and can select the correct format
 
-**What it does**: Creates new record only if no duplicate exists
-**Use when**: You want to avoid overwriting existing data
-**Example**:
-```
-CSV: "Acme Corp"
-Existing: "Acme Corp" with Phone: 555-1234
-Result: CSV row skipped, existing record unchanged
-```
+3. **ISO dates**: Always unambiguous
+   - `2024-01-15` → Clearly January 15
 
-#### 2. Update (Use with Caution)
+### Selecting Date Format
 
-**What it does**: Updates existing record with CSV data
-**Use when**: Refreshing data from a master system
-**Example**:
-```
-CSV: "Acme Corp", Phone: 555-9999
-Existing: "Acme Corp", Phone: 555-1234
-Result: Phone updated to 555-9999
-```
+In Step 3 (Review Values), date columns show a format dropdown:
 
-**⚠️ Warning**: This overwrites existing field values. Blank fields in CSV will erase data.
+- **High confidence**: Format auto-selected, dropdown shows detected format
+- **Low confidence**: Warning icon appears, select the correct format manually
 
-#### 3. Create New (Allows Duplicates)
-
-**What it does**: Always creates new record, even if duplicate name exists
-**Use when**: You need multiple records with same name
-**Example**:
-```
-CSV: "Acme Corp"
-Existing: "Acme Corp" (ID: 123)
-Result: New "Acme Corp" created (ID: 456)
-```
+**Example**: If your CSV has `01/02/2024` and you know it means February 1st (European), select "European" from the dropdown.
 
 ---
 
-## ID-Based Record Updates
+## Duplicate Handling
 
-### What Is It?
+### How Duplicates Are Detected
 
-Precise record matching using unique Record IDs, allowing you to update specific records even when duplicates exist.
+| Entity | Detection Method |
+|--------|------------------|
+| Companies | Domain (from custom_fields_domains) |
+| People | Email (from custom_fields_emails) |
+| Opportunities | Record ID only |
+| Tasks | Record ID only |
+| Notes | Record ID only |
 
-**Key Benefits**:
-- ✅ Update exact record, no ambiguity
-- ✅ Works with duplicate names/emails
-- ✅ Bypass duplicate handling strategy
-- ✅ Perfect for bulk data refreshes
+**Note**: Opportunities, Tasks, and Notes only match by Record ID. To update existing records, include the `id` column from a previous export.
 
-### When to Use
+### Duplicate Strategies
 
-- **Bulk updating existing records**: Refreshing data from external system
-- **Correcting specific records**: Fix data without affecting others
-- **Working with duplicates**: Update one "John Smith" among many
+Choose how to handle matched records:
 
-### How It Works
+| Strategy | Behavior |
+|----------|----------|
+| **Skip** (default) | Keep existing record, ignore CSV row |
+| **Update** | Overwrite existing record with CSV data |
+| **Create New** | Always create new record (allows duplicates) |
 
-#### Step 1: Export Current Data
+---
 
-Get the Record IDs you need to update:
+## ID-Based Updates
 
-1. Navigate to entity list (Companies, People, etc.)
-2. Select records to update (or export all)
-3. Click **Export to CSV**
-4. CSV will include an `id` column with ULIDs
+For precise updates, include Record IDs from a previous export.
 
-Example export:
-```csv
-id,name,custom_fields_industry
-01KCCFMZ52QWZSQZWVG0AP704V,Acme Corp,Technology
-01KCCFN1A8XVQR4ZFWB3KC5M7P,TechStart Inc,Technology
+### Workflow
+
+1. **Export** your records (includes `id` column with ULIDs)
+2. **Modify** the CSV, keeping the `id` column intact
+3. **Re-import** - rows with valid IDs update those exact records
+
+### Example
+
 ```
-
-#### Step 2: Modify Your Data
-
-Keep the `id` column and update other fields:
-
-```csv
 id,name,custom_fields_industry
 01KCCFMZ52QWZSQZWVG0AP704V,Acme Corporation,Software
 01KCCFN1A8XVQR4ZFWB3KC5M7P,TechStart Inc,Hardware
 ```
 
-#### Step 3: Re-Import
-
-1. Upload modified CSV
-2. Map columns (including `id` column)
-3. Choose any duplicate strategy (doesn't matter - ID takes precedence)
-4. Review preview - you'll see "Update by ID" badges
-5. Import runs - system matches by ID and updates those specific records
+**Preview shows**:
+- Rows with valid IDs: "Update by ID" (blue badge)
+- Rows without IDs: "New" (green badge)
 
 ### Mixed Imports
 
-You can create new records and update existing ones in the same import:
+You can create and update in the same file:
 
-```csv
+```
 id,name
 01KCCFMZ52QWZSQZWVG0AP704V,Update This Company
-,Create New Company (no ID = new record)
-01KCCFN1A8XVQR4ZFWB3KC5M7P,Update Another Company
+,New Company (blank ID = create new)
 ```
-
-**Preview will show**:
-- Row 1: "Update by ID" (blue badge)
-- Row 2: "New" (green badge)
-- Row 3: "Update by ID" (blue badge)
-
-### Security & Validation
-
-**ID Validation** (happens in Step 3: Review Values):
-- ✅ Must be valid ULID format
-- ✅ Record must exist in your workspace
-- ✅ You must have permission to edit it
-
-**Error Messages**:
-- `"Invalid ID format"`: Not a valid ULID - check for typos
-- `"Record not found"`: ID doesn't exist or belongs to another workspace
-- `"Invalid ULID"`: Format is wrong (should be 26 characters)
-
-**Team Isolation**:
-- IDs from other workspaces are automatically rejected
-- You can only update records in your current workspace
-- Import fails safely without cross-contamination
-
-### Best Practices
-
-✅ **DO**:
-- Always export first before bulk updating
-- Test with 5-10 rows before full import
-- Keep ID column in your working spreadsheet
-- Verify IDs are current (re-export if data is old)
-- Back up data before large updates
-
-❌ **DON'T**:
-- Manually type ULIDs (always copy from export)
-- Mix IDs from different workspaces
-- Delete the ID column accidentally
-- Share CSV files with IDs across teams
-
-### Example Workflow: Quarterly Data Refresh
-
-1. **Export**: Download all companies with IDs
-2. **Enrich**: Add updated information from your accounting system
-3. **Import**: Re-upload with IDs intact
-4. **Result**: All companies updated precisely, no duplicates created
 
 ---
 
-## Importing Each Entity Type
+## Entity-Specific Details
 
 ### Companies
 
-**Required Fields**:
-- Name
+**Columns**:
+- `name` (required) - Company name
+- `account_owner_email` - Team member email for ownership
+- Custom fields with `custom_fields_` prefix
 
-**Optional Fields**:
-- Account Owner Email (assigns ownership to team member)
-- Custom fields (industry, website, etc.)
+**Duplicate Detection**: By domain (custom_fields_domains field)
 
-**CSV Example**:
-```csv
-id,name,account_owner_email,custom_fields_industry,custom_fields_website
-,Acme Corporation,owner@company.com,Technology,https://acme.com
-,TechStart Inc,owner@company.com,Software,https://techstart.io
 ```
-
-**Auto-Assignment**:
-- If Account Owner Email not provided, defaults to user performing import
-- If email doesn't match team member, field is left blank
+name,account_owner_email,custom_fields_industry
+Acme Corporation,owner@yourcompany.com,Technology
+```
 
 ### People
 
-**Required Fields**:
-- Name
-- Company Name (auto-creates company if doesn't exist)
+**Columns**:
+- `name` (required) - Person's full name
+- `company_id` - Link to company by Record ID
+- `company_name` - Link or create company by name
+- `custom_fields_emails` - Email addresses (for duplicate detection)
+- Other custom fields
 
-**Optional Fields**:
-- Email (recommended for duplicate detection)
-- Phone, Title, and other custom fields
+**Duplicate Detection**: By email address
 
-**CSV Example**:
-```csv
-id,name,company_name,custom_fields_emails,custom_fields_title
-,John Doe,Acme Corporation,john@acme.com,CEO
-,Jane Smith,Acme Corporation,jane@acme.com,CTO
+**Company Linking Priority**:
+1. `company_id` - Direct ID match (highest priority)
+2. Domain match - From email domain to company's domains field
+3. `company_name` - Match by name, or create new company
+
+```
+name,company_name,custom_fields_emails,custom_fields_title
+John Doe,Acme Corporation,john@acme.com,CEO
+Jane Smith,Acme Corporation,jane@acme.com,CTO
 ```
 
-**Auto-Company Creation**:
-- If Company Name doesn't exist, it's automatically created
-- Company matched by exact name
-- New company inherits import user as creator
-
-**Duplicate Detection**:
-- Based on email address (exact match)
-- Uses `custom_fields_emails` field
-- If email exists → update/skip based on strategy
-- If email blank → always creates new
+**Note**: If `company_name` doesn't match an existing company, a new company is automatically created.
 
 ### Opportunities
 
-**Required Fields**:
-- Name
+**Columns**:
+- `name` (required) - Opportunity name
+- `company_id` or `company_name` - Link to company
+- `contact_name` - Link or create contact
+- Custom fields (amount, stage, close_date, etc.)
 
-**Optional Fields**:
-- Company Name (auto-creates if needed)
-- Contact Name (auto-creates if needed)
-- Amount, Stage, Close Date, custom fields
+**Duplicate Detection**: Record ID only
 
-**CSV Example**:
-```csv
-id,name,company_name,contact_name,custom_fields_amount,custom_fields_stage
-,Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
-,Renewal 2024,TechStart Inc,Jane Smith,25000,Negotiation
 ```
-
-**Auto-Creation Behavior**:
-- Company and Contact created if they don't exist
-- Links opportunity to existing records if names match
+name,company_name,contact_name,custom_fields_amount,custom_fields_stage
+Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
+```
 
 ### Tasks
 
-**Required Fields**:
-- Title
+**Columns**:
+- `title` (required) - Task title
+- `assignee_email` - Team member to assign
+- Custom fields (due_date, priority, status, etc.)
 
-**Optional Fields**:
-- Company Name, Person Name, Opportunity Name
-- Assignee Email, Due Date, Priority
+**Duplicate Detection**: Record ID only
 
-**CSV Example**:
-```csv
-id,title,company_name,assignee_email,custom_fields_due_date,custom_fields_priority
-,Follow up with Acme,Acme Corporation,assignee@company.com,2024-03-15,High
-,Send proposal,TechStart Inc,assignee@company.com,2024-03-20,Medium
+```
+title,assignee_email,custom_fields_due_date,custom_fields_priority
+Follow up with client,assignee@yourcompany.com,2024-03-15,High
 ```
 
 ### Notes
 
-**Required Fields**:
-- Title
+**Columns**:
+- `title` (required) - Note title
+- Custom fields (content, etc.)
 
-**Optional Fields**:
-- Company Name, Person Name, Opportunity Name
-- Content, Created Date
+**Duplicate Detection**: Record ID only
 
-**CSV Example**:
-```csv
-id,title,company_name,custom_fields_content,custom_fields_created_date
-,Meeting Notes - Q1 Review,Acme Corporation,Discussed expansion plans,2024-02-01
-,Call Summary,TechStart Inc,Technical requirements gathering,2024-02-05
+```
+title,custom_fields_content
+Meeting Notes - Q1 Review,Discussed expansion plans for Q2
 ```
 
 ---
 
-## Custom Fields in Imports
+## Custom Fields
 
-### Naming Convention
+### Column Naming
 
-Custom fields use the prefix `custom_fields_` followed by the field code:
+Use the prefix `custom_fields_` followed by the field code:
 
-**Format**: `custom_fields_[code]`
-
-**Examples**:
-- `custom_fields_industry` → Industry field
-- `custom_fields_emails` → Emails field
-- `custom_fields_website` → Website field
-- `custom_fields_annual_revenue` → Annual Revenue field
-
-### Finding Field Codes
-
-1. Navigate to Settings → Custom Fields
-2. Find your field
-3. Look at the "Code" column
-4. Use code with `custom_fields_` prefix in your CSV
-
-### Field Type Handling
-
-**Text Fields**:
-```csv
+```
 custom_fields_industry
-Technology
-```
-
-**Number Fields**:
-```csv
-custom_fields_annual_revenue
-1000000
-```
-
-**Date Fields** (use YYYY-MM-DD format):
-```csv
-custom_fields_contract_end_date
-2024-12-31
-```
-
-**Single Select** (use option label):
-```csv
-custom_fields_company_size
-51-200 employees
-```
-
-**Multi-Select** (comma-separated):
-```csv
-custom_fields_products
-CRM,Marketing Automation,Analytics
-```
-
-**Email** (comma-separated for multiple):
-```csv
 custom_fields_emails
-john@acme.com,john.doe@acme.com
+custom_fields_website
 ```
 
-**Boolean** (true/false, yes/no, 1/0):
-```csv
-custom_fields_is_partner
-true
-```
+Find field codes in **Settings → Custom Fields** under the "Code" column.
 
-### Validation
+### Field Type Formatting
 
-Custom fields maintain their validation rules during import:
-
-- **Required fields**: Must have value (not blank)
-- **Email format**: Validates email addresses
-- **Number range**: Enforces min/max values
-- **Select options**: Must match existing option labels
-- **Date format**: Accepts various formats, converts to YYYY-MM-DD
-
-**Error Messages**:
-- Show actual validation rule that failed
-- Display in Step 3: Review Values
-- Can be corrected before import
+| Type | Format | Example |
+|------|--------|---------|
+| Text | Plain text | `Technology` |
+| Number | Numeric, no symbols | `50000` |
+| Date | YYYY-MM-DD, DD/MM/YYYY, or MM/DD/YYYY | `2024-03-15` |
+| Email | Valid email(s), comma-separated | `john@acme.com,jane@acme.com` |
+| Select | Exact option label | `Enterprise` |
+| Multi-Select | Comma-separated labels | `CRM,Analytics` |
+| Boolean | true/false, yes/no, 1/0 | `true` |
 
 ---
 
-## CSV Formatting Best Practices
+## CSV Best Practices
 
-### File Structure Requirements
+### Do
 
-✅ **DO**:
-- Include header row with column names
-- Use UTF-8 encoding
-- Quote fields containing commas: `"Last, First"`
-- Keep consistent column order
-- Use YYYY-MM-DD for dates
+- Include headers in the first row
+- Save as UTF-8 encoding
+- Quote values containing commas: `"Last, First"`
+- Use consistent formatting within each column
+- Test with a small sample first (5-10 rows)
 
-❌ **DON'T**:
+### Don't
+
 - Use Excel's default encoding (use "CSV UTF-8")
-- Include empty columns
-- Mix date formats in same column
-- Use special characters in column names
+- Mix date formats in the same column
+- Include currency symbols in numbers: use `50000` not `$50,000`
+- Leave empty rows at the end of the file
 
-### Data Formatting Rules
+### Date Formatting Tips
 
-**Text Fields**:
-- Remove leading/trailing spaces
-- Use consistent capitalization
-- Quote values with commas or newlines
+The wizard accepts multiple date formats, but consistency is key:
 
-**Numbers**:
-- Remove currency symbols: `50000` not `$50,000`
-- Use decimals for currency: `1234.56`
-- Don't use thousands separators
+**Good** (pick one format per column):
+- `2024-03-15` (ISO - recommended)
+- `15/03/2024` (European)
+- `03/15/2024` (American)
 
-**Dates**:
-- Preferred: `2024-03-15` (YYYY-MM-DD)
-- Accepted: `03/15/2024`, `March 15, 2024`
-- Avoid: `3-15-24`, `15/3/2024`
-
-**Emails**:
-- Validate before import
-- Use comma-separation for multiple: `john@acme.com,jane@acme.com`
-- Trim whitespace
-
-**Booleans**:
-- Use: `true`/`false`, `yes`/`no`, `1`/`0`
-- Case-insensitive
-
-### Common Mistakes to Avoid
-
-1. **Wrong encoding**: Save as "CSV UTF-8" in Excel
-2. **Formula instead of values**: Copy-paste-values before saving
-3. **Hidden columns**: Ensure all needed data is visible
-4. **Merged cells**: Unmerge all cells before export
-5. **Extra rows at bottom**: Delete empty rows
-6. **Inconsistent data**: Use same format throughout column
+**Avoid**:
+- Mixing formats: `2024-03-15` and `03/15/2024` in same column
+- Two-digit years without context: `03/15/24`
 
 ---
 
@@ -552,162 +328,99 @@ Custom fields maintain their validation rules during import:
 
 ### Upload Issues
 
-**Problem**: "File too large"
-- **Solution**: Split into multiple files under 50MB each (max 10,000 rows)
-- **Tip**: Import in batches of 10,000-20,000 rows
-
-**Problem**: "Invalid file format"
-- **Solution**: Re-save as CSV UTF-8
-- **Mac Excel**: File → Save As → CSV UTF-8
-- **Windows Excel**: Save As → CSV UTF-8 (Comma delimited)
-
-**Problem**: "Upload failed"
-- **Solution**: Check internet connection, try smaller file, refresh page
+| Problem | Solution |
+|---------|----------|
+| File too large | Split into files under 10,000 rows each |
+| Invalid format | Re-save as "CSV UTF-8" from Excel |
+| Upload fails | Check internet, try smaller file |
 
 ### Mapping Issues
 
-**Problem**: Column not auto-mapped correctly
-- **Solution**: Manually select correct field from dropdown
-- **Tip**: Use standard column names for auto-mapping
-
-**Problem**: Custom field not appearing
-- **Solution**: Check field code in Settings → Custom Fields
-- **Format**: Must be `custom_fields_[code]`
-
-**Problem**: Required field marked red
-- **Solution**: Map required field to CSV column
-- **Required fields**: Name (companies), Name + Company (people), etc.
+| Problem | Solution |
+|---------|----------|
+| Column not auto-mapped | Manually select from dropdown |
+| Custom field missing | Check field code in Settings → Custom Fields |
+| Required field red | Map a CSV column to the required field |
 
 ### Validation Issues
 
-**Problem**: "Invalid email format"
-- **Solution**: Fix emails in CSV, use valid format: user@domain.com
-- **Tip**: Use Excel formula to validate before import
+| Problem | Solution |
+|---------|----------|
+| Invalid email | Fix email format: `user@domain.com` |
+| Invalid date | Use a supported format (ISO, European, or American) |
+| Invalid ID | Re-export to get fresh Record IDs |
+| Unknown select option | Use exact option label from field settings |
 
-**Problem**: "Invalid date format"
-- **Solution**: Convert dates to YYYY-MM-DD format
-- **Excel formula**: `=TEXT(A1,"YYYY-MM-DD")`
+### Import Issues
 
-**Problem**: "Invalid ULID"
-- **Solution**: Check ID column, must be valid ULID (26 characters)
-- **Tip**: Re-export to get fresh IDs
-
-**Problem**: "Unknown option for select field"
-- **Solution**: Use exact option label from field settings
-- **Case-sensitive**: "Technology" ≠ "technology"
-
-### Execution Issues
-
-**Problem**: Import stuck at "Processing"
-- **Solution**: Wait (large imports take time), refresh page after 10 minutes
-- **Background processing**: You can navigate away, will notify when complete
-
-**Problem**: "Some rows failed"
-- **Solution**: Download failed rows CSV, fix errors, re-import
-- **Check**: Failed rows report shows exact error per row
-
-**Problem**: Duplicates created unexpectedly
-- **Solution**: Check duplicate detection method for entity
-- **Companies**: Exact name match
-- **People**: Email match
-- **Tip**: Use ID-based updates to avoid this
+| Problem | Solution |
+|---------|----------|
+| Stuck at "Processing" | Large imports take time; check back in a few minutes |
+| Some rows failed | Download failed rows, fix errors, re-import |
+| Unexpected duplicates | Use ID-based updates for precise matching |
 
 ---
 
 ## FAQ
 
-### Can I import more than one entity type at once?
-Each entity type is imported separately. When importing people or opportunities, related companies and contacts are automatically created or linked based on the name fields in your CSV.
+**Can I import multiple entity types at once?**
+No, each entity imports separately. When importing People, related companies are auto-created.
 
-### What happens if my import fails halfway?
-Successfully imported rows remain in the system. Failed rows can be downloaded, corrected, and re-imported.
+**What happens if my import fails halfway?**
+Successful rows remain. Failed rows can be downloaded, fixed, and re-imported.
 
-### Can I undo an import?
-No automatic undo. Recommendation: Test with small sample first, backup data before large imports.
+**Can I undo an import?**
+No automatic undo. Test with small samples first and backup important data.
 
-### How do I update existing records?
-Two methods:
-1. **ID-based** (recommended): Include `id` column with record ULIDs
-2. **Name/email-based**: Set duplicate strategy to "Update"
+**How do I update existing records?**
+Include the `id` column from a previous export. For People, email matching also works.
 
-### Can I import custom fields?
-Yes! Use `custom_fields_[code]` format. Find codes in Settings → Custom Fields.
+**What date formats are supported?**
+ISO (YYYY-MM-DD), European (DD/MM/YYYY), and American (MM/DD/YYYY). The wizard auto-detects the format.
 
-### What's the maximum file size?
-50MB per file, maximum 10,000 rows. For larger datasets, split into multiple imports.
+**What if a date is ambiguous (like 01/02/2024)?**
+You'll see a warning. Use the format dropdown to select European or American interpretation.
 
-### Do imports run in real-time?
-Large imports process in background queue. You'll receive notification when complete.
+**What's the maximum file size?**
+50MB or 10,000 rows per file. Split larger datasets into multiple imports.
 
-### Can I schedule recurring imports?
-Not currently supported. Imports are manual, on-demand only.
-
-### What if I have duplicate company names?
-Use ID-based updates to target specific records. Without IDs, first match wins.
-
-### How are team members assigned?
-- Account Owner Email: Matches by email, must be team member
-- Creator: Defaults to user performing import
-- Assignee Email: For tasks, must be team member
+**Do imports run in real-time?**
+Small imports complete immediately. Large imports process in the background with progress updates.
 
 ---
 
-## Appendix: CSV Templates
+## CSV Templates
 
-### Company Import Template
+Export existing records to get perfectly formatted templates with all your custom fields.
 
-```csv
-id,name,account_owner_email,custom_fields_industry,custom_fields_website
-,Acme Corporation,owner@yourcompany.com,Technology,https://acme.com
+### Company Template
+```
+id,name,account_owner_email,custom_fields_industry,custom_fields_domains
+,Acme Corporation,owner@yourcompany.com,Technology,acme.com
 ```
 
-**Download**: Export any company to get template with all custom fields
-
-### People Import Template
-
-```csv
-id,name,company_name,custom_fields_emails,custom_fields_phone,custom_fields_title
-,John Doe,Acme Corporation,john@acme.com,555-1234,CEO
+### People Template
+```
+id,name,company_name,custom_fields_emails,custom_fields_title
+,John Doe,Acme Corporation,john@acme.com,CEO
 ```
 
-**Download**: Export any person to get template with all custom fields
-
-### Opportunity Import Template
-
-```csv
+### Opportunity Template
+```
 id,name,company_name,contact_name,custom_fields_amount,custom_fields_stage
 ,Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
 ```
 
-**Download**: Export any opportunity to get template with all custom fields
-
-### Task Import Template
-
-```csv
-id,title,company_name,assignee_email,custom_fields_due_date,custom_fields_priority
-,Follow up with client,Acme Corporation,assignee@yourcompany.com,2024-03-15,High
+### Task Template
+```
+id,title,assignee_email,custom_fields_due_date,custom_fields_priority
+,Follow up with client,assignee@yourcompany.com,2024-03-15,High
 ```
 
-**Download**: Export any task to get template with all custom fields
-
-### Note Import Template
-
-```csv
-id,title,company_name,custom_fields_content,custom_fields_created_date
-,Meeting Notes - Q1 Review,Acme Corporation,Discussed expansion plans for Q2,2024-02-01
+### Note Template
+```
+id,title,custom_fields_content
+,Meeting Notes,Discussed expansion plans
 ```
 
-**Download**: Export any note to get template with all custom fields
-
----
-
-## Need Help?
-
-If you encounter issues not covered in this guide:
-
-1. Check the **in-app tooltips** during import (hover over ⓘ icons)
-2. Review your CSV formatting against examples above
-3. Test with small sample (5-10 rows) to isolate issues
-4. Export existing records to see correct format
-
-**Pro Tip**: The export feature generates perfectly formatted CSV templates with all your custom fields. Use it as a starting point for imports.
+**Tip**: Export any existing record to get a template with all your workspace's custom fields already included.

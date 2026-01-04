@@ -137,17 +137,11 @@ final class CompanyMatcher
      */
     private function findInCacheByDomain(array $domains): array
     {
-        $matches = [];
-
-        foreach ($domains as $domain) {
-            if (isset($this->companyCache['byDomain'][$domain])) {
-                foreach ($this->companyCache['byDomain'][$domain] as $company) {
-                    $matches[$company->id] = $company;
-                }
-            }
-        }
-
-        return array_values($matches);
+        return collect($domains)
+            ->flatMap(fn (string $domain): array => $this->companyCache['byDomain'][$domain] ?? [])
+            ->unique('id')
+            ->values()
+            ->all();
     }
 
     /**
@@ -157,17 +151,10 @@ final class CompanyMatcher
     private function extractEmailDomains(array $emails): array
     {
         return collect($emails)
-            ->map(function (mixed $email): ?string {
-                $email = strtolower(trim($email));
-                if (! str_contains($email, '@')) {
-                    return null;
-                }
-
-                return substr($email, (int) strrpos($email, '@') + 1);
-            })
-            ->filter()
+            ->filter(fn (string $email): bool => str_contains($email, '@'))
+            ->map(fn (string $email): string => str($email)->lower()->trim()->afterLast('@')->toString())
             ->unique()
             ->values()
-            ->toArray();
+            ->all();
     }
 }

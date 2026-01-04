@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Services\DataTypeInferencer;
 
 describe('DataTypeInferencer', function (): void {
@@ -58,5 +59,99 @@ describe('DataTypeInferencer', function (): void {
         expect($this->inferencer->inferType($values))
             ->type->toBe('email')
             ->confidence->toBe(0.7);
+    });
+});
+
+describe('DataTypeInferencer::detectDateFormat', function (): void {
+    beforeEach(function (): void {
+        $this->inferencer = new DataTypeInferencer;
+    });
+
+    it('detects ISO date format with high confidence', function (): void {
+        $values = ['2024-01-15', '2024-12-25', '2025-06-01', '2024-03-20'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->detectedFormat->toBe(DateFormat::ISO)
+            ->confidence->toBe(1.0)
+            ->isoCount->toBe(4);
+    });
+
+    it('detects European format from unambiguous values', function (): void {
+        // Values like 31/01/2024 can ONLY be DD/MM
+        $values = ['31/01/2024', '25/12/2023', '15/06/2024', '28/02/2024'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->detectedFormat->toBe(DateFormat::EUROPEAN)
+            ->europeanOnlyCount->toBeGreaterThan(0)
+            ->americanOnlyCount->toBe(0);
+    });
+
+    it('detects American format from unambiguous values', function (): void {
+        // Values like 01/31/2024 can ONLY be MM/DD
+        $values = ['01/31/2024', '12/25/2023', '06/15/2024', '02/28/2024'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->detectedFormat->toBe(DateFormat::AMERICAN)
+            ->americanOnlyCount->toBeGreaterThan(0)
+            ->europeanOnlyCount->toBe(0);
+    });
+
+    it('identifies ambiguous dates correctly', function (): void {
+        // All values have both day and month <= 12
+        $values = ['01/02/2024', '03/04/2024', '05/06/2024', '07/08/2024'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->ambiguousCount->toBe(4)
+            ->europeanOnlyCount->toBe(0)
+            ->americanOnlyCount->toBe(0)
+            ->confidence->toBeLessThan(0.5);
+    });
+
+    it('handles mixed format evidence', function (): void {
+        // Mix of unambiguous and ambiguous values
+        $values = ['31/01/2024', '01/02/2024', '25/12/2023', '03/04/2024'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->detectedFormat->toBe(DateFormat::EUROPEAN)
+            ->europeanOnlyCount->toBe(2)
+            ->ambiguousCount->toBe(2);
+    });
+
+    it('returns low confidence for conflicting formats', function (): void {
+        // Contains both European-only AND American-only values (unlikely but test edge case)
+        $values = ['31/01/2024', '01/31/2024'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result->confidence)->toBeLessThanOrEqual(0.5);
+    });
+
+    it('handles empty values gracefully', function (): void {
+        $values = ['', '', ''];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->totalAnalyzed->toBe(0)
+            ->confidence->toBe(0.0);
+    });
+
+    it('identifies invalid dates', function (): void {
+        $values = ['not-a-date', 'invalid', '99/99/9999'];
+
+        $result = $this->inferencer->detectDateFormat($values);
+
+        expect($result)
+            ->invalidCount->toBeGreaterThan(0);
     });
 });

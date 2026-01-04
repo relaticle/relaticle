@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Data;
 
 use Illuminate\Support\Collection;
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\DataCollection;
@@ -29,7 +30,53 @@ final class ColumnAnalysis extends Data
         #[DataCollectionOf(ValueIssue::class)]
         public DataCollection $issues,
         public bool $isRequired = false,
+        public ?DateFormat $detectedDateFormat = null,
+        public ?DateFormat $selectedDateFormat = null,
+        public ?float $dateFormatConfidence = null,
     ) {}
+
+    /**
+     * Check if this column is a date or datetime field.
+     */
+    public function isDateField(): bool
+    {
+        return in_array($this->fieldType, ['date', 'datetime'], true);
+    }
+
+    /**
+     * Check if this column is a date-only field (no time component).
+     */
+    public function isDateOnlyField(): bool
+    {
+        return $this->fieldType === 'date';
+    }
+
+    /**
+     * Check if this column is a datetime field (with time component).
+     */
+    public function isDateTimeField(): bool
+    {
+        return $this->fieldType === 'datetime';
+    }
+
+    /**
+     * Get the effective date format (selected or detected).
+     */
+    public function getEffectiveDateFormat(): ?DateFormat
+    {
+        return $this->selectedDateFormat ?? $this->detectedDateFormat;
+    }
+
+    /**
+     * Check if date format needs user confirmation (low confidence).
+     */
+    public function needsDateFormatConfirmation(): bool
+    {
+        return $this->isDateField()
+            && $this->dateFormatConfidence !== null
+            && $this->dateFormatConfidence < 0.8
+            && ! $this->selectedDateFormat instanceof DateFormat;
+    }
 
     /**
      * Get unique values for display with "load more" pattern.
