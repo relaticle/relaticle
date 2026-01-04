@@ -20,19 +20,19 @@ final class ColumnAnalysis extends Data
      * @param  DataCollection<int, ValueIssue>  $issues
      */
     public function __construct(
-        public string $csvColumnName,
-        public string $mappedToField,
-        public string $fieldType,
-        public int $totalValues,
-        public int $uniqueCount,
-        public int $blankCount,
-        public array $uniqueValues,
+        public readonly string $csvColumnName,
+        public readonly string $mappedToField,
+        public readonly string $fieldType,
+        public readonly int $totalValues,
+        public readonly int $uniqueCount,
+        public readonly int $blankCount,
+        public readonly array $uniqueValues,
         #[DataCollectionOf(ValueIssue::class)]
-        public DataCollection $issues,
-        public bool $isRequired = false,
-        public ?DateFormat $detectedDateFormat = null,
-        public ?DateFormat $selectedDateFormat = null,
-        public ?float $dateFormatConfidence = null,
+        public readonly DataCollection $issues,
+        public readonly bool $isRequired = false,
+        public readonly ?DateFormat $detectedDateFormat = null,
+        public readonly ?DateFormat $selectedDateFormat = null,
+        public readonly ?float $dateFormatConfidence = null,
     ) {}
 
     /**

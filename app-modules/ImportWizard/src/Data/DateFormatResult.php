@@ -13,14 +13,14 @@ use Spatie\LaravelData\Data;
 final class DateFormatResult extends Data
 {
     public function __construct(
-        public DateFormat $detectedFormat,
-        public float $confidence,
-        public int $isoCount,
-        public int $europeanOnlyCount,
-        public int $americanOnlyCount,
-        public int $ambiguousCount,
-        public int $invalidCount,
-        public int $totalAnalyzed,
+        public readonly DateFormat $detectedFormat,
+        public readonly float $confidence,
+        public readonly int $isoCount,
+        public readonly int $europeanOnlyCount,
+        public readonly int $americanOnlyCount,
+        public readonly int $ambiguousCount,
+        public readonly int $invalidCount,
+        public readonly int $totalAnalyzed,
     ) {}
 
     /**
