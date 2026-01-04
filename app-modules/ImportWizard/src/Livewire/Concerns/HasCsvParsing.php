@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use League\Csv\SyntaxError;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\ImportWizard\Data\ImportSessionData;
-use Relaticle\ImportWizard\Services\CsvReaderFactory;
+use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
 trait HasCsvParsing
 {

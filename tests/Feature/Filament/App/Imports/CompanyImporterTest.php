@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
-use Relaticle\ImportWizard\Services\CompanyMatcher;
+use Relaticle\ImportWizard\Support\CompanyMatcher;
 
 beforeEach(function (): void {
     Storage::fake('local');

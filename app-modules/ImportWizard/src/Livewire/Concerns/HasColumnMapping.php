@@ -8,8 +8,8 @@ use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
-use Relaticle\ImportWizard\Services\ColumnMatcher;
-use Relaticle\ImportWizard\Services\DataTypeInferencer;
+use Relaticle\ImportWizard\Support\ColumnMatcher;
+use Relaticle\ImportWizard\Support\DataTypeInferencer;
 
 /**
  * @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns

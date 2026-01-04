@@ -9,8 +9,8 @@ use Livewire\Attributes\Computed;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
 use Relaticle\ImportWizard\Enums\DateFormat;
-use Relaticle\ImportWizard\Services\CsvAnalyzer;
-use Relaticle\ImportWizard\Services\DateValidator;
+use Relaticle\ImportWizard\Support\CsvAnalyzer;
+use Relaticle\ImportWizard\Support\DateValidator;
 
 /** @property Collection<int, ColumnAnalysis> $columnAnalyses */
 trait HasValueAnalysis

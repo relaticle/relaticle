@@ -18,7 +18,7 @@ use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
-use Relaticle\ImportWizard\Services\ImportRecordResolver;
+use Relaticle\ImportWizard\Support\ImportRecordResolver;
 
 abstract class BaseImporter extends Importer
 {

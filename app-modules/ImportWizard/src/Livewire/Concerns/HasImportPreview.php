@@ -13,8 +13,8 @@ use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Enums\PreviewStatus;
 use Relaticle\ImportWizard\Jobs\ProcessImportPreview;
-use Relaticle\ImportWizard\Services\ImportRecordResolver;
-use Relaticle\ImportWizard\Services\PreviewChunkService;
+use Relaticle\ImportWizard\Support\ImportRecordResolver;
+use Relaticle\ImportWizard\Support\PreviewChunkService;
 
 /** @property ImportPreviewResult|null $previewResult */
 trait HasImportPreview

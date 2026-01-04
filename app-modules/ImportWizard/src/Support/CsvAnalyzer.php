@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\ImportWizard\Services;
+namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use Filament\Actions\Imports\ImportColumn;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Carbon\Carbon;
 use Relaticle\ImportWizard\Enums\DateFormat;
-use Relaticle\ImportWizard\Services\DateValidator;
+use Relaticle\ImportWizard\Support\DateValidator;
 
 describe('DateValidator', function (): void {
     beforeEach(function (): void {
