@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Relaticle\ImportWizard\Services\ColumnMatcher;
+use Relaticle\ImportWizard\Support\ColumnMatcher;
 
 describe('ColumnMatcher', function (): void {
     beforeEach(function (): void {

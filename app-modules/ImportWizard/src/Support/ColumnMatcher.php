@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\ImportWizard\Services;
+namespace Relaticle\ImportWizard\Support;
 
 use Illuminate\Support\Str;
 

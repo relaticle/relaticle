@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Statement;
 use Relaticle\ImportWizard\Models\Import;
-use Relaticle\ImportWizard\Services\CsvReaderFactory;
+use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
 /**
  * Streaming import job that reads rows on-demand from file instead of serializing data.

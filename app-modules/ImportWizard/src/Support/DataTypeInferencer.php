@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\ImportWizard\Services;
+namespace Relaticle\ImportWizard\Support;
 
 use Relaticle\ImportWizard\Data\DateFormatResult;
 use Relaticle\ImportWizard\Enums\DateFormat;

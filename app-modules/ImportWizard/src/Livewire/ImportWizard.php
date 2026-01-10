@@ -37,7 +37,7 @@ use Relaticle\ImportWizard\Livewire\Concerns\HasCsvParsing;
 use Relaticle\ImportWizard\Livewire\Concerns\HasImportPreview;
 use Relaticle\ImportWizard\Livewire\Concerns\HasValueAnalysis;
 use Relaticle\ImportWizard\Models\Import;
-use Relaticle\ImportWizard\Services\CsvReaderFactory;
+use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
 /**
  * 4-step import wizard following the Attio pattern.

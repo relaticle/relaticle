@@ -14,11 +14,11 @@ use Spatie\LaravelData\Data;
 final class ValueIssue extends Data
 {
     public function __construct(
-        public string $value,
-        public string $message,
-        public int $rowCount,
-        public string $severity = 'error',
-        public ?string $issueType = null,
+        public readonly string $value,
+        public readonly string $message,
+        public readonly int $rowCount,
+        public readonly string $severity = 'error',
+        public readonly ?string $issueType = null,
     ) {}
 
     /**

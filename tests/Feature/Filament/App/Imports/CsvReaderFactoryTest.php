@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Storage;
-use Relaticle\ImportWizard\Services\CsvReaderFactory;
+use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
 beforeEach(fn () => Storage::fake('local'));
 

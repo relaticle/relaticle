@@ -18,10 +18,10 @@ use Spatie\LaravelData\Data;
 final class CompanyMatchResult extends Data
 {
     public function __construct(
-        public string $companyName,
-        public string $matchType,
-        public int $matchCount,
-        public ?string $companyId = null,
+        public readonly string $companyName,
+        public readonly string $matchType,
+        public readonly int $matchCount,
+        public readonly ?string $companyId = null,
     ) {}
 
     public function isDomainMatch(): bool

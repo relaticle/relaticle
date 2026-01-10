@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Relaticle\ImportWizard\Enums\DateFormat;
-use Relaticle\ImportWizard\Services\DataTypeInferencer;
+use Relaticle\ImportWizard\Support\DataTypeInferencer;
 
 describe('DataTypeInferencer', function (): void {
     beforeEach(function (): void {

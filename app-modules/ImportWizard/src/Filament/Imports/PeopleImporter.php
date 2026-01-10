@@ -12,7 +12,7 @@ use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Services\CompanyMatcher;
+use Relaticle\ImportWizard\Support\CompanyMatcher;
 
 final class PeopleImporter extends BaseImporter
 {

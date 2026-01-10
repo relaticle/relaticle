@@ -12,8 +12,8 @@ use Illuminate\Queue\SerializesModels;
 use League\Csv\Writer;
 use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
-use Relaticle\ImportWizard\Services\ImportRecordResolver;
-use Relaticle\ImportWizard\Services\PreviewChunkService;
+use Relaticle\ImportWizard\Support\ImportRecordResolver;
+use Relaticle\ImportWizard\Support\PreviewChunkService;
 
 /**
  * Background job to process remaining import preview rows.
