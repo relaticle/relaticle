@@ -20,7 +20,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use Laravel\Jetstream\Events\TeamMemberUpdated;
 use Laravel\Jetstream\Jetstream;
 
 final class TeamMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
@@ -125,7 +124,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
         $team->users()->updateExistingPivot($teamMember->user_id, ['role' => $data['role']]);
 
-        TeamMemberUpdated::dispatch($team->fresh(), $teamMember);
+        event(new \Laravel\Jetstream\Events\TeamMemberUpdated($team->fresh(), $teamMember));
 
         $this->sendNotification();
 
@@ -135,7 +134,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     public function removeTeamMember(Team $team, Membership $teamMember): void
     {
         try {
-            app(RemoveTeamMemberAction::class)->remove($this->authUser(), $team, $teamMember->user);
+            resolve(RemoveTeamMemberAction::class)->remove($this->authUser(), $team, $teamMember->user);
 
             $this->sendNotification(__('teams.notifications.team_member_removed.success'));
 
@@ -158,7 +157,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
         $teamMember = $this->authUser();
 
         try {
-            app(RemoveTeamMemberAction::class)->remove($teamMember, $team, $teamMember);
+            resolve(RemoveTeamMemberAction::class)->remove($teamMember, $team, $teamMember);
 
             $this->sendNotification(__('teams.notifications.leave_team.success'));
 

@@ -74,7 +74,7 @@ final class OnboardSeedManager
     private function initializeSeeders(): void
     {
         foreach ($this->entitySeederSequence as $seederClass) {
-            $this->seeders[$seederClass] = app($seederClass)->initialize();
+            $this->seeders[$seederClass] = resolve($seederClass)->initialize();
         }
     }
 }

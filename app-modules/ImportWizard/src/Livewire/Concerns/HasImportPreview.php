@@ -12,7 +12,6 @@ use Relaticle\ImportWizard\Data\ImportPreviewResult;
 use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Enums\PreviewStatus;
-use Relaticle\ImportWizard\Jobs\ProcessImportPreview;
 use Relaticle\ImportWizard\Support\ImportRecordResolver;
 use Relaticle\ImportWizard\Support\PreviewChunkService;
 
@@ -60,11 +59,11 @@ trait HasImportPreview
         $enrichedPath = Storage::disk('local')->path("temp-imports/{$this->sessionId}/enriched.csv");
 
         // Pre-load records for fast lookups
-        $recordResolver = app(ImportRecordResolver::class);
+        $recordResolver = resolve(ImportRecordResolver::class);
         $recordResolver->loadForTeam($teamId, $importerClass);
 
         // SYNC: Process first batch immediately
-        $service = app(PreviewChunkService::class);
+        $service = resolve(PreviewChunkService::class);
         $initialBatchSize = min(self::INITIAL_BATCH_SIZE, $this->rowCount);
 
         $firstBatch = $service->processChunk(
@@ -113,23 +112,7 @@ trait HasImportPreview
 
         // ASYNC: Dispatch job for remaining rows
         if ($this->rowCount > $initialBatchSize) {
-            ProcessImportPreview::dispatch(
-                sessionId: $this->sessionId,
-                csvPath: $this->persistedFilePath,
-                enrichedPath: $enrichedPath,
-                importerClass: $importerClass,
-                columnMap: $this->columnMap,
-                options: $options,
-                teamId: $teamId,
-                userId: $userId,
-                startRow: $initialBatchSize,
-                totalRows: $this->rowCount,
-                initialCreates: $firstBatch['creates'],
-                initialUpdates: $firstBatch['updates'],
-                inputHash: $newHash,
-                valueCorrections: $this->valueCorrections,
-                initialNewCompanyNames: $newCompanyNames,
-            );
+            dispatch(new \Relaticle\ImportWizard\Jobs\ProcessImportPreview(sessionId: $this->sessionId, csvPath: $this->persistedFilePath, enrichedPath: $enrichedPath, importerClass: $importerClass, columnMap: $this->columnMap, options: $options, teamId: $teamId, userId: $userId, startRow: $initialBatchSize, totalRows: $this->rowCount, initialCreates: $firstBatch['creates'], initialUpdates: $firstBatch['updates'], inputHash: $newHash, valueCorrections: $this->valueCorrections, initialNewCompanyNames: $newCompanyNames));
         }
     }
 

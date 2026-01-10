@@ -101,7 +101,7 @@ final class CleanupOrphanedImportsCommand extends Command
             return false;
         }
 
-        $fileAge = Carbon::createFromTimestamp(
+        $fileAge = \Illuminate\Support\Facades\Date::createFromTimestamp(
             Storage::disk('local')->lastModified($csvFile)
         );
         $isOldEnough = $fileAge->lt($ageCutoff);

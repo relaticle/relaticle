@@ -8,10 +8,8 @@ use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
-use App\Models\Opportunity;
 use App\Models\People;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
-use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
 use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 
 final class ImportRecordResolver
@@ -19,14 +17,12 @@ final class ImportRecordResolver
     /**
      * @var array{
      *     people: array{byId: array<int|string, People>, byEmail: array<string, People>},
-     *     companies: array{byId: array<int|string, Company>, byDomain: array<string, Company>},
-     *     opportunities: array{byId: array<int|string, Opportunity>}
+     *     companies: array{byId: array<int|string, Company>, byDomain: array<string, Company>}
      * }
      */
     private array $cache = [
         'people' => ['byId' => [], 'byEmail' => []],
         'companies' => ['byId' => [], 'byDomain' => []],
-        'opportunities' => ['byId' => []],
     ];
 
     private ?string $cachedTeamId = null;
@@ -43,14 +39,12 @@ final class ImportRecordResolver
         $this->cache = [
             'people' => ['byId' => [], 'byEmail' => []],
             'companies' => ['byId' => [], 'byDomain' => []],
-            'opportunities' => ['byId' => []],
         ];
 
         // Load records based on importer type
         match ($importerClass) {
             PeopleImporter::class => $this->loadPeople($teamId),
             CompanyImporter::class => $this->loadCompanies($teamId),
-            OpportunityImporter::class => $this->loadOpportunities($teamId),
             default => null,
         };
     }
@@ -165,20 +159,6 @@ final class ImportRecordResolver
                     $this->cache['companies']['byDomain'][$domain] ??= $company;
                 }
             }
-        }
-    }
-
-    private function loadOpportunities(string $teamId): void
-    {
-        // Query: Load ALL opportunities
-        $opportunities = Opportunity::query()
-            ->where('team_id', $teamId)
-            ->get();
-
-        // Build indexes
-        foreach ($opportunities as $opportunity) {
-            // Index by ID (cast to string to match array type)
-            $this->cache['opportunities']['byId'][(string) $opportunity->id] = $opportunity;
         }
     }
 

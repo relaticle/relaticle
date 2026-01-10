@@ -63,7 +63,7 @@ final class UpdateTeamName extends BaseLivewireComponent
 
         $data = $this->form->getState();
 
-        app(UpdateTeamNameAction::class)->update($this->authUser(), $team, $data);
+        resolve(UpdateTeamNameAction::class)->update($this->authUser(), $team, $data);
 
         $this->sendNotification();
     }

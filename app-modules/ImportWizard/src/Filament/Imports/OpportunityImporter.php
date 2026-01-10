@@ -157,6 +157,6 @@ final class OpportunityImporter extends BaseImporter
 
     public static function getEntityName(): string
     {
-        return 'opportunities';
+        return 'opportunity';
     }
 }

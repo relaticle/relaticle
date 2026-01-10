@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
-use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use App\Models\User;
 
@@ -28,7 +27,7 @@ final readonly class CompanyObserver
      */
     public function created(Company $company): void
     {
-        FetchFaviconForCompany::dispatch($company)->afterCommit();
+        dispatch(new \App\Jobs\FetchFaviconForCompany($company))->afterCommit();
     }
 
     /**

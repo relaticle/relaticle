@@ -39,7 +39,7 @@ trait HasColumnMapping
             return;
         }
 
-        $matcher = app(ColumnMatcher::class);
+        $matcher = resolve(ColumnMatcher::class);
 
         // Phase 1: Header matching
         $this->columnMap = collect($this->importerColumns)
@@ -48,7 +48,7 @@ trait HasColumnMapping
 
                 return [$column->getName() => $match ?? ''];
             })
-            ->toArray();
+            ->all();
 
         // Phase 2: Data type inference for unmapped CSV columns
         $this->applyDataTypeInference();
@@ -59,7 +59,7 @@ trait HasColumnMapping
      */
     protected function applyDataTypeInference(): void
     {
-        $inferencer = app(DataTypeInferencer::class);
+        $inferencer = resolve(DataTypeInferencer::class);
         $this->inferredMappings = [];
 
         /** @var array<string> */

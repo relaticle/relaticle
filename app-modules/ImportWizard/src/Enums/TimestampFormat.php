@@ -155,8 +155,8 @@ enum TimestampFormat: string implements HasLabel
      */
     private function tryParseWithFormat(string $value, string $format): ?Carbon
     {
-        return Carbon::canBeCreatedFromFormat($value, $format)
-            ? Carbon::createFromFormat($format, $value)
+        return \Illuminate\Support\Facades\Date::canBeCreatedFromFormat($value, $format)
+            ? \Illuminate\Support\Facades\Date::createFromFormat($format, $value)
             : null;
     }
 

@@ -272,7 +272,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
             ...$this->getGlobalAttributes(),
         ]);
 
-        $entity = app($this->modelClass)->create($attributes);
+        $entity = resolve($this->modelClass)->create($attributes);
         $this->applyCustomFields($entity, $customFields);
 
         // Register the entity in the registry

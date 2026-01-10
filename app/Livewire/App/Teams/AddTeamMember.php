@@ -88,7 +88,7 @@ final class AddTeamMember extends BaseLivewireComponent
 
         $data = $this->form->getState();
 
-        app(InviteTeamMember::class)->invite(
+        resolve(InviteTeamMember::class)->invite(
             $this->authUser(),
             $team,
             $data['email'],

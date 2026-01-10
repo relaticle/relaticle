@@ -11,7 +11,6 @@ use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
-use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -61,7 +60,7 @@ final class ViewCompany extends ViewRecord
 
         // Only dispatch if domains changed and new value is not empty
         if ($newDomains !== $oldDomains && ! empty($newDomains)) {
-            FetchFaviconForCompany::dispatch($company)->afterCommit();
+            dispatch(new \App\Jobs\FetchFaviconForCompany($company))->afterCommit();
         }
     }
 

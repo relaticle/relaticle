@@ -11,7 +11,6 @@ use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
-use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Number;
@@ -92,23 +91,6 @@ abstract class BaseImporter extends Importer
     }
 
     /**
-     * Shared options form components for all importers.
-     *
-     * @return array<\Filament\Schemas\Components\Component>
-     */
-    public static function getOptionsFormComponents(): array
-    {
-        return [
-            Select::make('duplicate_handling')
-                ->label('When duplicates are found')
-                ->options(DuplicateHandlingStrategy::class)
-                ->default(DuplicateHandlingStrategy::SKIP)
-                ->required()
-                ->helperText('Choose how to handle records that already exist in the system'),
-        ];
-    }
-
-    /**
      * Build the standard ID column for record matching.
      * Use this in getColumns() to include consistent ID handling.
      */
@@ -161,7 +143,7 @@ abstract class BaseImporter extends Importer
      */
     protected function hasIdValue(): bool
     {
-        return ! blank($this->data['id'] ?? null);
+        return filled($this->data['id'] ?? null);
     }
 
     /**

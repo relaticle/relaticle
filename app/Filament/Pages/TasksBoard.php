@@ -11,7 +11,6 @@ use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\Team;
 use BackedEnum;
-use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -245,7 +244,7 @@ final class TasksBoard extends BoardPage
             return '';
         }
 
-        $date = Carbon::parse($state);
+        $date = \Illuminate\Support\Facades\Date::parse($state);
 
         return match (true) {
             $date->isPast() => $date->format('M j, Y').' (Overdue)',

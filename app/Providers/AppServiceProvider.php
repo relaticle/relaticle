@@ -168,7 +168,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         // Share GitHub stars count with the header component
         Facades\View::composer('components.layout.header', function (View $view): void {
-            $gitHubService = app(GitHubService::class);
+            $gitHubService = resolve(GitHubService::class);
             $starsCount = $gitHubService->getStarsCount();
             $formattedStarsCount = $gitHubService->getFormattedStarsCount();
 

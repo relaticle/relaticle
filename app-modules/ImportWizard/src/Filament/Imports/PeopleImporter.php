@@ -90,7 +90,7 @@ final class PeopleImporter extends BaseImporter
 
                     // Try domain-based matching first when company_name is empty but emails exist
                     if ($companyName === '' && $emails !== []) {
-                        $matcher = app(CompanyMatcher::class);
+                        $matcher = resolve(CompanyMatcher::class);
                         $result = $matcher->match('', '', $emails, $importer->import->team_id);
 
                         if ($result->isDomainMatch() && $result->companyId !== null) {
@@ -223,7 +223,7 @@ final class PeopleImporter extends BaseImporter
             ->map(fn (mixed $email): string => trim((string) $email))
             ->filter(fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)
             ->values()
-            ->toArray();
+            ->all();
     }
 
     public static function getEntityName(): string

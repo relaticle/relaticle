@@ -52,7 +52,7 @@ final readonly class PreviewChunkService
             ->limit($limit)
             ->process($csvReader);
 
-        $recordResolver ??= tap(app(ImportRecordResolver::class), fn (ImportRecordResolver $r) => $r->loadForTeam($teamId, $importerClass));
+        $recordResolver ??= tap(resolve(ImportRecordResolver::class), fn (ImportRecordResolver $r) => $r->loadForTeam($teamId, $importerClass));
 
         $creates = 0;
         $updates = 0;
@@ -101,7 +101,7 @@ final readonly class PreviewChunkService
                 }
 
                 // Detect update method
-                $hasId = ! blank($formattedRow['id'] ?? null);
+                $hasId = filled($formattedRow['id'] ?? null);
                 $updateMethod = null;
                 $recordId = null;
 

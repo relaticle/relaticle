@@ -30,7 +30,7 @@ trait HasCsvParsing
 
         try {
             // Parse the CSV
-            $csvReader = app(CsvReaderFactory::class)->createFromPath($csvPath);
+            $csvReader = resolve(CsvReaderFactory::class)->createFromPath($csvPath);
             $this->csvHeaders = $csvReader->getHeader();
             $this->rowCount = iterator_count($csvReader->getRecords());
 
@@ -130,13 +130,13 @@ trait HasCsvParsing
             return [];
         }
 
-        $csvReader = app(CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
+        $csvReader = resolve(CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
 
         return collect($csvReader->getRecords())
             ->take($limit)
             ->pluck($csvColumn)
             ->map(fn (mixed $value): string => (string) $value)
             ->values()
-            ->toArray();
+            ->all();
     }
 }

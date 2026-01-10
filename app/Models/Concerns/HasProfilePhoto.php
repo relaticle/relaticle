@@ -45,7 +45,7 @@ trait HasProfilePhoto
      *
      * @return Attribute<string, never>
      */
-    public function profilePhotoUrl(): Attribute
+    protected function profilePhotoUrl(): Attribute
     {
         return Attribute::get(fn (): string => $this->profile_photo_path
             ? Storage::disk($this->profilePhotoDisk())->url($this->profile_photo_path)
@@ -72,7 +72,7 @@ trait HasProfilePhoto
         return config('jetstream.profile_photo_disk', 'public');
     }
 
-    public function getAvatarAttribute(): string
+    protected function getAvatarAttribute(): string
     {
         return $this->getFilamentAvatarUrl();
     }
@@ -81,6 +81,6 @@ trait HasProfilePhoto
     {
         return $this->profile_photo_path
             ? Storage::disk($this->profilePhotoDisk())->url($this->profile_photo_path)
-            : app(AvatarService::class)->generate($this->name);
+            : resolve(AvatarService::class)->generate($this->name);
     }
 }

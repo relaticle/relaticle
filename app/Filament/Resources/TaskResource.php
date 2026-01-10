@@ -61,7 +61,7 @@ final class TaskResource extends Resource
         /** @var Collection<string, CustomField> $customFields */
         $customFields = CustomField::query()->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
         /** @var ValueResolvers $valueResolver */
-        $valueResolver = app(ValueResolvers::class);
+        $valueResolver = resolve(ValueResolvers::class);
 
         return $table
             ->columns([

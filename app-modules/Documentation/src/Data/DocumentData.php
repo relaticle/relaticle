@@ -56,7 +56,7 @@ final class DocumentData extends Data
 
         abort_if($content === false, 500, 'Unable to read document content');
 
-        $renderedContent = app(MarkdownRenderer::class)->toHtml($content);
+        $renderedContent = resolve(MarkdownRenderer::class)->toHtml($content);
 
         $tableOfContents = self::extractTableOfContents($renderedContent);
 

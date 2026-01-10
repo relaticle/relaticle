@@ -385,7 +385,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
      */
     private function applyCorrectionsToCsv(): string
     {
-        $csvReader = app(CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
+        $csvReader = resolve(CsvReaderFactory::class)->createFromPath($this->persistedFilePath);
         $headers = $csvReader->getHeader();
 
         $output = fopen('php://temp', 'r+');

@@ -69,7 +69,7 @@ final class DeleteAccount extends BaseLivewireComponent
                 /** @var \Illuminate\Database\Eloquent\Collection<int, Team> $ownedTeams */
                 $ownedTeams = $user->ownedTeams;
                 $ownedTeams->each(function (Team $team): void {
-                    app(DeleteTeam::class)->delete($team);
+                    resolve(DeleteTeam::class)->delete($team);
                 });
             }
 

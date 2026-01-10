@@ -11,7 +11,6 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -102,7 +101,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
                     'agent' => $agent,
                     'ip_address' => $session->ip_address,
                     'is_current_device' => $session->id === request()->session()->getId(),
-                    'last_active' => Carbon::createFromTimestamp($session->last_activity)->diffForHumans(),
+                    'last_active' => \Illuminate\Support\Facades\Date::createFromTimestamp($session->last_activity)->diffForHumans(),
                 ];
             });
     }

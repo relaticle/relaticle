@@ -81,11 +81,11 @@ final class Company extends Model implements HasCustomFields, HasMedia
         ];
     }
 
-    public function getLogoAttribute(): string
+    protected function getLogoAttribute(): string
     {
         $logo = $this->getFirstMediaUrl('logo');
 
-        return $logo === '' || $logo === '0' ? app(AvatarService::class)->generateAuto(name: $this->name) : $logo;
+        return $logo === '' || $logo === '0' ? resolve(AvatarService::class)->generateAuto(name: $this->name) : $logo;
     }
 
     /**

@@ -140,8 +140,7 @@ final readonly class CallbackController
             ->persistent()
             ->send();
 
-        return redirect()
-            ->route('login')
+        return to_route('login')
             ->withErrors(['login' => $message])
             ->with('error', $message);
     }

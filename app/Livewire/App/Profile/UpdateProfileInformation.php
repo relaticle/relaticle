@@ -76,7 +76,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
         $data = $this->form->getState();
 
-        app(UpdateUserProfileInformationAction::class)->update($this->authUser(), $data);
+        resolve(UpdateUserProfileInformationAction::class)->update($this->authUser(), $data);
 
         $this->sendNotification();
     }

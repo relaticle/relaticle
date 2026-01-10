@@ -76,7 +76,7 @@ final class ProcessImportPreview implements ShouldQueue
         $newCompanyNames = array_flip($this->initialNewCompanyNames);
 
         // Pre-load records for fast lookups
-        $recordResolver = app(ImportRecordResolver::class);
+        $recordResolver = resolve(ImportRecordResolver::class);
         $recordResolver->loadForTeam($this->teamId, $this->importerClass);
 
         // Open enriched CSV for appending

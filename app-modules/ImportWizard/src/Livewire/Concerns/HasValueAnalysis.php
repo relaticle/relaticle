@@ -23,7 +23,7 @@ trait HasValueAnalysis
             return;
         }
 
-        $analyzer = app(CsvAnalyzer::class);
+        $analyzer = resolve(CsvAnalyzer::class);
 
         // Get the model class from the importer for custom field lookup
         $entityType = $this->getEntityTypeForAnalysis();
@@ -36,7 +36,7 @@ trait HasValueAnalysis
         );
 
         // Store as serializable array data
-        $this->columnAnalysesData = $analyses->map(fn (ColumnAnalysis $analysis): array => $analysis->toArray())->toArray();
+        $this->columnAnalysesData = $analyses->map(fn (ColumnAnalysis $analysis): array => $analysis->toArray())->all();
     }
 
     protected function getEntityTypeForAnalysis(): ?string
@@ -100,11 +100,11 @@ trait HasValueAnalysis
         $issues = collect($existingIssues)
             ->reject(fn (array $issue): bool => $issue['value'] === $oldValue)
             ->values()
-            ->toArray();
+            ->all();
 
         // Validate the new value (if not blank/skipped)
         if ($newValue !== '') {
-            $analyzer = app(CsvAnalyzer::class);
+            $analyzer = resolve(CsvAnalyzer::class);
             $entityType = $this->getEntityTypeForAnalysis();
 
             $errorMessage = $analyzer->validateSingleValue(
@@ -202,7 +202,7 @@ trait HasValueAnalysis
         $uniqueValues = $this->columnAnalysesData[$analysisIndex]['uniqueValues'];
 
         // Re-validate with the new format
-        $dateValidator = app(DateValidator::class);
+        $dateValidator = resolve(DateValidator::class);
         $validationResult = $dateValidator->validateColumn($uniqueValues, $format);
 
         // Add required field issue if needed
@@ -223,7 +223,7 @@ trait HasValueAnalysis
         $this->columnAnalysesData[$analysisIndex]['issues'] = collect($issues)
             ->map(fn (ValueIssue $issue): array => $issue->toArray())
             ->values()
-            ->toArray();
+            ->all();
         $this->columnAnalysesData[$analysisIndex]['selectedDateFormat'] = $formatValue;
     }
 

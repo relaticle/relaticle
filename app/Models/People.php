@@ -71,9 +71,9 @@ final class People extends Model implements HasCustomFields
         ];
     }
 
-    public function getAvatarAttribute(): string
+    protected function getAvatarAttribute(): string
     {
-        return app(AvatarService::class)->generateAuto(name: $this->name, initialCount: 1);
+        return resolve(AvatarService::class)->generateAuto(name: $this->name, initialCount: 1);
     }
 
     /**

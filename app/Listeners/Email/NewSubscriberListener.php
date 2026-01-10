@@ -6,8 +6,6 @@ namespace App\Listeners\Email;
 
 use App\Data\SubscriberData;
 use App\Enums\SubscriberTagEnum;
-use App\Jobs\Email\CreateSubscriberJob;
-use App\Jobs\Email\UpdateSubscriberJob;
 use App\Models\User;
 use Exception;
 use Illuminate\Auth\Events\Verified;
@@ -34,23 +32,19 @@ final class NewSubscriberListener implements ShouldHandleEventsAfterCommit, Shou
             $subscriber = retry(10, fn (): mixed => Mailcoach::findByEmail(config('mailcoach-sdk.subscribers_list_id'), $user->email), fn (int $attempt): int => $attempt * 100 * random_int(1, 15));
 
             if ($subscriber) {
-                UpdateSubscriberJob::dispatch(
-                    SubscriberData::from([
-                        'email' => $user->email,
-                        'tags' => [SubscriberTagEnum::VERIFIED->value],
-                    ])
-                );
+                dispatch(new \App\Jobs\Email\UpdateSubscriberJob(SubscriberData::from([
+                    'email' => $user->email,
+                    'tags' => [SubscriberTagEnum::VERIFIED->value],
+                ])));
             }
 
-            CreateSubscriberJob::dispatch(
-                SubscriberData::from([
-                    'email' => $user->email,
-                    'first_name' => $user->name,
-                    'last_name' => $user->name,
-                    'tags' => [SubscriberTagEnum::VERIFIED->value],
-                    'skip_confirmation' => true,
-                ])
-            );
+            dispatch(new \App\Jobs\Email\CreateSubscriberJob(SubscriberData::from([
+                'email' => $user->email,
+                'first_name' => $user->name,
+                'last_name' => $user->name,
+                'tags' => [SubscriberTagEnum::VERIFIED->value],
+                'skip_confirmation' => true,
+            ])));
         }
     }
 }

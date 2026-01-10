@@ -65,7 +65,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
     public function getFilamentAvatarUrl(): string
     {
-        return app(AvatarService::class)->generate(name: $this->name, bgColor: '#000000', textColor: '#ffffff');
+        return resolve(AvatarService::class)->generate(name: $this->name, bgColor: '#000000', textColor: '#ffffff');
     }
 
     /**
