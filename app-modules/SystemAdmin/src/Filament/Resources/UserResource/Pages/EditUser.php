@@ -23,7 +23,7 @@ final class EditUser extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (! empty($data['password'])) {
+        if (filled($data['password'])) {
             $data['password'] = bcrypt($data['password']);
         } else {
             unset($data['password']);

@@ -212,7 +212,7 @@ final class TaskResource extends Resource
             ->getTitleFromRecordUsing(function (Task $record) use ($valueResolver, $field, $label): string {
                 $value = $valueResolver->resolve($record, $field);
 
-                return empty($value) ? "No {$label}" : $value;
+                return blank($value) ? "No {$label}" : $value;
             })
             ->getKeyFromRecordUsing(function (Task $record) use ($field): string {
                 $fieldValue = $record->customFieldValues->firstWhere('custom_field_id', $field->id);

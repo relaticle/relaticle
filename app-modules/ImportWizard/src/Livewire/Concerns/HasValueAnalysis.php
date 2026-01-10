@@ -153,7 +153,7 @@ trait HasValueAnalysis
             unset($this->valueCorrections[$fieldName][$oldValue]);
         }
 
-        if (empty($this->valueCorrections[$fieldName])) {
+        if (blank($this->valueCorrections[$fieldName])) {
             unset($this->valueCorrections[$fieldName]);
         }
     }

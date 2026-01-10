@@ -206,7 +206,7 @@ final class PeopleImporter extends BaseImporter
     {
         $emailsField = $this->data['custom_fields_emails'] ?? null;
 
-        if (empty($emailsField)) {
+        if (blank($emailsField)) {
             return [];
         }
 

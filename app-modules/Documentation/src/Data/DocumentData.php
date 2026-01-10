@@ -78,7 +78,7 @@ final class DocumentData extends Data
 
         preg_match_all('/<h2.*><a.*id="([^"]+)".*>#<\/a>([^<]+)/', $contents, $matches);
 
-        if (empty($matches[1]) || empty($matches[2])) {
+        if (blank($matches[1]) || blank($matches[2])) {
             return [];
         }
 

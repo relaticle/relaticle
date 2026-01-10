@@ -59,7 +59,7 @@ final class ViewCompany extends ViewRecord
         $oldDomains = $domainField !== null ? $company->getCustomFieldValue($domainField) : null;
 
         // Only dispatch if domains changed and new value is not empty
-        if ($newDomains !== $oldDomains && ! empty($newDomains)) {
+        if ($newDomains !== $oldDomains && filled($newDomains)) {
             dispatch(new \App\Jobs\FetchFaviconForCompany($company))->afterCommit();
         }
     }

@@ -456,7 +456,7 @@ final readonly class AvatarService
         $normalizedName = Str::ascii(trim($name));
 
         // Handle empty names
-        if (empty($normalizedName)) {
+        if (blank($normalizedName)) {
             return [
                 'length' => 0,
                 'vowelRatio' => 0.5,
