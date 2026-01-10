@@ -12,7 +12,9 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 final class AiSummary extends Model
 {
     use HasTeam;
+
     use HasUlids;
+    /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
     use \Illuminate\Database\Eloquent\Factories\HasFactory;
 
     /**

@@ -10,6 +10,7 @@ use Laravel\Jetstream\Membership as JetstreamMembership;
 
 final class Membership extends JetstreamMembership
 {
+    /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
     use \Illuminate\Database\Eloquent\Factories\HasFactory;
 
     /**

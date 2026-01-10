@@ -140,7 +140,7 @@ PROMPT;
      */
     private function addRelationships(\Illuminate\Support\Collection $parts, array $context): void
     {
-        if (blank($context['relationships'])) {
+        if (blank($context['relationships'] ?? [])) {
             return;
         }
 

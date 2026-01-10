@@ -79,7 +79,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * @var list<string>
      */
     protected $appends = [
-        'profile_photo_url', // @phpstan-ignore rules.modelAppends
+        'profile_photo_url',
     ];
 
     /**
