@@ -10,4 +10,5 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 final class FailedImportRow extends BaseFailedImportRow
 {
     use HasUlids;
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
 }

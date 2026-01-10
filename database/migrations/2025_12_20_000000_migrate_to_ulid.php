@@ -464,7 +464,7 @@ return new class extends Migration
             ->whereIn('custom_field_id', $emailFieldIds)
             ->whereNotNull('string_value')
             ->where('string_value', '!=', '')
-            ->where(function ($query): void {
+            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
                 $query->whereNull('json_value')
                     ->orWhere('json_value', '=', '[]')
                     ->orWhere('json_value', '=', 'null');
@@ -505,7 +505,7 @@ return new class extends Migration
         // Find all domains custom fields (code 'domains' or legacy 'domain_name')
         $domainFieldIds = DB::table($fieldTable)
             ->where('entity_type', 'company')
-            ->where(function ($query): void {
+            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
                 $query->where('code', 'domains')
                     ->orWhere('code', 'domain_name');
             })
@@ -520,7 +520,7 @@ return new class extends Migration
             ->whereIn('custom_field_id', $domainFieldIds)
             ->whereNotNull('string_value')
             ->where('string_value', '!=', '')
-            ->where(function ($query): void {
+            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
                 $query->whereNull('json_value')
                     ->orWhere('json_value', '=', '[]')
                     ->orWhere('json_value', '=', 'null');

@@ -24,9 +24,7 @@ final class GoogleHighResDriver implements Fetcher
 
     public function fetch(string $url): ?Favicon
     {
-        if (! $this->urlIsValid($url)) {
-            throw new InvalidUrlException($url.' is not a valid URL');
-        }
+        throw_unless($this->urlIsValid($url), InvalidUrlException::class, $url.' is not a valid URL');
 
         if ($this->useCache && $favicon = $this->attemptToFetchFromCache($url)) {
             return $favicon;

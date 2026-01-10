@@ -72,9 +72,7 @@ trait HasCsvParsing
 
             $sourcePath = $file->getRealPath();
             $content = file_get_contents($sourcePath);
-            if ($content === false) {
-                throw new \RuntimeException('Failed to read file content');
-            }
+            throw_if($content === false, \RuntimeException::class, 'Failed to read file content');
 
             Storage::disk('local')->makeDirectory($folder);
             Storage::disk('local')->put($storagePath, $content);

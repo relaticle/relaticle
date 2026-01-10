@@ -32,10 +32,8 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
      */
     private function authorize(User $user, Team $team, User $teamMember): void
     {
-        if (! Gate::forUser($user)->check('removeTeamMember', $team) &&
-            $user->id !== $teamMember->id) {
-            throw new AuthorizationException;
-        }
+        throw_if(! Gate::forUser($user)->check('removeTeamMember', $team) &&
+            $user->id !== $teamMember->id, AuthorizationException::class);
     }
 
     /**

@@ -10,6 +10,8 @@ use Laravel\Jetstream\Membership as JetstreamMembership;
 
 final class Membership extends JetstreamMembership
 {
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+
     /**
      * Indicates if the IDs are auto-incrementing.
      *

@@ -158,11 +158,7 @@ abstract class BaseImporter extends Importer
         $id = trim((string) $this->data['id']);
 
         // Validate ULID format
-        if (! Str::isUlid($id)) {
-            throw new RowImportFailedException(
-                "Invalid ID format: {$id}. Must be a valid ULID."
-            );
-        }
+        throw_unless(Str::isUlid($id), RowImportFailedException::class, "Invalid ID format: {$id}. Must be a valid ULID.");
 
         /** @var class-string<Model> $modelClass */
         $modelClass = static::getModel();
@@ -173,11 +169,7 @@ abstract class BaseImporter extends Importer
             ->where('team_id', $this->import->team_id)
             ->first();
 
-        if (! $record) {
-            throw new RowImportFailedException(
-                "Record with ID {$id} not found or does not belong to your workspace."
-            );
-        }
+        throw_unless($record, RowImportFailedException::class, "Record with ID {$id} not found or does not belong to your workspace.");
 
         return $record;
     }

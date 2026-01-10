@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Statement;
 use Relaticle\ImportWizard\Models\Import;
@@ -65,9 +66,7 @@ final class StreamingImportCsv implements ShouldQueue
 
         $csvPath = Storage::disk('local')->path($this->import->file_path);
 
-        if (! file_exists($csvPath)) {
-            throw new \RuntimeException("Import file not found: {$csvPath}");
-        }
+        throw_unless(file_exists($csvPath), \RuntimeException::class, "Import file not found: {$csvPath}");
 
         $csvReader = App::make(CsvReaderFactory::class)->createFromPath($csvPath);
 
@@ -106,7 +105,7 @@ final class StreamingImportCsv implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        \Log::error('StreamingImportCsv failed', [
+        Log::error('StreamingImportCsv failed', [
             'import_id' => $this->import->id,
             'start_row' => $this->startRow,
             'row_count' => $this->rowCount,

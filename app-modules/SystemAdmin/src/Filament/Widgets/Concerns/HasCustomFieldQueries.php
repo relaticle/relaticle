@@ -154,7 +154,7 @@ trait HasCustomFieldQueries
             ->join('custom_fields as cf', 'cfo.custom_field_id', '=', 'cf.id')
             ->where('cf.entity_type', $entityType)
             ->where('cf.code', $fieldCode)
-            ->where(fn ($query) => collect($patterns)->each(fn ($pattern) => $query->orWhereRaw('LOWER(cfo.name) = ?', [strtolower($pattern)])
+            ->where(fn (\Illuminate\Contracts\Database\Query\Builder $query) => collect($patterns)->each(fn ($pattern) => $query->orWhereRaw('LOWER(cfo.name) = ?', [strtolower($pattern)])
             )
             )
             ->pluck('cfo.id')

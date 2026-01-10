@@ -164,10 +164,6 @@ final class ImportRecordResolver
 
     private function ensureCacheLoaded(string $teamId): void
     {
-        if ($this->cachedTeamId !== $teamId) {
-            throw new \RuntimeException(
-                "ImportRecordResolver not loaded for team {$teamId}. Call loadForTeam() first."
-            );
-        }
+        throw_if($this->cachedTeamId !== $teamId, \RuntimeException::class, "ImportRecordResolver not loaded for team {$teamId}. Call loadForTeam() first.");
     }
 }

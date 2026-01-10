@@ -185,15 +185,11 @@ final class TasksBoard extends BoardPage
         $board = $this->getBoard();
         $query = $board->getQuery();
 
-        if (! $query instanceof \Illuminate\Database\Eloquent\Builder) {
-            throw new InvalidArgumentException('Board query not available');
-        }
+        throw_unless($query instanceof \Illuminate\Database\Eloquent\Builder, InvalidArgumentException::class, 'Board query not available');
 
         /** @var Task|null $card */
         $card = (clone $query)->with(['assignees'])->find($cardId);
-        if (! $card) {
-            throw new InvalidArgumentException("Card not found: {$cardId}");
-        }
+        throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
 
         // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);

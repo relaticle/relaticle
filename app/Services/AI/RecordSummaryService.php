@@ -55,9 +55,7 @@ final readonly class RecordSummaryService
     {
         $teamId = Filament::getTenant()?->getKey();
 
-        if ($teamId === null) {
-            throw new RuntimeException('No team context available for caching AI summary');
-        }
+        throw_if($teamId === null, RuntimeException::class, 'No team context available for caching AI summary');
 
         if (method_exists($record, 'aiSummary')) {
             $record->aiSummary()->delete();

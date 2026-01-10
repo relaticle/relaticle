@@ -85,9 +85,7 @@ final class OpportunityImporter extends BaseImporter
                         return;
                     }
 
-                    if (! $importer->import->team_id) {
-                        throw new \RuntimeException('Team ID is required for import');
-                    }
+                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
 
                     $company = Company::query()->firstOrCreate([
                         'name' => trim($state),
@@ -116,9 +114,7 @@ final class OpportunityImporter extends BaseImporter
                         return;
                     }
 
-                    if (! $importer->import->team_id) {
-                        throw new \RuntimeException('Team ID is required for import');
-                    }
+                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
 
                     $contact = People::query()->firstOrCreate([
                         'name' => trim($state),

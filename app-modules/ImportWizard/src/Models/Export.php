@@ -12,4 +12,5 @@ final class Export extends BaseExport
 {
     use HasTeam;
     use HasUlids;
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
 }

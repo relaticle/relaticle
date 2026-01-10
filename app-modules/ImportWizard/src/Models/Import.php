@@ -12,4 +12,5 @@ final class Import extends BaseImport
 {
     use HasTeam;
     use HasUlids;
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
 }

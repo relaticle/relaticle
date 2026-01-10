@@ -13,6 +13,7 @@ final class AiSummary extends Model
 {
     use HasTeam;
     use HasUlids;
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
 
     /**
      * @var list<string>
