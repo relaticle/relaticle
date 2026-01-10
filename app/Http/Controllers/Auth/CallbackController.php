@@ -68,7 +68,7 @@ final readonly class CallbackController
             }
 
             $email = $socialUser->getEmail();
-            $user = $email ? User::where('email', $email)->first() : null;
+            $user = $email ? User::query()->where('email', $email)->first() : null;
 
             if (! $user) {
                 $user = $this->createUser($socialUser, $creator, $provider);

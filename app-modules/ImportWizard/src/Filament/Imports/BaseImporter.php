@@ -190,7 +190,7 @@ abstract class BaseImporter extends Importer
      */
     protected function afterSave(): void
     {
-        $team = Team::find($this->import->team_id);
+        $team = Team::query()->find($this->import->team_id);
 
         if (! $team) {
             throw new \RuntimeException(

@@ -287,7 +287,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         }
 
         // Create the Import model
-        $import = Import::create([
+        $import = Import::query()->create([
             'team_id' => $team->getKey(),
             'user_id' => $user->getAuthIdentifier(),
             'file_name' => $this->uploadedFile?->getClientOriginalName() ?? 'import.csv',

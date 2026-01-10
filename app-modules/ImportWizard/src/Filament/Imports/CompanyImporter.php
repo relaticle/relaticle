@@ -112,7 +112,7 @@ final class CompanyImporter extends BaseImporter
 
         // Slow path: Query database (actual import execution)
         // Uses 'company' morph alias (from Relation::enforceMorphMap) instead of Company::class
-        $domainField = CustomField::withoutGlobalScopes()
+        $domainField = CustomField::query()->withoutGlobalScopes()
             ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $this->import->team_id)

@@ -63,7 +63,7 @@ final readonly class RecordSummaryService
             $record->aiSummary()->delete();
         }
 
-        return AiSummary::create([
+        return AiSummary::query()->create([
             'team_id' => $teamId,
             'summarizable_type' => $record->getMorphClass(),
             'summarizable_id' => $record->getKey(),

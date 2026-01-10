@@ -89,16 +89,13 @@ final class OpportunityImporter extends BaseImporter
                         throw new \RuntimeException('Team ID is required for import');
                     }
 
-                    $company = Company::firstOrCreate(
-                        [
-                            'name' => trim($state),
-                            'team_id' => $importer->import->team_id,
-                        ],
-                        [
-                            'creator_id' => $importer->import->user_id,
-                            'creation_source' => CreationSource::IMPORT,
-                        ]
-                    );
+                    $company = Company::query()->firstOrCreate([
+                        'name' => trim($state),
+                        'team_id' => $importer->import->team_id,
+                    ], [
+                        'creator_id' => $importer->import->user_id,
+                        'creation_source' => CreationSource::IMPORT,
+                    ]);
 
                     $record->company_id = $company->getKey();
                 }),
@@ -123,16 +120,13 @@ final class OpportunityImporter extends BaseImporter
                         throw new \RuntimeException('Team ID is required for import');
                     }
 
-                    $contact = People::firstOrCreate(
-                        [
-                            'name' => trim($state),
-                            'team_id' => $importer->import->team_id,
-                        ],
-                        [
-                            'creator_id' => $importer->import->user_id,
-                            'creation_source' => CreationSource::IMPORT,
-                        ]
-                    );
+                    $contact = People::query()->firstOrCreate([
+                        'name' => trim($state),
+                        'team_id' => $importer->import->team_id,
+                    ], [
+                        'creator_id' => $importer->import->user_id,
+                        'creation_source' => CreationSource::IMPORT,
+                    ]);
 
                     $record->contact_id = $contact->getKey();
                 }),

@@ -106,16 +106,13 @@ final class PeopleImporter extends BaseImporter
                     }
 
                     // Find or create company by name (prevents duplicates within import)
-                    $company = Company::firstOrCreate(
-                        [
-                            'name' => $companyName,
-                            'team_id' => $importer->import->team_id,
-                        ],
-                        [
-                            'creator_id' => $importer->import->user_id,
-                            'creation_source' => CreationSource::IMPORT,
-                        ]
-                    );
+                    $company = Company::query()->firstOrCreate([
+                        'name' => $companyName,
+                        'team_id' => $importer->import->team_id,
+                    ], [
+                        'creator_id' => $importer->import->user_id,
+                        'creation_source' => CreationSource::IMPORT,
+                    ]);
 
                     $record->company_id = $company->getKey();
                 }),
@@ -165,7 +162,7 @@ final class PeopleImporter extends BaseImporter
         // Slow path: Query database (actual import execution)
         // Find the emails custom field for this team
         // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
-        $emailsField = CustomField::withoutGlobalScopes()
+        $emailsField = CustomField::query()->withoutGlobalScopes()
             ->where('code', PeopleField::EMAILS->value)
             ->where('entity_type', 'people')
             ->where('tenant_id', $this->import->team_id)

@@ -85,7 +85,7 @@ final class PeopleResource extends Resource
                                     ->slideOver()
                                     ->icon('heroicon-o-plus')
                                     ->action(function (array $data, Set $set): void {
-                                        $company = Company::create($data);
+                                        $company = Company::query()->create($data);
                                         $set('company_id', $company->id);
                                     })
                             )

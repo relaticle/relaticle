@@ -44,6 +44,7 @@ return RectorConfig::configure()
     ->withSets([
         LaravelSetList::LARAVEL_CODE_QUALITY,
         LaravelSetList::LARAVEL_COLLECTION,
+        LaravelSetList::LARAVEL_ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER,
     ])
     ->withPreparedSets(
         deadCode: true,

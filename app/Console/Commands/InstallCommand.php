@@ -349,7 +349,7 @@ final class InstallCommand extends Command
     {
         try {
             // Check if system administrator already exists
-            if (SystemAdministrator::exists()) {
+            if (SystemAdministrator::query()->exists()) {
                 $this->warn('A System Administrator already exists.');
                 $overwrite = confirm(
                     label: 'Do you want to create another one?',
@@ -376,7 +376,7 @@ final class InstallCommand extends Command
             );
 
             // Check if email already exists
-            if (SystemAdministrator::where('email', $email)->exists()) {
+            if (SystemAdministrator::query()->where('email', $email)->exists()) {
                 $this->error("A System Administrator with email '{$email}' already exists.");
 
                 return false;
@@ -390,7 +390,7 @@ final class InstallCommand extends Command
             );
 
             // Create the system administrator
-            SystemAdministrator::create([
+            SystemAdministrator::query()->create([
                 'name' => $name,
                 'email' => $email,
                 'password' => bcrypt($password),

@@ -28,7 +28,7 @@ final readonly class CreateNewSocialUser implements CreatesNewSocialUsers
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
         ])->validate();
 
-        return DB::transaction(fn () => tap(User::create([
+        return DB::transaction(fn () => tap(User::query()->create([
             'name' => $input['name'],
             'email' => $input['email'],
         ]), function (User $user): void {

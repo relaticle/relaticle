@@ -77,7 +77,7 @@ final class ImportRecordResolver
     {
         // Query 1: Get emails custom field ID
         // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
-        $emailsField = CustomField::withoutGlobalScopes()
+        $emailsField = CustomField::query()->withoutGlobalScopes()
             ->where('code', PeopleField::EMAILS->value)
             ->where('entity_type', 'people')
             ->where('tenant_id', $teamId)
@@ -120,7 +120,7 @@ final class ImportRecordResolver
     {
         // Query 1: Get domains custom field ID
         // Uses 'company' morph alias (from Relation::enforceMorphMap) instead of Company::class
-        $domainField = CustomField::withoutGlobalScopes()
+        $domainField = CustomField::query()->withoutGlobalScopes()
             ->where('code', CompanyField::DOMAINS->value)
             ->where('entity_type', 'company')
             ->where('tenant_id', $teamId)

@@ -39,7 +39,7 @@ final class PeopleResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return self::getModel()::count() > 0 ? (string) self::getModel()::count() : null;
+        return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
     }
 
     protected static ?string $slug = 'people';

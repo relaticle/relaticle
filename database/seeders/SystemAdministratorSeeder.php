@@ -15,14 +15,11 @@ final class SystemAdministratorSeeder extends Seeder
      */
     public function run(): void
     {
-        SystemAdministrator::firstOrCreate(
-            ['email' => 'sysadmin@relaticle.com'],
-            [
-                'name' => 'System Administrator',
-                'password' => bcrypt('password'),
-                'role' => SystemAdministratorRole::SuperAdministrator,
-                'email_verified_at' => now(),
-            ]
-        );
+        SystemAdministrator::query()->firstOrCreate(['email' => 'sysadmin@relaticle.com'], [
+            'name' => 'System Administrator',
+            'password' => bcrypt('password'),
+            'role' => SystemAdministratorRole::SuperAdministrator,
+            'email_verified_at' => now(),
+        ]);
     }
 }
