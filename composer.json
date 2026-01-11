@@ -12,15 +12,6 @@
         "team-collaboration"
     ],
     "license": "AGPL-3.0",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../custom-fields",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "require": {
         "php": "^8.4",
         "ashallendesign/favicon-fetcher": "^3.8",
@@ -37,7 +28,7 @@
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.0",
         "prism-php/prism": "^0.98.5",
-        "relaticle/custom-fields": "@dev",
+        "relaticle/custom-fields": "^3.0.0-beta",
         "relaticle/flowforge": "^v3.0.0-beta",
         "sentry/sentry-laravel": "^4.13",
         "spatie/eloquent-sortable": "^4.4",
