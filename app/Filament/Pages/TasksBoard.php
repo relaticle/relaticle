@@ -79,7 +79,8 @@ final class TasksBoard extends BoardPage
                 $descriptionCustomField = $customFields->get('custom_fields.description')
                     ?->columnSpanFull()
                     ->visible(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
+                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString())
+                    ->extraAttributes(['class' => 'mb-4']);
 
                 $priorityField = $customFields->get('custom_fields.priority')
                     ?->visible(fn (?string $state): bool => filled($state))
@@ -99,6 +100,7 @@ final class TasksBoard extends BoardPage
 
                 return $schema
                     ->inline()
+                    ->gap(false)
                     ->components([
                         $descriptionCustomField,
                         CardFlex::make([
@@ -107,7 +109,7 @@ final class TasksBoard extends BoardPage
                             ImageEntry::make('assignees.profile_photo_url')
                                 ->hiddenLabel()
                                 ->alignLeft()
-                                ->imageHeight(24)
+                                ->imageHeight(20)
                                 ->circular()
                                 ->visible(fn (?string $state): bool => filled($state))
                                 ->stacked(),
