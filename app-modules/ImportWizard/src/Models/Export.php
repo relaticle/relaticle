@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 final class Export extends BaseExport
 {
     use HasTeam;
-
     use HasUlids;
+
     /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
     use \Illuminate\Database\Eloquent\Factories\HasFactory;
 }

@@ -12,6 +12,7 @@ use Relaticle\ImportWizard\Data\ImportPreviewResult;
 use Relaticle\ImportWizard\Data\ImportSessionData;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
 use Relaticle\ImportWizard\Enums\PreviewStatus;
+use Relaticle\ImportWizard\Jobs\ProcessImportPreview;
 use Relaticle\ImportWizard\Support\ImportRecordResolver;
 use Relaticle\ImportWizard\Support\PreviewChunkService;
 
@@ -112,7 +113,23 @@ trait HasImportPreview
 
         // ASYNC: Dispatch job for remaining rows
         if ($this->rowCount > $initialBatchSize) {
-            dispatch(new \Relaticle\ImportWizard\Jobs\ProcessImportPreview(sessionId: $this->sessionId, csvPath: $this->persistedFilePath, enrichedPath: $enrichedPath, importerClass: $importerClass, columnMap: $this->columnMap, options: $options, teamId: $teamId, userId: $userId, startRow: $initialBatchSize, totalRows: $this->rowCount, initialCreates: $firstBatch['creates'], initialUpdates: $firstBatch['updates'], inputHash: $newHash, valueCorrections: $this->valueCorrections, initialNewCompanyNames: $newCompanyNames));
+            dispatch(new ProcessImportPreview(
+                sessionId: $this->sessionId,
+                csvPath: $this->persistedFilePath,
+                enrichedPath: $enrichedPath,
+                importerClass: $importerClass,
+                columnMap: $this->columnMap,
+                options: $options,
+                teamId: $teamId,
+                userId: $userId,
+                startRow: $initialBatchSize,
+                totalRows: $this->rowCount,
+                initialCreates: $firstBatch['creates'],
+                initialUpdates: $firstBatch['updates'],
+                inputHash: $newHash,
+                valueCorrections: $this->valueCorrections,
+                initialNewCompanyNames: $newCompanyNames,
+            ));
         }
     }
 
