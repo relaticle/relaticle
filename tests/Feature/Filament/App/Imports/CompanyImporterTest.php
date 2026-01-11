@@ -8,6 +8,7 @@ use App\Models\Team;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
 use Relaticle\ImportWizard\Enums\DuplicateHandlingStrategy;
+use Relaticle\ImportWizard\Enums\MatchType;
 use Relaticle\ImportWizard\Filament\Imports\CompanyImporter;
 use Relaticle\ImportWizard\Support\CompanyMatcher;
 
@@ -68,7 +69,7 @@ describe('Domain-Based Duplicate Detection', function (): void {
 });
 
 describe('CompanyMatcher Service', function (): void {
-    it('matches by :dataset', function (string $matchType, ?string $companyId, string $companyName, array $emails, string $expectedType): void {
+    it('matches by :dataset', function (string $matchType, ?string $companyId, string $companyName, array $emails, MatchType $expectedType): void {
         $company = Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
         setCompanyDomain($company, 'acme.com', $this->domainField);
 
@@ -84,19 +85,19 @@ describe('CompanyMatcher Service', function (): void {
         expect($result)->toBeInstanceOf(CompanyMatchResult::class)
             ->matchType->toBe($expectedType);
 
-        if ($expectedType !== 'new' && $expectedType !== 'none') {
+        if ($expectedType !== MatchType::New && $expectedType !== MatchType::None) {
             expect($result->companyId)->toBe($company->id);
         }
     })->with([
-        'ID with highest priority' => ['id', 'valid', 'Different Name', [], 'id'],
-        'domain from email' => ['domain', '', 'Acme Inc', ['john@acme.com'], 'domain'],
-        'domain over company name' => ['domain', '', 'Acme Inc', ['john@acme.com'], 'domain'],
-        'multiple emails' => ['domain', '', 'Some Company', ['john@gmail.com', 'jane@acme.com'], 'domain'],
-        'uppercase domain normalization' => ['domain', '', 'Acme Inc', ['JOHN@ACME.COM'], 'domain'],
-        'invalid ID falls back to domain' => ['domain', 'invalid', 'Some Name', ['john@acme.com'], 'domain'],
+        'ID with highest priority' => ['id', 'valid', 'Different Name', [], MatchType::Id],
+        'domain from email' => ['domain', '', 'Acme Inc', ['john@acme.com'], MatchType::Domain],
+        'domain over company name' => ['domain', '', 'Acme Inc', ['john@acme.com'], MatchType::Domain],
+        'multiple emails' => ['domain', '', 'Some Company', ['john@gmail.com', 'jane@acme.com'], MatchType::Domain],
+        'uppercase domain normalization' => ['domain', '', 'Acme Inc', ['JOHN@ACME.COM'], MatchType::Domain],
+        'invalid ID falls back to domain' => ['domain', 'invalid', 'Some Name', ['john@acme.com'], MatchType::Domain],
     ]);
 
-    it('returns :dataset match result', function (string $scenario, string $companyName, array $emails, string $expectedType): void {
+    it('returns :dataset match result', function (string $scenario, string $companyName, array $emails, MatchType $expectedType): void {
         if ($scenario === 'with company') {
             Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
         }
@@ -107,11 +108,11 @@ describe('CompanyMatcher Service', function (): void {
             ->matchType->toBe($expectedType)
             ->companyId->toBeNull();
     })->with([
-        'new when company name without domain match' => ['with company', 'Acme Inc', [], 'new'],
-        'new for personal emails' => ['with company', 'Acme Inc', ['john@gmail.com'], 'new'],
-        'new when no match exists' => ['empty', 'Unknown Company', ['contact@unknown.com'], 'new'],
-        'new when ID not found' => ['empty', 'New Company', [], 'new'],
-        'none for empty company name' => ['empty', '', ['john@acme.com'], 'none'],
+        'new when company name without domain match' => ['with company', 'Acme Inc', [], MatchType::New],
+        'new for personal emails' => ['with company', 'Acme Inc', ['john@gmail.com'], MatchType::New],
+        'new when no match exists' => ['empty', 'Unknown Company', ['contact@unknown.com'], MatchType::New],
+        'new when ID not found' => ['empty', 'New Company', [], MatchType::New],
+        'none for empty company name' => ['empty', '', ['john@acme.com'], MatchType::None],
     ]);
 
     it('handles invalid emails gracefully', function (): void {
@@ -119,7 +120,7 @@ describe('CompanyMatcher Service', function (): void {
 
         $result = $this->matcher->match('', 'Acme Inc', ['not-an-email', 'also.not.valid', ''], $this->team->id);
 
-        expect($result)->matchType->toBe('new')->matchCount->toBe(0);
+        expect($result)->matchType->toBe(MatchType::New)->matchCount->toBe(0);
     });
 
     it('takes first match when multiple companies share domain', function (): void {
@@ -131,7 +132,7 @@ describe('CompanyMatcher Service', function (): void {
         $result = $this->matcher->match('', 'Something Else', ['john@acme.com'], $this->team->id);
 
         expect($result)
-            ->matchType->toBe('domain')
+            ->matchType->toBe(MatchType::Domain)
             ->matchCount->toBe(2)
             ->companyId->toBeIn([$company1->id, $company2->id]);
     });
@@ -154,24 +155,24 @@ describe('Team Isolation', function (): void {
             $this->team->id
         );
 
-        expect($result)->matchType->toBe('new')->companyId->toBeNull();
+        expect($result)->matchType->toBe(MatchType::New)->companyId->toBeNull();
     })->with(['id', 'domain']);
 });
 
 describe('CompanyMatchResult', function (): void {
-    it('isDomainMatch returns correct value for :dataset', function (string $type, bool $expected): void {
+    it('isDomainMatch returns correct value for :dataset', function (MatchType $type, bool $expected): void {
         $result = new CompanyMatchResult(
             companyName: 'Test',
             matchType: $type,
-            matchCount: $type === 'domain' ? 1 : 0,
-            companyId: $type === 'domain' ? '01kccnz9t2x1r00369k6wm6wk2' : null
+            matchCount: $type === MatchType::Domain ? 1 : 0,
+            companyId: $type === MatchType::Domain ? '01kccnz9t2x1r00369k6wm6wk2' : null
         );
 
         expect($result->isDomainMatch())->toBe($expected);
     })->with([
-        'domain match' => ['domain', true],
-        'new' => ['new', false],
-        'id' => ['id', false],
-        'none' => ['none', false],
+        'domain match' => [MatchType::Domain, true],
+        'new' => [MatchType::New, false],
+        'id' => [MatchType::Id, false],
+        'none' => [MatchType::None, false],
     ]);
 });

@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CustomFieldValue;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\CompanyMatchResult;
+use Relaticle\ImportWizard\Enums\MatchType;
 
 final class CompanyMatcher
 {
@@ -32,7 +33,7 @@ final class CompanyMatcher
             if ($company instanceof Company) {
                 return new CompanyMatchResult(
                     companyName: $company->name,
-                    matchType: 'id',
+                    matchType: MatchType::Id,
                     matchCount: 1,
                     companyId: (string) $company->id,
                 );
@@ -50,7 +51,7 @@ final class CompanyMatcher
 
                 return new CompanyMatchResult(
                     companyName: $company->name,
-                    matchType: 'domain',
+                    matchType: MatchType::Domain,
                     matchCount: count($domainMatches),
                     companyId: (string) $company->id,
                 );
@@ -61,7 +62,7 @@ final class CompanyMatcher
         if ($companyName === '') {
             return new CompanyMatchResult(
                 companyName: '',
-                matchType: 'none',
+                matchType: MatchType::None,
                 matchCount: 0,
             );
         }
@@ -69,7 +70,7 @@ final class CompanyMatcher
         // Priority 4: company_name provided → will create new company
         return new CompanyMatchResult(
             companyName: $companyName,
-            matchType: 'new',
+            matchType: MatchType::New,
             matchCount: 0,
         );
     }
