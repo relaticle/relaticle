@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Statement;
-use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportColumnConfigurator;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
@@ -69,45 +68,36 @@ final class StreamingImportCsv implements ShouldQueue
 
         throw_unless(file_exists($csvPath), \RuntimeException::class, "Import file not found: {$csvPath}");
 
-        // Set runtime flag for creating missing select options
-        $createMissingOptions = $this->options['create_missing_select_options'] ?? false;
-        ImportColumnConfigurator::setCreateMissingSelectOptions($createMissingOptions);
+        $csvReader = App::make(CsvReaderFactory::class)->createFromPath($csvPath);
 
-        try {
-            $csvReader = App::make(CsvReaderFactory::class)->createFromPath($csvPath);
+        $records = (new Statement)
+            ->offset($this->startRow)
+            ->limit($this->rowCount)
+            ->process($csvReader);
 
-            $records = (new Statement)
-                ->offset($this->startRow)
-                ->limit($this->rowCount)
-                ->process($csvReader);
+        /** @var Importer $importer */
+        $importer = App::make($this->import->importer, [
+            'import' => $this->import,
+            'columnMap' => $this->columnMap,
+            'options' => $this->options,
+        ]);
 
-            /** @var Importer $importer */
-            $importer = App::make($this->import->importer, [
-                'import' => $this->import,
-                'columnMap' => $this->columnMap,
-                'options' => $this->options,
-            ]);
+        $processedCount = 0;
+        $successCount = 0;
 
-            $processedCount = 0;
-            $successCount = 0;
-
-            foreach ($records as $record) {
-                try {
-                    ($importer)($record);
-                    $successCount++;
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-
-                $processedCount++;
+        foreach ($records as $record) {
+            try {
+                ($importer)($record);
+                $successCount++;
+            } catch (\Throwable $e) {
+                report($e);
             }
 
-            $this->import->increment('processed_rows', $processedCount);
-            $this->import->increment('successful_rows', $successCount);
-        } finally {
-            // Always reset the flag after processing
-            ImportColumnConfigurator::setCreateMissingSelectOptions(false);
+            $processedCount++;
         }
+
+        $this->import->increment('processed_rows', $processedCount);
+        $this->import->increment('successful_rows', $successCount);
     }
 
     /**

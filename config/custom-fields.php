@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Relaticle\CustomFields\EntitySystem\EntityConfigurator;
-use Relaticle\CustomFields\EntitySystem\EntityModel;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\FeatureSystem\FeatureConfigurator;
 use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
@@ -17,25 +16,9 @@ return [
     | Configure entities (models that can have custom fields) using the
     | clean, type-safe fluent builder interface.
     |
-    | lookupIdentifier: Specifies the unique custom field used for matching
-    | records during imports (e.g., email for People, domain for Company).
-    |
     */
     'entity_configuration' => EntityConfigurator::configure()
         ->discover(app_path('Models'))
-        ->models([
-            EntityModel::configure(
-                modelClass: App\Models\People::class,
-                lookupIdentifier: ['field_code' => 'emails', 'value_column' => 'json_value'],
-            ),
-            EntityModel::configure(
-                modelClass: App\Models\Company::class,
-                lookupIdentifier: ['field_code' => 'domains', 'value_column' => 'json_value'],
-            ),
-            EntityModel::for(App\Models\Opportunity::class),
-            EntityModel::for(App\Models\Task::class),
-            EntityModel::for(App\Models\Note::class),
-        ])
         ->cache(),
 
     /*
