@@ -10,13 +10,12 @@ use Filament\Support\Contracts\HasLabel;
 /**
  * Supported timestamp formats for CSV import parsing.
  *
- * IMPORTANT: Time position follows Attio's export format convention:
+ * Time position conventions:
  * - ISO: time LAST (2024-05-15 16:00:00) - standard ISO 8601
  * - European/American: time FIRST (16:00 15-05-2024)
  *
- * The time-first convention for European/American formats differs from
- * common regional conventions where time typically appears after the date.
- * This design choice enables seamless migration from Attio exports.
+ * The time-first convention for European/American formats enables
+ * seamless migration from common CRM export formats.
  */
 enum TimestampFormat: string implements HasLabel
 {
@@ -48,7 +47,7 @@ enum TimestampFormat: string implements HasLabel
     }
 
     /**
-     * Get example patterns for UI display (like Attio).
+     * Get example patterns for UI display.
      *
      * @return array<string>
      */

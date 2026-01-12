@@ -51,7 +51,7 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Get example patterns for UI display (like Attio).
+     * Get example patterns for UI display.
      *
      * @return array<string>
      */

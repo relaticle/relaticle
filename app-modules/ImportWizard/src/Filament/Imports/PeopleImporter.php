@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
-use App\Enums\CreationSource;
 use App\Enums\CustomFields\PeopleField;
-use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Support\CompanyMatcher;
+use Relaticle\ImportWizard\Data\RelationshipField;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasCompanyRelationshipColumns;
 
 final class PeopleImporter extends BaseImporter
 {
+    use HasCompanyRelationshipColumns;
+
     protected static ?string $model = People::class;
 
     protected static array $uniqueIdentifierColumns = ['id', 'custom_fields_emails'];
@@ -43,77 +44,7 @@ final class PeopleImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
-            ImportColumn::make('company_id')
-                ->label('Company Record ID')
-                ->guess(['company_id', 'company_record_id'])
-                ->rules(['nullable', 'string', 'ulid'])
-                ->example('01HQWX...')
-                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
-                    if (blank($state) || ! $importer->import->team_id) {
-                        return;
-                    }
-
-                    $companyId = trim($state);
-
-                    // Verify company exists in current team
-                    $company = Company::query()
-                        ->where('id', $companyId)
-                        ->where('team_id', $importer->import->team_id)
-                        ->first();
-
-                    if ($company) {
-                        $record->company_id = $company->getKey();
-                    }
-                }),
-
-            ImportColumn::make('company_name')
-                ->label('Company Name')
-                ->guess([
-                    'company_name', 'Company',
-                    'company', 'employer', 'organization', 'organisation', 'works_at',
-                    'associated company', 'account', 'account_name', 'business',
-                ])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation')
-                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
-                    // Skip if company already set by company_id column
-                    if ($record->company_id) {
-                        return;
-                    }
-
-                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
-
-                    $companyName = $state !== null ? trim($state) : '';
-                    $emails = $importer->extractEmails();
-
-                    // Try domain-based matching first when company_name is empty but emails exist
-                    if ($companyName === '' && $emails !== []) {
-                        $matcher = resolve(CompanyMatcher::class);
-                        $result = $matcher->match('', '', $emails, $importer->import->team_id);
-
-                        if ($result->isDomainMatch() && $result->companyId !== null) {
-                            $record->company_id = $result->companyId;
-
-                            return;
-                        }
-                    }
-
-                    // No company to link - person will have no company
-                    if ($companyName === '') {
-                        return;
-                    }
-
-                    // Find or create company by name (prevents duplicates within import)
-                    $company = Company::query()->firstOrCreate([
-                        'name' => $companyName,
-                        'team_id' => $importer->import->team_id,
-                    ], [
-                        'creator_id' => $importer->import->user_id,
-                        'creation_source' => CreationSource::IMPORT,
-                    ]);
-
-                    $record->company_id = $company->getKey();
-                }),
+            ...self::buildCompanyRelationshipColumns(),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),
         ];
@@ -224,5 +155,15 @@ final class PeopleImporter extends BaseImporter
     public static function getEntityName(): string
     {
         return 'people';
+    }
+
+    /**
+     * @return array<string, RelationshipField>
+     */
+    public static function getRelationshipFields(): array
+    {
+        return [
+            'company' => RelationshipField::company(),
+        ];
     }
 }

@@ -7,19 +7,31 @@ namespace Relaticle\ImportWizard\Livewire\Concerns;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Relaticle\ImportWizard\Data\RelationshipField;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
 use Relaticle\ImportWizard\Support\ColumnMatcher;
 use Relaticle\ImportWizard\Support\DataTypeInferencer;
 
 /**
  * @property array<\Filament\Actions\Imports\ImportColumn> $importerColumns
+ * @property array<string, RelationshipField> $relationshipFields
+ * @property array<string> $hiddenRelationshipColumns
+ * @property array<\Filament\Actions\Imports\ImportColumn> $visibleImporterColumns
  *
  * @phpstan-type InferredMapping array{field: string, confidence: float, type: string}
+ * @phpstan-type RelationshipMapping array{csvColumn: string, matcher: string}
  */
 trait HasColumnMapping
 {
     /** @var array<string, array{field: string, confidence: float, type: string}> */
     public array $inferredMappings = [];
+
+    /**
+     * Relationship field mappings: relationshipName => [csvColumn, matcher].
+     *
+     * @var array<string, array{csvColumn: string, matcher: string}>
+     */
+    public array $relationshipMappings = [];
 
     /** @return array<ImportColumn> */
     #[Computed]
@@ -33,6 +45,188 @@ trait HasColumnMapping
         return $importerClass::getColumns();
     }
 
+    /**
+     * Get relationship fields for two-level selection UI.
+     *
+     * @return array<string, RelationshipField>
+     */
+    #[Computed]
+    public function relationshipFields(): array
+    {
+        $importerClass = $this->getImporterClass();
+        if ($importerClass === null) {
+            return [];
+        }
+
+        return $importerClass::getRelationshipFields();
+    }
+
+    /**
+     * Check if this importer has any relationship fields.
+     */
+    public function hasRelationshipFields(): bool
+    {
+        return $this->relationshipFields !== [];
+    }
+
+    /**
+     * Get fields that should NOT be shown in the regular field dropdown.
+     * These are handled by the relationship two-level select instead.
+     *
+     * @return array<string>
+     */
+    #[Computed]
+    public function hiddenRelationshipColumns(): array
+    {
+        $hidden = [];
+
+        foreach ($this->relationshipFields as $field) {
+            foreach ($field->matchers as $matcher) {
+                // Build the internal column name based on relationship + matcher
+                $columnName = $this->getInternalColumnName($field->name, $matcher->key);
+                $hidden[] = $columnName;
+            }
+        }
+
+        return $hidden;
+    }
+
+    /**
+     * Get visible importer columns (excluding relationship-based columns).
+     *
+     * @return array<ImportColumn>
+     */
+    #[Computed]
+    public function visibleImporterColumns(): array
+    {
+        $hidden = $this->hiddenRelationshipColumns;
+
+        return collect($this->importerColumns)
+            ->reject(fn (ImportColumn $col): bool => in_array($col->getName(), $hidden, true))
+            ->values()
+            ->all();
+    }
+
+    public function mapRelationshipField(string $relationshipName, string $csvColumn, string $matcherKey): void
+    {
+        $field = $this->relationshipFields[$relationshipName] ?? null;
+        if ($field === null) {
+            return;
+        }
+
+        $this->clearMappingsForCsvColumn($csvColumn);
+
+        // Clear any previous internal column mappings for this relationship
+        foreach ($field->matchers as $matcher) {
+            $internalName = $this->getInternalColumnName($relationshipName, $matcher->key);
+            if (isset($this->columnMap[$internalName])) {
+                $this->columnMap[$internalName] = '';
+            }
+        }
+
+        if ($csvColumn === '') {
+            unset($this->relationshipMappings[$relationshipName]);
+
+            return;
+        }
+
+        $this->relationshipMappings[$relationshipName] = [
+            'csvColumn' => $csvColumn,
+            'matcher' => $matcherKey,
+        ];
+
+        $internalName = $this->getInternalColumnName($relationshipName, $matcherKey);
+        if (isset($this->columnMap[$internalName])) {
+            $this->columnMap[$internalName] = $csvColumn;
+        }
+    }
+
+    /**
+     * Update the matcher for a relationship without changing the CSV column.
+     */
+    public function updateRelationshipMatcher(string $relationshipName, string $matcherKey): void
+    {
+        if (! isset($this->relationshipMappings[$relationshipName])) {
+            return;
+        }
+
+        $csvColumn = $this->relationshipMappings[$relationshipName]['csvColumn'];
+        $this->mapRelationshipField($relationshipName, $csvColumn, $matcherKey);
+    }
+
+    protected function getInternalColumnName(string $relationshipName, string $matcherKey): string
+    {
+        return "rel_{$relationshipName}_{$matcherKey}";
+    }
+
+    private function clearMappingsForCsvColumn(string $csvColumn): void
+    {
+        foreach ($this->relationshipMappings as $name => $mapping) {
+            if ($mapping['csvColumn'] === $csvColumn) {
+                unset($this->relationshipMappings[$name]);
+            }
+        }
+
+        foreach ($this->columnMap as $field => $mappedCsv) {
+            if ($mappedCsv === $csvColumn) {
+                $this->columnMap[$field] = '';
+            }
+        }
+    }
+
+    /**
+     * Check if a CSV column is used by a relationship mapping.
+     */
+    public function isColumnUsedByRelationship(string $csvColumn): bool
+    {
+        foreach ($this->relationshipMappings as $mapping) {
+            if ($mapping['csvColumn'] === $csvColumn) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the relationship mapping for a CSV column, if any.
+     *
+     * @return array{relationship: string, matcher: string}|null
+     */
+    public function getRelationshipForColumn(string $csvColumn): ?array
+    {
+        foreach ($this->relationshipMappings as $name => $mapping) {
+            if ($mapping['csvColumn'] === $csvColumn) {
+                return ['relationship' => $name, 'matcher' => $mapping['matcher']];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get relationship info for a field name (like rel_company_name).
+     *
+     * @return array{field: RelationshipField, matcherKey: string}|null
+     */
+    public function getRelationshipInfoForField(string $fieldName): ?array
+    {
+        if (! str_starts_with($fieldName, 'rel_')) {
+            return null;
+        }
+
+        foreach ($this->relationshipFields as $relName => $field) {
+            foreach ($field->matchers as $matcher) {
+                $internalName = $this->getInternalColumnName($relName, $matcher->key);
+                if ($internalName === $fieldName) {
+                    return ['field' => $field, 'matcherKey' => $matcher->key];
+                }
+            }
+        }
+
+        return null;
+    }
+
     protected function autoMapColumns(): void
     {
         if ($this->csvHeaders === [] || $this->importerColumns === []) {
@@ -41,17 +235,60 @@ trait HasColumnMapping
 
         $matcher = resolve(ColumnMatcher::class);
 
-        // Phase 1: Header matching
+        // Initialize columnMap with all columns (hidden ones start empty)
         $this->columnMap = collect($this->importerColumns)
-            ->mapWithKeys(function (ImportColumn $column) use ($matcher): array {
-                $match = $matcher->findMatchingHeader($this->csvHeaders, $column->getGuesses());
-
-                return [$column->getName() => $match ?? ''];
-            })
+            ->mapWithKeys(fn (ImportColumn $column): array => [$column->getName() => ''])
             ->all();
 
-        // Phase 2: Data type inference for unmapped CSV columns
+        // Phase 1: Header matching for VISIBLE ImportColumns only
+        // Hidden relationship columns are handled in Phase 2
+        foreach ($this->visibleImporterColumns as $column) {
+            $match = $matcher->findMatchingHeader($this->csvHeaders, $column->getGuesses());
+            if ($match !== null) {
+                $this->columnMap[$column->getName()] = $match;
+            }
+        }
+
+        // Phase 2: Auto-map relationship fields (handles rel_* columns)
+        $this->autoMapRelationshipFields($matcher);
+
+        // Phase 3: Data type inference for unmapped CSV columns
         $this->applyDataTypeInference();
+    }
+
+    /**
+     * Auto-map relationship fields based on CSV header guesses.
+     */
+    protected function autoMapRelationshipFields(ColumnMatcher $matcher): void
+    {
+        $this->relationshipMappings = [];
+        $usedHeaders = array_filter($this->columnMap);
+
+        foreach ($this->relationshipFields as $relationshipName => $field) {
+            // Try each matcher's guesses to find a matching CSV header
+            foreach ($field->matchers as $fieldMatcher) {
+                $match = $matcher->findMatchingHeader(
+                    array_diff($this->csvHeaders, $usedHeaders),
+                    $fieldMatcher->guesses
+                );
+
+                if ($match !== null) {
+                    $this->relationshipMappings[$relationshipName] = [
+                        'csvColumn' => $match,
+                        'matcher' => $fieldMatcher->key,
+                    ];
+
+                    // Also set the internal column map
+                    $internalName = $this->getInternalColumnName($relationshipName, $fieldMatcher->key);
+                    if (isset($this->columnMap[$internalName])) {
+                        $this->columnMap[$internalName] = $match;
+                    }
+
+                    $usedHeaders[] = $match;
+                    break; // Found a match for this relationship, move to next
+                }
+            }
+        }
     }
 
     /**
@@ -112,14 +349,8 @@ trait HasColumnMapping
 
     public function mapCsvColumnToField(string $csvColumn, string $fieldName): void
     {
-        // First, find and clear any existing mapping for this CSV column
-        foreach ($this->columnMap as $field => $mappedCsv) {
-            if ($mappedCsv === $csvColumn) {
-                $this->columnMap[$field] = '';
-            }
-        }
+        $this->clearMappingsForCsvColumn($csvColumn);
 
-        // If a field was selected, map it
         if ($fieldName !== '') {
             $this->columnMap[$fieldName] = $csvColumn;
         }
@@ -183,24 +414,35 @@ trait HasColumnMapping
             return true;
         }
 
-        return (bool) $this->hasCompanyNameWithoutId();
+        return (bool) $this->hasRelationshipCreatingNewRecords();
     }
 
-    protected function hasCompanyNameWithoutId(): bool
+    protected function hasRelationshipCreatingNewRecords(): bool
     {
-        /** @var \Illuminate\Support\Collection<string, ImportColumn> */
-        $columns = collect($this->importerColumns)->keyBy(fn (ImportColumn $col): string => $col->getName());
+        return $this->getRelationshipsCreatingNewRecords() !== [];
+    }
 
-        if (! $columns->has('company_name') || ! $columns->has('company_id')) {
-            return false;
+    /**
+     * @return array<array{relationship: string, matcher: string, label: string}>
+     */
+    protected function getRelationshipsCreatingNewRecords(): array
+    {
+        $creating = [];
+
+        foreach ($this->relationshipMappings as $relationshipName => $mapping) {
+            $field = $this->relationshipFields[$relationshipName] ?? null;
+            $matcher = $field?->getMatcher($mapping['matcher']);
+
+            if ($matcher?->createsNew === true) {
+                $creating[] = [
+                    'relationship' => $relationshipName,
+                    'matcher' => $mapping['matcher'],
+                    'label' => $field->label,
+                ];
+            }
         }
 
-        /** @var bool */
-        $hasCompanyName = isset($this->columnMap['company_name']) && $this->columnMap['company_name'] !== '';
-        /** @var bool */
-        $hasCompanyId = isset($this->columnMap['company_id']) && $this->columnMap['company_id'] !== '';
-
-        return $hasCompanyName && ! $hasCompanyId;
+        return $creating;
     }
 
     protected function getMappingWarningsHtml(): string
@@ -212,9 +454,13 @@ trait HasColumnMapping
             $warnings[] = '<strong>'.$this->getMissingUniqueIdentifiersMessage().'</strong>';
         }
 
-        if ($this->hasCompanyNameWithoutId()) {
-            $warnings[] = '<strong>Company Name</strong> is mapped without <strong>Company Record ID</strong>. '.
-                'New companies will be created for each unique name in your CSV.';
+        $creatingRelationships = $this->getRelationshipsCreatingNewRecords();
+        foreach ($creatingRelationships as $rel) {
+            $warnings[] = "<strong>{$rel['label']}</strong> will create new records if not found by name.";
+        }
+
+        if ($warnings === []) {
+            return '';
         }
 
         $docsUrl = route('documentation.show', 'import').'#unique-identifiers';

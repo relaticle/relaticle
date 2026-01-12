@@ -201,7 +201,8 @@ Acme Corporation,owner@yourcompany.com,Technology
 **Columns**:
 - `name` (required) - Person's full name
 - `company_id` - Link to company by Record ID
-- `company_name` - Link or create company by name
+- `company_domain` - Link to company by domain
+- `company_name` - Create new company by name
 - `custom_fields_emails` - Email addresses (for duplicate detection)
 - Other custom fields
 
@@ -209,8 +210,9 @@ Acme Corporation,owner@yourcompany.com,Technology
 
 **Company Linking Priority**:
 1. `company_id` - Direct ID match (highest priority)
-2. Domain match - From email domain to company's domains field
-3. `company_name` - Match by name, or create new company
+2. `company_domain` - Direct domain match
+3. Automatic domain match - From person's email domain (invisible)
+4. `company_name` - Create new company (name is not unique)
 
 ```
 name,company_name,custom_fields_emails,custom_fields_title
@@ -218,22 +220,35 @@ John Doe,Acme Corporation,john@acme.com,CEO
 Jane Smith,Acme Corporation,jane@acme.com,CTO
 ```
 
-**Note**: If `company_name` doesn't match an existing company, a new company is automatically created.
+**Note**: `company_name` always creates a new company since names are not unique. To link to existing companies, use `company_id` or `company_domain`. If the person has an email address mapped, the system will automatically try to match by email domain before creating a new company.
 
 ### Opportunities
 
 **Columns**:
 - `name` (required) - Opportunity name
-- `company_id` or `company_name` - Link to company
-- `contact_name` - Link or create contact
+- `company_id` - Link to company by Record ID
+- `company_domain` - Link to company by domain
+- `company_name` - Create new company by name
+- `contact_id` - Link to contact by Record ID
+- `contact_email` - Link to contact by email
+- `contact_name` - Create new contact by name
 - Custom fields (amount, stage, close_date, etc.)
 
 **Duplicate Detection**: Record ID only
+
+**Company Linking**: Same as People (ID → Domain → Name creates new)
+
+**Contact Linking Priority**:
+1. `contact_id` - Direct ID match (highest priority)
+2. `contact_email` - Match by email address
+3. `contact_name` - Create new contact (name is not unique)
 
 ```
 name,company_name,contact_name,custom_fields_amount,custom_fields_stage
 Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
 ```
+
+**Note**: `contact_name` always creates a new contact since names are not unique. To link to existing contacts, use `contact_id` or `contact_email`.
 
 ### Tasks
 
@@ -401,15 +416,19 @@ id,name,account_owner_email,custom_fields_industry,custom_fields_domains
 
 ### People Template
 ```
-id,name,company_name,custom_fields_emails,custom_fields_title
-,John Doe,Acme Corporation,john@acme.com,CEO
+id,name,company_domain,custom_fields_emails,custom_fields_title
+,John Doe,acme.com,john@acme.com,CEO
 ```
+
+**Tip**: Use `company_domain` to link to existing companies. Use `company_name` only when you want to create new companies.
 
 ### Opportunity Template
 ```
-id,name,company_name,contact_name,custom_fields_amount,custom_fields_stage
-,Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
+id,name,company_domain,contact_email,custom_fields_amount,custom_fields_stage
+,Q1 Enterprise Deal,acme.com,john@acme.com,50000,Proposal
 ```
+
+**Tip**: Use `company_domain` and `contact_email` to link to existing records. Use `company_name` and `contact_name` only when you want to create new records.
 
 ### Task Template
 ```

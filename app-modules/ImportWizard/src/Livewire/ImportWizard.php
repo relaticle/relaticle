@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire;
 
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -40,7 +42,7 @@ use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Support\CsvReaderFactory;
 
 /**
- * 4-step import wizard following the Attio pattern.
+ * 4-step import wizard.
  *
  * Steps:
  * 1. Upload - File upload with row/column counts
@@ -486,6 +488,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->rowCount = 0;
         $this->csvHeaders = [];
         $this->columnMap = [];
+        $this->relationshipMappings = [];
+        $this->inferredMappings = [];
         $this->columnAnalysesData = [];
         $this->valueCorrections = [];
         $this->selectedDateFormats = [];
@@ -493,6 +497,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->previewRows = [];
         $this->reviewPage = 1;
         $this->expandedColumn = null;
+        $this->showOnlyErrors = false;
         $this->importStarted = false;
         $this->previewInputHash = null;
     }
@@ -546,7 +551,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     {
         return collect($this->columnMap)
             ->filter()
-            ->mapWithKeys(fn ($_, string $field): array => [$field => $this->getFieldLabel($field)])
+            ->mapWithKeys(fn (mixed $_, string $field): array => [$field => $this->getFieldLabel($field)])
             ->all();
     }
 
@@ -612,6 +617,198 @@ final class ImportWizard extends Component implements HasActions, HasForms
             ->action(function (): void {
                 $this->advanceToNextStep();
             });
+    }
+
+    /**
+     * Action for creating missing choice options for a column.
+     */
+    public function createMissingOptionsAction(): Action
+    {
+        return Action::make('createMissingOptions')
+            ->label('Create missing options')
+            ->icon(Heroicon::OutlinedPlusCircle)
+            ->color('primary')
+            ->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedExclamationTriangle)
+            ->modalHeading('Create missing options?')
+            ->modalDescription(fn (): HtmlString => $this->getMissingOptionsModalContent())
+            ->modalSubmitActionLabel('Create options')
+            ->modalCancelActionLabel('Cancel')
+            ->action(fn () => $this->createMissingOptionsForColumn());
+    }
+
+    /**
+     * Get the modal content showing missing options for the currently expanded column.
+     */
+    private function getMissingOptionsModalContent(): HtmlString
+    {
+        if ($this->expandedColumn === null) {
+            return new HtmlString('<p>No column selected.</p>');
+        }
+
+        /** @var ColumnAnalysis|null $analysis */
+        $analysis = $this->columnAnalyses->firstWhere('mappedToField', $this->expandedColumn);
+
+        if ($analysis === null || ! $analysis->isChoiceField()) {
+            return new HtmlString('<p>This column does not support creating options.</p>');
+        }
+
+        $missingOptions = $analysis->getMissingChoiceOptions();
+
+        if ($missingOptions === []) {
+            return new HtmlString('<p>No missing options found.</p>');
+        }
+
+        $count = count($missingOptions);
+        $optionsList = collect($missingOptions)
+            ->take(10)
+            ->map(fn (string $value): string => '<li class="text-sm text-gray-700 dark:text-gray-300">'.e($value).'</li>')
+            ->implode('');
+
+        $moreText = $count > 10 ? '<li class="text-sm text-gray-500 dark:text-gray-400">...and '.($count - 10).' more</li>' : '';
+
+        return new HtmlString(
+            '<p class="mb-3">This will add <strong>'.$count.'</strong> new '.Str::plural('option', $count).' to the <strong>'.e($analysis->csvColumnName).'</strong> field:</p>'.
+            '<ul class="list-disc list-inside space-y-1 max-h-48 overflow-y-auto">'.$optionsList.$moreText.'</ul>'.
+            '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">This action cannot be undone.</p>'
+        );
+    }
+
+    /**
+     * Create the missing options for the currently expanded column.
+     */
+    private function createMissingOptionsForColumn(): void
+    {
+        if ($this->expandedColumn === null) {
+            return;
+        }
+
+        /** @var ColumnAnalysis|null $analysis */
+        $analysis = $this->columnAnalyses->firstWhere('mappedToField', $this->expandedColumn);
+
+        if ($analysis === null || ! $analysis->isChoiceField()) {
+            return;
+        }
+
+        $missingOptions = $analysis->getMissingChoiceOptions();
+
+        if ($missingOptions === []) {
+            return;
+        }
+
+        // Get the custom field for this column
+        $fieldCode = str_replace('custom_fields_', '', $analysis->mappedToField);
+        $morphAlias = $this->getMorphAlias();
+        $teamId = Filament::getTenant()?->getKey();
+
+        if ($teamId === null) {
+            Notification::make()
+                ->title('Error')
+                ->body('Could not determine workspace.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $customField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('code', $fieldCode)
+            ->where('entity_type', $morphAlias)
+            ->where('tenant_id', $teamId)
+            ->first();
+
+        if ($customField === null) {
+            Notification::make()
+                ->title('Error')
+                ->body('Could not find the custom field.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        // Get the highest existing sort order
+        $maxSortOrder = CustomFieldOption::query()
+            ->withoutGlobalScopes()
+            ->where('custom_field_id', $customField->id)
+            ->max('sort_order') ?? 0;
+
+        // Create options for each missing value
+        foreach ($missingOptions as $value) {
+            CustomFieldOption::query()->create([
+                'custom_field_id' => $customField->id,
+                'tenant_id' => $teamId,
+                'name' => $value,
+                'sort_order' => ++$maxSortOrder,
+            ]);
+        }
+
+        // Re-run analysis to clear the errors
+        $this->analyzeColumns();
+
+        $count = count($missingOptions);
+        Notification::make()
+            ->title('Options created')
+            ->body("Created {$count} new ".Str::plural('option', $count).'.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Get the morph alias for the current entity type.
+     */
+    private function getMorphAlias(): string
+    {
+        $importerClass = $this->getImporterClass();
+
+        if ($importerClass === null) {
+            return Str::singular($this->entityType);
+        }
+
+        /** @var class-string<\Illuminate\Database\Eloquent\Model> $modelClass */
+        $modelClass = $importerClass::getModel();
+
+        return (new $modelClass)->getMorphClass();
+    }
+
+    /**
+     * Get choice options for a custom field by field name.
+     *
+     * @return array<string>
+     */
+    public function getChoiceOptionsForField(string $fieldName): array
+    {
+        if (! str_starts_with($fieldName, 'custom_fields_')) {
+            return [];
+        }
+
+        $fieldCode = str_replace('custom_fields_', '', $fieldName);
+        $morphAlias = $this->getMorphAlias();
+        $teamId = Filament::getTenant()?->getKey();
+
+        if ($teamId === null) {
+            return [];
+        }
+
+        $customField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('code', $fieldCode)
+            ->where('entity_type', $morphAlias)
+            ->where('tenant_id', $teamId)
+            ->with('options')
+            ->first();
+
+        if ($customField === null || ! $customField->isChoiceField()) {
+            return [];
+        }
+
+        // Lookup fields reference other entities - too many options for dropdown
+        if ($customField->lookup_type !== null) {
+            return [];
+        }
+
+        return $customField->options->pluck('name')->all();
     }
 
     /**

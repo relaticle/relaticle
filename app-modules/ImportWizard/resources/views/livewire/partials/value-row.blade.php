@@ -44,7 +44,99 @@
         <div class="flex-1 min-w-0">
             @if ($isSkipped)
                 <span class="text-sm text-gray-400 italic">Skipped</span>
+            @elseif ($isChoiceField && !empty($choiceOptions))
+                {{-- Choice field with static options --}}
+                @if ($isMultiChoice)
+                    {{-- Multi-choice: Tag-based UI --}}
+                    @php
+                        $selectedValues = $hasCorrection
+                            ? array_map('trim', explode(',', $mappedValue))
+                            : ($value !== '' ? array_map('trim', explode(',', $value)) : []);
+                        $selectedValues = array_filter($selectedValues);
+                    @endphp
+                    <div
+                        x-data="{
+                            selected: @js($selectedValues),
+                            options: @js($choiceOptions),
+                            showDropdown: false,
+                            addOption(opt) {
+                                if (!this.selected.includes(opt)) {
+                                    this.selected.push(opt);
+                                    this.saveValue();
+                                }
+                                this.showDropdown = false;
+                            },
+                            removeOption(opt) {
+                                this.selected = this.selected.filter(v => v !== opt);
+                                this.saveValue();
+                            },
+                            saveValue() {
+                                $wire.correctValue('{{ $selectedAnalysis->mappedToField }}', '{{ addslashes($value) }}', this.selected.join(', '));
+                            },
+                            get availableOptions() {
+                                return this.options.filter(opt => !this.selected.includes(opt));
+                            }
+                        }"
+                        class="relative"
+                    >
+                        <div @class([
+                            'flex flex-wrap gap-1 items-center min-h-[30px] px-2 py-1 rounded border',
+                            'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950' => $hasCorrection && !$hasError,
+                            'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' => !$hasCorrection || $hasError,
+                        ])>
+                            <template x-for="opt in selected" :key="opt">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
+                                    <span x-text="opt"></span>
+                                    <button type="button" @click="removeOption(opt)" class="hover:text-primary-900 dark:hover:text-primary-100">
+                                        <x-filament::icon icon="heroicon-m-x-mark" class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </template>
+                            <button
+                                type="button"
+                                @click="showDropdown = !showDropdown"
+                                x-show="availableOptions.length > 0"
+                                class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                + Add
+                            </button>
+                        </div>
+                        <div
+                            x-show="showDropdown"
+                            x-cloak
+                            @click.outside="showDropdown = false"
+                            class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg max-h-40 overflow-y-auto"
+                        >
+                            <template x-for="opt in availableOptions" :key="opt">
+                                <button
+                                    type="button"
+                                    @click="addOption(opt)"
+                                    class="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    x-text="opt"
+                                ></button>
+                            </template>
+                        </div>
+                    </div>
+                @else
+                    {{-- Single-choice: Select dropdown --}}
+                    <select
+                        wire:change="correctValue('{{ $selectedAnalysis->mappedToField }}', '{{ addslashes($value) }}', $event.target.value)"
+                        @class([
+                            'w-full px-2 py-1 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-primary-500',
+                            'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950' => $hasCorrection && !$hasError,
+                            'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' => !$hasCorrection || $hasError,
+                        ])
+                    >
+                        @if (!in_array($mappedValue, $choiceOptions))
+                            <option value="{{ $mappedValue }}" selected>{{ $mappedValue }} (invalid)</option>
+                        @endif
+                        @foreach ($choiceOptions as $option)
+                            <option value="{{ $option }}" @selected($option === $mappedValue)>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                @endif
             @else
+                {{-- Default: Text input --}}
                 <div class="flex items-center gap-2">
                     <input
                         type="text"

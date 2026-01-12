@@ -8,16 +8,15 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use League\Csv\Statement;
+use Relaticle\ImportWizard\Data\RelationshipField;
 use Relaticle\ImportWizard\Filament\Imports\BaseImporter;
-use Relaticle\ImportWizard\Filament\Imports\OpportunityImporter;
-use Relaticle\ImportWizard\Filament\Imports\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
 
 final readonly class PreviewChunkService
 {
     public function __construct(
         private CsvReaderFactory $csvReaderFactory,
-        private CompanyMatcher $companyMatcher,
+        private RelationshipPreviewMatcher $relationshipMatcher,
     ) {}
 
     /**
@@ -25,7 +24,8 @@ final readonly class PreviewChunkService
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
-     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int, newCompanyNames: array<string>}
+     * @param  array<string, array{csvColumn: string, matcher: string}>  $relationshipMappings
+     * @return array{rows: array<int, array<string, mixed>>, creates: int, updates: int, newRelationships: array<string, int>}
      */
     public function processChunk(
         string $importerClass,
@@ -38,6 +38,7 @@ final readonly class PreviewChunkService
         string $userId,
         array $valueCorrections = [],
         ?ImportRecordResolver $recordResolver = null,
+        array $relationshipMappings = [],
     ): array {
         // Create a non-persisted Import model for the importer
         $import = new Import;
@@ -57,7 +58,12 @@ final readonly class PreviewChunkService
         $creates = 0;
         $updates = 0;
         $rows = [];
-        $newCompanyNames = [];
+        /** @var array<string, int> $newRelationships Track counts of new records to be created per relationship */
+        $newRelationships = [];
+
+        // Get relationship fields for this importer
+        /** @var array<string, RelationshipField> */
+        $relationshipFields = $importerClass::getRelationshipFields();
 
         $rowNumber = $startRow;
         foreach ($records as $record) {
@@ -87,19 +93,6 @@ final readonly class PreviewChunkService
                 // Format row data
                 $formattedRow = $this->formatRowRecord($record, $columnMap);
 
-                // Enrich with company match data for People/Opportunity imports
-                if ($this->shouldEnrichWithCompanyMatch($importerClass)) {
-                    $formattedRow = $this->enrichRowWithCompanyMatch($formattedRow, $teamId);
-
-                    // Track unique new company names
-                    if (($formattedRow['_company_match_type'] ?? null) === 'new') {
-                        $companyName = (string) ($formattedRow['_company_name'] ?? '');
-                        if ($companyName !== '') {
-                            $newCompanyNames[$companyName] = true;
-                        }
-                    }
-                }
-
                 // Detect update method
                 $hasId = filled($formattedRow['id'] ?? null);
                 $updateMethod = null;
@@ -110,6 +103,15 @@ final readonly class PreviewChunkService
                     $recordId = $result['record']?->getKey();
                 }
 
+                // Process relationship matches
+                $relationshipMatches = $this->processRelationshipMatches(
+                    $relationshipFields,
+                    $relationshipMappings,
+                    $record,
+                    $teamId,
+                    $newRelationships,
+                );
+
                 $rows[] = array_merge(
                     $formattedRow,
                     [
@@ -117,6 +119,7 @@ final readonly class PreviewChunkService
                         '_action' => $isNew ? 'create' : 'update',
                         '_update_method' => $updateMethod,
                         '_record_id' => $recordId,
+                        '_relationships' => $relationshipMatches,
                     ]
                 );
             } catch (\Throwable $e) {
@@ -135,8 +138,54 @@ final readonly class PreviewChunkService
             'rows' => $rows,
             'creates' => $creates,
             'updates' => $updates,
-            'newCompanyNames' => array_keys($newCompanyNames),
+            'newRelationships' => $newRelationships,
         ];
+    }
+
+    /**
+     * Process relationship matches for a single row.
+     *
+     * @param  array<string, RelationshipField>  $relationshipFields
+     * @param  array<string, array{csvColumn: string, matcher: string}>  $relationshipMappings
+     * @param  array<string, mixed>  $rowData
+     * @param  array<string, int>  $newRelationships
+     * @return array<string, array{matchType: string, matcherUsed: string, matchedName: string|null, icon: string}>
+     */
+    private function processRelationshipMatches(
+        array $relationshipFields,
+        array $relationshipMappings,
+        array $rowData,
+        string $teamId,
+        array &$newRelationships,
+    ): array {
+        $matches = [];
+
+        foreach ($relationshipFields as $relationshipName => $field) {
+            $mapping = $relationshipMappings[$relationshipName] ?? [];
+
+            $result = $this->relationshipMatcher->match(
+                $field,
+                $mapping,
+                $rowData,
+                $teamId,
+            );
+
+            // Track new records to be created
+            if ($result->willCreate()) {
+                $newRelationships[$relationshipName] = ($newRelationships[$relationshipName] ?? 0) + 1;
+            }
+
+            $matches[$relationshipName] = [
+                'label' => $result->displayName,
+                'matchType' => $result->matchType->value,
+                'matcherUsed' => $result->matcherUsed,
+                'matchedName' => $result->matchedRecordName,
+                'matchedId' => $result->matchedRecordId,
+                'icon' => $result->icon,
+            ];
+        }
+
+        return $matches;
     }
 
     /**
@@ -261,54 +310,5 @@ final readonly class PreviewChunkService
         }
 
         return $formatted;
-    }
-
-    /** @param class-string<BaseImporter> $importerClass */
-    private function shouldEnrichWithCompanyMatch(string $importerClass): bool
-    {
-        return in_array($importerClass, [
-            PeopleImporter::class,
-            OpportunityImporter::class,
-        ], true);
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @return array<string, mixed>
-     */
-    private function enrichRowWithCompanyMatch(array $row, string $teamId): array
-    {
-        $companyId = (string) ($row['company_id'] ?? '');
-        $companyName = (string) ($row['company_name'] ?? '');
-        $emails = $this->extractEmailsFromRow($row);
-
-        $matchResult = $this->companyMatcher->match($companyId, $companyName, $emails, $teamId);
-
-        return array_merge($row, [
-            '_company_name' => $matchResult->companyName,
-            '_company_match_type' => $matchResult->matchType,
-            '_company_match_count' => $matchResult->matchCount,
-            '_company_id' => $matchResult->companyId,
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @return array<string>
-     */
-    private function extractEmailsFromRow(array $row): array
-    {
-        $raw = $row['custom_fields_emails'] ?? '';
-        if (blank($raw)) {
-            return [];
-        }
-
-        /** @var array<int, string> $emails */
-        $emails = is_string($raw) ? explode(',', $raw) : (array) $raw;
-
-        return array_values(array_filter(
-            array_map(trim(...), $emails),
-            static fn (string $e): bool => filter_var($e, FILTER_VALIDATE_EMAIL) !== false
-        ));
     }
 }

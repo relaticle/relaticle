@@ -1,5 +1,10 @@
 @php
     $totalRows = $this->previewResultData['totalRows'] ?? 0;
+
+    // Build relationship fields metadata for preview
+    $relationshipFieldsMeta = collect($this->relationshipFields)
+        ->map(fn ($field) => ['label' => $field->label, 'icon' => $field->icon])
+        ->all();
 @endphp
 
 <div class="space-y-6">
@@ -11,6 +16,8 @@
         'fieldLabels' => $this->fieldLabels,
         'previewRows' => $previewRows,
         'totalRows' => $totalRows,
+        'relationshipMappings' => $relationshipMappings,
+        'relationshipFieldsMeta' => $relationshipFieldsMeta,
     ], key('preview-table-' . $sessionId))
 
     {{-- Navigation buttons outside nested component --}}

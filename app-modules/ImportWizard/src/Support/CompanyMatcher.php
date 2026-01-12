@@ -18,8 +18,15 @@ final class CompanyMatcher
 
     private ?string $cachedTeamId = null;
 
-    /** @param array<string> $emails */
-    public function match(string $companyId, string $companyName, array $emails, string $teamId): CompanyMatchResult
+    public function __construct(
+        private readonly PublicEmailDomainFilter $publicEmailFilter = new PublicEmailDomainFilter,
+    ) {}
+
+    /**
+     * @param  array<string>  $emails
+     * @param  bool  $filterPublicDomains  Whether to filter out public email domains (gmail, etc.)
+     */
+    public function match(string $companyId, string $companyName, array $emails, string $teamId, bool $filterPublicDomains = true): CompanyMatchResult
     {
         $companyId = trim($companyId);
         $companyName = trim($companyName);
@@ -41,7 +48,7 @@ final class CompanyMatcher
         }
 
         // Priority 2: Domain matching (second highest confidence)
-        $domains = $this->extractEmailDomains($emails);
+        $domains = $this->extractEmailDomains($emails, $filterPublicDomains);
         if ($domains !== []) {
             $domainMatches = $this->findInCacheByDomain($domains);
 
@@ -146,16 +153,23 @@ final class CompanyMatcher
     }
 
     /**
+     * Extract domains from emails, optionally filtering out public email providers.
+     *
      * @param  array<string>  $emails
+     * @param  bool  $filterPublicDomains  Whether to filter out public email providers
      * @return array<string>
      */
-    private function extractEmailDomains(array $emails): array
+    private function extractEmailDomains(array $emails, bool $filterPublicDomains = true): array
     {
-        return collect($emails)
+        $domains = collect($emails)
             ->filter(fn (string $email): bool => str_contains($email, '@'))
             ->map(fn (string $email): string => str($email)->lower()->trim()->afterLast('@')->toString())
             ->unique()
             ->values()
             ->all();
+
+        return $filterPublicDomains
+            ? $this->publicEmailFilter->filterDomains($domains)
+            : $domains;
     }
 }

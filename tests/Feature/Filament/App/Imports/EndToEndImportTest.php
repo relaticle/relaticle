@@ -40,7 +40,7 @@ describe('End-to-End People Import', function (): void {
             import: $import,
             startRow: 0,
             rowCount: 5,
-            columnMap: ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            columnMap: ['name' => 'name', 'rel_company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             options: [],
         ))->handle();
 
@@ -116,7 +116,7 @@ describe('End-to-End People Import', function (): void {
             $import,
             0,
             3,
-            ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
+            ['name' => 'name', 'rel_company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'],
             []
         ))->handle();
 
@@ -147,7 +147,7 @@ describe('End-to-End People Import', function (): void {
             'successful_rows' => 0,
         ]);
 
-        $columnMap = ['name' => 'name', 'company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'];
+        $columnMap = ['name' => 'name', 'rel_company_name' => 'company_name', 'custom_fields_emails' => 'custom_fields_emails'];
         for ($offset = 0; $offset < 1000; $offset += 100) {
             (new StreamingImportCsv($import, $offset, 100, $columnMap, []))->handle();
         }

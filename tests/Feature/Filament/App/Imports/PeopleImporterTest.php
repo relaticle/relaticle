@@ -105,34 +105,64 @@ describe('Email Domain → Company Auto-Linking', function (): void {
         setCompanyDomain($this->company, 'acme.com', $this->domainField);
     });
 
-    it(':dataset company linking behavior', function (string $scenario, array $data, ?string $expectedCompanyName): void {
-        if ($scenario === 'explicit company') {
-            Company::factory()->for($this->team)->create(['name' => 'Different Corp']);
-        }
-
-        $columnMap = ['name' => 'name', 'company_name' => 'company_name'];
-        if (isset($data['custom_fields_emails'])) {
-            $columnMap['custom_fields_emails'] = 'custom_fields_emails';
-        }
-
+    it('links company by domain when email is provided via rel_company_domain', function (): void {
         $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
+        $columnMap = ['name' => 'name', 'rel_company_domain' => 'domain'];
+        $data = ['name' => 'John Doe', 'domain' => 'john@acme.com'];
+
         $importer = new PeopleImporter($import, $columnMap, ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]);
         setImporterData($importer, $data);
         ($importer)($data);
 
-        $person = People::where('name', $data['name'])->first();
-        expect($person)->not->toBeNull();
+        $person = People::where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBe($this->company->id);
+    });
 
-        if ($expectedCompanyName === null) {
-            expect($person->company_id)->toBeNull();
-        } else {
-            $expectedCompany = Company::where('name', $expectedCompanyName)->first();
-            expect($person->company_id)->toBe($expectedCompany?->id);
-        }
-    })->with([
-        'auto-links by email domain' => ['domain match', ['name' => 'John Doe', 'company_name' => '', 'custom_fields_emails' => 'john@acme.com'], 'Acme Corp'],
-        'prefers explicit company_name' => ['explicit company', ['name' => 'John Doe', 'company_name' => 'Different Corp', 'custom_fields_emails' => 'john@acme.com'], 'Different Corp'],
-        'creates new company when no match' => ['new company', ['name' => 'John Doe', 'company_name' => 'Brand New Company'], 'Brand New Company'],
-        'leaves null when no company_name and no domain' => ['no match', ['name' => 'John Doe', 'company_name' => '', 'custom_fields_emails' => 'john@unknown-company.com'], null],
-    ]);
+    it('creates new company via rel_company_name', function (): void {
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
+        $columnMap = ['name' => 'name', 'rel_company_name' => 'company_name'];
+        $data = ['name' => 'John Doe', 'company_name' => 'Brand New Company'];
+
+        $importer = new PeopleImporter($import, $columnMap, ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]);
+        setImporterData($importer, $data);
+        ($importer)($data);
+
+        $person = People::where('name', 'John Doe')->first();
+        $newCompany = Company::where('name', 'Brand New Company')->first();
+
+        expect($person)->not->toBeNull()
+            ->and($newCompany)->not->toBeNull()
+            ->and($person->company_id)->toBe($newCompany->id);
+    });
+
+    it('prefers ID match over name match', function (): void {
+        $differentCompany = Company::factory()->for($this->team)->create(['name' => 'Different Corp']);
+
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
+        $columnMap = ['name' => 'name', 'rel_company_id' => 'company_id', 'rel_company_name' => 'company_name'];
+        $data = ['name' => 'John Doe', 'company_id' => $this->company->id, 'company_name' => 'Different Corp'];
+
+        $importer = new PeopleImporter($import, $columnMap, ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]);
+        setImporterData($importer, $data);
+        ($importer)($data);
+
+        $person = People::where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBe($this->company->id); // ID wins
+    });
+
+    it('leaves company null when no relationship column is mapped', function (): void {
+        $import = createImportRecord($this->user, $this->team, PeopleImporter::class);
+        $columnMap = ['name' => 'name', 'custom_fields_emails' => 'custom_fields_emails'];
+        $data = ['name' => 'John Doe', 'custom_fields_emails' => 'john@unknown-company.com'];
+
+        $importer = new PeopleImporter($import, $columnMap, ['duplicate_handling' => DuplicateHandlingStrategy::CREATE_NEW]);
+        setImporterData($importer, $data);
+        ($importer)($data);
+
+        $person = People::where('name', 'John Doe')->first();
+        expect($person)->not->toBeNull()
+            ->and($person->company_id)->toBeNull();
+    });
 });

@@ -237,6 +237,19 @@ final readonly class CsvAnalyzer
             $rules = $this->mergeValidationRules($rules, $customFieldRules);
             $itemRules = $this->validationService->getItemValidationRules($customField);
             $isMultiValue = $customField->isMultiChoiceField();
+
+            // For choice fields, add validation against available options
+            if ($customField->isChoiceField()) {
+                $optionNames = $customField->options->pluck('name')->map(fn ($name): string => (string) $name)->all();
+                if ($optionNames !== []) {
+                    $inRule = 'in:'.implode(',', $optionNames);
+                    if ($isMultiValue) {
+                        $itemRules[] = $inRule;
+                    } else {
+                        $rules[] = $inRule;
+                    }
+                }
+            }
         }
 
         return [
@@ -419,11 +432,7 @@ final readonly class CsvAnalyzer
     {
         // Check custom field type first (takes priority)
         if ($customField instanceof CustomField) {
-            return match ($customField->typeData->dataType) {
-                FieldDataType::DATE => 'date',
-                FieldDataType::DATE_TIME => 'datetime',
-                default => 'string',
-            };
+            return $customField->typeData->dataType->value;
         }
 
         // Check ImportColumn validation rules for date hints
@@ -432,16 +441,16 @@ final readonly class CsvAnalyzer
             $rulesString = implode('|', array_map(strval(...), $rules));
 
             if (str_contains($rulesString, 'date') || str_contains($rulesString, 'Date')) {
-                return 'date';
+                return FieldDataType::DATE->value;
             }
         }
 
-        return 'string';
+        return FieldDataType::STRING->value;
     }
 
     private function isDateFieldType(string $fieldType): bool
     {
-        return in_array($fieldType, ['date', 'datetime'], true);
+        return in_array($fieldType, [FieldDataType::DATE->value, FieldDataType::DATE_TIME->value], true);
     }
 
     /** @param array<ImportColumn> $importerColumns */

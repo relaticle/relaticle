@@ -7,9 +7,15 @@ namespace Relaticle\ImportWizard\Filament\Imports;
 use App\Models\Note;
 use Filament\Actions\Imports\ImportColumn;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\ImportWizard\Data\RelationshipField;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasPolymorphicRelationshipFields;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\SyncsPolymorphicLinks;
 
 final class NoteImporter extends BaseImporter
 {
+    use HasPolymorphicRelationshipFields;
+    use SyncsPolymorphicLinks;
+
     protected static ?string $model = Note::class;
 
     protected static bool $skipUniqueIdentifierWarning = true;
@@ -40,7 +46,6 @@ final class NoteImporter extends BaseImporter
 
     public function resolveRecord(): Note
     {
-        // ID-based matching only
         if ($this->hasIdValue()) {
             /** @var Note|null $record */
             $record = $this->resolveById();
@@ -48,12 +53,25 @@ final class NoteImporter extends BaseImporter
             return $record ?? new Note;
         }
 
-        // No match found - create new note
         return new Note;
+    }
+
+    protected function afterSave(): void
+    {
+        parent::afterSave();
+        $this->syncPendingEntityLinks();
     }
 
     public static function getEntityName(): string
     {
         return 'note';
+    }
+
+    /**
+     * @return array<string, RelationshipField>
+     */
+    public static function getRelationshipFields(): array
+    {
+        return self::buildPolymorphicRelationshipFields('Note');
     }
 }

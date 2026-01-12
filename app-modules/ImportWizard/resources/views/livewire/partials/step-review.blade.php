@@ -10,6 +10,12 @@
                         $hasErrors = $errorCount > 0;
                         $colIsDateField = $analysis->isDateField();
                         $colNeedsFormatConfirm = $analysis->needsDateFormatConfirmation();
+
+                        // Get relationship info for this field
+                        $relInfo = $this->getRelationshipInfoForField($analysis->mappedToField);
+                        $relField = $relInfo['field'] ?? null;
+                        $relMatcherKey = $relInfo['matcherKey'] ?? null;
+                        $relMatcher = $relField?->getMatcher($relMatcherKey);
                     @endphp
                     <button
                         type="button"
@@ -34,7 +40,16 @@
                                 </span>
                             @endif
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $this->getFieldLabel($analysis->mappedToField) }}</div>
+                        @if ($relField && $relMatcher)
+                            <div class="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                <x-filament::icon icon="{{ $relField->icon }}" class="w-3 h-3 shrink-0" />
+                                <span>{{ $relField->label }}</span>
+                                <x-filament::icon icon="heroicon-m-chevron-right" class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" />
+                                <span>{{ $relMatcher->label }}</span>
+                            </div>
+                        @else
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $this->getFieldLabel($analysis->mappedToField) }}</div>
+                        @endif
                     </button>
                 @endforeach
             </div>
@@ -70,6 +85,12 @@
                     $effectiveDateFormat = $selectedAnalysis->getEffectiveDateFormat();
                     $needsFormatConfirmation = $selectedAnalysis->needsDateFormatConfirmation();
 
+                    // Choice field detection
+                    $isChoiceField = $selectedAnalysis->isChoiceField();
+                    $isMultiChoice = $selectedAnalysis->isMultiChoiceField();
+                    $hasMissingOptions = $selectedAnalysis->hasMissingChoiceOptions();
+                    $choiceOptions = $isChoiceField ? $this->getChoiceOptionsForField($selectedAnalysis->mappedToField) : [];
+
                     // Use appropriate format enum based on field type
                     $formatOptions = $isDateTimeField
                         ? \Relaticle\ImportWizard\Enums\TimestampFormat::cases()
@@ -100,9 +121,13 @@
                                 {{ $showOnlyErrors ? 'Show all' : 'Errors only (' . $errorValueCount . ')' }}
                             </button>
                         @endif
+                        {{-- Create Missing Options Button --}}
+                        @if ($hasMissingOptions)
+                            {{ ($this->createMissingOptionsAction)(['column' => $selectedAnalysis->mappedToField]) }}
+                        @endif
                     </div>
                     <div class="flex items-center gap-3">
-                        {{-- Date/Timestamp Format Dropdown (Attio-style) --}}
+                        {{-- Date/Timestamp Format Dropdown --}}
                         @if ($isDateField)
                             @include('import-wizard::components.format-select', [
                                 'formats' => $formatOptions,
@@ -171,6 +196,9 @@
                                     'count' => $count,
                                     'isDateField' => $isDateField,
                                     'effectiveDateFormat' => $effectiveDateFormat,
+                                    'isChoiceField' => $isChoiceField,
+                                    'isMultiChoice' => $isMultiChoice,
+                                    'choiceOptions' => $choiceOptions,
                                 ])
                             @endforeach
                         @endif
@@ -189,6 +217,9 @@
                                     'count' => $count,
                                     'isDateField' => $isDateField,
                                     'effectiveDateFormat' => $effectiveDateFormat,
+                                    'isChoiceField' => $isChoiceField,
+                                    'isMultiChoice' => $isMultiChoice,
+                                    'choiceOptions' => $choiceOptions,
                                 ])
                             @endforeach
                         @endif
