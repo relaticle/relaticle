@@ -131,11 +131,12 @@ describe('Importer Relationship Fields', function (): void {
         expect($fields['company']->getMatcher('name')?->createsNew)->toBeTrue()
             ->and($fields['company']->getMatcher('id')?->createsNew)->toBeFalse();
 
-        // Contact matchers (id, email, and name)
+        // Contact matchers (id, email, phone, and name)
         expect($fields['contact']->getMatcher('name')?->createsNew)->toBeTrue()
             ->and($fields['contact']->getMatcher('id')?->createsNew)->toBeFalse()
             ->and($fields['contact']->getMatcher('email')?->createsNew)->toBeFalse()
-            ->and($fields['contact']->matchers)->toHaveCount(3);
+            ->and($fields['contact']->getMatcher('phone')?->createsNew)->toBeFalse()
+            ->and($fields['contact']->matchers)->toHaveCount(4);
     });
 
     it('TaskImporter has linked entity relationship fields', function (): void {

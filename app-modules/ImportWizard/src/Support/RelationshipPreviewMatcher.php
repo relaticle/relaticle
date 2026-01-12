@@ -65,7 +65,7 @@ final class RelationshipPreviewMatcher
         }
 
         $matcher = $field->getMatcher($matcherKey);
-        if (! $matcher instanceof \Relaticle\ImportWizard\Data\RelationshipMatcher) {
+        if ($matcher === null) {
             return new RelationshipMatchResult(
                 relationshipName: $field->name,
                 displayName: $field->label,
@@ -140,9 +140,8 @@ final class RelationshipPreviewMatcher
             'id' => Str::isUlid($value) ? ($this->byIdCache[$targetEntity][$value] ?? null) : null,
             // Name matcher always creates new - names are not unique identifiers
             'name' => null,
-            // Email/domain matching would require loading custom field values - simplified for preview
-            'email' => null,
-            'domain' => null,
+            // Email/domain/phone matching would require loading custom field values - simplified for preview
+            'email', 'domain', 'phone' => null,
             default => null,
         };
     }
@@ -153,6 +152,7 @@ final class RelationshipPreviewMatcher
             'id' => MatchType::Id,
             'domain' => MatchType::Domain,
             'email' => MatchType::Email,
+            'phone' => MatchType::Phone,
             default => MatchType::New,
         };
     }

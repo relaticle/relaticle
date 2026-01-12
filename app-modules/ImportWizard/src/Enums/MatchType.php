@@ -14,6 +14,7 @@ enum MatchType: string implements HasLabel
     case Id = 'id';
     case Domain = 'domain';
     case Email = 'email';
+    case Phone = 'phone';
     case New = 'new';
     case None = 'none';
 
@@ -23,6 +24,7 @@ enum MatchType: string implements HasLabel
             self::Id => 'Matched by ID',
             self::Domain => 'Matched by Domain',
             self::Email => 'Matched by Email',
+            self::Phone => 'Matched by Phone',
             self::New => 'Will Create New',
             self::None => 'Not Mapped',
         };
@@ -33,7 +35,7 @@ enum MatchType: string implements HasLabel
      */
     public function isMatched(): bool
     {
-        return in_array($this, [self::Id, self::Domain, self::Email], true);
+        return in_array($this, [self::Id, self::Domain, self::Email, self::Phone], true);
     }
 
     /**

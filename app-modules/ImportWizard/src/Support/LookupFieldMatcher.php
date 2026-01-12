@@ -181,28 +181,14 @@ final class LookupFieldMatcher
      */
     private function getCustomFieldId(string $lookupType, string $fieldCode, string $teamId): ?string
     {
-        $entityType = $this->getEntityMorphType($lookupType);
-
         $field = CustomFields::newCustomFieldModel()::query()
             ->withoutGlobalScopes()
-            ->where('entity_type', $entityType)
+            ->where('entity_type', $lookupType)
             ->where('code', $fieldCode)
             ->where('tenant_id', $teamId)
             ->first();
 
         return $field?->getKey();
-    }
-
-    /**
-     * Convert lookup type to entity morph type.
-     */
-    private function getEntityMorphType(string $lookupType): string
-    {
-        return match ($lookupType) {
-            'people' => 'people',
-            'company' => 'company',
-            default => $lookupType,
-        };
     }
 
     /**

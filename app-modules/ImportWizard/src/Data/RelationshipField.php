@@ -49,7 +49,7 @@ final class RelationshipField extends Data
     {
         if ($this->defaultMatcher !== null) {
             $matcher = $this->getMatcher($this->defaultMatcher);
-            if ($matcher instanceof \Relaticle\ImportWizard\Data\RelationshipMatcher) {
+            if ($matcher !== null) {
                 return $matcher;
             }
         }
@@ -104,7 +104,7 @@ final class RelationshipField extends Data
     }
 
     /**
-     * Standard contact relationship field with ID, email, and name matchers.
+     * Standard contact relationship field with ID, email, phone, and name matchers.
      */
     public static function contact(): self
     {
@@ -131,6 +131,15 @@ final class RelationshipField extends Data
                     hint: 'Email is unique - matches existing contacts',
                     guesses: ['contact_email', 'person_email'],
                     rules: ['nullable', 'email'],
+                ),
+                new RelationshipMatcher(
+                    key: 'phone',
+                    label: 'Phone',
+                    description: 'Match contact by phone number',
+                    createsNew: false,
+                    hint: 'Phone is unique - matches existing contacts',
+                    guesses: ['contact_phone', 'person_phone', 'phone', 'mobile', 'cell'],
+                    rules: ['nullable', 'phone:AUTO'],
                 ),
                 new RelationshipMatcher(
                     key: 'name',

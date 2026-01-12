@@ -65,7 +65,7 @@ enum PeopleField: string
     public function isUniquePerEntityType(): bool
     {
         return match ($this) {
-            self::EMAILS => true,
+            self::EMAILS, self::PHONE_NUMBER => true,
             default => false,
         };
     }
