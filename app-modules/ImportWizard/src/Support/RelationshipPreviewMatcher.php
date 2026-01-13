@@ -65,7 +65,7 @@ final class RelationshipPreviewMatcher
         }
 
         $matcher = $field->getMatcher($matcherKey);
-        if ($matcher === null) {
+        if (! $matcher instanceof \Relaticle\ImportWizard\Data\RelationshipMatcher) {
             return new RelationshipMatchResult(
                 relationshipName: $field->name,
                 displayName: $field->label,

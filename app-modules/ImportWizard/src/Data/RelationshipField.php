@@ -49,7 +49,7 @@ final class RelationshipField extends Data
     {
         if ($this->defaultMatcher !== null) {
             $matcher = $this->getMatcher($this->defaultMatcher);
-            if ($matcher !== null) {
+            if ($matcher instanceof \Relaticle\ImportWizard\Data\RelationshipMatcher) {
                 return $matcher;
             }
         }

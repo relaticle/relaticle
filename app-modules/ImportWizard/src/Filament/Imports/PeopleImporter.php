@@ -238,7 +238,7 @@ final class PeopleImporter extends BaseImporter
         }
 
         // Try to normalize using CountryPhoneService
-        $service = app(\Relaticle\CustomFields\Services\Phone\CountryPhoneService::class);
+        $service = resolve(\Relaticle\CustomFields\Services\Phone\CountryPhoneService::class);
         $defaultCountry = $service->detectCountryFromLocale();
         $e164 = $service->formatToE164($defaultCountry, $phone);
 

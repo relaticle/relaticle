@@ -25,7 +25,7 @@ final class LookupFieldMatcher
      *
      * @var array<string, array{model: class-string<Model>, field_code: string, value_column: string}>
      */
-    private const ENTITY_CONFIG = [
+    private const array ENTITY_CONFIG = [
         'people' => [
             'model' => People::class,
             'field_code' => 'emails',
