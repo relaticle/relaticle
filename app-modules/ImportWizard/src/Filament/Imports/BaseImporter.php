@@ -42,6 +42,17 @@ abstract class BaseImporter extends Importer
     protected static bool $skipUniqueIdentifierWarning = false;
 
     /**
+     * Get relationship fields for this importer.
+     * Override in child classes to define entity-specific relationship mappings.
+     *
+     * @return array<\Relaticle\ImportWizard\Data\RelationshipField>
+     */
+    public static function getRelationshipFields(): array
+    {
+        return [];
+    }
+
+    /**
      * Optional record resolver for fast preview lookups.
      * When set, importers should use this instead of database queries.
      */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Data;
 
 use Illuminate\Support\Collection;
+use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Data;
@@ -40,7 +41,9 @@ final class ColumnAnalysis extends Data
      */
     public function isDateField(): bool
     {
-        return in_array($this->fieldType, ['date', 'datetime'], true);
+        $dataType = FieldDataType::tryFrom($this->fieldType);
+
+        return $dataType === FieldDataType::DATE || $dataType === FieldDataType::DATE_TIME;
     }
 
     /**
@@ -48,7 +51,7 @@ final class ColumnAnalysis extends Data
      */
     public function isDateOnlyField(): bool
     {
-        return $this->fieldType === 'date';
+        return $this->fieldType === FieldDataType::DATE->value;
     }
 
     /**
@@ -56,7 +59,7 @@ final class ColumnAnalysis extends Data
      */
     public function isDateTimeField(): bool
     {
-        return $this->fieldType === 'datetime';
+        return $this->fieldType === FieldDataType::DATE_TIME->value;
     }
 
     /**
@@ -76,6 +79,64 @@ final class ColumnAnalysis extends Data
             && $this->dateFormatConfidence !== null
             && $this->dateFormatConfidence < 0.8
             && ! $this->selectedDateFormat instanceof DateFormat;
+    }
+
+    /**
+     * Check if this column is a single or multi choice field.
+     */
+    public function isChoiceField(): bool
+    {
+        $dataType = FieldDataType::tryFrom($this->fieldType);
+
+        return $dataType?->isChoiceField() ?? false;
+    }
+
+    /**
+     * Check if this column is a multi-choice field.
+     */
+    public function isMultiChoiceField(): bool
+    {
+        $dataType = FieldDataType::tryFrom($this->fieldType);
+
+        return $dataType === FieldDataType::MULTI_CHOICE;
+    }
+
+    /**
+     * Check if this column is a single-choice field.
+     */
+    public function isSingleChoiceField(): bool
+    {
+        $dataType = FieldDataType::tryFrom($this->fieldType);
+
+        return $dataType === FieldDataType::SINGLE_CHOICE;
+    }
+
+    /**
+     * Get the values that are missing from the choice options.
+     * For choice fields, validation errors are typically due to invalid option values.
+     *
+     * @return array<string>
+     */
+    public function getMissingChoiceOptions(): array
+    {
+        if (! $this->isChoiceField()) {
+            return [];
+        }
+
+        // For choice fields, validation errors indicate values not in the options list
+        // Laravel generates "The selected {field} is invalid" messages
+        return $this->errorIssues()
+            ->filter(fn (ValueIssue $issue): bool => $issue->value !== '' && str_contains(strtolower($issue->message), 'invalid'))
+            ->pluck('value')
+            ->all();
+    }
+
+    /**
+     * Check if this column has missing choice options that can be created.
+     */
+    public function hasMissingChoiceOptions(): bool
+    {
+        return $this->isChoiceField() && $this->getMissingChoiceOptions() !== [];
     }
 
     /**

@@ -25,4 +25,22 @@ return [
     */
     'session_ttl_hours' => 24,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public Email Domain Filtering
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, automatic company-domain matching will skip common public
+    | email providers (gmail.com, outlook.com, yahoo.com, etc.) to prevent
+    | false associations. Explicit domain mapping (rel_company_domain) is
+    | not affected.
+    |
+    | Update the domain list with: php artisan import-wizard:update-email-domains
+    |
+    */
+    'public_email_domains' => [
+        'enabled' => true,
+        'path' => null,
+    ],
+
 ];

@@ -15,6 +15,9 @@ final class ImportSessionData extends Data
 {
     private const int DEFAULT_TTL_HOURS = 24;
 
+    /**
+     * @param  array<string, int>  $newRelationships  Map of relationship name to count of new records
+     */
     public function __construct(
         public string $teamId,
         public string $inputHash,
@@ -22,7 +25,7 @@ final class ImportSessionData extends Data
         public int $processed = 0,
         public int $creates = 0,
         public int $updates = 0,
-        public int $newCompanies = 0,
+        public array $newRelationships = [],
         public ?int $heartbeat = null,
         public ?string $error = null,
     ) {}

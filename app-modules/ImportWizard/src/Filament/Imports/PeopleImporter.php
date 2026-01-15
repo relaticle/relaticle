@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
-use App\Enums\CreationSource;
 use App\Enums\CustomFields\PeopleField;
-use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\ImportWizard\Support\CompanyMatcher;
+use Relaticle\ImportWizard\Data\RelationshipField;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasCompanyRelationshipColumns;
 
 final class PeopleImporter extends BaseImporter
 {
+    use HasCompanyRelationshipColumns;
+
     protected static ?string $model = People::class;
 
-    protected static array $uniqueIdentifierColumns = ['id', 'custom_fields_emails'];
+    protected static array $uniqueIdentifierColumns = ['id', 'custom_fields_emails', 'custom_fields_phone_number'];
 
-    protected static string $missingUniqueIdentifiersMessage = 'For People, map an Email addresses or Record ID column';
+    protected static string $missingUniqueIdentifiersMessage = 'For People, map an Email, Phone, or Record ID column';
 
     public static function getColumns(): array
     {
@@ -43,77 +44,7 @@ final class PeopleImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
-            ImportColumn::make('company_id')
-                ->label('Company Record ID')
-                ->guess(['company_id', 'company_record_id'])
-                ->rules(['nullable', 'string', 'ulid'])
-                ->example('01HQWX...')
-                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
-                    if (blank($state) || ! $importer->import->team_id) {
-                        return;
-                    }
-
-                    $companyId = trim($state);
-
-                    // Verify company exists in current team
-                    $company = Company::query()
-                        ->where('id', $companyId)
-                        ->where('team_id', $importer->import->team_id)
-                        ->first();
-
-                    if ($company) {
-                        $record->company_id = $company->getKey();
-                    }
-                }),
-
-            ImportColumn::make('company_name')
-                ->label('Company Name')
-                ->guess([
-                    'company_name', 'Company',
-                    'company', 'employer', 'organization', 'organisation', 'works_at',
-                    'associated company', 'account', 'account_name', 'business',
-                ])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation')
-                ->fillRecordUsing(function (People $record, ?string $state, PeopleImporter $importer): void {
-                    // Skip if company already set by company_id column
-                    if ($record->company_id) {
-                        return;
-                    }
-
-                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
-
-                    $companyName = $state !== null ? trim($state) : '';
-                    $emails = $importer->extractEmails();
-
-                    // Try domain-based matching first when company_name is empty but emails exist
-                    if ($companyName === '' && $emails !== []) {
-                        $matcher = resolve(CompanyMatcher::class);
-                        $result = $matcher->match('', '', $emails, $importer->import->team_id);
-
-                        if ($result->isDomainMatch() && $result->companyId !== null) {
-                            $record->company_id = $result->companyId;
-
-                            return;
-                        }
-                    }
-
-                    // No company to link - person will have no company
-                    if ($companyName === '') {
-                        return;
-                    }
-
-                    // Find or create company by name (prevents duplicates within import)
-                    $company = Company::query()->firstOrCreate([
-                        'name' => $companyName,
-                        'team_id' => $importer->import->team_id,
-                    ], [
-                        'creator_id' => $importer->import->user_id,
-                        'creation_source' => CreationSource::IMPORT,
-                    ]);
-
-                    $record->company_id = $company->getKey();
-                }),
+            ...self::buildCompanyRelationshipColumns(),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),
         ];
@@ -121,7 +52,7 @@ final class PeopleImporter extends BaseImporter
 
     public function resolveRecord(): People
     {
-        // ID-based resolution takes absolute precedence
+        // Priority 1: ID-based resolution takes absolute precedence
         if ($this->hasIdValue()) {
             /** @var People|null $record */
             $record = $this->resolveById();
@@ -129,8 +60,15 @@ final class PeopleImporter extends BaseImporter
             return $record ?? new People;
         }
 
-        // Fall back to email-based duplicate detection
+        // Priority 2: Email-based duplicate detection
         $existing = $this->findByEmail();
+        if ($existing instanceof People) {
+            /** @var People */
+            return $this->applyDuplicateStrategy($existing);
+        }
+
+        // Priority 3: Phone-based duplicate detection
+        $existing = $this->findByPhone();
 
         /** @var People */
         return $this->applyDuplicateStrategy($existing);
@@ -221,8 +159,111 @@ final class PeopleImporter extends BaseImporter
             ->all();
     }
 
+    private function findByPhone(): ?People
+    {
+        $phone = $this->extractPhone();
+
+        if ($phone === null) {
+            return null;
+        }
+
+        // Security: Always require team_id for proper tenant isolation
+        if (! $this->import->team_id) {
+            return null;
+        }
+
+        // Fast path: Use pre-loaded resolver (preview mode)
+        if ($this->hasRecordResolver()) {
+            return $this->getRecordResolver()->resolvePeopleByPhone(
+                $phone,
+                $this->import->team_id
+            );
+        }
+
+        // Slow path: Query database (actual import execution)
+        // Find the phone custom field for this team
+        // Uses 'people' morph alias (from Relation::enforceMorphMap) instead of People::class
+        $phoneField = CustomField::query()->withoutGlobalScopes()
+            ->where('code', PeopleField::PHONE_NUMBER->value)
+            ->where('entity_type', 'people')
+            ->where('tenant_id', $this->import->team_id)
+            ->first();
+
+        if (! $phoneField) {
+            return null;
+        }
+
+        // Phone is stored in string_value column in E.164 format
+        // Normalize the search phone to match stored format
+        return People::query()
+            ->where('team_id', $this->import->team_id)
+            ->whereHas('customFieldValues', function (Builder $query) use ($phone, $phoneField): void {
+                $query->withoutGlobalScopes()
+                    ->where('custom_field_id', $phoneField->id)
+                    ->where('tenant_id', $this->import->team_id)
+                    ->where('string_value', $phone);
+            })
+            ->first();
+    }
+
+    /**
+     * Extract and normalize phone from import data.
+     */
+    private function extractPhone(): ?string
+    {
+        $phoneField = $this->data['custom_fields_phone_number'] ?? null;
+
+        if (blank($phoneField)) {
+            return null;
+        }
+
+        // Handle array format (from cast) - take first value
+        $phone = is_array($phoneField) ? ($phoneField[0] ?? null) : $phoneField;
+
+        if (blank($phone)) {
+            return null;
+        }
+
+        return $this->normalizePhoneForMatching((string) $phone);
+    }
+
+    /**
+     * Normalize phone number to E.164 format for matching.
+     */
+    private function normalizePhoneForMatching(string $phone): string
+    {
+        // If already in E.164 format, just strip non-digits except leading +
+        if (str_starts_with($phone, '+')) {
+            return preg_replace('/[^\d+]/', '', $phone) ?? '';
+        }
+
+        // Try to normalize using CountryPhoneService
+        $service = resolve(\Relaticle\CustomFields\Services\Phone\CountryPhoneService::class);
+        $defaultCountry = $service->detectCountryFromLocale();
+        $e164 = $service->formatToE164($defaultCountry, $phone);
+
+        // Fallback: strip non-digits and add + prefix
+        if ($e164 === null) {
+            $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+            return $digits !== '' ? '+'.$digits : '';
+        }
+
+        return $e164;
+    }
+
     public static function getEntityName(): string
     {
         return 'people';
+    }
+
+    /**
+     * @return array<string, RelationshipField>
+     */
+    public static function getRelationshipFields(): array
+    {
+        return [
+            'company' => RelationshipField::company(),
+        ];
     }
 }

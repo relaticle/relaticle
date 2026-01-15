@@ -4,12 +4,12 @@ document.addEventListener('livewire:init', () => {
         sessionId: config.sessionId,
         totalRows: config.totalRows,
         columns: config.columns,
-        showCompanyMatch: config.showCompanyMatch,
+        relationshipColumns: config.relationshipColumns || [],
         isProcessing: config.isProcessing,
         isReady: config.isReady,
         creates: config.creates,
         updates: config.updates,
-        newCompanies: config.newCompanies || 0,
+        newRelationships: config.newRelationships || {},
         processed: config.processed,
         rows: config.rows,
         currentRowCount: config.rows.length,
@@ -45,7 +45,7 @@ document.addEventListener('livewire:init', () => {
 
                 this.creates = data.progress.creates;
                 this.updates = data.progress.updates;
-                this.newCompanies = data.progress.newCompanies || 0;
+                this.newRelationships = data.progress.newRelationships || {};
                 this.processed = data.progress.processed;
 
                 if (data.status === 'ready') {
@@ -111,6 +111,11 @@ document.addEventListener('livewire:init', () => {
                 return `<svg class='h-5 w-5 text-info-500' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z' clip-rule='evenodd'/></svg>`;
             }
             return '';
+        },
+
+        getRelationshipLabel(relName) {
+            const col = this.relationshipColumns.find(c => c.key === relName);
+            return col?.label || relName.replace(/_/g, ' ');
         }
     }));
 });

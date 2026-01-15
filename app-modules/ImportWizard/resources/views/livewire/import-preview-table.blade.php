@@ -5,7 +5,7 @@
 >
     {{-- Summary Stats --}}
     <div>
-        <div class="flex items-center gap-6 text-sm">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <div class="flex items-center gap-1.5">
                 <span x-show="isProcessing" x-cloak>
                     <x-filament::loading-indicator class="h-5 w-5 text-success-500" />
@@ -26,17 +26,19 @@
                 <span class="font-medium text-info-600 dark:text-info-400" x-text="updates.toLocaleString()"></span>
                 <span class="text-gray-500 dark:text-gray-400">will be updated</span>
             </div>
-            <template x-if="showCompanyMatch && newCompanies > 0">
-                <div class="flex items-center gap-1.5">
-                    <span x-show="isProcessing" x-cloak>
-                        <x-filament::loading-indicator class="h-5 w-5 text-warning-500" />
-                    </span>
-                    <span x-show="!isProcessing" x-cloak>
-                        <x-filament::icon icon="heroicon-m-building-office" class="h-5 w-5 text-warning-500" />
-                    </span>
-                    <span class="font-medium text-warning-600 dark:text-warning-400" x-text="newCompanies.toLocaleString()"></span>
-                    <span class="text-gray-500 dark:text-gray-400">new companies</span>
-                </div>
+            <template x-for="(count, relName) in newRelationships" :key="relName">
+                <template x-if="count > 0">
+                    <div class="flex items-center gap-1.5">
+                        <span x-show="isProcessing" x-cloak>
+                            <x-filament::loading-indicator class="h-5 w-5 text-warning-500" />
+                        </span>
+                        <span x-show="!isProcessing" x-cloak>
+                            <x-filament::icon icon="heroicon-m-plus-circle" class="h-5 w-5 text-warning-500" />
+                        </span>
+                        <span class="font-medium text-warning-600 dark:text-warning-400" x-text="count.toLocaleString()"></span>
+                        <span class="text-gray-500 dark:text-gray-400">new <span x-text="getRelationshipLabel(relName)"></span></span>
+                    </div>
+                </template>
             </template>
         </div>
     </div>
@@ -59,8 +61,9 @@
                             <template x-for="col in columns" :key="col.key">
                                 <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400" x-text="col.label"></th>
                             </template>
-                            <template x-if="showCompanyMatch">
-                                <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Company Match</th>
+                            {{-- Individual relationship columns --}}
+                            <template x-for="relCol in relationshipColumns" :key="relCol.key">
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400" x-text="relCol.label"></th>
                             </template>
                         </tr>
                     </thead>
@@ -72,11 +75,26 @@
                                 <template x-for="col in columns" :key="col.key">
                                     <td class="px-3 py-2 text-gray-950 dark:text-white max-w-xs truncate" x-text="row[col.key] || '-'"></td>
                                 </template>
-                                <template x-if="showCompanyMatch">
+                                {{-- Individual relationship column values --}}
+                                <template x-for="relCol in relationshipColumns" :key="relCol.key">
                                     <td class="px-3 py-2">
-                                        <div class="flex items-center gap-2">
-                                            <span class="truncate max-w-[100px] text-gray-950 dark:text-white" x-text="row._company_name || row.company_name || '-'"></span>
-                                        </div>
+                                        <template x-if="row._relationships && row._relationships[relCol.key]">
+                                            <span
+                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md max-w-[120px]"
+                                                :class="{
+                                                    'bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300': row._relationships[relCol.key].matchType !== 'new' && row._relationships[relCol.key].matchType !== 'none',
+                                                    'bg-warning-100 text-warning-700 dark:bg-warning-900/50 dark:text-warning-300': row._relationships[relCol.key].matchType === 'new',
+                                                }"
+                                            >
+                                                <span class="truncate" x-text="row._relationships[relCol.key].matchedName || row._relationships[relCol.key].inputValue || '-'"></span>
+                                                <template x-if="row._relationships[relCol.key].matchType === 'new'">
+                                                    <span class="text-[10px] opacity-75">(new)</span>
+                                                </template>
+                                            </span>
+                                        </template>
+                                        <template x-if="!row._relationships || !row._relationships[relCol.key]">
+                                            <span class="text-gray-400">-</span>
+                                        </template>
                                     </td>
                                 </template>
                             </tr>

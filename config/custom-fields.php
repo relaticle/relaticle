@@ -19,13 +19,6 @@ return [
     */
     'entity_configuration' => EntityConfigurator::configure()
         ->discover(app_path('Models'))
-        ->include([
-            App\Models\People::class,
-            App\Models\Company::class,
-            App\Models\Opportunity::class,
-            App\Models\Task::class,
-            App\Models\Note::class,
-        ])
         ->cache(),
 
     /*

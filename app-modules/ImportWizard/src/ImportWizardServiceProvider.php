@@ -9,6 +9,7 @@ use Filament\Actions\Imports\Models\Import as BaseImport;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Console\CleanupOrphanedImportsCommand;
+use Relaticle\ImportWizard\Console\Commands\UpdateEmailDomainsCommand;
 use Relaticle\ImportWizard\Livewire\ImportPreviewTable;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Models\FailedImportRow;
@@ -37,6 +38,7 @@ final class ImportWizardServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 CleanupOrphanedImportsCommand::class,
+                UpdateEmailDomainsCommand::class,
             ]);
         }
     }

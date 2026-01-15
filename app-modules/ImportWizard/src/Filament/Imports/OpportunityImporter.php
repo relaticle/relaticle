@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Imports;
 
-use App\Enums\CreationSource;
-use App\Models\Company;
 use App\Models\Opportunity;
-use App\Models\People;
 use Filament\Actions\Imports\ImportColumn;
-use Filament\Actions\Imports\Importer;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\ImportWizard\Data\RelationshipField;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasCompanyRelationshipColumns;
+use Relaticle\ImportWizard\Filament\Imports\Concerns\HasContactRelationshipColumns;
 
 final class OpportunityImporter extends BaseImporter
 {
+    use HasCompanyRelationshipColumns;
+    use HasContactRelationshipColumns;
+
     protected static ?string $model = Opportunity::class;
 
     protected static array $uniqueIdentifierColumns = ['id'];
@@ -41,91 +43,11 @@ final class OpportunityImporter extends BaseImporter
                     $importer->initializeNewRecord($record);
                 }),
 
-            ImportColumn::make('company_id')
-                ->label('Company Record ID')
-                ->guess(['company_id', 'company_record_id'])
-                ->rules(['nullable', 'string', 'ulid'])
-                ->example('01HQWX...')
-                ->fillRecordUsing(function (Opportunity $record, ?string $state, OpportunityImporter $importer): void {
-                    if (blank($state) || ! $importer->import->team_id) {
-                        return;
-                    }
+            // Relationship columns for Company (hidden from dropdown, shown under "Link to Records")
+            ...self::buildCompanyRelationshipColumns(),
 
-                    $companyId = trim($state);
-
-                    // Verify company exists in current team
-                    $company = Company::query()
-                        ->where('id', $companyId)
-                        ->where('team_id', $importer->import->team_id)
-                        ->first();
-
-                    if ($company) {
-                        $record->company_id = $company->getKey();
-                    }
-                }),
-
-            ImportColumn::make('company_name')
-                ->label('Company Name')
-                ->guess([
-                    'company_name', 'company', 'account',
-                    'company name', 'account_name', 'account name', 'organization',
-                    'associated company', 'business', 'client', 'customer',
-                ])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('Acme Corporation')
-                ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    // Skip if company already set by company_id column
-                    if ($record->company_id) {
-                        return;
-                    }
-
-                    if (blank($state)) {
-                        $record->company_id = null;
-
-                        return;
-                    }
-
-                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
-
-                    $company = Company::query()->firstOrCreate([
-                        'name' => trim($state),
-                        'team_id' => $importer->import->team_id,
-                    ], [
-                        'creator_id' => $importer->import->user_id,
-                        'creation_source' => CreationSource::IMPORT,
-                    ]);
-
-                    $record->company_id = $company->getKey();
-                }),
-
-            ImportColumn::make('contact_name')
-                ->label('Contact Name')
-                ->guess([
-                    'contact_name', 'contact', 'person',
-                    'contact name', 'primary contact', 'main contact', 'lead',
-                    'prospect', 'decision maker', 'buyer',
-                ])
-                ->rules(['nullable', 'string', 'max:255'])
-                ->example('John Doe')
-                ->fillRecordUsing(function (Opportunity $record, ?string $state, Importer $importer): void {
-                    if (blank($state)) {
-                        $record->contact_id = null;
-
-                        return;
-                    }
-
-                    throw_unless($importer->import->team_id, \RuntimeException::class, 'Team ID is required for import');
-
-                    $contact = People::query()->firstOrCreate([
-                        'name' => trim($state),
-                        'team_id' => $importer->import->team_id,
-                    ], [
-                        'creator_id' => $importer->import->user_id,
-                        'creation_source' => CreationSource::IMPORT,
-                    ]);
-
-                    $record->contact_id = $contact->getKey();
-                }),
+            // Relationship columns for Contact (hidden from dropdown, shown under "Link to Records")
+            ...self::buildContactRelationshipColumns(),
 
             ...CustomFields::importer()->forModel(self::getModel())->columns(),
         ];
@@ -148,5 +70,16 @@ final class OpportunityImporter extends BaseImporter
     public static function getEntityName(): string
     {
         return 'opportunity';
+    }
+
+    /**
+     * @return array<string, RelationshipField>
+     */
+    public static function getRelationshipFields(): array
+    {
+        return [
+            'company' => RelationshipField::company(),
+            'contact' => RelationshipField::contact(),
+        ];
     }
 }

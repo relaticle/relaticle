@@ -44,7 +44,8 @@ final class ProcessImportPreview implements ShouldQueue
      * @param  array<string, string>  $columnMap
      * @param  array<string, mixed>  $options
      * @param  array<string, array<string, string>>  $valueCorrections
-     * @param  array<string>  $initialNewCompanyNames
+     * @param  array<string, int>  $initialNewRelationships
+     * @param  array<string, array{csvColumn: string, matcher: string}>  $relationshipMappings
      */
     public function __construct(
         public string $sessionId,
@@ -61,7 +62,8 @@ final class ProcessImportPreview implements ShouldQueue
         public int $initialUpdates,
         public string $inputHash,
         public array $valueCorrections = [],
-        public array $initialNewCompanyNames = [],
+        public array $initialNewRelationships = [],
+        public array $relationshipMappings = [],
     ) {
         $this->onQueue('imports');
     }
@@ -72,8 +74,8 @@ final class ProcessImportPreview implements ShouldQueue
         $creates = $this->initialCreates;
         $updates = $this->initialUpdates;
 
-        // Track unique new company names across all chunks
-        $newCompanyNames = array_flip($this->initialNewCompanyNames);
+        // Track new relationship counts across all chunks
+        $newRelationships = $this->initialNewRelationships;
 
         // Pre-load records for fast lookups
         $recordResolver = resolve(ImportRecordResolver::class);
@@ -104,6 +106,7 @@ final class ProcessImportPreview implements ShouldQueue
                     userId: $this->userId,
                     valueCorrections: $this->valueCorrections,
                     recordResolver: $recordResolver,
+                    relationshipMappings: $this->relationshipMappings,
                 );
 
                 // Write rows to CSV
@@ -115,13 +118,13 @@ final class ProcessImportPreview implements ShouldQueue
                 $updates += $result['updates'];
                 $processed += $limit;
 
-                // Accumulate unique new company names
-                foreach ($result['newCompanyNames'] as $companyName) {
-                    $newCompanyNames[$companyName] = true;
+                // Accumulate relationship counts
+                foreach ($result['newRelationships'] as $relationshipName => $count) {
+                    $newRelationships[$relationshipName] = ($newRelationships[$relationshipName] ?? 0) + $count;
                 }
 
                 // Update progress in consolidated cache
-                $this->updateProgress($processed, $creates, $updates, count($newCompanyNames));
+                $this->updateProgress($processed, $creates, $updates, $newRelationships);
             }
 
             // Processing complete - status will be derived as 'ready' since processed >= total
@@ -146,13 +149,14 @@ final class ProcessImportPreview implements ShouldQueue
         return $data->inputHash !== $this->inputHash || $data->isHeartbeatStale(self::HEARTBEAT_TIMEOUT_SECONDS);
     }
 
-    private function updateProgress(int $processed, int $creates, int $updates, int $newCompanies): void
+    /** @param  array<string, int>  $newRelationships */
+    private function updateProgress(int $processed, int $creates, int $updates, array $newRelationships): void
     {
         ImportSessionData::update($this->sessionId, [
             'processed' => $processed,
             'creates' => $creates,
             'updates' => $updates,
-            'new_companies' => $newCompanies,
+            'new_relationships' => $newRelationships,
         ]);
     }
 
