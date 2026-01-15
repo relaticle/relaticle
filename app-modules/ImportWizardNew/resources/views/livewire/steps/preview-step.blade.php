@@ -39,18 +39,15 @@
     </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
         <x-filament::button
             color="gray"
             wire:click="$parent.goBack()"
-            icon="heroicon-o-arrow-left"
         >
             Back
         </x-filament::button>
         <x-filament::button
             color="success"
-            icon="heroicon-o-play"
-            icon-position="after"
         >
             Start Import
         </x-filament::button>

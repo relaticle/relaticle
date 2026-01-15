@@ -145,8 +145,6 @@
             wire:click="continueToMapping"
             :disabled="!$isParsed"
             wire:loading.attr="disabled"
-            icon="heroicon-m-arrow-right"
-            icon-position="after"
         >
             <span wire:loading.remove wire:target="continueToMapping">Continue</span>
             <span wire:loading wire:target="continueToMapping">Processing...</span>

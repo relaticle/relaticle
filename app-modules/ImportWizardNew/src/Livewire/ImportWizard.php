@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizardNew\Livewire;
 
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -91,6 +93,24 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->currentStep = max($this->currentStep - 1, self::STEP_UPLOAD);
     }
 
+    /**
+     * Navigate directly to a specific step (only for completed steps).
+     */
+    public function goToStep(int $step): void
+    {
+        if ($step < self::STEP_UPLOAD || $step >= $this->currentStep) {
+            return;
+        }
+
+        if ($step === self::STEP_UPLOAD) {
+            $this->mountAction('startOver');
+
+            return;
+        }
+
+        $this->currentStep = $step;
+    }
+
     public function getStepTitle(): string
     {
         return match ($this->currentStep) {
@@ -122,5 +142,31 @@ final class ImportWizard extends Component implements HasActions, HasForms
         if ($this->returnUrl !== null) {
             $this->redirect($this->returnUrl);
         }
+    }
+
+    public function startOverAction(): Action
+    {
+        return Action::make('startOver')
+            ->label('Start over')
+            ->color('gray')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->requiresConfirmation()
+            ->modalHeading('Start a new import?')
+            ->modalDescription('Are you sure you want to start a new import? Your current progress will be lost.')
+            ->modalSubmitActionLabel('Start over')
+            ->modalCancelActionLabel('Cancel')
+            ->action(fn () => $this->startOver());
+    }
+
+    public function startOver(): void
+    {
+        if ($this->storeId !== null) {
+            ImportStore::load($this->storeId)?->destroy();
+        }
+
+        $this->storeId = null;
+        $this->rowCount = 0;
+        $this->columnCount = 0;
+        $this->currentStep = self::STEP_UPLOAD;
     }
 }

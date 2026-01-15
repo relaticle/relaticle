@@ -24,20 +24,17 @@
     </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
         <x-filament::button
             color="gray"
             wire:click="$parent.goBack()"
-            icon="heroicon-o-arrow-left"
         >
             Back
         </x-filament::button>
         <x-filament::button
             wire:click="$parent.nextStep()"
-            icon="heroicon-o-arrow-right"
-            icon-position="after"
         >
-            Continue to Preview
+            Continue
         </x-filament::button>
     </div>
 </div>
