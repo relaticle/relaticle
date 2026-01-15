@@ -240,7 +240,7 @@ final readonly class CsvAnalyzer
 
             // For choice fields, add validation against available options
             if ($customField->isChoiceField()) {
-                $optionNames = $customField->options->pluck('name')->map(fn ($name): string => (string) $name)->all();
+                $optionNames = $customField->options->pluck('name')->map(fn (mixed $name): string => (string) $name)->all();
                 if ($optionNames !== []) {
                     $inRule = 'in:'.implode(',', $optionNames);
                     if ($isMultiValue) {
