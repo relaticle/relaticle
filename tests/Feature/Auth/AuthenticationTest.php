@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 
-use function Pest\Livewire\livewire;
-
 test('login screen can be rendered', function () {
     $response = $this->get(url()->getAppUrl('login'));
 

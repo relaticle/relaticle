@@ -205,14 +205,14 @@ final class LookupFieldMatcher
         if (is_string($rawValue)) {
             $decoded = json_decode($rawValue, true);
             if (is_array($decoded)) {
-                return array_filter($decoded, fn ($v): bool => is_string($v) && $v !== '');
+                return array_filter($decoded, fn (mixed $v): bool => is_string($v) && $v !== '');
             }
 
             return $rawValue !== '' ? [$rawValue] : [];
         }
 
         if (is_array($rawValue)) {
-            return array_filter($rawValue, fn ($v): bool => is_string($v) && $v !== '');
+            return array_filter($rawValue, fn (mixed $v): bool => is_string($v) && $v !== '');
         }
 
         return [];

@@ -19,26 +19,32 @@
             "options": {
                 "symlink": true
             }
+        },
+        {
+            "type": "path",
+            "url": "../flowforge",
+            "options": {
+                "symlink": true
+            }
         }
     ],
     "require": {
         "php": "^8.4",
         "ashallendesign/favicon-fetcher": "^3.8",
-        "awcodes/overlook": "^v3.0",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
         "doctrine/dbal": "^4.4",
-        "filament/filament": "^4.0",
+        "filament/filament": "^5.0@beta",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
-        "livewire/livewire": "^3.0",
+        "livewire/livewire": "^4.0@beta",
         "prism-php/prism": "^0.98.5",
         "relaticle/custom-fields": "@dev",
-        "relaticle/flowforge": "^v3.0.0-beta",
+        "relaticle/flowforge": "@dev",
         "sentry/sentry-laravel": "^4.13",
         "spatie/eloquent-sortable": "^4.4",
         "spatie/laravel-data": "^4.15",
@@ -68,7 +74,6 @@
         "nunomaduro/collision": "^8.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-livewire": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
         "rector/rector": "^2.0",
         "spatie/laravel-horizon-watcher": "^1.1"
@@ -155,6 +160,6 @@
             "cweagans/composer-patches": true
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "beta",
     "prefer-stable": true
 }
