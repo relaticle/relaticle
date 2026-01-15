@@ -8,7 +8,6 @@
                     @php
                         $errorCount = $analysis->getErrorCount();
                         $hasErrors = $errorCount > 0;
-                        $colIsDateField = $analysis->isDateField();
                         $colNeedsFormatConfirm = $analysis->needsDateFormatConfirmation();
 
                         // Get relationship info for this field
@@ -61,26 +60,13 @@
                 $selectedAnalysis = $expandedColumn
                     ? $this->columnAnalyses->firstWhere('mappedToField', $expandedColumn)
                     : $this->columnAnalyses->first();
-                $perPage = 100;
                 $hasColumnErrors = $selectedAnalysis?->hasErrors() ?? false;
                 $errorValueCount = $selectedAnalysis?->getErrorCount() ?? 0;
-
-                if ($showOnlyErrors && $hasColumnErrors) {
-                    $values = $selectedAnalysis?->paginatedErrorValues($reviewPage, $perPage) ?? [];
-                    $totalUnique = $errorValueCount;
-                } else {
-                    $values = $selectedAnalysis?->paginatedValues($reviewPage, $perPage) ?? [];
-                    $totalUnique = $selectedAnalysis?->uniqueCount ?? 0;
-                }
-
-                $showing = min($reviewPage * $perPage, $totalUnique);
-                $hasMore = $showing < $totalUnique;
             @endphp
 
             @if ($selectedAnalysis)
                 @php
                     $isDateField = $selectedAnalysis->isDateField();
-                    $isDateOnlyField = $selectedAnalysis->isDateOnlyField();
                     $isDateTimeField = $selectedAnalysis->isDateTimeField();
                     $effectiveDateFormat = $selectedAnalysis->getEffectiveDateFormat();
                     $needsFormatConfirmation = $selectedAnalysis->needsDateFormatConfirmation();
@@ -100,160 +86,227 @@
                     $displayFormat = $isDateTimeField && $effectiveDateFormat
                         ? \Relaticle\ImportWizard\Enums\TimestampFormat::fromDateFormat($effectiveDateFormat)
                         : $effectiveDateFormat;
+
+                    // Pass config to Alpine as a single JSON object
+                    $alpineConfig = [
+                        'sessionId' => $sessionId,
+                        'csvColumn' => $selectedAnalysis->csvColumnName,
+                        'fieldName' => $selectedAnalysis->mappedToField,
+                        'perPage' => 100,
+                        'isDateField' => $isDateField,
+                        'isChoiceField' => $isChoiceField,
+                        'isMultiChoice' => $isMultiChoice,
+                        'choiceOptions' => $choiceOptions,
+                        'dateFormat' => $effectiveDateFormat?->value,
+                        'uniqueCount' => $selectedAnalysis->uniqueCount,
+                        'valuesUrl' => route('import.values'),
+                        'correctionsStoreUrl' => route('import.corrections.store'),
+                        'correctionsDestroyUrl' => route('import.corrections.destroy'),
+                    ];
                 @endphp
-                {{-- Column Header with Stats --}}
-                <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <div class="flex items-center gap-3">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($selectedAnalysis->uniqueCount) }}</span> unique values
-                        </div>
-                        @if ($hasColumnErrors)
-                            <button
-                                type="button"
-                                wire:click="toggleShowOnlyErrors"
-                                @class([
-                                    'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-colors',
-                                    'bg-danger-100 text-danger-700 dark:bg-danger-900 dark:text-danger-300' => $showOnlyErrors,
-                                    'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700' => !$showOnlyErrors,
-                                ])
-                            >
-                                <x-filament::icon icon="heroicon-m-funnel" class="h-3.5 w-3.5" />
-                                {{ $showOnlyErrors ? 'Show all' : 'Errors only (' . $errorValueCount . ')' }}
-                            </button>
-                        @endif
-                        {{-- Create Missing Options Button --}}
-                        @if ($hasMissingOptions)
-                            {{ ($this->createMissingOptionsAction)(['column' => $selectedAnalysis->mappedToField]) }}
-                        @endif
-                    </div>
-                    <div class="flex items-center gap-3">
-                        {{-- Date/Timestamp Format Dropdown --}}
-                        @if ($isDateField)
-                            @include('import-wizard::components.format-select', [
-                                'formats' => $formatOptions,
-                                'selected' => $displayFormat,
-                                'label' => $isDateTimeField ? 'Timestamp format' : 'Date format',
-                                'field' => $selectedAnalysis->mappedToField,
-                                'needsConfirmation' => $needsFormatConfirmation,
-                            ])
-                        @endif
-                        <div class="text-xs text-gray-400">
-                            Showing {{ number_format($showing) }} of {{ number_format($totalUnique) }}
-                        </div>
-                    </div>
-                </div>
 
-                {{-- Column Labels --}}
-                <div class="flex items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <div class="flex-1">Raw data</div>
-                    <div class="w-8"></div>
-                    <div class="flex-1">Mapped value</div>
-                    <div class="w-10"></div>
-                </div>
-
-                {{-- Values List with Fixed Height Scroll --}}
+                {{-- Alpine-powered Values Panel using fetch() to bypass Livewire state sync --}}
                 <div
-                    x-data="{ loading: false }"
-                    x-on:scroll.debounce.100ms="
-                        if (!loading && $el.scrollTop + $el.clientHeight >= $el.scrollHeight - 100) {
-                            loading = true;
-                            $wire.loadMoreValues().then(() => { loading = false; });
-                        }
-                    "
-                    class="overflow-y-auto flex-1 max-h-[400px]"
+                    x-data="valueReviewer({{ Js::from($alpineConfig) }})"
+                    x-init="loadValues()"
+                    wire:key="values-panel-{{ $selectedAnalysis->mappedToField }}-{{ $effectiveDateFormat?->value ?? 'auto' }}"
+                    class="flex flex-col flex-1"
                 >
-                    @php
-                        // For date fields, separate values into groups
-                        $needsReviewValues = [];
-                        $autoMappedValues = [];
-
-                        if ($isDateField && !$showOnlyErrors) {
-                            foreach ($values as $val => $cnt) {
-                                $issue = $selectedAnalysis->getIssueForValue($val);
-                                if ($issue !== null) {
-                                    $needsReviewValues[$val] = $cnt;
-                                } else {
-                                    $autoMappedValues[$val] = $cnt;
-                                }
-                            }
-                        }
-                        $showGroupedView = $isDateField && !$showOnlyErrors && (count($needsReviewValues) > 0 || count($autoMappedValues) > 0);
-                    @endphp
-
-                    @if ($showGroupedView)
-                        {{-- Grouped View for Date Fields --}}
-                        @if (count($needsReviewValues) > 0)
-                            <div class="px-3 py-2 bg-warning-50 dark:bg-warning-950/50 border-b border-warning-200 dark:border-warning-800">
-                                <div class="flex items-center gap-1.5 text-xs font-medium text-warning-700 dark:text-warning-300 uppercase tracking-wider">
-                                    <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-3.5 w-3.5" />
-                                    Needs Review ({{ count($needsReviewValues) }})
-                                </div>
+                    {{-- Column Header with Stats --}}
+                    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                        <div class="flex items-center gap-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($selectedAnalysis->uniqueCount) }}</span> unique values
                             </div>
-                            @foreach ($needsReviewValues as $value => $count)
-                                @include('import-wizard::livewire.partials.value-row', [
-                                    'selectedAnalysis' => $selectedAnalysis,
-                                    'value' => $value,
-                                    'count' => $count,
-                                    'isDateField' => $isDateField,
-                                    'effectiveDateFormat' => $effectiveDateFormat,
-                                    'isChoiceField' => $isChoiceField,
-                                    'isMultiChoice' => $isMultiChoice,
-                                    'choiceOptions' => $choiceOptions,
-                                ])
-                            @endforeach
-                        @endif
-
-                        @if (count($autoMappedValues) > 0)
-                            <div class="px-3 py-2 bg-success-50 dark:bg-success-950/50 border-b border-success-200 dark:border-success-800 @if(count($needsReviewValues) > 0) mt-2 @endif">
-                                <div class="flex items-center gap-1.5 text-xs font-medium text-success-700 dark:text-success-300 uppercase tracking-wider">
-                                    <x-filament::icon icon="heroicon-m-check-circle" class="h-3.5 w-3.5" />
-                                    Automatically Mapped ({{ count($autoMappedValues) }})
-                                </div>
-                            </div>
-                            @foreach ($autoMappedValues as $value => $count)
-                                @include('import-wizard::livewire.partials.value-row', [
-                                    'selectedAnalysis' => $selectedAnalysis,
-                                    'value' => $value,
-                                    'count' => $count,
-                                    'isDateField' => $isDateField,
-                                    'effectiveDateFormat' => $effectiveDateFormat,
-                                    'isChoiceField' => $isChoiceField,
-                                    'isMultiChoice' => $isMultiChoice,
-                                    'choiceOptions' => $choiceOptions,
-                                ])
-                            @endforeach
-                        @endif
-                    @else
-                        {{-- Standard View --}}
-                        @forelse ($values as $value => $count)
-                            @include('import-wizard::livewire.partials.value-row', [
-                                'selectedAnalysis' => $selectedAnalysis,
-                                'value' => $value,
-                                'count' => $count,
-                                'isDateField' => $isDateField,
-                                'effectiveDateFormat' => $effectiveDateFormat,
-                            ])
-                        @empty
-                            <div class="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                                No values found
-                            </div>
-                        @endforelse
-                    @endif
-
-                    {{-- Load More indicator --}}
-                    @if ($hasMore)
-                        <div
-                            wire:key="load-more-{{ $reviewPage }}"
-                            class="px-3 py-3 text-center border-t border-gray-100 dark:border-gray-800"
-                        >
-                            <span x-show="!loading" class="text-sm text-gray-400">
-                                Scroll for more...
-                            </span>
-                            <span x-show="loading" x-cloak class="text-sm text-gray-400">
-                                <x-filament::loading-indicator class="h-4 w-4 inline-block" /> Loading...
-                            </span>
+                            @if ($hasColumnErrors)
+                                <button
+                                    type="button"
+                                    @click="toggleErrorsOnly()"
+                                    :class="{
+                                        'bg-danger-100 text-danger-700 dark:bg-danger-900 dark:text-danger-300': errorsOnly,
+                                        'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700': !errorsOnly,
+                                    }"
+                                    class="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                                >
+                                    <x-filament::icon icon="heroicon-m-funnel" class="h-3.5 w-3.5" />
+                                    <span x-text="errorsOnly ? 'Show all' : 'Errors only ({{ $errorValueCount }})'"></span>
+                                </button>
+                            @endif
+                            {{-- Create Missing Options Button --}}
+                            @if ($hasMissingOptions)
+                                {{ ($this->createMissingOptionsAction)(['column' => $selectedAnalysis->mappedToField]) }}
+                            @endif
                         </div>
-                    @endif
+                        <div class="flex items-center gap-3">
+                            {{-- Date/Timestamp Format Dropdown --}}
+                            @if ($isDateField)
+                                @include('import-wizard::components.format-select', [
+                                    'formats' => $formatOptions,
+                                    'selected' => $displayFormat,
+                                    'label' => $isDateTimeField ? 'Timestamp format' : 'Date format',
+                                    'field' => $selectedAnalysis->mappedToField,
+                                    'needsConfirmation' => $needsFormatConfirmation,
+                                ])
+                            @endif
+                            <div class="text-xs text-gray-400">
+                                Showing <span x-text="showing.toLocaleString()">0</span> of <span x-text="total.toLocaleString()">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Column Labels --}}
+                    <div class="flex items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <div class="flex-1">Raw data</div>
+                        <div class="w-8"></div>
+                        <div class="flex-1">Mapped value</div>
+                        <div class="w-10"></div>
+                    </div>
+
+                    {{-- Values List --}}
+                    <div class="flex-1 flex flex-col overflow-hidden">
+                        {{-- Loading State --}}
+                        <div x-show="loading" x-cloak class="flex items-center justify-center flex-1 py-12">
+                            <div class="text-center">
+                                <x-filament::loading-indicator class="h-8 w-8 mx-auto text-primary-500" />
+                                <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Loading values...</p>
+                            </div>
+                        </div>
+
+                        {{-- Values Content --}}
+                        <div
+                            x-show="!loading"
+                            x-cloak
+                            @scroll.debounce.100ms="onScroll($event)"
+                            class="overflow-y-auto flex-1 max-h-[400px]"
+                        >
+                            {{-- Render values with Alpine x-for --}}
+                            <template x-for="(item, index) in values" :key="item.value + '-' + index">
+                                <div
+                                    :class="{
+                                        'bg-warning-50/50 dark:bg-warning-950/30': item.issue && item.issue.severity === 'warning' && !item.isSkipped,
+                                    }"
+                                    class="px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                                >
+                                    <div class="flex items-center">
+                                        {{-- Raw Value --}}
+                                        <div class="flex-1 flex items-center gap-2 min-w-0">
+                                            <span
+                                                :class="{
+                                                    'text-gray-400 line-through': item.isSkipped,
+                                                    'text-gray-950 dark:text-white': !item.isSkipped,
+                                                }"
+                                                class="text-sm truncate"
+                                                x-text="item.value !== '' ? item.value : '(blank)'"
+                                            ></span>
+                                            <span class="text-xs text-gray-400 shrink-0" x-text="item.count + '×'"></span>
+                                        </div>
+
+                                        {{-- Arrow --}}
+                                        <div class="w-8 flex justify-center">
+                                            <x-filament::icon icon="heroicon-m-arrow-right" class="h-3.5 w-3.5 text-gray-300 dark:text-gray-600" />
+                                        </div>
+
+                                        {{-- Mapped Value / Input --}}
+                                        <div class="flex-1 min-w-0">
+                                            <template x-if="item.isSkipped">
+                                                <span class="text-sm text-gray-400 italic">Skipped</span>
+                                            </template>
+
+                                            <template x-if="!item.isSkipped && isChoiceField && choiceOptions.length > 0 && !isMultiChoice">
+                                                {{-- Single-choice: Select dropdown --}}
+                                                <select
+                                                    @change="correctValue(item.value, $event.target.value)"
+                                                    :class="{
+                                                        'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950': item.correctedValue && !(item.issue && item.issue.severity === 'error'),
+                                                        'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800': !item.correctedValue || (item.issue && item.issue.severity === 'error'),
+                                                    }"
+                                                    class="w-full px-2 py-1 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                                >
+                                                    <template x-for="opt in choiceOptions" :key="opt">
+                                                        <option
+                                                            :value="opt"
+                                                            :selected="opt === (item.correctedValue ?? item.value)"
+                                                            x-text="opt"
+                                                        ></option>
+                                                    </template>
+                                                </select>
+                                            </template>
+
+                                            <template x-if="!item.isSkipped && (!isChoiceField || choiceOptions.length === 0)">
+                                                {{-- Default: Text input --}}
+                                                <div class="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        :value="item.correctedValue ?? (item.value !== '' ? item.value : '(blank)')"
+                                                        @blur="if ($event.target.value !== (item.correctedValue ?? item.value)) correctValue(item.value, $event.target.value)"
+                                                        @keydown.enter="$event.target.blur()"
+                                                        :class="{
+                                                            'border-success-300 dark:border-success-700 bg-success-50 dark:bg-success-950': item.correctedValue && !(item.issue && item.issue.severity === 'error'),
+                                                            'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800': !item.correctedValue || (item.issue && item.issue.severity === 'error'),
+                                                        }"
+                                                        class="w-full px-2 py-1 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                                    />
+                                                    {{-- Show parsed date preview for date fields --}}
+                                                    <template x-if="isDateField && item.parsedDate">
+                                                        <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400" x-text="'→ ' + item.parsedDate"></span>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        {{-- Skip Button --}}
+                                        <div class="w-10 flex justify-end">
+                                            <button
+                                                type="button"
+                                                @click="skipValue(item.value)"
+                                                :title="item.isSkipped ? 'Unskip' : 'Skip'"
+                                                :class="{
+                                                    'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700': !item.isSkipped,
+                                                    'text-primary-600 bg-primary-100 dark:bg-primary-900': item.isSkipped,
+                                                }"
+                                                class="p-1 rounded transition-colors"
+                                            >
+                                                <x-filament::icon icon="heroicon-o-no-symbol" class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Validation Error/Warning Message --}}
+                                    <template x-if="item.issue && item.issue.severity === 'error' && !item.isSkipped">
+                                        <div class="mt-1 ml-0 text-xs text-danger-600 dark:text-danger-400">
+                                            <x-filament::icon icon="heroicon-m-exclamation-circle" class="h-3.5 w-3.5 inline-block -mt-0.5 mr-0.5" />
+                                            <span x-text="item.issue.message"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="item.issue && item.issue.severity === 'warning' && !item.isSkipped">
+                                        <div class="mt-1 ml-0 text-xs text-warning-600 dark:text-warning-400">
+                                            <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-3.5 w-3.5 inline-block -mt-0.5 mr-0.5" />
+                                            <span x-text="item.issue.message"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Empty State --}}
+                            <template x-if="values.length === 0 && !loading">
+                                <div class="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    No values found
+                                </div>
+                            </template>
+
+                            {{-- Load More indicator --}}
+                            <template x-if="hasMore">
+                                <div class="px-3 py-3 text-center border-t border-gray-100 dark:border-gray-800">
+                                    <span x-show="!loadingMore" class="text-sm text-gray-400">
+                                        Scroll for more...
+                                    </span>
+                                    <span x-show="loadingMore" x-cloak class="text-sm text-gray-400">
+                                        <x-filament::loading-indicator class="h-4 w-4 inline-block" /> Loading...
+                                    </span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
             @else
                 <div class="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">

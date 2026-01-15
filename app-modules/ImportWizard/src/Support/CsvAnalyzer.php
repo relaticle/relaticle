@@ -14,6 +14,7 @@ use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\ColumnAnalysis;
 use Relaticle\ImportWizard\Data\ValueIssue;
+use Relaticle\ImportWizard\Enums\TimestampFormat;
 use Spatie\LaravelData\DataCollection;
 
 final readonly class CsvAnalyzer
@@ -23,6 +24,7 @@ final readonly class CsvAnalyzer
         private ValidationService $validationService,
         private DataTypeInferencer $dataTypeInferencer,
         private DateValidator $dateValidator,
+        private TimestampValidator $timestampValidator,
     ) {}
 
     /**
@@ -101,7 +103,7 @@ final readonly class CsvAnalyzer
             $detectedDateFormat = null;
             $dateFormatConfidence = null;
 
-            // For date fields, detect format and use DateValidator
+            // For date/datetime fields, detect format and validate
             if ($this->isDateFieldType($fieldType)) {
                 $nonBlankValues = array_keys(
                     array_filter($collector['values'], fn (int $count, string $val): bool => $val !== '', ARRAY_FILTER_USE_BOTH)
@@ -112,11 +114,21 @@ final readonly class CsvAnalyzer
                     $detectedDateFormat = $dateFormatResult->detectedFormat;
                     $dateFormatConfidence = $dateFormatResult->confidence;
 
-                    // Use DateValidator for date field validation
-                    $dateValidation = $this->dateValidator->validateColumn(
-                        $collector['values'],
-                        $detectedDateFormat
-                    );
+                    // Use appropriate validator based on field type
+                    if ($this->isDateTimeFieldType($fieldType)) {
+                        // Convert DateFormat to TimestampFormat for datetime fields
+                        $timestampFormat = TimestampFormat::fromDateFormat($detectedDateFormat);
+                        $dateValidation = $this->timestampValidator->validateColumn(
+                            $collector['values'],
+                            $timestampFormat
+                        );
+                    } else {
+                        // Use DateValidator for date-only fields
+                        $dateValidation = $this->dateValidator->validateColumn(
+                            $collector['values'],
+                            $detectedDateFormat
+                        );
+                    }
 
                     // Add required field issue if needed
                     $issues = $dateValidation['issues'];
@@ -451,6 +463,11 @@ final readonly class CsvAnalyzer
     private function isDateFieldType(string $fieldType): bool
     {
         return in_array($fieldType, [FieldDataType::DATE->value, FieldDataType::DATE_TIME->value], true);
+    }
+
+    private function isDateTimeFieldType(string $fieldType): bool
+    {
+        return $fieldType === FieldDataType::DATE_TIME->value;
     }
 
     /** @param array<ImportColumn> $importerColumns */

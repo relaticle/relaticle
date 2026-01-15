@@ -18,17 +18,17 @@ Visit `http://localhost:8000` to access the application.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Backend | PHP 8.4, Laravel 12 |
-| Admin UI | Filament 4 |
-| Frontend | Livewire 3, Alpine.js, Tailwind CSS 4 |
-| Database | PostgreSQL (recommended), MySQL |
-| Queue | Laravel Horizon |
-| Testing | Pest v4 |
-| Static Analysis | PHPStan (Level 7) |
-| Code Style | Laravel Pint, Rector |
-| Auth | Laravel Jetstream |
+| Component | Technology                            |
+|-----------|---------------------------------------|
+| Backend | PHP 8.4, Laravel 12                   |
+| Admin UI | Filament 5                            |
+| Frontend | Livewire 4, Alpine.js, Tailwind CSS 4 |
+| Database | PostgreSQL (recommended), MySQL       |
+| Queue | Laravel Horizon                       |
+| Testing | Pest v4                               |
+| Static Analysis | PHPStan (Level 7)                     |
+| Code Style | Laravel Pint, Rector                  |
+| Auth | Laravel Jetstream                     |
 
 ---
 

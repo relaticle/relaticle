@@ -17,8 +17,11 @@ use Spatie\LaravelData\DataCollection;
 final class ColumnAnalysis extends Data
 {
     /**
-     * @param  array<string, int>  $uniqueValues  Map of value to occurrence count
-     * @param  DataCollection<int, ValueIssue>  $issues
+     * @param  array<string, int>  $uniqueValues  Map of value to occurrence count (stored in cache, not serialized)
+     * @param  DataCollection<int, ValueIssue>  $issues  Full issues (only in cache, NOT in Livewire state)
+     * @param  int|null  $issueCount  Pre-computed count (used in Livewire state when issues aren't serialized)
+     * @param  int|null  $errorCount  Pre-computed error count (used in Livewire state when issues aren't serialized)
+     * @param  int|null  $warningCount  Pre-computed warning count (used in Livewire state when issues aren't serialized)
      */
     public function __construct(
         public readonly string $csvColumnName,
@@ -27,13 +30,16 @@ final class ColumnAnalysis extends Data
         public readonly int $totalValues,
         public readonly int $uniqueCount,
         public readonly int $blankCount,
-        public readonly array $uniqueValues,
+        public readonly array $uniqueValues = [],
         #[DataCollectionOf(ValueIssue::class)]
-        public readonly DataCollection $issues,
+        public readonly DataCollection $issues = new DataCollection(ValueIssue::class, []),
         public readonly bool $isRequired = false,
         public readonly ?DateFormat $detectedDateFormat = null,
         public readonly ?DateFormat $selectedDateFormat = null,
         public readonly ?float $dateFormatConfidence = null,
+        public readonly ?int $issueCount = null,
+        public readonly ?int $errorCount = null,
+        public readonly ?int $warningCount = null,
     ) {}
 
     /**
@@ -164,6 +170,11 @@ final class ColumnAnalysis extends Data
      */
     public function hasErrors(): bool
     {
+        // Use pre-computed count if available (from Livewire state where full issues aren't serialized)
+        if ($this->errorCount !== null) {
+            return $this->errorCount > 0;
+        }
+
         return $this->errorIssues()->isNotEmpty();
     }
 
@@ -172,6 +183,11 @@ final class ColumnAnalysis extends Data
      */
     public function getErrorCount(): int
     {
+        // Use pre-computed count if available (from Livewire state where full issues aren't serialized)
+        if ($this->errorCount !== null) {
+            return $this->errorCount;
+        }
+
         return $this->errorIssues()->count();
     }
 

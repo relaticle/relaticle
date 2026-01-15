@@ -65,4 +65,9 @@
 
     {{-- Filament Action Modals --}}
     <x-filament-actions::modals />
+
+    @push('scripts')
+        @include('filament.app.import-preview-alpine')
+        @include('filament.app.import-value-reviewer-alpine')
+    @endpush
 </div>

@@ -9,11 +9,16 @@
     $isAmbiguous = $valueIssue?->isDateAmbiguous() ?? false;
 
     // For date fields, show parsed preview
+    // Use pre-calculated preview for performance (avoids expensive template-side parsing)
     $parsedDatePreview = null;
-    if ($isDateField && $effectiveDateFormat !== null && $value !== '' && !$hasError) {
-        $parsed = $effectiveDateFormat->parse($value);
-        if ($parsed !== null) {
-            $parsedDatePreview = $parsed->format('M j, Y');
+    if ($isDateField && $value !== '' && !$hasError) {
+        // Check pre-calculated cache first (populated by changeDateFormat)
+        $parsedDatePreview = $this->parsedDatePreviews[$selectedAnalysis->mappedToField][$value] ?? null;
+
+        // Fallback to parsing for initial render (before any format change)
+        if ($parsedDatePreview === null && $effectiveDateFormat !== null) {
+            $parsed = $effectiveDateFormat->parse($value);
+            $parsedDatePreview = $parsed?->format('M j, Y');
         }
     }
 @endphp

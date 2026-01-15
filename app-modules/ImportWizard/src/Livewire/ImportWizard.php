@@ -479,6 +479,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function resetWizard(): void
     {
         $this->cleanupTempFile();
+        $this->clearUniqueValuesCache();
 
         $this->currentStep = self::STEP_UPLOAD;
         // Note: entityType and returnUrl are locked, don't reset them
@@ -516,6 +517,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function cancelImport(): void
     {
         $this->cleanupTempFile();
+        $this->clearUniqueValuesCache();
 
         if ($this->returnUrl !== null) {
             $this->redirect($this->returnUrl);
@@ -746,6 +748,9 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
         // Re-run analysis to clear the errors
         $this->analyzeColumns();
+
+        // Reset pagination to limit DOM updates (prevents browser freeze with large datasets)
+        $this->reviewPage = 1;
 
         $count = count($missingOptions);
         Notification::make()
