@@ -1,29 +1,32 @@
-<nav aria-label="Progress">
-    <ol role="list" class="flex items-center">
+<nav class="mb-8" aria-label="Progress">
+    <ol role="list" class="flex items-center gap-2">
         @foreach ([1 => 'Upload', 2 => 'Map', 3 => 'Review', 4 => 'Import'] as $step => $label)
-            <li class="relative {{ $step < 4 ? 'pr-8 sm:pr-20 flex-1' : '' }}">
-                @if ($step < 4)
-                    <div class="absolute inset-0 flex items-center" aria-hidden="true">
-                        <div class="h-0.5 w-full {{ $currentStep > $step ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700' }}"></div>
-                    </div>
-                @endif
-                <div
+            @php
+                $isClickable = $step < $currentStep;
+            @endphp
+            <li class="flex items-center">
+                <button
+                    type="button"
                     @class([
-                        'relative flex h-8 w-8 items-center justify-center rounded-full transition-colors',
-                        'bg-primary-600 text-white' => $currentStep > $step,
-                        'border-2 border-primary-600 bg-white dark:bg-gray-900 text-primary-600' => $currentStep === $step,
-                        'border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-500' => $currentStep < $step,
+                        'flex items-center gap-2 text-sm transition-colors',
+                        'cursor-pointer hover:opacity-80' => $isClickable,
+                        'cursor-default' => !$isClickable,
                     ])
+                    @disabled(!$isClickable)
                 >
-                    @if ($currentStep > $step)
-                        <x-heroicon-s-check class="h-5 w-5" />
-                    @else
-                        <span class="text-sm font-medium">{{ $step }}</span>
-                    @endif
-                </div>
-                <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium {{ $currentStep >= $step ? 'text-primary-600' : 'text-gray-500' }}">
-                    {{ $label }}
-                </span>
+                    <span @class([
+                        'inline-flex items-center justify-center h-5 w-5 rounded text-xs font-medium',
+                        'bg-primary-600 text-white' => $currentStep === $step,
+                        'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' => $currentStep !== $step,
+                    ])>{{ $step }}</span>
+                    <span @class([
+                        'text-gray-950 dark:text-white' => $currentStep === $step,
+                        'text-gray-500 dark:text-gray-400' => $currentStep !== $step,
+                    ])>{{ $label }}</span>
+                </button>
+                @if ($step < 4)
+                    <x-filament::icon icon="heroicon-m-chevron-right" class="h-4 w-4 text-gray-300 dark:text-gray-600 mx-2" />
+                @endif
             </li>
         @endforeach
     </ol>
