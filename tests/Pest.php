@@ -39,6 +39,17 @@ expect()->extend('toBeOne', function () {
     return $this->toBe(1);
 });
 
+/**
+ * Livewire testing helper - replacement for pest-plugin-livewire.
+ *
+ * @param  class-string  $component
+ * @param  array<string, mixed>  $params
+ */
+function livewire(string $component, array $params = []): \Livewire\Features\SupportTesting\Testable
+{
+    return \Livewire\Livewire::test($component, $params);
+}
+
 /*
 |--------------------------------------------------------------------------
 | Functions

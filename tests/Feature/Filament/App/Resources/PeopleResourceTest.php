@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 
-use function Pest\Livewire\livewire;
-
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($this->user);
