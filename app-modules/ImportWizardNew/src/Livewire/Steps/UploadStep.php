@@ -38,7 +38,7 @@ final class UploadStep extends Component implements HasForms
 
     public bool $isParsed = false;
 
-    protected ?ImportStore $store = null;
+    private ?ImportStore $store = null;
 
     public function mount(ImportEntityType $entityType, ?string $storeId = null): void
     {
@@ -46,7 +46,7 @@ final class UploadStep extends Component implements HasForms
         $this->storeId = $storeId;
         $this->store = $storeId ? ImportStore::load($storeId) : null;
 
-        if ($this->store === null) {
+        if (! $this->store instanceof \Relaticle\ImportWizardNew\Store\ImportStore) {
             return;
         }
 
@@ -66,9 +66,9 @@ final class UploadStep extends Component implements HasForms
         $this->validateFile();
     }
 
-    protected function validateFile(): void
+    private function validateFile(): void
     {
-        if ($this->uploadedFile === null) {
+        if (! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
             return;
         }
 
@@ -119,7 +119,7 @@ final class UploadStep extends Component implements HasForms
 
     public function continueToMapping(): void
     {
-        if (! $this->isParsed || $this->uploadedFile === null) {
+        if (! $this->isParsed || ! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
             $this->addError('uploadedFile', 'File no longer available. Please re-upload.');
             $this->reset(['headers', 'rowCount', 'isParsed']);
 
@@ -147,7 +147,7 @@ final class UploadStep extends Component implements HasForms
                 ->map(function (array $row) use (&$rowCount): array {
                     return [
                         'row_number' => ++$rowCount + 1,
-                        'data' => json_encode(
+                        'raw_data' => json_encode(
                             array_combine($this->headers, $this->normalizeRow($row)),
                             JSON_UNESCAPED_UNICODE
                         ) ?: '{}',
@@ -182,7 +182,7 @@ final class UploadStep extends Component implements HasForms
      * @param  array<int|string, string>  $rawHeaders
      * @return list<string>|null
      */
-    protected function processHeaders(array $rawHeaders): ?array
+    private function processHeaders(array $rawHeaders): ?array
     {
         /** @var list<string> $headers */
         $headers = collect($rawHeaders)
@@ -205,7 +205,7 @@ final class UploadStep extends Component implements HasForms
      * @param  array<string, mixed>  $row
      * @return list<string>
      */
-    protected function normalizeRow(array $row): array
+    private function normalizeRow(array $row): array
     {
         $headerCount = count($this->headers);
         $values = array_values($row);
@@ -220,12 +220,12 @@ final class UploadStep extends Component implements HasForms
         $this->reset(['storeId', 'uploadedFile', 'headers', 'rowCount', 'isParsed']);
     }
 
-    protected function maxRows(): int
+    private function maxRows(): int
     {
         return once(fn (): int => (int) config('import-wizard.max_rows', 10_000));
     }
 
-    protected function chunkSize(): int
+    private function chunkSize(): int
     {
         return once(fn (): int => (int) config('import-wizard.chunk_size', 500));
     }

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizardNew\Store;
 
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Connectors\ConnectionFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Relaticle\ImportWizardNew\Data\ColumnMapping;
 use Relaticle\ImportWizardNew\Enums\ImportEntityType;
 use Relaticle\ImportWizardNew\Enums\ImportStatus;
 
@@ -108,6 +111,8 @@ final class ImportStore
 
     /**
      * @return array<string, mixed>
+     *
+     * @throws FileNotFoundException
      */
     public function meta(): array
     {
@@ -168,6 +173,8 @@ final class ImportStore
 
     /**
      * @return list<string>
+     *
+     * @throws FileNotFoundException
      */
     public function headers(): array
     {
@@ -193,19 +200,61 @@ final class ImportStore
     }
 
     /**
-     * @return array<string, string>
+     * Get all column mappings as a collection.
+     *
+     * Uses Spatie Data's collect() for automatic deserialization.
+     *
+     * @return Collection<int, ColumnMapping>
+     *
+     * @throws FileNotFoundException
      */
-    public function columnMappings(): array
+    public function mappings(): Collection
     {
-        return $this->meta()['column_mappings'] ?? [];
+        $raw = $this->meta()['column_mappings'] ?? [];
+
+        return ColumnMapping::collect($raw, Collection::class);
     }
 
     /**
-     * @param  array<string, string>  $mappings
+     * Set column mappings.
+     *
+     * @param  iterable<ColumnMapping>  $mappings
      */
-    public function setColumnMappings(array $mappings): void
+    public function setMappings(iterable $mappings): void
     {
-        $this->updateMeta(['column_mappings' => $mappings]);
+        $raw = collect($mappings)
+            ->map(fn (ColumnMapping $m): array => $m->toArray())
+            ->values()
+            ->all();
+
+        $this->updateMeta(['column_mappings' => $raw]);
+    }
+
+    /**
+     * Get a single column mapping by column name.
+     */
+    public function getMapping(string $column): ?ColumnMapping
+    {
+        return $this->mappings()->firstWhere('column', $column);
+    }
+
+    /**
+     * Get row data transformed to entity field keys.
+     *
+     * Applies corrections and remaps CSV columns to field names.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws FileNotFoundException
+     */
+    public function getFieldData(ImportRow $row): array
+    {
+        $data = $row->getFinalData();
+
+        return $this->mappings()
+            ->filter(fn (ColumnMapping $m): bool => $m->isField())
+            ->mapWithKeys(fn (ColumnMapping $m): array => [$m->field => $data[$m->column] ?? null])
+            ->all();
     }
 
     // =========================================================================
@@ -226,7 +275,7 @@ final class ImportStore
      */
     public function connection(): Connection
     {
-        if ($this->connection === null) {
+        if (! $this->connection instanceof \Illuminate\Database\Connection) {
             $this->connection = $this->createConnection();
         }
 
@@ -261,9 +310,9 @@ final class ImportStore
         ];
 
         // Register connection in config (Sushi pattern)
-        app('config')->set("database.connections.{$name}", $config);
+        resolve(\Illuminate\Contracts\Config\Repository::class)->set("database.connections.{$name}", $config);
 
-        return app(ConnectionFactory::class)->make($config, $name);
+        return resolve(ConnectionFactory::class)->make($config, $name);
     }
 
     /**
@@ -289,14 +338,30 @@ final class ImportStore
         try {
             $schema->create('import_rows', function ($table): void {
                 $table->integer('row_number')->primary();
-                $table->text('data');
+                $table->text('raw_data');  // NOT NULL - SQLite will reject if missing
                 $table->text('validation')->nullable();
                 $table->text('corrections')->nullable();
+                $table->string('match_action')->nullable();
+                $table->string('matched_id')->nullable();
+                $table->text('relationships')->nullable();
             });
 
-            // Add index for validation queries
+            // Enforce raw_data is never empty (catches silent insert failures)
+            $this->connection()->statement('
+                CREATE TRIGGER validate_raw_data_insert
+                BEFORE INSERT ON import_rows
+                BEGIN
+                    SELECT CASE
+                        WHEN NEW.raw_data IS NULL OR NEW.raw_data = \'\' OR NEW.raw_data = \'{}\'
+                        THEN RAISE(ABORT, \'raw_data cannot be null or empty\')
+                    END;
+                END
+            ');
+
+            // Add indexes for common queries
             $schema->table('import_rows', function ($table): void {
                 $table->index('validation');
+                $table->index('match_action');
             });
         } catch (QueryException $e) {
             // Handle race condition (Sushi pattern)

@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizardNew\Livewire\Steps;
 
 use Illuminate\View\View;
-use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Relaticle\ImportWizardNew\Enums\ImportEntityType;
-use Relaticle\ImportWizardNew\Store\ImportStore;
+use Relaticle\ImportWizardNew\Livewire\Concerns\WithImportStore;
 
 /**
  * Step 2: Column mapping.
@@ -18,26 +17,18 @@ use Relaticle\ImportWizardNew\Store\ImportStore;
  */
 final class MappingStep extends Component
 {
-    #[Locked]
-    public string $storeId;
-
-    #[Locked]
-    public ImportEntityType $entityType;
-
-    protected ?ImportStore $store = null;
+    use WithImportStore;
 
     public function mount(string $storeId, ImportEntityType $entityType): void
     {
-        $this->storeId = $storeId;
-        $this->entityType = $entityType;
-        $this->store = ImportStore::load($storeId);
+        $this->mountWithImportStore($storeId, $entityType);
     }
 
     public function render(): View
     {
         return view('import-wizard-new::livewire.steps.mapping-step', [
-            'headers' => $this->store?->headers() ?? [],
-            'rowCount' => $this->store?->rowCount() ?? 0,
+            'headers' => $this->headers(),
+            'rowCount' => $this->rowCount(),
         ]);
     }
 }

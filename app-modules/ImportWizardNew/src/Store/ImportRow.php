@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizardNew\Store;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Relaticle\ImportWizardNew\Data\RelationshipMatch;
+use Relaticle\ImportWizardNew\Enums\RowMatchAction;
+use Spatie\LaravelData\DataCollection;
 
 /**
  * Eloquent model for import rows within SQLite storage.
@@ -14,16 +19,24 @@ use Illuminate\Database\Eloquent\Model;
  * Use ImportStore::query() to get a properly bound query builder.
  *
  * @property int $row_number
- * @property string $data
- * @property string|null $validation
- * @property string|null $corrections
+ * @property Collection<string, mixed> $raw_data
+ * @property Collection<string, string>|null $validation
+ * @property Collection<string, mixed>|null $corrections
+ * @property RowMatchAction|null $match_action
+ * @property string|null $matched_id
+ * @property DataCollection<int, RelationshipMatch>|null $relationships
  *
  * @method static Builder<static> withErrors()
  * @method static Builder<static> withCorrections()
  * @method static Builder<static> valid()
+ * @method static Builder<static> toCreate()
+ * @method static Builder<static> toUpdate()
+ * @method static Builder<static> toSkip()
  */
 final class ImportRow extends Model
 {
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+
     protected $table = 'import_rows';
 
     protected $primaryKey = 'row_number';
@@ -35,61 +48,26 @@ final class ImportRow extends Model
     /** @var list<string> */
     protected $fillable = [
         'row_number',
-        'data',
+        'raw_data',
         'validation',
         'corrections',
+        'match_action',
+        'matched_id',
+        'relationships',
     ];
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, string>
      */
-    public function getDataAttribute(): array
+    protected function casts(): array
     {
-        return json_decode($this->attributes['data'] ?? '{}', true);
-    }
-
-    /**
-     * @param  array<string, mixed>  $value
-     */
-    public function setDataAttribute(array $value): void
-    {
-        $this->attributes['data'] = json_encode($value, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * @return array<string, string>|null
-     */
-    public function getValidationAttribute(): ?array
-    {
-        $value = $this->attributes['validation'] ?? null;
-
-        return $value ? json_decode($value, true) : null;
-    }
-
-    /**
-     * @param  array<string, string>|null  $value
-     */
-    public function setValidationAttribute(?array $value): void
-    {
-        $this->attributes['validation'] = $value ? json_encode($value, JSON_UNESCAPED_UNICODE) : null;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function getCorrectionsAttribute(): ?array
-    {
-        $value = $this->attributes['corrections'] ?? null;
-
-        return $value ? json_decode($value, true) : null;
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $value
-     */
-    public function setCorrectionsAttribute(?array $value): void
-    {
-        $this->attributes['corrections'] = $value ? json_encode($value, JSON_UNESCAPED_UNICODE) : null;
+        return [
+            'raw_data' => AsCollection::class,
+            'validation' => AsCollection::class,
+            'corrections' => AsCollection::class,
+            'match_action' => RowMatchAction::class,
+            'relationships' => DataCollection::class.':'.RelationshipMatch::class,
+        ];
     }
 
     // =========================================================================
@@ -97,59 +75,67 @@ final class ImportRow extends Model
     // =========================================================================
 
     /**
-     * Scope to rows with validation errors.
-     *
      * @param  Builder<static>  $query
      */
-    public function scopeWithErrors(Builder $query): void
+    protected function scopeWithErrors(Builder $query): void
     {
         $query->whereNotNull('validation')->where('validation', '!=', '{}');
     }
 
     /**
-     * Scope to rows with corrections applied.
-     *
      * @param  Builder<static>  $query
      */
-    public function scopeWithCorrections(Builder $query): void
+    protected function scopeWithCorrections(Builder $query): void
     {
         $query->whereNotNull('corrections')->where('corrections', '!=', '{}');
     }
 
     /**
-     * Scope to rows without validation errors.
-     *
      * @param  Builder<static>  $query
      */
-    public function scopeValid(Builder $query): void
+    protected function scopeValid(Builder $query): void
     {
-        $query->where(function ($q): void {
+        $query->where(function (\Illuminate\Contracts\Database\Query\Builder $q): void {
             $q->whereNull('validation')->orWhere('validation', '=', '{}');
         });
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    protected function scopeToCreate(Builder $query): void
+    {
+        $query->where('match_action', RowMatchAction::Create->value);
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    protected function scopeToUpdate(Builder $query): void
+    {
+        $query->where('match_action', RowMatchAction::Update->value);
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    protected function scopeToSkip(Builder $query): void
+    {
+        $query->where('match_action', RowMatchAction::Skip->value);
     }
 
     // =========================================================================
     // HELPERS
     // =========================================================================
 
-    /**
-     * Check if this row has any validation errors.
-     */
     public function hasErrors(): bool
     {
-        $validation = $this->validation;
-
-        return $validation !== null && $validation !== [];
+        return $this->validation !== null && $this->validation->isNotEmpty();
     }
 
-    /**
-     * Check if this row has any corrections.
-     */
     public function hasCorrections(): bool
     {
-        $corrections = $this->corrections;
-
-        return $corrections !== null && $corrections !== [];
+        return $this->corrections !== null && $this->corrections->isNotEmpty();
     }
 
     /**
@@ -157,13 +143,11 @@ final class ImportRow extends Model
      */
     public function getFinalValue(string $column): mixed
     {
-        $corrections = $this->corrections;
-
-        if ($corrections !== null && array_key_exists($column, $corrections)) {
-            return $corrections[$column];
+        if ($this->corrections?->has($column)) {
+            return $this->corrections->get($column);
         }
 
-        return $this->data[$column] ?? null;
+        return $this->raw_data->get($column);
     }
 
     /**
@@ -173,9 +157,21 @@ final class ImportRow extends Model
      */
     public function getFinalData(): array
     {
-        $data = $this->data;
-        $corrections = $this->corrections ?? [];
+        return $this->raw_data->merge($this->corrections ?? [])->all();
+    }
 
-        return array_merge($data, $corrections);
+    public function isCreate(): bool
+    {
+        return $this->match_action === RowMatchAction::Create;
+    }
+
+    public function isUpdate(): bool
+    {
+        return $this->match_action === RowMatchAction::Update;
+    }
+
+    public function isSkip(): bool
+    {
+        return $this->match_action === RowMatchAction::Skip;
     }
 }
