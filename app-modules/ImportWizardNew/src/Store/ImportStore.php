@@ -199,6 +199,10 @@ final class ImportStore
         $this->updateMeta(['row_count' => $count]);
     }
 
+    // =========================================================================
+    // COLUMN MAPPINGS (unified ColumnMapping DTO approach)
+    // =========================================================================
+
     /**
      * Get all column mappings as a collection.
      *
@@ -234,11 +238,11 @@ final class ImportStore
     }
 
     /**
-     * Get a single column mapping by column name.
+     * Get a single column mapping by source (CSV column).
      */
-    public function getMapping(string $column): ?ColumnMapping
+    public function getMapping(string $source): ?ColumnMapping
     {
-        return $this->mappings()->firstWhere('column', $column);
+        return $this->mappings()->firstWhere('source', $source);
     }
 
     /**
@@ -255,9 +259,21 @@ final class ImportStore
         $data = $row->getFinalData();
 
         return $this->mappings()
-            ->filter(fn (ColumnMapping $m): bool => $m->isField())
-            ->mapWithKeys(fn (ColumnMapping $m): array => [$m->field => $data[$m->column] ?? null])
+            ->filter(fn (ColumnMapping $m): bool => $m->isFieldMapping())
+            ->mapWithKeys(fn (ColumnMapping $m): array => [$m->target => $data[$m->source] ?? null])
             ->all();
+    }
+
+    /**
+     * Get relationship mappings.
+     *
+     * @return Collection<int, ColumnMapping>
+     *
+     * @throws FileNotFoundException
+     */
+    public function getRelationshipMappings(): Collection
+    {
+        return $this->mappings()->filter(fn (ColumnMapping $m): bool => $m->isRelationshipMapping());
     }
 
     // =========================================================================
@@ -278,7 +294,7 @@ final class ImportStore
      */
     public function connection(): Connection
     {
-        if (! $this->connection instanceof \Illuminate\Database\Connection) {
+        if (! $this->connection instanceof Connection) {
             $this->connection = $this->createConnection();
         }
 

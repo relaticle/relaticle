@@ -278,13 +278,8 @@ final readonly class RelationshipField
      */
     public function getMatcher(string $field): ?MatchableField
     {
-        foreach ($this->matchableFields as $matcher) {
-            if ($matcher->field === $field) {
-                return $matcher;
-            }
-        }
-
-        return null;
+        return collect($this->matchableFields)
+            ->first(fn (MatchableField $m): bool => $m->field === $field);
     }
 
     /**
@@ -306,6 +301,19 @@ final readonly class RelationshipField
     }
 
     /**
+     * Get the icon for this relationship based on the related model.
+     */
+    public function icon(): string
+    {
+        return match ($this->relatedModel) {
+            Company::class => 'heroicon-o-building-office-2',
+            People::class => 'heroicon-o-user',
+            Opportunity::class => 'heroicon-o-currency-dollar',
+            default => 'heroicon-o-link',
+        };
+    }
+
+    /**
      * Convert to array representation.
      *
      * @return array<string, mixed>
@@ -324,6 +332,7 @@ final readonly class RelationshipField
             'label' => $this->label,
             'foreignKey' => $this->foreignKey,
             'guesses' => $this->guesses,
+            'icon' => $this->icon(),
         ];
     }
 }

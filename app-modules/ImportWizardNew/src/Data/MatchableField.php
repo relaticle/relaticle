@@ -92,4 +92,20 @@ final class MatchableField extends Data
             createsNew: true,
         );
     }
+
+    /**
+     * Get a user-friendly description of this matcher's behavior.
+     */
+    public function description(): string
+    {
+        if ($this->updateOnly) {
+            return 'Only update existing records. Skip if not found.';
+        }
+
+        if ($this->createsNew) {
+            return 'Always create a new record (no lookup).';
+        }
+
+        return 'Find existing record or create new if not found.';
+    }
 }

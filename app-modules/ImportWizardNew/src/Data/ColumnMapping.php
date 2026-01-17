@@ -9,62 +9,55 @@ use Spatie\LaravelData\Data;
 /**
  * Represents a mapping from a CSV column to an entity field or relationship.
  *
- * Stored in ImportStore meta.json as part of column_mappings.
+ * The naming convention:
+ * - source: CSV column header (the key in the columnMappings array)
+ * - target: field key for field mappings, or matcherKey for relationship mappings
+ * - relationship: if set, indicates this is a relationship mapping
+ *
+ * The rule: presence of `relationship` determines the mapping type.
  */
 final class ColumnMapping extends Data
 {
     public function __construct(
-        public readonly string $column,
-        public readonly ?string $field = null,
+        public readonly string $source,
+        public readonly string $target,
         public readonly ?string $relationship = null,
-        public readonly ?string $relationshipMatch = null,
-        public readonly ?string $format = null,
     ) {}
 
     /**
      * Create a field mapping.
      */
-    public static function field(string $column, string $field, ?string $format = null): self
+    public static function toField(string $source, string $target): self
     {
         return new self(
-            column: $column,
-            field: $field,
-            format: $format,
+            source: $source,
+            target: $target,
         );
     }
 
     /**
      * Create a relationship mapping.
+     *
+     * @param  string  $source  CSV column header
+     * @param  string  $matcherKey  The field to match on (e.g., 'name', 'email')
+     * @param  string  $relationship  The relationship name (e.g., 'company')
      */
-    public static function relationship(string $column, string $relationship, string $relationshipMatch): self
+    public static function toRelationship(string $source, string $matcherKey, string $relationship): self
     {
         return new self(
-            column: $column,
+            source: $source,
+            target: $matcherKey,
             relationship: $relationship,
-            relationshipMatch: $relationshipMatch,
         );
     }
 
-    /**
-     * Create a skipped column (not mapped).
-     */
-    public static function skip(string $column): self
+    public function isFieldMapping(): bool
     {
-        return new self(column: $column);
+        return $this->relationship === null;
     }
 
-    public function isRelationship(): bool
+    public function isRelationshipMapping(): bool
     {
         return $this->relationship !== null;
-    }
-
-    public function isSkipped(): bool
-    {
-        return $this->field === null && $this->relationship === null;
-    }
-
-    public function isField(): bool
-    {
-        return $this->field !== null && $this->relationship === null;
     }
 }
