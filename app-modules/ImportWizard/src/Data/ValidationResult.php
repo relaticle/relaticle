@@ -65,7 +65,7 @@ final class ValidationResult extends Data
      */
     public function hasIssue(): bool
     {
-        return $this->issue !== null;
+        return $this->issue instanceof \Relaticle\ImportWizard\Data\ValueIssue;
     }
 
     /**
@@ -73,7 +73,7 @@ final class ValidationResult extends Data
      */
     public function hasError(): bool
     {
-        return ! $this->isValid && $this->issue !== null;
+        return ! $this->isValid && $this->issue instanceof \Relaticle\ImportWizard\Data\ValueIssue;
     }
 
     /**
@@ -81,7 +81,7 @@ final class ValidationResult extends Data
      */
     public function hasWarning(): bool
     {
-        return $this->isValid && $this->issue !== null;
+        return $this->isValid && $this->issue instanceof \Relaticle\ImportWizard\Data\ValueIssue;
     }
 
     /**
