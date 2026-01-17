@@ -12,7 +12,10 @@ use Spatie\LaravelData\Data;
  * Priority determines which field is used when multiple matchable fields are mapped.
  * Higher priority = checked first.
  *
- * If updateOnly is true, rows without a match will be skipped (not created).
+ * Matching behavior flags:
+ * - updateOnly=true: Skip row if no match (ID matching)
+ * - updateOnly=false, createsNew=false: Lookup existing, create if not found (email/domain/phone)
+ * - updateOnly=false, createsNew=true: Always create new, no lookup (name matching)
  */
 final class MatchableField extends Data
 {
@@ -21,6 +24,7 @@ final class MatchableField extends Data
         public readonly string $label,
         public readonly int $priority = 0,
         public readonly bool $updateOnly = false,
+        public readonly bool $createsNew = false,
     ) {}
 
     /**
@@ -73,7 +77,10 @@ final class MatchableField extends Data
     }
 
     /**
-     * Name field - low priority, for relationship matching only.
+     * Name field - low priority, always creates new (no lookup).
+     *
+     * Names are not unique identifiers, so matching by name always
+     * creates a new record rather than looking up existing ones.
      */
     public static function name(): self
     {
@@ -81,6 +88,8 @@ final class MatchableField extends Data
             field: 'name',
             label: 'Name',
             priority: 10,
+            updateOnly: false,
+            createsNew: true,
         );
     }
 }

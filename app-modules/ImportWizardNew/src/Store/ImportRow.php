@@ -6,6 +6,8 @@ namespace Relaticle\ImportWizardNew\Store;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Relaticle\ImportWizardNew\Data\RelationshipMatch;
@@ -35,7 +37,8 @@ use Spatie\LaravelData\DataCollection;
  */
 final class ImportRow extends Model
 {
-    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+    /** @use HasFactory<Factory<ImportRow>> */
+    use HasFactory;
 
     protected $table = 'import_rows';
 

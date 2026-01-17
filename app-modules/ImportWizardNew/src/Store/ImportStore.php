@@ -218,11 +218,14 @@ final class ImportStore
     /**
      * Set column mappings.
      *
-     * @param  iterable<ColumnMapping>  $mappings
+     * @param  iterable<int, ColumnMapping>  $mappings
      */
     public function setMappings(iterable $mappings): void
     {
-        $raw = collect($mappings)
+        /** @var array<int, ColumnMapping> $mappingsArray */
+        $mappingsArray = is_array($mappings) ? $mappings : iterator_to_array($mappings);
+
+        $raw = collect($mappingsArray)
             ->map(fn (ColumnMapping $m): array => $m->toArray())
             ->values()
             ->all();

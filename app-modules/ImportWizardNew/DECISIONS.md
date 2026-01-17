@@ -2,7 +2,7 @@
 
 This document contains the finalized architecture decisions for the new Import Wizard.
 
-**Last Updated:** 2026-01-16
+**Last Updated:** 2026-01-18
 
 ---
 
@@ -489,9 +489,281 @@ SimpleExcelReader::create($path)
 
 ---
 
+## 13. Importer Architecture
+
+### Decision: Framework-Agnostic Importers
+
+**Status:** `IMPLEMENTED`
+
+Replace Filament importers with new framework-agnostic Importer classes that serve as the single source of truth for all import configuration.
+
+**Rationale:**
+1. Filament's `Importer` class is tightly coupled to modal UI flow
+2. New wizard needs preview, validation display, corrections - Filament doesn't support
+3. One source of truth prevents sync issues between two import systems
+4. Framework-agnostic design allows reuse (API imports, CLI, etc.)
+
+**Design Principles:**
+1. **Explicit over implicit** - Each importer writes its own relationship logic
+2. **Minimal shared utilities** - BaseImporter provides optional helper methods
+3. **No traits** - Keep importers self-contained and easy to understand
+
+**File Structure:**
+```
+src/Importers/
+├── Contracts/
+│   └── ImporterContract.php       # Interface
+├── Fields/
+│   ├── ImportField.php            # Single field definition (immutable)
+│   ├── RelationshipField.php      # Relationship field definition
+│   └── FieldCollection.php        # Collection with auto-mapping
+├── BaseImporter.php               # Shared logic + optional helpers
+├── CompanyImporter.php
+├── PeopleImporter.php
+├── OpportunityImporter.php
+├── TaskImporter.php
+└── NoteImporter.php
+```
+
+---
+
+### 14. Field Definition Pattern
+
+**Status:** `IMPLEMENTED`
+
+Immutable `ImportField` class with fluent builder pattern:
+
+```php
+ImportField::make('name')
+    ->label('Name')
+    ->required()
+    ->rules(['required', 'string', 'max:255'])
+    ->guess(['name', 'company_name', 'organization'])
+    ->example('Acme Corporation')
+    ->type('text');
+```
+
+**Properties:**
+| Property | Description |
+|----------|-------------|
+| `key` | Database column or custom field key |
+| `label` | Display label |
+| `required` | Whether field is required |
+| `rules` | Laravel validation rules |
+| `guesses` | Column name aliases for auto-mapping |
+| `example` | Example value for display |
+| `type` | Field type hint (text, email, number, date, etc.) |
+| `isCustomField` | Whether this is a custom field |
+
+**Pre-configured Factory:**
+```php
+ImportField::id()  // Pre-configured ID field with ULID validation
+```
+
+---
+
+### 15. Relationship Handling
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** Explicit in each importer with minimal shared utilities.
+
+Each importer writes its own relationship resolution logic. BaseImporter provides optional helper methods but importers choose whether to use them.
+
+**RelationshipField Definition:**
+```php
+RelationshipField::belongsTo('company', Company::class)
+    ->matchableFields([
+        MatchableField::id(),
+        MatchableField::domain('custom_fields_domains'),
+        MatchableField::name(),
+    ])
+    ->foreignKey('company_id')
+    ->guess(['company', 'company_name', 'organization']);
+```
+
+**Pre-configured Factories:**
+```php
+RelationshipField::company()              // BelongsTo Company
+RelationshipField::contact()              // BelongsTo People
+RelationshipField::polymorphicCompanies() // MorphToMany Company
+RelationshipField::polymorphicPeople()    // MorphToMany People
+RelationshipField::polymorphicOpportunities() // MorphToMany Opportunity
+```
+
+**Relationship Types:**
+| Type | Description | Example |
+|------|-------------|---------|
+| `belongsTo` | Single foreign key | People → Company |
+| `morphToMany` | Polymorphic many-to-many | Task → Companies/People/Opportunities |
+
+---
+
+### 16. Matching Logic
+
+**Decision:** `CONFIRMED` - Single Field by Priority
+
+Record matching uses **ONE field only** - the highest priority mapped field.
+
+```
+User maps: email, name columns
+Available matchable fields: ID (100), Email (90), Name (10)
+→ Highest mapped = Email (90)
+→ Match ONLY by email. If no match, create new record.
+```
+
+**MatchableField Priority:**
+| Field | Priority | updateOnly |
+|-------|----------|------------|
+| ID | 100 | true (skip if not found) |
+| Email | 90 | false |
+| Domain | 80 | false |
+| Phone | 70 | false |
+| Name | 10 | false |
+
+**Relationship Resolution:** Same single-field logic applies.
+
+---
+
+### 17. Custom Fields Integration
+
+**Status:** `IMPLEMENTED`
+
+Custom fields are automatically discovered and appended to standard fields.
+
+```php
+// In BaseImporter
+public function allFields(): FieldCollection
+{
+    return $this->fields()->merge($this->customFields());
+}
+```
+
+**Property Mapping:**
+| CustomField Property | ImportField Property |
+|---------------------|---------------------|
+| `name` | `label` |
+| `code` | `key` (prefixed with `custom_fields_`) |
+| validation_rules contains REQUIRED | `required` |
+| `type` | `type` (mapped to text, email, number, etc.) |
+
+---
+
+### 18. Entity Summary
+
+| Entity | Standard Fields | Relationships | Matchable By |
+|--------|-----------------|---------------|--------------|
+| Company | id, name, account_owner_email | None | ID, Domain |
+| People | id, name | company (belongsTo) | ID, Email, Phone |
+| Opportunity | id, name | company, contact (belongsTo) | ID only |
+| Task | id, title, description, assignee_email | companies, people, opportunities (morphToMany) | ID only |
+| Note | id, title, content | companies, people, opportunities (morphToMany) | None (always create) |
+
+---
+
+### 19. ImportEntityType Integration
+
+**Status:** `IMPLEMENTED`
+
+Updated enum with importer factory methods:
+
+```php
+use Relaticle\ImportWizardNew\Enums\ImportEntityType;
+
+// Get importer class
+$class = ImportEntityType::Company->importerClass();
+
+// Create importer instance
+$importer = ImportEntityType::Company->importer($teamId);
+```
+
+---
+
+## Key Patterns: Importer Architecture
+
+### Immutable Value Objects
+```php
+$field = ImportField::make('name');
+$required = $field->required();  // New instance, $field unchanged
+```
+
+### Explicit Relationship Resolution
+```php
+// In PeopleImporter::prepareForSave()
+private function resolveCompanyRelationship(array $data, array $context): array
+{
+    $companyValue = $data['company'] ?? null;
+    unset($data['company']);
+
+    if (blank($companyValue)) {
+        return $data;
+    }
+
+    $matchField = $context['company_match_field'] ?? 'name';
+    $companyId = $this->resolveBelongsTo(Company::class, $matchField, $companyValue);
+
+    if ($companyId !== null) {
+        $data['company_id'] = $companyId;
+    }
+
+    return $data;
+}
+```
+
+### Polymorphic Sync in afterSave
+```php
+// In TaskImporter::afterSave()
+foreach (['companies', 'people', 'opportunities'] as $relation) {
+    $ids = $context["{$relation}_ids"] ?? null;
+    if (filled($ids) && is_array($ids)) {
+        $this->syncMorphToMany($record, $relation, $ids);
+    }
+}
+```
+
+---
+
+## Updated File Structure
+
+```
+src/
+├── Data/
+│   ├── ColumnMapping.php          ✅
+│   ├── MatchableField.php         ✅
+│   └── RelationshipMatch.php      ✅
+├── Enums/
+│   ├── ImportStatus.php           ✅
+│   ├── ImportEntityType.php       ✅ (with importer() method)
+│   └── RowMatchAction.php         ✅
+├── Importers/                     ✅ NEW
+│   ├── Contracts/
+│   │   └── ImporterContract.php   ✅
+│   ├── Fields/
+│   │   ├── ImportField.php        ✅
+│   │   ├── RelationshipField.php  ✅
+│   │   └── FieldCollection.php    ✅
+│   ├── BaseImporter.php           ✅
+│   ├── CompanyImporter.php        ✅
+│   ├── PeopleImporter.php         ✅
+│   ├── OpportunityImporter.php    ✅
+│   ├── TaskImporter.php           ✅
+│   └── NoteImporter.php           ✅
+├── Livewire/
+│   ├── ImportWizard.php           ✅
+│   └── Steps/
+│       ├── UploadStep.php         ✅
+│       ├── MappingStep.php        ⏳ (needs importer integration)
+│       ├── ReviewStep.php         ⏳ (needs importer integration)
+│       └── PreviewStep.php        ⏳ (needs importer integration)
+└── Store/
+    ├── ImportStore.php            ✅
+    └── ImportRow.php              ✅
+```
+
+---
+
 ## Next Decisions Needed
 
-1. **Auto-mapping algorithm**: How fuzzy should matching be?
-2. **Validation approach**: All upfront vs per-column on-demand?
-3. **Relationship matching priority**: Domain → Email → ID?
-4. **Custom field options**: Auto-create or confirm first?
+1. **Date format handling**: Per-column selection in MappingStep (ISO, European, American)
+2. **Unknown choice options**: Show error + "Create Option" button in ReviewStep
+3. **Relationship creation**: Should unknown companies be created when importing People?
