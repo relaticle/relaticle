@@ -71,8 +71,8 @@
 
                 <div
                     wire:key="row-{{ md5($header) }}"
-                    class="flex items-center py-2 border-b border-gray-100 dark:border-gray-800 -mx-2 px-2 rounded-md transition-colors"
-                    :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-white dark:bg-white/5' : ''"
+                    class="flex items-center py-2 border-b border-gray-100 dark:border-gray-800 px-2 transition-colors"
+                    :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-gray-100 dark:bg-gray-800' : ''"
                     @mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
                 >
                     {{-- File Column Name --}}
@@ -92,7 +92,7 @@
                             @click.outside="if (activeDropdown === '{{ $dropdownId }}' && !activeSubmenu) closeDropdown()"
                         >
                             <div
-                                class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-150 dark:hover:bg-gray-750 transition-colors cursor-pointer"
+                                class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                                 @click="activeDropdown === '{{ $dropdownId }}' ? closeDropdown() : openDropdown('{{ $dropdownId }}', '{{ addslashes($header) }}')"
                             >
                             @if ($isUsedByRelationship)
@@ -121,7 +121,7 @@
                                     type="button"
                                     wire:click.stop="unmapColumn('{{ addslashes($header) }}')"
                                     @click.stop
-                                    class="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                                    class="p-0.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0 transition-colors"
                                 >
                                     <x-filament::icon icon="heroicon-o-x-mark" class="w-3.5 h-3.5" />
                                 </button>
@@ -139,7 +139,7 @@
                             x-transition:leave="transition ease-in duration-75"
                             x-transition:leave-start="opacity-100 scale-100"
                             x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute left-0 z-50 mt-1 w-56 rounded-md bg-white dark:bg-gray-900 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
+                            class="absolute left-0 z-50 mt-1 w-56 rounded-xl bg-white dark:bg-gray-900 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
                             x-cloak
                         >
                             {{-- Search --}}
@@ -149,7 +149,9 @@
                                     <input
                                         type="text"
                                         placeholder="Search..."
-                                        class="w-full pl-7 pr-2 py-1 text-xs bg-gray-50 dark:bg-gray-800 border-0 rounded text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                        class="w-full pl-7 pr-2 py-1 text-xs bg-gray-50 dark:bg-gray-800 border-0 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                        x-ref="search-{{ md5($header) }}"
+                                        x-effect="if (activeDropdown === '{{ $dropdownId }}') $nextTick(() => $el.focus())"
                                         @input="$dispatch('search-{{ md5($header) }}', $el.value)"
                                     />
                                 </div>
@@ -172,7 +174,7 @@
                                         wire:click="mapToField('{{ addslashes($header) }}', '{{ $field->key }}')"
                                         @click="closeDropdown()"
                                         :disabled="{{ $isMapped ? 'true' : 'false' }}"
-                                        class="w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors
+                                        class="w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg transition-colors
                                             {{ $isSelected ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
                                             {{ $isMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
                                     >
@@ -192,20 +194,31 @@
                                         <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Link to Records</span>
                                     </div>
                                     @foreach ($this->relationships as $relName => $field)
-                                        @php $isRelSel = $isUsedByRelationship && $relationshipMapping['relName'] === $relName; @endphp
+                                        @php
+                                            $isRelSel = $isUsedByRelationship && $relationshipMapping['relName'] === $relName;
+                                            $isRelMapped = $this->isRelationshipMapped($relName) && !$isRelSel;
+                                        @endphp
                                         <div
                                             x-show="!search || '{{ strtolower($field->label) }}'.includes(search.toLowerCase())"
-                                            @mouseenter="showSubmenu('{{ $relName }}', $event)"
-                                            @mouseleave="hideSubmenu()"
+                                            @if (!$isRelMapped)
+                                                @mouseenter="showSubmenu('{{ $relName }}', $event)"
+                                                @mouseleave="hideSubmenu()"
+                                            @endif
                                         >
                                             <button
                                                 type="button"
-                                                class="w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors
-                                                    {{ $isRelSel ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
+                                                @if ($isRelMapped) disabled @endif
+                                                class="w-full flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg transition-colors
+                                                    {{ $isRelSel ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
+                                                    {{ $isRelMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
                                             >
                                                 <x-filament::icon icon="{{ $field->icon() }}" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                                 <span class="flex-1 text-left">{{ $field->label }}</span>
-                                                <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                                @if ($isRelMapped)
+                                                    <span class="text-[10px] text-gray-400">mapped</span>
+                                                @else
+                                                    <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                                @endif
                                             </button>
                                         </div>
                                     @endforeach
@@ -219,20 +232,29 @@
         </div>
 
         {{-- Preview Panel --}}
-        <div class="w-48 shrink-0 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col max-h-72">
-            <div class="px-2.5 py-1.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <span class="text-xs font-medium text-gray-900 dark:text-white truncate" x-text="hoveredColumn"></span>
+        <div class="w-64 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col max-h-[28rem] bg-white dark:bg-gray-900">
+            <div class="px-3.5 py-2 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="hoveredColumn"></span>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <x-filament::icon icon="heroicon-o-eye" class="w-3.5 h-3.5 text-gray-400" />
+                        <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Preview</span>
+                    </div>
+                </div>
             </div>
             <div class="flex-1 overflow-y-auto">
                 @foreach ($headers as $header)
                     <div x-show="hoveredColumn === '{{ addslashes($header) }}'" x-cloak>
-                        @foreach ($this->previewValues($header, 5) as $value)
-                            <div class="px-2.5 py-1.5 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 truncate">
+                        @foreach ($this->previewValues($header, 20) as $value)
+                            <div class="px-3.5 py-1.5 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 truncate">
                                 {{ $value ?: '(blank)' }}
                             </div>
                         @endforeach
                     </div>
                 @endforeach
+            </div>
+            <div class="px-3.5 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">This preview shows only a portion of the column values</p>
             </div>
         </div>
     </div>
@@ -247,7 +269,7 @@
                     :style="{ position: 'fixed', top: submenuPosition.top, left: submenuPosition.left, zIndex: 9999 }"
                     @mouseenter="keepSubmenu()"
                     @mouseleave="hideSubmenu()"
-                    class="w-52 rounded-lg bg-white dark:bg-gray-900 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
+                    class="w-52 rounded-xl bg-white dark:bg-gray-900 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
                     x-cloak
                 >
                     <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
@@ -260,32 +282,27 @@
                                 @click="$wire.mapToRelationship(activeDropdownColumn, '{{ $matcher->field }}', '{{ $relName }}'); closeDropdown()"
                                 :class="isMatcherSelected('{{ $relName }}', '{{ $matcher->field }}')
                                     ? 'bg-primary-50 dark:bg-primary-950/50'
-                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
-                                class="w-full flex items-start gap-2.5 px-2.5 py-2 text-left rounded-md transition-colors"
+                                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'"
+                                class="w-full px-2.5 py-1.5 text-left rounded-lg transition-colors"
                             >
-                                {{-- Checkmark space - always reserve width for alignment --}}
-                                <div class="w-4 h-4 shrink-0 mt-0.5 flex items-center justify-center">
+                                <div class="flex items-center gap-1.5">
                                     <x-filament::icon
                                         icon="heroicon-s-check"
-                                        class="w-4 h-4 text-primary-500"
+                                        class="w-3.5 h-3.5 text-primary-500 shrink-0"
                                         x-show="isMatcherSelected('{{ $relName }}', '{{ $matcher->field }}')"
                                         x-cloak
                                     />
+                                    <span
+                                        :class="isMatcherSelected('{{ $relName }}', '{{ $matcher->field }}')
+                                            ? 'text-primary-700 dark:text-primary-300'
+                                            : 'text-gray-900 dark:text-white'"
+                                        class="text-sm font-medium"
+                                    >{{ $matcher->label }}</span>
+                                    @if ($matcher->createsNew)
+                                        <span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">creates</span>
+                                    @endif
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-1.5">
-                                        <span
-                                            :class="isMatcherSelected('{{ $relName }}', '{{ $matcher->field }}')
-                                                ? 'text-primary-700 dark:text-primary-300'
-                                                : 'text-gray-900 dark:text-white'"
-                                            class="text-sm font-medium"
-                                        >{{ $matcher->label }}</span>
-                                        @if ($matcher->createsNew)
-                                            <span class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">creates</span>
-                                        @endif
-                                    </div>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $matcher->description() }}</p>
-                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 w-full">{{ $matcher->description() }}</p>
                             </button>
                         @endforeach
                     </div>

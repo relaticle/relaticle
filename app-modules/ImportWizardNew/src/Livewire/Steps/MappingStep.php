@@ -9,10 +9,10 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\ImportWizardNew\Data\ColumnMapping;
 use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\RelationshipField;
 use Relaticle\ImportWizardNew\Enums\ImportEntityType;
 use Relaticle\ImportWizardNew\Enums\ImportStatus;
-use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Importers\BaseImporter;
 use Relaticle\ImportWizardNew\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizardNew\Support\DataTypeInferencer;
@@ -293,7 +293,7 @@ final class MappingStep extends Component
     /**
      * Check if a relationship is already mapped.
      */
-    private function isRelationshipMapped(string $relName): bool
+    public function isRelationshipMapped(string $relName): bool
     {
         return collect($this->columnMappings)
             ->contains(fn (array $m): bool => $m['relationship'] === $relName);
