@@ -6,10 +6,10 @@ namespace Relaticle\ImportWizardNew\Importers;
 
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
-use Relaticle\ImportWizardNew\Importers\Fields\RelationshipField;
+use Relaticle\ImportWizardNew\Data\RelationshipField;
 
 /**
  * Importer for Task entities.
@@ -29,9 +29,9 @@ final class TaskImporter extends BaseImporter
         return 'task';
     }
 
-    public function fields(): FieldCollection
+    public function fields(): ImportFieldCollection
     {
-        return FieldCollection::make([
+        return new ImportFieldCollection([
             ImportField::id(),
 
             ImportField::make('title')
@@ -43,8 +43,7 @@ final class TaskImporter extends BaseImporter
                     'task', 'task name', 'action', 'action item',
                     'to do', 'todo item', 'activity',
                 ])
-                ->example('Follow up with client')
-                ->type('text'),
+                ->example('Follow up with client'),
 
             ImportField::make('description')
                 ->label('Description')
@@ -53,8 +52,7 @@ final class TaskImporter extends BaseImporter
                     'description', 'details', 'notes', 'body',
                     'task description', 'task details',
                 ])
-                ->example('Schedule a follow-up call to discuss proposal')
-                ->type('text'),
+                ->example('Schedule a follow-up call to discuss proposal'),
 
             ImportField::make('assignee_email')
                 ->label('Assignee Email')
@@ -63,8 +61,7 @@ final class TaskImporter extends BaseImporter
                     'assignee', 'assigned_to', 'owner', 'assignee_email',
                     'assigned_email', 'owner_email', 'responsible',
                 ])
-                ->example('user@company.com')
-                ->type('email'),
+                ->example('user@company.com'),
         ]);
     }
 

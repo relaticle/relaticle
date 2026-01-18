@@ -6,9 +6,9 @@ namespace Relaticle\ImportWizardNew\Importers;
 
 use App\Models\Company;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
 
 /**
  * Importer for Company entities.
@@ -27,9 +27,9 @@ final class CompanyImporter extends BaseImporter
         return 'company';
     }
 
-    public function fields(): FieldCollection
+    public function fields(): ImportFieldCollection
     {
-        return FieldCollection::make([
+        return new ImportFieldCollection([
             ImportField::id(),
 
             ImportField::make('name')
@@ -43,8 +43,7 @@ final class CompanyImporter extends BaseImporter
                     'business', 'business_name', 'org', 'org_name', 'organisation',
                     'firm', 'client', 'customer', 'customer_name', 'vendor', 'vendor_name',
                 ])
-                ->example('Acme Corporation')
-                ->type('text'),
+                ->example('Acme Corporation'),
 
             ImportField::make('account_owner_email')
                 ->label('Account Owner Email')
@@ -54,8 +53,7 @@ final class CompanyImporter extends BaseImporter
                     'owner email', 'sales rep', 'sales_rep', 'rep', 'salesperson', 'sales_owner',
                     'account_rep', 'assigned_user', 'manager_email', 'contact_owner',
                 ])
-                ->example('owner@company.com')
-                ->type('email'),
+                ->example('owner@company.com'),
         ]);
     }
 

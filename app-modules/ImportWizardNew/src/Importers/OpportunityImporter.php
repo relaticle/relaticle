@@ -8,10 +8,10 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
-use Relaticle\ImportWizardNew\Importers\Fields\RelationshipField;
+use Relaticle\ImportWizardNew\Data\RelationshipField;
 
 /**
  * Importer for Opportunity entities.
@@ -31,9 +31,9 @@ final class OpportunityImporter extends BaseImporter
         return 'opportunity';
     }
 
-    public function fields(): FieldCollection
+    public function fields(): ImportFieldCollection
     {
-        return FieldCollection::make([
+        return new ImportFieldCollection([
             ImportField::id(),
 
             ImportField::make('name')
@@ -45,8 +45,7 @@ final class OpportunityImporter extends BaseImporter
                     'opportunity', 'title', 'subject',
                     'deal title', 'opportunity title', 'pipeline',
                 ])
-                ->example('Enterprise License Deal')
-                ->type('text'),
+                ->example('Enterprise License Deal'),
         ]);
     }
 

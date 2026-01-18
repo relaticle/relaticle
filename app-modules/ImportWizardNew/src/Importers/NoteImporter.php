@@ -6,10 +6,10 @@ namespace Relaticle\ImportWizardNew\Importers;
 
 use App\Models\Note;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
-use Relaticle\ImportWizardNew\Importers\Fields\RelationshipField;
+use Relaticle\ImportWizardNew\Data\RelationshipField;
 
 /**
  * Importer for Note entities.
@@ -29,9 +29,9 @@ final class NoteImporter extends BaseImporter
         return 'note';
     }
 
-    public function fields(): FieldCollection
+    public function fields(): ImportFieldCollection
     {
-        return FieldCollection::make([
+        return new ImportFieldCollection([
             ImportField::id(),
 
             ImportField::make('title')
@@ -41,8 +41,7 @@ final class NoteImporter extends BaseImporter
                     'title', 'subject', 'note_title', 'heading',
                     'note subject', 'summary',
                 ])
-                ->example('Meeting Notes')
-                ->type('text'),
+                ->example('Meeting Notes'),
 
             ImportField::make('content')
                 ->label('Content')
@@ -52,8 +51,7 @@ final class NoteImporter extends BaseImporter
                     'content', 'body', 'text', 'note', 'notes',
                     'note content', 'note body', 'description', 'details',
                 ])
-                ->example('Discussed project timeline and deliverables.')
-                ->type('text'),
+                ->example('Discussed project timeline and deliverables.'),
         ]);
     }
 

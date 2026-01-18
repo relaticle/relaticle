@@ -7,10 +7,10 @@ namespace Relaticle\ImportWizardNew\Importers;
 use App\Models\Company;
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
-use Relaticle\ImportWizardNew\Importers\Fields\RelationshipField;
+use Relaticle\ImportWizardNew\Data\RelationshipField;
 
 /**
  * Importer for People entities.
@@ -29,9 +29,9 @@ final class PeopleImporter extends BaseImporter
         return 'people';
     }
 
-    public function fields(): FieldCollection
+    public function fields(): ImportFieldCollection
     {
-        return FieldCollection::make([
+        return new ImportFieldCollection([
             ImportField::id(),
 
             ImportField::make('name')
@@ -44,8 +44,7 @@ final class PeopleImporter extends BaseImporter
                     'full name', 'display_name', 'displayname',
                     'contact name', 'lead name', 'prospect name',
                 ])
-                ->example('John Doe')
-                ->type('text'),
+                ->example('John Doe'),
         ]);
     }
 

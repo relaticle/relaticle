@@ -12,11 +12,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Enums\ValidationRule;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
+use Relaticle\ImportWizardNew\Data\RelationshipField;
 use Relaticle\ImportWizardNew\Importers\Contracts\ImporterContract;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
-use Relaticle\ImportWizardNew\Importers\Fields\ImportField;
-use Relaticle\ImportWizardNew\Importers\Fields\RelationshipField;
 
 /**
  * Base class for entity importers.
@@ -51,7 +51,7 @@ abstract class BaseImporter implements ImporterContract
      *
      * Merges standard entity fields with auto-discovered custom fields.
      */
-    public function allFields(): FieldCollection
+    public function allFields(): ImportFieldCollection
     {
         return $this->fields()->merge($this->customFields());
     }
@@ -124,7 +124,7 @@ abstract class BaseImporter implements ImporterContract
     /**
      * Get custom fields for this entity as ImportField objects.
      */
-    protected function customFields(): FieldCollection
+    protected function customFields(): ImportFieldCollection
     {
         $customFields = CustomField::query()
             ->withoutGlobalScopes()
@@ -135,7 +135,7 @@ abstract class BaseImporter implements ImporterContract
             ->get();
 
         if ($customFields->isEmpty()) {
-            return FieldCollection::empty();
+            return new ImportFieldCollection;
         }
 
         $fields = $customFields->map(function (CustomField $customField): ImportField {
@@ -146,11 +146,10 @@ abstract class BaseImporter implements ImporterContract
                 ->label($customField->name)
                 ->required($isRequired)
                 ->rules($isRequired ? ['required'] : ['nullable'])
-                ->type($this->mapCustomFieldType($customField->type))
                 ->asCustomField();
         });
 
-        return FieldCollection::make($fields->all());
+        return new ImportFieldCollection($fields->all());
     }
 
     /**
@@ -160,22 +159,6 @@ abstract class BaseImporter implements ImporterContract
     {
         return $field->validation_rules->toCollection()
             ->contains('name', ValidationRule::REQUIRED->value);
-    }
-
-    /**
-     * Map custom field type to ImportField type.
-     */
-    protected function mapCustomFieldType(string $fieldType): string
-    {
-        return match ($fieldType) {
-            'email' => 'email',
-            'phone' => 'phone',
-            'number', 'money' => 'number',
-            'date' => 'date',
-            'datetime' => 'datetime',
-            'url' => 'url',
-            default => 'text',
-        };
     }
 
     /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizardNew\Importers\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\ImportWizardNew\Importers\Fields\FieldCollection;
+use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 
 /**
  * Contract for entity importers.
@@ -35,17 +35,17 @@ interface ImporterContract
     /**
      * Get the standard fields for this entity.
      */
-    public function fields(): FieldCollection;
+    public function fields(): ImportFieldCollection;
 
     /**
      * Get all fields including custom fields.
      */
-    public function allFields(): FieldCollection;
+    public function allFields(): ImportFieldCollection;
 
     /**
      * Get relationship definitions for this entity.
      *
-     * @return array<string, \Relaticle\ImportWizardNew\Importers\Fields\RelationshipField>
+     * @return array<string, \Relaticle\ImportWizardNew\Data\RelationshipField>
      */
     public function relationships(): array;
 

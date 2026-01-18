@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\ImportWizardNew\Importers\Fields;
+namespace Relaticle\ImportWizardNew\Data;
 
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\ImportWizardNew\Data\MatchableField;
+use Spatie\LaravelData\Attributes\DataCollectionOf;
+use Spatie\LaravelData\Data;
 
 /**
  * Defines a relationship field for import mapping.
@@ -17,7 +18,7 @@ use Relaticle\ImportWizardNew\Data\MatchableField;
  * They specify which model to link to, how to match records, and whether
  * new related records can be created.
  */
-final readonly class RelationshipField
+final class RelationshipField extends Data
 {
     /**
      * @param  string  $name  Internal relationship name (e.g., 'company')
@@ -29,15 +30,16 @@ final readonly class RelationshipField
      * @param  string|null  $foreignKey  Foreign key column (for belongsTo)
      * @param  array<string>  $guesses  Column name aliases for auto-mapping
      */
-    private function __construct(
-        public string $name,
-        public string $relatedModel,
-        public string $type,
-        public array $matchableFields = [],
-        public bool $canCreate = false,
-        public string $label = '',
-        public ?string $foreignKey = null,
-        public array $guesses = [],
+    public function __construct(
+        public readonly string $name,
+        public readonly string $relatedModel,
+        public readonly string $type,
+        #[DataCollectionOf(MatchableField::class)]
+        public readonly array $matchableFields = [],
+        public readonly bool $canCreate = false,
+        public readonly string $label = '',
+        public readonly ?string $foreignKey = null,
+        public readonly array $guesses = [],
     ) {}
 
     /**
@@ -311,28 +313,5 @@ final readonly class RelationshipField
             Opportunity::class => 'heroicon-o-currency-dollar',
             default => 'heroicon-o-link',
         };
-    }
-
-    /**
-     * Convert to array representation.
-     *
-     * @return array<string, mixed>
-     */
-    public function toArray(): array
-    {
-        return [
-            'name' => $this->name,
-            'relatedModel' => $this->relatedModel,
-            'type' => $this->type,
-            'matchableFields' => array_map(
-                fn (MatchableField $field): array => $field->toArray(),
-                $this->matchableFields
-            ),
-            'canCreate' => $this->canCreate,
-            'label' => $this->label,
-            'foreignKey' => $this->foreignKey,
-            'guesses' => $this->guesses,
-            'icon' => $this->icon(),
-        ];
     }
 }
