@@ -105,7 +105,7 @@
     @endif
 
     {{-- Navigation --}}
-    <div class="flex justify-between pt-3">
+    <div class="flex justify-end gap-3 pt-3">
         <x-filament::button
             wire:click="$parent.mountAction('startOver')"
             color="gray"

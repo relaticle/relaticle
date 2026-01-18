@@ -14,6 +14,7 @@
         <livewire:import-wizard-new.steps.mapping
             :store-id="$storeId"
             :entity-type="$entityType"
+            @completed="nextStep"
             :wire:key="'map-' . $storeId"
         />
     @elseif($currentStep === self::STEP_REVIEW)

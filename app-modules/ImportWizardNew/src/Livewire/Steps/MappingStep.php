@@ -15,6 +15,7 @@ use Relaticle\ImportWizardNew\Enums\ImportEntityType;
 use Relaticle\ImportWizardNew\Enums\ImportStatus;
 use Relaticle\ImportWizardNew\Importers\BaseImporter;
 use Relaticle\ImportWizardNew\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizardNew\Store\ImportStore;
 use Relaticle\ImportWizardNew\Support\DataTypeInferencer;
 
 /**
@@ -202,7 +203,7 @@ final class MappingStep extends Component
     public function previewValues(string $column, int $limit = 5): array
     {
         $store = $this->store();
-        if (! $store instanceof \Relaticle\ImportWizardNew\Store\ImportStore) {
+        if (! $store instanceof ImportStore) {
             return [];
         }
 
@@ -376,7 +377,7 @@ final class MappingStep extends Component
         $this->saveMappings();
 
         $store = $this->store();
-        if ($store instanceof \Relaticle\ImportWizardNew\Store\ImportStore) {
+        if ($store instanceof ImportStore) {
             $store->setStatus(ImportStatus::Reviewing);
         }
 
@@ -393,7 +394,7 @@ final class MappingStep extends Component
     private function saveMappings(): void
     {
         $store = $this->store();
-        if (! $store instanceof \Relaticle\ImportWizardNew\Store\ImportStore) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 
@@ -410,7 +411,7 @@ final class MappingStep extends Component
     private function loadMappings(): void
     {
         $store = $this->store();
-        if (! $store instanceof \Relaticle\ImportWizardNew\Store\ImportStore) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 
