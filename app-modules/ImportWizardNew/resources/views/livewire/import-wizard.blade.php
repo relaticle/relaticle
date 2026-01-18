@@ -21,6 +21,7 @@
         <livewire:import-wizard-new.steps.review
             :store-id="$storeId"
             :entity-type="$entityType"
+            @completed="nextStep"
             :wire:key="'review-' . $storeId"
         />
     @elseif($currentStep === self::STEP_PREVIEW)
