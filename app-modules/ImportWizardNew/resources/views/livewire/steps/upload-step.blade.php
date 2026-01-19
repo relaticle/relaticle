@@ -1,6 +1,6 @@
 <div class="flex flex-col h-full">
     {{-- File Upload Container --}}
-    <div class="flex-1 flex flex-col min-h-[20rem]">
+    <div class="flex-1 flex flex-col min-h-[12rem]">
     @if ($isParsed)
         @php
             $fileName = $uploadedFile?->getClientOriginalName() ?? 'import.csv';
@@ -83,7 +83,7 @@
                 }
             "
             x-bind:class="dragging
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-2 ring-primary-500/20 scale-[1.01]'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-2 ring-primary-500/20'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'"
             class="flex-1 relative rounded-xl border border-dashed p-12 transition-all duration-200 grid place-items-center"
         >

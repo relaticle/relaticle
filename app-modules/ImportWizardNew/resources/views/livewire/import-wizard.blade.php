@@ -1,4 +1,4 @@
-<div class="flex flex-col h-[calc(100vh-14rem)]">
+<div class="flex flex-col h-[calc(100vh-13.8rem)]">
     {{-- Step Progress --}}
     @include('import-wizard-new::livewire.partials.step-indicator')
 
