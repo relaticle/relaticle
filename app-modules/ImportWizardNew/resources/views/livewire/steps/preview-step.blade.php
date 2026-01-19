@@ -1,5 +1,6 @@
-<div class="space-y-6">
+<div class="flex flex-col h-full">
     {{-- Preview Step Placeholder --}}
+    <div class="flex-1 min-h-[20rem]">
     <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
         <div class="text-center">
             <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-100 dark:bg-success-900/20">
@@ -37,9 +38,10 @@
             </p>
         </div>
     </div>
+    </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="flex justify-end gap-3 pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <x-filament::button
             color="gray"
             wire:click="$parent.goBack()"

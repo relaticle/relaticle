@@ -1,12 +1,13 @@
-<div class="space-y-6">
+<div class="flex flex-col h-full">
     {{-- File Upload Container --}}
+    <div class="flex-1 flex flex-col min-h-[20rem]">
     @if ($isParsed)
         @php
             $fileName = $uploadedFile?->getClientOriginalName() ?? 'import.csv';
             $fileExtension = strtoupper(pathinfo($fileName, PATHINFO_EXTENSION));
             $fileSizeFormatted = Number::fileSize($uploadedFile?->getSize() ?? 0, precision: 1);
         @endphp
-        <div class="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-12 flex items-center justify-center min-h-[400px]">
+        <div class="flex-1 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-12 flex items-center justify-center">
             {{-- File Info Card --}}
             <div x-data class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 w-full max-w-sm">
                 {{-- Hidden file input for replace --}}
@@ -84,7 +85,7 @@
             x-bind:class="dragging
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-2 ring-primary-500/20 scale-[1.01]'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'"
-            class="relative rounded-xl border border-dashed p-12 transition-all duration-200 grid place-items-center min-h-[400px]"
+            class="flex-1 relative rounded-xl border border-dashed p-12 transition-all duration-200 grid place-items-center"
         >
             {{-- Hidden file input (NOT covering the zone) --}}
             <input
@@ -138,9 +139,10 @@
 
         </div>
     @endif
+    </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="flex justify-end pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <x-filament::button
             wire:click="continueToMapping"
             :disabled="!$isParsed"

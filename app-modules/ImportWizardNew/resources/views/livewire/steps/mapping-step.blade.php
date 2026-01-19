@@ -1,16 +1,17 @@
 <div
-    class="space-y-4"
+    class="flex flex-col h-full overflow-hidden"
     x-data="{ hoveredColumn: '{{ $headers[0] ?? '' }}' }"
     @field-selected.window="$wire.mapToField($event.detail.column, $event.detail.fieldKey)"
     @relationship-selected.window="$wire.mapToRelationship($event.detail.column, $event.detail.matcherKey, $event.detail.relationshipName)"
     @field-cleared.window="$wire.unmapColumn($event.detail.column)"
     wire:ignore.self
 >
-    <div class="flex gap-4">
+    <div class="flex-1 flex flex-col space-y-4 overflow-hidden min-h-0">
+    <div class="flex-1 flex gap-4 min-h-0 overflow-hidden">
         {{-- Column Mapping List --}}
-        <div class="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900">
+        <div class="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
             {{-- Header --}}
-            <div class="flex items-center px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl">
+            <div class="flex items-center px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
                 <div class="flex-1">File column</div>
                 <div class="w-6"></div>
                 <div class="flex-1 flex justify-end">
@@ -19,6 +20,7 @@
             </div>
 
             {{-- Mapping Rows --}}
+            <div class="flex-1 overflow-y-auto">
             @foreach ($headers as $index => $header)
                 @php
                     $mapping = $this->getMapping($header);
@@ -58,10 +60,11 @@
                     </div>
                 </div>
             @endforeach
+            </div>
         </div>
 
         {{-- Preview Panel --}}
-        <div class="w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col max-h-[28rem] bg-white dark:bg-gray-900">
+        <div class="w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-gray-900">
             <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</span>
@@ -74,7 +77,7 @@
             <div class="flex-1 overflow-y-auto">
                 @foreach ($headers as $header)
                     <div x-show="hoveredColumn === '{{ addslashes($header) }}'" x-cloak>
-                        @foreach ($this->previewValues($header, 20) as $value)
+                        @foreach ($this->previewValues($header, 50) as $value)
                             <div class="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0 text-xs text-gray-600 dark:text-gray-300 truncate">
                                 {{ $value ?: '—' }}
                             </div>
@@ -103,9 +106,10 @@
             </p>
         </div>
     @endif
+    </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-end gap-3 pt-3">
+    <div class="shrink-0 flex justify-end gap-3 pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <x-filament::button
             wire:click="$parent.mountAction('startOver')"
             color="gray"
