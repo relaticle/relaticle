@@ -60,6 +60,7 @@
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-livewire": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
+        "phpstan/phpstan": "2.1.33",
         "rector/rector": "^2.0",
         "spatie/laravel-horizon-watcher": "^1.1"
     },
