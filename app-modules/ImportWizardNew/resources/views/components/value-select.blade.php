@@ -5,7 +5,6 @@
     'searchable' => true,
     'placeholder' => 'Select...',
     'disabled' => false,
-    'warning' => false,
     'label' => null,
 ])
 
@@ -405,9 +404,7 @@
         :class="[
             open
                 ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
-                : @js($warning)
-                    ? 'border-warning-300 dark:border-warning-700 bg-warning-50 dark:bg-warning-950'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
         ]"
         x-on:click="toggle()"
     >
@@ -425,13 +422,6 @@
                 :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
                 x-text="displayLabel || '{{ $placeholder }}'"
             ></span>
-        @endif
-
-        @if ($warning)
-            <span class="text-warning-600 dark:text-warning-400 shrink-0" title="Low confidence - please verify" aria-hidden="true">
-                <x-filament::icon icon="heroicon-m-exclamation-triangle" class="w-4 h-4" />
-            </span>
-            <span class="sr-only">Warning: Low confidence detection, please verify</span>
         @endif
 
         <x-filament::icon
