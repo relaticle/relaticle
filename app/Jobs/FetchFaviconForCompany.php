@@ -12,6 +12,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
 
 final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
@@ -49,6 +50,8 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            $domainName = Str::start($domainName, 'https://');
+
             $favicon = Favicon::driver('high-quality')->fetch($domainName);
             $url = $favicon?->getFaviconUrl();
 
@@ -61,7 +64,6 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 
             $filename = match ($extension) {
                 'svg' => 'logo.svg',
-                'png' => 'logo.png',
                 'webp' => 'logo.webp',
                 'jpg', 'jpeg' => 'logo.jpg',
                 default => 'logo.png',
