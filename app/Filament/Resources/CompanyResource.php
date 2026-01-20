@@ -58,10 +58,8 @@ final class CompanyResource extends Resource
                     ->preload()
                     ->searchable(),
 
-                CustomFields::form()->forSchema($schema)->build()->columns(1),
-            ])
-            ->columns(1)
-            ->inlineLabel();
+                CustomFields::form()->build()->columnSpanFull()->columns(1),
+            ]);
     }
 
     public static function table(Table $table): Table
