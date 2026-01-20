@@ -32,7 +32,7 @@ final class ImportFieldCollection extends Collection
      */
     public function hasKey(string $key): bool
     {
-        return $this->get($key) !== null;
+        return $this->get($key) instanceof \Relaticle\ImportWizardNew\Data\ImportField;
     }
 
     /**
@@ -61,7 +61,7 @@ final class ImportFieldCollection extends Collection
      */
     public function optional(): static
     {
-        return $this->filter(fn (ImportField $f): bool => ! $f->required);
+        return $this->reject(fn (ImportField $f): bool => $f->required);
     }
 
     /**
@@ -69,7 +69,7 @@ final class ImportFieldCollection extends Collection
      */
     public function standard(): static
     {
-        return $this->filter(fn (ImportField $f): bool => ! $f->isCustomField);
+        return $this->reject(fn (ImportField $f): bool => $f->isCustomField);
     }
 
     /**

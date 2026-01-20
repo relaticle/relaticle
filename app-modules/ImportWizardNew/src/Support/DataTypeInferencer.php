@@ -91,7 +91,7 @@ final class DataTypeInferencer
             return;
         }
 
-        $fieldManager = app(FieldManager::class);
+        $fieldManager = resolve(FieldManager::class);
 
         foreach ($fieldManager->getFieldTypes() as $fieldTypeClass) {
             /** @var \Relaticle\CustomFields\Contracts\FieldTypeDefinitionInterface $instance */
