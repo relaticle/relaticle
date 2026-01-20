@@ -72,6 +72,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 ->usingFileName($filename)
                 ->usingName('company_logo')
                 ->withCustomProperties([
+                    'domain' => $domainName,
                     'original_size' => $favicon->getIconSize(),
                     'icon_type' => $favicon->getIconType(),
                     'fetched_at' => now()->toIso8601String(),

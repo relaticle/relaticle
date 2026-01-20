@@ -12,6 +12,7 @@ use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
 use App\Models\Company;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -30,11 +31,38 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
             ActionGroup::make([
-                EditAction::make()
-                    ->after(function (Company $record, array $data): void {
-                        $this->dispatchFaviconFetchIfNeeded($record, $data);
-                    }),
+                ActionGroup::make([
+                    Action::make('copyPageUrl')
+                        ->label('Copy page URL')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (Company $record): void {
+                            $url = CompanyResource::getUrl('view', [$record]);
+                            $this->js("
+                            navigator.clipboard.writeText('{$url}').then(() => {
+                                new FilamentNotification()
+                                    .title('URL copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                    Action::make('copyRecordId')
+                        ->label('Copy record ID')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (Company $record): void {
+                            $id = $record->getKey();
+                            $this->js("
+                            navigator.clipboard.writeText('{$id}').then(() => {
+                                new FilamentNotification()
+                                    .title('Record ID copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                ])->dropdown(false),
                 DeleteAction::make(),
             ]),
         ];
