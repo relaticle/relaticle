@@ -23,7 +23,6 @@ final class OpportunityForm
                     ->relationship('company', 'name')
                     ->searchable()
                     ->preload()
-                    ->required()
                     ->columnSpan(2),
                 Select::make('contact_id')
                     ->relationship('contact', 'name')
