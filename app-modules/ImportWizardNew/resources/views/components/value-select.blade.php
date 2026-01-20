@@ -407,9 +407,9 @@
         @if ($multiple)
             {{-- Multi-select: show tags or placeholder --}}
             <template x-if="hasValue">
-                <div class="flex-1 flex flex-wrap gap-1 min-w-0">
+                <div class="flex-1 flex flex-wrap gap-1.5 min-w-0">
                     <template x-for="val in selectedArray" :key="String(val)">
-                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-200 ring-1 ring-inset ring-primary-200 dark:ring-primary-700">
                             <span x-text="getOption(val).label" class="truncate max-w-[100px]"></span>
                             <span
                                 role="button"
@@ -418,7 +418,7 @@
                                 x-on:click.stop="remove(val)"
                                 x-on:keydown.enter.stop="remove(val)"
                                 x-on:keydown.space.stop="remove(val)"
-                                class="p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                class="p-0.5 -mr-0.5 rounded hover:bg-primary-200/80 dark:hover:bg-primary-700/50 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-500"
                             >
                                 <x-filament::icon icon="heroicon-o-x-mark" class="w-3 h-3" aria-hidden="true" />
                             </span>
@@ -462,7 +462,7 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-1"
-        class="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden"
+        class="absolute left-0 z-50 mt-1 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
         x-cloak
     >
         @if ($searchable)
@@ -502,23 +502,20 @@
                     :data-active="activeIndex === index ? 'true' : 'false'"
                     x-on:click="select(option.value)"
                     x-on:mouseenter="activeIndex = index"
-                    class="w-full text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer"
+                    class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
                     :class="[
-                        isSelected(option.value)
-                            ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300'
-                            : activeIndex === index
-                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        activeIndex === index
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     ]"
                 >
                     <div class="flex items-center gap-1.5">
                         <span
-                            class="w-4 h-4 shrink-0 flex items-center justify-center"
+                            class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
+                            :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
                             aria-hidden="true"
                         >
-                            <template x-if="isSelected(option.value)">
-                                <x-filament::icon icon="heroicon-s-check" class="w-3.5 h-3.5 text-primary-500" />
-                            </template>
+                            <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
                         </span>
                         <span class="truncate flex-1 text-xs" x-text="option.label"></span>
                     </div>
