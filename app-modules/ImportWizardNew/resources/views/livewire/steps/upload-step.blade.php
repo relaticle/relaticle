@@ -142,7 +142,16 @@
     </div>
 
     {{-- Navigation --}}
-    <div class="flex justify-end pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
+    <div class="flex items-center justify-between pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
+        <a
+            href="{{ url()->getPublicUrl('documentation/import') }}"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
+        >
+            <x-filament::icon icon="heroicon-o-book-open" class="w-4 h-4" />
+            <span>Import Guide</span>
+            <x-filament::icon icon="heroicon-o-arrow-top-right-on-square" class="w-3 h-3" />
+        </a>
         <x-filament::button
             wire:click="continueToMapping"
             :disabled="!$isParsed"
