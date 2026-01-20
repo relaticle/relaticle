@@ -26,12 +26,6 @@
     // Extract wire:model for Livewire integration
     $wireModel = $attributes->wire('model')->value();
     $hasLiveModifier = $attributes->wire('model')->hasModifier('live');
-
-    // Generate unique IDs for accessibility
-    $componentId = 'sm-' . Str::random(8);
-    $buttonId = $componentId . '-btn';
-    $listboxId = $componentId . '-listbox';
-    $labelId = $label ? $componentId . '-label' : null;
 @endphp
 
 <div
@@ -44,7 +38,6 @@
         options: @js($normalizedOptions),
         disabled: @js($disabled),
         searchable: @js($searchable),
-        componentId: @js($componentId),
         @if($wireModel)
         state: $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}),
         @else
@@ -52,6 +45,7 @@
         @endif
     })"
     x-on:click.outside="close()"
+    x-on:keydown.esc="open && (close(), $event.stopPropagation())"
     x-on:keydown="onKeydown($event)"
     {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'relative']) }}
 >
@@ -60,25 +54,23 @@
 
     {{-- Optional visible label --}}
     @if ($label)
-        <label id="{{ $labelId }}" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label :id="$id('label')" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             {{ $label }}
         </label>
     @endif
 
     {{-- Trigger Button --}}
     <button
-        x-ref="button"
+        x-ref="trigger"
         type="button"
         role="combobox"
-        id="{{ $buttonId }}"
+        :id="$id('button')"
         aria-haspopup="listbox"
         :aria-expanded="open ? 'true' : 'false'"
-        aria-controls="{{ $listboxId }}"
+        :aria-controls="$id('listbox')"
         :aria-activedescendant="activeDescendant"
-        @if ($labelId)
-            aria-labelledby="{{ $labelId }}"
-        @elseif ($label)
-            aria-label="{{ $label }}"
+        @if ($label)
+            :aria-labelledby="$id('label')"
         @else
             aria-label="{{ $placeholder }}"
         @endif
@@ -119,16 +111,12 @@
 
     {{-- Dropdown Panel --}}
     <div
-        x-show="open"
-        x-anchor.bottom-start.offset.4="$refs.button"
-        x-transition:enter="transition ease-out duration-100"
-        x-transition:enter-start="opacity-0 translate-y-1"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 translate-y-1"
-        class="absolute z-50 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
         x-cloak
+        x-float.placement.bottom-start.flip.offset="{ offset: 4 }"
+        x-transition:enter-start="opacity-0"
+        x-transition:leave-end="opacity-0"
+        x-ref="panel"
+        class="absolute z-50 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden transition"
     >
         @if ($searchable)
             <div class="relative border-b border-gray-200 dark:border-gray-700">
@@ -137,7 +125,7 @@
                     type="text"
                     placeholder="Search..."
                     aria-label="Search options"
-                    aria-controls="{{ $listboxId }}"
+                    :aria-controls="$id('listbox')"
                     :aria-activedescendant="activeDescendant"
                     class="w-full h-8 pl-8 pr-2 text-xs bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
                     x-ref="searchInput"
@@ -152,9 +140,9 @@
         <ul
             x-ref="listbox"
             role="listbox"
-            id="{{ $listboxId }}"
+            :id="$id('listbox')"
             :aria-multiselectable="multiple ? 'true' : 'false'"
-            aria-labelledby="{{ $buttonId }}"
+            :aria-labelledby="$id('button')"
             tabindex="-1"
             class="max-h-56 overflow-y-auto p-1 focus:outline-none"
         >
@@ -217,14 +205,19 @@ document.addEventListener('alpine:init', () => {
         options: config.options,
         disabled: config.disabled,
         searchable: config.searchable,
-        componentId: config.componentId,
         activeIndex: -1,
 
         init() {
+            // Sync open state when panel visibility changes
             this.$watch('open', (isOpen) => {
                 if (isOpen) {
                     this.activeIndex = this.getInitialActiveIndex();
-                    this.$nextTick(() => this.scrollActiveIntoView());
+                    this.$nextTick(() => {
+                        this.scrollActiveIntoView();
+                        if (this.searchable) {
+                            this.$refs.searchInput?.focus();
+                        }
+                    });
                 } else {
                     this.activeIndex = -1;
                     this.search = '';
@@ -288,13 +281,22 @@ document.addEventListener('alpine:init', () => {
 
         toggle() {
             if (this.disabled) return;
-            this.open = !this.open;
-            if (this.open && this.searchable) {
-                this.$nextTick(() => this.$refs.searchInput?.focus());
+            if (this.open) {
+                this.close();
+            } else {
+                this.openPanel();
             }
         },
 
+        openPanel() {
+            if (this.disabled || this.open) return;
+            this.$refs.panel?.open(this.$refs.trigger);
+            this.open = true;
+        },
+
         close() {
+            if (!this.open) return;
+            this.$refs.panel?.close();
             this.open = false;
         },
 
@@ -333,7 +335,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         getOptionId(index) {
-            return this.componentId + '-option-' + index;
+            return this.$id('option-' + index);
         },
 
         onKeydown(event) {
@@ -343,12 +345,20 @@ document.addEventListener('alpine:init', () => {
                 case 'ArrowDown':
                     event.preventDefault();
                     event.stopPropagation();
-                    this.open ? this.focusNext() : (this.open = true);
+                    if (this.open) {
+                        this.focusNext();
+                    } else {
+                        this.openPanel();
+                    }
                     break;
                 case 'ArrowUp':
                     event.preventDefault();
                     event.stopPropagation();
-                    this.open ? this.focusPrevious() : (this.open = true);
+                    if (this.open) {
+                        this.focusPrevious();
+                    } else {
+                        this.openPanel();
+                    }
                     break;
                 case 'Home':
                     if (this.open) { event.preventDefault(); this.focusFirst(); }
@@ -361,7 +371,7 @@ document.addEventListener('alpine:init', () => {
                     if (this.open && this.activeIndex >= 0 && this.activeIndex < this.filteredOptions.length) {
                         this.select(this.filteredOptions[this.activeIndex].value);
                     } else if (!this.open) {
-                        this.open = true;
+                        this.openPanel();
                     }
                     break;
                 case ' ':
@@ -372,15 +382,7 @@ document.addEventListener('alpine:init', () => {
                     // WAI-ARIA: Space opens listbox but does NOT select (only Enter selects)
                     if (!this.open) {
                         event.preventDefault();
-                        this.open = true;
-                    }
-                    break;
-                case 'Escape':
-                    if (this.open) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        this.close();
-                        this.$refs.button?.focus();
+                        this.openPanel();
                     }
                     break;
                 case 'Tab':
@@ -414,7 +416,7 @@ document.addEventListener('alpine:init', () => {
                     event.preventDefault();
                     event.stopPropagation();
                     this.close();
-                    this.$refs.button?.focus();
+                    this.$refs.trigger?.focus();
                     break;
             }
         },
