@@ -206,6 +206,7 @@ document.addEventListener('alpine:init', () => {
         disabled: config.disabled,
         searchable: config.searchable,
         activeIndex: -1,
+        documentClickListener: null,
 
         init() {
             // Sync open state when panel visibility changes
@@ -223,6 +224,19 @@ document.addEventListener('alpine:init', () => {
                     this.search = '';
                 }
             });
+
+            this.documentClickListener = (event) => {
+                if (this.open && !this.$el.contains(event.target)) {
+                    this.close();
+                }
+            };
+            document.addEventListener('click', this.documentClickListener);
+        },
+
+        destroy() {
+            if (this.documentClickListener) {
+                document.removeEventListener('click', this.documentClickListener);
+            }
         },
 
         get selected() {
