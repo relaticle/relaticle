@@ -62,6 +62,13 @@
             });
         },
 
+        get multiSelectDisplay() {
+            if (!this.multiple || !Array.isArray(this.selected) || this.selected.length === 0) {
+                return null;
+            }
+            return this.selected.map(v => this.getOption(v).label).join(', ');
+        },
+
         getInitialActiveIndex() {
             if (!this.hasValue) return 0;
             if (this.multiple && Array.isArray(this.selected) && this.selected.length > 0) {
@@ -391,7 +398,7 @@
         @endif
         :disabled="disabled"
         @class([
-            'w-full flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border focus:outline-none transition-colors',
+            'w-full h-9 flex items-center gap-1.5 px-2.5 text-sm rounded-lg border focus:outline-none',
             'cursor-not-allowed opacity-50' => $disabled,
             'cursor-pointer' => !$disabled,
         ])
@@ -405,30 +412,12 @@
         x-on:click="toggle()"
     >
         @if ($multiple)
-            {{-- Multi-select: show tags or placeholder --}}
-            <template x-if="hasValue">
-                <div class="flex-1 flex flex-wrap gap-1.5 min-w-0">
-                    <template x-for="val in selectedArray" :key="String(val)">
-                        <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-200 ring-1 ring-inset ring-primary-200 dark:ring-primary-700">
-                            <span x-text="getOption(val).label" class="truncate max-w-[100px]"></span>
-                            <span
-                                role="button"
-                                tabindex="0"
-                                :aria-label="'Remove ' + getOption(val).label"
-                                x-on:click.stop="remove(val)"
-                                x-on:keydown.enter.stop="remove(val)"
-                                x-on:keydown.space.stop="remove(val)"
-                                class="p-0.5 -mr-0.5 rounded hover:bg-primary-200/80 dark:hover:bg-primary-700/50 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-500"
-                            >
-                                <x-filament::icon icon="heroicon-o-x-mark" class="w-3 h-3" aria-hidden="true" />
-                            </span>
-                        </span>
-                    </template>
-                </div>
-            </template>
-            <template x-if="!hasValue">
-                <span class="flex-1 text-left text-gray-400 truncate text-sm">{{ $placeholder }}</span>
-            </template>
+            {{-- Multi-select: show comma-separated labels with truncate --}}
+            <span
+                class="flex-1 text-left truncate text-sm"
+                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+                x-text="multiSelectDisplay || '{{ $placeholder }}'"
+            ></span>
         @else
             {{-- Single-select: show selected label or placeholder --}}
             <span
@@ -447,7 +436,7 @@
 
         <x-filament::icon
             icon="heroicon-o-chevron-down"
-            class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
+            class="w-3.5 h-3.5 text-gray-400 shrink-0"
             x-bind:class="open ? 'rotate-180' : ''"
             aria-hidden="true"
         />
