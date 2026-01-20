@@ -35,24 +35,9 @@
                     </p>
                 </div>
 
-                {{-- Search and Filters --}}
-                <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2 shrink-0">
-                    {{-- Search Input --}}
-                    <div class="relative">
-                        <x-filament::icon
-                            icon="heroicon-o-magnifying-glass"
-                            class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                        />
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="search"
-                            placeholder="Search values..."
-                            class="w-full pl-8 pr-3 py-1.5 text-sm rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                        />
-                    </div>
-
-                    {{-- Filter Tabs and Sort Dropdown --}}
-                    <div class="flex items-center justify-between">
+                {{-- Filters, Search and Sort --}}
+                <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                    <div class="flex items-center justify-between gap-3">
                         <div class="flex gap-1 text-xs">
                             @foreach ([
                                 'all' => 'All',
@@ -71,8 +56,24 @@
                             @endforeach
                         </div>
 
-                        {{-- Sort Dropdown --}}
-                        <div x-data="{ open: false }" class="relative">
+                        {{-- Search and Sort --}}
+                        <div class="flex items-center gap-2">
+                            {{-- Search Input --}}
+                            <div class="relative">
+                                <x-filament::icon
+                                    icon="heroicon-o-magnifying-glass"
+                                    class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+                                />
+                                <input
+                                    type="text"
+                                    wire:model.live.debounce.300ms="search"
+                                    placeholder="Search..."
+                                    class="{{ $search !== '' ? 'w-48' : 'w-32' }} pl-7 pr-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 focus:w-48 transition-all"
+                                />
+                            </div>
+
+                            {{-- Sort Dropdown --}}
+                            <div x-data="{ open: false }" class="relative">
                             <button
                                 @click="open = !open"
                                 @click.outside="open = false"
@@ -154,6 +155,7 @@
                                     </button>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>
