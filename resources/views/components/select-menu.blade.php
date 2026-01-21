@@ -5,6 +5,7 @@
     'placeholder' => 'Select...',
     'disabled' => false,
     'label' => null,
+    'icon' => null,
 ])
 
 @php
@@ -87,6 +88,14 @@
         ]"
         x-on:click="toggle()"
     >
+        @if ($icon)
+            <x-filament::icon
+                :icon="$icon"
+                class="w-4 h-4 text-gray-400 shrink-0"
+                aria-hidden="true"
+            />
+        @endif
+
         @if ($multiple)
             <span
                 class="flex-1 text-left truncate text-sm"
