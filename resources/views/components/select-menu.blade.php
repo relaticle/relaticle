@@ -34,191 +34,18 @@
     @if($wireModel)
     wire:ignore
     @endif
-    x-data="selectMenu({
+    x-data="{
+        open: false,
+        search: '',
+        state: @if($wireModel) $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}) @else @js($multiple ? [] : null) @endif,
         multiple: @js($multiple),
         options: @js($normalizedOptions),
         disabled: @js($disabled),
         searchable: @js($searchable),
-        @if($wireModel)
-        state: $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}),
-        @else
-        state: @js($multiple ? [] : null),
-        @endif
-    })"
-    x-on:click.outside="close()"
-    x-on:keydown.esc="open && (close(), $event.stopPropagation())"
-    x-on:keydown="onKeydown($event)"
-    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'relative']) }}
->
-    {{-- Hidden live region for screen reader announcements --}}
-    <div x-ref="announcer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
-
-    {{-- Optional visible label --}}
-    @if ($label)
-        <label :id="$id('label')" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {{ $label }}
-        </label>
-    @endif
-
-    {{-- Trigger Button --}}
-    <button
-        x-ref="trigger"
-        type="button"
-        role="combobox"
-        :id="$id('button')"
-        aria-haspopup="listbox"
-        :aria-expanded="open ? 'true' : 'false'"
-        :aria-controls="$id('listbox')"
-        :aria-activedescendant="activeDescendant"
-        @if ($label)
-            :aria-labelledby="$id('label')"
-        @else
-            aria-label="{{ $placeholder }}"
-        @endif
-        :disabled="disabled"
-        @class([
-            'w-full h-9 flex items-center gap-1.5 px-2.5 text-sm rounded-lg border focus:outline-none',
-            'cursor-not-allowed opacity-50' => $disabled,
-            'cursor-pointer' => !$disabled,
-        ])
-        :class="[
-            open
-                ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
-        ]"
-        x-on:click="toggle()"
-    >
-        @if ($icon)
-            <x-filament::icon
-                :icon="$icon"
-                class="w-4 h-4 text-gray-400 shrink-0"
-                aria-hidden="true"
-            />
-        @endif
-
-        @if ($multiple)
-            <span
-                class="flex-1 text-left truncate text-sm"
-                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-                x-text="displayText || '{{ $placeholder }}'"
-            ></span>
-        @else
-            <span
-                class="flex-1 text-left truncate text-sm"
-                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-                x-text="displayText || '{{ $placeholder }}'"
-            ></span>
-        @endif
-
-        <x-filament::icon
-            icon="heroicon-o-chevron-down"
-            class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150"
-            x-bind:class="open && 'rotate-180'"
-            aria-hidden="true"
-        />
-    </button>
-
-    {{-- Dropdown Panel --}}
-    <div
-        x-cloak
-        x-float.placement.bottom-start.flip.offset="{ offset: 4 }"
-        x-transition:enter-start="opacity-0"
-        x-transition:leave-end="opacity-0"
-        x-ref="panel"
-        class="absolute z-50 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden transition"
-    >
-        @if ($searchable)
-            <div class="relative border-b border-gray-200 dark:border-gray-700">
-                <x-filament::icon icon="heroicon-o-magnifying-glass" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" aria-hidden="true" />
-                <input
-                    type="text"
-                    placeholder="Search..."
-                    aria-label="Search options"
-                    :aria-controls="$id('listbox')"
-                    :aria-activedescendant="activeDescendant"
-                    class="w-full h-8 pl-8 pr-2 text-xs bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
-                    x-ref="searchInput"
-                    x-model="search"
-                    x-on:input="onSearchInput()"
-                    x-on:keydown="onSearchKeydown($event)"
-                />
-            </div>
-        @endif
-
-        {{-- Listbox --}}
-        <ul
-            x-ref="listbox"
-            role="listbox"
-            :id="$id('listbox')"
-            :aria-multiselectable="multiple ? 'true' : 'false'"
-            :aria-labelledby="$id('button')"
-            tabindex="-1"
-            class="max-h-56 overflow-y-auto p-1 focus:outline-none"
-        >
-            <template x-for="(option, index) in filteredOptions" :key="option.value">
-                <li
-                    role="option"
-                    :id="getOptionId(index)"
-                    :aria-selected="isSelected(option.value) ? 'true' : 'false'"
-                    :data-highlighted="activeIndex === index ? '' : undefined"
-                    :data-selected="isSelected(option.value) ? '' : undefined"
-                    x-on:click="select(option.value)"
-                    x-on:mouseenter="activeIndex = index"
-                    class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
-                    :class="[
-                        activeIndex === index
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    ]"
-                >
-                    <div class="flex items-center gap-1.5">
-                        <span
-                            class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
-                            :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
-                            aria-hidden="true"
-                        >
-                            <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                        </span>
-                        <span class="truncate flex-1 text-xs" x-text="option.label"></span>
-                    </div>
-                    <template x-if="option.description">
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 ml-[22px]" x-text="option.description"></p>
-                    </template>
-                </li>
-            </template>
-
-            <template x-if="filteredOptions.length === 0 && options.length > 0">
-                <li role="option" aria-disabled="true" class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    No matching options
-                </li>
-            </template>
-
-            <template x-if="options.length === 0">
-                <li role="option" aria-disabled="true" class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    No options available
-                </li>
-            </template>
-        </ul>
-    </div>
-</div>
-
-@once
-@push('scripts')
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('selectMenu', (config) => ({
-        open: false,
-        search: '',
-        state: config.state,
-        multiple: config.multiple,
-        options: config.options,
-        disabled: config.disabled,
-        searchable: config.searchable,
         activeIndex: -1,
         documentClickListener: null,
 
         init() {
-            // Sync open state when panel visibility changes
             this.$watch('open', (isOpen) => {
                 if (isOpen) {
                     this.activeIndex = this.getInitialActiveIndex();
@@ -313,13 +140,13 @@ document.addEventListener('alpine:init', () => {
 
         openPanel() {
             if (this.disabled || this.open) return;
-            this.$refs.panel?.open(this.$refs.trigger);
+            this.$refs.panel?.open?.(this.$refs.trigger);
             this.open = true;
         },
 
         close() {
             if (!this.open) return;
-            this.$refs.panel?.close();
+            this.$refs.panel?.close?.();
             this.open = false;
         },
 
@@ -398,11 +225,9 @@ document.addEventListener('alpine:init', () => {
                     }
                     break;
                 case ' ':
-                    // Don't intercept space when typing in search input
                     if (this.searchable && document.activeElement === this.$refs.searchInput) {
                         return;
                     }
-                    // WAI-ARIA: Space opens listbox but does NOT select (only Enter selects)
                     if (!this.open) {
                         event.preventDefault();
                         this.openPanel();
@@ -497,8 +322,165 @@ document.addEventListener('alpine:init', () => {
                 this.$refs.announcer.textContent = message;
             }
         },
-    }));
-});
-</script>
-@endpush
-@endonce
+    }"
+    x-on:click.outside="close()"
+    x-on:keydown.esc="open && (close(), $event.stopPropagation())"
+    x-on:keydown="onKeydown($event)"
+    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'relative']) }}
+>
+    {{-- Hidden live region for screen reader announcements --}}
+    <div x-ref="announcer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    {{-- Optional visible label --}}
+    @if ($label)
+        <label :id="$id('label')" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {{ $label }}
+        </label>
+    @endif
+
+    {{-- Trigger Button --}}
+    <button
+        x-ref="trigger"
+        type="button"
+        role="combobox"
+        :id="$id('button')"
+        aria-haspopup="listbox"
+        :aria-expanded="open ? 'true' : 'false'"
+        :aria-controls="$id('listbox')"
+        :aria-activedescendant="activeDescendant"
+        @if ($label)
+            :aria-labelledby="$id('label')"
+        @else
+            aria-label="{{ $placeholder }}"
+        @endif
+        :disabled="disabled"
+        @class([
+            'w-full h-9 flex items-center gap-1.5 px-2.5 text-sm rounded-lg border focus:outline-none',
+            'cursor-not-allowed opacity-50' => $disabled,
+            'cursor-pointer' => !$disabled,
+        ])
+        :class="[
+            open
+                ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
+        ]"
+        x-on:click="toggle()"
+    >
+        @if ($icon)
+            <x-filament::icon
+                :icon="$icon"
+                class="w-4 h-4 text-gray-400 shrink-0"
+                aria-hidden="true"
+            />
+        @endif
+
+        @if ($multiple)
+            <span
+                class="flex-1 text-left truncate text-sm"
+                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+                x-text="displayText || '{{ $placeholder }}'"
+            ></span>
+        @else
+            <span
+                class="flex-1 text-left truncate text-sm"
+                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+                x-text="displayText || '{{ $placeholder }}'"
+            ></span>
+        @endif
+
+        <x-filament::icon
+            icon="heroicon-o-chevron-down"
+            class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150"
+            x-bind:class="open && 'rotate-180'"
+            aria-hidden="true"
+        />
+    </button>
+
+    {{-- Dropdown Panel --}}
+    <div
+        x-cloak
+        x-show="open"
+        x-float.placement.bottom-start.flip.offset="{ offset: 4 }"
+        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        x-ref="panel"
+        class="absolute z-50 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
+    >
+        @if ($searchable)
+            <div class="relative border-b border-gray-200 dark:border-gray-700">
+                <x-filament::icon icon="heroicon-o-magnifying-glass" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" aria-hidden="true" />
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    aria-label="Search options"
+                    :aria-controls="$id('listbox')"
+                    :aria-activedescendant="activeDescendant"
+                    class="w-full h-8 pl-8 pr-2 text-xs bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
+                    x-ref="searchInput"
+                    x-model="search"
+                    x-on:input="onSearchInput()"
+                    x-on:keydown="onSearchKeydown($event)"
+                />
+            </div>
+        @endif
+
+        {{-- Listbox --}}
+        <ul
+            x-ref="listbox"
+            role="listbox"
+            :id="$id('listbox')"
+            :aria-multiselectable="multiple ? 'true' : 'false'"
+            :aria-labelledby="$id('button')"
+            tabindex="-1"
+            class="max-h-56 overflow-y-auto p-1 focus:outline-none"
+        >
+            <template x-for="(option, index) in filteredOptions" :key="option.value">
+                <li
+                    role="option"
+                    :id="getOptionId(index)"
+                    :aria-selected="isSelected(option.value) ? 'true' : 'false'"
+                    :data-highlighted="activeIndex === index ? '' : undefined"
+                    :data-selected="isSelected(option.value) ? '' : undefined"
+                    x-on:click="select(option.value)"
+                    x-on:mouseenter="activeIndex = index"
+                    class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
+                    :class="[
+                        activeIndex === index
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    ]"
+                >
+                    <div class="flex items-center gap-1.5">
+                        <span
+                            class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
+                            :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
+                            aria-hidden="true"
+                        >
+                            <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                        </span>
+                        <span class="truncate flex-1 text-xs" x-text="option.label"></span>
+                    </div>
+                    <template x-if="option.description">
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 ml-[22px]" x-text="option.description"></p>
+                    </template>
+                </li>
+            </template>
+
+            <template x-if="filteredOptions.length === 0 && options.length > 0">
+                <li role="option" aria-disabled="true" class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    No matching options
+                </li>
+            </template>
+
+            <template x-if="options.length === 0">
+                <li role="option" aria-disabled="true" class="px-2 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    No options available
+                </li>
+            </template>
+        </ul>
+    </div>
+</div>
