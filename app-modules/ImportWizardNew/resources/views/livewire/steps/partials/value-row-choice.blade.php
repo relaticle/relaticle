@@ -59,7 +59,15 @@
         }"
         class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
     >
-        <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0 ml-2"/>
+        @php
+            $errorMessage = "\"{$rawValue}\" is not a valid option. Select a valid option from the dropdown.";
+        @endphp
+        <span
+            x-tooltip="{ content: @js($errorMessage), theme: $store.theme }"
+            class="ml-2 cursor-help"
+        >
+            <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+        </span>
         <div class="flex-1 min-w-0">
             <x-select-menu
                 :options="$options"

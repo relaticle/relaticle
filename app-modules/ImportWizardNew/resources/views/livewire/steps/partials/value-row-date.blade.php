@@ -51,9 +51,19 @@
                 class="absolute left-0 top-0 w-[calc(100%-4rem)] h-full opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
             />
 
-            {{-- Visible display: warning icon + raw value --}}
+            {{-- Visible display: warning icon with tooltip + raw value --}}
+            @php
+                $dateFormatLabel = $this->selectedColumnDateFormatEnum?->getLabel() ?? 'selected format';
+                $errorMessage = "Cannot parse \"{$rawValue}\" as a date using {$dateFormatLabel} format. Click the edit button or select a different format.";
+            @endphp
             <div class="flex-1 flex items-center gap-2 px-2 py-1 pointer-events-none">
-                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+                <span
+                    x-data
+                    x-tooltip="{ content: @js($errorMessage), theme: $store.theme }"
+                    class="pointer-events-auto cursor-help"
+                >
+                    <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+                </span>
                 <span class="text-sm text-gray-900 dark:text-white">{{ $rawValue }}</span>
             </div>
 
