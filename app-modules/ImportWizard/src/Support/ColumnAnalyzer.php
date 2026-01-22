@@ -49,7 +49,7 @@ final readonly class ColumnAnalyzer
     public function getUniqueValuesPaginated(
         string $csvColumn,
         int $page = 1,
-        int $perPage = 5000,
+        int $perPage = 100,
         string $search = '',
         string $filter = 'all',
         string $sortField = 'count',
