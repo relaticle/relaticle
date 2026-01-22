@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizardNew\Data;
 
+use Relaticle\CustomFields\Enums\FieldDataType;
 use Spatie\LaravelData\Data;
 
 /**
@@ -21,6 +22,7 @@ final class ImportField extends Data
      * @param  array<string>  $guesses  Column name aliases for auto-mapping
      * @param  string|null  $example  Example value for display
      * @param  bool  $isCustomField  Whether this is a custom field
+     * @param  FieldDataType|null  $type  The data type
      */
     public function __construct(
         public readonly string $key,
@@ -30,6 +32,7 @@ final class ImportField extends Data
         public readonly array $guesses = [],
         public readonly ?string $example = null,
         public readonly bool $isCustomField = false,
+        public readonly ?FieldDataType $type = null,
     ) {}
 
     /**
@@ -63,15 +66,7 @@ final class ImportField extends Data
      */
     public function label(string $label): self
     {
-        return new self(
-            key: $this->key,
-            label: $label,
-            required: $this->required,
-            rules: $this->rules,
-            guesses: $this->guesses,
-            example: $this->example,
-            isCustomField: $this->isCustomField,
-        );
+        return $this->cloneWith(['label' => $label]);
     }
 
     /**
@@ -79,15 +74,7 @@ final class ImportField extends Data
      */
     public function required(bool $required = true): self
     {
-        return new self(
-            key: $this->key,
-            label: $this->label,
-            required: $required,
-            rules: $this->rules,
-            guesses: $this->guesses,
-            example: $this->example,
-            isCustomField: $this->isCustomField,
-        );
+        return $this->cloneWith(['required' => $required]);
     }
 
     /**
@@ -97,15 +84,7 @@ final class ImportField extends Data
      */
     public function rules(array $rules): self
     {
-        return new self(
-            key: $this->key,
-            label: $this->label,
-            required: $this->required,
-            rules: $rules,
-            guesses: $this->guesses,
-            example: $this->example,
-            isCustomField: $this->isCustomField,
-        );
+        return $this->cloneWith(['rules' => $rules]);
     }
 
     /**
@@ -115,15 +94,7 @@ final class ImportField extends Data
      */
     public function guess(array $aliases): self
     {
-        return new self(
-            key: $this->key,
-            label: $this->label,
-            required: $this->required,
-            rules: $this->rules,
-            guesses: $aliases,
-            example: $this->example,
-            isCustomField: $this->isCustomField,
-        );
+        return $this->cloneWith(['guesses' => $aliases]);
     }
 
     /**
@@ -131,15 +102,7 @@ final class ImportField extends Data
      */
     public function example(string $example): self
     {
-        return new self(
-            key: $this->key,
-            label: $this->label,
-            required: $this->required,
-            rules: $this->rules,
-            guesses: $this->guesses,
-            example: $example,
-            isCustomField: $this->isCustomField,
-        );
+        return $this->cloneWith(['example' => $example]);
     }
 
     /**
@@ -147,14 +110,33 @@ final class ImportField extends Data
      */
     public function asCustomField(bool $isCustomField = true): self
     {
+        return $this->cloneWith(['isCustomField' => $isCustomField]);
+    }
+
+    /**
+     * Set the data type.
+     */
+    public function type(?FieldDataType $type): self
+    {
+        return $this->cloneWith(['type' => $type]);
+    }
+
+    /**
+     * Create a new instance with specified property overrides.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function cloneWith(array $overrides): self
+    {
         return new self(
-            key: $this->key,
-            label: $this->label,
-            required: $this->required,
-            rules: $this->rules,
-            guesses: $this->guesses,
-            example: $this->example,
-            isCustomField: $isCustomField,
+            key: $overrides['key'] ?? $this->key,
+            label: $overrides['label'] ?? $this->label,
+            required: $overrides['required'] ?? $this->required,
+            rules: $overrides['rules'] ?? $this->rules,
+            guesses: $overrides['guesses'] ?? $this->guesses,
+            example: $overrides['example'] ?? $this->example,
+            isCustomField: $overrides['isCustomField'] ?? $this->isCustomField,
+            type: $overrides['type'] ?? $this->type,
         );
     }
 

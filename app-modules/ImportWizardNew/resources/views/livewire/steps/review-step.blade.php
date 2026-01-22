@@ -28,11 +28,28 @@
             @if ($selectedColumn !== '')
                 {{-- Header --}}
                 <div class="px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
-                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ $selectedColumn }}</h3>
-                    <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                        Mapped to <span class="font-medium">{{ $this->selectedColumnAnalysis?->fieldLabel }}</span>
-                        · {{ $this->selectedColumnAnalysis?->uniqueCount ?? 0 }} unique values
-                    </p>
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ $selectedColumn }}</h3>
+                            <p class="text-[10px] text-gray-500 dark:text-gray-400">
+                                Mapped to <span class="font-medium">{{ $this->selectedColumnAnalysis?->fieldLabel }}</span>
+                                · {{ $this->selectedColumnAnalysis?->uniqueCount ?? 0 }} unique values
+                            </p>
+                        </div>
+
+                        @if ($this->isSelectedColumnDateType)
+                            {{-- Date Format Select Menu --}}
+                            <div class="w-44">
+                                <x-select-menu
+                                    :options="$this->dateFormatOptions"
+                                    :searchable="false"
+                                    placeholder="Date format"
+                                    icon="heroicon-o-cog-6-tooth"
+                                    wire:model.live="columnDateFormats.{{ $selectedColumn }}"
+                                />
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- Filters, Search and Sort --}}
@@ -162,13 +179,11 @@
 
                 {{-- Table Header --}}
                 <div class="flex items-center px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
-                    <div class="w-2/5">Raw Data</div>
-                    <div class="w-8 text-center">
+                    <div class="w-1/2">Raw Data</div>
+                    <div class="w-6 text-center">
                         <x-filament::icon icon="heroicon-o-arrow-right" class="w-3 h-3 mx-auto"/>
                     </div>
                     <div class="flex-1">Mapped Value</div>
-                    <div class="w-16 text-center">Rows</div>
-                    <div class="w-16 text-right">Skip</div>
                 </div>
 
                 {{-- Values List --}}
@@ -186,61 +201,33 @@
                             wire:key="val-{{ $index }}-{{ crc32($rawValue) }}"
                             class="flex items-center px-3 py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0"
                         >
-                            {{-- Raw Data --}}
-                            <div class="w-2/5 min-w-0 pr-2">
-                                <span class="text-sm {{ $isRawBlank ? 'text-gray-400 dark:text-gray-500 italic' : 'text-gray-900 dark:text-white' }} truncate block" title="{{ $rawValue }}">
-                                    {{ $isRawBlank ? '(blank)' : Str::limit($rawValue, 40) }}
+                            {{-- Raw Data + Row Count --}}
+                            <div class="w-1/2 min-w-0 pr-2 flex items-center gap-2">
+                                <span class="text-sm {{ $isRawBlank ? 'text-gray-400 dark:text-gray-500 italic' : 'text-gray-900 dark:text-white' }} truncate" title="{{ $rawValue }}">
+                                    {{ $isRawBlank ? '(blank)' : Str::limit($rawValue, 35) }}
+                                </span>
+                                <span class="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                                    {{ $valueData['count'] }} {{ Str::plural('row', $valueData['count']) }}
                                 </span>
                             </div>
 
                             {{-- Arrow --}}
-                            <div class="w-8 text-center">
+                            <div class="w-6 text-center">
                                 <x-filament::icon icon="heroicon-o-arrow-right" class="w-3 h-3 text-gray-400 mx-auto"/>
                             </div>
 
-                            {{-- Mapped Value --}}
-                            <div class="flex-1 min-w-0 pr-2">
+                            {{-- Mapped Value + Actions --}}
+                            <div class="flex-1 min-w-0 flex items-center gap-2">
                                 @if ($isSkipped)
-                                    <span class="text-sm text-warning-600 dark:text-warning-400 italic">(skipped)</span>
+                                    @include('import-wizard-new::livewire.steps.partials.value-row-skipped', compact('rawValue', 'selectedColumn'))
                                 @elseif ($isRawBlank)
                                     <span class="text-sm text-gray-400 dark:text-gray-500 italic">(blank)</span>
+                                @elseif ($this->isSelectedColumnDateType)
+                                    @include('import-wizard-new::livewire.steps.partials.value-row-date', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn'))
+                                @elseif ($this->isSelectedColumnChoiceType)
+                                    @include('import-wizard-new::livewire.steps.partials.value-row-choice', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn'))
                                 @else
-                                    <input
-                                        type="text"
-                                        value="{{ $hasCorrection ? $mappedValue : $rawValue }}"
-                                        wire:change.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, $event.target.value)"
-                                        class="w-full text-sm px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                                    />
-                                @endif
-                            </div>
-
-                            {{-- Row Count --}}
-                            <div class="w-16 text-center">
-                                <span class="text-xs text-gray-500 dark:text-gray-400">
-                                    {{ number_format($valueData['count']) }}
-                                </span>
-                            </div>
-
-                            {{-- Skip Button --}}
-                            <div class="w-16 flex justify-end">
-                                @if (!$isRawBlank)
-                                    @if ($isSkipped)
-                                        <button
-                                            wire:click.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, {{ Js::from($rawValue) }})"
-                                            class="p-1.5 rounded text-warning-600 dark:text-warning-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors data-[loading]:opacity-50 data-[loading]:pointer-events-none"
-                                            title="Restore this value"
-                                        >
-                                            <x-filament::icon icon="heroicon-o-arrow-uturn-left" class="w-4 h-4"/>
-                                        </button>
-                                    @else
-                                        <button
-                                            wire:click.preserve-scroll="skipValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }})"
-                                            class="p-1.5 rounded text-gray-400 hover:text-warning-600 hover:bg-warning-50 dark:hover:text-warning-400 dark:hover:bg-warning-950/50 transition-colors data-[loading]:opacity-50 data-[loading]:pointer-events-none"
-                                            title="Skip this value"
-                                        >
-                                            <x-filament::icon icon="heroicon-o-no-symbol" class="w-4 h-4"/>
-                                        </button>
-                                    @endif
+                                    @include('import-wizard-new::livewire.steps.partials.value-row-text', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn'))
                                 @endif
                             </div>
                         </div>

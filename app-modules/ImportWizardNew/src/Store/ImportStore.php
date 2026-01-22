@@ -246,6 +246,17 @@ final class ImportStore
     }
 
     /**
+     * Update a single column mapping.
+     */
+    public function updateMapping(string $source, ColumnMapping $newMapping): void
+    {
+        $mappings = $this->mappings()
+            ->map(fn (ColumnMapping $m): ColumnMapping => $m->source === $source ? $newMapping : $m);
+
+        $this->setMappings($mappings);
+    }
+
+    /**
      * Get row data transformed to entity field keys.
      *
      * Applies corrections and remaps CSV columns to field names.

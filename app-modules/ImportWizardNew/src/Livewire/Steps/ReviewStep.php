@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizardNew\Livewire\Steps;
 
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizardNew\Data\ColumnAnalysisResult;
+use Relaticle\ImportWizardNew\Data\ColumnMapping;
+use Relaticle\ImportWizardNew\Enums\DateFormat;
 use Relaticle\ImportWizardNew\Enums\ImportEntityType;
 use Relaticle\ImportWizardNew\Enums\ImportStatus;
 use Relaticle\ImportWizardNew\Importers\BaseImporter;
@@ -62,6 +67,11 @@ final class ReviewStep extends Component
 
     public int $totalFiltered = 0;
 
+    /**
+     * @var array<string, string> CSV column => date format value (iso, european, american)
+     */
+    public array $columnDateFormats = [];
+
     private ?BaseImporter $importer = null;
 
     private ?ColumnAnalyzer $analyzer = null;
@@ -70,7 +80,22 @@ final class ReviewStep extends Component
     {
         $this->mountWithImportStore($storeId, $entityType);
         $this->runAnalysis();
+        $this->initializeDateFormats();
         $this->loadInitialValues();
+    }
+
+    /**
+     * Initialize date formats from stored mappings or set ISO default.
+     */
+    private function initializeDateFormats(): void
+    {
+        foreach ($this->columnAnalyses as $csvColumn => $analysis) {
+            $dataType = isset($analysis['dataType']) ? FieldDataType::tryFrom($analysis['dataType']) : null;
+
+            if ($dataType?->isDateOrDateTime()) {
+                $this->columnDateFormats[$csvColumn] = $analysis['dateFormat'] ?? 'iso';
+            }
+        }
     }
 
     public function render(): View
@@ -92,6 +117,149 @@ final class ReviewStep extends Component
     public function totalPages(): int
     {
         return $this->totalFiltered > 0 ? (int) ceil($this->totalFiltered / $this->perPage) : 1;
+    }
+
+    #[Computed]
+    public function isSelectedColumnDateType(): bool
+    {
+        return $this->selectedColumnAnalysis()?->isDateOrDateTime() ?? false;
+    }
+
+    #[Computed]
+    public function selectedColumnDateFormat(): string
+    {
+        return $this->columnDateFormats[$this->selectedColumn] ?? 'iso';
+    }
+
+    #[Computed]
+    public function selectedColumnDateFormatEnum(): ?DateFormat
+    {
+        return DateFormat::tryFrom($this->columnDateFormats[$this->selectedColumn] ?? 'iso');
+    }
+
+    #[Computed]
+    public function isSelectedColumnDateTime(): bool
+    {
+        return $this->selectedColumnAnalysis()?->dataType === FieldDataType::DATE_TIME;
+    }
+
+    /**
+     * Get date format options for the currently selected column.
+     *
+     * @return array<int, array{value: string, label: string, description: string}>
+     */
+    #[Computed]
+    public function dateFormatOptions(): array
+    {
+        $withTime = $this->selectedColumnAnalysis()?->dataType === FieldDataType::DATE_TIME;
+
+        return collect(DateFormat::cases())
+            ->map(fn (DateFormat $format): array => [
+                'value' => $format->value,
+                'label' => $format->getLabel(),
+                'description' => implode(' • ', $format->getExamples($withTime)),
+            ])
+            ->all();
+    }
+
+    #[Computed]
+    public function isSelectedColumnChoiceType(): bool
+    {
+        return $this->selectedColumnAnalysis()?->isChoiceField() ?? false;
+    }
+
+    #[Computed]
+    public function isSelectedColumnMultiChoice(): bool
+    {
+        return $this->selectedColumnAnalysis()?->isMultiChoice() ?? false;
+    }
+
+    /**
+     * Get choice options for the currently selected column.
+     *
+     * @return array<int, array{value: string, label: string}>
+     */
+    #[Computed]
+    public function selectedColumnOptions(): array
+    {
+        $analysis = $this->selectedColumnAnalysis();
+
+        if (! $analysis instanceof ColumnAnalysisResult || ! $this->isSelectedColumnChoiceType()) {
+            return [];
+        }
+
+        $fieldKey = $analysis->fieldKey;
+
+        if (! str_starts_with($fieldKey, 'custom_fields_')) {
+            return [];
+        }
+
+        $code = Str::after($fieldKey, 'custom_fields_');
+        $customField = CustomFields::customFieldModel()::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->getImporter()->getTeamId())
+            ->where('code', $code)
+            ->with('options')
+            ->first();
+
+        if ($customField === null) {
+            return [];
+        }
+
+        return $customField->options->map(fn ($option): array => [
+            'value' => $option->name,
+            'label' => $option->name,
+        ])->all();
+    }
+
+    /**
+     * Check if a value is valid for the selected choice field.
+     */
+    public function isValidChoiceValue(string $rawValue): bool
+    {
+        if (! $this->isSelectedColumnChoiceType()) {
+            return true;
+        }
+
+        if ($rawValue === '') {
+            return true;
+        }
+
+        $options = collect($this->selectedColumnOptions());
+
+        if ($this->isSelectedColumnMultiChoice()) {
+            $values = array_map(trim(...), explode(',', $rawValue));
+
+            return array_all($values, fn ($v): bool => ! ($v !== '' && $options->doesntContain(fn (array $o): bool => strcasecmp((string) $o['value'], (string) $v) === 0)));
+        }
+
+        return $options->contains(fn (array $o): bool => strcasecmp($o['value'], $rawValue) === 0);
+    }
+
+    /**
+     * Normalize choice values to match option casing and filter to valid options only.
+     *
+     * @return string|list<string>
+     */
+    public function normalizeChoiceValue(string $rawValue): string|array
+    {
+        $options = collect($this->selectedColumnOptions());
+
+        if ($this->isSelectedColumnMultiChoice()) {
+            $values = array_map(trim(...), explode(',', $rawValue));
+
+            return array_values(array_filter(
+                array_map(function (string $v) use ($options): ?string {
+                    $match = $options->first(fn (array $o): bool => strcasecmp((string) $o['value'], $v) === 0);
+
+                    return $match['value'] ?? null;
+                }, $values)
+            ));
+        }
+
+        $match = $options->first(fn (array $o): bool => strcasecmp((string) $o['value'], $rawValue) === 0);
+
+        return $match['value'] ?? $rawValue;
     }
 
     public function runAnalysis(): void
@@ -155,6 +323,52 @@ final class ReviewStep extends Component
         $this->sortField = $field;
         $this->sortDirection = $direction;
         $this->valuesPage = 1;
+        $this->loadPage();
+    }
+
+    /**
+     * Handle wire:model updates to columnDateFormats.
+     */
+    public function updatedColumnDateFormats(string $format, string $csvColumn): void
+    {
+        $this->setDateFormat($csvColumn, $format);
+    }
+
+    public function setDateFormat(string $csvColumn, string $format): void
+    {
+        // Validate the format value
+        $dateFormatEnum = DateFormat::tryFrom($format);
+        if ($dateFormatEnum === null) {
+            return;
+        }
+
+        // Only apply to date columns
+        $analysis = $this->columnAnalyses[$csvColumn] ?? null;
+        $dataType = isset($analysis['dataType']) ? FieldDataType::tryFrom($analysis['dataType']) : null;
+
+        if (! $dataType?->isDateOrDateTime()) {
+            return;
+        }
+
+        // Update local state (may already be set by wire:model)
+        $this->columnDateFormats[$csvColumn] = $format;
+
+        // Update the mapping in the store using enum
+        $store = $this->store();
+
+        if ($store instanceof ImportStore) {
+            $mapping = $store->getMapping($csvColumn);
+
+            if ($mapping instanceof ColumnMapping) {
+                $updatedMapping = $mapping->withDateFormat($dateFormatEnum);
+                $store->updateMapping($csvColumn, $updatedMapping);
+            }
+        }
+
+        // Refresh column analysis to get updated parse error count
+        $this->refreshColumnAnalysis($csvColumn);
+
+        // Reload values
         $this->loadPage();
     }
 
@@ -250,12 +464,13 @@ final class ReviewStep extends Component
 
     public function updateMappedValue(string $csvColumn, string $rawValue, string $newValue): void
     {
-        $this->getAnalyzer()->applyCorrection($csvColumn, $rawValue, $newValue);
+        $trimmedNew = DateFormat::normalizePickerValue($newValue);
+
+        $this->getAnalyzer()->applyCorrection($csvColumn, $rawValue, $trimmedNew);
         $this->refreshColumnAnalysis($csvColumn);
 
         // When restoring to original (trimmed values match), correction was removed
         // so mapped should be null (no correction exists)
-        $trimmedNew = trim($newValue);
         $isRestored = $trimmedNew === trim($rawValue);
         $mappedValue = $isRestored ? null : $trimmedNew;
 
@@ -307,7 +522,7 @@ final class ReviewStep extends Component
     private function refreshColumnAnalysis(string $csvColumn): void
     {
         $mapping = $this->store()?->getMapping($csvColumn);
-        if (! $mapping instanceof \Relaticle\ImportWizardNew\Data\ColumnMapping) {
+        if (! $mapping instanceof ColumnMapping) {
             return;
         }
 

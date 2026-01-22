@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizardNew\Data;
 
+use Relaticle\ImportWizardNew\Enums\DateFormat;
 use Spatie\LaravelData\Data;
 
 /**
@@ -13,6 +14,7 @@ use Spatie\LaravelData\Data;
  * - source: CSV column header (the key in the columnMappings array)
  * - target: field key for field mappings, or matcherKey for relationship mappings
  * - relationship: if set, indicates this is a relationship mapping
+ * - dateFormat: if set, indicates the date format to use for parsing (iso, european, american)
  *
  * The rule: presence of `relationship` determines the mapping type.
  */
@@ -22,6 +24,7 @@ final class ColumnMapping extends Data
         public readonly string $source,
         public readonly string $target,
         public readonly ?string $relationship = null,
+        public readonly ?DateFormat $dateFormat = null,
     ) {}
 
     /**
@@ -59,5 +62,18 @@ final class ColumnMapping extends Data
     public function isRelationshipMapping(): bool
     {
         return $this->relationship !== null;
+    }
+
+    /**
+     * Create a new instance with the given date format.
+     */
+    public function withDateFormat(?DateFormat $dateFormat): self
+    {
+        return new self(
+            source: $this->source,
+            target: $this->target,
+            relationship: $this->relationship,
+            dateFormat: $dateFormat,
+        );
     }
 }

@@ -6,6 +6,8 @@
     'disabled' => false,
     'label' => null,
     'icon' => null,
+    'value' => null,
+    'borderless' => false,
 ])
 
 @php
@@ -34,10 +36,11 @@
     @if($wireModel)
     wire:ignore
     @endif
+    x-modelable="state"
     x-data="{
         open: false,
         search: '',
-        state: @if($wireModel) $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}) @else @js($multiple ? [] : null) @endif,
+        state: @if($wireModel) $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}) @else @js($value ?? ($multiple ? [] : null)) @endif,
         multiple: @js($multiple),
         options: @js($normalizedOptions),
         disabled: @js($disabled),
@@ -160,9 +163,14 @@
                 }
                 this.selected = current;
                 this.announceSelection(value);
+                this.$dispatch('input', current);
             } else {
+                // Close first (instantly) to avoid transition collision with Livewire
+                // When entangled with wire:model.live, setting selected triggers Livewire
+                // which morphs the DOM while leave transition would still be animating
+                this.open = false;
                 this.selected = value;
-                this.close();
+                this.$dispatch('input', value);
             }
         },
 
@@ -326,7 +334,7 @@
     x-on:click.outside="close()"
     x-on:keydown.esc="open && (close(), $event.stopPropagation())"
     x-on:keydown="onKeydown($event)"
-    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'relative']) }}
+    {{ $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->merge(['class' => 'relative']) }}
 >
     {{-- Hidden live region for screen reader announcements --}}
     <div x-ref="announcer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
@@ -355,15 +363,19 @@
         @endif
         :disabled="disabled"
         @class([
-            'w-full h-9 flex items-center gap-1.5 px-2.5 text-sm rounded-lg border focus:outline-none',
+            'w-full flex items-center text-sm focus:outline-none',
+            'h-9 gap-1.5 px-2.5 rounded-lg border' => !$borderless,
+            'gap-2 px-2 py-1 border-0 bg-transparent' => $borderless,
             'cursor-not-allowed opacity-50' => $disabled,
             'cursor-pointer' => !$disabled,
         ])
+        @if(!$borderless)
         :class="[
             open
                 ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'
         ]"
+        @endif
         x-on:click="toggle()"
     >
         @if ($icon)
@@ -374,19 +386,12 @@
             />
         @endif
 
-        @if ($multiple)
-            <span
-                class="flex-1 text-left truncate text-sm"
-                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-                x-text="displayText || '{{ $placeholder }}'"
-            ></span>
-        @else
-            <span
-                class="flex-1 text-left truncate text-sm"
-                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-                x-text="displayText || '{{ $placeholder }}'"
-            ></span>
-        @endif
+        <span
+            class="flex-1 text-left truncate text-sm"
+            :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+            :title="displayText"
+            x-text="displayText || '{{ $placeholder }}'"
+        ></span>
 
         <x-filament::icon
             icon="heroicon-o-chevron-down"
@@ -404,9 +409,6 @@
         x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="opacity-100 scale-100"
-        x-transition:leave-end="opacity-0 scale-95"
         x-ref="panel"
         class="absolute z-50 w-full min-w-[200px] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
     >
@@ -462,7 +464,7 @@
                         >
                             <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
                         </span>
-                        <span class="truncate flex-1 text-xs" x-text="option.label"></span>
+                        <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
                     </div>
                     <template x-if="option.description">
                         <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 ml-[22px]" x-text="option.description"></p>

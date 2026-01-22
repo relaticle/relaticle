@@ -146,7 +146,8 @@ abstract class BaseImporter implements ImporterContract
                 ->label($customField->name)
                 ->required($isRequired)
                 ->rules($isRequired ? ['required'] : ['nullable'])
-                ->asCustomField();
+                ->asCustomField()
+                ->type($customField->typeData->dataType);
         });
 
         return new ImportFieldCollection($fields->all());

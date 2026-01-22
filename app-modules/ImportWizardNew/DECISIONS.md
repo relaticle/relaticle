@@ -2,7 +2,7 @@
 
 This document contains the finalized architecture decisions for the new Import Wizard.
 
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-01-21
 
 ---
 
@@ -56,8 +56,8 @@ storage/app/imports/{ulid}/
 
 | Class | Responsibility | Lines |
 |-------|----------------|-------|
-| `ImportStore` | Storage layer (files, connections, lifecycle) | 333 |
-| `ImportRow` | Eloquent model (queries, scopes, accessors) | ~130 |
+| `ImportStore` | Storage layer (files, connections, lifecycle) | ~425 |
+| `ImportRow` | Eloquent model (queries, scopes, accessors) | ~180 |
 
 **ImportStore handles:**
 - File/folder management (paths)
@@ -357,6 +357,8 @@ app-modules/ImportWizardNew/
 │   └── views/
 │       ├── filament/pages/
 │       │   └── import-page.blade.php
+│       ├── components/
+│       │   └── field-select.blade.php
 │       └── livewire/
 │           ├── import-wizard.blade.php
 │           ├── partials/
@@ -368,24 +370,49 @@ app-modules/ImportWizardNew/
 │               └── preview-step.blade.php
 ├── src/
 │   ├── ImportWizardNewServiceProvider.php
+│   ├── Data/
+│   │   ├── ColumnAnalysisResult.php  ✅
+│   │   ├── ColumnMapping.php         ✅
+│   │   ├── ImportField.php           ✅
+│   │   ├── ImportFieldCollection.php ✅
+│   │   ├── InferenceResult.php       ✅
+│   │   ├── MatchableField.php        ✅
+│   │   ├── RelationshipField.php     ✅
+│   │   └── RelationshipMatch.php     ✅
 │   ├── Enums/
+│   │   ├── DateFormat.php            ✅
+│   │   ├── ImportEntityType.php      ✅
 │   │   ├── ImportStatus.php          ✅
-│   │   └── ImportEntityType.php      ✅
+│   │   └── RowMatchAction.php        ✅
 │   ├── Filament/
 │   │   └── Pages/
 │   │       ├── ImportPage.php        (Base class)
 │   │       ├── ImportCompaniesNew.php
 │   │       └── ImportTasksNew.php
+│   ├── Importers/
+│   │   ├── Contracts/
+│   │   │   └── ImporterContract.php  ✅
+│   │   ├── BaseImporter.php          ✅
+│   │   ├── CompanyImporter.php       ✅
+│   │   ├── NoteImporter.php          ✅
+│   │   ├── OpportunityImporter.php   ✅
+│   │   ├── PeopleImporter.php        ✅
+│   │   └── TaskImporter.php          ✅
 │   ├── Livewire/
+│   │   ├── Concerns/
+│   │   │   └── WithImportStore.php   ✅
 │   │   ├── ImportWizard.php          ✅ (Parent)
 │   │   └── Steps/
 │   │       ├── UploadStep.php        ✅
-│   │       ├── MappingStep.php       ✅ (Placeholder)
-│   │       ├── ReviewStep.php        ✅ (Placeholder)
-│   │       └── PreviewStep.php       ✅ (Placeholder)
-│   └── Store/
-│       ├── ImportStore.php           ✅ (333 lines)
-│       └── ImportRow.php             ✅ (~130 lines)
+│   │       ├── MappingStep.php       ✅ (~443 lines)
+│   │       ├── ReviewStep.php        ✅ (~450 lines)
+│   │       └── PreviewStep.php       ⏳ (Placeholder)
+│   ├── Store/
+│   │   ├── ImportStore.php           ✅ (~425 lines)
+│   │   └── ImportRow.php             ✅ (~180 lines)
+│   └── Support/
+│       ├── ColumnAnalyzer.php        ✅
+│       └── DataTypeInferencer.php    ✅
 ├── BRAINSTORMING.md
 └── DECISIONS.md
 ```
@@ -510,19 +537,22 @@ Replace Filament importers with new framework-agnostic Importer classes that ser
 
 **File Structure:**
 ```
-src/Importers/
-├── Contracts/
-│   └── ImporterContract.php       # Interface
-├── Fields/
+src/
+├── Data/
 │   ├── ImportField.php            # Single field definition (immutable)
+│   ├── ImportFieldCollection.php  # Collection with auto-mapping
 │   ├── RelationshipField.php      # Relationship field definition
-│   └── FieldCollection.php        # Collection with auto-mapping
-├── BaseImporter.php               # Shared logic + optional helpers
-├── CompanyImporter.php
-├── PeopleImporter.php
-├── OpportunityImporter.php
-├── TaskImporter.php
-└── NoteImporter.php
+│   ├── MatchableField.php         # Field matching configuration
+│   └── ...
+└── Importers/
+    ├── Contracts/
+    │   └── ImporterContract.php   # Interface
+    ├── BaseImporter.php           # Shared logic + optional helpers
+    ├── CompanyImporter.php
+    ├── PeopleImporter.php
+    ├── OpportunityImporter.php
+    ├── TaskImporter.php
+    └── NoteImporter.php
 ```
 
 ---
@@ -679,6 +709,200 @@ $importer = ImportEntityType::Company->importer($teamId);
 
 ---
 
+### 20. Date Format Handling
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** User-selectable date format (ISO, European, American) per column in ReviewStep with parsed previews and error highlighting.
+
+#### Design Choices
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Format detection | Manual selection | Auto-detection is unreliable for ambiguous dates (05/06/2024 could be May 6 or June 5) |
+| Default format | ISO | Unambiguous, internationally recognized standard |
+| Format scope | Per-column | Different columns may have different formats in same CSV |
+| Preview display | ISO normalized | Consistent display regardless of input format |
+| Unparseable handling | Show error count + highlight | Users can switch format or manually correct |
+
+#### Date Format Enum
+
+Single enum handles both date-only and datetime fields:
+
+```php
+enum DateFormat: string implements HasLabel
+{
+    case ISO = 'iso';        // 2024-05-15 or 2024-05-15T16:00
+    case EUROPEAN = 'european'; // 15-05-2024, 15/05/2024, 15 May 2024
+    case AMERICAN = 'american'; // 05-15-2024, 05/15/2024, May 15th 2024
+
+    public function parse(string $value): ?Carbon;
+    public function format(Carbon $date, bool $includeTime = false): string;
+    public function getLabel(): string;
+}
+```
+
+**Note:** HTML5 date pickers always output ISO format, so corrections are stored in ISO regardless of the user's selected input format.
+
+#### Data Flow
+
+```
+CSV Upload → MappingStep (field gets type from FieldDataType)
+    ↓
+ReviewStep mounts → loads analyses with dataType from ImportField
+    ↓
+Date columns initialized with ISO format (default)
+    ↓
+User selects date column → format dropdown appears
+    ↓
+User changes format → setDateFormat() called
+    ↓
+ColumnMapping.dateFormat updated → meta.json saved
+    ↓
+Values reloaded with new format previews
+    ↓
+Import uses stored format for parsing
+```
+
+#### Modified Data Classes
+
+**ImportField** - Added `type` property:
+```php
+public function __construct(
+    // ... existing
+    public readonly ?string $type = null,  // 'date', 'date_time', 'string', etc.
+) {}
+
+public function isDateType(): bool;
+public function isDateTimeType(): bool;
+public function isDateOrDateTime(): bool;
+```
+
+**ColumnMapping** - Added `dateFormat` property:
+```php
+public function __construct(
+    public readonly string $source,
+    public readonly string $target,
+    public readonly ?string $relationship = null,
+    public readonly ?string $dateFormat = null,  // 'iso', 'european', 'american'
+) {}
+
+public function withDateFormat(?string $dateFormat): self;
+```
+
+**ColumnAnalysisResult** - Added date-related properties:
+```php
+public function __construct(
+    // ... existing
+    public readonly ?string $dataType = null,      // 'date', 'date_time', null
+    public readonly ?string $dateFormat = null,    // Currently selected format
+    public readonly int $parseErrorCount = 0,      // Unparseable values count
+) {}
+
+public function isDateOrDateTime(): bool;
+```
+
+#### ColumnAnalyzer Enhancements
+
+New methods for date handling:
+
+```php
+// Count values that cannot be parsed with selected format
+public function getDateParseErrorCount(
+    string $csvColumn,
+    ?string $dataType,
+    string $dateFormat
+): int;
+
+// getUniqueValuesPaginated() now accepts date parameters
+public function getUniqueValuesPaginated(
+    string $csvColumn,
+    // ... existing params
+    ?string $dataType = null,    // NEW
+    ?string $dateFormat = null,  // NEW
+): array;
+// Returns ['values' => [..., 'parsed' => '2024-05-15'], ...]
+```
+
+#### BaseImporter Integration
+
+Custom fields automatically get their `type` from `FieldDataType`:
+
+```php
+// In customFields() method
+return ImportField::make($key)
+    ->label($customField->name)
+    ->asCustomField()
+    ->type($customField->typeData->dataType->value);  // 'date', 'date_time', etc.
+```
+
+#### ReviewStep Component Changes
+
+**New properties:**
+```php
+public array $columnDateFormats = [];  // CSV column => format value
+```
+
+**New methods:**
+```php
+public function setDateFormat(string $csvColumn, string $format): void
+{
+    // Validate format, update local state
+    // Update ColumnMapping in store
+    // Refresh analysis and reload values
+}
+```
+
+**New computed properties:**
+```php
+#[Computed]
+public function isSelectedColumnDateType(): bool;
+
+#[Computed]
+public function selectedColumnDateFormat(): string;
+
+#[Computed]
+public function dateFormatOptions(): array;
+```
+
+#### UI Changes (review-step.blade.php)
+
+**Format selector in column header:**
+```blade
+@if ($this->isSelectedColumnDateType)
+    <x-select-menu
+        :options="$this->dateFormatOptions"
+        wire:model.live="columnDateFormats.{{ $selectedColumn }}"
+    />
+@endif
+```
+
+**Value display for date columns:**
+- **Valid dates:** Bordered container with visible date text and invisible date input overlay
+- **Invalid dates:** Neutral bordered container + warning icon + pencil button with invisible date input overlay
+- Uses `type="date"` for date fields, `type="datetime-local"` for datetime fields
+- **Styling:** Both valid and invalid use neutral gray borders/backgrounds; warning icon alone signals invalid state
+- Picker value pre-formatted to HTML5 standard (YYYY-MM-DD or YYYY-MM-DDTHH:MM)
+- Corrections stored via `updateMappedValue()` like other columns
+- Undo button appears when correction exists
+
+**Key implementation detail:** The invisible date input uses opacity-0 and is positioned absolutely over the clickable area. The `::-webkit-calendar-picker-indicator` pseudo-element is stretched to cover the full input area for Chrome/Safari compatibility (see BF-3).
+
+#### Files Modified for Date Handling
+
+| File | Changes |
+|------|---------|
+| `src/Enums/DateFormat.php` | NEW - Date parsing/formatting enum |
+| `src/Data/ImportField.php` | Added `type` property |
+| `src/Data/ColumnMapping.php` | Added `dateFormat` property |
+| `src/Data/ColumnAnalysisResult.php` | Added `dataType`, `dateFormat`, `parseErrorCount` |
+| `src/Support/ColumnAnalyzer.php` | Added date parsing methods |
+| `src/Importers/BaseImporter.php` | Added `type` from custom fields |
+| `src/Store/ImportStore.php` | Added `updateMapping()` method |
+| `src/Livewire/Steps/ReviewStep.php` | Added date format selection UI |
+
+---
+
 ## Key Patterns: Importer Architecture
 
 ### Immutable Value Objects
@@ -725,45 +949,334 @@ foreach (['companies', 'people', 'opportunities'] as $relation) {
 
 ## Updated File Structure
 
+See [File Structure](#file-structure) section above for the complete, up-to-date directory layout.
+
+**Implementation Status Summary:**
+
+| Component | Status |
+|-----------|--------|
+| Data classes | ✅ Complete |
+| Enums | ✅ Complete |
+| Importers | ✅ Complete |
+| UploadStep | ✅ Complete |
+| MappingStep | ✅ Complete (~443 lines) |
+| ReviewStep | ✅ Complete (~450 lines) |
+| PreviewStep | ⏳ Placeholder (needs implementation) |
+
+---
+
+## Bug Fixes
+
+### BF-1. Date Correction Not Saving (2026-01-21)
+
+**Problem:** Selecting a date from the picker to correct an invalid date did NOT save the correction. The picker closed and the value reverted to "Invalid date". Text inputs worked correctly.
+
+**Root Cause:** `x-if` destroys the input element before Livewire can process the `wire:change` event.
+
+The date input was wrapped in `<template x-if="editing">`. When user selected a date:
+1. Browser fires `change` event
+2. `wire:change` tries to queue Livewire request
+3. Date picker closes → input loses focus → `blur` event fires
+4. `@blur="editing = false"` executes synchronously
+5. **`x-if="editing"` evaluates to false → input is removed from DOM**
+6. Livewire's pending request fails or loses context
+
+**Why text inputs worked:** They weren't inside `x-if`, so they stayed in DOM and `wire:change` completed normally.
+
+**Fix:** Replace `x-if` with `x-show` for the date editing UI.
+
+```blade
+{{-- BEFORE: x-if removes element from DOM --}}
+<template x-if="editing">
+    <input wire:change="updateMappedValue(...)" @blur="editing = false" />
+</template>
+
+{{-- AFTER: x-show hides with CSS, element stays in DOM --}}
+<input x-show="editing" wire:change="updateMappedValue(...)" @blur="editing = false" />
 ```
-src/
-├── Data/
-│   ├── ColumnMapping.php          ✅
-│   ├── MatchableField.php         ✅
-│   └── RelationshipMatch.php      ✅
-├── Enums/
-│   ├── ImportStatus.php           ✅
-│   ├── ImportEntityType.php       ✅ (with importer() method)
-│   └── RowMatchAction.php         ✅
-├── Importers/                     ✅ NEW
-│   ├── Contracts/
-│   │   └── ImporterContract.php   ✅
-│   ├── Fields/
-│   │   ├── ImportField.php        ✅
-│   │   ├── RelationshipField.php  ✅
-│   │   └── FieldCollection.php    ✅
-│   ├── BaseImporter.php           ✅
-│   ├── CompanyImporter.php        ✅
-│   ├── PeopleImporter.php         ✅
-│   ├── OpportunityImporter.php    ✅
-│   ├── TaskImporter.php           ✅
-│   └── NoteImporter.php           ✅
-├── Livewire/
-│   ├── ImportWizard.php           ✅
-│   └── Steps/
-│       ├── UploadStep.php         ✅
-│       ├── MappingStep.php        ⏳ (needs importer integration)
-│       ├── ReviewStep.php         ⏳ (needs importer integration)
-│       └── PreviewStep.php        ⏳ (needs importer integration)
-└── Store/
-    ├── ImportStore.php            ✅
-    └── ImportRow.php              ✅
+
+| `x-if` | `x-show` |
+|--------|----------|
+| Removes element from DOM | Hides with `display: none` |
+| Event handlers lost on toggle | Event handlers persist |
+| Livewire bindings break | Livewire bindings work |
+
+For inline editing where events must fire after blur, `x-show` is the correct choice.
+
+---
+
+### BF-2. Corrected Dates Still Show "Invalid date" (2026-01-21)
+
+**Problem:** After correcting an invalid date using the date picker, the value still displayed "Invalid date" instead of the corrected date.
+
+**Root Cause:** HTML5 date picker outputs ISO format, but corrections were being parsed with the user's selected input format.
+
+In `review-step.blade.php`:
+```php
+// BEFORE: Always used user's selected format
+$valueToFormat = $mappedValue ?? $rawValue;
+$parsed = $dateFormatEnum->parse($valueToFormat);
 ```
+
+When a correction was saved:
+1. HTML5 date picker returns ISO format (`2024-05-15`)
+2. Stored as `$mappedValue = '2024-05-15'`
+3. User's selected input format is European (`d/m/Y`)
+4. European format tries to parse `2024-05-15` → **fails** (expects `15/05/2024`)
+5. `$parsed = null` → displays "Invalid date" even though correction exists
+
+**Fix:** Detect when a correction exists and use ISO format to parse it:
+```php
+// AFTER: Use ISO for corrections, user's format for raw values
+if ($hasCorrection && $mappedValue !== null) {
+    $parseFormat = \Relaticle\ImportWizardNew\Enums\DateFormat::ISO;
+    $valueToFormat = $mappedValue;
+} else {
+    $parseFormat = $dateFormatEnum;
+    $valueToFormat = $rawValue;
+}
+$parsed = $parseFormat->parse($valueToFormat);
+```
+
+**UX Improvement (same commit):** Changed date column interaction pattern:
+- **Valid dates:** Now show in an editable input field (direct click to change)
+- **Invalid dates:** Show badge + "Fix" button (opens picker)
+- **Undo:** "Undo correction" button appears when correction exists
+
+---
+
+### BF-3. Date Picker Click Only Working on Calendar Icon (2026-01-21)
+
+**Problem:** Clicking on the date display area did not open the date picker in Chrome/Safari. Only clicking the tiny calendar icon opened it.
+
+**Root Cause:** WebKit browsers (Chrome, Safari) only make the `::-webkit-calendar-picker-indicator` pseudo-element clickable by default - not the entire input area. The invisible date input had `opacity: 0` but the clickable area was still just the small icon.
+
+**Fix:** Stretch the webkit picker indicator to cover the full input area using Tailwind's arbitrary selector syntax:
+
+```blade
+<input
+    type="date"
+    class="absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer
+           [&::-webkit-calendar-picker-indicator]:absolute
+           [&::-webkit-calendar-picker-indicator]:left-0
+           [&::-webkit-calendar-picker-indicator]:top-0
+           [&::-webkit-calendar-picker-indicator]:w-full
+           [&::-webkit-calendar-picker-indicator]:h-full
+           [&::-webkit-calendar-picker-indicator]:m-0
+           [&::-webkit-calendar-picker-indicator]:p-0
+           [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+/>
+```
+
+**Browser Notes:**
+- Firefox makes the entire date input clickable by default (no fix needed)
+- The fix specifically targets WebKit browsers via the `-webkit-` prefix
+- Native picker toggle behavior is standard: opens on click, closes on select/blur/Escape (not on second click)
+
+Applied to both:
+- Valid date input (clickable date display area)
+- Invalid date input (clickable pencil button area)
+
+---
+
+### 21. Choice Field Handling
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** Choice fields (single_choice, multi_choice) get specialized dropdown UI in ReviewStep with case-insensitive matching and invalid option detection.
+
+#### Design Choices
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Value matching | By option name (case-insensitive) | Human-readable CSVs, no need to know internal IDs |
+| Invalid handling | Warning badge + select dropdown to fix | Consistent with date handling pattern |
+| Multi-choice delimiter | Comma-separated | Most common CSV format |
+| Options source | CustomField.options relationship | Single source of truth |
+
+#### Data Flow
+
+```
+CSV Upload → MappingStep (field gets type 'single_choice' or 'multi_choice')
+    ↓
+ReviewStep mounts → detects choice type via dataType
+    ↓
+Choice columns show select-menu instead of text input
+    ↓
+Invalid values show warning badge + dropdown to select valid option
+    ↓
+User selects new value → updateMappedValue() saves correction
+    ↓
+Import uses corrected value for database storage
+```
+
+#### ReviewStep Component Changes
+
+**New computed properties:**
+```php
+#[Computed]
+public function isSelectedColumnChoiceType(): bool
+{
+    return in_array($this->selectedColumnAnalysis()?->dataType, ['single_choice', 'multi_choice'], true);
+}
+
+#[Computed]
+public function isSelectedColumnMultiChoice(): bool
+{
+    return $this->selectedColumnAnalysis()?->dataType === 'multi_choice';
+}
+
+#[Computed]
+public function selectedColumnOptions(): array
+{
+    // Returns [{value: 'Option Name', label: 'Option Name'}, ...]
+    // Loaded from CustomField::with('options') by field code
+}
+```
+
+**New helper method:**
+```php
+public function isValidChoiceValue(string $rawValue): bool
+{
+    // Case-insensitive matching against available options
+    // For multi-choice: validates each comma-separated value
+}
+```
+
+#### ColumnAnalysisResult Enhancements
+
+```php
+public function isChoiceField(): bool
+{
+    return in_array($this->dataType, ['single_choice', 'multi_choice'], true);
+}
+
+public function isMultiChoice(): bool
+{
+    return $this->dataType === 'multi_choice';
+}
+```
+
+#### UI Changes (review-step.blade.php)
+
+**Valid choice values:**
+- Bordered container with select-menu dropdown
+- Pre-selected to current value
+- Undo + Skip action buttons
+
+**Invalid choice values:**
+- Neutral bordered container + warning icon (subtle indicator)
+- Select dropdown to choose valid replacement
+- Skip button to exclude value
+- **Styling:** Same neutral gray borders/backgrounds as valid rows; warning icon alone signals invalid state
+
+**Multi-choice handling:**
+- Input: Comma-separated values (e.g., "Option1, Option2")
+- Storage: Individual values joined with comma
+- Display: Multi-select dropdown
+
+#### Key Implementation Details
+
+1. **Options loaded via CustomFields facade:**
+   ```php
+   CustomFields::customFieldModel()::query()
+       ->withoutGlobalScopes()
+       ->where('tenant_id', $teamId)
+       ->where('code', $fieldCode)
+       ->with('options')
+       ->first();
+   ```
+
+2. **Field key extraction:** Custom field keys are prefixed with `custom_fields_`, so code is extracted with `Str::after($fieldKey, 'custom_fields_')`
+
+3. **Alpine.js bridge for select-menu:** Uses `x-data` with `$watch` to call `$wire.updateMappedValue()` when selection changes
+
+4. **Searchable dropdown:** Enabled when options count > 5 for better UX
+
+#### Files Modified for Choice Field Handling
+
+| File | Changes |
+|------|---------|
+| `src/Livewire/Steps/ReviewStep.php` | Added choice field computed properties and validation |
+| `src/Data/ColumnAnalysisResult.php` | Added `isChoiceField()` and `isMultiChoice()` helpers |
+| `resources/views/livewire/steps/review-step.blade.php` | Added choice field UI block with select-menu |
+
+---
+
+### BF-4. Select-Menu x-model Binding Not Working (2026-01-21)
+
+**Problem:** Choice field dropdowns showed the correct pre-selected value, but selecting a new option did not trigger the backend `updateMappedValue()` call. The UI updated but no correction was saved.
+
+**Root Cause:** Alpine's `x-model` directive on a Blade component binds to the LOCAL scope, not the parent scope.
+
+When using:
+```blade
+<x-select-menu x-model="selected" />
+```
+
+Blade merges `x-model="selected"` onto the select-menu's root div, which has its own `x-data`:
+```html
+<div x-data="{ state: null, get selected() { return this.state; }, ... }" x-model="selected">
+```
+
+Alpine evaluates `x-model="selected"` in the LOCAL scope of that element. Since select-menu defines a `selected` getter/setter internally, x-model binds to THAT, not the parent's `selected` property.
+
+**Result:**
+1. User selects new value
+2. select-menu's internal `state` updates (UI shows new value)
+3. x-model updates select-menu's LOCAL `selected` (which just sets `state`)
+4. Parent's `selected` is never touched
+5. Parent's `$watch('selected', ...)` never fires
+6. `$wire.updateMappedValue()` never called
+
+**Fix (3 parts):**
+
+1. **Exclude x-model from merged attributes** in `select-menu.blade.php`:
+   ```blade
+   {{-- BEFORE --}}
+   {{ $attributes->whereDoesntStartWith('wire:model')->merge([...]) }}
+
+   {{-- AFTER --}}
+   {{ $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->merge([...]) }}
+   ```
+
+2. **Add `$dispatch('input')` in select-menu** when value changes (already done):
+   ```js
+   select(value) {
+       this.selected = value;
+       this.$dispatch('input', value);  // Notify parent
+   }
+   ```
+
+3. **Use explicit `@input` listener** in parent instead of x-model:
+   ```blade
+   {{-- BEFORE --}}
+   <x-select-menu x-model="selected" />
+
+   {{-- AFTER --}}
+   <x-select-menu @input="selected = $event.detail; updateValue($event.detail)" />
+   ```
+
+**Why this works:**
+- `$dispatch('input', value)` creates a CustomEvent with `detail = value`
+- `@input` listener on parent catches the event
+- `$event.detail` contains the selected value
+- Parent's `updateValue()` is called directly, triggering `$wire.updateMappedValue()`
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `resources/views/components/select-menu.blade.php` | Exclude x-model from attributes, add `$dispatch('input')` |
+| `app-modules/ImportWizardNew/.../review-step.blade.php` | Replace `x-model` with `@input` handler |
+
+**Key Takeaway:** When using Alpine components inside Blade components, avoid `x-model` on the component invocation. Use explicit event dispatching and `@input` listeners instead.
 
 ---
 
 ## Next Decisions Needed
 
-1. **Date format handling**: Per-column selection in MappingStep (ISO, European, American)
-2. **Unknown choice options**: Show error + "Create Option" button in ReviewStep
+1. ~~**Date format handling**: Per-column selection in ReviewStep (ISO, European, American)~~ ✅ IMPLEMENTED (Decision #20)
+2. ~~**Unknown choice options**: Show error + select dropdown to fix in ReviewStep~~ ✅ IMPLEMENTED (Decision #21)
 3. **Relationship creation**: Should unknown companies be created when importing People?
+4. ~~**Date value editing**: Should users be able to manually correct unparseable dates via date picker?~~ ✅ IMPLEMENTED + BF-1 fix
+5. **Create option on-the-fly**: Allow users to create new options for unknown values (future enhancement)

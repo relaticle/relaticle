@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\ImportWizardNew\Data\ColumnAnalysisResult;
 use Relaticle\ImportWizardNew\Data\ColumnMapping;
 use Relaticle\ImportWizardNew\Data\ImportField;
+use Relaticle\ImportWizardNew\Enums\DateFormat;
 use Relaticle\ImportWizardNew\Importers\BaseImporter;
 use Relaticle\ImportWizardNew\Store\ImportStore;
 
@@ -57,6 +58,8 @@ final readonly class ColumnAnalyzer
         foreach ($mappings as $mapping) {
             $field = $this->getField($mapping);
             $stats = $statsMap->get($mapping->source);
+            $dataType = $field?->type;
+            $dateFormat = $mapping->dateFormat ?? DateFormat::ISO;
 
             $result = new ColumnAnalysisResult(
                 csvColumn: $mapping->source,
@@ -68,6 +71,8 @@ final readonly class ColumnAnalyzer
                 blankCount: (int) ($stats->blank_count ?? 0),
                 isRequired: $field instanceof ImportField && $field->required,
                 relationship: $mapping->relationship,
+                dataType: $dataType,
+                dateFormat: $dataType?->isDateOrDateTime() ? $dateFormat : null,
             );
             $results->put($mapping->source, $result);
         }
@@ -83,6 +88,8 @@ final readonly class ColumnAnalyzer
         $field = $this->getField($mapping);
         $totalRows = $this->store->rowCount();
         $stats = $this->getColumnStats($mapping->source);
+        $dataType = $field?->type;
+        $dateFormat = $mapping->dateFormat ?? DateFormat::ISO;
 
         return new ColumnAnalysisResult(
             csvColumn: $mapping->source,
@@ -94,6 +101,8 @@ final readonly class ColumnAnalyzer
             blankCount: $stats['blankCount'],
             isRequired: $field instanceof ImportField && $field->required,
             relationship: $mapping->relationship,
+            dataType: $dataType,
+            dateFormat: $dataType?->isDateOrDateTime() ? $dateFormat : null,
         );
     }
 
@@ -138,7 +147,6 @@ final readonly class ColumnAnalyzer
         $jsonPath = $this->jsonPath($csvColumn);
         $offset = ($page - 1) * $perPage;
 
-        // Build base query
         $baseQuery = $this->store->connection()
             ->table('import_rows')
             ->selectRaw(
@@ -147,22 +155,18 @@ final readonly class ColumnAnalyzer
             )
             ->groupBy('raw_value', 'correction');
 
-        // Apply search filter (case-insensitive LIKE on raw_value)
         $baseQuery->when($search !== '', fn ($q) => $q->havingRaw(
             "raw_value LIKE ? ESCAPE '\\'",
             [$this->escapeLikePattern($search)]
         ));
 
-        // Apply filter conditions
         $baseQuery->when($filter === 'modified', fn ($q) => $q->havingRaw("correction IS NOT NULL AND correction != ''"));
         $baseQuery->when($filter === 'skipped', fn ($q) => $q->havingRaw("correction = ''"));
 
-        // Get total count for filtered results (requires counting grouped results)
         $countQuery = clone $baseQuery;
         /** @phpstan-ignore larastan.noUnnecessaryCollectionCall */
         $totalFiltered = $countQuery->get()->count();
 
-        // Fetch perPage + 1 to detect if more exist
         $results = $baseQuery
             ->orderBy($sortField, $sortDirection)
             ->offset($offset)
@@ -225,11 +229,9 @@ final readonly class ColumnAnalyzer
     }
 
     /**
-     * Apply a correction to all rows with a specific value using bulk SQL update.
+     * Apply a correction to all rows with a specific value.
      *
-     * If restoring to original value (newValue === oldValue), removes the correction
-     * instead of storing it. This keeps the corrections column clean and ensures
-     * restored values don't appear in the "Modified" filter.
+     * If restoring to original value, removes the correction instead.
      */
     public function applyCorrection(string $csvColumn, string $oldValue, string $newValue): int
     {
@@ -237,7 +239,6 @@ final readonly class ColumnAnalyzer
         $pdo = $this->store->connection()->getPdo();
         $newValue = trim($newValue);
 
-        // If restoring to original value, remove the correction instead of storing it
         if ($newValue === trim($oldValue)) {
             return $this->store->connection()
                 ->table('import_rows')
@@ -270,17 +271,11 @@ final readonly class ColumnAnalyzer
         return $this->importer->allFields()->get($mapping->target);
     }
 
-    /**
-     * Build a JSON path for SQLite json_extract/json_set.
-     */
     private function jsonPath(string $csvColumn): string
     {
         return '$.'.str_replace('"', '\"', $csvColumn);
     }
 
-    /**
-     * Escape special characters for SQL LIKE pattern.
-     */
     private function escapeLikePattern(string $search): string
     {
         return '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
