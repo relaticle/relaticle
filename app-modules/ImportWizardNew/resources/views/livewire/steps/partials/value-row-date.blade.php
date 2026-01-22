@@ -58,7 +58,7 @@
             @endphp
             <span
                 x-tooltip="{ content: @js($errorMessage), theme: $store.theme }"
-                class="ml-2 cursor-help shrink-0"
+                class="relative z-10 ml-2 cursor-help shrink-0"
             >
                 <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500"/>
             </span>
