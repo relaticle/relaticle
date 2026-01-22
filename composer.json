@@ -85,7 +85,6 @@
             "Relaticle\\Documentation\\": "app-modules/Documentation/src",
             "Relaticle\\OnboardSeed\\": "app-modules/OnboardSeed/src",
             "Relaticle\\ImportWizard\\": "app-modules/ImportWizard/src",
-            "Relaticle\\ImportWizardNew\\": "app-modules/ImportWizardNew/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
