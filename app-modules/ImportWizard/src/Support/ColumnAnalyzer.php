@@ -74,9 +74,11 @@ final readonly class ColumnAnalyzer
         $baseQuery->when($filter === 'modified', fn ($q) => $q->havingRaw("correction IS NOT NULL AND correction != ''"));
         $baseQuery->when($filter === 'skipped', fn ($q) => $q->havingRaw("correction = ''"));
 
-        $countQuery = clone $baseQuery;
-        /** @phpstan-ignore larastan.noUnnecessaryCollectionCall */
-        $totalFiltered = $countQuery->get()->count();
+        $totalFiltered = (int) $this->store->connection()
+            ->query()
+            ->fromSub($baseQuery, 'grouped')
+            ->selectRaw('COUNT(*) as total')
+            ->value('total');
 
         $results = $baseQuery
             ->orderBy($sortField, $sortDirection)
