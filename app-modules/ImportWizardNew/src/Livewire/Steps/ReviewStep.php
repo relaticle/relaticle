@@ -10,8 +10,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
-use Relaticle\ImportWizardNew\Data\ColumnAnalysisResult;
 use Relaticle\ImportWizardNew\Data\ColumnMapping;
+use Relaticle\ImportWizardNew\Data\ImportField;
 use Relaticle\ImportWizardNew\Enums\DateFormat;
 use Relaticle\ImportWizardNew\Enums\ImportEntityType;
 use Relaticle\ImportWizardNew\Enums\ImportStatus;
@@ -19,6 +19,8 @@ use Relaticle\ImportWizardNew\Importers\BaseImporter;
 use Relaticle\ImportWizardNew\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizardNew\Store\ImportStore;
 use Relaticle\ImportWizardNew\Support\ColumnAnalyzer;
+use Relaticle\ImportWizardNew\Support\ValueValidator;
+use RuntimeException;
 
 /**
  * Step 3: Value review.
@@ -39,14 +41,7 @@ final class ReviewStep extends Component
     /** @var list<string> */
     private const array ALLOWED_FILTERS = ['all', 'modified', 'skipped'];
 
-    /**
-     * @var array<string, array<string, mixed>>
-     */
-    public array $columnAnalyses = [];
-
     public string $selectedColumn = '';
-
-    public bool $analysisComplete = false;
 
     public int $valuesPage = 1;
 
@@ -60,42 +55,24 @@ final class ReviewStep extends Component
 
     public string $sortDirection = 'desc';
 
-    /**
-     * @var array<int, array<string, mixed>>
-     */
+    /** @var array<int, array<string, mixed>> */
     public array $loadedValues = [];
 
     public int $totalFiltered = 0;
-
-    /**
-     * @var array<string, string> CSV column => date format value (iso, european, american)
-     */
-    public array $columnDateFormats = [];
 
     private ?BaseImporter $importer = null;
 
     private ?ColumnAnalyzer $analyzer = null;
 
+    /** @var array<string, array<int, array{value: string, label: string}>> */
+    private array $cachedChoiceOptions = [];
+
     public function mount(string $storeId, ImportEntityType $entityType): void
     {
         $this->mountWithImportStore($storeId, $entityType);
-        $this->runAnalysis();
-        $this->initializeDateFormats();
+
+        $this->selectedColumn = $this->store()->mappings()->first()->source;
         $this->loadInitialValues();
-    }
-
-    /**
-     * Initialize date formats from stored mappings or set ISO default.
-     */
-    private function initializeDateFormats(): void
-    {
-        foreach ($this->columnAnalyses as $csvColumn => $analysis) {
-            $dataType = isset($analysis['dataType']) ? FieldDataType::tryFrom($analysis['dataType']) : null;
-
-            if ($dataType?->isDateOrDateTime()) {
-                $this->columnDateFormats[$csvColumn] = $analysis['dateFormat'] ?? 'iso';
-            }
-        }
     }
 
     public function render(): View
@@ -103,14 +80,62 @@ final class ReviewStep extends Component
         return view('import-wizard-new::livewire.steps.review-step');
     }
 
+    /**
+     * Get mapped columns for sidebar display.
+     *
+     * @return array<int, array{source: string, label: string}>
+     */
     #[Computed]
-    public function selectedColumnAnalysis(): ?ColumnAnalysisResult
+    public function mappedColumns(): array
     {
-        if ($this->selectedColumn === '' || ! isset($this->columnAnalyses[$this->selectedColumn])) {
+        $importer = $this->getImporter();
+        $columns = [];
+
+        foreach ($this->store()->mappings() as $mapping) {
+            $field = $mapping->isRelationshipMapping()
+                ? null
+                : $importer->allFields()->get($mapping->target);
+
+            $columns[] = [
+                'source' => $mapping->source,
+                'label' => $field !== null ? $field->label : $mapping->target,
+            ];
+        }
+
+        return $columns;
+    }
+
+    #[Computed]
+    public function selectedMapping(): ?ColumnMapping
+    {
+        return $this->store()->getMapping($this->selectedColumn);
+    }
+
+    #[Computed]
+    public function selectedField(): ?ImportField
+    {
+        $mapping = $this->selectedMapping();
+
+        if ($mapping === null || $mapping->isRelationshipMapping()) {
             return null;
         }
 
-        return ColumnAnalysisResult::from($this->columnAnalyses[$this->selectedColumn]);
+        return $this->getImporter()->allFields()->get($mapping->target);
+    }
+
+    /**
+     * Get stats for the selected column (fetched on-demand).
+     *
+     * @return array{uniqueCount: int, blankCount: int}
+     */
+    #[Computed]
+    public function selectedColumnStats(): array
+    {
+        if ($this->selectedColumn === '') {
+            return ['uniqueCount' => 0, 'blankCount' => 0];
+        }
+
+        return $this->getAnalyzer()->getColumnStats($this->selectedColumn);
     }
 
     #[Computed]
@@ -122,25 +147,19 @@ final class ReviewStep extends Component
     #[Computed]
     public function isSelectedColumnDateType(): bool
     {
-        return $this->selectedColumnAnalysis()?->isDateOrDateTime() ?? false;
+        return $this->selectedField()?->type?->isDateOrDateTime() ?? false;
     }
 
     #[Computed]
-    public function selectedColumnDateFormat(): string
+    public function selectedColumnDateFormat(): DateFormat
     {
-        return $this->columnDateFormats[$this->selectedColumn] ?? 'iso';
-    }
-
-    #[Computed]
-    public function selectedColumnDateFormatEnum(): ?DateFormat
-    {
-        return DateFormat::tryFrom($this->columnDateFormats[$this->selectedColumn] ?? 'iso');
+        return $this->selectedMapping()?->dateFormat ?: DateFormat::ISO;
     }
 
     #[Computed]
     public function isSelectedColumnDateTime(): bool
     {
-        return $this->selectedColumnAnalysis()?->dataType === FieldDataType::DATE_TIME;
+        return $this->selectedField()?->type === FieldDataType::DATE_TIME;
     }
 
     /**
@@ -151,7 +170,7 @@ final class ReviewStep extends Component
     #[Computed]
     public function dateFormatOptions(): array
     {
-        $withTime = $this->selectedColumnAnalysis()?->dataType === FieldDataType::DATE_TIME;
+        $withTime = $this->isSelectedColumnDateTime();
 
         return collect(DateFormat::cases())
             ->map(fn (DateFormat $format): array => [
@@ -165,13 +184,13 @@ final class ReviewStep extends Component
     #[Computed]
     public function isSelectedColumnChoiceType(): bool
     {
-        return $this->selectedColumnAnalysis()?->isChoiceField() ?? false;
+        return $this->selectedField()?->type?->isChoiceField() ?? false;
     }
 
     #[Computed]
     public function isSelectedColumnMultiChoice(): bool
     {
-        return $this->selectedColumnAnalysis()?->isMultiChoice() ?? false;
+        return $this->selectedField()?->type?->isMultiChoiceField() ?? false;
     }
 
     /**
@@ -182,19 +201,31 @@ final class ReviewStep extends Component
     #[Computed]
     public function selectedColumnOptions(): array
     {
-        $analysis = $this->selectedColumnAnalysis();
+        $field = $this->selectedField();
 
-        if (! $analysis instanceof ColumnAnalysisResult || ! $this->isSelectedColumnChoiceType()) {
+        if ($field === null || ! $field->isCustomField || ! $field->type?->isChoiceField()) {
             return [];
         }
 
-        $fieldKey = $analysis->fieldKey;
-
-        if (! str_starts_with($fieldKey, 'custom_fields_')) {
-            return [];
+        if (isset($this->cachedChoiceOptions[$field->key])) {
+            return $this->cachedChoiceOptions[$field->key];
         }
 
-        $code = Str::after($fieldKey, 'custom_fields_');
+        $code = Str::after($field->key, 'custom_fields_');
+        $options = $this->loadChoiceOptions($code);
+
+        $this->cachedChoiceOptions[$field->key] = $options;
+
+        return $options;
+    }
+
+    /**
+     * Load choice options from the custom field.
+     *
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function loadChoiceOptions(string $code): array
+    {
         $customField = CustomFields::customFieldModel()::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->getImporter()->getTeamId())
@@ -213,27 +244,22 @@ final class ReviewStep extends Component
     }
 
     /**
-     * Check if a value is valid for the selected choice field.
+     * Get the validation error for a raw value in the selected column.
      */
-    public function isValidChoiceValue(string $rawValue): bool
+    public function getValidationError(string $rawValue): ?string
     {
-        if (! $this->isSelectedColumnChoiceType()) {
-            return true;
+        $field = $this->selectedField();
+
+        if ($field === null) {
+            return null;
         }
 
-        if ($rawValue === '') {
-            return true;
-        }
-
-        $options = collect($this->selectedColumnOptions());
-
-        if ($this->isSelectedColumnMultiChoice()) {
-            $values = array_map(trim(...), explode(',', $rawValue));
-
-            return array_all($values, fn ($v): bool => ! ($v !== '' && $options->doesntContain(fn (array $o): bool => strcasecmp((string) $o['value'], (string) $v) === 0)));
-        }
-
-        return $options->contains(fn (array $o): bool => strcasecmp($o['value'], $rawValue) === 0);
+        return app(ValueValidator::class)->validate(
+            field: $field,
+            value: $rawValue,
+            dateFormat: $this->selectedColumnDateFormat(),
+            choiceOptions: $this->selectedColumnOptions(),
+        );
     }
 
     /**
@@ -262,22 +288,11 @@ final class ReviewStep extends Component
         return $match['value'] ?? $rawValue;
     }
 
-    public function runAnalysis(): void
-    {
-        $analyzer = $this->getAnalyzer();
-        $results = $analyzer->analyzeAllColumns();
-
-        $this->columnAnalyses = $results
-            ->map(fn (ColumnAnalysisResult $result): array => $result->toArray())
-            ->all();
-
-        $this->selectedColumn = $results->keys()->first() ?? '';
-        $this->analysisComplete = true;
-    }
-
     public function selectColumn(string $csvColumn): void
     {
-        if (isset($this->columnAnalyses[$csvColumn])) {
+        $mapping = $this->store()->getMapping($csvColumn);
+
+        if ($mapping !== null) {
             $this->selectedColumn = $csvColumn;
             $this->resetColumnState();
             $this->loadInitialValues();
@@ -326,49 +341,20 @@ final class ReviewStep extends Component
         $this->loadPage();
     }
 
-    /**
-     * Handle wire:model updates to columnDateFormats.
-     */
-    public function updatedColumnDateFormats(string $format, string $csvColumn): void
+    public function setDateFormat(string $format): void
     {
-        $this->setDateFormat($csvColumn, $format);
-    }
-
-    public function setDateFormat(string $csvColumn, string $format): void
-    {
-        // Validate the format value
         $dateFormatEnum = DateFormat::tryFrom($format);
-        if ($dateFormatEnum === null) {
+
+        if ($dateFormatEnum === null || ! $this->isSelectedColumnDateType()) {
             return;
         }
 
-        // Only apply to date columns
-        $analysis = $this->columnAnalyses[$csvColumn] ?? null;
-        $dataType = isset($analysis['dataType']) ? FieldDataType::tryFrom($analysis['dataType']) : null;
+        $mapping = $this->selectedMapping();
 
-        if (! $dataType?->isDateOrDateTime()) {
-            return;
+        if ($mapping !== null) {
+            $this->store()->updateMapping($this->selectedColumn, $mapping->withDateFormat($dateFormatEnum));
         }
 
-        // Update local state (may already be set by wire:model)
-        $this->columnDateFormats[$csvColumn] = $format;
-
-        // Update the mapping in the store using enum
-        $store = $this->store();
-
-        if ($store instanceof ImportStore) {
-            $mapping = $store->getMapping($csvColumn);
-
-            if ($mapping instanceof ColumnMapping) {
-                $updatedMapping = $mapping->withDateFormat($dateFormatEnum);
-                $store->updateMapping($csvColumn, $updatedMapping);
-            }
-        }
-
-        // Refresh column analysis to get updated parse error count
-        $this->refreshColumnAnalysis($csvColumn);
-
-        // Reload values
         $this->loadPage();
     }
 
@@ -404,10 +390,6 @@ final class ReviewStep extends Component
 
     public function loadInitialValues(): void
     {
-        if ($this->selectedColumn === '') {
-            return;
-        }
-
         $this->valuesPage = 1;
         $this->loadPage();
     }
@@ -451,10 +433,7 @@ final class ReviewStep extends Component
     public function skipValue(string $csvColumn, string $value): void
     {
         $this->getAnalyzer()->skipValue($csvColumn, $value);
-        $this->refreshColumnAnalysis($csvColumn);
 
-        // Skipped values: mapped='' (empty string)
-        // Remove from view if on 'modified' filter (no longer modified)
         if ($this->filter === 'modified') {
             $this->removeValueFromList($value);
         } else {
@@ -467,18 +446,14 @@ final class ReviewStep extends Component
         $trimmedNew = DateFormat::normalizePickerValue($newValue);
 
         $this->getAnalyzer()->applyCorrection($csvColumn, $rawValue, $trimmedNew);
-        $this->refreshColumnAnalysis($csvColumn);
 
-        // When restoring to original (trimmed values match), correction was removed
-        // so mapped should be null (no correction exists)
         $isRestored = $trimmedNew === trim($rawValue);
         $mappedValue = $isRestored ? null : $trimmedNew;
 
-        // Remove from view if action moves row out of current filter
         $shouldRemove = match ($this->filter) {
-            'modified' => $isRestored,  // Restored values are no longer modified
-            'skipped' => true,          // Any change moves it out of skipped
-            default => false,           // 'all' filter: always keep in view
+            'modified' => $isRestored,
+            'skipped' => true,
+            default => false,
         };
 
         if ($shouldRemove) {
@@ -490,11 +465,7 @@ final class ReviewStep extends Component
 
     public function continueToPreview(): void
     {
-        $store = $this->store();
-        if ($store instanceof ImportStore) {
-            $store->setStatus(ImportStatus::Importing);
-        }
-
+        $this->store()->setStatus(ImportStatus::Importing);
         $this->dispatch('completed');
     }
 
@@ -519,24 +490,13 @@ final class ReviewStep extends Component
         $this->totalFiltered = max(0, $this->totalFiltered - 1);
     }
 
-    private function refreshColumnAnalysis(string $csvColumn): void
-    {
-        $mapping = $this->store()?->getMapping($csvColumn);
-        if (! $mapping instanceof ColumnMapping) {
-            return;
-        }
-
-        $result = $this->getAnalyzer()->analyzeColumn($mapping);
-        $this->columnAnalyses[$csvColumn] = $result->toArray();
-    }
-
     private function getAnalyzer(): ColumnAnalyzer
     {
         if (! $this->analyzer instanceof ColumnAnalyzer) {
             $store = $this->store();
-            throw_unless($store instanceof ImportStore, \RuntimeException::class, 'ImportStore not available');
+            throw_unless($store instanceof ImportStore, RuntimeException::class, 'ImportStore not available');
 
-            $this->analyzer = new ColumnAnalyzer($store, $this->getImporter());
+            $this->analyzer = new ColumnAnalyzer($store);
         }
 
         return $this->analyzer;

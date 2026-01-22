@@ -8,15 +8,15 @@
             </div>
 
             <div class="flex-1 overflow-y-auto">
-                @foreach ($this->columnAnalyses as $csvColumn => $analysis)
+                @foreach ($this->mappedColumns as $column)
                     <button
-                        wire:key="col-{{ md5($csvColumn) }}"
-                        wire:click="selectColumn({{ Js::from($csvColumn) }})"
-                        class="w-full px-3 py-2 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 data-[loading]:opacity-50 {{ $selectedColumn === $csvColumn ? 'bg-primary-50 dark:bg-primary-950/30' : '' }}"
+                        wire:key="col-{{ md5($column['source']) }}"
+                        wire:click="selectColumn({{ Js::from($column['source']) }})"
+                        class="w-full px-3 py-2 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 data-[loading]:opacity-50 {{ $selectedColumn === $column['source'] ? 'bg-primary-50 dark:bg-primary-950/30' : '' }}"
                     >
-                        <span class="text-sm text-gray-900 dark:text-white truncate block">{{ $csvColumn }}</span>
+                        <span class="text-sm text-gray-900 dark:text-white truncate block">{{ $column['source'] }}</span>
                         <span class="text-[10px] text-gray-500 dark:text-gray-400 truncate block">
-                            → {{ $analysis['fieldLabel'] }}
+                            → {{ $column['label'] }}
                         </span>
                     </button>
                 @endforeach
@@ -32,8 +32,8 @@
                         <div>
                             <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ $selectedColumn }}</h3>
                             <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                                Mapped to <span class="font-medium">{{ $this->selectedColumnAnalysis?->fieldLabel }}</span>
-                                · {{ $this->selectedColumnAnalysis?->uniqueCount ?? 0 }} unique values
+                                Mapped to <span class="font-medium">{{ $this->selectedField?->label ?? $selectedColumn }}</span>
+                                · {{ $this->selectedColumnStats['uniqueCount'] }} unique values
                             </p>
                         </div>
 
@@ -45,7 +45,8 @@
                                     :searchable="false"
                                     placeholder="Date format"
                                     icon="heroicon-o-cog-6-tooth"
-                                    wire:model.live="columnDateFormats.{{ $selectedColumn }}"
+                                    :value="$this->selectedColumnDateFormat->value"
+                                    wire:change="setDateFormat($event.target.value)"
                                 />
                             </div>
                         @endif

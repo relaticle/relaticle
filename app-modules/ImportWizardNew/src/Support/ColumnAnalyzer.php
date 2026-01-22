@@ -6,11 +6,6 @@ namespace Relaticle\ImportWizardNew\Support;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Relaticle\ImportWizardNew\Data\ColumnAnalysisResult;
-use Relaticle\ImportWizardNew\Data\ColumnMapping;
-use Relaticle\ImportWizardNew\Data\ImportField;
-use Relaticle\ImportWizardNew\Enums\DateFormat;
-use Relaticle\ImportWizardNew\Importers\BaseImporter;
 use Relaticle\ImportWizardNew\Store\ImportStore;
 
 /**
@@ -20,98 +15,14 @@ final readonly class ColumnAnalyzer
 {
     public function __construct(
         private ImportStore $store,
-        private BaseImporter $importer,
     ) {}
-
-    /**
-     * Analyze all mapped columns using a single batched query.
-     *
-     * @return Collection<string, ColumnAnalysisResult>
-     */
-    public function analyzeAllColumns(): Collection
-    {
-        $mappings = $this->store->mappings();
-
-        if ($mappings->isEmpty()) {
-            return collect();
-        }
-
-        $unionParts = [];
-        $bindings = [];
-
-        foreach ($mappings as $mapping) {
-            $jsonPath = $this->jsonPath($mapping->source);
-            $unionParts[] = "SELECT ? as csv_column,
-                COUNT(DISTINCT COALESCE(json_extract(corrections, ?), json_extract(raw_data, ?), '')) as unique_count,
-                SUM(CASE WHEN COALESCE(json_extract(corrections, ?), json_extract(raw_data, ?), '') = '' THEN 1 ELSE 0 END) as blank_count
-                FROM import_rows";
-            $bindings = array_merge($bindings, [$mapping->source, $jsonPath, $jsonPath, $jsonPath, $jsonPath]);
-        }
-
-        $sql = implode(' UNION ALL ', $unionParts);
-        $statsResults = $this->store->connection()->select($sql, $bindings);
-
-        $statsMap = collect($statsResults)->keyBy('csv_column');
-        $totalRows = $this->store->rowCount();
-        $results = collect();
-
-        foreach ($mappings as $mapping) {
-            $field = $this->getField($mapping);
-            $stats = $statsMap->get($mapping->source);
-            $dataType = $field?->type;
-            $dateFormat = $mapping->dateFormat ?? DateFormat::ISO;
-
-            $result = new ColumnAnalysisResult(
-                csvColumn: $mapping->source,
-                fieldKey: $mapping->target,
-                fieldLabel: $field instanceof ImportField ? $field->label : $mapping->target,
-                fieldType: $field?->isCustomField ? 'custom_field' : 'field',
-                totalRows: $totalRows,
-                uniqueCount: (int) ($stats->unique_count ?? 0),
-                blankCount: (int) ($stats->blank_count ?? 0),
-                isRequired: $field instanceof ImportField && $field->required,
-                relationship: $mapping->relationship,
-                dataType: $dataType,
-                dateFormat: $dataType?->isDateOrDateTime() ? $dateFormat : null,
-            );
-            $results->put($mapping->source, $result);
-        }
-
-        return $results;
-    }
-
-    /**
-     * Analyze a single column mapping.
-     */
-    public function analyzeColumn(ColumnMapping $mapping): ColumnAnalysisResult
-    {
-        $field = $this->getField($mapping);
-        $totalRows = $this->store->rowCount();
-        $stats = $this->getColumnStats($mapping->source);
-        $dataType = $field?->type;
-        $dateFormat = $mapping->dateFormat ?? DateFormat::ISO;
-
-        return new ColumnAnalysisResult(
-            csvColumn: $mapping->source,
-            fieldKey: $mapping->target,
-            fieldLabel: $field instanceof ImportField ? $field->label : $mapping->target,
-            fieldType: $field?->isCustomField ? 'custom_field' : 'field',
-            totalRows: $totalRows,
-            uniqueCount: $stats['uniqueCount'],
-            blankCount: $stats['blankCount'],
-            isRequired: $field instanceof ImportField && $field->required,
-            relationship: $mapping->relationship,
-            dataType: $dataType,
-            dateFormat: $dataType?->isDateOrDateTime() ? $dateFormat : null,
-        );
-    }
 
     /**
      * Get statistics for a column (unique count and blank count).
      *
      * @return array{uniqueCount: int, blankCount: int}
      */
-    private function getColumnStats(string $csvColumn): array
+    public function getColumnStats(string $csvColumn): array
     {
         $jsonPath = $this->jsonPath($csvColumn);
 
@@ -260,15 +171,6 @@ final readonly class ColumnAnalyzer
                     $pdo->quote($newValue).')'
                 ),
             ]);
-    }
-
-    private function getField(ColumnMapping $mapping): ?ImportField
-    {
-        if ($mapping->isRelationshipMapping()) {
-            return null;
-        }
-
-        return $this->importer->allFields()->get($mapping->target);
     }
 
     private function jsonPath(string $csvColumn): string

@@ -10,8 +10,8 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\CustomFields\Enums\ValidationRule;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizardNew\Data\ImportField;
 use Relaticle\ImportWizardNew\Data\ImportFieldCollection;
 use Relaticle\ImportWizardNew\Data\MatchableField;
@@ -134,32 +134,24 @@ abstract class BaseImporter implements ImporterContract
             ->orderBy('sort_order')
             ->get();
 
-        if ($customFields->isEmpty()) {
-            return new ImportFieldCollection;
-        }
+        $validationService = app(ValidationService::class);
 
-        $fields = $customFields->map(function (CustomField $customField): ImportField {
-            $key = "custom_fields_{$customField->code}";
-            $isRequired = $this->isCustomFieldRequired($customField);
+        $fields = $customFields->map(function (CustomField $customField) use ($validationService): ImportField {
+            $rules = $validationService->getValidationRules($customField);
 
-            return ImportField::make($key)
+            // Filter out object rules (like UniqueCustomFieldValue) for import preview
+            // Import validation handles uniqueness differently via match field
+            $importRules = array_filter($rules, is_string(...));
+
+            return ImportField::make("custom_fields_{$customField->code}")
                 ->label($customField->name)
-                ->required($isRequired)
-                ->rules($isRequired ? ['required'] : ['nullable'])
+                ->required($validationService->isRequired($customField))
+                ->rules($importRules)
                 ->asCustomField()
                 ->type($customField->typeData->dataType);
         });
 
         return new ImportFieldCollection($fields->all());
-    }
-
-    /**
-     * Check if a custom field is required based on its validation rules.
-     */
-    protected function isCustomFieldRequired(CustomField $field): bool
-    {
-        return $field->validation_rules->toCollection()
-            ->contains('name', ValidationRule::REQUIRED->value);
     }
 
     /**
@@ -241,7 +233,7 @@ abstract class BaseImporter implements ImporterContract
     {
         $team = $this->getTeam();
 
-        if (! $team instanceof \App\Models\Team) {
+        if ($team === null) {
             return;
         }
 

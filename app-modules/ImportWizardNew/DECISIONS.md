@@ -2,7 +2,7 @@
 
 This document contains the finalized architecture decisions for the new Import Wizard.
 
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-01-22
 
 ---
 
@@ -371,7 +371,6 @@ app-modules/ImportWizardNew/
 ├── src/
 │   ├── ImportWizardNewServiceProvider.php
 │   ├── Data/
-│   │   ├── ColumnAnalysisResult.php  ✅
 │   │   ├── ColumnMapping.php         ✅
 │   │   ├── ImportField.php           ✅
 │   │   ├── ImportFieldCollection.php ✅
@@ -407,12 +406,20 @@ app-modules/ImportWizardNew/
 │   │       ├── MappingStep.php       ✅ (~443 lines)
 │   │       ├── ReviewStep.php        ✅ (~450 lines)
 │   │       └── PreviewStep.php       ⏳ (Placeholder)
+│   ├── Rules/
+│   │   ├── ImportDateRule.php        ✅
+│   │   └── ImportChoiceRule.php      ✅
 │   ├── Store/
 │   │   ├── ImportStore.php           ✅ (~425 lines)
 │   │   └── ImportRow.php             ✅ (~180 lines)
 │   └── Support/
 │       ├── ColumnAnalyzer.php        ✅
-│       └── DataTypeInferencer.php    ✅
+│       ├── DataTypeInferencer.php    ✅
+│       └── ValueValidator.php        ✅
+├── resources/
+│   └── lang/
+│       └── en/
+│           └── validation.php        ✅
 ├── BRAINSTORMING.md
 └── DECISIONS.md
 ```
@@ -1134,15 +1141,6 @@ public function selectedColumnOptions(): array
 }
 ```
 
-**New helper method:**
-```php
-public function isValidChoiceValue(string $rawValue): bool
-{
-    // Case-insensitive matching against available options
-    // For multi-choice: validates each comma-separated value
-}
-```
-
 #### ColumnAnalysisResult Enhancements
 
 ```php
@@ -1273,6 +1271,281 @@ Alpine evaluates `x-model="selected"` in the LOCAL scope of that element. Since 
 
 ---
 
+### 22. Unified Validation Architecture
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** Use custom validation rules for imports that leverage custom-fields' ValidationService while adding import-specific rules for dates and choices.
+
+#### Why Import Validation Differs from Form Validation
+
+| Context | Value Type | Validation Mechanism |
+|---------|------------|---------------------|
+| **Filament Forms** | Option **IDs**, Laravel date strings | Filament auto-validates via `in()` rule; ValidationService rules apply |
+| **CSV Import** | Option **names**, ambiguous date formats | Custom rules needed for name matching, format-specific parsing |
+
+**Key insight from research:** Filament's Select component automatically applies `in()` validation against option IDs. But imports receive option **names** (e.g., "High Priority") not IDs (e.g., "01KCCF..."), requiring different validation logic.
+
+#### Architecture
+
+```
+BaseImporter.customFields()
+    ↓
+Uses ValidationService::getValidationRules() → Full Laravel rules (email, max:255, etc.)
+    ↓
+ImportField stores rules in ->rules property
+    ↓
+ReviewStep calls ValueValidator::validate()
+    ↓
+ValueValidator combines:
+  - ImportField->rules (from ValidationService)
+  - ImportDateRule (format-specific parsing)
+  - ImportChoiceRule (case-insensitive name matching)
+    ↓
+Returns localized error message or null
+```
+
+#### New Classes
+
+**ValueValidator** (`src/Support/ValueValidator.php`)
+```php
+final readonly class ValueValidator
+{
+    public function validate(
+        ImportField $field,
+        string $value,
+        ?DateFormat $dateFormat = null,
+        ?array $choiceOptions = null,
+    ): ?string;  // Returns error message or null
+}
+```
+
+**ImportDateRule** (`src/Rules/ImportDateRule.php`)
+```php
+// Uses DateFormat::parse() which handles:
+// - Ambiguous formats (European vs American)
+// - 2-digit years
+// - Multiple format variations per type
+// Laravel's built-in 'date' rule uses strtotime() which is too permissive
+```
+
+**ImportChoiceRule** (`src/Rules/ImportChoiceRule.php`)
+```php
+// Validates option NAMES (not IDs) with:
+// - Case-insensitive matching
+// - Multi-select comma-separated value support
+// Filament's built-in 'in' rule validates IDs, not names
+```
+
+#### BaseImporter Changes
+
+**Before:**
+```php
+// Only set required/nullable - ignored ValidationService completely
+return ImportField::make($key)
+    ->rules($isRequired ? ['required'] : ['nullable']);
+```
+
+**After:**
+```php
+// Use full ValidationService rules (email, max:255, etc.)
+$rules = $validationService->getValidationRules($customField);
+$stringRules = array_filter($rules, fn ($r) => is_string($r)); // Filter object rules
+
+return ImportField::make($key)
+    ->rules($stringRules);
+```
+
+#### Why Not Just Use ValidationService Directly?
+
+| What ValidationService Provides | What Import Needs Instead |
+|--------------------------------|---------------------------|
+| `date` rule (strtotime, accepts ANY format) | `ImportDateRule` (format-specific parsing) |
+| `in:id1,id2` (validates IDs) | `ImportChoiceRule` (validates names) |
+| Email, max, min rules | ✅ Used directly from ValidationService |
+
+#### Translation Support
+
+Added `resources/lang/en/validation.php`:
+```php
+return [
+    'invalid_date' => 'Cannot parse as :format date format.',
+    'invalid_choice' => '":value" is not a valid option.',
+];
+```
+
+#### Files Added/Modified
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/Support/ValueValidator.php` | NEW | Central validation orchestration |
+| `src/Rules/ImportDateRule.php` | NEW | Format-specific date validation |
+| `src/Rules/ImportChoiceRule.php` | NEW | Case-insensitive option validation |
+| `resources/lang/en/validation.php` | NEW | Localized error messages |
+| `src/ImportWizardNewServiceProvider.php` | MODIFIED | Register translations |
+| `src/Importers/BaseImporter.php` | MODIFIED | Use ValidationService rules |
+| `src/Livewire/Steps/ReviewStep.php` | MODIFIED | Use ValueValidator |
+| `views/.../value-row-date.blade.php` | MODIFIED | Use backend validation error |
+| `views/.../value-row-choice.blade.php` | MODIFIED | Use backend validation error |
+
+---
+
+### 23. Livewire Serialization and Code Simplification
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** Explicit serialization boundary for Spatie Data objects and improved code organization.
+
+#### Problem: Livewire Serializes Data Objects to Arrays
+
+Livewire serializes all public properties between requests. When using Spatie Data objects (like `ColumnAnalysisResult`) as public properties, they become plain arrays after serialization. This caused defensive `instanceof` checks throughout the code:
+
+```php
+// BEFORE: Defensive check indicates serialization problem
+return $analysis instanceof ColumnAnalysisResult
+    ? $analysis
+    : ColumnAnalysisResult::from($analysis);
+```
+
+#### Solution: Explicit Serialization Boundary
+
+Store arrays in public property, hydrate via computed property:
+
+```php
+// Store raw data for Livewire serialization
+public array $columnAnalysesData = [];
+
+// Hydrate on access via computed property
+#[Computed]
+public function columnAnalyses(): array
+{
+    return array_map(
+        fn (array $data): ColumnAnalysisResult => ColumnAnalysisResult::from($data),
+        $this->columnAnalysesData
+    );
+}
+```
+
+**Benefits:**
+- Explicit about what gets serialized (arrays) vs what gets used (objects)
+- No defensive `instanceof` checks needed
+- Cleaner `selectedColumnAnalysis()` computed property
+- Type-safe throughout the codebase
+
+#### Code Simplifications Applied
+
+| Change | Before | After | Benefit |
+|--------|--------|-------|---------|
+| Choice field type check | `str_starts_with($fieldKey, 'custom_fields_')` | `$field->isCustomField` | Uses existing property |
+| Choice options | Re-queried on every access | Cached in `$cachedChoiceOptions` | Performance |
+| Validation rule empty check | `$value === ''` in rules | Removed (ValueValidator handles) | Single responsibility |
+
+#### Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/Livewire/Steps/ReviewStep.php` | Renamed `$columnAnalyses` → `$columnAnalysesData`, added computed property, caching for choice options, used `ImportField::isCustomField` |
+| `src/Rules/ImportDateRule.php` | Removed redundant `$value === ''` check |
+| `src/Rules/ImportChoiceRule.php` | Removed redundant `$value === ''` check |
+
+---
+
+### 24. Eliminated ColumnAnalysisResult Data Class
+
+**Status:** `IMPLEMENTED`
+
+**Decision:** Remove the `ColumnAnalysisResult` data class entirely. Access data directly from source objects (`ColumnMapping`, `ImportField`) and fetch stats on-demand.
+
+#### Problem: Data Duplication
+
+`ColumnAnalysisResult` was a "Frankenstein" class that duplicated data from multiple sources:
+
+| Property | Source | Duplication |
+|----------|--------|-------------|
+| `csvColumn` | `ColumnMapping.source` | Redundant |
+| `fieldKey` | `ColumnMapping.target` | Redundant |
+| `relationship` | `ColumnMapping.relationship` | Redundant |
+| `dateFormat` | `ColumnMapping.dateFormat` | Redundant |
+| `fieldLabel` | `ImportField.label` | Redundant |
+| `fieldType` | `ImportField.isCustomField` | Redundant |
+| `dataType` | `ImportField.type` | Redundant |
+| `isRequired` | `ImportField.required` | Redundant |
+| `uniqueCount` | Computed from SQLite | **Only unique data** |
+| `blankCount` | Computed from SQLite | **Only unique data** |
+
+**Only 2 properties were truly unique:** `uniqueCount` and `blankCount` - these can be fetched on-demand.
+
+#### Solution: Direct Access Pattern
+
+| What | Old Access | New Access |
+|------|------------|------------|
+| Field label | `$analysis->fieldLabel` | `$this->selectedField?->label` |
+| Is date type | `$analysis->isDateOrDateTime()` | `$this->selectedField?->type?->isDateOrDateTime()` |
+| Unique count | `$analysis->uniqueCount` | `$this->selectedColumnStats['uniqueCount']` |
+| Date format | `$analysis->dateFormat` | `$this->selectedMapping?->dateFormat` |
+| CSV column | `$analysis->csvColumn` | `$mapping->source` |
+| Target field | `$analysis->fieldKey` | `$mapping->target` |
+
+#### Key Changes
+
+**ColumnAnalyzer simplified:**
+```php
+// BEFORE: 2 methods returning ColumnAnalysisResult
+public function analyzeAllColumns(): Collection<ColumnAnalysisResult>
+public function analyzeColumn(ColumnMapping $mapping): ColumnAnalysisResult
+
+// AFTER: 1 method returning simple array
+public function getColumnStats(string $csvColumn): array
+// Returns: ['uniqueCount' => int, 'blankCount' => int]
+```
+
+**ReviewStep simplified:**
+```php
+// BEFORE: Cached all analyses upfront
+public array $columnAnalysesData = [];
+public array $columnDateFormats = [];  // Duplicated from mappings
+
+// AFTER: No caching, direct access
+#[Computed]
+public function selectedMapping(): ?ColumnMapping
+#[Computed]
+public function selectedField(): ?ImportField
+#[Computed]
+public function selectedColumnStats(): array  // Fetched on-demand
+```
+
+**Blade template simplified:**
+```blade
+{{-- BEFORE --}}
+@foreach ($this->columnAnalyses as $csvColumn => $analysis)
+    {{ $analysis->fieldLabel }}
+@endforeach
+
+{{-- AFTER --}}
+@foreach ($this->mappedColumns as $column)
+    {{ $column['label'] }}
+@endforeach
+```
+
+#### Benefits
+
+1. **Zero data duplication** - Single source of truth for each piece of data
+2. **Simpler code** - No intermediate object to construct and maintain
+3. **Better Livewire compatibility** - Stats fetched fresh on each render
+4. **Fewer lines of code** - ~100 lines removed
+5. **Cleaner architecture** - Each class has one responsibility
+
+#### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/Data/ColumnAnalysisResult.php` | **DELETED** |
+| `src/Support/ColumnAnalyzer.php` | Removed `analyzeAllColumns()`, `analyzeColumn()`, importer dependency |
+| `src/Livewire/Steps/ReviewStep.php` | Replaced with direct access via computed properties |
+| `views/livewire/steps/review-step.blade.php` | Updated to use `mappedColumns` and `selectedColumnStats` |
+
+---
+
 ## Next Decisions Needed
 
 1. ~~**Date format handling**: Per-column selection in ReviewStep (ISO, European, American)~~ ✅ IMPLEMENTED (Decision #20)
@@ -1280,3 +1553,5 @@ Alpine evaluates `x-model="selected"` in the LOCAL scope of that element. Since 
 3. **Relationship creation**: Should unknown companies be created when importing People?
 4. ~~**Date value editing**: Should users be able to manually correct unparseable dates via date picker?~~ ✅ IMPLEMENTED + BF-1 fix
 5. **Create option on-the-fly**: Allow users to create new options for unknown values (future enhancement)
+6. ~~**Unified validation**: Use ValidationService rules + import-specific rules~~ ✅ IMPLEMENTED (Decision #22)
+7. ~~**Livewire serialization**: Explicit boundary for Spatie Data objects~~ ✅ IMPLEMENTED (Decision #23)

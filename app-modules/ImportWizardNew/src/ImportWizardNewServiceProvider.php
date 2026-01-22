@@ -24,6 +24,7 @@ final class ImportWizardNewServiceProvider extends ServiceProvider
     {
         $this->registerRoutes();
         $this->registerViews();
+        $this->registerTranslations();
         $this->registerLivewireComponents();
     }
 
@@ -38,6 +39,11 @@ final class ImportWizardNewServiceProvider extends ServiceProvider
     private function registerViews(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'import-wizard-new');
+    }
+
+    private function registerTranslations(): void
+    {
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'import-wizard-new');
     }
 
     private function registerLivewireComponents(): void
