@@ -526,7 +526,7 @@ final class ImportStore
 
     /**
      * Set a correction for a raw value and validate it.
-     * Updates all rows with matching raw value.
+     * Updates all rows with matching raw value using batch SQL UPDATE.
      */
     public function setCorrection(string $columnSource, string $rawValue, string $newValue): void
     {
@@ -537,30 +537,34 @@ final class ImportStore
         }
 
         $error = $this->validateValue($column, $newValue);
+        $jsonPath = '$.'.$columnSource;
 
-        $this->query()
-            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
-            ->each(function (ImportRow $row) use ($columnSource, $newValue, $error): void {
-                $corrections = $row->corrections ?? collect();
-                $validation = $row->validation ?? collect();
+        // Batch update corrections
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET corrections = json_set(COALESCE(corrections, '{}'), ?, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $newValue, $jsonPath, $rawValue]);
 
-                $corrections->put($columnSource, $newValue);
-
-                if ($error !== null) {
-                    $validation->put($columnSource, $error);
-                } else {
-                    $validation->forget($columnSource);
-                }
-
-                $row->update([
-                    'corrections' => $corrections,
-                    'validation' => $validation->isEmpty() ? null : $validation,
-                ]);
-            });
+        // Batch update validation
+        if ($error !== null) {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $error, $jsonPath, $rawValue]);
+        } else {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_remove(validation, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $jsonPath, $rawValue]);
+        }
     }
 
     /**
      * Clear a correction (undo) and re-validate the original value.
+     * Uses batch SQL UPDATE for performance.
      */
     public function clearCorrection(string $columnSource, string $rawValue): void
     {
@@ -570,54 +574,53 @@ final class ImportStore
             return;
         }
 
-        $this->query()
-            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
-            ->each(function (ImportRow $row) use ($column, $columnSource, $rawValue): void {
-                $corrections = $row->corrections ?? collect();
-                $validation = $row->validation ?? collect();
+        $error = $this->validateValue($column, $rawValue);
+        $jsonPath = '$.'.$columnSource;
 
-                $corrections->forget($columnSource);
+        // Batch remove correction
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET corrections = json_remove(corrections, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $jsonPath, $rawValue]);
 
-                // Re-validate the original raw value
-                $error = $this->validateValue($column, $rawValue);
-
-                if ($error !== null) {
-                    $validation->put($columnSource, $error);
-                } else {
-                    $validation->forget($columnSource);
-                }
-
-                $row->update([
-                    'corrections' => $corrections->isEmpty() ? null : $corrections,
-                    'validation' => $validation->isEmpty() ? null : $validation,
-                ]);
-            });
+        // Batch update validation
+        if ($error !== null) {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $error, $jsonPath, $rawValue]);
+        } else {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_remove(validation, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $jsonPath, $rawValue]);
+        }
     }
 
     /**
      * Mark a value as skipped (will become null during import).
      * Clears validation error since it's intentionally skipped.
+     * Uses batch SQL UPDATE for performance.
      */
     public function setValueSkipped(string $columnSource, string $rawValue): void
     {
-        $this->query()
-            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
-            ->each(function (ImportRow $row) use ($columnSource): void {
-                $skipped = $row->skipped ?? collect();
-                $validation = $row->validation ?? collect();
+        $jsonPath = '$.'.$columnSource;
 
-                $skipped->put($columnSource, true);
-                $validation->forget($columnSource);
-
-                $row->update([
-                    'skipped' => $skipped,
-                    'validation' => $validation->isEmpty() ? null : $validation,
-                ]);
-            });
+        // Batch set skipped flag and remove validation error in one query
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true')),
+                validation = json_remove(validation, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $jsonPath, $jsonPath, $rawValue]);
     }
 
     /**
      * Clear a skipped value (unskip) and re-validate the original value.
+     * Uses batch SQL UPDATE for performance.
      */
     public function clearSkipped(string $columnSource, string $rawValue): void
     {
@@ -627,25 +630,24 @@ final class ImportStore
             return;
         }
 
-        $this->query()
-            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
-            ->each(function (ImportRow $row) use ($column, $columnSource, $rawValue): void {
-                $skipped = $row->skipped ?? collect();
-                $validation = $row->validation ?? collect();
+        $error = $this->validateValue($column, $rawValue);
+        $jsonPath = '$.'.$columnSource;
 
-                $skipped->forget($columnSource);
+        // Batch remove skipped flag
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET skipped = json_remove(skipped, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $jsonPath, $rawValue]);
 
-                $error = $this->validateValue($column, $rawValue);
-
-                if ($error !== null) {
-                    $validation->put($columnSource, $error);
-                }
-
-                $row->update([
-                    'skipped' => $skipped->isEmpty() ? null : $skipped,
-                    'validation' => $validation->isEmpty() ? null : $validation,
-                ]);
-            });
+        // Batch update validation if the raw value has an error
+        if ($error !== null) {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $error, $jsonPath, $rawValue]);
+        }
     }
 
     /**
