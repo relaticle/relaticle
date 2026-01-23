@@ -113,3 +113,12 @@ it('uses abbreviation for large star counts', function () {
     // Should be abbreviated
     expect($result)->toBe('12.5K');
 });
+
+it('returns int even when cache contains string value', function () {
+    // Simulate cache containing a string (as might happen from serialization)
+    Cache::put('github_stars_Relaticle_relaticle', '125', now()->addMinutes(15));
+
+    $result = $this->service->getStarsCount('Relaticle', 'relaticle');
+
+    expect($result)->toBe(125)->toBeInt();
+});

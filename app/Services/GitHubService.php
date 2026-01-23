@@ -24,7 +24,7 @@ final readonly class GitHubService
     {
         $cacheKey = "github_stars_{$owner}_{$repo}";
 
-        $cachedValue = Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo): int {
+        return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo): int {
             try {
                 /** @var Response $response */
                 $response = Http::withHeaders([
@@ -44,8 +44,6 @@ final readonly class GitHubService
                 return 0;
             }
         });
-
-        return is_null($cachedValue) ? 0 : (int) $cachedValue;
     }
 
     /**
