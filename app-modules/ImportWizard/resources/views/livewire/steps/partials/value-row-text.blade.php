@@ -18,7 +18,7 @@
     <input
         type="text"
         value="{{ $mappedValue }}"
-        wire:change.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, $event.target.value)"
+        wire:change.preserve-scroll="updateMappedValue({{ Js::from($rawValue) }}, $event.target.value)"
         class="flex-1 text-sm pl-2 pr-2 py-1 bg-transparent border-0 text-gray-900 dark:text-white focus:ring-0 focus:outline-none"
     />
     <x-import-wizard-new::value-row-actions

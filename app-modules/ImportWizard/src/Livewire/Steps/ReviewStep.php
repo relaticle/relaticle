@@ -40,6 +40,8 @@ final class ReviewStep extends Component
         $this->columns = $this->store()->columnMappings();
         $columnSource = $this->store()->columnMappings()->first()->source;
         $this->selectColumn($columnSource);
+
+        $this->store()->validateAllColumns();
     }
 
     /**
@@ -71,7 +73,7 @@ final class ReviewStep extends Component
 
         return $this->store()->query()
             ->uniqueValuesFor($column)
-            ->forFilter($this->filter)
+            ->forFilter($this->filter, $column)
             ->when(filled($this->search), fn ($q) => $q->searchValue($column, $this->search))
             ->paginate(100);
     }
@@ -90,7 +92,7 @@ final class ReviewStep extends Component
     public function selectColumn(string $columnSource): void
     {
         $this->selectedColumn = $this->store()->getColumnMapping($columnSource);
-        $this->resetPage();
+        $this->setFilter(ReviewFilter::All->value);
     }
 
     /**
@@ -137,5 +139,39 @@ final class ReviewStep extends Component
 
         $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
         $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
+
+        $this->store()->revalidateColumn($this->selectedColumn);
+    }
+
+    /**
+     * Update a mapped value (correction) for all rows with matching raw value.
+     */
+    public function updateMappedValue(string $rawValue, string $newValue): void
+    {
+        $this->store()->setCorrection($this->selectedColumn->source, $rawValue, $newValue);
+    }
+
+    /**
+     * Undo a correction and revert to the original raw value.
+     */
+    public function undoCorrection(string $rawValue): void
+    {
+        $this->store()->clearCorrection($this->selectedColumn->source, $rawValue);
+    }
+
+    /**
+     * Skip a value (set to null during import).
+     */
+    public function skipValue(string $rawValue): void
+    {
+        $this->store()->setValueSkipped($this->selectedColumn->source, $rawValue);
+    }
+
+    /**
+     * Unskip a value (restore original value and re-validate).
+     */
+    public function unskipValue(string $rawValue): void
+    {
+        $this->store()->clearSkipped($this->selectedColumn->source, $rawValue);
     }
 }

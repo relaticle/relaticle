@@ -26,19 +26,21 @@ use Spatie\LaravelData\DataCollection;
  * @property Collection<string, mixed> $raw_data
  * @property Collection<string, string>|null $validation
  * @property Collection<string, mixed>|null $corrections
+ * @property Collection<string, bool>|null $skipped
  * @property RowMatchAction|null $match_action
  * @property string|null $matched_id
  * @property DataCollection<int, RelationshipMatch>|null $relationships
  *
- * @method static Builder<static> withErrors()
- * @method static Builder<static> withCorrections()
+ * @method static Builder<static> withErrors(string $column)
+ * @method static Builder<static> withCorrections(string $column)
+ * @method static Builder<static> withSkipped(string $column)
  * @method static Builder<static> valid()
  * @method static Builder<static> toCreate()
  * @method static Builder<static> toUpdate()
  * @method static Builder<static> toSkip()
  * @method static Builder<static> uniqueValuesFor(string $column)
  * @method static Builder<static> searchValue(string $column, string $search)
- * @method static Builder<static> forFilter(ReviewFilter $filter)
+ * @method static Builder<static> forFilter(ReviewFilter $filter, string $column)
  */
 final class ImportRow extends Model
 {
@@ -59,6 +61,7 @@ final class ImportRow extends Model
         'raw_data',
         'validation',
         'corrections',
+        'skipped',
         'match_action',
         'matched_id',
         'relationships',
@@ -73,6 +76,7 @@ final class ImportRow extends Model
             'raw_data' => AsCollection::class,
             'validation' => AsCollection::class,
             'corrections' => AsCollection::class,
+            'skipped' => AsCollection::class,
             'match_action' => RowMatchAction::class,
             'relationships' => DataCollection::class.':'.RelationshipMatch::class,
         ];
@@ -83,15 +87,21 @@ final class ImportRow extends Model
     // =========================================================================
 
     #[Scope]
-    protected function withErrors(Builder $query): void
+    protected function withErrors(Builder $query, string $column): void
     {
-        $query->whereNotNull('validation')->where('validation', '!=', '{}');
+        $query->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column]);
     }
 
     #[Scope]
-    protected function withCorrections(Builder $query): void
+    protected function withCorrections(Builder $query, string $column): void
     {
-        $query->whereNotNull('corrections')->where('corrections', '!=', '{}');
+        $query->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column]);
+    }
+
+    #[Scope]
+    protected function withSkipped(Builder $query, string $column): void
+    {
+        $query->whereRaw('json_extract(skipped, ?) IS NOT NULL', ['$.'.$column]);
     }
 
     #[Scope]
@@ -129,8 +139,9 @@ final class ImportRow extends Model
             'json_extract(raw_data, ?) as raw_value,
              COUNT(*) as count,
              MAX(json_extract(validation, ?)) as validation_error,
-             MAX(json_extract(corrections, ?)) as correction',
-            [$jsonPath, $jsonPath, $jsonPath]
+             MAX(json_extract(corrections, ?)) as correction,
+             MAX(CASE WHEN json_extract(skipped, ?) IS NOT NULL THEN 1 ELSE 0 END) as is_skipped',
+            [$jsonPath, $jsonPath, $jsonPath, $jsonPath]
         )
             ->groupBy('raw_value')
             ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END, count DESC');
@@ -143,13 +154,13 @@ final class ImportRow extends Model
     }
 
     #[Scope]
-    protected function forFilter(Builder $query, ReviewFilter $filter): void
+    protected function forFilter(Builder $query, ReviewFilter $filter, string $column): void
     {
         match ($filter) {
             ReviewFilter::All => null,
-            ReviewFilter::NeedsReview => $query->withErrors(),
-            ReviewFilter::Modified => $query->withCorrections(),
-            ReviewFilter::Skipped => $query->toSkip(),
+            ReviewFilter::NeedsReview => $query->withErrors($column),
+            ReviewFilter::Modified => $query->withCorrections($column),
+            ReviewFilter::Skipped => $query->withSkipped($column),
         };
     }
 
@@ -171,18 +182,18 @@ final class ImportRow extends Model
             ->selectRaw('
                 COUNT(DISTINCT json_extract(raw_data, ?)) as all_count,
                 COUNT(DISTINCT CASE
-                    WHEN validation IS NOT NULL AND validation != "{}"
+                    WHEN json_extract(validation, ?) IS NOT NULL
                     THEN json_extract(raw_data, ?)
                 END) as needs_review_count,
                 COUNT(DISTINCT CASE
-                    WHEN corrections IS NOT NULL AND corrections != "{}"
+                    WHEN json_extract(corrections, ?) IS NOT NULL
                     THEN json_extract(raw_data, ?)
                 END) as modified_count,
                 COUNT(DISTINCT CASE
-                    WHEN match_action = ?
+                    WHEN json_extract(skipped, ?) IS NOT NULL
                     THEN json_extract(raw_data, ?)
                 END) as skipped_count
-            ', [$jsonPath, $jsonPath, $jsonPath, RowMatchAction::Skip->value, $jsonPath])
+            ', [$jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath])
             ->first();
 
         return [
@@ -209,14 +220,27 @@ final class ImportRow extends Model
 
     /**
      * Get the final value for a column (corrected or original).
+     * Returns null for skipped values.
      */
     public function getFinalValue(string $column): mixed
     {
+        if ($this->isValueSkipped($column)) {
+            return null;
+        }
+
         if ($this->corrections?->has($column)) {
             return $this->corrections->get($column);
         }
 
         return $this->raw_data->get($column);
+    }
+
+    /**
+     * Check if a specific column value is marked as skipped.
+     */
+    public function isValueSkipped(string $column): bool
+    {
+        return $this->skipped?->has($column) === true;
     }
 
     /**

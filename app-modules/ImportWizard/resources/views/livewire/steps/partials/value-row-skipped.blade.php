@@ -4,20 +4,13 @@
         <x-filament::icon icon="heroicon-o-no-symbol" class="w-4 h-4 text-gray-400 shrink-0"/>
         <span class="text-sm text-gray-400 dark:text-gray-500 italic">Skipped</span>
     </div>
-    <x-import-wizard-new::value-row-actions
-        :selected-column="$selectedColumn"
-        :raw-value="$rawValue"
-        :show-undo="true"
-        :show-skip="false"
-        undo-title="Restore original value"
-    >
-        <div class="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
+    <div class="flex items-center bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shrink-0">
         <button
-            wire:click.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, {{ Js::from($rawValue) }})"
-            class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-950/50 transition-colors"
-            title="Add a value"
+            wire:click.stop.preserve-scroll="unskipValue({{ Js::from($rawValue) }})"
+            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+            title="Restore original value"
         >
-            <x-filament::icon icon="heroicon-o-plus" class="w-4 h-4"/>
+            <x-filament::icon icon="heroicon-o-arrow-uturn-left" class="w-4 h-4"/>
         </button>
-    </x-import-wizard-new::value-row-actions>
+    </div>
 </div>

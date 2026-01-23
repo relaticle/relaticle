@@ -219,7 +219,7 @@
                         $hasCorrection = $valueData->correction !== null;
                         $mappedValue = $hasCorrection ? $valueData->correction : $rawValue;
                         $isRawBlank = blank($rawValue);
-                        $isSkipped = false;
+                        $isSkipped = (bool) ($valueData->is_skipped ?? false);
                         $count = (int) $valueData->count;
                     @endphp
 

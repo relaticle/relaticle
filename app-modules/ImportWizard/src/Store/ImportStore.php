@@ -15,8 +15,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 
 /**
@@ -422,6 +424,7 @@ final class ImportStore
                 $table->text('raw_data');  // NOT NULL - SQLite will reject if missing
                 $table->text('validation')->nullable();
                 $table->text('corrections')->nullable();
+                $table->text('skipped')->nullable();  // JSON: {"column_name": true, ...}
                 $table->string('match_action')->nullable();
                 $table->string('matched_id')->nullable();
                 $table->text('relationships')->nullable();
@@ -443,6 +446,7 @@ final class ImportStore
             $schema->table('import_rows', function ($table): void {
                 $table->index('validation');
                 $table->index('match_action');
+                $table->index('skipped');
             });
         } catch (QueryException $e) {
             // Handle race condition (Sushi pattern)
@@ -452,6 +456,248 @@ final class ImportStore
 
             throw $e;
         }
+    }
+
+    // =========================================================================
+    // VALIDATION
+    // =========================================================================
+
+    /**
+     * Validate all values for all mapped columns.
+     * Called once when entering Review Step.
+     */
+    public function validateAllColumns(): void
+    {
+        $columns = $this->columnMappings();
+
+        $this->query()->each(function (ImportRow $row) use ($columns): void {
+            $validation = collect();
+
+            foreach ($columns as $column) {
+                if (! $column->isFieldMapping()) {
+                    continue;
+                }
+
+                $valueToValidate = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
+
+                $error = $this->validateValue($column, $valueToValidate);
+
+                if ($error !== null) {
+                    $validation->put($column->source, $error);
+                }
+            }
+
+            $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
+        });
+    }
+
+    /**
+     * Re-validate all values for a specific column.
+     * Called when format setting changes.
+     */
+    public function revalidateColumn(ColumnData $column): void
+    {
+        $this->query()->each(function (ImportRow $row) use ($column): void {
+            $skipped = $row->skipped ?? collect();
+
+            if ($skipped->has($column->source)) {
+                $validation = $row->validation ?? collect();
+                $validation->forget($column->source);
+                $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
+
+                return;
+            }
+
+            $valueToValidate = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
+
+            $error = $this->validateValue($column, $valueToValidate);
+
+            $validation = $row->validation ?? collect();
+
+            if ($error !== null) {
+                $validation->put($column->source, $error);
+            } else {
+                $validation->forget($column->source);
+            }
+
+            $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
+        });
+    }
+
+    /**
+     * Set a correction for a raw value and validate it.
+     * Updates all rows with matching raw value.
+     */
+    public function setCorrection(string $columnSource, string $rawValue, string $newValue): void
+    {
+        $column = $this->getColumnMapping($columnSource);
+
+        if (! $column instanceof ColumnData) {
+            return;
+        }
+
+        $error = $this->validateValue($column, $newValue);
+
+        $this->query()
+            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
+            ->each(function (ImportRow $row) use ($columnSource, $newValue, $error): void {
+                $corrections = $row->corrections ?? collect();
+                $validation = $row->validation ?? collect();
+
+                $corrections->put($columnSource, $newValue);
+
+                if ($error !== null) {
+                    $validation->put($columnSource, $error);
+                } else {
+                    $validation->forget($columnSource);
+                }
+
+                $row->update([
+                    'corrections' => $corrections,
+                    'validation' => $validation->isEmpty() ? null : $validation,
+                ]);
+            });
+    }
+
+    /**
+     * Clear a correction (undo) and re-validate the original value.
+     */
+    public function clearCorrection(string $columnSource, string $rawValue): void
+    {
+        $column = $this->getColumnMapping($columnSource);
+
+        if (! $column instanceof ColumnData) {
+            return;
+        }
+
+        $this->query()
+            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
+            ->each(function (ImportRow $row) use ($column, $columnSource, $rawValue): void {
+                $corrections = $row->corrections ?? collect();
+                $validation = $row->validation ?? collect();
+
+                $corrections->forget($columnSource);
+
+                // Re-validate the original raw value
+                $error = $this->validateValue($column, $rawValue);
+
+                if ($error !== null) {
+                    $validation->put($columnSource, $error);
+                } else {
+                    $validation->forget($columnSource);
+                }
+
+                $row->update([
+                    'corrections' => $corrections->isEmpty() ? null : $corrections,
+                    'validation' => $validation->isEmpty() ? null : $validation,
+                ]);
+            });
+    }
+
+    /**
+     * Mark a value as skipped (will become null during import).
+     * Clears validation error since it's intentionally skipped.
+     */
+    public function setValueSkipped(string $columnSource, string $rawValue): void
+    {
+        $this->query()
+            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
+            ->each(function (ImportRow $row) use ($columnSource): void {
+                $skipped = $row->skipped ?? collect();
+                $validation = $row->validation ?? collect();
+
+                $skipped->put($columnSource, true);
+                $validation->forget($columnSource);
+
+                $row->update([
+                    'skipped' => $skipped,
+                    'validation' => $validation->isEmpty() ? null : $validation,
+                ]);
+            });
+    }
+
+    /**
+     * Clear a skipped value (unskip) and re-validate the original value.
+     */
+    public function clearSkipped(string $columnSource, string $rawValue): void
+    {
+        $column = $this->getColumnMapping($columnSource);
+
+        if (! $column instanceof ColumnData) {
+            return;
+        }
+
+        $this->query()
+            ->whereRaw('json_extract(raw_data, ?) = ?', ['$.'.$columnSource, $rawValue])
+            ->each(function (ImportRow $row) use ($column, $columnSource, $rawValue): void {
+                $skipped = $row->skipped ?? collect();
+                $validation = $row->validation ?? collect();
+
+                $skipped->forget($columnSource);
+
+                $error = $this->validateValue($column, $rawValue);
+
+                if ($error !== null) {
+                    $validation->put($columnSource, $error);
+                }
+
+                $row->update([
+                    'skipped' => $skipped->isEmpty() ? null : $skipped,
+                    'validation' => $validation->isEmpty() ? null : $validation,
+                ]);
+            });
+    }
+
+    /**
+     * Validate a single value against the column's type and format settings.
+     */
+    private function validateValue(ColumnData $column, mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            $value = (string) $value;
+        }
+
+        $type = $column->getType();
+
+        return match (true) {
+            $type->isDateOrDateTime() => $this->validateDate($column, $value),
+            $type->isFloat() => $this->validateFloat($column, $value),
+            $type->isChoiceField() => $this->validateChoice($column, $value),
+            default => null,
+        };
+    }
+
+    private function validateDate(ColumnData $column, string $value): ?string
+    {
+        $format = $column->dateFormat ?? DateFormat::ISO;
+        $isTimestamp = $column->getType()->isTimestamp();
+
+        return $format->parse($value, $isTimestamp) === null
+            ? __('import-wizard-new::validation.invalid_date', ['format' => $format->getLabel()])
+            : null;
+    }
+
+    private function validateFloat(ColumnData $column, string $value): ?string
+    {
+        $format = $column->numberFormat ?? NumberFormat::POINT;
+
+        return $format->parse($value) === null
+            ? __('import-wizard-new::validation.invalid_number', ['format' => $format->getLabel()])
+            : null;
+    }
+
+    private function validateChoice(ColumnData $column, string $value): ?string
+    {
+        $options = $this->getChoiceOptions($column);
+        $validValues = collect($options)->pluck('value')->all();
+
+        return in_array($value, $validValues, true)
+            ? null
+            : __('import-wizard-new::validation.invalid_choice', ['value' => $value]);
     }
 
     // =========================================================================
@@ -465,27 +711,6 @@ final class ImportStore
     {
         $this->connection = null;
         File::deleteDirectory($this->path());
-    }
-
-    /**
-     * Get unique values with counts for a specific column.
-     * Blank/null values are returned first.
-     *
-     * @return Collection<int, array{raw_value: string|null, count: int}>
-     */
-    public function getUniqueValuesWithCount(string $columnSource): Collection
-    {
-        $results = $this->connection()
-            ->table('import_rows')
-            ->selectRaw('json_extract(raw_data, ?) as raw_value, COUNT(*) as count', ['$.'.$columnSource])
-            ->groupBy('raw_value')
-            ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END, raw_value')
-            ->get();
-
-        return $results->map(fn (object $row): array => [
-            'raw_value' => $row->raw_value,
-            'count' => (int) $row->count,
-        ]);
     }
 
     /**
