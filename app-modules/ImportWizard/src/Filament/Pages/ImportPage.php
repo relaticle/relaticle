@@ -7,14 +7,15 @@ namespace Relaticle\ImportWizard\Filament\Pages;
 use BackedEnum;
 use Filament\Pages\Page;
 use Override;
+use Relaticle\ImportWizard\Enums\ImportEntityType;
 use UnitEnum;
 
 /**
- * Base import page that embeds the import wizard for a specific entity type.
+ * Base import page that embeds the new import wizard for a specific entity type.
  */
 abstract class ImportPage extends Page
 {
-    protected string $view = 'import-wizard::filament.pages.import-page';
+    protected string $view = 'import-wizard-new::filament.pages.import-page';
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-arrow-up-tray';
 
@@ -23,9 +24,9 @@ abstract class ImportPage extends Page
     protected static bool $shouldRegisterNavigation = false;
 
     /**
-     * Get the entity type key (e.g., 'companies', 'people').
+     * Get the entity type for this import page.
      */
-    abstract public static function getEntityType(): string;
+    abstract public static function getEntityType(): ImportEntityType;
 
     /**
      * Get the resource class to redirect back to after import.
@@ -34,24 +35,16 @@ abstract class ImportPage extends Page
      */
     abstract public static function getResourceClass(): string;
 
-    /**
-     * Get the entity label (e.g., 'Companies', 'People').
-     */
-    public static function getEntityLabel(): string
-    {
-        return str(static::getEntityType())->title()->toString();
-    }
-
     #[Override]
     public function getTitle(): string
     {
-        return 'Import '.static::getEntityLabel();
+        return 'Import '.static::getEntityType()->label();
     }
 
     #[Override]
     public function getSubheading(): string
     {
-        return 'Import '.strtolower(static::getEntityLabel()).' from a CSV file';
+        return 'Import '.strtolower(static::getEntityType()->label()).' from a CSV file';
     }
 
     /**
@@ -66,7 +59,7 @@ abstract class ImportPage extends Page
         $breadcrumbs = [];
 
         if (method_exists($resourceClass, 'getUrl')) {
-            $breadcrumbs[$resourceClass::getUrl()] = static::getEntityLabel();
+            $breadcrumbs[$resourceClass::getUrl()] = static::getEntityType()->label();
         }
 
         $breadcrumbs[] = 'Import';

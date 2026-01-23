@@ -56,6 +56,7 @@
         "spatie/laravel-prefixed-ids": "^1.4",
         "spatie/laravel-settings": "^3.3",
         "spatie/laravel-sitemap": "^7.3",
+        "spatie/simple-excel": "^3.8",
         "symfony/http-client": "^7.2",
         "symfony/postmark-mailer": "^7.2",
         "symfony/yaml": "^7.2"
@@ -75,8 +76,7 @@
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
-        "rector/rector": "^2.0",
-        "spatie/laravel-horizon-watcher": "^1.1"
+        "rector/rector": "^2.0"
     },
     "autoload": {
         "psr-4": {

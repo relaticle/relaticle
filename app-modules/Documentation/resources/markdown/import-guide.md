@@ -67,8 +67,8 @@ The wizard analyzes your data and shows validation issues.
 - **Warnings** (yellow): Optional to fix, won't block import
 
 **Actions You Can Take**:
-- **Fix**: Enter a corrected value in the text field
-- **Skip**: Leave correction blank to skip these rows
+- **Fix**: Enter a corrected value to apply to all rows with this value
+- **Skip**: Click the skip icon to exclude this value. The row will still be imported, but this field will be empty
 - **Change Date Format**: For date columns, select the correct format if auto-detection is uncertain
 
 ### Step 4: Preview & Import

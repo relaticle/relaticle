@@ -1,6 +1,6 @@
 <x-filament-panels::page>
-    <livewire:import-wizard
-        :entity-type="static::getEntityType()"
+    <livewire:import-wizard-new.wizard
+        :entity-type="$this->getEntityType()"
         :return-url="$this->getReturnUrl()"
     />
 </x-filament-panels::page>

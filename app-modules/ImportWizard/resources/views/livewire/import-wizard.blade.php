@@ -1,73 +1,39 @@
-<div
-    x-data="{ heartbeatInterval: null }"
-    x-init="
-        heartbeatInterval = setInterval(() => {
-            if ($wire.sessionId) {
-                $wire.touchHeartbeat();
-            }
-        }, 15000);
-    "
-    @beforeunload.window="clearInterval(heartbeatInterval)"
->
-    {{-- Step Progress (Minimal) --}}
-    <nav class="mb-8" aria-label="Progress">
-        <ol role="list" class="flex items-center gap-2">
-            @foreach ($this->getStepLabels() as $step => $label)
-                @php
-                    $isClickable = $step <= $currentStep;
-                @endphp
-                <li class="flex items-center">
-                    <button
-                        type="button"
-                        @if($isClickable)
-                            wire:click="goToStep({{ $step }})"
-                        @endif
-                        @class([
-                            'flex items-center gap-2 text-sm transition-colors',
-                            'cursor-pointer hover:opacity-80' => $isClickable,
-                            'cursor-default' => !$isClickable,
-                        ])
-                        @disabled(!$isClickable)
-                    >
-                        <span @class([
-                            'inline-flex items-center justify-center h-5 w-5 rounded text-xs font-medium',
-                            'bg-primary-600 text-white' => $currentStep === $step,
-                            'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' => $currentStep !== $step,
-                        ])>{{ $step }}</span>
-                        <span @class([
-                            'text-gray-950 dark:text-white' => $currentStep === $step,
-                            'text-gray-500 dark:text-gray-400' => $currentStep !== $step,
-                        ])>{{ $label }}</span>
-                    </button>
-                    @if ($step < 4)
-                        <x-filament::icon icon="heroicon-m-chevron-right" class="h-4 w-4 text-gray-300 dark:text-gray-600 mx-2" />
-                    @endif
-                </li>
-            @endforeach
-        </ol>
-    </nav>
+<div class="flex flex-col h-[calc(100vh-13.8rem)]">
+    {{-- Step Progress --}}
+    @include('import-wizard-new::livewire.partials.step-indicator')
 
-    {{-- Step Content --}}
-    @switch($currentStep)
-        @case(1)
-            @include('import-wizard::livewire.partials.step-upload')
-            @break
-        @case(2)
-            @include('import-wizard::livewire.partials.step-map')
-            @break
-        @case(3)
-            @include('import-wizard::livewire.partials.step-review')
-            @break
-        @case(4)
-            @include('import-wizard::livewire.partials.step-preview')
-            @break
-    @endswitch
+    {{-- Step Content (Child Components) --}}
+    <div class="flex-1 min-h-0 overflow-hidden flex flex-col [&>div]:flex-1 [&>div]:min-h-0 [&>div]:flex [&>div]:flex-col">
+        @if($currentStep === self::STEP_UPLOAD)
+            <livewire:import-wizard-new.steps.upload
+                :entity-type="$entityType"
+                :store-id="$storeId"
+                @completed="onUploadCompleted($event.detail.storeId, $event.detail.rowCount, $event.detail.columnCount)"
+                :wire:key="'upload-' . ($storeId ?? 'new')"
+            />
+        @elseif($currentStep === self::STEP_MAP)
+            <livewire:import-wizard-new.steps.mapping
+                :store-id="$storeId"
+                :entity-type="$entityType"
+                @completed="nextStep"
+                :wire:key="'map-' . $storeId"
+            />
+        @elseif($currentStep === self::STEP_REVIEW)
+            <livewire:import-wizard-new.steps.review
+                :store-id="$storeId"
+                :entity-type="$entityType"
+                @completed="nextStep"
+                :wire:key="'review-' . $storeId"
+            />
+        @elseif($currentStep === self::STEP_PREVIEW)
+            <livewire:import-wizard-new.steps.preview
+                :store-id="$storeId"
+                :entity-type="$entityType"
+                :wire:key="'preview-' . $storeId"
+            />
+        @endif
+    </div>
 
     {{-- Filament Action Modals --}}
     <x-filament-actions::modals />
-
-    @push('scripts')
-        @include('filament.app.import-preview-alpine')
-        @include('filament.app.import-value-reviewer-alpine')
-    @endpush
 </div>

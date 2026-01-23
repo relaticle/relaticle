@@ -1,0 +1,122 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\ImportWizard\Livewire\Steps;
+
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\View\View;
+use Livewire\Attributes\Computed;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Enums\ReviewFilter;
+use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+
+/**
+ * Step 3: Value review.
+ *
+ * Shows raw data → mapped value transformation.
+ * Allows skipping unwanted values.
+ */
+final class ReviewStep extends Component
+{
+    use WithImportStore;
+    use WithPagination;
+
+    public string $search = '';
+
+    public ReviewFilter $filter = ReviewFilter::All;
+
+    public Collection $columns;
+
+    public ColumnData $selectedColumn;
+
+    public function mount(): void
+    {
+        $this->columns = $this->store()->columnMappings();
+        $columnSource = $this->store()->columnMappings()->first()->source;
+        $this->selectColumn($columnSource);
+    }
+
+    /**
+     * Re-hydrate transient fields after Livewire deserialization.
+     *
+     * ColumnData's importField and relationshipField are transient (not stored in JSON),
+     * so we need to re-hydrate them on each request.
+     */
+    public function hydrate(): void
+    {
+        $this->columns = $this->store()->columnMappings();
+        $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
+    }
+
+    public function render(): View
+    {
+        return view('import-wizard-new::livewire.steps.review-step');
+    }
+
+    /**
+     * Get unique values for the selected column with pagination.
+     *
+     * @return LengthAwarePaginator<object>
+     */
+    #[Computed]
+    public function selectedColumnRows(): LengthAwarePaginator
+    {
+        $column = $this->selectedColumn->source;
+
+        return $this->store()->query()
+            ->uniqueValuesFor($column)
+            ->forFilter($this->filter)
+            ->when(filled($this->search), fn ($q) => $q->searchValue($column, $this->search))
+            ->paginate(100);
+    }
+
+    /**
+     * Get counts for each filter option in a single query.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function filterCounts(): array
+    {
+        return $this->store()->countUniqueValuesByFilter($this->selectedColumn->source);
+    }
+
+    public function selectColumn(string $columnSource): void
+    {
+        $this->selectedColumn = $this->store()->getColumnMapping($columnSource);
+        $this->resetPage();
+    }
+
+    /**
+     * Get choice options for the selected column.
+     *
+     * @return array<int, array{label: string, value: string}>
+     */
+    #[Computed]
+    public function choiceOptions(): array
+    {
+        return $this->store()->getChoiceOptions($this->selectedColumn);
+    }
+
+    public function setFilter(string $filter): void
+    {
+        $this->filter = ReviewFilter::from($filter);
+        $this->resetPage();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->search = '';
+        $this->filter = ReviewFilter::All;
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+}

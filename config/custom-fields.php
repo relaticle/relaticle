@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource;
+use App\Models\People;
 use Relaticle\CustomFields\EntitySystem\EntityConfigurator;
+use Relaticle\CustomFields\EntitySystem\EntityModel;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\FeatureSystem\FeatureConfigurator;
 use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
@@ -19,6 +22,20 @@ return [
     */
     'entity_configuration' => EntityConfigurator::configure()
         ->discover(app_path('Models'))
+        ->models([
+            EntityModel::configure(
+                modelClass: People::class,
+                primaryAttribute: 'name',
+                resourceClass: PeopleResource::class,
+                avatarConfiguration: EntityModel::avatar(attribute: 'avatar'),
+            ),
+            EntityModel::configure(
+                modelClass: \App\Models\Company::class,
+                primaryAttribute: 'name',
+                resourceClass: \App\Filament\Resources\CompanyResource::class,
+                avatarConfiguration: EntityModel::avatar(attribute: 'logo', shape: \Relaticle\CustomFields\Enums\AvatarShape::Square),
+            ),
+        ])
         ->cache(),
 
     /*
