@@ -11,6 +11,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 
@@ -118,5 +120,22 @@ final class ReviewStep extends Component
     public function updatedSearch(): void
     {
         $this->resetPage();
+    }
+
+    /**
+     * Update the format setting for the selected column.
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function setColumnFormat(string $type, string $value): void
+    {
+        $updated = match ($type) {
+            'date' => $this->selectedColumn->withDateFormat(DateFormat::from($value)),
+            'number' => $this->selectedColumn->withNumberFormat(NumberFormat::from($value)),
+            default => throw new \InvalidArgumentException("Unknown format type: {$type}"),
+        };
+
+        $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
+        $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
     }
 }

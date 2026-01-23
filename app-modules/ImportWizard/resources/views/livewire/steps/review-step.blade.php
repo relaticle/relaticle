@@ -1,4 +1,4 @@
-@php use Relaticle\ImportWizard\Enums\ReviewFilter; @endphp
+@php use Relaticle\ImportWizard\Enums\DateFormat;use Relaticle\ImportWizard\Enums\NumberFormat;use Relaticle\ImportWizard\Enums\ReviewFilter; @endphp
 <div class="flex flex-col h-full overflow-hidden">
     {{-- Main Content --}}
     <div class="flex-1 flex gap-4 overflow-hidden min-h-[12rem]">
@@ -45,12 +45,26 @@
                         {{-- Date Format Select Menu --}}
                         <div class="w-44">
                             <x-select-menu
-                                :options="$this->dateFormatOptions"
+                                :options="DateFormat::toOptions($this->selectedColumn->getType()->isTimestamp())"
                                 :searchable="false"
                                 placeholder="Date format"
                                 icon="heroicon-o-cog-6-tooth"
-                                :value="$this->selectedColumnDateFormat->value"
-                                @input="$wire.setDateFormat($event.detail)"
+                                :value="$this->selectedColumn->dateFormat ?? DateFormat::ISO"
+                                @input="$wire.setColumnFormat('date', $event.detail)"
+                            />
+                        </div>
+                    @endif
+
+                    @if ($this->selectedColumn->getType()->isFloat())
+                        {{-- Number Format Select Menu --}}
+                        <div class="w-44">
+                            <x-select-menu
+                                :options="NumberFormat::toOptions()"
+                                :searchable="false"
+                                placeholder="Number format"
+                                icon="heroicon-o-cog-6-tooth"
+                                :value="$this->selectedColumn->numberFormat ?? NumberFormat::POINT"
+                                @input="$wire.setColumnFormat('number', $event.detail)"
                             />
                         </div>
                     @endif
@@ -242,6 +256,8 @@
                                 <span class="text-sm text-gray-400 dark:text-gray-500 italic">(blank)</span>
                             @elseif ($this->selectedColumn->getType()->isDateOrDateTime())
                                 @include('import-wizard-new::livewire.steps.partials.value-row-date', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
+                            @elseif ($this->selectedColumn->getType()->isFloat())
+                                @include('import-wizard-new::livewire.steps.partials.value-row-number', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                             @elseif ($this->selectedColumn->getType()->isChoiceField())
                                 @include('import-wizard-new::livewire.steps.partials.value-row-choice', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                             @else

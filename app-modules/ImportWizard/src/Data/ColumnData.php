@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Data;
 use Livewire\Wireable;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Spatie\LaravelData\Concerns\WireableData;
 use Spatie\LaravelData\Data;
 
@@ -42,6 +43,7 @@ final class ColumnData extends Data implements Wireable
         public readonly string $target,
         public readonly ?string $relationship = null,
         public readonly ?DateFormat $dateFormat = null,
+        public readonly ?NumberFormat $numberFormat = null,
     ) {}
 
     /**
@@ -116,6 +118,35 @@ final class ColumnData extends Data implements Wireable
             'target' => $this->target,
             'relationship' => $this->relationship,
             'dateFormat' => $this->dateFormat,
+            'numberFormat' => $this->numberFormat,
         ];
+    }
+
+    /**
+     * Create a new instance with a different date format.
+     */
+    public function withDateFormat(DateFormat $format): self
+    {
+        return new self(
+            source: $this->source,
+            target: $this->target,
+            relationship: $this->relationship,
+            dateFormat: $format,
+            numberFormat: $this->numberFormat,
+        );
+    }
+
+    /**
+     * Create a new instance with a different number format.
+     */
+    public function withNumberFormat(NumberFormat $format): self
+    {
+        return new self(
+            source: $this->source,
+            target: $this->target,
+            relationship: $this->relationship,
+            dateFormat: $this->dateFormat,
+            numberFormat: $format,
+        );
     }
 }

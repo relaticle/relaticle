@@ -17,11 +17,11 @@ final readonly class ImportChoiceRule implements ValidationRule
 {
     /**
      * @param  array<int, array{value: string, label: string}>  $options  Available choice options
-     * @param  bool  $isMulti  Whether multiple selections are allowed (comma-separated)
+     * @param  bool  $isMultiChoice  Whether multiple selections are allowed (comma-separated)
      */
     public function __construct(
         private array $options,
-        private bool $isMulti = false,
+        private bool $isMultiChoice = false,
     ) {}
 
     /**
@@ -42,7 +42,7 @@ final readonly class ImportChoiceRule implements ValidationRule
             $this->options,
         );
 
-        $values = $this->isMulti
+        $values = $this->isMultiChoice
             ? array_map(trim(...), explode(',', $value))
             : [$value];
 

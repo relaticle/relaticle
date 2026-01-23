@@ -51,16 +51,6 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Get label with example patterns for UI display.
-     */
-    public function getLabelWithExamples(bool $withTime = false): string
-    {
-        $examples = implode(' • ', $this->getExamples($withTime));
-
-        return "{$this->getLabel()} ({$examples})";
-    }
-
-    /**
      * Format a Carbon instance for display.
      */
     public function format(Carbon $date, bool $withTime = false): string
@@ -77,6 +67,122 @@ enum DateFormat: string implements HasLabel
             self::ISO => $date->format('Y-m-d'),
             self::EUROPEAN => $date->format('d/m/Y'),
             self::AMERICAN => $date->format('m/d/Y'),
+        };
+    }
+
+    public static function toOptions(bool $withTime = false): array
+    {
+        $options = [];
+
+        foreach (self::cases() as $case) {
+            $options[$case->value] = [
+                'value' => $case->value,
+                'label' => $case->getLabel(),
+                'description' => implode(', ', $case->getExamples($withTime)),
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Parse a date string into a Carbon instance.
+     *
+     * Attempts multiple format variations to handle real-world CSV data.
+     */
+    public function parse(string $value, bool $withTime = false): ?Carbon
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        foreach ($this->getParseFormats($withTime) as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $value);
+
+                if ($date !== false) {
+                    return $date;
+                }
+            } catch (\Exception) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Format a Carbon instance for use in HTML date/datetime-local input.
+     */
+    public function toPickerValue(Carbon $date, bool $withTime = false): string
+    {
+        return $date->format($withTime ? 'Y-m-d\TH:i' : 'Y-m-d');
+    }
+
+    /**
+     * Get the parse formats to attempt for this date format.
+     *
+     * @return array<string>
+     */
+    private function getParseFormats(bool $withTime): array
+    {
+        if ($withTime) {
+            return match ($this) {
+                self::ISO => [
+                    'Y-m-d H:i:s',
+                    'Y-m-d\TH:i:s',
+                    'Y-m-d\TH:i',
+                    'Y-m-d H:i',
+                ],
+                self::EUROPEAN => [
+                    'd/m/Y H:i:s',
+                    'd-m-Y H:i:s',
+                    'd.m.Y H:i:s',
+                    'j/n/Y H:i:s',
+                    'd/m/Y H:i',
+                    'd-m-Y H:i',
+                    'd.m.Y H:i',
+                    'j/n/Y H:i',
+                    'H:i:s d/m/Y',
+                    'H:i:s d-m-Y',
+                    'H:i d/m/Y',
+                    'H:i d-m-Y',
+                ],
+                self::AMERICAN => [
+                    'm/d/Y H:i:s',
+                    'm-d-Y H:i:s',
+                    'n/j/Y H:i:s',
+                    'm/d/Y H:i',
+                    'm-d-Y H:i',
+                    'n/j/Y H:i',
+                    'H:i:s m/d/Y',
+                    'H:i:s m-d-Y',
+                    'H:i m/d/Y',
+                    'H:i m-d-Y',
+                ],
+            };
+        }
+
+        return match ($this) {
+            self::ISO => [
+                'Y-m-d',
+            ],
+            self::EUROPEAN => [
+                'd/m/Y',
+                'd-m-Y',
+                'd.m.Y',
+                'j/n/Y',
+                'j-n-Y',
+                'j.n.Y',
+            ],
+            self::AMERICAN => [
+                'm/d/Y',
+                'm-d-Y',
+                'n/j/Y',
+                'n-j-Y',
+            ],
         };
     }
 }

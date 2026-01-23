@@ -1,23 +1,15 @@
 {{-- Date/DateTime value row: Bordered container with date picker --}}
 @php
-    use Carbon\Carbon;
-    $isDateTime = $this->isSelectedColumnDateTime;
+    use Relaticle\ImportWizard\Enums\DateFormat;
+
+    $dateFormat = $this->selectedColumn->dateFormat ?? DateFormat::ISO;
+    $isTimestamp = $this->selectedColumn->getType()->isTimestamp();
     $validationError = $valueData->validation_error;
-    $dateFormat = $this->selectedColumnDateFormat;
 
-    $sourceValue = $mappedValue;
-    $parsedDate = null;
-    if ($sourceValue && $dateFormat) {
-        try {
-            $parsedDate = Carbon::createFromFormat($dateFormat->phpFormat(), $sourceValue);
-        } catch (\Exception) {
-            // Leave as null if parsing fails
-        }
-    }
-
-    $pickerValue = $parsedDate?->format($isDateTime ? 'Y-m-d\TH:i' : 'Y-m-d') ?? '';
-    $formattedDisplay = $parsedDate?->format($isDateTime ? 'M j, Y g:i A' : 'M j, Y') ?? '';
-    $isValid = $validationError === null && $pickerValue !== '';
+    $parsedDate = $dateFormat->parse($mappedValue ?? $rawValue, $isTimestamp);
+    $pickerValue = $parsedDate ? $dateFormat->toPickerValue($parsedDate, $isTimestamp) : '';
+    $formattedDisplay = $parsedDate ? $dateFormat->format($parsedDate, $isTimestamp) : '';
+    $isValid = $validationError === null && $parsedDate !== null;
 @endphp
 
 <div class="flex-1 flex items-center gap-2">
@@ -28,7 +20,7 @@
         {{-- Invisible date input positioned over clickable area --}}
         <input
             x-ref="picker"
-            type="{{ $isDateTime ? 'datetime-local' : 'date' }}"
+            type="{{ $isTimestamp ? 'datetime-local' : 'date' }}"
             value="{{ $isValid ? $pickerValue : '' }}"
             wire:change.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, $event.target.value)"
             class="absolute left-0 top-0 w-[calc(100%-4rem)] h-full opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
