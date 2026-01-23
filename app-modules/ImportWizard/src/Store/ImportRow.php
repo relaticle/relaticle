@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Store;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
+use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Spatie\LaravelData\DataCollection;
 
@@ -34,6 +36,9 @@ use Spatie\LaravelData\DataCollection;
  * @method static Builder<static> toCreate()
  * @method static Builder<static> toUpdate()
  * @method static Builder<static> toSkip()
+ * @method static Builder<static> uniqueValuesFor(string $column)
+ * @method static Builder<static> searchValue(string $column, string $search)
+ * @method static Builder<static> forFilter(ReviewFilter $filter)
  */
 final class ImportRow extends Model
 {
@@ -77,54 +82,115 @@ final class ImportRow extends Model
     // QUERY SCOPES
     // =========================================================================
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeWithErrors(Builder $query): void
+    #[Scope]
+    protected function withErrors(Builder $query): void
     {
         $query->whereNotNull('validation')->where('validation', '!=', '{}');
     }
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeWithCorrections(Builder $query): void
+    #[Scope]
+    protected function withCorrections(Builder $query): void
     {
         $query->whereNotNull('corrections')->where('corrections', '!=', '{}');
     }
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeValid(Builder $query): void
+    #[Scope]
+    protected function valid(Builder $query): void
     {
         $query->where(function (\Illuminate\Contracts\Database\Query\Builder $q): void {
             $q->whereNull('validation')->orWhere('validation', '=', '{}');
         });
     }
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeToCreate(Builder $query): void
+    #[Scope]
+    protected function toCreate(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Create->value);
     }
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeToUpdate(Builder $query): void
+    #[Scope]
+    protected function toUpdate(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Update->value);
     }
 
-    /**
-     * @param  Builder<static>  $query
-     */
-    protected function scopeToSkip(Builder $query): void
+    #[Scope]
+    protected function toSkip(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Skip->value);
+    }
+
+    #[Scope]
+    protected function uniqueValuesFor(Builder $query, string $column): void
+    {
+        $jsonPath = '$.'.$column;
+
+        $query->selectRaw(
+            'json_extract(raw_data, ?) as raw_value,
+             COUNT(*) as count,
+             MAX(json_extract(validation, ?)) as validation_error,
+             MAX(json_extract(corrections, ?)) as correction',
+            [$jsonPath, $jsonPath, $jsonPath]
+        )
+            ->groupBy('raw_value')
+            ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END, count DESC');
+    }
+
+    #[Scope]
+    protected function searchValue(Builder $query, string $column, string $search): void
+    {
+        $query->whereRaw('json_extract(raw_data, ?) LIKE ?', ['$.'.$column, '%'.$search.'%']);
+    }
+
+    #[Scope]
+    protected function forFilter(Builder $query, ReviewFilter $filter): void
+    {
+        match ($filter) {
+            ReviewFilter::All => null,
+            ReviewFilter::NeedsReview => $query->withErrors(),
+            ReviewFilter::Modified => $query->withCorrections(),
+            ReviewFilter::Skipped => $query->toSkip(),
+        };
+    }
+
+    // =========================================================================
+    // QUERY METHODS
+    // =========================================================================
+
+    /**
+     * Count unique values for each filter type in a single query.
+     *
+     * @param  Builder<static>  $query
+     * @return array<string, int>
+     */
+    public static function countUniqueValuesByFilter(Builder $query, string $column): array
+    {
+        $jsonPath = '$.'.$column;
+
+        $result = $query
+            ->selectRaw('
+                COUNT(DISTINCT json_extract(raw_data, ?)) as all_count,
+                COUNT(DISTINCT CASE
+                    WHEN validation IS NOT NULL AND validation != "{}"
+                    THEN json_extract(raw_data, ?)
+                END) as needs_review_count,
+                COUNT(DISTINCT CASE
+                    WHEN corrections IS NOT NULL AND corrections != "{}"
+                    THEN json_extract(raw_data, ?)
+                END) as modified_count,
+                COUNT(DISTINCT CASE
+                    WHEN match_action = ?
+                    THEN json_extract(raw_data, ?)
+                END) as skipped_count
+            ', [$jsonPath, $jsonPath, $jsonPath, RowMatchAction::Skip->value, $jsonPath])
+            ->first();
+
+        return [
+            ReviewFilter::All->value => (int) $result->all_count,
+            ReviewFilter::NeedsReview->value => (int) $result->needs_review_count,
+            ReviewFilter::Modified->value => (int) $result->modified_count,
+            ReviewFilter::Skipped->value => (int) $result->skipped_count,
+        ];
     }
 
     // =========================================================================

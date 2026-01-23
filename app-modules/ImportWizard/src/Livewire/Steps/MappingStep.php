@@ -7,7 +7,7 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
-use Relaticle\ImportWizard\Data\ColumnMapping;
+use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\RelationshipField;
@@ -22,7 +22,7 @@ use Relaticle\ImportWizard\Support\DataTypeInferencer;
  * Step 2: Column mapping.
  *
  * Maps CSV columns to entity fields with auto-detection and manual adjustment.
- * Uses a unified ColumnMapping DTO keyed by source (CSV column).
+ * Uses a unified ColumnData DTO keyed by source (CSV column).
  */
 final class MappingStep extends Component
 {
@@ -33,7 +33,7 @@ final class MappingStep extends Component
      *
      * @var array<string, array<string, mixed>>
      */
-    public array $columnMappings = [];
+    public array $columns = [];
 
     private ?BaseImporter $importer = null;
 
@@ -42,7 +42,7 @@ final class MappingStep extends Component
         $this->mountWithImportStore($storeId, $entityType);
         $this->loadMappings();
 
-        if ($this->columnMappings === []) {
+        if ($this->columns === []) {
             $this->autoMap();
         }
     }
@@ -110,7 +110,7 @@ final class MappingStep extends Component
     public function mappedFieldKeys(): array
     {
         /** @var list<string> */
-        return collect($this->columnMappings)
+        return collect($this->columns)
             ->filter(fn (array $m): bool => $m['relationship'] === null)
             ->pluck('target')
             ->values()
@@ -126,7 +126,7 @@ final class MappingStep extends Component
      */
     public function isMapped(string $source): bool
     {
-        return isset($this->columnMappings[$source]);
+        return isset($this->columns[$source]);
     }
 
     /**
@@ -134,20 +134,20 @@ final class MappingStep extends Component
      */
     public function isTargetMapped(string $target): bool
     {
-        return collect($this->columnMappings)
+        return collect($this->columns)
             ->contains(fn (array $m): bool => $m['target'] === $target && $m['relationship'] === null);
     }
 
     /**
      * Get the mapping for a CSV column.
      */
-    public function getMapping(string $source): ?ColumnMapping
+    public function getMapping(string $source): ?ColumnData
     {
-        if (! isset($this->columnMappings[$source])) {
+        if (! isset($this->columns[$source])) {
             return null;
         }
 
-        return ColumnMapping::from($this->columnMappings[$source]);
+        return ColumnData::from($this->columns[$source]);
     }
 
     /**
@@ -155,7 +155,7 @@ final class MappingStep extends Component
      */
     public function getSourceForTarget(string $target): ?string
     {
-        return collect($this->columnMappings)
+        return collect($this->columns)
             ->filter(fn (array $m): bool => $m['target'] === $target && $m['relationship'] === null)
             ->keys()
             ->first();
@@ -168,7 +168,7 @@ final class MappingStep extends Component
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnMapping || $mapping->isRelationshipMapping()) {
+        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isRelationshipMapping()) {
             return null;
         }
 
@@ -184,7 +184,7 @@ final class MappingStep extends Component
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnMapping || $mapping->isFieldMapping()) {
+        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isFieldMapping()) {
             return null;
         }
 
@@ -253,7 +253,7 @@ final class MappingStep extends Component
 
             $field = $allFields->guessFor($header);
             if ($field instanceof ImportField && ! $this->isTargetMapped($field->key)) {
-                $this->columnMappings[$header] = ColumnMapping::toField($header, $field->key)->toArray();
+                $this->columns[$header] = ColumnData::toField($header, $field->key)->toArray();
             }
         }
     }
@@ -279,10 +279,10 @@ final class MappingStep extends Component
                 if ($relationship->matchesHeader($header)) {
                     $highestMatcher = $relationship->getHighestPriorityMatcher();
                     if ($highestMatcher !== null) {
-                        $this->columnMappings[$header] = ColumnMapping::toRelationship(
+                        $this->columns[$header] = ColumnData::toRelationship(
                             $header,
                             $highestMatcher->field,
-                            $relName
+                            $relName,
                         )->toArray();
                         break;
                     }
@@ -296,7 +296,7 @@ final class MappingStep extends Component
      */
     public function isRelationshipMapped(string $relName): bool
     {
-        return collect($this->columnMappings)
+        return collect($this->columns)
             ->contains(fn (array $m): bool => $m['relationship'] === $relName);
     }
 
@@ -327,7 +327,7 @@ final class MappingStep extends Component
                 );
 
                 if ($suggestedField !== null) {
-                    $this->columnMappings[$header] = ColumnMapping::toField($header, $suggestedField)->toArray();
+                    $this->columns[$header] = ColumnData::toField($header, $suggestedField)->toArray();
                 }
             }
         }
@@ -343,9 +343,9 @@ final class MappingStep extends Component
     public function mapToField(string $source, string $target): void
     {
         if ($target === '') {
-            unset($this->columnMappings[$source]);
+            unset($this->columns[$source]);
         } elseif (! $this->isTargetMapped($target)) {
-            $this->columnMappings[$source] = ColumnMapping::toField($source, $target)->toArray();
+            $this->columns[$source] = ColumnData::toField($source, $target)->toArray();
         }
     }
 
@@ -354,7 +354,7 @@ final class MappingStep extends Component
      */
     public function mapToRelationship(string $source, string $matcherKey, string $relationship): void
     {
-        $this->columnMappings[$source] = ColumnMapping::toRelationship($source, $matcherKey, $relationship)->toArray();
+        $this->columns[$source] = ColumnData::toRelationship($source, $matcherKey, $relationship)->toArray();
     }
 
     /**
@@ -362,7 +362,7 @@ final class MappingStep extends Component
      */
     public function unmapColumn(string $source): void
     {
-        unset($this->columnMappings[$source]);
+        unset($this->columns[$source]);
     }
 
     /**
@@ -398,11 +398,11 @@ final class MappingStep extends Component
             return;
         }
 
-        $mappings = collect($this->columnMappings)
-            ->map(fn (array $data): ColumnMapping => ColumnMapping::from($data))
+        $mappings = collect($this->columns)
+            ->map(fn (array $data): ColumnData => ColumnData::from($data))
             ->values();
 
-        $store->setMappings($mappings);
+        $store->setColumnMappings($mappings);
     }
 
     /**
@@ -415,11 +415,11 @@ final class MappingStep extends Component
             return;
         }
 
-        $stored = $store->mappings();
+        $stored = $store->columnMappings();
 
-        $this->columnMappings = $stored
+        $this->columns = $stored
             ->keyBy('source')
-            ->map(fn (ColumnMapping $m): array => $m->toArray())
+            ->map(fn (ColumnData $m): array => $m->toArray())
             ->all();
     }
 

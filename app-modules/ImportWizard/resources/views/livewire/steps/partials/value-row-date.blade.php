@@ -1,10 +1,23 @@
 {{-- Date/DateTime value row: Bordered container with date picker --}}
 @php
+    use Carbon\Carbon;
     $isDateTime = $this->isSelectedColumnDateTime;
-    $currentValue = $hasCorrection ? $mappedValue : $rawValue;
-    $display = $this->selectedColumnDateFormat->parseForDisplay($rawValue, $mappedValue, $hasCorrection, $isDateTime);
-    $validationError = $this->getValidationError($currentValue);
-    $isValid = $validationError === null;
+    $validationError = $valueData->validation_error;
+    $dateFormat = $this->selectedColumnDateFormat;
+
+    $sourceValue = $mappedValue;
+    $parsedDate = null;
+    if ($sourceValue && $dateFormat) {
+        try {
+            $parsedDate = Carbon::createFromFormat($dateFormat->phpFormat(), $sourceValue);
+        } catch (\Exception) {
+            // Leave as null if parsing fails
+        }
+    }
+
+    $pickerValue = $parsedDate?->format($isDateTime ? 'Y-m-d\TH:i' : 'Y-m-d') ?? '';
+    $formattedDisplay = $parsedDate?->format($isDateTime ? 'M j, Y g:i A' : 'M j, Y') ?? '';
+    $isValid = $validationError === null && $pickerValue !== '';
 @endphp
 
 <div class="flex-1 flex items-center gap-2">
@@ -16,7 +29,7 @@
         <input
             x-ref="picker"
             type="{{ $isDateTime ? 'datetime-local' : 'date' }}"
-            value="{{ $isValid ? $display['pickerValue'] : '' }}"
+            value="{{ $isValid ? $pickerValue : '' }}"
             wire:change.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, $event.target.value)"
             class="absolute left-0 top-0 w-[calc(100%-4rem)] h-full opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
         />
@@ -25,7 +38,7 @@
             {{-- Valid: Show formatted date --}}
             <div class="flex-1 flex items-center gap-2 px-2 py-1 pointer-events-none">
                 <x-filament::icon icon="heroicon-o-calendar" class="w-4 h-4 text-gray-400 shrink-0"/>
-                <span class="text-sm text-gray-900 dark:text-white">{{ $display['formattedDisplay'] }}</span>
+                <span class="text-sm text-gray-900 dark:text-white">{{ $formattedDisplay }}</span>
             </div>
 
             <x-import-wizard-new::value-row-actions
@@ -47,7 +60,8 @@
             </div>
 
             {{-- Actions: Fix (opens picker) and Skip --}}
-            <div class="flex items-center bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shrink-0">
+            <div
+                class="flex items-center bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shrink-0">
                 <button
                     type="button"
                     @click="$refs.picker.showPicker()"

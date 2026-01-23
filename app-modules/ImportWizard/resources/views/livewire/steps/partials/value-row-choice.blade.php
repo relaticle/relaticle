@@ -1,18 +1,19 @@
 {{-- Choice field value row: Select dropdown for single/multi choice fields --}}
 @php
-    $isMulti = $this->isSelectedColumnMultiChoice;
-    $options = $this->selectedColumnOptions;
-    $currentValue = $hasCorrection ? $mappedValue : $rawValue;
-    $validationError = $this->getValidationError($currentValue);
+    $isMulti = $selectedColumn->getType()->isMultiChoiceField();
+    $options = $this->choiceOptions;
+    $validationError = $valueData->validation_error;
     $isValid = $validationError === null;
-    $normalizedValue = $this->normalizeChoiceValue($currentValue);
+    $selectedValue = $isMulti
+        ? collect(explode(', ', $mappedValue))->filter()->values()->all()
+        : $mappedValue;
     $rowKey = 'choice-' . crc32($rawValue);
 @endphp
 
 <div
     wire:key="{{ $rowKey }}"
     x-data="{
-        selected: @js($normalizedValue),
+        selected: @js($selectedValue),
         options: @js($options),
         isMulti: @js($isMulti),
         rawValue: @js($rawValue),
@@ -38,7 +39,7 @@
             :options="$options"
             :multiple="$isMulti"
             :searchable="count($options) > 5"
-            :value="$normalizedValue"
+            :value="$selectedValue"
             :borderless="true"
             :placeholder="$isValid ? 'Select...' : 'Select to fix...'"
             @input="selected = $event.detail; updateValue($event.detail)"

@@ -10,9 +10,9 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 /**
  * Import page for companies using the new import wizard.
  */
-final class ImportCompaniesNew extends ImportPage
+final class ImportCompanies extends ImportPage
 {
-    protected static ?string $slug = 'import-companies-new';
+    protected static ?string $slug = 'companies/import';
 
     public static function getEntityType(): ImportEntityType
     {

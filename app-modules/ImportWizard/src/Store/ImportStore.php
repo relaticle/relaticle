@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Store;
 
+use App\Models\CustomField;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Connectors\ConnectionFactory;
@@ -12,9 +14,10 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Relaticle\ImportWizard\Data\ColumnMapping;
+use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Importers\BaseImporter;
 
 /**
  * Manages a single import session with SQLite storage.
@@ -200,37 +203,85 @@ final class ImportStore
     }
 
     // =========================================================================
-    // COLUMN MAPPINGS (unified ColumnMapping DTO approach)
+    // COLUMN MAPPINGS (unified ColumnData DTO approach)
     // =========================================================================
 
     /**
-     * Get all column mappings as a collection.
+     * Get all column mappings as a collection with hydrated ImportField/RelationshipField.
      *
-     * Uses Spatie Data's collect() for automatic deserialization.
+     * Uses Spatie Data's collect() for automatic deserialization,
+     * then hydrates each ColumnData with its ImportField or RelationshipField for direct access.
      *
-     * @return Collection<int, ColumnMapping>
+     * @return Collection<int, ColumnData>
      *
      * @throws FileNotFoundException
      */
-    public function mappings(): Collection
+    public function columnMappings(): Collection
     {
         $raw = $this->meta()['column_mappings'] ?? [];
+        $importer = $this->getImporter();
+        $fields = $importer->allFields();
+        $relationships = collect($importer->relationships());
 
-        return ColumnMapping::collect($raw, Collection::class);
+        return ColumnData::collect($raw, Collection::class)
+            ->each(function (ColumnData $col) use ($fields, $relationships): void {
+                if ($col->isFieldMapping()) {
+                    $col->importField = $fields->get($col->target);
+                } else {
+                    $col->relationshipField = $relationships->get($col->relationship);
+                }
+            });
+    }
+
+    /**
+     * Get the importer instance for this import session.
+     */
+    public function getImporter(): BaseImporter
+    {
+        return $this->entityType()->importer($this->teamId());
+    }
+
+    /**
+     * Get choice options for a column mapping.
+     *
+     * Loads options from CustomField for custom choice fields.
+     *
+     * @return array<int, array{label: string, value: string}>
+     */
+    public function getChoiceOptions(ColumnData $column): array
+    {
+        if (! $column->getType()->isChoiceField()) {
+            return [];
+        }
+
+        $customField = CustomField::query()
+            ->forEntity($this->entityType()->value)
+            ->where('code', Str::after($column->target, 'custom_fields_'))
+            ->first();
+
+        if (! $customField instanceof CustomField) {
+            return [];
+        }
+
+        return $customField
+            ->options()
+            ->pluck('name')
+            ->map(fn ($option): array => ['label' => $option, 'value' => $option])
+            ->toArray();
     }
 
     /**
      * Set column mappings.
      *
-     * @param  iterable<int, ColumnMapping>  $mappings
+     * @param  iterable<int, ColumnData>  $mappings
      */
-    public function setMappings(iterable $mappings): void
+    public function setColumnMappings(iterable $mappings): void
     {
-        /** @var array<int, ColumnMapping> $mappingsArray */
+        /** @var array<int, ColumnData> $mappingsArray */
         $mappingsArray = is_array($mappings) ? $mappings : iterator_to_array($mappings);
 
         $raw = collect($mappingsArray)
-            ->map(fn (ColumnMapping $m): array => $m->toArray())
+            ->map(fn (ColumnData $m): array => $m->toArray())
             ->values()
             ->all();
 
@@ -240,20 +291,20 @@ final class ImportStore
     /**
      * Get a single column mapping by source (CSV column).
      */
-    public function getMapping(string $source): ?ColumnMapping
+    public function getColumnMapping(string $source): ?ColumnData
     {
-        return $this->mappings()->firstWhere('source', $source);
+        return $this->columnMappings()->firstWhere('source', $source);
     }
 
     /**
      * Update a single column mapping.
      */
-    public function updateMapping(string $source, ColumnMapping $newMapping): void
+    public function updateColumnMapping(string $source, ColumnData $newMapping): void
     {
-        $mappings = $this->mappings()
-            ->map(fn (ColumnMapping $m): ColumnMapping => $m->source === $source ? $newMapping : $m);
+        $mappings = $this->columnMappings()
+            ->map(fn (ColumnData $m): ColumnData => $m->source === $source ? $newMapping : $m);
 
-        $this->setMappings($mappings);
+        $this->setColumnMappings($mappings);
     }
 
     /**
@@ -269,22 +320,22 @@ final class ImportStore
     {
         $data = $row->getFinalData();
 
-        return $this->mappings()
-            ->filter(fn (ColumnMapping $m): bool => $m->isFieldMapping())
-            ->mapWithKeys(fn (ColumnMapping $m): array => [$m->target => $data[$m->source] ?? null])
+        return $this->columnMappings()
+            ->filter(fn (ColumnData $m): bool => $m->isFieldMapping())
+            ->mapWithKeys(fn (ColumnData $m): array => [$m->target => $data[$m->source] ?? null])
             ->all();
     }
 
     /**
      * Get relationship mappings.
      *
-     * @return Collection<int, ColumnMapping>
+     * @return Collection<int, ColumnData>
      *
      * @throws FileNotFoundException
      */
     public function getRelationshipMappings(): Collection
     {
-        return $this->mappings()->filter(fn (ColumnMapping $m): bool => $m->isRelationshipMapping());
+        return $this->columnMappings()->filter(fn (ColumnData $m): bool => $m->isRelationshipMapping());
     }
 
     // =========================================================================
@@ -340,7 +391,7 @@ final class ImportStore
         ];
 
         // Register connection in config (Sushi pattern)
-        resolve(\Illuminate\Contracts\Config\Repository::class)->set("database.connections.{$name}", $config);
+        resolve(Repository::class)->set("database.connections.{$name}", $config);
 
         return resolve(ConnectionFactory::class)->make($config, $name);
     }
@@ -417,10 +468,33 @@ final class ImportStore
     }
 
     /**
-     * Check if this import belongs to a team.
+     * Get unique values with counts for a specific column.
+     * Blank/null values are returned first.
+     *
+     * @return Collection<int, array{raw_value: string|null, count: int}>
      */
-    public function belongsToTeam(string $teamId): bool
+    public function getUniqueValuesWithCount(string $columnSource): Collection
     {
-        return $this->teamId() === $teamId;
+        $results = $this->connection()
+            ->table('import_rows')
+            ->selectRaw('json_extract(raw_data, ?) as raw_value, COUNT(*) as count', ['$.'.$columnSource])
+            ->groupBy('raw_value')
+            ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END, raw_value')
+            ->get();
+
+        return $results->map(fn (object $row): array => [
+            'raw_value' => $row->raw_value,
+            'count' => (int) $row->count,
+        ]);
+    }
+
+    /**
+     * Count unique values for each filter type in a single query.
+     *
+     * @return array<string, int>
+     */
+    public function countUniqueValuesByFilter(string $column): array
+    {
+        return ImportRow::countUniqueValuesByFilter($this->query(), $column);
     }
 }
