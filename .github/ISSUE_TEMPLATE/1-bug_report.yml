@@ -1,0 +1,102 @@
+name: Bug report
+description: Report a problem you're experiencing with Relaticle
+labels: ["area:bug"]
+projects: ["Relaticle/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a bug report, please search the existing issues (both open and closed).
+
+        ---
+
+        Thank you for taking the time to file a bug report. To address this bug as fast as possible, we need some information.
+
+  - type: input
+    id: relaticle-version
+    attributes:
+      label: Relaticle Version
+      description: What version of Relaticle are you running?
+      placeholder: v2.0.8
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP Version
+      description: What PHP version are you using?
+      placeholder: 8.4.16
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: Which database are you using?
+      options:
+        - PostgreSQL 15+
+        - PostgreSQL 16+
+        - MySQL 8.0+
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      description: How are you running Relaticle?
+      options:
+        - Laravel Herd (local)
+        - Docker (docker-compose.prod.yml)
+        - Manual installation
+        - Other
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      description: What happened when you experienced the problem?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expectation
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Which steps do we need to take to reproduce the problem?
+        Any code examples need to be **as short as possible**, remove any code that is unrelated to the bug.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: If applicable, provide relevant log output from `storage/logs/laravel.log` or browser console. No need for backticks here.
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
