@@ -15,7 +15,7 @@
 <div class="flex items-center bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shrink-0">
     @if ($showUndo)
         <button
-            wire:click.stop.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, {{ Js::from($rawValue) }})"
+            wire:click.stop.preserve-scroll="undoCorrection({{ Js::from($rawValue) }}, {{ Js::from($rawValue) }})"
             class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors"
             title="{{ $undoTitle }}"
         >
@@ -28,7 +28,7 @@
 
     @if ($showSkip)
         <button
-            wire:click.stop.preserve-scroll="skipValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }})"
+            wire:click.stop.preserve-scroll="skipValue({{ Js::from($rawValue) }})"
             class="p-1.5 text-gray-400 hover:text-warning-600 hover:bg-warning-50 dark:hover:text-warning-400 dark:hover:bg-warning-950/50 transition-colors"
             title="Skip this value"
         >

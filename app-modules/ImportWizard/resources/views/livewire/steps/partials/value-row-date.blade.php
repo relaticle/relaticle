@@ -1,23 +1,22 @@
 {{-- Date/DateTime value row: Bordered container with date picker --}}
 @php
-    use Carbon\Carbon;
-    $isDateTime = $this->isSelectedColumnDateTime;
-    $validationError = $valueData->validation_error;
-    $dateFormat = $this->selectedColumnDateFormat;
+    use Relaticle\ImportWizard\Enums\DateFormat;
 
-    $sourceValue = $mappedValue;
-    $parsedDate = null;
-    if ($sourceValue && $dateFormat) {
-        try {
-            $parsedDate = Carbon::createFromFormat($dateFormat->phpFormat(), $sourceValue);
-        } catch (\Exception) {
-            // Leave as null if parsing fails
-        }
+    $dateFormat = $this->selectedColumn->dateFormat ?? DateFormat::ISO;
+    $isTimestamp = $this->selectedColumn->getType()->isTimestamp();
+    $validationError = $valueData->validation_error;
+
+    $parsedDate = $dateFormat->parse($mappedValue ?? $rawValue, $isTimestamp);
+
+    // Fallback: Try ISO format for corrections (date picker always outputs ISO)
+    // This handles cases where format changed after correction was made
+    if ($parsedDate === null && $dateFormat !== DateFormat::ISO && $mappedValue !== null) {
+        $parsedDate = DateFormat::ISO->parse($mappedValue, $isTimestamp);
     }
 
-    $pickerValue = $parsedDate?->format($isDateTime ? 'Y-m-d\TH:i' : 'Y-m-d') ?? '';
-    $formattedDisplay = $parsedDate?->format($isDateTime ? 'M j, Y g:i A' : 'M j, Y') ?? '';
-    $isValid = $validationError === null && $pickerValue !== '';
+    $pickerValue = $parsedDate ? $dateFormat->toPickerValue($parsedDate, $isTimestamp) : '';
+    $formattedDisplay = $parsedDate ? $dateFormat->format($parsedDate, $isTimestamp) : '';
+    $isValid = $validationError === null && $parsedDate !== null;
 @endphp
 
 <div class="flex-1 flex items-center gap-2">
@@ -28,9 +27,9 @@
         {{-- Invisible date input positioned over clickable area --}}
         <input
             x-ref="picker"
-            type="{{ $isDateTime ? 'datetime-local' : 'date' }}"
+            type="{{ $isTimestamp ? 'datetime-local' : 'date' }}"
             value="{{ $isValid ? $pickerValue : '' }}"
-            wire:change.preserve-scroll="updateMappedValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }}, $event.target.value)"
+            wire:change.preserve-scroll="updateMappedValue({{ Js::from($rawValue) }}, $event.target.value)"
             class="absolute left-0 top-0 w-[calc(100%-4rem)] h-full opacity-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
         />
 
@@ -72,7 +71,7 @@
                 </button>
                 <div class="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
                 <button
-                    wire:click.stop.preserve-scroll="skipValue({{ Js::from($selectedColumn) }}, {{ Js::from($rawValue) }})"
+                    wire:click.stop.preserve-scroll="skipValue({{ Js::from($rawValue) }})"
                     class="p-1.5 text-gray-400 hover:text-warning-600 hover:bg-warning-50 dark:hover:text-warning-400 dark:hover:bg-warning-950/50 transition-colors"
                     title="Skip this value"
                 >
