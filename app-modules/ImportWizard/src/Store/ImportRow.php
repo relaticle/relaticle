@@ -144,7 +144,7 @@ final class ImportRow extends Model
             [$jsonPath, $jsonPath, $jsonPath, $jsonPath]
         )
             ->groupBy('raw_value')
-            ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END, count DESC');
+            ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END');
     }
 
     #[Scope]

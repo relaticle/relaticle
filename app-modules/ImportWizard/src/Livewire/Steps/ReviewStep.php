@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -14,7 +15,10 @@ use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
+use Relaticle\ImportWizard\Enums\SortDirection;
+use Relaticle\ImportWizard\Enums\SortField;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Support\ImportValueValidator;
 
 /**
  * Step 3: Value review.
@@ -31,9 +35,16 @@ final class ReviewStep extends Component
 
     public ReviewFilter $filter = ReviewFilter::All;
 
+    public SortField $sortField = SortField::Count;
+
+    public SortDirection $sortDirection = SortDirection::Desc;
+
     public Collection $columns;
 
     public ColumnData $selectedColumn;
+
+    /** @var array<string, string> Column source => batch ID */
+    public array $batchIds = [];
 
     public function mount(): void
     {
@@ -41,7 +52,18 @@ final class ReviewStep extends Component
         $columnSource = $this->store()->columnMappings()->first()->source;
         $this->selectColumn($columnSource);
 
-        $this->store()->validateAllColumns();
+        // Preload choice options to avoid N+1 queries
+        $validator = new ImportValueValidator($this->store()->entityType()->value);
+        $validator->preloadChoiceOptions($this->columns);
+
+        // Async validate ALL mapped columns
+        foreach ($this->columns as $column) {
+            if (! $column->isFieldMapping()) {
+                continue;
+            }
+
+            $this->batchIds[$column->source] = $this->store()->validateColumnAsync($column);
+        }
     }
 
     /**
@@ -75,6 +97,7 @@ final class ReviewStep extends Component
             ->uniqueValuesFor($column)
             ->forFilter($this->filter, $column)
             ->when(filled($this->search), fn ($q) => $q->searchValue($column, $this->search))
+            ->orderBy($this->sortField->value, $this->sortDirection->value)
             ->paginate(100);
     }
 
@@ -112,6 +135,18 @@ final class ReviewStep extends Component
         $this->resetPage();
     }
 
+    public function setSortField(string $field): void
+    {
+        $this->sortField = SortField::from($field);
+        $this->resetPage();
+    }
+
+    public function setSortDirection(string $direction): void
+    {
+        $this->sortDirection = SortDirection::from($direction);
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';
@@ -140,7 +175,8 @@ final class ReviewStep extends Component
         $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
         $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
 
-        $this->store()->revalidateColumn($this->selectedColumn);
+        // Dispatch async validation (hash includes format, so changed format = new cache keys)
+        $this->batchIds[$this->selectedColumn->source] = $this->store()->validateColumnAsync($this->selectedColumn);
     }
 
     /**
@@ -173,5 +209,70 @@ final class ReviewStep extends Component
     public function unskipValue(string $rawValue): void
     {
         $this->store()->clearSkipped($this->selectedColumn->source, $rawValue);
+    }
+
+    /**
+     * Check validation progress and update UI when complete.
+     */
+    public function checkProgress(): void
+    {
+        if (empty($this->batchIds)) {
+            return;
+        }
+
+        foreach ($this->batchIds as $columnSource => $batchId) {
+            $batch = Bus::findBatch($batchId);
+
+            if ($batch?->finished()) {
+                unset($this->batchIds[$columnSource]);
+                $this->dispatch('validation-complete', column: $columnSource);
+            }
+        }
+    }
+
+    /**
+     * Check if the selected column is currently being validated.
+     */
+    #[Computed]
+    public function isSelectedColumnValidating(): bool
+    {
+        return isset($this->batchIds[$this->selectedColumn->source]);
+    }
+
+    /**
+     * Get validation progress for the selected column's batch.
+     *
+     * @return array{total: int, processed: int, percent: int}
+     */
+    #[Computed]
+    public function selectedColumnProgress(): array
+    {
+        $batchId = $this->batchIds[$this->selectedColumn->source] ?? null;
+
+        if (! $batchId) {
+            return ['total' => 0, 'processed' => 0, 'percent' => 100];
+        }
+
+        $batch = Bus::findBatch($batchId);
+
+        if (! $batch || $batch->totalJobs === 0) {
+            return ['total' => 0, 'processed' => 0, 'percent' => 0];
+        }
+
+        return [
+            'total' => $batch->totalJobs,
+            'processed' => $batch->processedJobs(),
+            'percent' => (int) round(($batch->processedJobs() / $batch->totalJobs) * 100),
+        ];
+    }
+
+    /**
+     * Check if a specific column has validation errors.
+     */
+    public function columnHasErrors(string $columnSource): bool
+    {
+        return $this->store()->query()
+            ->withErrors($columnSource)
+            ->exists();
     }
 }

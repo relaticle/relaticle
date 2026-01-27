@@ -149,4 +149,18 @@ final class ColumnData extends Data implements Wireable
             numberFormat: $format,
         );
     }
+
+    /**
+     * Calculate hash for a value based on column configuration.
+     * Used for validation deduplication and caching.
+     */
+    public function hash(string $value): string
+    {
+        return hash('sha256', json_encode([
+            'type' => $this->getType()->value,
+            'dateFormat' => $this->dateFormat?->value,
+            'numberFormat' => $this->numberFormat?->value,
+            'value' => $value,
+        ]));
+    }
 }

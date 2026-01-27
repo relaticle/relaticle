@@ -43,6 +43,25 @@ final class RelationshipField extends Data
     ) {}
 
     /**
+     * Create new instance with selective property overrides.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function cloneWith(array $overrides): self
+    {
+        return new self(
+            name: $overrides['name'] ?? $this->name,
+            relatedModel: $overrides['relatedModel'] ?? $this->relatedModel,
+            type: $overrides['type'] ?? $this->type,
+            matchableFields: $overrides['matchableFields'] ?? $this->matchableFields,
+            canCreate: $overrides['canCreate'] ?? $this->canCreate,
+            label: $overrides['label'] ?? $this->label,
+            foreignKey: $overrides['foreignKey'] ?? $this->foreignKey,
+            guesses: $overrides['guesses'] ?? $this->guesses,
+        );
+    }
+
+    /**
      * Create a belongsTo relationship field.
      *
      * @param  class-string<Model>  $relatedModel
@@ -163,16 +182,7 @@ final class RelationshipField extends Data
      */
     public function matchableFields(array $matchableFields): self
     {
-        return new self(
-            name: $this->name,
-            relatedModel: $this->relatedModel,
-            type: $this->type,
-            matchableFields: $matchableFields,
-            canCreate: $this->canCreate,
-            label: $this->label,
-            foreignKey: $this->foreignKey,
-            guesses: $this->guesses,
-        );
+        return $this->cloneWith(['matchableFields' => $matchableFields]);
     }
 
     /**
@@ -180,16 +190,7 @@ final class RelationshipField extends Data
      */
     public function canCreate(bool $canCreate = true): self
     {
-        return new self(
-            name: $this->name,
-            relatedModel: $this->relatedModel,
-            type: $this->type,
-            matchableFields: $this->matchableFields,
-            canCreate: $canCreate,
-            label: $this->label,
-            foreignKey: $this->foreignKey,
-            guesses: $this->guesses,
-        );
+        return $this->cloneWith(['canCreate' => $canCreate]);
     }
 
     /**
@@ -197,16 +198,7 @@ final class RelationshipField extends Data
      */
     public function label(string $label): self
     {
-        return new self(
-            name: $this->name,
-            relatedModel: $this->relatedModel,
-            type: $this->type,
-            matchableFields: $this->matchableFields,
-            canCreate: $this->canCreate,
-            label: $label,
-            foreignKey: $this->foreignKey,
-            guesses: $this->guesses,
-        );
+        return $this->cloneWith(['label' => $label]);
     }
 
     /**
@@ -214,16 +206,7 @@ final class RelationshipField extends Data
      */
     public function foreignKey(string $foreignKey): self
     {
-        return new self(
-            name: $this->name,
-            relatedModel: $this->relatedModel,
-            type: $this->type,
-            matchableFields: $this->matchableFields,
-            canCreate: $this->canCreate,
-            label: $this->label,
-            foreignKey: $foreignKey,
-            guesses: $this->guesses,
-        );
+        return $this->cloneWith(['foreignKey' => $foreignKey]);
     }
 
     /**
@@ -233,16 +216,7 @@ final class RelationshipField extends Data
      */
     public function guess(array $guesses): self
     {
-        return new self(
-            name: $this->name,
-            relatedModel: $this->relatedModel,
-            type: $this->type,
-            matchableFields: $this->matchableFields,
-            canCreate: $this->canCreate,
-            label: $this->label,
-            foreignKey: $this->foreignKey,
-            guesses: $guesses,
-        );
+        return $this->cloneWith(['guesses' => $guesses]);
     }
 
     /**

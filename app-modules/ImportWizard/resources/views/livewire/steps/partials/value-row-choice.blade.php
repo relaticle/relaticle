@@ -17,10 +17,9 @@
         options: @js($options),
         isMulti: @js($isMulti),
         rawValue: @js($rawValue),
-        csvColumn: @js($selectedColumn),
         updateValue(newVal) {
             const value = this.isMulti && Array.isArray(newVal) ? newVal.join(', ') : newVal;
-            $wire.updateMappedValue(this.csvColumn, this.rawValue, value);
+            $wire.updateMappedValue(this.rawValue, value);
         }
     }"
     class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"

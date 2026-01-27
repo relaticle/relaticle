@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Store;
 
-use App\Models\CustomField;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Connection;
@@ -12,14 +11,16 @@ use Illuminate\Database\Connectors\ConnectionFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
-use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Importers\BaseImporter;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
+use Relaticle\ImportWizard\Support\ImportValueValidator;
 
 /**
  * Manages a single import session with SQLite storage.
@@ -37,6 +38,8 @@ final class ImportStore
 
     /** @var array<string, mixed>|null */
     private ?array $metaCache = null;
+
+    private ?ImportValueValidator $validator = null;
 
     public function __construct(
         private readonly string $id,
@@ -86,6 +89,9 @@ final class ImportStore
         if (! File::exists($store->metaPath())) {
             return null;
         }
+
+        // Ensure SQLite connection is registered (critical for queue workers)
+        $store->connection();
 
         return $store;
     }
@@ -244,9 +250,20 @@ final class ImportStore
     }
 
     /**
+     * Get the validator instance for this import session.
+     */
+    private function validator(): ImportValueValidator
+    {
+        if ($this->validator === null) {
+            $this->validator = new ImportValueValidator($this->entityType()->value);
+        }
+
+        return $this->validator;
+    }
+
+    /**
      * Get choice options for a column mapping.
-     *
-     * Loads options from CustomField for custom choice fields.
+     * Delegates to ImportValueValidator for consistency.
      *
      * @return array<int, array{label: string, value: string}>
      */
@@ -256,20 +273,7 @@ final class ImportStore
             return [];
         }
 
-        $customField = CustomField::query()
-            ->forEntity($this->entityType()->value)
-            ->where('code', Str::after($column->target, 'custom_fields_'))
-            ->first();
-
-        if (! $customField instanceof CustomField) {
-            return [];
-        }
-
-        return $customField
-            ->options()
-            ->pluck('name')
-            ->map(fn ($option): array => ['label' => $option, 'value' => $option])
-            ->toArray();
+        return $this->validator()->getChoiceOptions($column);
     }
 
     /**
@@ -425,6 +429,7 @@ final class ImportStore
                 $table->text('validation')->nullable();
                 $table->text('corrections')->nullable();
                 $table->text('skipped')->nullable();  // JSON: {"column_name": true, ...}
+                $table->text('value_hash')->nullable();  // SHA-256 hash for validation deduplication
                 $table->string('match_action')->nullable();
                 $table->string('matched_id')->nullable();
                 $table->text('relationships')->nullable();
@@ -447,6 +452,7 @@ final class ImportStore
                 $table->index('validation');
                 $table->index('match_action');
                 $table->index('skipped');
+                $table->index('value_hash');
             });
         } catch (QueryException $e) {
             // Handle race condition (Sushi pattern)
@@ -463,70 +469,106 @@ final class ImportStore
     // =========================================================================
 
     /**
-     * Validate all values for all mapped columns.
-     * Called once when entering Review Step.
-     */
-    public function validateAllColumns(): void
-    {
-        $columns = $this->columnMappings();
-
-        $this->query()->each(function (ImportRow $row) use ($columns): void {
-            $validation = collect();
-
-            foreach ($columns as $column) {
-                if (! $column->isFieldMapping()) {
-                    continue;
-                }
-
-                $valueToValidate = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
-
-                $error = $this->validateValue($column, $valueToValidate);
-
-                if ($error !== null) {
-                    $validation->put($column->source, $error);
-                }
-            }
-
-            $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
-        });
-    }
-
-    /**
      * Re-validate all values for a specific column.
-     * Called when format setting changes.
+     * Called when format setting changes (e.g., date/number format).
+     *
+     * CRITICAL: This method ONLY updates the `validation` column.
+     * It NEVER modifies `corrections` or `raw_data`.
+     *
+     * For date fields:
+     * - Raw values are validated against the newly selected format
+     * - Corrections (stored in ISO from the date picker) are validated
+     *   using logic that accepts both ISO and the selected format
+     *
+     * Uses temporary table approach for optimal performance.
      */
     public function revalidateColumn(ColumnData $column): void
     {
-        $this->query()->each(function (ImportRow $row) use ($column): void {
+        $jsonPath = '$.'.$column->source;
+
+        // Step 1: Create temporary table
+        $this->connection()->statement('
+            CREATE TEMPORARY TABLE temp_revalidation (
+                row_number INTEGER PRIMARY KEY,
+                new_validation_error TEXT NULL
+            )
+        ');
+
+        // Step 2-4: Stream rows, compute validation, batch insert
+        $batchSize = 500;
+        $batch = [];
+
+        $this->query()->cursor()->each(function (ImportRow $row) use ($column, &$batch, $batchSize): void {
             $skipped = $row->skipped ?? collect();
 
+            // If value is skipped, validation should be null (no error)
             if ($skipped->has($column->source)) {
-                $validation = $row->validation ?? collect();
-                $validation->forget($column->source);
-                $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
-
-                return;
-            }
-
-            $valueToValidate = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
-
-            $error = $this->validateValue($column, $valueToValidate);
-
-            $validation = $row->validation ?? collect();
-
-            if ($error !== null) {
-                $validation->put($column->source, $error);
+                $batch[] = [
+                    'row_number' => $row->row_number,
+                    'new_validation_error' => null,
+                ];
             } else {
-                $validation->forget($column->source);
+                $hasCorrection = $row->corrections?->has($column->source) ?? false;
+
+                // Date corrections are validated against ISO (not the selected format),
+                // so they remain valid regardless of format changes - skip revalidation
+                if ($hasCorrection && $column->getType()->isDateOrDateTime()) {
+                    $batch[] = ['row_number' => $row->row_number, 'new_validation_error' => null];
+                } else {
+                    $valueToValidate = $hasCorrection
+                        ? $row->corrections->get($column->source)
+                        : $row->raw_data->get($column->source);
+
+                    $error = $this->validator()->validate($column, $valueToValidate);
+                    $batch[] = ['row_number' => $row->row_number, 'new_validation_error' => $error];
+                }
             }
 
-            $row->update(['validation' => $validation->isEmpty() ? null : $validation]);
+            // Batch insert when we hit batch size
+            if (count($batch) >= $batchSize) {
+                $this->connection()->table('temp_revalidation')->insert($batch);
+                $batch = [];
+            }
         });
+
+        // Insert remaining rows
+        if (! empty($batch)) {
+            $this->connection()->table('temp_revalidation')->insert($batch);
+        }
+
+        // Step 5: Single UPDATE with JOIN (SQLite uses UPDATE...FROM syntax)
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET validation = CASE
+                WHEN temp.new_validation_error IS NULL
+                    THEN json_remove(validation, ?)
+                ELSE
+                    json_set(COALESCE(validation, '{}'), ?, temp.new_validation_error)
+            END
+            FROM temp_revalidation AS temp
+            WHERE import_rows.row_number = temp.row_number
+        ", [$jsonPath, $jsonPath]);
+
+        // Step 6: Cleanup
+        $this->connection()->statement('DROP TABLE IF EXISTS temp_revalidation');
     }
 
     /**
      * Set a correction for a raw value and validate it.
      * Updates all rows with matching raw value using batch SQL UPDATE.
+     *
+     * IMPORTANT - Date Correction Storage:
+     * For date fields, corrections from the HTML date picker are stored in ISO format
+     * (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) regardless of the user's selected date format.
+     *
+     * This is intentional because:
+     * - HTML date/datetime inputs always output ISO format (browser constraint)
+     * - Laravel/Eloquent expects ISO format for database storage
+     * - The selected format only affects how ambiguous raw CSV data is interpreted
+     *
+     * Date corrections are validated against ISO format directly (not the selected format),
+     * since date pickers always output ISO. When the user changes the date format setting,
+     * existing corrections remain valid because they're stored and validated as ISO.
      */
     public function setCorrection(string $columnSource, string $rawValue, string $newValue): void
     {
@@ -536,7 +578,16 @@ final class ImportStore
             return;
         }
 
-        $error = $this->validateValue($column, $newValue);
+        // Date corrections: validate against ISO (date picker output)
+        // Other fields: validate against column format
+        if ($column->getType()->isDateOrDateTime()) {
+            $withTime = $column->getType()->isTimestamp();
+            $parsed = DateFormat::ISO->parse($newValue, $withTime);
+            $error = $parsed === null ? 'Invalid date format' : null;
+        } else {
+            $error = $this->validator()->validate($column, $newValue);
+        }
+
         $jsonPath = '$.'.$columnSource;
 
         // Batch update corrections
@@ -554,11 +605,11 @@ final class ImportStore
                 WHERE json_extract(raw_data, ?) = ?
             ", [$jsonPath, $error, $jsonPath, $rawValue]);
         } else {
-            $this->connection()->statement("
+            $this->connection()->statement('
                 UPDATE import_rows
                 SET validation = json_remove(validation, ?)
                 WHERE json_extract(raw_data, ?) = ?
-            ", [$jsonPath, $jsonPath, $rawValue]);
+            ', [$jsonPath, $jsonPath, $rawValue]);
         }
     }
 
@@ -574,15 +625,15 @@ final class ImportStore
             return;
         }
 
-        $error = $this->validateValue($column, $rawValue);
+        $error = $this->validator()->validate($column, $rawValue);
         $jsonPath = '$.'.$columnSource;
 
         // Batch remove correction
-        $this->connection()->statement("
+        $this->connection()->statement('
             UPDATE import_rows
             SET corrections = json_remove(corrections, ?)
             WHERE json_extract(raw_data, ?) = ?
-        ", [$jsonPath, $jsonPath, $rawValue]);
+        ', [$jsonPath, $jsonPath, $rawValue]);
 
         // Batch update validation
         if ($error !== null) {
@@ -592,11 +643,11 @@ final class ImportStore
                 WHERE json_extract(raw_data, ?) = ?
             ", [$jsonPath, $error, $jsonPath, $rawValue]);
         } else {
-            $this->connection()->statement("
+            $this->connection()->statement('
                 UPDATE import_rows
                 SET validation = json_remove(validation, ?)
                 WHERE json_extract(raw_data, ?) = ?
-            ", [$jsonPath, $jsonPath, $rawValue]);
+            ', [$jsonPath, $jsonPath, $rawValue]);
         }
     }
 
@@ -630,15 +681,15 @@ final class ImportStore
             return;
         }
 
-        $error = $this->validateValue($column, $rawValue);
+        $error = $this->validator()->validate($column, $rawValue);
         $jsonPath = '$.'.$columnSource;
 
         // Batch remove skipped flag
-        $this->connection()->statement("
+        $this->connection()->statement('
             UPDATE import_rows
             SET skipped = json_remove(skipped, ?)
             WHERE json_extract(raw_data, ?) = ?
-        ", [$jsonPath, $jsonPath, $rawValue]);
+        ', [$jsonPath, $jsonPath, $rawValue]);
 
         // Batch update validation if the raw value has an error
         if ($error !== null) {
@@ -651,55 +702,26 @@ final class ImportStore
     }
 
     /**
-     * Validate a single value against the column's type and format settings.
+     * Dispatch background jobs to validate all unique values for a column.
+     * Returns the batch ID for progress tracking.
      */
-    private function validateValue(ColumnData $column, mixed $value): ?string
+    public function validateColumnAsync(ColumnData $column): string
     {
-        if (blank($value)) {
-            return null;
-        }
+        $uniqueValues = $this->query()
+            ->uniqueValuesFor($column->source)
+            ->pluck('raw_value');
 
-        if (! is_string($value)) {
-            $value = (string) $value;
-        }
+        $chunks = $uniqueValues->chunk(500);
 
-        $type = $column->getType();
+        $jobs = $chunks->map(fn ($chunk) => new ValidateColumnJob($this->id, $column, $chunk->all()));
 
-        return match (true) {
-            $type->isDateOrDateTime() => $this->validateDate($column, $value),
-            $type->isFloat() => $this->validateFloat($column, $value),
-            $type->isChoiceField() => $this->validateChoice($column, $value),
-            default => null,
-        };
-    }
+        $batch = Bus::batch($jobs->all())
+            ->name("Validate {$column->source}")
+            ->dispatch();
 
-    private function validateDate(ColumnData $column, string $value): ?string
-    {
-        $format = $column->dateFormat ?? DateFormat::ISO;
-        $isTimestamp = $column->getType()->isTimestamp();
+        $this->updateMeta(['validation_batch_id' => $batch->id]);
 
-        return $format->parse($value, $isTimestamp) === null
-            ? __('import-wizard-new::validation.invalid_date', ['format' => $format->getLabel()])
-            : null;
-    }
-
-    private function validateFloat(ColumnData $column, string $value): ?string
-    {
-        $format = $column->numberFormat ?? NumberFormat::POINT;
-
-        return $format->parse($value) === null
-            ? __('import-wizard-new::validation.invalid_number', ['format' => $format->getLabel()])
-            : null;
-    }
-
-    private function validateChoice(ColumnData $column, string $value): ?string
-    {
-        $options = $this->getChoiceOptions($column);
-        $validValues = collect($options)->pluck('value')->all();
-
-        return in_array($value, $validValues, true)
-            ? null
-            : __('import-wizard-new::validation.invalid_choice', ['value' => $value]);
+        return $batch->id;
     }
 
     // =========================================================================
