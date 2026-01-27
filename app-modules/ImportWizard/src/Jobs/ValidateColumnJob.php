@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Jobs;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -42,18 +43,57 @@ final class ValidateColumnJob implements ShouldQueue
         $connection = $store->connection();
         $jsonPath = '$.'.$this->column->source;
 
-        // Fetch ALL unique values for this column (single query)
-        $uniqueValues = $store->query()
-            ->selectRaw('DISTINCT json_extract(raw_data, ?) as value', [$jsonPath])
-            ->pluck('value')
-            ->filter()
-            ->all();
+        $this->clearValidationForCorrectedDateFields($connection, $jsonPath);
+
+        $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
 
         if (empty($uniqueValues)) {
             return;
         }
 
-        // Validate all values in memory (fast - ~0.1ms per value)
+        $results = $this->validateValues($store, $uniqueValues);
+
+        $this->updateValidationErrors($connection, $jsonPath, $results);
+    }
+
+    /**
+     * Date corrections are stored in ISO format (from HTML date picker).
+     * ISO is always valid regardless of the selected display format.
+     */
+    private function clearValidationForCorrectedDateFields(
+        Connection $connection,
+        string $jsonPath,
+    ): void {
+        if (! $this->column->getType()->isDateOrDateTime()) {
+            return;
+        }
+
+        $connection->statement("
+            UPDATE import_rows
+            SET validation = json_remove(COALESCE(validation, '{}'), ?)
+            WHERE json_extract(corrections, ?) IS NOT NULL
+        ", [$jsonPath, $jsonPath]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function fetchUncorrectedUniqueValues(ImportStore $store, string $jsonPath): array
+    {
+        return $store->query()
+            ->selectRaw('DISTINCT json_extract(raw_data, ?) as value', [$jsonPath])
+            ->whereRaw('json_extract(corrections, ?) IS NULL', [$jsonPath])
+            ->pluck('value')
+            ->filter()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, string>  $uniqueValues
+     * @return array<int, array{raw_value: string, validation_error: string|null}>
+     */
+    private function validateValues(ImportStore $store, array $uniqueValues): array
+    {
         $validator = new ImportValueValidator($store->entityType()->value);
         $results = [];
 
@@ -64,31 +104,44 @@ final class ValidateColumnJob implements ShouldQueue
             ];
         }
 
-        // Create temp table
-        $connection->statement('
-            CREATE TEMPORARY TABLE IF NOT EXISTS temp_validation (
-                raw_value TEXT,
-                validation_error TEXT
-            )
-        ');
+        return $results;
+    }
 
-        // Batch insert into temp table
-        $connection->table('temp_validation')->insert($results);
+    /**
+     * @param array<int, array{raw_value: string, validation_error: string|null}> $results
+     * @throws \Throwable
+     */
+    private function updateValidationErrors(
+        Connection $connection,
+        string $jsonPath,
+        array $results,
+    ): void {
+        $connection->transaction(function () use ($connection, $jsonPath, $results): void {
+            $connection->statement('
+                CREATE TEMPORARY TABLE IF NOT EXISTS temp_validation (
+                    raw_value TEXT,
+                    validation_error TEXT
+                )
+            ');
 
-        // Single UPDATE from temp table (replaces N individual UPDATEs)
-        $connection->statement("
-            UPDATE import_rows
-            SET validation = CASE
-                WHEN temp.validation_error IS NULL
-                    THEN json_remove(COALESCE(validation, '{}'), ?)
-                ELSE
-                    json_set(COALESCE(validation, '{}'), ?, temp.validation_error)
-            END
-            FROM temp_validation AS temp
-            WHERE json_extract(import_rows.raw_data, ?) = temp.raw_value
-        ", [$jsonPath, $jsonPath, $jsonPath]);
+            try {
+                $connection->table('temp_validation')->insert($results);
 
-        // Cleanup temp table
-        $connection->statement('DROP TABLE IF EXISTS temp_validation');
+                $connection->statement("
+                    UPDATE import_rows
+                    SET validation = CASE
+                        WHEN temp.validation_error IS NULL
+                            THEN json_remove(COALESCE(validation, '{}'), ?)
+                        ELSE
+                            json_set(COALESCE(validation, '{}'), ?, temp.validation_error)
+                    END
+                    FROM temp_validation AS temp
+                    WHERE json_extract(import_rows.raw_data, ?) = temp.raw_value
+                      AND json_extract(import_rows.corrections, ?) IS NULL
+                ", [$jsonPath, $jsonPath, $jsonPath, $jsonPath]);
+            } finally {
+                $connection->statement('DROP TABLE IF EXISTS temp_validation');
+            }
+        });
     }
 }
