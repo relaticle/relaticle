@@ -84,24 +84,38 @@
             </div>
 
             @if ($this->isSelectedColumnValidating)
-                {{-- Loading State --}}
-                @php $progress = $this->selectedColumnProgress; @endphp
-                <div class="flex-1 flex items-center justify-center">
+                {{-- Loading State with Fake Progress Animation --}}
+                <div
+                    x-data="{ progress: 5 }"
+                    x-init="
+                        let interval = setInterval(() => {
+                            if (progress < 90) {
+                                progress += Math.random() * 8;
+                                if (progress > 90) progress = 90;
+                            }
+                        }, 200);
+                        $wire.on('validation-complete', () => {
+                            clearInterval(interval);
+                            progress = 100;
+                        });
+                    "
+                    class="flex-1 flex items-center justify-center"
+                >
                     <div class="flex flex-col items-center text-center max-w-sm">
-                        <x-filament::icon icon="heroicon-o-arrow-path" class="h-12 w-12 text-primary-500" />
+                        <x-filament::icon icon="heroicon-o-arrow-path" class="h-12 w-12 text-primary-500 animate-spin" />
                         <p class="mt-6 text-sm font-medium text-gray-700 dark:text-gray-300">Processing column values...</p>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Validating and preparing data for review</p>
 
-                        {{-- Progress Bar --}}
+                        {{-- Fake Progress Bar --}}
                         <div class="w-full mt-6">
                             <div class="flex items-center justify-between text-xs mb-2">
-                                <span class="font-medium text-gray-900 dark:text-white">{{ $progress['percent'] }}%</span>
+                                <span class="font-medium text-gray-900 dark:text-white" x-text="Math.round(progress) + '%'"></span>
                                 <span class="text-gray-500 dark:text-gray-400">complete</span>
                             </div>
                             <div class="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div
-                                    class="h-full bg-primary-500 rounded-full transition-all duration-300"
-                                    style="width: {{ $progress['percent'] }}%"
+                                    class="h-full bg-primary-500 rounded-full transition-all duration-200"
+                                    :style="`width: ${progress}%`"
                                 ></div>
                             </div>
                         </div>

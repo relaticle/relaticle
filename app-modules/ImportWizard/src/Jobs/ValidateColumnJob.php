@@ -22,17 +22,13 @@ final class ValidateColumnJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 60;
+    public int $timeout = 120;
 
     public int $tries = 1;
 
-    /**
-     * @param  array<int, string>  $uniqueValues
-     */
     public function __construct(
         private readonly string $importId,
         private readonly ColumnData $column,
-        private readonly array $uniqueValues,
     ) {}
 
     public function handle(): void
@@ -43,20 +39,32 @@ final class ValidateColumnJob implements ShouldQueue
             return;
         }
 
-        $validator = new ImportValueValidator($store->entityType()->value);
         $connection = $store->connection();
         $jsonPath = '$.'.$this->column->source;
 
-        // Step 1: Validate all values in memory (fast - ~0.1ms per value)
+        // Fetch ALL unique values for this column (single query)
+        $uniqueValues = $store->query()
+            ->selectRaw('DISTINCT json_extract(raw_data, ?) as value', [$jsonPath])
+            ->pluck('value')
+            ->filter()
+            ->all();
+
+        if (empty($uniqueValues)) {
+            return;
+        }
+
+        // Validate all values in memory (fast - ~0.1ms per value)
+        $validator = new ImportValueValidator($store->entityType()->value);
         $results = [];
-        foreach ($this->uniqueValues as $value) {
+
+        foreach ($uniqueValues as $value) {
             $results[] = [
                 'raw_value' => $value,
                 'validation_error' => $validator->validate($this->column, $value),
             ];
         }
 
-        // Step 2: Create temp table (IF NOT EXISTS for concurrent job safety)
+        // Create temp table
         $connection->statement('
             CREATE TEMPORARY TABLE IF NOT EXISTS temp_validation (
                 raw_value TEXT,
@@ -64,10 +72,10 @@ final class ValidateColumnJob implements ShouldQueue
             )
         ');
 
-        // Step 3: Batch insert into temp table
+        // Batch insert into temp table
         $connection->table('temp_validation')->insert($results);
 
-        // Step 4: Single UPDATE from temp table (replaces 500+ individual UPDATEs)
+        // Single UPDATE from temp table (replaces N individual UPDATEs)
         $connection->statement("
             UPDATE import_rows
             SET validation = CASE
@@ -80,7 +88,7 @@ final class ValidateColumnJob implements ShouldQueue
             WHERE json_extract(import_rows.raw_data, ?) = temp.raw_value
         ", [$jsonPath, $jsonPath, $jsonPath]);
 
-        // Step 5: Cleanup temp table for next chunk
-        $connection->statement('DELETE FROM temp_validation');
+        // Cleanup temp table
+        $connection->statement('DROP TABLE IF EXISTS temp_validation');
     }
 }

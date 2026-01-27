@@ -702,20 +702,14 @@ final class ImportStore
     }
 
     /**
-     * Dispatch background jobs to validate all unique values for a column.
+     * Dispatch a single background job to validate all unique values for a column.
      * Returns the batch ID for progress tracking.
      */
     public function validateColumnAsync(ColumnData $column): string
     {
-        $uniqueValues = $this->query()
-            ->uniqueValuesFor($column->source)
-            ->pluck('raw_value');
-
-        $chunks = $uniqueValues->chunk(500);
-
-        $jobs = $chunks->map(fn ($chunk) => new ValidateColumnJob($this->id, $column, $chunk->all()));
-
-        $batch = Bus::batch($jobs->all())
+        $batch = Bus::batch([
+            new ValidateColumnJob($this->id, $column),
+        ])
             ->name("Validate {$column->source}")
             ->dispatch();
 

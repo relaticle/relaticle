@@ -240,33 +240,6 @@ final class ReviewStep extends Component
     }
 
     /**
-     * Get validation progress for the selected column's batch.
-     *
-     * @return array{total: int, processed: int, percent: int}
-     */
-    #[Computed]
-    public function selectedColumnProgress(): array
-    {
-        $batchId = $this->batchIds[$this->selectedColumn->source] ?? null;
-
-        if (! $batchId) {
-            return ['total' => 0, 'processed' => 0, 'percent' => 100];
-        }
-
-        $batch = Bus::findBatch($batchId);
-
-        if (! $batch || $batch->totalJobs === 0) {
-            return ['total' => 0, 'processed' => 0, 'percent' => 0];
-        }
-
-        return [
-            'total' => $batch->totalJobs,
-            'processed' => $batch->processedJobs(),
-            'percent' => (int) round(($batch->processedJobs() / $batch->totalJobs) * 100),
-        ];
-    }
-
-    /**
      * Check if a specific column has validation errors.
      */
     public function columnHasErrors(string $columnSource): bool
