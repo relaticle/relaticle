@@ -17,9 +17,6 @@ use Relaticle\ImportWizard\Enums\NumberFormat;
  */
 final class ImportValueValidator
 {
-    /** @var array<string, array<int, array{label: string, value: string}>> */
-    private array $choiceOptionsCache = [];
-
     public function __construct(
         private readonly string $entityType,
     ) {}
@@ -94,15 +91,9 @@ final class ImportValueValidator
      */
     public function getChoiceOptions(ColumnData $column): array
     {
-        $cacheKey = $column->target;
-
-        if (isset($this->choiceOptionsCache[$cacheKey])) {
-            return $this->choiceOptionsCache[$cacheKey];
-        }
-
         $customFieldKey = str_replace('custom_fields_', '', $column->target);
 
-        $options = CustomField::query()
+        return CustomField::query()
             ->forEntity($this->entityType)
             ->where('code', $customFieldKey)
             ->first()
@@ -113,10 +104,6 @@ final class ImportValueValidator
                 'value' => $option->name,
             ])
             ->toArray() ?? [];
-
-        $this->choiceOptionsCache[$cacheKey] = $options;
-
-        return $options;
     }
 
     /**
