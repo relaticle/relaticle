@@ -18,7 +18,6 @@ use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
-use Relaticle\ImportWizard\Support\ImportValueValidator;
 
 /**
  * Step 3: Value review.
@@ -51,10 +50,6 @@ final class ReviewStep extends Component
         $this->columns = $this->store()->columnMappings();
         $columnSource = $this->store()->columnMappings()->first()->source;
         $this->selectColumn($columnSource);
-
-        // Preload choice options to avoid N+1 queries
-        $validator = new ImportValueValidator($this->store()->entityType()->value);
-        $validator->preloadChoiceOptions($this->columns);
 
         // Async validate ALL mapped columns
         foreach ($this->columns as $column) {

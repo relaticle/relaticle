@@ -429,7 +429,6 @@ final class ImportStore
                 $table->text('validation')->nullable();
                 $table->text('corrections')->nullable();
                 $table->text('skipped')->nullable();  // JSON: {"column_name": true, ...}
-                $table->text('value_hash')->nullable();  // SHA-256 hash for validation deduplication
                 $table->string('match_action')->nullable();
                 $table->string('matched_id')->nullable();
                 $table->text('relationships')->nullable();
@@ -452,7 +451,6 @@ final class ImportStore
                 $table->index('validation');
                 $table->index('match_action');
                 $table->index('skipped');
-                $table->index('value_hash');
             });
         } catch (QueryException $e) {
             // Handle race condition (Sushi pattern)
@@ -512,20 +510,7 @@ final class ImportStore
             WHERE json_extract(raw_data, ?) = ?
         ", [$jsonPath, $newValue, $jsonPath, $rawValue]);
 
-        // Batch update validation
-        if ($error !== null) {
-            $this->connection()->statement("
-                UPDATE import_rows
-                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
-                WHERE json_extract(raw_data, ?) = ?
-            ", [$jsonPath, $error, $jsonPath, $rawValue]);
-        } else {
-            $this->connection()->statement('
-                UPDATE import_rows
-                SET validation = json_remove(validation, ?)
-                WHERE json_extract(raw_data, ?) = ?
-            ', [$jsonPath, $jsonPath, $rawValue]);
-        }
+        $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
     }
 
     /**
@@ -550,20 +535,7 @@ final class ImportStore
             WHERE json_extract(raw_data, ?) = ?
         ', [$jsonPath, $jsonPath, $rawValue]);
 
-        // Batch update validation
-        if ($error !== null) {
-            $this->connection()->statement("
-                UPDATE import_rows
-                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
-                WHERE json_extract(raw_data, ?) = ?
-            ", [$jsonPath, $error, $jsonPath, $rawValue]);
-        } else {
-            $this->connection()->statement('
-                UPDATE import_rows
-                SET validation = json_remove(validation, ?)
-                WHERE json_extract(raw_data, ?) = ?
-            ', [$jsonPath, $jsonPath, $rawValue]);
-        }
+        $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
     }
 
     /**
@@ -586,7 +558,7 @@ final class ImportStore
 
     /**
      * Clear a skipped value (unskip) and re-validate the original value.
-     * Uses batch SQL UPDATE for performance.
+     * Uses a single atomic SQL UPDATE for performance.
      */
     public function clearSkipped(string $columnSource, string $rawValue): void
     {
@@ -599,20 +571,35 @@ final class ImportStore
         $error = $this->validator()->validate($column, $rawValue);
         $jsonPath = '$.'.$columnSource;
 
-        // Batch remove skipped flag
-        $this->connection()->statement('
+        $this->connection()->statement("
             UPDATE import_rows
-            SET skipped = json_remove(skipped, ?)
+            SET skipped = json_remove(skipped, ?),
+                validation = CASE
+                    WHEN ? IS NOT NULL THEN json_set(COALESCE(validation, '{}'), ?, ?)
+                    ELSE validation
+                END
             WHERE json_extract(raw_data, ?) = ?
-        ', [$jsonPath, $jsonPath, $rawValue]);
+        ", [$jsonPath, $error, $jsonPath, $error, $jsonPath, $rawValue]);
+    }
 
-        // Batch update validation if the raw value has an error
+    /**
+     * Update validation for all rows matching a raw value.
+     * Sets error if provided, removes validation entry if null.
+     */
+    private function updateValidationForRawValue(string $jsonPath, string $rawValue, ?string $error): void
+    {
         if ($error !== null) {
             $this->connection()->statement("
                 UPDATE import_rows
                 SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
                 WHERE json_extract(raw_data, ?) = ?
             ", [$jsonPath, $error, $jsonPath, $rawValue]);
+        } else {
+            $this->connection()->statement('
+                UPDATE import_rows
+                SET validation = json_remove(validation, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ', [$jsonPath, $jsonPath, $rawValue]);
         }
     }
 

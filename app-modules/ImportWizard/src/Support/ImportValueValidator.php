@@ -105,17 +105,4 @@ final class ImportValueValidator
             ])
             ->toArray() ?? [];
     }
-
-    /**
-     * Preload all choice options for given columns.
-     * Eliminates N+1 queries during bulk validation.
-     */
-    public function preloadChoiceOptions(iterable $columns): void
-    {
-        foreach ($columns as $column) {
-            if ($column->getType()->isChoiceField()) {
-                $this->getChoiceOptions($column);
-            }
-        }
-    }
 }
