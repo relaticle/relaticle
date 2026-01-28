@@ -83,15 +83,11 @@ final class ReviewStep extends Component
             return $this->validateEntityLinkValue($column, $value);
         }
 
-        if ($column->getType()->isDateOrDateTime()) {
-            if ($isCorrection) {
-                $withTime = $column->getType()->isTimestamp();
-                $parsed = DateFormat::ISO->parse($value, $withTime);
+        if ($isCorrection && $column->getType()->isDateOrDateTime()) {
+            $withTime = $column->getType()->isTimestamp();
+            $parsed = DateFormat::ISO->parse($value, $withTime);
 
-                return $parsed === null ? 'Invalid date format' : null;
-            }
-
-            return $this->validator()->validate($column, $value);
+            return $parsed === null ? 'Invalid date format' : null;
         }
 
         return $this->validator()->validate($column, $value);

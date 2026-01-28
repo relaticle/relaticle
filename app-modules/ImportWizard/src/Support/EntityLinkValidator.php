@@ -66,18 +66,16 @@ final class EntityLinkValidator
             }
         }
 
-        if (empty($toValidate)) {
+        if ($toValidate === []) {
             return $results;
         }
 
         $resolved = $this->resolver->batchResolve($link, $matcher, $toValidate);
 
         foreach ($toValidate as $value) {
-            if (($resolved[$value] ?? null) === null) {
-                $results[$value] = $this->buildErrorMessage($link, $matcher, $value);
-            } else {
-                $results[$value] = null;
-            }
+            $results[$value] = isset($resolved[$value])
+                ? null
+                : $this->buildErrorMessage($link, $matcher, $value);
         }
 
         return $results;

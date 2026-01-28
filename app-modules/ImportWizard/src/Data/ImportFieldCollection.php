@@ -32,7 +32,7 @@ final class ImportFieldCollection extends Collection
      */
     public function hasKey(string $key): bool
     {
-        return $this->get($key) instanceof \Relaticle\ImportWizard\Data\ImportField;
+        return $this->get($key) !== null;
     }
 
     /**
