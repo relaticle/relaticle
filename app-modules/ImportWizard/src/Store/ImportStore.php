@@ -213,6 +213,7 @@ final class ImportStore
      *
      * Uses Spatie Data's collect() for automatic deserialization,
      * then hydrates each ColumnData with its ImportField or EntityLink for direct access.
+     * Results are sorted to match the original CSV header order.
      *
      * @return Collection<int, ColumnData>
      *
@@ -224,6 +225,7 @@ final class ImportStore
         $importer = $this->getImporter();
         $fields = $importer->allFields();
         $entityLinks = collect($importer->entityLinks());
+        $headerOrder = array_flip($this->headers());
 
         return ColumnData::collect($raw, Collection::class)
             ->each(function (ColumnData $col) use ($fields, $entityLinks): void {
@@ -232,7 +234,9 @@ final class ImportStore
                 } else {
                     $col->entityLinkField = $entityLinks->get($col->entityLink);
                 }
-            });
+            })
+            ->sortBy(fn (ColumnData $col): int => $headerOrder[$col->source] ?? PHP_INT_MAX)
+            ->values();
     }
 
     /**
