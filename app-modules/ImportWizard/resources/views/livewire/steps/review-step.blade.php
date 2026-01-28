@@ -86,7 +86,7 @@
                                 wire:key="date-format-{{ $this->selectedColumn->getType()->value }}"
                                 :options="DateFormat::toOptions($this->selectedColumn->getType()->isTimestamp())"
                                 :searchable="false"
-                                :inline-label="$this->selectedColumn->getType()->isTimestamp() ? 'Timestamp:' : 'Date:'"
+                                :inline-label="$this->selectedColumn->getType()->isTimestamp() ? 'Timestamp format:' : 'Date format:'"
                                 icon="heroicon-o-cog-6-tooth"
                                 :value="$this->selectedColumn->dateFormat ?? DateFormat::ISO"
                                 @input="$wire.setColumnFormat('date', $event.detail)"
