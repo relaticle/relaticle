@@ -42,34 +42,42 @@
         search: '',
         activeSubmenu: null,
         submenuPosition: { top: 0, left: 0 },
-        submenuTrigger: null,
         submenuTimeout: null,
+        init() {
+            this.$watch('open', (isOpen) => {
+                if (isOpen) {
+                    this.$nextTick(() => this.$refs.searchInput?.focus());
+                } else {
+                    this.search = '';
+                    this.activeSubmenu = null;
+                }
+            });
+        },
         toggle() {
-            this.open = !this.open;
             if (this.open) {
-                this.$nextTick(() => this.$refs.searchInput?.focus());
+                this.close();
             } else {
-                this.activeSubmenu = null;
+                this.openPanel();
             }
         },
+        openPanel() {
+            if (this.open) return;
+            this.$refs.panel?.open?.(this.$refs.trigger);
+            this.open = true;
+        },
         close() {
+            if (!this.open) return;
+            this.$refs.panel?.close?.();
             this.open = false;
-            this.search = '';
-            this.activeSubmenu = null;
         },
         showSubmenu(name, event) {
             clearTimeout(this.submenuTimeout);
             const rect = event.currentTarget.getBoundingClientRect();
-            this.submenuPosition = { top: rect.top + 'px', left: (rect.right + 4) + 'px' };
+            this.submenuPosition = { top: rect.top, left: rect.right + 4 };
             this.activeSubmenu = name;
-            this.submenuTrigger = event.currentTarget;
         },
         hideSubmenu() {
             this.submenuTimeout = setTimeout(() => { this.activeSubmenu = null; }, 150);
-        },
-        closeSubmenuAndFocusTrigger() {
-            this.activeSubmenu = null;
-            this.$nextTick(() => this.submenuTrigger?.focus());
         },
         keepSubmenu() {
             clearTimeout(this.submenuTimeout);
@@ -87,7 +95,7 @@
         }
     }"
     @click.outside="close()"
-    @keydown.escape.window="if (open) close()"
+    @keydown.escape.window="open && close()"
     class="w-52 relative"
 >
     {{-- Trigger Button --}}
@@ -101,6 +109,7 @@
         :class="open
             ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
             : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+        x-ref="trigger"
         @click="toggle()"
     >
         @if ($selectedEntityLink)
@@ -135,25 +144,24 @@
         @else
             <x-filament::icon
                 icon="heroicon-o-chevron-down"
-                class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
-                ::class="open ? 'rotate-180' : ''"
+                class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150"
+                x-bind:class="open && 'rotate-180'"
             />
         @endif
     </button>
 
     {{-- Dropdown Panel --}}
     <div
+        x-ref="panel"
+        x-cloak
         x-show="open"
+        x-float.placement.bottom-start.flip.offset.teleport="{ offset: 4 }"
         x-transition:enter="transition ease-out duration-100"
-        x-transition:enter-start="opacity-0 translate-y-1"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 translate-y-1"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
         role="listbox"
         aria-label="Available fields"
-        class="absolute left-0 z-50 mt-1 w-52 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden"
-        x-cloak
+        class="absolute z-50 w-52 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
     >
         {{-- Search Header --}}
         <div class="relative border-b border-gray-200 dark:border-gray-700">
@@ -249,23 +257,20 @@
         @endphp
         <template x-teleport="body">
             <div
+                x-cloak
                 x-show="activeSubmenu === '{{ $linkKey }}'"
                 x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0 translate-x-1"
-                x-transition:enter-end="opacity-100 translate-x-0"
-                x-transition:leave="transition ease-in duration-75"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                :style="{ position: 'fixed', top: submenuPosition.top, left: submenuPosition.left }"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                :style="{ position: 'fixed', top: submenuPosition.top + 'px', left: submenuPosition.left + 'px' }"
                 @mouseenter="keepSubmenu()"
                 @mouseleave="hideSubmenu()"
-                @keydown.escape.prevent="closeSubmenuAndFocusTrigger()"
-                @keydown.arrow-left.prevent="closeSubmenuAndFocusTrigger()"
+                @keydown.escape.prevent="activeSubmenu = null"
+                @keydown.arrow-left.prevent="activeSubmenu = null"
                 x-effect="if (activeSubmenu === '{{ $linkKey }}') $nextTick(() => $el.querySelector('button')?.focus())"
                 role="menu"
                 aria-label="Match options for {{ $link->label }}"
                 class="w-56 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden z-[60]"
-                x-cloak
             >
                 <div class="px-2.5 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Match by</span>
