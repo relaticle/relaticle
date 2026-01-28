@@ -28,4 +28,5 @@ parameters:
 
     configDirectories:
         - config
+        - app-modules/ImportWizard/config
         - app-modules/Documentation/config
