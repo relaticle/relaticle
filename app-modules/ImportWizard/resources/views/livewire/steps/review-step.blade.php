@@ -82,29 +82,26 @@
 
                     @if (!$this->isSelectedColumnValidating)
                         @if ($this->selectedColumn->getType()->isDateOrDateTime())
-                            <div class="w-44">
-                                <x-select-menu
-                                    :options="DateFormat::toOptions($this->selectedColumn->getType()->isTimestamp())"
-                                    :searchable="false"
-                                    placeholder="Date format"
-                                    icon="heroicon-o-cog-6-tooth"
-                                    :value="$this->selectedColumn->dateFormat ?? DateFormat::ISO"
-                                    @input="$wire.setColumnFormat('date', $event.detail)"
-                                />
-                            </div>
+                            <x-select-menu
+                                wire:key="date-format-{{ $this->selectedColumn->getType()->value }}"
+                                :options="DateFormat::toOptions($this->selectedColumn->getType()->isTimestamp())"
+                                :searchable="false"
+                                :inline-label="$this->selectedColumn->getType()->isTimestamp() ? 'Timestamp:' : 'Date:'"
+                                icon="heroicon-o-cog-6-tooth"
+                                :value="$this->selectedColumn->dateFormat ?? DateFormat::ISO"
+                                @input="$wire.setColumnFormat('date', $event.detail)"
+                            />
                         @endif
 
                         @if ($this->selectedColumn->getType()->isFloat())
-                            <div class="w-44">
-                                <x-select-menu
-                                    :options="NumberFormat::toOptions()"
-                                    :searchable="false"
-                                    placeholder="Number format"
-                                    icon="heroicon-o-cog-6-tooth"
-                                    :value="$this->selectedColumn->numberFormat ?? NumberFormat::POINT"
-                                    @input="$wire.setColumnFormat('number', $event.detail)"
-                                />
-                            </div>
+                            <x-select-menu
+                                :options="NumberFormat::toOptions()"
+                                :searchable="false"
+                                inline-label="Decimal separator:"
+                                icon="heroicon-o-cog-6-tooth"
+                                :value="$this->selectedColumn->numberFormat ?? NumberFormat::POINT"
+                                @input="$wire.setColumnFormat('number', $event.detail)"
+                            />
                         @endif
                     @endif
                 </div>

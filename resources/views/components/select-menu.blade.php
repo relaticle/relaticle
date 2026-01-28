@@ -5,6 +5,7 @@
     'placeholder' => 'Select...',
     'disabled' => false,
     'label' => null,
+    'inlineLabel' => null,
     'icon' => null,
     'value' => null,
     'borderless' => false,
@@ -364,7 +365,7 @@
         :disabled="disabled"
         @class([
             'w-full flex items-center text-sm focus:outline-none',
-            'h-9 gap-1.5 px-2.5 rounded-lg border' => !$borderless,
+            'gap-1.5 px-2.5 py-1.5 rounded-lg border' => !$borderless,
             'gap-2 px-2 py-1 border-0 bg-transparent' => $borderless,
             'cursor-not-allowed opacity-50' => $disabled,
             'cursor-pointer' => !$disabled,
@@ -386,12 +387,16 @@
             />
         @endif
 
-        <span
-            class="flex-1 text-left truncate text-sm"
-            :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-            :title="displayText"
-            x-text="displayText || '{{ $placeholder }}'"
-        ></span>
+        <span class="flex-1 text-left truncate text-sm">
+            @if ($inlineLabel)
+                <span class="text-gray-500 dark:text-gray-400">{{ $inlineLabel }}</span>
+            @endif
+            <span
+                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+                :title="displayText"
+                x-text="displayText || '{{ $placeholder }}'"
+            ></span>
+        </span>
 
         <x-filament::icon
             icon="heroicon-o-chevron-down"
