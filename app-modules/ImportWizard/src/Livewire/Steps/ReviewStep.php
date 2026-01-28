@@ -84,8 +84,7 @@ final class ReviewStep extends Component
         }
 
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
-            $withTime = $column->getType()->isTimestamp();
-            $parsed = DateFormat::ISO->parse($value, $withTime);
+            $parsed = DateFormat::ISO->parse($value, $column->getType()->isTimestamp());
 
             return $parsed === null ? 'Invalid date format' : null;
         }
@@ -142,8 +141,8 @@ final class ReviewStep extends Component
     public function mount(): void
     {
         $this->columns = $this->store()->columnMappings();
-        $columnSource = $this->store()->columnMappings()->first()->source;
-        $this->selectColumn($columnSource);
+        $this->selectedColumn = $this->columns->first();
+        $this->filter = ReviewFilter::All;
 
         // Async validate ALL mapped columns (both field and entity link mappings)
         foreach ($this->columns as $column) {
@@ -202,7 +201,7 @@ final class ReviewStep extends Component
 
     public function selectColumn(string $columnSource): void
     {
-        $this->selectedColumn = $this->store()->getColumnMapping($columnSource);
+        $this->selectedColumn = $this->columns->firstWhere('source', $columnSource);
         $this->setFilter(ReviewFilter::All->value);
     }
 
@@ -265,7 +264,12 @@ final class ReviewStep extends Component
         };
 
         $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
-        $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
+
+        // Update local state directly to avoid re-fetching
+        $this->columns = $this->columns->map(
+            fn (ColumnData $col): ColumnData => $col->source === $updated->source ? $updated : $col
+        );
+        $this->selectedColumn = $updated;
 
         // Dispatch async validation (hash includes format, so changed format = new cache keys)
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
@@ -348,17 +352,18 @@ final class ReviewStep extends Component
      */
     public function checkProgress(): void
     {
-        if (empty($this->batchIds)) {
-            return;
-        }
+        $hasCompleted = false;
 
         foreach ($this->batchIds as $columnSource => $batchId) {
-            $batch = Bus::findBatch($batchId);
-
-            if ($batch?->finished()) {
+            if (Bus::findBatch($batchId)?->finished()) {
                 unset($this->batchIds[$columnSource]);
                 $this->dispatch('validation-complete', column: $columnSource);
+                $hasCompleted = true;
             }
+        }
+
+        if ($hasCompleted) {
+            unset($this->columnErrorStatuses);
         }
     }
 
@@ -372,12 +377,18 @@ final class ReviewStep extends Component
     }
 
     /**
-     * Check if a specific column has validation errors.
+     * Get error status for all columns in a single batched query.
+     *
+     * Persisted across requests to avoid recalculating on every hydration.
+     * Cache is cleared when validations complete via checkProgress().
+     *
+     * @return array<string, bool>
      */
-    public function columnHasErrors(string $columnSource): bool
+    #[Computed(persist: true, seconds: 60)]
+    public function columnErrorStatuses(): array
     {
-        return $this->store()->query()
-            ->withErrors($columnSource)
-            ->exists();
+        $columnSources = $this->columns->pluck('source')->all();
+
+        return ImportRow::getColumnErrorStatuses($this->store()->query(), $columnSources);
     }
 }

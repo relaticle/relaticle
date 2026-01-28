@@ -35,6 +35,8 @@ final class ImportStore
     /** @var array<string, mixed>|null */
     private ?array $metaCache = null;
 
+    private ?BaseImporter $importerCache = null;
+
     public function __construct(
         private readonly string $id,
     ) {}
@@ -136,11 +138,11 @@ final class ImportStore
     {
         $data['updated_at'] = now()->toIso8601String();
         $this->metaCache = $data;
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-        if ($json !== false) {
-            File::put($this->metaPath(), $json);
-        }
+        File::put(
+            $this->metaPath(),
+            json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+        );
     }
 
     /**
@@ -241,10 +243,11 @@ final class ImportStore
 
     /**
      * Get the importer instance for this import session.
+     * Result is cached for the lifetime of this store instance.
      */
     public function getImporter(): BaseImporter
     {
-        return $this->entityType()->importer($this->teamId());
+        return $this->importerCache ??= $this->entityType()->importer($this->teamId());
     }
 
     /**
@@ -254,10 +257,7 @@ final class ImportStore
      */
     public function setColumnMappings(iterable $mappings): void
     {
-        /** @var array<int, ColumnData> $mappingsArray */
-        $mappingsArray = is_array($mappings) ? $mappings : iterator_to_array($mappings);
-
-        $raw = collect($mappingsArray)
+        $raw = collect($mappings)
             ->map(fn (ColumnData $m): array => $m->toArray())
             ->values()
             ->all();
@@ -302,11 +302,7 @@ final class ImportStore
      */
     public function connection(): Connection
     {
-        if (! $this->connection instanceof Connection) {
-            $this->connection = $this->createConnection();
-        }
-
-        return $this->connection;
+        return $this->connection ??= $this->createConnection();
     }
 
     /**

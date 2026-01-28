@@ -119,7 +119,7 @@ final class ImportRow extends Model
     #[Scope]
     protected function valid(Builder $query): void
     {
-        $query->where(function (\Illuminate\Contracts\Database\Query\Builder $q): void {
+        $query->where(function (Builder $q): void {
             $q->whereNull('validation')->orWhere('validation', '=', '{}');
         });
     }
@@ -237,18 +237,49 @@ final class ImportRow extends Model
         ];
     }
 
+    /**
+     * Get error status for multiple columns in a single query.
+     *
+     * @param  Builder<static>  $query
+     * @param  array<string>  $columns
+     * @return array<string, bool>
+     */
+    public static function getColumnErrorStatuses(Builder $query, array $columns): array
+    {
+        if (empty($columns)) {
+            return [];
+        }
+
+        $selectParts = [];
+        $bindings = [];
+
+        foreach ($columns as $column) {
+            $selectParts[] = 'MAX(CASE WHEN json_extract(validation, ?) IS NOT NULL THEN 1 ELSE 0 END) as '.$query->getGrammar()->wrap("has_error_{$column}");
+            $bindings[] = '$.'.$column;
+        }
+
+        $result = $query->selectRaw(implode(', ', $selectParts), $bindings)->first();
+
+        $statuses = [];
+        foreach ($columns as $column) {
+            $statuses[$column] = (bool) ($result?->getAttribute("has_error_{$column}") ?? false);
+        }
+
+        return $statuses;
+    }
+
     // =========================================================================
     // HELPERS
     // =========================================================================
 
     public function hasErrors(): bool
     {
-        return $this->validation !== null && $this->validation->isNotEmpty();
+        return $this->validation?->isNotEmpty() === true;
     }
 
     public function hasCorrections(): bool
     {
-        return $this->corrections !== null && $this->corrections->isNotEmpty();
+        return $this->corrections?->isNotEmpty() === true;
     }
 
     /**

@@ -109,14 +109,6 @@ final class ColumnData extends Data implements Wireable
         return $this->entityLinkField?->getMatcher($this->target);
     }
 
-    /**
-     * Get the entity link key if this is an entity link mapping.
-     */
-    public function getEntityLinkKey(): ?string
-    {
-        return $this->entityLink;
-    }
-
     public function isFieldMapping(): bool
     {
         return $this->entityLink === null;
@@ -141,7 +133,7 @@ final class ColumnData extends Data implements Wireable
         }
 
         $link = $this->entityLinkField
-            ?? ($importer->entityLinks()[$this->getEntityLinkKey()] ?? null);
+            ?? ($importer->entityLinks()[$this->entityLink] ?? null);
 
         if ($link === null) {
             return null;
@@ -168,31 +160,29 @@ final class ColumnData extends Data implements Wireable
         ];
     }
 
-    /**
-     * Create a new instance with a different date format.
-     */
     public function withDateFormat(DateFormat $format): self
     {
-        return new self(
-            source: $this->source,
-            target: $this->target,
-            entityLink: $this->entityLink,
-            dateFormat: $format,
-            numberFormat: $this->numberFormat,
-        );
+        return $this->cloneWith(dateFormat: $format);
     }
 
-    /**
-     * Create a new instance with a different number format.
-     */
     public function withNumberFormat(NumberFormat $format): self
     {
-        return new self(
+        return $this->cloneWith(numberFormat: $format);
+    }
+
+    private function cloneWith(?DateFormat $dateFormat = null, ?NumberFormat $numberFormat = null): self
+    {
+        $new = new self(
             source: $this->source,
             target: $this->target,
             entityLink: $this->entityLink,
-            dateFormat: $this->dateFormat,
-            numberFormat: $format,
+            dateFormat: $dateFormat ?? $this->dateFormat,
+            numberFormat: $numberFormat ?? $this->numberFormat,
         );
+
+        $new->importField = $this->importField;
+        $new->entityLinkField = $this->entityLinkField;
+
+        return $new;
     }
 }

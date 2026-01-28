@@ -9,8 +9,8 @@ use App\Models\CustomField;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\EntityLink;
@@ -27,6 +27,11 @@ use Relaticle\ImportWizard\Importers\Contracts\ImporterContract;
  */
 abstract class BaseImporter implements ImporterContract
 {
+    private ?ImportFieldCollection $allFieldsCache = null;
+
+    /** @var array<string, EntityLink>|null */
+    private ?array $entityLinksCache = null;
+
     public function __construct(
         protected readonly string $teamId,
     ) {}
@@ -51,10 +56,11 @@ abstract class BaseImporter implements ImporterContract
      * Get all fields including custom fields, excluding Record-type fields.
      *
      * Record-type custom fields are excluded because they appear in entityLinks() instead.
+     * Results are cached for the lifetime of this importer instance.
      */
     public function allFields(): ImportFieldCollection
     {
-        return $this->fields()->merge($this->customFields());
+        return $this->allFieldsCache ??= $this->fields()->merge($this->customFields());
     }
 
     /**
@@ -62,11 +68,16 @@ abstract class BaseImporter implements ImporterContract
      *
      * This unifies relationship definitions and Record custom fields into a single
      * collection for consistent handling in the UI and import process.
+     * Results are cached for the lifetime of this importer instance.
      *
      * @return array<string, EntityLink>
      */
     public function entityLinks(): array
     {
+        if ($this->entityLinksCache !== null) {
+            return $this->entityLinksCache;
+        }
+
         $links = $this->defineEntityLinks();
 
         foreach ($this->getRecordCustomFields() as $customField) {
@@ -74,7 +85,7 @@ abstract class BaseImporter implements ImporterContract
             $links[$link->key] = $link;
         }
 
-        return $links;
+        return $this->entityLinksCache = $links;
     }
 
     /**
@@ -90,11 +101,9 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Get Record-type custom fields for this entity.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection<int, \Relaticle\CustomFields\Models\CustomField>
+     * @return EloquentCollection<int, CustomField>
      */
-    protected function getRecordCustomFields(): \Illuminate\Database\Eloquent\Collection
+    protected function getRecordCustomFields(): EloquentCollection
     {
         return CustomField::query()
             ->withoutGlobalScopes()
@@ -295,21 +304,12 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Get the highest priority matchable field that is mapped.
-     *
-     * @param  array<string>  $mappedFields  List of mapped field keys
+     * @param  array<string>  $mappedFields
      */
     public function getMatchFieldForMappedColumns(array $mappedFields): ?MatchableField
     {
-        $matchableFields = collect($this->matchableFields())
-            ->sortByDesc(fn (MatchableField $field): int => $field->priority);
-
-        foreach ($matchableFields as $matchable) {
-            if (in_array($matchable->field, $mappedFields, true)) {
-                return $matchable;
-            }
-        }
-
-        return null;
+        return collect($this->matchableFields())
+            ->sortByDesc(fn (MatchableField $field): int => $field->priority)
+            ->first(fn (MatchableField $field): bool => in_array($field->field, $mappedFields, true));
     }
 }

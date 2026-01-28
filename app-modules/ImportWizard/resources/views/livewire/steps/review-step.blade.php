@@ -20,7 +20,7 @@
                         wire:key="col-{{ md5($column->source) }}"
                         wire:click="selectColumn({{ Js::from($column->source) }})"
                         @class([
-                            'w-full px-3 py-2.5 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors',
+                            'w-full px-3 py-2.5 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors data-[loading]:opacity-50',
                             'bg-primary-50 dark:bg-primary-950/30' => $isSelected,
                             'hover:bg-gray-50 dark:hover:bg-gray-800/50' => !$isSelected,
                         ])
@@ -54,7 +54,7 @@
                                 </div>
                                 <span class="text-[11px] text-gray-500 dark:text-gray-400 truncate block">{{ $column->source }}</span>
                             </div>
-                            @if ($this->columnHasErrors($column->source))
+                            @if ($this->columnErrorStatuses[$column->source] ?? false)
                                 <span class="w-1.5 h-1.5 mt-2 rounded-full bg-amber-400 shrink-0"></span>
                             @endif
                         </div>
@@ -154,7 +154,7 @@
                                 <button
                                     wire:key="filter-{{ $filterCase->value }}"
                                     wire:click="setFilter('{{ $filterCase->value }}')"
-                                    class="flex items-center gap-1 px-2 py-1 rounded transition-colors {{ $filter === $filterCase
+                                    class="flex items-center gap-1 px-2 py-1 rounded transition-colors data-[loading]:opacity-50 {{ $filter === $filterCase
                                             ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
                                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}"
                                 >
