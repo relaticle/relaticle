@@ -8,9 +8,9 @@ use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
-use Relaticle\ImportWizard\Data\RelationshipField;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Importers\BaseImporter;
@@ -69,14 +69,14 @@ final class MappingStep extends Component
     }
 
     /**
-     * Get relationship definitions.
+     * Get entity link definitions (relationships and Record custom fields).
      *
-     * @return array<string, RelationshipField>
+     * @return array<string, EntityLink>
      */
     #[Computed]
-    public function relationships(): array
+    public function entityLinks(): array
     {
-        return $this->getImporter()->relationships();
+        return $this->getImporter()->entityLinks();
     }
 
     /**
@@ -93,16 +93,16 @@ final class MappingStep extends Component
     }
 
     /**
-     * Check if there are any relationship fields defined.
+     * Check if there are any entity links defined.
      */
     #[Computed]
-    public function hasRelationships(): bool
+    public function hasEntityLinks(): bool
     {
-        return $this->relationships() !== [];
+        return $this->entityLinks() !== [];
     }
 
     /**
-     * Get field keys that are currently mapped (excludes relationship mappings).
+     * Get field keys that are currently mapped (excludes entity link mappings).
      *
      * @return list<string>
      */
@@ -111,7 +111,7 @@ final class MappingStep extends Component
     {
         /** @var list<string> */
         return collect($this->columns)
-            ->filter(fn (array $m): bool => $m['relationship'] === null)
+            ->filter(fn (array $m): bool => ($m['entityLink'] ?? null) === null)
             ->pluck('target')
             ->values()
             ->all();
@@ -135,7 +135,7 @@ final class MappingStep extends Component
     public function isTargetMapped(string $target): bool
     {
         return collect($this->columns)
-            ->contains(fn (array $m): bool => $m['target'] === $target && $m['relationship'] === null);
+            ->contains(fn (array $m): bool => $m['target'] === $target && ($m['entityLink'] ?? null) === null);
     }
 
     /**
@@ -156,7 +156,7 @@ final class MappingStep extends Component
     public function getSourceForTarget(string $target): ?string
     {
         return collect($this->columns)
-            ->filter(fn (array $m): bool => $m['target'] === $target && $m['relationship'] === null)
+            ->filter(fn (array $m): bool => $m['target'] === $target && ($m['entityLink'] ?? null) === null)
             ->keys()
             ->first();
     }
@@ -168,7 +168,7 @@ final class MappingStep extends Component
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isRelationshipMapping()) {
+        if (! $mapping instanceof ColumnData || $mapping->isEntityLinkMapping()) {
             return null;
         }
 
@@ -176,22 +176,22 @@ final class MappingStep extends Component
     }
 
     /**
-     * Get relationship mapping for a CSV column, or null.
+     * Get entity link mapping for a CSV column, or null.
      *
-     * @return array{relName: string, field: RelationshipField, matcherKey: string}|null
+     * @return array{linkKey: string, link: EntityLink, matcherKey: string}|null
      */
-    public function getRelationshipForSource(string $source): ?array
+    public function getEntityLinkForSource(string $source): ?array
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isFieldMapping()) {
+        if (! $mapping instanceof ColumnData || $mapping->isFieldMapping()) {
             return null;
         }
 
-        $field = $this->relationships()[$mapping->relationship] ?? null;
+        $link = $this->entityLinks()[$mapping->entityLink] ?? null;
 
-        return $field !== null
-            ? ['relName' => $mapping->relationship, 'field' => $field, 'matcherKey' => $mapping->target]
+        return $link !== null
+            ? ['linkKey' => $mapping->entityLink, 'link' => $link, 'matcherKey' => $mapping->target]
             : null;
     }
 
@@ -234,7 +234,7 @@ final class MappingStep extends Component
     public function autoMap(): void
     {
         $this->autoMapByHeaders();
-        $this->autoMapRelationships();
+        $this->autoMapEntityLinks();
         $this->inferDataTypes();
     }
 
@@ -259,15 +259,15 @@ final class MappingStep extends Component
     }
 
     /**
-     * Auto-map relationship columns based on guesses.
+     * Auto-map entity link columns based on guesses.
      */
-    private function autoMapRelationships(): void
+    private function autoMapEntityLinks(): void
     {
         $headers = $this->headers();
-        $relationships = $this->relationships();
+        $entityLinks = $this->entityLinks();
 
-        foreach ($relationships as $relName => $relationship) {
-            if ($this->isRelationshipMapped($relName)) {
+        foreach ($entityLinks as $linkKey => $entityLink) {
+            if ($this->isEntityLinkMapped($linkKey)) {
                 continue;
             }
 
@@ -276,13 +276,13 @@ final class MappingStep extends Component
                     continue;
                 }
 
-                if ($relationship->matchesHeader($header)) {
-                    $highestMatcher = $relationship->getHighestPriorityMatcher();
+                if ($entityLink->matchesHeader($header)) {
+                    $highestMatcher = $entityLink->getHighestPriorityMatcher();
                     if ($highestMatcher !== null) {
-                        $this->columns[$header] = ColumnData::toRelationship(
+                        $this->columns[$header] = ColumnData::toEntityLink(
                             $header,
                             $highestMatcher->field,
-                            $relName,
+                            $linkKey,
                         )->toArray();
                         break;
                     }
@@ -292,12 +292,12 @@ final class MappingStep extends Component
     }
 
     /**
-     * Check if a relationship is already mapped.
+     * Check if an entity link is already mapped.
      */
-    public function isRelationshipMapped(string $relName): bool
+    public function isEntityLinkMapped(string $linkKey): bool
     {
         return collect($this->columns)
-            ->contains(fn (array $m): bool => $m['relationship'] === $relName);
+            ->contains(fn (array $m): bool => ($m['entityLink'] ?? null) === $linkKey);
     }
 
     /**
@@ -350,11 +350,11 @@ final class MappingStep extends Component
     }
 
     /**
-     * Map a CSV column to a relationship.
+     * Map a CSV column to an entity link.
      */
-    public function mapToRelationship(string $source, string $matcherKey, string $relationship): void
+    public function mapToEntityLink(string $source, string $matcherKey, string $entityLinkKey): void
     {
-        $this->columns[$source] = ColumnData::toRelationship($source, $matcherKey, $relationship)->toArray();
+        $this->columns[$source] = ColumnData::toEntityLink($source, $matcherKey, $entityLinkKey)->toArray();
     }
 
     /**

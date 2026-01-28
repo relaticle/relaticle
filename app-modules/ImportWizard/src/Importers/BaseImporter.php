@@ -10,12 +10,13 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Services\ValidationService;
+use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\MatchableField;
-use Relaticle\ImportWizard\Data\RelationshipField;
 use Relaticle\ImportWizard\Importers\Contracts\ImporterContract;
 
 /**
@@ -47,9 +48,9 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Get all fields including custom fields.
+     * Get all fields including custom fields, excluding Record-type fields.
      *
-     * Merges standard entity fields with auto-discovered custom fields.
+     * Record-type custom fields are excluded because they appear in entityLinks() instead.
      */
     public function allFields(): ImportFieldCollection
     {
@@ -57,15 +58,51 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Get relationship definitions for this entity.
+     * Get all entity links (hardcoded relationships + Record-type custom fields).
+     *
+     * This unifies relationship definitions and Record custom fields into a single
+     * collection for consistent handling in the UI and import process.
+     *
+     * @return array<string, EntityLink>
+     */
+    public function entityLinks(): array
+    {
+        $links = $this->defineEntityLinks();
+
+        foreach ($this->getRecordCustomFields() as $customField) {
+            $link = EntityLink::fromCustomField($customField);
+            $links[$link->key] = $link;
+        }
+
+        return $links;
+    }
+
+    /**
+     * Define hardcoded entity links for this importer.
      *
      * Override in child classes to define entity-specific relationships.
      *
-     * @return array<string, RelationshipField>
+     * @return array<string, EntityLink>
      */
-    public function relationships(): array
+    protected function defineEntityLinks(): array
     {
         return [];
+    }
+
+    /**
+     * Get Record-type custom fields for this entity.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Relaticle\CustomFields\Models\CustomField>
+     */
+    protected function getRecordCustomFields(): \Illuminate\Database\Eloquent\Collection
+    {
+        return CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->teamId)
+            ->where('entity_type', $this->entityName())
+            ->forType('record')
+            ->active()
+            ->get();
     }
 
     /**
@@ -123,6 +160,8 @@ abstract class BaseImporter implements ImporterContract
 
     /**
      * Get custom fields for this entity as ImportField objects.
+     *
+     * Excludes Record-type custom fields since they appear in entityLinks() instead.
      */
     protected function customFields(): ImportFieldCollection
     {
@@ -130,6 +169,7 @@ abstract class BaseImporter implements ImporterContract
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $this->entityName())
+            ->where('type', '!=', 'record')
             ->active()
             ->orderBy('sort_order')
             ->get();

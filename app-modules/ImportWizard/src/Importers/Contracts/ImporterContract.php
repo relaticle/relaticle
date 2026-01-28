@@ -11,7 +11,7 @@ use Relaticle\ImportWizard\Data\ImportFieldCollection;
  * Contract for entity importers.
  *
  * Importers are the single source of truth for import configuration.
- * They define fields, relationships, matching strategies, and processing logic.
+ * They define fields, entity links, matching strategies, and processing logic.
  */
 interface ImporterContract
 {
@@ -43,11 +43,11 @@ interface ImporterContract
     public function allFields(): ImportFieldCollection;
 
     /**
-     * Get relationship definitions for this entity.
+     * Get entity links (relationships and Record custom fields) for this entity.
      *
-     * @return array<string, \Relaticle\ImportWizard\Data\RelationshipField>
+     * @return array<string, \Relaticle\ImportWizard\Data\EntityLink>
      */
-    public function relationships(): array;
+    public function entityLinks(): array;
 
     /**
      * Get fields that can be used to match imported rows to existing records.
@@ -72,7 +72,7 @@ interface ImporterContract
      * Prepare data for saving to the database.
      *
      * This method transforms the mapped CSV data into model-ready data.
-     * Override this to handle special cases like relationship resolution.
+     * Override this to handle special cases like entity link resolution.
      *
      * @param  array<string, mixed>  $data  The mapped row data
      * @param  Model|null  $existing  The existing record if updating
@@ -84,7 +84,7 @@ interface ImporterContract
     /**
      * Perform post-save operations.
      *
-     * Called after the record is saved. Use for relationship syncing,
+     * Called after the record is saved. Use for entity link syncing,
      * polymorphic links, and other operations that require the saved record.
      *
      * @param  Model  $record  The saved record

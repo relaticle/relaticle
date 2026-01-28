@@ -10,12 +10,12 @@ use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 
 /**
- * Validates import values based on column type and format settings.
+ * Validates import field values based on column type and format settings.
  *
  * Supports: Date/DateTime, Float, Choice (single/multi).
  * Returns error message or null if valid.
  */
-final class ImportValueValidator
+final class FieldFormatValidator
 {
     public function __construct(
         private readonly string $entityType,

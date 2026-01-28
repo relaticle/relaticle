@@ -2,7 +2,7 @@
     class="flex flex-col h-full overflow-hidden"
     x-data="{ hoveredColumn: '{{ $headers[0] ?? '' }}' }"
     @field-selected.window="$wire.mapToField($event.detail.column, $event.detail.fieldKey)"
-    @relationship-selected.window="$wire.mapToRelationship($event.detail.column, $event.detail.matcherKey, $event.detail.relationshipName)"
+    @entity-link-selected.window="$wire.mapToEntityLink($event.detail.column, $event.detail.matcherKey, $event.detail.entityLinkKey)"
     @field-cleared.window="$wire.unmapColumn($event.detail.column)"
     wire:ignore.self
 >
@@ -26,9 +26,9 @@
                     @foreach ($headers as $index => $header)
                         @php
                             $mapping = $this->getMapping($header);
-                            $mappedRelationshipNames = collect($this->relationships)
+                            $mappedEntityLinkKeys = collect($this->entityLinks)
                                 ->keys()
-                                ->filter(fn ($name) => $this->isRelationshipMapped($name) && !($mapping?->relationship === $name))
+                                ->filter(fn ($key) => $this->isEntityLinkMapped($key) && !($mapping?->entityLink === $key))
                                 ->values()
                                 ->all();
                         @endphp
@@ -54,10 +54,10 @@
                             <div class="flex-1 flex justify-end">
                                 <x-import-wizard-new::field-select
                                     :fields="$this->allFields"
-                                    :relationships="$this->relationships"
+                                    :entity-links="$this->entityLinks"
                                     :selected="$mapping"
                                     :mapped-field-keys="$this->mappedFieldKeys"
-                                    :mapped-relationships="$mappedRelationshipNames"
+                                    :mapped-entity-links="$mappedEntityLinkKeys"
                                     :column="$header"
                                 />
                             </div>

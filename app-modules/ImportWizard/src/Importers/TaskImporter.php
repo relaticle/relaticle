@@ -6,10 +6,10 @@ namespace Relaticle\ImportWizard\Importers;
 
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\MatchableField;
-use Relaticle\ImportWizard\Data\RelationshipField;
 
 /**
  * Importer for Task entities.
@@ -66,14 +66,14 @@ final class TaskImporter extends BaseImporter
     }
 
     /**
-     * @return array<string, RelationshipField>
+     * @return array<string, EntityLink>
      */
-    public function relationships(): array
+    protected function defineEntityLinks(): array
     {
         return [
-            'companies' => RelationshipField::polymorphicCompanies(),
-            'people' => RelationshipField::polymorphicPeople(),
-            'opportunities' => RelationshipField::polymorphicOpportunities(),
+            'companies' => EntityLink::polymorphicCompanies(),
+            'people' => EntityLink::polymorphicPeople(),
+            'opportunities' => EntityLink::polymorphicOpportunities(),
         ];
     }
 
@@ -110,7 +110,7 @@ final class TaskImporter extends BaseImporter
 
         unset($data['companies'], $data['people'], $data['opportunities']);
 
-        if (! $existing instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
         }
 

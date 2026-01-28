@@ -13,7 +13,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Store\ImportStore;
-use Relaticle\ImportWizard\Support\ImportValueValidator;
+use Relaticle\ImportWizard\Support\EntityLinkValidator;
+use Relaticle\ImportWizard\Support\FieldFormatValidator;
 
 final class ValidateColumnJob implements ShouldQueue
 {
@@ -43,6 +44,13 @@ final class ValidateColumnJob implements ShouldQueue
         $connection = $store->connection();
         $jsonPath = '$.'.$this->column->source;
 
+        // Entity link mappings use their own validation logic
+        if ($this->column->isEntityLinkMapping()) {
+            $this->validateEntityLink($store, $connection, $jsonPath);
+
+            return;
+        }
+
         $this->clearValidationForCorrectedDateFields($connection, $jsonPath);
 
         $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
@@ -52,6 +60,33 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $results = $this->validateValues($store, $uniqueValues);
+
+        $this->updateValidationErrors($connection, $jsonPath, $results);
+    }
+
+    /**
+     * Validate entity link column values.
+     *
+     * Performs batch lookup against target entity to find matching records.
+     */
+    private function validateEntityLink(ImportStore $store, Connection $connection, string $jsonPath): void
+    {
+        $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
+
+        if (empty($uniqueValues)) {
+            return;
+        }
+
+        $validator = new EntityLinkValidator($store->teamId());
+        $errorMap = $validator->batchValidateFromColumn($this->column, $store->getImporter(), $uniqueValues);
+
+        $results = [];
+        foreach ($errorMap as $value => $error) {
+            $results[] = [
+                'raw_value' => $value,
+                'validation_error' => $error,
+            ];
+        }
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
     }
@@ -94,7 +129,7 @@ final class ValidateColumnJob implements ShouldQueue
      */
     private function validateValues(ImportStore $store, array $uniqueValues): array
     {
-        $validator = new ImportValueValidator($store->entityType()->value);
+        $validator = new FieldFormatValidator($store->entityType()->value);
         $results = [];
 
         foreach ($uniqueValues as $value) {
@@ -108,7 +143,8 @@ final class ValidateColumnJob implements ShouldQueue
     }
 
     /**
-     * @param array<int, array{raw_value: string, validation_error: string|null}> $results
+     * @param  array<int, array{raw_value: string, validation_error: string|null}>  $results
+     *
      * @throws \Throwable
      */
     private function updateValidationErrors(
