@@ -77,24 +77,18 @@ final class ColumnData extends Data implements Wireable
         );
     }
 
-    /**
-     * Get the data type from the hydrated importField.
-     */
     public function getType(): FieldDataType
     {
-        return $this->importField?->type ?? FieldDataType::STRING;
+        return $this->importField->type ?? FieldDataType::STRING;
     }
 
-    /**
-     * Get a display label for this mapping.
-     */
     public function getLabel(): string
     {
         if ($this->isFieldMapping()) {
-            return $this->importField?->label ?? $this->target;
+            return $this->importField->label ?? $this->target;
         }
 
-        return $this->entityLinkField?->label ?? $this->entityLink ?? $this->target;
+        return $this->entityLinkField->label ?? $this->entityLink ?? $this->target;
     }
 
     /**

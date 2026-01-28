@@ -86,24 +86,36 @@ final class ImportRow extends Model
     // QUERY SCOPES
     // =========================================================================
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function withErrors(Builder $query, string $column): void
     {
         $query->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column]);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function withCorrections(Builder $query, string $column): void
     {
         $query->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column]);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function withSkipped(Builder $query, string $column): void
     {
         $query->whereRaw('json_extract(skipped, ?) IS NOT NULL', ['$.'.$column]);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function valid(Builder $query): void
     {
@@ -112,24 +124,36 @@ final class ImportRow extends Model
         });
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function toCreate(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Create->value);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function toUpdate(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Update->value);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function toSkip(Builder $query): void
     {
         $query->where('match_action', RowMatchAction::Skip->value);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function uniqueValuesFor(Builder $query, string $column): void
     {
@@ -147,20 +171,26 @@ final class ImportRow extends Model
             ->orderByRaw('CASE WHEN raw_value IS NULL OR raw_value = "" THEN 0 ELSE 1 END');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function searchValue(Builder $query, string $column, string $search): void
     {
         $query->whereRaw('json_extract(raw_data, ?) LIKE ?', ['$.'.$column, '%'.$search.'%']);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     #[Scope]
     protected function forFilter(Builder $query, ReviewFilter $filter, string $column): void
     {
         match ($filter) {
             ReviewFilter::All => null,
-            ReviewFilter::NeedsReview => $query->withErrors($column),
-            ReviewFilter::Modified => $query->withCorrections($column),
-            ReviewFilter::Skipped => $query->withSkipped($column),
+            ReviewFilter::NeedsReview => $query->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column]),
+            ReviewFilter::Modified => $query->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column]),
+            ReviewFilter::Skipped => $query->whereRaw('json_extract(skipped, ?) IS NOT NULL', ['$.'.$column]),
         };
     }
 
@@ -197,10 +227,10 @@ final class ImportRow extends Model
             ->first();
 
         return [
-            ReviewFilter::All->value => (int) $result->all_count,
-            ReviewFilter::NeedsReview->value => (int) $result->needs_review_count,
-            ReviewFilter::Modified->value => (int) $result->modified_count,
-            ReviewFilter::Skipped->value => (int) $result->skipped_count,
+            ReviewFilter::All->value => (int) $result?->getAttribute('all_count'),
+            ReviewFilter::NeedsReview->value => (int) $result?->getAttribute('needs_review_count'),
+            ReviewFilter::Modified->value => (int) $result?->getAttribute('modified_count'),
+            ReviewFilter::Skipped->value => (int) $result?->getAttribute('skipped_count'),
         ];
     }
 

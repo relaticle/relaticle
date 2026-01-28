@@ -43,6 +43,7 @@ final class ReviewStep extends Component
 
     public SortDirection $sortDirection = SortDirection::Desc;
 
+    /** @var Collection<int, ColumnData> */
     public Collection $columns;
 
     public ColumnData $selectedColumn;
@@ -174,7 +175,7 @@ final class ReviewStep extends Component
     /**
      * Get unique values for the selected column with pagination.
      *
-     * @return LengthAwarePaginator<object>
+     * @return LengthAwarePaginator<int, ImportRow>
      */
     #[Computed]
     public function selectedColumnRows(): LengthAwarePaginator

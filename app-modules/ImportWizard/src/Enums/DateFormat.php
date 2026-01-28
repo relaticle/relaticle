@@ -70,6 +70,9 @@ enum DateFormat: string implements HasLabel
         };
     }
 
+    /**
+     * @return array<string, array{value: string, label: string, description: string}>
+     */
     public static function toOptions(bool $withTime = false): array
     {
         $options = [];
@@ -102,7 +105,7 @@ enum DateFormat: string implements HasLabel
             try {
                 $date = Carbon::createFromFormat($format, $value);
 
-                if ($date !== false) {
+                if ($date instanceof Carbon) {
                     return $date;
                 }
             } catch (\Exception) {

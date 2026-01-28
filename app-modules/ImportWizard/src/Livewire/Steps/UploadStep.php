@@ -44,9 +44,9 @@ final class UploadStep extends Component implements HasForms
     {
         $this->entityType = $entityType;
         $this->storeId = $storeId;
-        $this->store = $storeId ? ImportStore::load($storeId) : null;
+        $this->store = $storeId !== null ? ImportStore::load($storeId) : null;
 
-        if (! $this->store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
+        if ($this->store === null) {
             return;
         }
 
@@ -68,7 +68,7 @@ final class UploadStep extends Component implements HasForms
 
     private function validateFile(): void
     {
-        if (! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+        if ($this->uploadedFile === null) {
             return;
         }
 
@@ -119,7 +119,7 @@ final class UploadStep extends Component implements HasForms
 
     public function continueToMapping(): void
     {
-        if (! $this->isParsed || ! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+        if (! $this->isParsed || $this->uploadedFile === null) {
             $this->addError('uploadedFile', 'File no longer available. Please re-upload.');
             $this->reset(['headers', 'rowCount', 'isParsed']);
 
