@@ -91,6 +91,24 @@ final class ColumnData extends Data implements Wireable
         return $this->entityLinkField->label ?? $this->entityLink ?? $this->target;
     }
 
+    public function getIcon(): string
+    {
+        if ($this->isEntityLinkMapping()) {
+            return $this->entityLinkField?->icon() ?? 'heroicon-o-link';
+        }
+
+        return $this->importField?->icon ?? 'heroicon-o-squares-2x2';
+    }
+
+    public function getMatcher(): ?MatchableField
+    {
+        if (! $this->isEntityLinkMapping()) {
+            return null;
+        }
+
+        return $this->entityLinkField?->getMatcher($this->target);
+    }
+
     /**
      * Get the entity link key if this is an entity link mapping.
      */

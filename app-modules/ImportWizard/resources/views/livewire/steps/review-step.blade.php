@@ -15,20 +15,47 @@
 
             <div class="flex-1 overflow-y-auto">
                 @foreach ($this->columns as $column)
+                    @php $isSelected = $selectedColumn->source === $column->source @endphp
                     <button
                         wire:key="col-{{ md5($column->source) }}"
                         wire:click="selectColumn({{ Js::from($column->source) }})"
-                        class="w-full px-3 py-2 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 data-[loading]:opacity-50 {{ $selectedColumn->source === $column->source ? 'bg-primary-50 dark:bg-primary-950/30' : '' }}"
+                        @class([
+                            'w-full px-3 py-2.5 text-left border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-colors',
+                            'bg-primary-50 dark:bg-primary-950/30' => $isSelected,
+                            'hover:bg-gray-50 dark:hover:bg-gray-800/50' => !$isSelected,
+                        ])
                     >
-                        <div class="flex items-center justify-between gap-2">
+                        <div class="flex gap-2 items-start">
+                            <div @class([
+                                'w-5 h-5 mt-0.5 rounded flex items-center justify-center shrink-0',
+                                'bg-primary-100 dark:bg-primary-900/50' => $isSelected,
+                                'bg-gray-100 dark:bg-gray-800' => !$isSelected,
+                            ])>
+                                <x-filament::icon
+                                    :icon="$column->getIcon()"
+                                    @class([
+                                        'w-3 h-3',
+                                        'text-primary-500 dark:text-primary-400' => $isSelected,
+                                        'text-gray-500 dark:text-gray-400' => !$isSelected,
+                                    ])
+                                />
+                            </div>
                             <div class="flex-1 min-w-0">
-                                <span class="text-sm text-gray-900 dark:text-white truncate block">{{ $column->source }}</span>
-                                <span class="text-[10px] text-gray-500 dark:text-gray-400 truncate block">
-                                    → {{ $column->getLabel() }}
-                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <span @class([
+                                        'text-sm font-medium truncate',
+                                        'text-primary-700 dark:text-primary-300' => $isSelected,
+                                        'text-gray-900 dark:text-white' => !$isSelected,
+                                    ])>{{ $column->getLabel() }}</span>
+                                    @if ($column->getMatcher())
+                                        <span class="text-gray-400 dark:text-gray-500">·</span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ $column->getMatcher()->label }}</span>
+                                    @endif
+                                </div>
+                                <span class="text-[11px] text-gray-500 dark:text-gray-400 truncate block">{{ $column->source }}</span>
                             </div>
                             @if ($this->columnHasErrors($column->source))
-                                <span class="text-yellow-500 dark:text-yellow-400 text-xs shrink-0">●</span>
+                                <span class="w-1.5 h-1.5 mt-2 rounded-full bg-amber-400 shrink-0"></span>
                             @endif
                         </div>
                     </button>
