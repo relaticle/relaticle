@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\View\View;
@@ -17,7 +18,11 @@ use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Store\ImportRow;
+use Relaticle\ImportWizard\Support\EntityLinkValidator;
+use Relaticle\ImportWizard\Support\FieldFormatValidator;
 
 /**
  * Step 3: Value review.
@@ -45,26 +50,114 @@ final class ReviewStep extends Component
     /** @var array<string, string> Column source => batch ID */
     public array $batchIds = [];
 
+    private ?FieldFormatValidator $validator = null;
+
+    private function connection(): Connection
+    {
+        return $this->store()->connection();
+    }
+
+    private function validator(): FieldFormatValidator
+    {
+        if ($this->validator === null) {
+            $this->validator = new FieldFormatValidator($this->store()->entityType()->value);
+        }
+
+        return $this->validator;
+    }
+
+    /**
+     * Validate a value based on column type.
+     *
+     * - Entity links: Use EntityLinkValidator to check if target record exists
+     * - Date corrections: Validate against ISO format (date picker output)
+     * - Raw dates: Validate against user's selected format
+     * - Other fields: Use standard FieldFormatValidator
+     *
+     * @param  bool  $isCorrection  Whether this is a UI correction (true) or raw CSV value (false)
+     */
+    private function validateValue(ColumnData $column, string $value, bool $isCorrection = false): ?string
+    {
+        if ($column->isEntityLinkMapping()) {
+            return $this->validateEntityLinkValue($column, $value);
+        }
+
+        if ($column->getType()->isDateOrDateTime()) {
+            if ($isCorrection) {
+                $withTime = $column->getType()->isTimestamp();
+                $parsed = DateFormat::ISO->parse($value, $withTime);
+
+                return $parsed === null ? 'Invalid date format' : null;
+            }
+
+            return $this->validator()->validate($column, $value);
+        }
+
+        return $this->validator()->validate($column, $value);
+    }
+
+    /**
+     * Validate an entity link value by checking if the target record exists.
+     */
+    private function validateEntityLinkValue(ColumnData $column, string $value): ?string
+    {
+        $validator = new EntityLinkValidator($this->store()->teamId());
+
+        return $validator->validateFromColumn($column, $this->store()->getImporter(), $value);
+    }
+
+    /**
+     * Update validation for all rows matching a raw value.
+     * Sets error if provided, removes validation entry if null.
+     */
+    private function updateValidationForRawValue(string $jsonPath, string $rawValue, ?string $error): void
+    {
+        if ($error !== null) {
+            $this->connection()->statement("
+                UPDATE import_rows
+                SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ", [$jsonPath, $error, $jsonPath, $rawValue]);
+        } else {
+            $this->connection()->statement('
+                UPDATE import_rows
+                SET validation = json_remove(validation, ?)
+                WHERE json_extract(raw_data, ?) = ?
+            ', [$jsonPath, $jsonPath, $rawValue]);
+        }
+    }
+
+    /**
+     * Dispatch a background job to validate all unique values for a column.
+     * Returns the batch ID for progress tracking.
+     */
+    private function validateColumnAsync(ColumnData $column): string
+    {
+        $batch = Bus::batch([
+            new ValidateColumnJob($this->store()->id(), $column),
+        ])
+            ->name("Validate {$column->source}")
+            ->dispatch();
+
+        return $batch->id;
+    }
+
     public function mount(): void
     {
         $this->columns = $this->store()->columnMappings();
         $columnSource = $this->store()->columnMappings()->first()->source;
         $this->selectColumn($columnSource);
 
-        // Async validate ALL mapped columns
+        // Async validate ALL mapped columns (both field and entity link mappings)
         foreach ($this->columns as $column) {
-            if (! $column->isFieldMapping()) {
-                continue;
-            }
-
-            $this->batchIds[$column->source] = $this->store()->validateColumnAsync($column);
+            $this->batchIds[$column->source] = $this->validateColumnAsync($column);
         }
     }
 
     /**
      * Re-hydrate transient fields after Livewire deserialization.
      *
-     * ColumnData's importField and relationshipField are transient (not stored in JSON),
+     * ColumnData's importField and entityLinkField are transient (not stored in JSON),
      * so we need to re-hydrate them on each request.
      */
     public function hydrate(): void
@@ -104,7 +197,10 @@ final class ReviewStep extends Component
     #[Computed]
     public function filterCounts(): array
     {
-        return $this->store()->countUniqueValuesByFilter($this->selectedColumn->source);
+        return ImportRow::countUniqueValuesByFilter(
+            $this->store()->query(),
+            $this->selectedColumn->source
+        );
     }
 
     public function selectColumn(string $columnSource): void
@@ -121,7 +217,11 @@ final class ReviewStep extends Component
     #[Computed]
     public function choiceOptions(): array
     {
-        return $this->store()->getChoiceOptions($this->selectedColumn);
+        if (! $this->selectedColumn->getType()->isChoiceField()) {
+            return [];
+        }
+
+        return $this->validator()->getChoiceOptions($this->selectedColumn);
     }
 
     public function setFilter(string $filter): void
@@ -171,31 +271,67 @@ final class ReviewStep extends Component
         $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
 
         // Dispatch async validation (hash includes format, so changed format = new cache keys)
-        $this->batchIds[$this->selectedColumn->source] = $this->store()->validateColumnAsync($this->selectedColumn);
+        $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
     }
 
     /**
      * Update a mapped value (correction) for all rows with matching raw value.
+     *
+     * IMPORTANT - Date Correction Storage:
+     * For date fields, corrections from the HTML date picker are stored in ISO format
+     * (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) regardless of the user's selected date format.
+     *
+     * This is intentional because:
+     * - HTML date/datetime inputs always output ISO format (browser constraint)
+     * - Laravel/Eloquent expects ISO format for database storage
+     * - The selected format only affects how ambiguous raw CSV data is interpreted
      */
     public function updateMappedValue(string $rawValue, string $newValue): void
     {
-        $this->store()->setCorrection($this->selectedColumn->source, $rawValue, $newValue);
+        $error = $this->validateValue($this->selectedColumn, $newValue, isCorrection: true);
+        $jsonPath = '$.'.$this->selectedColumn->source;
+
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET corrections = json_set(COALESCE(corrections, '{}'), ?, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $newValue, $jsonPath, $rawValue]);
+
+        $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
     }
 
     /**
      * Undo a correction and revert to the original raw value.
+     * Re-validates the original value.
      */
     public function undoCorrection(string $rawValue): void
     {
-        $this->store()->clearCorrection($this->selectedColumn->source, $rawValue);
+        $error = $this->validateValue($this->selectedColumn, $rawValue, isCorrection: false);
+        $jsonPath = '$.'.$this->selectedColumn->source;
+
+        $this->connection()->statement('
+            UPDATE import_rows
+            SET corrections = json_remove(corrections, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ', [$jsonPath, $jsonPath, $rawValue]);
+
+        $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
     }
 
     /**
      * Skip a value (set to null during import).
+     * Clears validation error since it's intentionally skipped.
      */
     public function skipValue(string $rawValue): void
     {
-        $this->store()->setValueSkipped($this->selectedColumn->source, $rawValue);
+        $jsonPath = '$.'.$this->selectedColumn->source;
+
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true')),
+                validation = json_remove(validation, ?)
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $jsonPath, $jsonPath, $rawValue]);
     }
 
     /**
@@ -203,7 +339,18 @@ final class ReviewStep extends Component
      */
     public function unskipValue(string $rawValue): void
     {
-        $this->store()->clearSkipped($this->selectedColumn->source, $rawValue);
+        $error = $this->validateValue($this->selectedColumn, $rawValue, isCorrection: false);
+        $jsonPath = '$.'.$this->selectedColumn->source;
+
+        $this->connection()->statement("
+            UPDATE import_rows
+            SET skipped = json_remove(skipped, ?),
+                validation = CASE
+                    WHEN ? IS NOT NULL THEN json_set(COALESCE(validation, '{}'), ?, ?)
+                    ELSE validation
+                END
+            WHERE json_extract(raw_data, ?) = ?
+        ", [$jsonPath, $error, $jsonPath, $error, $jsonPath, $rawValue]);
     }
 
     /**
