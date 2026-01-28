@@ -43,7 +43,8 @@ final class CompanyImporter extends BaseImporter
                     'business', 'business_name', 'org', 'org_name', 'organisation',
                     'firm', 'client', 'customer', 'customer_name', 'vendor', 'vendor_name',
                 ])
-                ->example('Acme Corporation'),
+                ->example('Acme Corporation')
+                ->icon('heroicon-o-building-office-2'),
 
             ImportField::make('account_owner_email')
                 ->label('Account Owner Email')
@@ -53,7 +54,8 @@ final class CompanyImporter extends BaseImporter
                     'owner email', 'sales rep', 'sales_rep', 'rep', 'salesperson', 'sales_owner',
                     'account_rep', 'assigned_user', 'manager_email', 'contact_owner',
                 ])
-                ->example('owner@company.com'),
+                ->example('owner@company.com')
+                ->icon('heroicon-o-envelope'),
         ]);
     }
 

@@ -23,6 +23,8 @@ final class ImportField extends Data
      * @param  string|null  $example  Example value for display
      * @param  bool  $isCustomField  Whether this is a custom field
      * @param  FieldDataType|null  $type  The data type
+     * @param  string|null  $icon  The display icon (Heroicon name)
+     * @param  int|null  $sortOrder  Display order for custom fields
      */
     public function __construct(
         public readonly string $key,
@@ -33,6 +35,8 @@ final class ImportField extends Data
         public readonly ?string $example = null,
         public readonly bool $isCustomField = false,
         public readonly ?FieldDataType $type = null,
+        public readonly ?string $icon = null,
+        public readonly ?int $sortOrder = null,
     ) {}
 
     /**
@@ -58,6 +62,7 @@ final class ImportField extends Data
             rules: ['nullable', 'ulid'],
             guesses: ['id', 'record_id', 'ulid', 'record id'],
             example: '01KCCFMZ52QWZSQZWVG0AP704V',
+            icon: 'heroicon-o-finger-print',
         );
     }
 
@@ -122,6 +127,22 @@ final class ImportField extends Data
     }
 
     /**
+     * Set the display icon.
+     */
+    public function icon(?string $icon): self
+    {
+        return $this->cloneWith(['icon' => $icon]);
+    }
+
+    /**
+     * Set the sort order.
+     */
+    public function sortOrder(?int $sortOrder): self
+    {
+        return $this->cloneWith(['sortOrder' => $sortOrder]);
+    }
+
+    /**
      * Create a new instance with specified property overrides.
      *
      * @param  array<string, mixed>  $overrides
@@ -137,6 +158,8 @@ final class ImportField extends Data
             example: $overrides['example'] ?? $this->example,
             isCustomField: $overrides['isCustomField'] ?? $this->isCustomField,
             type: $overrides['type'] ?? $this->type,
+            icon: $overrides['icon'] ?? $this->icon,
+            sortOrder: $overrides['sortOrder'] ?? $this->sortOrder,
         );
     }
 

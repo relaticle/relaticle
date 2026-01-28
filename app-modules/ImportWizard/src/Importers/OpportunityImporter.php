@@ -45,7 +45,8 @@ final class OpportunityImporter extends BaseImporter
                     'opportunity', 'title', 'subject',
                     'deal title', 'opportunity title', 'pipeline',
                 ])
-                ->example('Enterprise License Deal'),
+                ->example('Enterprise License Deal')
+                ->icon('heroicon-o-currency-dollar'),
         ]);
     }
 

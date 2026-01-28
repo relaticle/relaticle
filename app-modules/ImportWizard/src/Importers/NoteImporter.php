@@ -41,7 +41,8 @@ final class NoteImporter extends BaseImporter
                     'title', 'subject', 'note_title', 'heading',
                     'note subject', 'summary',
                 ])
-                ->example('Meeting Notes'),
+                ->example('Meeting Notes')
+                ->icon('heroicon-o-pencil-square'),
 
             ImportField::make('content')
                 ->label('Content')
@@ -51,7 +52,8 @@ final class NoteImporter extends BaseImporter
                     'content', 'body', 'text', 'note', 'notes',
                     'note content', 'note body', 'description', 'details',
                 ])
-                ->example('Discussed project timeline and deliverables.'),
+                ->example('Discussed project timeline and deliverables.')
+                ->icon('heroicon-o-document-text'),
         ]);
     }
 

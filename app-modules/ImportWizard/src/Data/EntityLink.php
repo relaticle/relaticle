@@ -46,6 +46,7 @@ final class EntityLink extends Data
      * @param  string|null  $morphRelation  Relation name (for MorphToMany storage)
      * @param  string|null  $customFieldCode  Custom field code (for CustomFieldValue storage)
      * @param  array<string>  $guesses  Column name aliases for auto-mapping
+     * @param  int|null  $sortOrder  Display order for custom field entity links
      */
     public function __construct(
         public readonly string $key,
@@ -62,6 +63,7 @@ final class EntityLink extends Data
         public readonly ?string $morphRelation = null,
         public readonly ?string $customFieldCode = null,
         public readonly array $guesses = [],
+        public readonly ?int $sortOrder = null,
     ) {}
 
     /**
@@ -85,6 +87,7 @@ final class EntityLink extends Data
             morphRelation: $overrides['morphRelation'] ?? $this->morphRelation,
             customFieldCode: $overrides['customFieldCode'] ?? $this->customFieldCode,
             guesses: $overrides['guesses'] ?? $this->guesses,
+            sortOrder: $overrides['sortOrder'] ?? $this->sortOrder,
         );
     }
 
@@ -158,6 +161,7 @@ final class EntityLink extends Data
                 strtolower($customField->name),
                 str_replace(' ', '_', strtolower($customField->name)),
             ],
+            sortOrder: $customField->sort_order,
         );
     }
 

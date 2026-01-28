@@ -16,6 +16,24 @@
     $selectedEntityLink = $isEntityLinkMapping ? ($entityLinks[$selected->entityLink] ?? null) : null;
     $selectedMatcher = $selectedEntityLink?->getMatcher($selected->target);
     $hasValue = $selectedField !== null || $selectedEntityLink !== null;
+
+    // Merge fields and entity links into sorted collection
+    $sortedItems = collect($fields->all())
+        ->map(fn($f) => (object)[
+            'type' => 'field',
+            'item' => $f,
+            'key' => $f->key,
+            'order' => $f->sortOrder ?? -1
+        ])
+        ->concat(
+            collect($entityLinks)->map(fn($link, $key) => (object)[
+                'type' => 'link',
+                'item' => $link,
+                'key' => $key,
+                'order' => $link->sortOrder ?? -1
+            ])
+        )
+        ->sortBy('order');
 @endphp
 
 <div
@@ -95,7 +113,7 @@
                 @endif
             </span>
         @elseif ($selectedField)
-            <x-filament::icon icon="heroicon-o-squares-2x2" class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+            <x-filament::icon icon="{{ $selectedField->icon ?? 'heroicon-o-squares-2x2' }}" class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
             <span class="flex-1 text-left text-gray-900 dark:text-white truncate text-sm">{{ $selectedField->label }}</span>
         @else
             <x-filament::icon icon="heroicon-o-squares-2x2" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -150,45 +168,38 @@
             />
         </div>
 
-        {{-- Options --}}
+        {{-- Options (unified sorted list) --}}
         <div class="max-h-56 overflow-y-auto p-1">
-            {{-- Fields Section --}}
-            <div class="px-2 py-1">
-                <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Fields</span>
-            </div>
-            @foreach ($fields as $field)
-                @php
-                    $isSelected = $isFieldMapping && $selected->target === $field->key;
-                    $isMapped = in_array($field->key, $mappedFieldKeys) && !$isSelected;
-                @endphp
-                <button
-                    type="button"
-                    role="option"
-                    :aria-selected="{{ $isSelected ? 'true' : 'false' }}"
-                    x-show="!search || '{{ strtolower($field->label) }}'.includes(search.toLowerCase())"
-                    @click="selectField('{{ $field->key }}')"
-                    {{ $isMapped ? 'disabled' : '' }}
-                    class="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
-                        {{ $isSelected ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
-                        {{ $isMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
-                >
-                    @if ($isSelected)
-                        <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
-                    @endif
-                    <span class="truncate flex-1 text-left">{{ $field->label }}{{ $field->required ? ' *' : '' }}</span>
-                    @if ($isMapped)
-                        <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
-                    @endif
-                </button>
-            @endforeach
-
-            {{-- Entity Links Section --}}
-            @if (count($entityLinks) > 0)
-                <div class="px-2 py-1 mt-1 border-t border-gray-100 dark:border-gray-800">
-                    <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Link to Records</span>
-                </div>
-                @foreach ($entityLinks as $linkKey => $link)
+            @foreach ($sortedItems as $entry)
+                @if ($entry->type === 'field')
                     @php
+                        $field = $entry->item;
+                        $isSelected = $isFieldMapping && $selected->target === $field->key;
+                        $isMapped = in_array($field->key, $mappedFieldKeys) && !$isSelected;
+                    @endphp
+                    <button
+                        type="button"
+                        role="option"
+                        :aria-selected="{{ $isSelected ? 'true' : 'false' }}"
+                        x-show="!search || '{{ strtolower($field->label) }}'.includes(search.toLowerCase())"
+                        @click="selectField('{{ $field->key }}')"
+                        {{ $isMapped ? 'disabled' : '' }}
+                        class="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
+                            {{ $isSelected ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
+                            {{ $isMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
+                    >
+                        <x-filament::icon icon="{{ $field->icon ?? 'heroicon-o-squares-2x2' }}" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span class="truncate flex-1 text-left">{{ $field->label }}{{ $field->required ? ' *' : '' }}</span>
+                        @if ($isMapped)
+                            <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
+                        @elseif ($isSelected)
+                            <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
+                        @endif
+                    </button>
+                @else
+                    @php
+                        $linkKey = $entry->key;
+                        $link = $entry->item;
                         $isLinkSelected = $isEntityLinkMapping && $selected->entityLink === $linkKey;
                         $isLinkMapped = in_array($linkKey, $mappedEntityLinks) && !$isLinkSelected;
                     @endphp
@@ -219,13 +230,15 @@
                             <span class="flex-1 text-left">{{ $link->label }}</span>
                             @if ($isLinkMapped)
                                 <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
+                            @elseif ($isLinkSelected)
+                                <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
                             @else
                                 <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             @endif
                         </button>
                     </div>
-                @endforeach
-            @endif
+                @endif
+            @endforeach
         </div>
     </div>
 

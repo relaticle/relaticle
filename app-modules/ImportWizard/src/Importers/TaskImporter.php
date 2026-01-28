@@ -43,7 +43,8 @@ final class TaskImporter extends BaseImporter
                     'task', 'task name', 'action', 'action item',
                     'to do', 'todo item', 'activity',
                 ])
-                ->example('Follow up with client'),
+                ->example('Follow up with client')
+                ->icon('heroicon-o-check-circle'),
 
             ImportField::make('description')
                 ->label('Description')
@@ -52,7 +53,8 @@ final class TaskImporter extends BaseImporter
                     'description', 'details', 'notes', 'body',
                     'task description', 'task details',
                 ])
-                ->example('Schedule a follow-up call to discuss proposal'),
+                ->example('Schedule a follow-up call to discuss proposal')
+                ->icon('heroicon-o-document-text'),
 
             ImportField::make('assignee_email')
                 ->label('Assignee Email')
@@ -61,7 +63,8 @@ final class TaskImporter extends BaseImporter
                     'assignee', 'assigned_to', 'owner', 'assignee_email',
                     'assigned_email', 'owner_email', 'responsible',
                 ])
-                ->example('user@company.com'),
+                ->example('user@company.com')
+                ->icon('heroicon-o-envelope'),
         ]);
     }
 

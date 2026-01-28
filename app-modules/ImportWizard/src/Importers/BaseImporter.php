@@ -102,6 +102,7 @@ abstract class BaseImporter implements ImporterContract
             ->where('entity_type', $this->entityName())
             ->forType('record')
             ->active()
+            ->orderBy('sort_order')
             ->get();
     }
 
@@ -188,7 +189,9 @@ abstract class BaseImporter implements ImporterContract
                 ->required($validationService->isRequired($customField))
                 ->rules($importRules)
                 ->asCustomField()
-                ->type($customField->typeData->dataType);
+                ->type($customField->typeData->dataType)
+                ->icon($customField->typeData->icon)
+                ->sortOrder($customField->sort_order);
         });
 
         return new ImportFieldCollection($fields->all());
