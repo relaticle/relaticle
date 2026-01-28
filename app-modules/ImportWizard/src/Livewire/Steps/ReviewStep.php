@@ -317,7 +317,6 @@ final class ReviewStep extends Component
 
     /**
      * Skip a value (set to null during import).
-     * Clears validation error since it's intentionally skipped.
      */
     public function skipValue(string $rawValue): void
     {
@@ -325,29 +324,23 @@ final class ReviewStep extends Component
 
         $this->connection()->statement("
             UPDATE import_rows
-            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true')),
-                validation = json_remove(validation, ?)
+            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true'))
             WHERE json_extract(raw_data, ?) = ?
-        ", [$jsonPath, $jsonPath, $jsonPath, $rawValue]);
+        ", [$jsonPath, $jsonPath, $rawValue]);
     }
 
     /**
-     * Unskip a value (restore original value and re-validate).
+     * Unskip a value (restore to previous state with validation preserved).
      */
     public function unskipValue(string $rawValue): void
     {
-        $error = $this->validateValue($this->selectedColumn, $rawValue, isCorrection: false);
         $jsonPath = '$.'.$this->selectedColumn->source;
 
-        $this->connection()->statement("
+        $this->connection()->statement('
             UPDATE import_rows
-            SET skipped = json_remove(skipped, ?),
-                validation = CASE
-                    WHEN ? IS NOT NULL THEN json_set(COALESCE(validation, '{}'), ?, ?)
-                    ELSE validation
-                END
+            SET skipped = json_remove(skipped, ?)
             WHERE json_extract(raw_data, ?) = ?
-        ", [$jsonPath, $error, $jsonPath, $error, $jsonPath, $rawValue]);
+        ', [$jsonPath, $jsonPath, $rawValue]);
     }
 
     /**

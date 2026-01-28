@@ -189,7 +189,9 @@ final class ImportRow extends Model
         match ($filter) {
             ReviewFilter::All => null,
             ReviewFilter::NeedsReview => $query->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column]),
-            ReviewFilter::Modified => $query->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column]),
+            ReviewFilter::Modified => $query
+                ->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column])
+                ->whereRaw('json_extract(skipped, ?) IS NULL', ['$.'.$column]),
             ReviewFilter::Skipped => $query->whereRaw('json_extract(skipped, ?) IS NOT NULL', ['$.'.$column]),
         };
     }
@@ -217,13 +219,14 @@ final class ImportRow extends Model
                 END) as needs_review_count,
                 COUNT(DISTINCT CASE
                     WHEN json_extract(corrections, ?) IS NOT NULL
+                     AND json_extract(skipped, ?) IS NULL
                     THEN json_extract(raw_data, ?)
                 END) as modified_count,
                 COUNT(DISTINCT CASE
                     WHEN json_extract(skipped, ?) IS NOT NULL
                     THEN json_extract(raw_data, ?)
                 END) as skipped_count
-            ', [$jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath])
+            ', [$jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath])
             ->first();
 
         return [
