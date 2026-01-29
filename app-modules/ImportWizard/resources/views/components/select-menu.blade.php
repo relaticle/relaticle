@@ -1,5 +1,6 @@
 @props([
     'options' => [],
+    'invalidOptions' => [],
     'multiple' => false,
     'searchable' => true,
     'placeholder' => 'Select...',
@@ -27,6 +28,24 @@
         return ['value' => $option, 'label' => (string) $option, 'description' => null];
     })->values()->all();
 
+    // Normalize invalid options with error flag
+    $normalizedInvalidOptions = collect($invalidOptions)->map(function ($option) {
+        if (is_array($option) && isset($option['value'])) {
+            return [
+                'value' => $option['value'],
+                'label' => (string) ($option['label'] ?? $option['value']),
+                'description' => $option['error'] ?? 'Invalid value',
+                'invalid' => true,
+            ];
+        }
+        return [
+            'value' => $option,
+            'label' => (string) $option,
+            'description' => 'Invalid value',
+            'invalid' => true,
+        ];
+    })->values()->all();
+
     // Extract wire:model for Livewire integration
     $wireModel = $attributes->wire('model')->value();
     $hasLiveModifier = $attributes->wire('model')->hasModifier('live');
@@ -44,6 +63,7 @@
         state: @if($wireModel) $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}) @else @js($value ?? ($multiple ? [] : null)) @endif,
         multiple: @js($multiple),
         options: @js($normalizedOptions),
+        invalidOptions: @js($normalizedInvalidOptions),
         disabled: @js($disabled),
         searchable: @js($searchable),
         activeIndex: -1,
@@ -103,10 +123,14 @@
             return this.selected !== null && this.selected !== undefined && this.selected !== '';
         },
 
+        get allOptions() {
+            return [...this.invalidOptions, ...this.options];
+        },
+
         get filteredOptions() {
-            if (!this.search || !this.search.trim()) return this.options;
+            if (!this.search || !this.search.trim()) return this.allOptions;
             const q = this.search.toLowerCase().trim();
-            return this.options.filter(o => {
+            return this.allOptions.filter(o => {
                 const label = String(o.label || '').toLowerCase();
                 const desc = o.description ? String(o.description).toLowerCase() : '';
                 return label.includes(q) || desc.includes(q);
@@ -190,7 +214,7 @@
         },
 
         getOption(value) {
-            return this.options.find(o => this.valuesEqual(o.value, value)) || null;
+            return this.allOptions.find(o => this.valuesEqual(o.value, value)) || null;
         },
 
         getOptionId(index) {
@@ -452,27 +476,43 @@
                     :aria-selected="isSelected(option.value) ? 'true' : 'false'"
                     :data-highlighted="activeIndex === index ? '' : undefined"
                     :data-selected="isSelected(option.value) ? '' : undefined"
+                    :data-invalid="option.invalid ? '' : undefined"
                     x-on:click="select(option.value)"
                     x-on:mouseenter="activeIndex = index"
                     class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
                     :class="[
-                        activeIndex === index
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        option.invalid
+                            ? (activeIndex === index
+                                ? 'bg-danger-100 dark:bg-danger-900/50 text-danger-900 dark:text-danger-100'
+                                : 'bg-danger-50 dark:bg-danger-950/30 text-danger-700 dark:text-danger-300 hover:bg-danger-100 dark:hover:bg-danger-900/50')
+                            : (activeIndex === index
+                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
                     ]"
                 >
                     <div class="flex items-center gap-1.5">
-                        <span
-                            class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
-                            :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
-                            aria-hidden="true"
-                        >
-                            <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                        </span>
+                        <template x-if="option.invalid">
+                            <span class="w-4 h-4 shrink-0 flex items-center justify-center" aria-hidden="true">
+                                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-danger-500" />
+                            </span>
+                        </template>
+                        <template x-if="!option.invalid">
+                            <span
+                                class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
+                                :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
+                                aria-hidden="true"
+                            >
+                                <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                            </span>
+                        </template>
                         <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
                     </div>
                     <template x-if="option.description">
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 ml-[22px]" x-text="option.description"></p>
+                        <p
+                            class="text-[11px] mt-0.5 ml-[22px]"
+                            :class="option.invalid ? 'text-danger-600 dark:text-danger-400' : 'text-gray-500 dark:text-gray-400'"
+                            x-text="option.description"
+                        ></p>
                     </template>
                 </li>
             </template>
