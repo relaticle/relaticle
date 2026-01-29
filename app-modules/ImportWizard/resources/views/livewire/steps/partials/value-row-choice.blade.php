@@ -4,9 +4,29 @@
     $options = $this->choiceOptions;
     $validationError = $valueData->validation_error;
     $isValid = $validationError === null;
+
+    // Parse selected values
     $selectedValue = $isMulti
         ? collect(explode(', ', $mappedValue))->filter()->values()->all()
         : $mappedValue;
+
+    // Build list of invalid options (values not in predefined options)
+    $validValues = collect($options)->pluck('value')->all();
+    $invalidOptions = [];
+
+    if (! $isValid && $mappedValue) {
+        $valuesToCheck = $isMulti ? $selectedValue : [$mappedValue];
+        foreach ($valuesToCheck as $val) {
+            if ($val && ! in_array($val, $validValues, true)) {
+                $invalidOptions[] = [
+                    'value' => $val,
+                    'label' => $val,
+                    'error' => 'Not a valid option',
+                ];
+            }
+        }
+    }
+
     $valueHash = is_array($selectedValue) ? implode(',', $selectedValue) : ($selectedValue ?? '');
     $rowKey = 'choice-' . crc32($rawValue . '-' . $valueHash);
 @endphp
@@ -16,6 +36,7 @@
     x-data="{
         selected: @js($selectedValue),
         options: @js($options),
+        invalidOptions: @js($invalidOptions),
         isMulti: @js($isMulti),
         rawValue: @js($rawValue),
         updateValue(newVal) {
@@ -37,6 +58,7 @@
     <div class="flex-1 min-w-0">
         <x-import-wizard-new::select-menu
             :options="$options"
+            :invalid-options="$invalidOptions"
             :multiple="$isMulti"
             :searchable="count($options) > 5"
             :value="$selectedValue"
