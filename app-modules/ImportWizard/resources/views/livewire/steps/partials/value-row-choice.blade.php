@@ -72,6 +72,6 @@
         :selected-column="$selectedColumn"
         :raw-value="$rawValue"
         :has-correction="$hasCorrection"
-        :show-undo="$isValid"
+        :show-undo="!$isValid || $hasCorrection"
     />
 </div>
