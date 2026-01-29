@@ -49,12 +49,6 @@ parameters:
 			path: app/Services/AvatarService.php
 
 		-
-			message: '#^Method App\\Services\\GitHubService\:\:getFormattedStarsCount\(\) should return string but returns bool\|string\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/GitHubService.php
-
-		-
 			message: '#^Parameter \#1 \$title of static method Illuminate\\Support\\Str\:\:slug\(\) expects string, bool\|string given\.$#'
 			identifier: argument.type
 			count: 1
