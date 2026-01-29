@@ -82,6 +82,46 @@ final class ColumnData extends Data implements Wireable
         return $this->importField->type ?? FieldDataType::STRING;
     }
 
+    /**
+     * Check if this is a choice field with predefined options.
+     *
+     * Returns false for fields like email/phone that use MULTI_CHOICE type
+     * but accept arbitrary values without predefined options.
+     */
+    public function isRealChoiceField(): bool
+    {
+        if (! $this->getType()->isChoiceField()) {
+            return false;
+        }
+
+        return ! ($this->importField?->acceptsArbitraryValues ?? false);
+    }
+
+    /**
+     * Check if this is a multi-value field that accepts arbitrary values.
+     *
+     * Used for email, phone, tags - fields that can have multiple comma-separated values
+     * but don't have predefined options to choose from.
+     */
+    public function isMultiValueArbitrary(): bool
+    {
+        if (! $this->getType()->isChoiceField()) {
+            return false;
+        }
+
+        return $this->importField?->acceptsArbitraryValues ?? false;
+    }
+
+    /**
+     * Get validation rules for this field.
+     *
+     * @return array<string>
+     */
+    public function getRules(): array
+    {
+        return $this->importField?->rules ?? [];
+    }
+
     public function getLabel(): string
     {
         if ($this->isFieldMapping()) {

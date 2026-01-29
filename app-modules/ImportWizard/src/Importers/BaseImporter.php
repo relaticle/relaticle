@@ -172,6 +172,7 @@ abstract class BaseImporter implements ImporterContract
      * Get custom fields for this entity as ImportField objects.
      *
      * Excludes Record-type custom fields since they appear in entityLinks() instead.
+     * Eager loads options for choice fields.
      */
     protected function customFields(): ImportFieldCollection
     {
@@ -181,17 +182,29 @@ abstract class BaseImporter implements ImporterContract
             ->where('entity_type', $this->entityName())
             ->where('type', '!=', 'record')
             ->active()
+            ->with('options')
             ->orderBy('sort_order')
             ->get();
 
         $validationService = app(ValidationService::class);
 
         $fields = $customFields->map(function (CustomField $customField) use ($validationService): ImportField {
-            $rules = $validationService->getValidationRules($customField);
+            // For multi-value arbitrary fields (email, phone), use item-level rules
+            // since CSV values are strings that may be comma-separated
+            $isMultiValueArbitrary = $customField->typeData->dataType->isChoiceField()
+                && $customField->typeData->acceptsArbitraryValues;
+
+            $rules = $isMultiValueArbitrary
+                ? $validationService->getItemValidationRules($customField)
+                : $validationService->getValidationRules($customField);
 
             // Filter out object rules (like UniqueCustomFieldValue) for import preview
-            // Import validation handles uniqueness differently via match field
             $importRules = array_filter($rules, is_string(...));
+
+            // Load options for real choice fields (not email/phone which accept arbitrary values)
+            $options = $this->shouldLoadOptions($customField)
+                ? $customField->options->map(fn ($o) => ['label' => $o->name, 'value' => $o->name])->all()
+                : null;
 
             return ImportField::make("custom_fields_{$customField->code}")
                 ->label($customField->name)
@@ -200,10 +213,18 @@ abstract class BaseImporter implements ImporterContract
                 ->asCustomField()
                 ->type($customField->typeData->dataType)
                 ->icon($customField->typeData->icon)
-                ->sortOrder($customField->sort_order);
+                ->sortOrder($customField->sort_order)
+                ->acceptsArbitraryValues($customField->typeData->acceptsArbitraryValues)
+                ->options($options);
         });
 
         return new ImportFieldCollection($fields->all());
+    }
+
+    private function shouldLoadOptions(CustomField $customField): bool
+    {
+        return $customField->typeData->dataType->isChoiceField()
+            && ! $customField->typeData->acceptsArbitraryValues;
     }
 
     /**

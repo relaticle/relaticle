@@ -25,6 +25,8 @@ final class ImportField extends Data
      * @param  FieldDataType|null  $type  The data type
      * @param  string|null  $icon  The display icon (Heroicon name)
      * @param  int|null  $sortOrder  Display order for custom fields
+     * @param  bool  $acceptsArbitraryValues  Whether field accepts arbitrary values (email, phone, tags)
+     * @param  array<int, array{label: string, value: string}>|null  $options  Choice options for select fields
      */
     public function __construct(
         public readonly string $key,
@@ -37,6 +39,8 @@ final class ImportField extends Data
         public readonly ?FieldDataType $type = null,
         public readonly ?string $icon = null,
         public readonly ?int $sortOrder = null,
+        public readonly bool $acceptsArbitraryValues = false,
+        public readonly ?array $options = null,
     ) {}
 
     /**
@@ -143,6 +147,24 @@ final class ImportField extends Data
     }
 
     /**
+     * Mark field as accepting arbitrary values (email, phone, tags).
+     */
+    public function acceptsArbitraryValues(bool $accepts = true): self
+    {
+        return $this->cloneWith(['acceptsArbitraryValues' => $accepts]);
+    }
+
+    /**
+     * Set choice options for select fields.
+     *
+     * @param  array<int, array{label: string, value: string}>|null  $options
+     */
+    public function options(?array $options): self
+    {
+        return $this->cloneWith(['options' => $options]);
+    }
+
+    /**
      * Create a new instance with specified property overrides.
      *
      * @param  array<string, mixed>  $overrides
@@ -160,6 +182,8 @@ final class ImportField extends Data
             type: $overrides['type'] ?? $this->type,
             icon: $overrides['icon'] ?? $this->icon,
             sortOrder: $overrides['sortOrder'] ?? $this->sortOrder,
+            acceptsArbitraryValues: $overrides['acceptsArbitraryValues'] ?? $this->acceptsArbitraryValues,
+            options: $overrides['options'] ?? $this->options,
         );
     }
 

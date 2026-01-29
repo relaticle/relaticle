@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
-use Relaticle\ImportWizard\Support\FieldFormatValidator;
+use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 
 final class ValidateColumnJob implements ShouldQueue
 {
@@ -129,17 +129,34 @@ final class ValidateColumnJob implements ShouldQueue
      */
     private function validateValues(ImportStore $store, array $uniqueValues): array
     {
-        $validator = new FieldFormatValidator($store->entityType()->value);
+        // Hydrate importField since it's not serialized with ColumnData
+        $this->hydrateColumnField($store);
+
+        $validator = new ColumnValidator;
         $results = [];
 
         foreach ($uniqueValues as $value) {
+            $error = $validator->validate($this->column, $value);
             $results[] = [
                 'raw_value' => $value,
-                'validation_error' => $validator->validate($this->column, $value),
+                'validation_error' => $error?->toStorageFormat(),
             ];
         }
 
         return $results;
+    }
+
+    /**
+     * Hydrate the importField on the column since transient properties aren't serialized.
+     */
+    private function hydrateColumnField(ImportStore $store): void
+    {
+        if ($this->column->importField !== null) {
+            return;
+        }
+
+        $importer = $store->getImporter();
+        $this->column->importField = $importer->allFields()->get($this->column->target);
     }
 
     /**

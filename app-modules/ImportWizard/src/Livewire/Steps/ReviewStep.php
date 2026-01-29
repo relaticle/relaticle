@@ -22,7 +22,7 @@ use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
-use Relaticle\ImportWizard\Support\FieldFormatValidator;
+use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 
 /**
  * Step 3: Value review.
@@ -51,20 +51,9 @@ final class ReviewStep extends Component
     /** @var array<string, string> Column source => batch ID */
     public array $batchIds = [];
 
-    private ?FieldFormatValidator $validator = null;
-
     private function connection(): Connection
     {
         return $this->store()->connection();
-    }
-
-    private function validator(): FieldFormatValidator
-    {
-        if ($this->validator === null) {
-            $this->validator = new FieldFormatValidator($this->store()->entityType()->value);
-        }
-
-        return $this->validator;
     }
 
     /**
@@ -73,7 +62,7 @@ final class ReviewStep extends Component
      * - Entity links: Use EntityLinkValidator to check if target record exists
      * - Date corrections: Validate against ISO format (date picker output)
      * - Raw dates: Validate against user's selected format
-     * - Other fields: Use standard FieldFormatValidator
+     * - Other fields: Use FieldHandlerFactory
      *
      * @param  bool  $isCorrection  Whether this is a UI correction (true) or raw CSV value (false)
      */
@@ -89,7 +78,10 @@ final class ReviewStep extends Component
             return $parsed === null ? 'Invalid date format' : null;
         }
 
-        return $this->validator()->validate($column, $value);
+        $validator = new ColumnValidator;
+        $error = $validator->validate($column, $value);
+
+        return $error?->toStorageFormat();
     }
 
     /**
@@ -213,11 +205,11 @@ final class ReviewStep extends Component
     #[Computed]
     public function choiceOptions(): array
     {
-        if (! $this->selectedColumn->getType()->isChoiceField()) {
+        if (! $this->selectedColumn->isRealChoiceField()) {
             return [];
         }
 
-        return $this->validator()->getChoiceOptions($this->selectedColumn);
+        return $this->selectedColumn->importField->options ?? [];
     }
 
     public function setFilter(string $filter): void
