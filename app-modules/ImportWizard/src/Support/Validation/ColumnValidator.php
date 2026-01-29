@@ -53,6 +53,21 @@ final class ColumnValidator
         $options = $column->importField->options ?? [];
         $validValues = array_column($options, 'value');
 
+        // For multi-choice fields, validate each value separately
+        if ($column->getType()->isMultiChoiceField()) {
+            $values = array_filter(array_map('trim', explode(',', $value)));
+            $errors = [];
+
+            foreach ($values as $item) {
+                if (! in_array($item, $validValues, true)) {
+                    $errors[$item] = 'Not a valid option';
+                }
+            }
+
+            return ! empty($errors) ? ValidationError::itemErrors($errors) : null;
+        }
+
+        // Single choice field
         if (in_array($value, $validValues, true)) {
             return null;
         }

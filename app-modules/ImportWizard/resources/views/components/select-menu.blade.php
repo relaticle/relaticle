@@ -1,6 +1,5 @@
 @props([
     'options' => [],
-    'invalidOptions' => [],
     'multiple' => false,
     'searchable' => true,
     'placeholder' => 'Select...',
@@ -13,37 +12,20 @@
 ])
 
 @php
-    // Normalize options to consistent format: [{value, label, description?}]
+    // Normalize options to consistent format: [{value, label, description?, invalid?}]
     $normalizedOptions = collect($options)->map(function ($option, $key) {
         if (is_array($option) && isset($option['value'])) {
             return [
                 'value' => $option['value'],
                 'label' => (string) ($option['label'] ?? $option['value']),
                 'description' => isset($option['description']) ? (string) $option['description'] : null,
+                'invalid' => ! empty($option['invalid']),
             ];
         }
         if (is_string($key)) {
-            return ['value' => $key, 'label' => (string) $option, 'description' => null];
+            return ['value' => $key, 'label' => (string) $option, 'description' => null, 'invalid' => false];
         }
-        return ['value' => $option, 'label' => (string) $option, 'description' => null];
-    })->values()->all();
-
-    // Normalize invalid options with error flag
-    $normalizedInvalidOptions = collect($invalidOptions)->map(function ($option) {
-        if (is_array($option) && isset($option['value'])) {
-            return [
-                'value' => $option['value'],
-                'label' => (string) ($option['label'] ?? $option['value']),
-                'description' => $option['error'] ?? 'Invalid value',
-                'invalid' => true,
-            ];
-        }
-        return [
-            'value' => $option,
-            'label' => (string) $option,
-            'description' => 'Invalid value',
-            'invalid' => true,
-        ];
+        return ['value' => $option, 'label' => (string) $option, 'description' => null, 'invalid' => false];
     })->values()->all();
 
     // Extract wire:model for Livewire integration
@@ -63,7 +45,6 @@
         state: @if($wireModel) $wire.$entangle('{{ $wireModel }}'{{ $hasLiveModifier ? ', { live: true }' : '' }}) @else @js($value ?? ($multiple ? [] : null)) @endif,
         multiple: @js($multiple),
         options: @js($normalizedOptions),
-        invalidOptions: @js($normalizedInvalidOptions),
         disabled: @js($disabled),
         searchable: @js($searchable),
         activeIndex: -1,
@@ -123,14 +104,20 @@
             return this.selected !== null && this.selected !== undefined && this.selected !== '';
         },
 
-        get allOptions() {
-            return [...this.invalidOptions, ...this.options];
+        get isMissingSingleSelect() {
+            if (this.multiple) return false;
+            if (!this.hasValue) return false;
+            return !this.getOption(this.selected);
         },
 
         get filteredOptions() {
-            if (!this.search || !this.search.trim()) return this.allOptions;
+            // Filter out invalid options that aren't selected (they disappear when unselected)
+            let opts = this.options.filter(o => !o.invalid || this.isSelected(o.value));
+
+            // Apply search filter
+            if (!this.search || !this.search.trim()) return opts;
             const q = this.search.toLowerCase().trim();
-            return this.allOptions.filter(o => {
+            return opts.filter(o => {
                 const label = String(o.label || '').toLowerCase();
                 const desc = o.description ? String(o.description).toLowerCase() : '';
                 return label.includes(q) || desc.includes(q);
@@ -176,6 +163,8 @@
             if (!this.open) return;
             this.$refs.panel?.close?.();
             this.open = false;
+            // Dispatch change event when closing (useful for syncing multi-select on close)
+            this.$dispatch('change', this.selected);
         },
 
         select(value) {
@@ -190,6 +179,15 @@
                 this.announceSelection(value);
                 this.$dispatch('input', current);
             } else {
+                // Single-select: clicking already-selected invalid option clears selection
+                const option = this.options.find(o => this.valuesEqual(o.value, value));
+                if (this.isSelected(value) && option?.invalid) {
+                    this.open = false;
+                    this.selected = null;
+                    this.$dispatch('input', null);
+                    return;
+                }
+
                 // Close first (instantly) to avoid transition collision with Livewire
                 // When entangled with wire:model.live, setting selected triggers Livewire
                 // which morphs the DOM while leave transition would still be animating
@@ -214,7 +212,7 @@
         },
 
         getOption(value) {
-            return this.allOptions.find(o => this.valuesEqual(o.value, value)) || null;
+            return this.options.find(o => this.valuesEqual(o.value, value)) || null;
         },
 
         getOptionId(index) {
@@ -411,15 +409,24 @@
             />
         @endif
 
-        <span class="flex-1 text-left truncate text-sm">
+        <span class="flex-1 text-left truncate text-sm min-w-0">
             @if ($inlineLabel)
                 <span class="text-gray-500 dark:text-gray-400">{{ $inlineLabel }}</span>
             @endif
-            <span
-                :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
-                :title="displayText"
-                x-text="displayText || '{{ $placeholder }}'"
-            ></span>
+            {{-- Missing single-select: show warning badge --}}
+            <template x-if="isMissingSingleSelect">
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning-50 text-warning-700 dark:bg-warning-950/50 dark:text-warning-400">
+                    Missing select option
+                </span>
+            </template>
+            {{-- Normal display --}}
+            <template x-if="!isMissingSingleSelect">
+                <span
+                    :class="hasValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'"
+                    :title="displayText"
+                    x-text="displayText || '{{ $placeholder }}'"
+                ></span>
+            </template>
         </span>
 
         <x-filament::icon
@@ -477,7 +484,7 @@
                     :data-highlighted="activeIndex === index ? '' : undefined"
                     :data-selected="isSelected(option.value) ? '' : undefined"
                     :data-invalid="option.invalid ? '' : undefined"
-                    x-on:click="select(option.value)"
+                    x-on:click.stop="select(option.value)"
                     x-on:mouseenter="activeIndex = index"
                     class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
                     :class="activeIndex === index
@@ -485,22 +492,11 @@
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'"
                 >
                     <div class="flex items-center gap-1.5">
-                        {{-- Checkmark for valid options --}}
-                        <template x-if="!option.invalid">
-                            <span
-                                class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
-                                :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
-                                aria-hidden="true"
-                            >
-                                <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                            </span>
-                        </template>
-
                         {{-- Invalid option: badge style --}}
                         <template x-if="option.invalid">
                             <span
-                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-400"
-                                :title="option.description"
+                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-400 min-w-0 max-w-[70%]"
+                                :title="option.label + ' - ' + option.description"
                             >
                                 <x-heroicon-o-exclamation-triangle class="size-3 shrink-0" aria-hidden="true" />
                                 <span class="truncate" x-text="option.label"></span>
@@ -511,6 +507,20 @@
                         <template x-if="!option.invalid">
                             <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
                         </template>
+
+                        {{-- Spacer to push checkmark right --}}
+                        <template x-if="option.invalid">
+                            <span class="flex-1"></span>
+                        </template>
+
+                        {{-- Checkmark on right for all options --}}
+                        <span
+                            class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
+                            :class="isSelected(option.value) ? 'opacity-100' : 'opacity-0'"
+                            aria-hidden="true"
+                        >
+                            <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                        </span>
                     </div>
                 </li>
             </template>
