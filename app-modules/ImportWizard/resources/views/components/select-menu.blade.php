@@ -480,22 +480,12 @@
                     x-on:click="select(option.value)"
                     x-on:mouseenter="activeIndex = index"
                     class="w-full text-left px-2.5 py-2 rounded-md transition-colors cursor-pointer"
-                    :class="[
-                        option.invalid
-                            ? (activeIndex === index
-                                ? 'bg-danger-100 dark:bg-danger-900/50 text-danger-900 dark:text-danger-100'
-                                : 'bg-danger-50 dark:bg-danger-950/30 text-danger-700 dark:text-danger-300 hover:bg-danger-100 dark:hover:bg-danger-900/50')
-                            : (activeIndex === index
-                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
-                    ]"
+                    :class="activeIndex === index
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'"
                 >
                     <div class="flex items-center gap-1.5">
-                        <template x-if="option.invalid">
-                            <span class="w-4 h-4 shrink-0 flex items-center justify-center" aria-hidden="true">
-                                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-danger-500" />
-                            </span>
-                        </template>
+                        {{-- Checkmark for valid options --}}
                         <template x-if="!option.invalid">
                             <span
                                 class="w-4 h-4 shrink-0 flex items-center justify-center transition-opacity duration-75"
@@ -505,15 +495,23 @@
                                 <x-filament::icon icon="heroicon-s-check" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
                             </span>
                         </template>
-                        <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
+
+                        {{-- Invalid option: badge style --}}
+                        <template x-if="option.invalid">
+                            <span
+                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-400"
+                                :title="option.description"
+                            >
+                                <x-heroicon-o-exclamation-triangle class="size-3 shrink-0" aria-hidden="true" />
+                                <span class="truncate" x-text="option.label"></span>
+                            </span>
+                        </template>
+
+                        {{-- Valid option: plain text --}}
+                        <template x-if="!option.invalid">
+                            <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
+                        </template>
                     </div>
-                    <template x-if="option.description">
-                        <p
-                            class="text-[11px] mt-0.5 ml-[22px]"
-                            :class="option.invalid ? 'text-danger-600 dark:text-danger-400' : 'text-gray-500 dark:text-gray-400'"
-                            x-text="option.description"
-                        ></p>
-                    </template>
                 </li>
             </template>
 
