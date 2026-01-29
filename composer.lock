@@ -7077,7 +7077,7 @@
             "dist": {
                 "type": "path",
                 "url": "../custom-fields",
-                "reference": "90c41dd115db5634883a26f30e08d255260ec1b4"
+                "reference": "6c77a0b5dc40898ecdef591346003f06a0096c69"
             },
             "require": {
                 "filament/filament": "^5.0",
@@ -7214,7 +7214,7 @@
             "dist": {
                 "type": "path",
                 "url": "../flowforge",
-                "reference": "2d5731ee08ac629f00458609f2035c0dd8d355e7"
+                "reference": "9918d1af46609cc416d09823229b1f4d341567fa"
             },
             "require": {
                 "ext-bcmath": "*",
@@ -16309,6 +16309,70 @@
                 }
             ],
             "time": "2025-02-07T05:00:38+00:00"
+        },
+        {
+            "name": "spatie/boost-spatie-guidelines",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/boost-spatie-guidelines.git",
+                "reference": "44a206c5225e264e9096909b4dcba1a9bb12e6da"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/boost-spatie-guidelines/zipball/44a206c5225e264e9096909b4dcba1a9bb12e6da",
+                "reference": "44a206c5225e264e9096909b4dcba1a9bb12e6da",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^8.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0|^4.0",
+                "phpstan/phpstan": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Spatie\\BoostSpatieGuidelines\\BoostSpatieGuidelinesServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\BoostSpatieGuidelines\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Spatie's Laravel & PHP coding guidelines for Laravel Boost",
+            "homepage": "https://github.com/spatie/boost-spatie-guidelines",
+            "keywords": [
+                "boost",
+                "coding-standards",
+                "guidelines",
+                "laravel",
+                "spatie"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/boost-spatie-guidelines/issues",
+                "source": "https://github.com/spatie/boost-spatie-guidelines/tree/v1.0.0"
+            },
+            "time": "2026-01-26T19:21:06+00:00"
         },
         {
             "name": "staabm/side-effects-detector",

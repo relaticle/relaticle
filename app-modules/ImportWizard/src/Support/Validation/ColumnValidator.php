@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Support\Validation;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 
-/**
- * Validates column values based on column configuration.
- *
- * Handles dates, numbers, choices, multi-value fields, and text validation
- * using a match expression to route to the appropriate validation logic.
- */
 final class ColumnValidator
 {
     public function validate(ColumnData $column, string $value): ?ValidationError
     {
+        $type = $column->getType();
+
         return match (true) {
-            $column->getType()->isDateOrDateTime() => $this->validateDate($column, $value),
-            $column->getType()->isFloat() => $this->validateNumber($column, $value),
-            $column->isRealChoiceField() => $this->validateChoice($column, $value),
+            $type->isDateOrDateTime() => $this->validateDate($column, $value),
+            $type->isFloat() => $this->validateNumber($column, $value),
+            $type->isMultiChoiceField() => $this->validateMultiChoice($column, $value),
+            $column->isRealChoiceField() => $this->validateSingleChoice($column, $value),
             $column->isMultiValueArbitrary() => $this->validateMultiValue($column, $value),
             default => $this->validateText($column, $value),
         };
@@ -31,103 +29,124 @@ final class ColumnValidator
     private function validateDate(ColumnData $column, string $value): ?ValidationError
     {
         $format = $column->dateFormat ?? DateFormat::ISO;
-        $parsed = $format->parse($value, $column->getType()->isTimestamp());
 
-        return $parsed === null
-            ? ValidationError::message("Invalid date format. Expected: {$format->getLabel()}")
-            : null;
+        if ($format->parse($value, $column->getType()->isTimestamp()) === null) {
+            return ValidationError::message("Invalid date format. Expected: {$format->getLabel()}");
+        }
+
+        return null;
     }
 
     private function validateNumber(ColumnData $column, string $value): ?ValidationError
     {
         $format = $column->numberFormat ?? NumberFormat::POINT;
-        $parsed = $format->parse($value);
 
-        return $parsed === null
-            ? ValidationError::message("Invalid number format. Expected: {$format->getLabel()}")
-            : null;
-    }
-
-    private function validateChoice(ColumnData $column, string $value): ?ValidationError
-    {
-        $options = $column->importField->options ?? [];
-        $validValues = array_column($options, 'value');
-
-        // For multi-choice fields, validate each value separately
-        if ($column->getType()->isMultiChoiceField()) {
-            $values = array_filter(array_map('trim', explode(',', $value)));
-            $errors = [];
-
-            foreach ($values as $item) {
-                if (! in_array($item, $validValues, true)) {
-                    $errors[$item] = 'Not a valid option';
-                }
-            }
-
-            return ! empty($errors) ? ValidationError::itemErrors($errors) : null;
+        if ($format->parse($value) === null) {
+            return ValidationError::message("Invalid number format. Expected: {$format->getLabel()}");
         }
 
-        // Single choice field
+        return null;
+    }
+
+    private function validateSingleChoice(ColumnData $column, string $value): ?ValidationError
+    {
+        $validValues = $this->getValidChoiceValues($column);
+
         if (in_array($value, $validValues, true)) {
             return null;
         }
 
-        $optionsList = implode(', ', array_slice($validValues, 0, 5));
-        $suffix = count($validValues) > 5 ? '...' : '';
+        return ValidationError::message($this->formatInvalidChoiceMessage($validValues));
+    }
 
-        return ValidationError::message("Invalid choice. Must be one of: {$optionsList}{$suffix}");
+    private function validateMultiChoice(ColumnData $column, string $value): ?ValidationError
+    {
+        $validValues = $this->getValidChoiceValues($column);
+
+        $errors = $this->parseCommaSeparated($value)
+            ->reject(fn (string $item) => in_array($item, $validValues, true))
+            ->mapWithKeys(fn (string $item) => [$item => 'Not a valid option'])
+            ->all();
+
+        if ($errors !== []) {
+            return ValidationError::itemErrors($errors);
+        }
+
+        return null;
     }
 
     private function validateMultiValue(ColumnData $column, string $value): ?ValidationError
     {
         $rules = $this->getPreviewRules($column);
 
-        if (empty($rules)) {
+        if ($rules === []) {
             return null;
         }
 
-        $errors = [];
+        $errors = $this->parseCommaSeparated($value)
+            ->mapWithKeys(fn (string $item) => [$item => $this->runValidator($item, $rules)])
+            ->filter()
+            ->all();
 
-        foreach (array_filter(array_map('trim', explode(',', $value))) as $item) {
-            $error = $this->runValidator($item, $rules);
-
-            if ($error !== null) {
-                $errors[$item] = $error;
-            }
+        if ($errors !== []) {
+            return ValidationError::itemErrors($errors);
         }
 
-        return ! empty($errors) ? ValidationError::itemErrors($errors) : null;
+        return null;
     }
 
     private function validateText(ColumnData $column, string $value): ?ValidationError
     {
         $rules = $this->getPreviewRules($column);
 
-        if (empty($rules)) {
+        if ($rules === []) {
             return null;
         }
 
         $error = $this->runValidator($value, $rules);
 
-        return $error !== null ? ValidationError::message($error) : null;
+        if ($error !== null) {
+            return ValidationError::message($error);
+        }
+
+        return null;
     }
 
-    /**
-     * Get rules for preview validation (excluding required/nullable).
-     *
-     * @return array<string>
-     */
+    /** @return Collection<int, non-falsy-string> */
+    private function parseCommaSeparated(string $value): Collection
+    {
+        return str($value)
+            ->explode(',')
+            ->map(fn (string $v) => trim($v))
+            ->filter()
+            ->values();
+    }
+
+    /** @return array<int, string> */
+    private function getValidChoiceValues(ColumnData $column): array
+    {
+        return collect($column->importField->options ?? [])->pluck('value')->all();
+    }
+
+    /** @param array<int, string> $validValues */
+    private function formatInvalidChoiceMessage(array $validValues): string
+    {
+        $preview = collect($validValues)->take(5)->implode(', ');
+        $suffix = count($validValues) > 5 ? '...' : '';
+
+        return "Invalid choice. Must be one of: {$preview}{$suffix}";
+    }
+
+    /** @return array<int, string> */
     private function getPreviewRules(ColumnData $column): array
     {
-        return array_filter(
-            $column->getRules(),
-            fn (string $rule): bool => ! in_array($rule, ['required', 'nullable'], true)
-        );
+        return collect($column->getRules())
+            ->reject(fn (string $rule) => in_array($rule, ['required', 'nullable'], true))
+            ->values()
+            ->all();
     }
 
-    /**
-     * @param  array<int, string>  $rules
-     */
+    /** @param array<int, string> $rules */
     private function runValidator(string $value, array $rules): ?string
     {
         $validator = Validator::make(['value' => $value], ['value' => $rules]);
@@ -136,9 +155,6 @@ final class ColumnValidator
             return null;
         }
 
-        /** @var array<int, string> $errors */
-        $errors = $validator->errors()->get('value');
-
-        return $errors[0] ?? 'Invalid value';
+        return $validator->errors()->first('value');
     }
 }
