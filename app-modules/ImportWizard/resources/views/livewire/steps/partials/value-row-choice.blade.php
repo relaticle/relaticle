@@ -7,7 +7,8 @@
     $selectedValue = $isMulti
         ? collect(explode(', ', $mappedValue))->filter()->values()->all()
         : $mappedValue;
-    $rowKey = 'choice-' . crc32($rawValue);
+    $valueHash = is_array($selectedValue) ? implode(',', $selectedValue) : ($selectedValue ?? '');
+    $rowKey = 'choice-' . crc32($rawValue . '-' . $valueHash);
 @endphp
 
 <div
