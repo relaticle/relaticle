@@ -35,7 +35,7 @@
     @endunless
 
     <div class="flex-1 min-w-0">
-        <x-select-menu
+        <x-import-wizard-new::select-menu
             :options="$options"
             :multiple="$isMulti"
             :searchable="count($options) > 5"

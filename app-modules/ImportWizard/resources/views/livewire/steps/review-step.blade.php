@@ -82,7 +82,7 @@
 
                     @if (!$this->isSelectedColumnValidating)
                         @if ($this->selectedColumn->getType()->isDateOrDateTime())
-                            <x-select-menu
+                            <x-import-wizard-new::select-menu
                                 wire:key="date-format-{{ $this->selectedColumn->getType()->value }}"
                                 :options="DateFormat::toOptions($this->selectedColumn->getType()->isTimestamp())"
                                 :searchable="false"
@@ -94,7 +94,7 @@
                         @endif
 
                         @if ($this->selectedColumn->getType()->isFloat())
-                            <x-select-menu
+                            <x-import-wizard-new::select-menu
                                 :options="NumberFormat::toOptions()"
                                 :searchable="false"
                                 inline-label="Decimal separator:"

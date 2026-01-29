@@ -29,7 +29,7 @@
     class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
 >
     <div class="flex-1 min-w-0">
-        <x-multi-value-input
+        <x-import-wizard-new::multi-value-input
             :value="$mappedValue"
             :input-type="$inputType"
             :placeholder="$placeholder"
