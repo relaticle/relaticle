@@ -291,6 +291,8 @@ final class ReviewStep extends Component
         ", [$jsonPath, $newValue, $jsonPath, $rawValue]);
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
+
+        unset($this->columnErrorStatuses);
     }
 
     /**
@@ -309,6 +311,8 @@ final class ReviewStep extends Component
         ', [$jsonPath, $jsonPath, $rawValue]);
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
+
+        unset($this->columnErrorStatuses);
     }
 
     /**
@@ -323,6 +327,8 @@ final class ReviewStep extends Component
             SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true'))
             WHERE json_extract(raw_data, ?) = ?
         ", [$jsonPath, $jsonPath, $rawValue]);
+
+        unset($this->columnErrorStatuses);
     }
 
     /**
@@ -337,6 +343,8 @@ final class ReviewStep extends Component
             SET skipped = json_remove(skipped, ?)
             WHERE json_extract(raw_data, ?) = ?
         ', [$jsonPath, $jsonPath, $rawValue]);
+
+        unset($this->columnErrorStatuses);
     }
 
     /**
