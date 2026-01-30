@@ -88,13 +88,9 @@ final class ColumnData extends Data implements Wireable
      * Returns false for fields like email/phone that use MULTI_CHOICE type
      * but accept arbitrary values without predefined options.
      */
-    public function isRealChoiceField(): bool
+    public function isMultiChoicePredefined(): bool
     {
-        if (! $this->getType()->isChoiceField()) {
-            return false;
-        }
-
-        return ! ($this->importField?->acceptsArbitraryValues ?? false);
+        return $this->getType()->isMultiChoiceField() && ! ($this->importField?->acceptsArbitraryValues ?? false);
     }
 
     /**
@@ -103,13 +99,9 @@ final class ColumnData extends Data implements Wireable
      * Used for email, phone, tags - fields that can have multiple comma-separated values
      * but don't have predefined options to choose from.
      */
-    public function isMultiValueArbitrary(): bool
+    public function isMultiChoiceArbitrary(): bool
     {
-        if (! $this->getType()->isChoiceField()) {
-            return false;
-        }
-
-        return $this->importField?->acceptsArbitraryValues ?? false;
+        return $this->getType()->isMultiChoiceField() && $this->importField?->acceptsArbitraryValues ?? false;
     }
 
     /**

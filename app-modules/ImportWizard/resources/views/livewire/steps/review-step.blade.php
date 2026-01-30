@@ -309,9 +309,9 @@
                                     @include('import-wizard-new::livewire.steps.partials.value-row-date', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                                 @elseif ($this->selectedColumn->getType()->isFloat())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-number', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
-                                @elseif ($this->selectedColumn->isRealChoiceField())
+                                @elseif ($this->selectedColumn->isMultiChoicePredefined())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-choice', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
-                                @elseif ($this->selectedColumn->isMultiValueArbitrary())
+                                @elseif ($this->selectedColumn->isMultiChoiceArbitrary())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-multi-value', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                                 @else
                                     @include('import-wizard-new::livewire.steps.partials.value-row-text', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))

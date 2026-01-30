@@ -24,6 +24,22 @@ abstract class ImportPage extends Page
     protected static bool $shouldRegisterNavigation = false;
 
     /**
+     * Check if the user can access the import page.
+     *
+     * Delegates to the resource's canCreate authorization if available.
+     */
+    public static function canAccess(): bool
+    {
+        $resourceClass = static::getResourceClass();
+
+        if (method_exists($resourceClass, 'canCreate')) {
+            return $resourceClass::canCreate();
+        }
+
+        return true;
+    }
+
+    /**
      * Get the entity type for this import page.
      */
     abstract public static function getEntityType(): ImportEntityType;

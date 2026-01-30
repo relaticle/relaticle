@@ -31,11 +31,12 @@ final class ValidateColumnJob implements ShouldQueue
     public function __construct(
         private readonly string $importId,
         private readonly ColumnData $column,
+        private readonly ?string $teamId = null,
     ) {}
 
     public function handle(): void
     {
-        $store = ImportStore::load($this->importId);
+        $store = ImportStore::load($this->importId, $this->teamId);
 
         if ($store === null) {
             return;

@@ -136,7 +136,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function cancelImport(): void
     {
         if ($this->storeId !== null) {
-            ImportStore::load($this->storeId)?->destroy();
+            ImportStore::load($this->storeId, $this->getCurrentTeamId())?->destroy();
         }
 
         if ($this->returnUrl !== null) {
@@ -161,12 +161,19 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function startOver(): void
     {
         if ($this->storeId !== null) {
-            ImportStore::load($this->storeId)?->destroy();
+            ImportStore::load($this->storeId, $this->getCurrentTeamId())?->destroy();
         }
 
         $this->storeId = null;
         $this->rowCount = 0;
         $this->columnCount = 0;
         $this->currentStep = self::STEP_UPLOAD;
+    }
+
+    private function getCurrentTeamId(): ?string
+    {
+        $tenant = filament()->getTenant();
+
+        return $tenant !== null ? (string) $tenant->getKey() : null;
     }
 }

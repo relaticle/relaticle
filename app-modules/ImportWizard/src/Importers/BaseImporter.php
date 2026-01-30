@@ -191,10 +191,10 @@ abstract class BaseImporter implements ImporterContract
         $fields = $customFields->map(function (CustomField $customField) use ($validationService): ImportField {
             // For multi-value arbitrary fields (email, phone), use item-level rules
             // since CSV values are strings that may be comma-separated
-            $isMultiValueArbitrary = $customField->typeData->dataType->isChoiceField()
+            $isMultiChoiceArbitrary = $customField->typeData->dataType->isMultiChoiceField()
                 && $customField->typeData->acceptsArbitraryValues;
 
-            $rules = $isMultiValueArbitrary
+            $rules = $isMultiChoiceArbitrary
                 ? $validationService->getItemValidationRules($customField)
                 : $validationService->getValidationRules($customField);
 

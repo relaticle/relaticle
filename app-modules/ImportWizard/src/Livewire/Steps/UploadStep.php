@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -44,7 +45,9 @@ final class UploadStep extends Component implements HasForms
     {
         $this->entityType = $entityType;
         $this->storeId = $storeId;
-        $this->store = $storeId !== null ? ImportStore::load($storeId) : null;
+        $this->store = $storeId !== null
+            ? ImportStore::load($storeId, $this->getCurrentTeamId())
+            : null;
 
         if ($this->store === null) {
             return;
@@ -53,6 +56,13 @@ final class UploadStep extends Component implements HasForms
         $this->headers = $this->store->headers();
         $this->rowCount = $this->store->rowCount();
         $this->isParsed = true;
+    }
+
+    private function getCurrentTeamId(): ?string
+    {
+        $tenant = filament()->getTenant();
+
+        return $tenant !== null ? (string) $tenant->getKey() : null;
     }
 
     public function render(): View
@@ -113,7 +123,8 @@ final class UploadStep extends Component implements HasForms
             $this->rowCount = $rowCount;
             $this->isParsed = true;
         } catch (\Exception $e) {
-            $this->addError('uploadedFile', 'Invalid CSV file: '.$e->getMessage());
+            report($e);
+            $this->addError('uploadedFile', 'Unable to process this file. Please check the format and try again.');
         }
     }
 
@@ -172,9 +183,10 @@ final class UploadStep extends Component implements HasForms
 
             $this->dispatch('completed', storeId: $this->store->id(), rowCount: $rowCount, columnCount: count($this->headers));
         } catch (\Exception $e) {
+            report($e);
             $this->store?->destroy();
             $this->store = null;
-            $this->addError('uploadedFile', 'Failed to process file: '.$e->getMessage());
+            $this->addError('uploadedFile', 'Unable to process this file. Please try again or use a different file.');
         }
     }
 

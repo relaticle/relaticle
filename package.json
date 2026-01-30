@@ -3,6 +3,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "prebuild": "rm -f public/hot",
         "build": "vite build"
     },
     "devDependencies": {

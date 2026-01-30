@@ -20,8 +20,8 @@ final class ColumnValidator
             $type->isDateOrDateTime() => $this->validateDate($column, $value),
             $type->isFloat() => $this->validateNumber($column, $value),
             $type->isMultiChoiceField() => $this->validateMultiChoice($column, $value),
-            $column->isRealChoiceField() => $this->validateSingleChoice($column, $value),
-            $column->isMultiValueArbitrary() => $this->validateMultiValue($column, $value),
+            $column->isMultiChoicePredefined() => $this->validateSingleChoice($column, $value),
+            $column->isMultiChoiceArbitrary() => $this->validateMultiValue($column, $value),
             default => $this->validateText($column, $value),
         };
     }

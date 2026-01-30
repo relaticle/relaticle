@@ -77,12 +77,23 @@ final class ImportStore
 
     /**
      * Load an existing import session.
+     *
+     * @param string $id The import session ULID
+     * @param string $expectedTeamId Verifies the import belongs to this team
+     * @throws FileNotFoundException
      */
-    public static function load(string $id): ?self
+    public static function load(string $id, string $expectedTeamId): ?self
     {
         $store = new self($id);
 
         if (! File::exists($store->metaPath())) {
+            return null;
+        }
+
+        $content = File::get($store->metaPath());
+        $meta = json_decode($content, true);
+
+        if (($meta['team_id'] ?? null) !== $expectedTeamId) {
             return null;
         }
 

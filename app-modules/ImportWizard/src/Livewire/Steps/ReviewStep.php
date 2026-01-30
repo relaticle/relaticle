@@ -122,7 +122,7 @@ final class ReviewStep extends Component
     private function validateColumnAsync(ColumnData $column): string
     {
         $batch = Bus::batch([
-            new ValidateColumnJob($this->store()->id(), $column),
+            new ValidateColumnJob($this->store()->id(), $column, $this->store()->teamId()),
         ])
             ->name("Validate {$column->source}")
             ->dispatch();
@@ -205,7 +205,7 @@ final class ReviewStep extends Component
     #[Computed]
     public function choiceOptions(): array
     {
-        if (! $this->selectedColumn->isRealChoiceField()) {
+        if (! $this->selectedColumn->isMultiChoicePredefined()) {
             return [];
         }
 
