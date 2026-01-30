@@ -281,6 +281,12 @@ final class ReviewStep extends Component
      */
     public function updateMappedValue(string $rawValue, string $newValue): void
     {
+        if (blank($newValue)) {
+            $this->skipValue($rawValue);
+
+            return;
+        }
+
         $error = $this->validateValue($this->selectedColumn, $newValue, isCorrection: true);
         $jsonPath = '$.'.$this->selectedColumn->source;
 
@@ -317,16 +323,24 @@ final class ReviewStep extends Component
 
     /**
      * Skip a value (set to null during import).
+     *
+     * Also removes any corrections to ensure unskipping returns to the original
+     * raw value with original validation errors (clean slate behavior).
      */
     public function skipValue(string $rawValue): void
     {
         $jsonPath = '$.'.$this->selectedColumn->source;
 
+        $error = $this->validateValue($this->selectedColumn, $rawValue, isCorrection: false);
+
         $this->connection()->statement("
             UPDATE import_rows
-            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true'))
+            SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true')),
+                corrections = json_remove(corrections, ?)
             WHERE json_extract(raw_data, ?) = ?
-        ", [$jsonPath, $jsonPath, $rawValue]);
+        ", [$jsonPath, $jsonPath, $jsonPath, $rawValue]);
+
+        $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
 
         unset($this->columnErrorStatuses);
     }

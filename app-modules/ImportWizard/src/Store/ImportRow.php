@@ -188,7 +188,9 @@ final class ImportRow extends Model
     {
         match ($filter) {
             ReviewFilter::All => null,
-            ReviewFilter::NeedsReview => $query->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column]),
+            ReviewFilter::NeedsReview => $query
+                ->whereRaw('json_extract(validation, ?) IS NOT NULL', ['$.'.$column])
+                ->whereRaw('json_extract(skipped, ?) IS NULL', ['$.'.$column]),
             ReviewFilter::Modified => $query
                 ->whereRaw('json_extract(corrections, ?) IS NOT NULL', ['$.'.$column])
                 ->whereRaw('json_extract(skipped, ?) IS NULL', ['$.'.$column]),
@@ -215,6 +217,7 @@ final class ImportRow extends Model
                 COUNT(DISTINCT json_extract(raw_data, ?)) as all_count,
                 COUNT(DISTINCT CASE
                     WHEN json_extract(validation, ?) IS NOT NULL
+                     AND json_extract(skipped, ?) IS NULL
                     THEN json_extract(raw_data, ?)
                 END) as needs_review_count,
                 COUNT(DISTINCT CASE
@@ -226,7 +229,7 @@ final class ImportRow extends Model
                     WHEN json_extract(skipped, ?) IS NOT NULL
                     THEN json_extract(raw_data, ?)
                 END) as skipped_count
-            ', [$jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath])
+            ', [$jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath, $jsonPath])
             ->first();
 
         return [
@@ -254,7 +257,8 @@ final class ImportRow extends Model
         $bindings = [];
 
         foreach ($columns as $column) {
-            $selectParts[] = 'MAX(CASE WHEN json_extract(validation, ?) IS NOT NULL THEN 1 ELSE 0 END) as '.$query->getGrammar()->wrap("has_error_{$column}");
+            $selectParts[] = 'MAX(CASE WHEN json_extract(validation, ?) IS NOT NULL AND json_extract(skipped, ?) IS NULL THEN 1 ELSE 0 END) as '.$query->getGrammar()->wrap("has_error_{$column}");
+            $bindings[] = '$.'.$column;
             $bindings[] = '$.'.$column;
         }
 

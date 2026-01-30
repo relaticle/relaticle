@@ -43,6 +43,6 @@
         :selected-column="$selectedColumn"
         :raw-value="$rawValue"
         :has-correction="$hasCorrection"
-        :show-undo="$hasErrors || $hasCorrection"
+        :show-undo="$hasCorrection"
     />
 </div>
