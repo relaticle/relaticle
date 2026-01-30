@@ -83,7 +83,7 @@ final class ColumnData extends Data implements Wireable
     }
 
     /**
-     * Check if this is a choice field with predefined options.
+     * Check if this is a MULTI_CHOICE field with predefined options (not arbitrary).
      *
      * Returns false for fields like email/phone that use MULTI_CHOICE type
      * but accept arbitrary values without predefined options.
@@ -94,11 +94,13 @@ final class ColumnData extends Data implements Wireable
     }
 
     /**
-     * Check if this is a multi-value field that accepts arbitrary values.
-     *
-     * Used for email, phone, tags - fields that can have multiple comma-separated values
-     * but don't have predefined options to choose from.
+     * Check if this is a SINGLE_CHOICE field with predefined options.
      */
+    public function isSingleChoicePredefined(): bool
+    {
+        return $this->getType()->isChoiceField() && ! $this->getType()->isMultiChoiceField();
+    }
+
     public function isMultiChoiceArbitrary(): bool
     {
         return $this->getType()->isMultiChoiceField() && $this->importField?->acceptsArbitraryValues ?? false;

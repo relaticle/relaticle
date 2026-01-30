@@ -19,9 +19,9 @@ final class ColumnValidator
         return match (true) {
             $type->isDateOrDateTime() => $this->validateDate($column, $value),
             $type->isFloat() => $this->validateNumber($column, $value),
-            $type->isMultiChoiceField() => $this->validateMultiChoice($column, $value),
-            $column->isMultiChoicePredefined() => $this->validateSingleChoice($column, $value),
-            $column->isMultiChoiceArbitrary() => $this->validateMultiValue($column, $value),
+            $column->isMultiChoiceArbitrary() => $this->validateMultiChoiceArbitrary($column, $value),
+            $column->isMultiChoicePredefined() => $this->validateMultiChoicePredefined($column, $value),
+            $column->isSingleChoicePredefined() => $this->validateSingleChoice($column, $value),
             default => $this->validateText($column, $value),
         };
     }
@@ -59,7 +59,7 @@ final class ColumnValidator
         return ValidationError::message($this->formatInvalidChoiceMessage($validValues));
     }
 
-    private function validateMultiChoice(ColumnData $column, string $value): ?ValidationError
+    private function validateMultiChoicePredefined(ColumnData $column, string $value): ?ValidationError
     {
         $validValues = $this->getValidChoiceValues($column);
 
@@ -75,7 +75,7 @@ final class ColumnValidator
         return null;
     }
 
-    private function validateMultiValue(ColumnData $column, string $value): ?ValidationError
+    private function validateMultiChoiceArbitrary(ColumnData $column, string $value): ?ValidationError
     {
         $rules = $this->getPreviewRules($column);
 
