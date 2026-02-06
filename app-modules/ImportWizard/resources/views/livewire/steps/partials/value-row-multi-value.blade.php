@@ -19,22 +19,24 @@
         'url' => 'Add URL...',
         default => 'Add value...',
     };
-    $rowKey = 'multi-value-' . crc32($rawValue . '|' . $mappedValue);
+    $rowKey = 'multi-value-' . crc32($rawValue);
+    $uniqueId = 'mvi-' . crc32($rawValue);
 @endphp
 
 <div
     wire:key="{{ $rowKey }}"
     x-data="{ rawValue: @js($rawValue) }"
-    x-on:multi-value-change="$wire.updateMappedValue(rawValue, $event.detail)"
+    x-on:multi-value-change.debounce.300ms="$wire.updateMappedValue(rawValue, $event.detail)"
     class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
 >
-    <div class="flex-1 min-w-0">
+    <div class="flex-1 min-w-0" wire:ignore>
         <x-import-wizard-new::multi-value-input
             :value="$mappedValue"
             :input-type="$inputType"
             :placeholder="$placeholder"
             :errors="$perValueErrors"
             :borderless="true"
+            :unique-id="$uniqueId"
             event-name="multi-value-change"
         />
     </div>

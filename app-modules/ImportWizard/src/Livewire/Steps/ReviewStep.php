@@ -23,6 +23,7 @@ use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
+use Relaticle\ImportWizard\Support\Validation\ValidationError;
 
 /**
  * Step 3: Value review.
@@ -298,7 +299,31 @@ final class ReviewStep extends Component
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
 
+        $this->dispatchValidationUpdate($rawValue, $error);
+
         unset($this->columnErrorStatuses);
+    }
+
+    /**
+     * Dispatch validation errors back to Alpine component via Livewire event.
+     *
+     * Used with wire:ignore to sync validation state without re-rendering the multi-value input.
+     */
+    private function dispatchValidationUpdate(string $rawValue, ?string $error): void
+    {
+        if (! $this->selectedColumn->isMultiChoiceArbitrary()) {
+            return;
+        }
+
+        $uniqueId = 'mvi-'.crc32($rawValue);
+        $perValueErrors = [];
+
+        if ($error !== null) {
+            $validationError = ValidationError::fromStorageFormat($error);
+            $perValueErrors = $validationError?->getItemErrors() ?? [];
+        }
+
+        $this->dispatch('validation-updated', id: $uniqueId, errors: $perValueErrors);
     }
 
     /**

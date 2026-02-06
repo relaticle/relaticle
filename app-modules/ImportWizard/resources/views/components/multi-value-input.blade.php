@@ -6,6 +6,7 @@
     'borderless' => false,
     'errors' => [],
     'eventName' => 'input',
+    'uniqueId' => null,
 ])
 
 @php
@@ -32,21 +33,38 @@
         inputType: @js($inputType),
         linkPrefix: @js($linkPrefix),
         eventName: @js($eventName),
+        uniqueId: @js($uniqueId),
         maxVisibleValues: 3,
+        open: false,
         documentClickListener: null,
+        validationListener: null,
 
         init() {
             this.documentClickListener = (event) => {
-                if (this.isOpen() && !this.$el.contains(event.target)) {
+                if (!this.isOpen()) return;
+                const clickedInTrigger = this.$el.contains(event.target);
+                const clickedInPanel = this.$refs.panel?.contains(event.target);
+                if (!clickedInTrigger && !clickedInPanel) {
                     this.closePanel();
                 }
             };
             document.addEventListener('click', this.documentClickListener);
+
+            if (this.uniqueId) {
+                this.validationListener = Livewire.on('validation-updated', (data) => {
+                    if (data.id === this.uniqueId) {
+                        this.errors = data.errors || {};
+                    }
+                });
+            }
         },
 
         destroy() {
             if (this.documentClickListener) {
                 document.removeEventListener('click', this.documentClickListener);
+            }
+            if (this.validationListener) {
+                this.validationListener();
             }
         },
 
@@ -83,13 +101,13 @@
         },
 
         isOpen() {
-            return this.$refs.panel?._x_isShown === true;
+            return this.open;
         },
 
         togglePanel() {
             if (this.isDisabled) return;
-            this.$refs.panel?.toggle(this.$refs.trigger);
-            if (this.isOpen()) {
+            this.open = !this.open;
+            if (this.open) {
                 this.newValue = '';
                 this.$nextTick(() => this.$refs.newInput?.focus());
             }
@@ -97,13 +115,13 @@
 
         openPanel() {
             if (this.isDisabled) return;
-            this.$refs.panel?.open(this.$refs.trigger);
+            this.open = true;
             this.newValue = '';
             this.$nextTick(() => this.$refs.newInput?.focus());
         },
 
         closePanel() {
-            this.$refs.panel?.close();
+            this.open = false;
             this.newValue = '';
         },
 
@@ -123,10 +141,10 @@
         },
 
         deleteValue(valueToDelete) {
-            this.values = this.values.filter((v) => v !== valueToDelete);
             if (this.errors.hasOwnProperty(valueToDelete)) {
                 delete this.errors[valueToDelete];
             }
+            this.values = this.values.filter((v) => v !== valueToDelete);
             this.emitChange();
         },
 
@@ -151,7 +169,6 @@
             return this.linkPrefix + value;
         }
     }"
-    x-on:click.outside="closePanel()"
     x-on:keydown.esc="isOpen() && (closePanel(), $event.stopPropagation())"
     {{ $attributes->merge(['class' => 'relative w-full']) }}
 >
@@ -181,7 +198,7 @@
             </template>
 
             {{-- Visible Values as Tags --}}
-            <template x-for="(value, index) in visibleValues" :key="`trigger-${value}-${index}`">
+            <template x-for="value in visibleValues" :key="value">
                 <span
                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[120px]"
                     :class="hasError(value)
@@ -222,31 +239,34 @@
         />
     </button>
 
-    {{-- Popover Panel --}}
-    <div
-        x-cloak
-        x-float.placement.bottom-start.flip.offset="{ offset: 4 }"
-        x-transition:enter="transition ease-out duration-100"
-        x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="opacity-100 scale-100"
-        x-transition:leave-end="opacity-0 scale-95"
-        x-ref="panel"
-        role="dialog"
-        aria-label="Manage values"
-        class="absolute z-50 w-full min-w-[240px] rounded-lg bg-white shadow-lg ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700 overflow-hidden"
-    >
-        {{-- Existing Values List --}}
-        <template x-if="hasValues">
-            <div
-                x-sortable
-                x-on:end.stop="reorderValues($event)"
-                class="max-h-[240px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800"
-            >
-                <template x-for="(value, index) in values" :key="`${value}-${index}`">
+    {{-- Popover Panel - teleported to body to avoid Livewire re-render z-index issues --}}
+    <template x-teleport="body">
+        <div
+            x-cloak
+            x-show="open"
+            x-anchor.bottom-start.offset.4="$refs.trigger"
+            x-ref="panel"
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-75"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            role="dialog"
+            aria-label="Manage values"
+            class="fixed z-[9999] min-w-[240px] rounded-lg bg-white shadow-lg ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700 overflow-hidden"
+            :style="{ width: $refs.trigger?.offsetWidth + 'px' }"
+        >
+            {{-- Existing Values List --}}
+            <template x-if="hasValues">
+                <div
+                    x-sortable
+                    x-on:end.stop="reorderValues($event)"
+                    class="max-h-[240px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800"
+                >
+                <template x-for="(value, index) in values" :key="value">
                     <div
-                        :x-sortable-item="index"
+                        :x-sortable-item="value"
                         class="group flex items-center gap-2 px-3 py-2"
                     >
                         {{-- Drag Handle --}}
@@ -301,12 +321,12 @@
                             <x-heroicon-m-x-mark class="size-4" aria-hidden="true" />
                         </button>
                     </div>
-                </template>
-            </div>
-        </template>
+                    </template>
+                </div>
+            </template>
 
-        {{-- Add New Value --}}
-        <div class="flex items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-gray-800/50">
+            {{-- Add New Value --}}
+            <div class="flex items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-gray-800/50">
             <x-heroicon-m-plus class="size-4 text-gray-400 shrink-0" aria-hidden="true" />
 
             <input
@@ -329,6 +349,7 @@
             >
                 Add
             </button>
+            </div>
         </div>
-    </div>
+    </template>
 </div>
