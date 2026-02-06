@@ -20,13 +20,22 @@
         default => 'Add value...',
     };
     $rowKey = 'multi-value-' . crc32($rawValue);
-    $uniqueId = 'mvi-' . crc32($rawValue);
 @endphp
 
 <div
     wire:key="{{ $rowKey }}"
-    x-data="{ rawValue: @js($rawValue) }"
-    x-on:multi-value-change.debounce.300ms="$wire.updateMappedValue(rawValue, $event.detail)"
+    x-data="{
+        rawValue: @js($rawValue),
+        handleChange(detail) {
+            const mvi = this.$el.querySelector('[data-multi-value-input]');
+            this.$wire.updateMappedValue(this.rawValue, detail).then(errors => {
+                mvi?.dispatchEvent(
+                    new CustomEvent('update-errors', { detail: { errors: errors || {} } })
+                );
+            });
+        }
+    }"
+    x-on:multi-value-change.debounce.300ms="handleChange($event.detail)"
     class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
 >
     <div class="flex-1 min-w-0" wire:ignore>
@@ -36,7 +45,6 @@
             :placeholder="$placeholder"
             :errors="$perValueErrors"
             :borderless="true"
-            :unique-id="$uniqueId"
             event-name="multi-value-change"
         />
     </div>

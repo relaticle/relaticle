@@ -6,7 +6,6 @@
     'borderless' => false,
     'errors' => [],
     'eventName' => 'input',
-    'uniqueId' => null,
 ])
 
 @php
@@ -33,38 +32,29 @@
         inputType: @js($inputType),
         linkPrefix: @js($linkPrefix),
         eventName: @js($eventName),
-        uniqueId: @js($uniqueId),
         maxVisibleValues: 3,
         open: false,
         documentClickListener: null,
-        validationListener: null,
+
+        get rootEl() {
+            return this.$refs.trigger?.closest('[data-multi-value-input]');
+        },
 
         init() {
             this.documentClickListener = (event) => {
                 if (!this.isOpen()) return;
-                const clickedInTrigger = this.$el.contains(event.target);
+                const clickedInTrigger = this.rootEl?.contains(event.target);
                 const clickedInPanel = this.$refs.panel?.contains(event.target);
                 if (!clickedInTrigger && !clickedInPanel) {
                     this.closePanel();
                 }
             };
             document.addEventListener('click', this.documentClickListener);
-
-            if (this.uniqueId) {
-                this.validationListener = Livewire.on('validation-updated', (data) => {
-                    if (data.id === this.uniqueId) {
-                        this.errors = data.errors || {};
-                    }
-                });
-            }
         },
 
         destroy() {
             if (this.documentClickListener) {
                 document.removeEventListener('click', this.documentClickListener);
-            }
-            if (this.validationListener) {
-                this.validationListener();
             }
         },
 
@@ -154,7 +144,10 @@
         },
 
         emitChange() {
-            this.$dispatch(this.eventName, this.commaSeparated);
+            this.rootEl?.dispatchEvent(new CustomEvent(this.eventName, {
+                detail: this.commaSeparated,
+                bubbles: true,
+            }));
         },
 
         reorderValues(event) {
@@ -170,6 +163,8 @@
         }
     }"
     x-on:keydown.esc="isOpen() && (closePanel(), $event.stopPropagation())"
+    x-on:update-errors="errors = $event.detail.errors || {}"
+    data-multi-value-input
     {{ $attributes->merge(['class' => 'relative w-full']) }}
 >
     {{-- Trigger Button --}}
@@ -198,7 +193,7 @@
             </template>
 
             {{-- Visible Values as Tags --}}
-            <template x-for="value in visibleValues" :key="value">
+            <template x-for="(value, index) in visibleValues" :key="`${value}-${index}`">
                 <span
                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[120px]"
                     :class="hasError(value)
@@ -264,7 +259,7 @@
                     x-on:end.stop="reorderValues($event)"
                     class="max-h-[240px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800"
                 >
-                <template x-for="(value, index) in values" :key="value">
+                <template x-for="(value, index) in values" :key="`${value}-${index}`">
                     <div
                         :x-sortable-item="value"
                         class="group flex items-center gap-2 px-3 py-2"

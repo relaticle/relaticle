@@ -270,22 +270,16 @@ final class ReviewStep extends Component
 
     /**
      * Update a mapped value (correction) for all rows with matching raw value.
+     * Returns per-value validation errors for multi-value fields (consumed by Alpine via DOM event).
      *
-     * IMPORTANT - Date Correction Storage:
-     * For date fields, corrections from the HTML date picker are stored in ISO format
-     * (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) regardless of the user's selected date format.
-     *
-     * This is intentional because:
-     * - HTML date/datetime inputs always output ISO format (browser constraint)
-     * - Laravel/Eloquent expects ISO format for database storage
-     * - The selected format only affects how ambiguous raw CSV data is interpreted
+     * @return array<string, string>
      */
-    public function updateMappedValue(string $rawValue, string $newValue): void
+    public function updateMappedValue(string $rawValue, string $newValue): array
     {
         if (blank($newValue)) {
             $this->skipValue($rawValue);
 
-            return;
+            return [];
         }
 
         $error = $this->validateValue($this->selectedColumn, $newValue, isCorrection: true);
@@ -299,31 +293,15 @@ final class ReviewStep extends Component
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
 
-        $this->dispatchValidationUpdate($rawValue, $error);
-
         unset($this->columnErrorStatuses);
-    }
 
-    /**
-     * Dispatch validation errors back to Alpine component via Livewire event.
-     *
-     * Used with wire:ignore to sync validation state without re-rendering the multi-value input.
-     */
-    private function dispatchValidationUpdate(string $rawValue, ?string $error): void
-    {
-        if (! $this->selectedColumn->isMultiChoiceArbitrary()) {
-            return;
+        if ($error === null || ! $this->selectedColumn->isMultiChoiceArbitrary()) {
+            return [];
         }
 
-        $uniqueId = 'mvi-'.crc32($rawValue);
-        $perValueErrors = [];
+        $validationError = ValidationError::fromStorageFormat($error);
 
-        if ($error !== null) {
-            $validationError = ValidationError::fromStorageFormat($error);
-            $perValueErrors = $validationError?->getItemErrors() ?? [];
-        }
-
-        $this->dispatch('validation-updated', id: $uniqueId, errors: $perValueErrors);
+        return $validationError?->getItemErrors() ?? [];
     }
 
     /**

@@ -29,3 +29,4 @@ boost.json
 /.claude
 /.cursor
 /.junie
+/.playwright-mcp
