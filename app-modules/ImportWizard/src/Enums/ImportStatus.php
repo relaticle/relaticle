@@ -9,6 +9,7 @@ enum ImportStatus: string
     case Uploading = 'uploading';
     case Mapping = 'mapping';
     case Reviewing = 'reviewing';
+    case Previewing = 'previewing';
     case Importing = 'importing';
     case Completed = 'completed';
     case Failed = 'failed';

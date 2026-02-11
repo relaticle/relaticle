@@ -6,7 +6,7 @@
                 $isCurrent = $step === $currentStep;
             @endphp
             <li class="flex items-center">
-                @if ($isCompleted)
+                @if ($isCompleted && ! $importStarted)
                     <button
                         type="button"
                         wire:click="goToStep({{ $step }})"
