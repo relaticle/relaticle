@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\CustomFields\CompanyField;
+use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use App\Models\User;
 
 final readonly class CompanyObserver
 {
-    /**
-     * Handle the Company "creating" event.
-     */
     public function creating(Company $company): void
     {
         if (auth()->check()) {
@@ -22,20 +21,32 @@ final readonly class CompanyObserver
         }
     }
 
-    /**
-     * Handle the Company "created" event.
-     */
-    public function created(Company $company): void
-    {
-        dispatch(new \App\Jobs\FetchFaviconForCompany($company))->afterCommit();
-    }
-
-    /**
-     * Handle the Company "saved" event.
-     * Invalidate AI summary when company data changes.
-     */
     public function saved(Company $company): void
     {
         $company->invalidateAiSummary();
+        $this->dispatchFaviconFetchIfNeeded($company);
+    }
+
+    private function dispatchFaviconFetchIfNeeded(Company $company): void
+    {
+        $domainField = $company->customFields()
+            ->whereBelongsTo($company->team)
+            ->where('code', CompanyField::DOMAINS->value)
+            ->first();
+
+        if ($domainField === null) {
+            return;
+        }
+
+        $company->load('customFieldValues');
+
+        $domains = $company->getCustomFieldValue($domainField);
+        $firstDomain = is_array($domains) ? ($domains[0] ?? null) : $domains;
+
+        if (blank($firstDomain)) {
+            return;
+        }
+
+        dispatch(new FetchFaviconForCompany($company))->afterCommit();
     }
 }
