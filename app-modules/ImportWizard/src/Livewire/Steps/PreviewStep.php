@@ -11,6 +11,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\View\View;
@@ -22,8 +23,8 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportRow;
-use Relaticle\ImportWizard\Support\MatchResolver;
 
 final class PreviewStep extends Component implements HasActions, HasForms
 {
@@ -41,7 +42,6 @@ final class PreviewStep extends Component implements HasActions, HasForms
     public function mount(string $storeId, ImportEntityType $entityType): void
     {
         $this->mountWithImportStore($storeId, $entityType);
-        $this->resolveMatches();
         $this->syncCompletionState();
     }
 
@@ -163,74 +163,104 @@ final class PreviewStep extends Component implements HasActions, HasForms
     #[Computed]
     public function relationshipTabs(): array
     {
+        $connection = $this->store()->connection();
+
         return $this->columns()
             ->filter(fn (ColumnData $col): bool => $col->isEntityLinkMapping())
-            ->map(fn (ColumnData $col): array => [
-                'key' => $col->entityLink,
-                'label' => $col->getLabel(),
-                'icon' => $col->getIcon(),
-                'count' => $this->store()->query()->whereRaw(
-                    "EXISTS (SELECT 1 FROM json_each(relationships) WHERE json_extract(value, '$.relationship') = ?)",
-                    [$col->entityLink]
-                )->count(),
-            ])
+            ->map(function (ColumnData $col) use ($connection): array {
+                $uniqueCount = $connection->selectOne(
+                    "SELECT COUNT(*) as total FROM ({$this->uniqueRelationshipSubquery()}) sub",
+                    [$col->entityLink],
+                );
+
+                return [
+                    'key' => $col->entityLink,
+                    'label' => $col->getLabel(),
+                    'icon' => $col->getIcon(),
+                    'count' => (int) $uniqueCount->total,
+                ];
+            })
             ->values()
             ->all();
     }
 
-    /**
-     * @return array<int, array{action: string, name: string, id: string|null, count: int}>
-     */
+    /** @phpstan-ignore missingType.generics */
     #[Computed]
-    public function relationshipSummary(): array
+    public function relationshipSummary(): Paginator
     {
         if ($this->activeTab === 'all') {
-            return [];
+            return new Paginator([], 0, 25);
         }
 
-        $rows = $this->store()->query()
-            ->whereNotNull('relationships')
-            ->where('relationships', '!=', '[]')
-            ->get();
+        $perPage = 25;
+        $page = $this->getPage();
+        $offset = ($page - 1) * $perPage;
+        $connection = $this->store()->connection();
+        $groupBy = $this->relationshipGroupByClause();
 
-        $summary = [];
+        $rows = $connection->select("
+            SELECT
+                json_extract(je.value, '$.action') as action,
+                COALESCE(json_extract(je.value, '$.name'), 'Record #' || json_extract(je.value, '$.id')) as name,
+                json_extract(je.value, '$.id') as id,
+                COUNT(*) as count
+            FROM import_rows, json_each(import_rows.relationships) AS je
+            WHERE json_extract(je.value, '$.relationship') = ?
+            GROUP BY action, {$groupBy}
+            ORDER BY count DESC
+            LIMIT ? OFFSET ?
+        ", [$this->activeTab, $perPage, $offset]);
 
-        foreach ($rows as $row) {
-            foreach ($row->relationships ?? [] as $match) {
-                if ($match->relationship !== $this->activeTab) {
-                    continue;
-                }
+        $total = $connection->selectOne(
+            "SELECT COUNT(*) as total FROM ({$this->uniqueRelationshipSubquery()}) sub",
+            [$this->activeTab],
+        );
 
-                $groupKey = $match->isExisting()
-                    ? "link:{$match->id}"
-                    : "create:{$match->name}";
+        /** @var list<array{action: string, name: string, id: string|null, count: int}> $items */
+        $items = array_map(fn (\stdClass $row): array => [
+            'action' => $row->action === 'update' ? 'link' : 'create',
+            'name' => $row->name,
+            'id' => $row->id,
+            'count' => (int) $row->count,
+        ], $rows);
 
-                $summary[$groupKey] ??= [
-                    'action' => $match->isExisting() ? 'link' : 'create',
-                    'name' => $match->name ?? "Record #{$match->id}",
-                    'id' => $match->id,
-                    'count' => 0,
-                ];
-
-                $summary[$groupKey]['count']++;
-            }
-        }
-
-        return collect($summary)->sortByDesc('count')->values()->all();
+        return new Paginator(
+            $items,
+            $total->total,
+            $perPage,
+            $page,
+        );
     }
 
-    /**
-     * @return array{link: int, create: int}
-     */
+    /** @return array{link: int, create: int} */
     #[Computed]
     public function relationshipStats(): array
     {
-        $summary = collect($this->relationshipSummary());
+        if ($this->activeTab === 'all') {
+            return ['link' => 0, 'create' => 0];
+        }
 
-        return [
-            'link' => $summary->where('action', 'link')->sum('count'),
-            'create' => $summary->where('action', 'create')->sum('count'),
-        ];
+        $rows = $this->store()->connection()->select("
+            SELECT action, COUNT(*) as count FROM (
+                SELECT json_extract(je.value, '$.action') as action
+                FROM import_rows, json_each(import_rows.relationships) AS je
+                WHERE json_extract(je.value, '$.relationship') = ?
+                GROUP BY action, {$this->relationshipGroupByClause()}
+            )
+            GROUP BY action
+        ", [$this->activeTab]);
+
+        $stats = ['link' => 0, 'create' => 0];
+
+        foreach ($rows as $row) {
+            if ($row->action === 'update') {
+                $stats['link'] = (int) $row->count;
+            } else {
+                $stats['create'] = (int) $row->count;
+            }
+        }
+
+        return $stats;
     }
 
     /**
@@ -268,6 +298,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
         ])->dispatch();
 
         $this->batchId = $batch->id;
+        $this->dispatch('import-started')->to(ImportWizard::class);
     }
 
     public function checkImportProgress(): void
@@ -287,17 +318,27 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return view('import-wizard-new::livewire.steps.preview-step');
     }
 
-    private function resolveMatches(): void
-    {
-        $store = $this->store();
-        (new MatchResolver($store, $store->getImporter()))->resolve();
-    }
-
     private function syncCompletionState(): void
     {
-        $status = $this->store()->status();
+        $this->isCompleted = in_array($this->store()->status(), [
+            ImportStatus::Completed,
+            ImportStatus::Failed,
+        ], true);
+    }
 
-        $this->isCompleted = $status === ImportStatus::Completed
-            || $status === ImportStatus::Failed;
+    private function relationshipGroupByClause(): string
+    {
+        return "CASE
+            WHEN json_extract(je.value, '$.action') = 'update' THEN json_extract(je.value, '$.id')
+            ELSE json_extract(je.value, '$.name')
+        END";
+    }
+
+    private function uniqueRelationshipSubquery(): string
+    {
+        return "SELECT 1
+            FROM import_rows, json_each(import_rows.relationships) AS je
+            WHERE json_extract(je.value, '$.relationship') = ?
+            GROUP BY json_extract(je.value, '$.action'), {$this->relationshipGroupByClause()}";
     }
 }

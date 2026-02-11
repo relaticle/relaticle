@@ -11,12 +11,14 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\MatchResolver;
 
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
@@ -54,6 +56,8 @@ function createPreviewReadyStore(
     $store->query()->insert($rows);
     $store->setRowCount(count($rows));
     $store->setStatus(ImportStatus::Reviewing);
+
+    (new MatchResolver($store, $store->getImporter()))->resolve();
 
     $context->store = $store;
 
@@ -205,14 +209,13 @@ it('resolves rows as Update when id matches existing record', function (): void 
         ->and($row->matched_id)->toBe((string) $person->id);
 });
 
-it('resolves entity link by name as AlwaysCreate even when record exists', function (): void {
-    Company::factory()->create([
-        'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
-    ]);
+it('renders entity link relationships from pre-populated data', function (): void {
+    $companyMatch = RelationshipMatch::create('company', 'Acme Corp');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp']),
+        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
+            'relationships' => json_encode([$companyMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
@@ -228,7 +231,7 @@ it('resolves entity link by name as AlwaysCreate even when record exists', funct
         ->and($row->relationships[0]->name)->toBe('Acme Corp');
 });
 
-it('skips entity link relationship when matching by id and record not found', function (): void {
+it('handles rows with no entity link relationships', function (): void {
     createPreviewReadyStore($this, ['Name', 'Company ID'], [
         makeRow(2, ['Name' => 'John', 'Company ID' => '99999']),
     ], [
@@ -242,14 +245,18 @@ it('skips entity link relationship when matching by id and record not found', fu
     expect($row->relationships)->toBeNull();
 });
 
-it('resolves entity link by id as existing when record exists', function (): void {
+it('renders existing entity link relationships from pre-populated data', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
         'team_id' => $this->team->id,
     ]);
 
+    $companyMatch = RelationshipMatch::existing('company', (string) $company->id);
+
     createPreviewReadyStore($this, ['Name', 'Company ID'], [
-        makeRow(2, ['Name' => 'John', 'Company ID' => (string) $company->id]),
+        makeRow(2, ['Name' => 'John', 'Company ID' => (string) $company->id], [
+            'relationships' => json_encode([$companyMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company'),
@@ -406,31 +413,6 @@ it('isImporting returns true while batch is running', function (): void {
     expect($component->get('isImporting'))->toBeTrue();
 });
 
-it('resets stale match_action on re-entry to preview step', function (): void {
-    createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com']),
-    ], [
-        ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
-    ]);
-
-    $component = mountPreviewStep($this);
-
-    $row = $this->store->query()->where('row_number', 2)->first();
-    expect($row->match_action)->toBe(RowMatchAction::Create);
-
-    $this->store->query()->where('row_number', 2)->update([
-        'match_action' => RowMatchAction::Skip->value,
-        'matched_id' => 'stale-id',
-    ]);
-
-    $component2 = mountPreviewStep($this);
-
-    $freshRow = $this->store->query()->where('row_number', 2)->first();
-    expect($freshRow->match_action)->toBe(RowMatchAction::Create)
-        ->and($freshRow->matched_id)->toBeNull();
-});
-
 it('does not skip rows with validation errors that are covered by per-value skips', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
         makeRow(2, ['Name' => 'John', 'Email' => 'bad-email'], [
@@ -482,8 +464,12 @@ it('columns returns mapped column data', function (): void {
 });
 
 it('relationshipTabs returns entity link tabs', function (): void {
+    $companyMatch = RelationshipMatch::create('company', 'Acme');
+
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme']),
+        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+            'relationships' => json_encode([$companyMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
@@ -510,15 +496,19 @@ it('relationshipTabs returns empty when no entity links mapped', function (): vo
 });
 
 it('relationshipSummary aggregates by entity link key', function (): void {
-    Company::factory()->create([
-        'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
-    ]);
+    $acmeMatch = RelationshipMatch::create('company', 'Acme Corp');
+    $newCorpMatch = RelationshipMatch::create('company', 'New Corp');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp']),
-        makeRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp']),
-        makeRow(4, ['Name' => 'Bob', 'Company' => 'New Corp']),
+        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
+            'relationships' => json_encode([$acmeMatch->toArray()]),
+        ]),
+        makeRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp'], [
+            'relationships' => json_encode([$acmeMatch->toArray()]),
+        ]),
+        makeRow(4, ['Name' => 'Bob', 'Company' => 'New Corp'], [
+            'relationships' => json_encode([$newCorpMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
@@ -529,15 +519,19 @@ it('relationshipSummary aggregates by entity link key', function (): void {
 
     $summary = $component->get('relationshipSummary');
 
-    $createEntries = collect($summary)->where('action', 'create');
+    $createEntries = collect($summary->items())->where('action', 'create');
     $totalCreated = $createEntries->sum('count');
 
     expect($totalCreated)->toBe(3);
 });
 
 it('relationshipSummary returns empty on all tab', function (): void {
+    $companyMatch = RelationshipMatch::create('company', 'Acme');
+
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme']),
+        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+            'relationships' => json_encode([$companyMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
@@ -549,8 +543,12 @@ it('relationshipSummary returns empty on all tab', function (): void {
 });
 
 it('setActiveTab changes tab and resets page', function (): void {
+    $companyMatch = RelationshipMatch::create('company', 'Acme');
+
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme']),
+        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+            'relationships' => json_encode([$companyMatch->toArray()]),
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),

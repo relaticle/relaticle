@@ -4,7 +4,7 @@
 >
     <div class="flex-1 flex flex-col overflow-hidden min-h-[20rem]">
         @if($this->isCompleted)
-            <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0">
+            <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
                 <x-heroicon-o-check-circle class="h-5 w-5 text-success-600 dark:text-success-400 shrink-0" />
                 <p class="text-sm font-medium text-gray-900 dark:text-white">Import Complete</p>
 
@@ -26,7 +26,7 @@
                 @endif
             </div>
         @elseif($this->isImporting)
-            <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0">
+            <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
                 <x-heroicon-o-arrow-path class="h-5 w-5 text-primary-600 dark:text-primary-400 animate-spin shrink-0" />
 
                 <div class="flex-1 min-w-0">
@@ -101,7 +101,7 @@
 
                 <div class="flex-1 overflow-auto">
                     <div class="min-w-max">
-                        <div class="flex items-stretch text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 sticky top-0 z-10">
+                        <div class="flex items-stretch text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                             <div class="w-8 shrink-0 border-r border-gray-200 dark:border-gray-700 py-1.5"></div>
                             @foreach($this->columns as $column)
                                 <div class="w-36 shrink-0 px-2 flex items-center gap-1 border-r border-gray-200 dark:border-gray-700 py-1.5" title="{{ $column->getLabel() }}">
@@ -247,14 +247,36 @@
                         </div>
                     @endforelse
                 </div>
+
+                @if($this->relationshipSummary->lastPage() > 1)
+                    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0 flex items-center justify-between">
+                        <button
+                            wire:click="previousPage"
+                            @disabled($this->relationshipSummary->onFirstPage())
+                            class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ number_format($this->relationshipSummary->firstItem()) }}–{{ number_format($this->relationshipSummary->lastItem()) }} of {{ number_format($this->relationshipSummary->total()) }}
+                        </span>
+                        <button
+                            wire:click="nextPage"
+                            @disabled(!$this->relationshipSummary->hasMorePages())
+                            class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                @endif
             @endif
         </div>
     </div>
 
     <x-filament-actions::modals />
 
-    <div class="flex justify-end gap-3 pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
-        @if(! $this->isImporting && ! $this->isCompleted)
+    @if(! $this->isImporting && ! $this->isCompleted)
+        <div class="flex justify-end gap-3 pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
             <x-filament::button
                 color="gray"
                 wire:click="$parent.goBack()"
@@ -262,6 +284,6 @@
                 Back
             </x-filament::button>
             {{ $this->startImportAction }}
-        @endif
-    </div>
+        </div>
+    @endif
 </div>
