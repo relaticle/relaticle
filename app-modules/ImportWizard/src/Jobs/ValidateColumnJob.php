@@ -12,6 +12,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\RelationshipMatch;
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
@@ -45,7 +47,6 @@ final class ValidateColumnJob implements ShouldQueue
         $connection = $store->connection();
         $jsonPath = '$.'.$this->column->source;
 
-        // Entity link mappings use their own validation logic
         if ($this->column->isEntityLinkMapping()) {
             $this->validateEntityLink($store, $connection, $jsonPath);
 
@@ -65,11 +66,6 @@ final class ValidateColumnJob implements ShouldQueue
         $this->updateValidationErrors($connection, $jsonPath, $results);
     }
 
-    /**
-     * Validate entity link column values.
-     *
-     * Performs batch lookup against target entity to find matching records.
-     */
     private function validateEntityLink(ImportStore $store, Connection $connection, string $jsonPath): void
     {
         $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
@@ -90,12 +86,76 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
+        $this->writeEntityLinkRelationships($store, $connection, $jsonPath, $validator, $uniqueValues);
     }
 
-    /**
-     * Date corrections are stored in ISO format (from HTML date picker).
-     * ISO is always valid regardless of the selected display format.
-     */
+    /** @param array<int, string> $uniqueValues */
+    private function writeEntityLinkRelationships(
+        ImportStore $store,
+        Connection $connection,
+        string $jsonPath,
+        EntityLinkValidator $validator,
+        array $uniqueValues,
+    ): void {
+        $context = $this->column->resolveEntityLinkContext($store->getImporter());
+
+        if ($context === null) {
+            return;
+        }
+
+        $link = $context['link'];
+        $matcher = $context['matcher'];
+
+        $resolvedMap = $matcher->behavior === MatchBehavior::AlwaysCreate
+            ? array_fill_keys($uniqueValues, null)
+            : $validator->getResolver()->batchResolve($link, $matcher, $uniqueValues);
+
+        $connection->statement('
+            CREATE TEMPORARY TABLE IF NOT EXISTS temp_relationships (
+                lookup_value TEXT,
+                relationship_json TEXT
+            )
+        ');
+
+        try {
+            $inserts = [];
+
+            foreach ($resolvedMap as $value => $resolvedId) {
+                if ($resolvedId === null && $matcher->behavior === MatchBehavior::UpdateOnly) {
+                    continue;
+                }
+
+                $match = $resolvedId !== null
+                    ? RelationshipMatch::existing($link->key, (string) $resolvedId)
+                    : RelationshipMatch::create($link->key, (string) $value);
+
+                $inserts[] = [
+                    'lookup_value' => (string) $value,
+                    'relationship_json' => json_encode($match->toArray()),
+                ];
+            }
+
+            if ($inserts === []) {
+                return;
+            }
+
+            $connection->table('temp_relationships')->insert($inserts);
+
+            $connection->statement("
+                UPDATE import_rows
+                SET relationships = json_insert(
+                    COALESCE(relationships, '[]'),
+                    '\$[#]',
+                    json(temp.relationship_json)
+                )
+                FROM temp_relationships AS temp
+                WHERE json_extract(import_rows.raw_data, ?) = temp.lookup_value
+            ", [$jsonPath]);
+        } finally {
+            $connection->statement('DROP TABLE IF EXISTS temp_relationships');
+        }
+    }
+
     private function clearValidationForCorrectedDateFields(
         Connection $connection,
         string $jsonPath,
@@ -130,7 +190,6 @@ final class ValidateColumnJob implements ShouldQueue
      */
     private function validateValues(ImportStore $store, array $uniqueValues): array
     {
-        // Hydrate importField since it's not serialized with ColumnData
         $this->hydrateColumnField($store);
 
         $validator = new ColumnValidator;
@@ -147,9 +206,6 @@ final class ValidateColumnJob implements ShouldQueue
         return $results;
     }
 
-    /**
-     * Hydrate the importField on the column since transient properties aren't serialized.
-     */
     private function hydrateColumnField(ImportStore $store): void
     {
         if ($this->column->importField !== null) {

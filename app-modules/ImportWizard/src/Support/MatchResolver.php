@@ -8,18 +8,17 @@ use Illuminate\Support\Collection;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
-use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Store\ImportStore;
 
-final class MatchResolver
+final readonly class MatchResolver
 {
     public function __construct(
-        private readonly ImportStore $store,
-        private readonly BaseImporter $importer,
+        private ImportStore $store,
+        private BaseImporter $importer,
     ) {}
 
     public function resolve(): void
@@ -38,7 +37,6 @@ final class MatchResolver
         }
 
         $this->markRemainingAsCreate();
-        $this->resolveEntityLinks($mappings);
     }
 
     private function resetPreviousResolutions(): void
@@ -46,8 +44,7 @@ final class MatchResolver
         $this->store->connection()->statement('
             UPDATE import_rows
             SET match_action = NULL,
-                matched_id = NULL,
-                relationships = NULL
+                matched_id = NULL
         ');
     }
 
@@ -142,83 +139,6 @@ final class MatchResolver
             $this->markRemainingAs($unmatchedAction);
         } finally {
             $connection->statement('DROP TABLE IF EXISTS temp_match_results');
-        }
-    }
-
-    /** @param  Collection<int, ColumnData>  $mappings */
-    private function resolveEntityLinks(Collection $mappings): void
-    {
-        $entityLinkMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isEntityLinkMapping());
-
-        if ($entityLinkMappings->isEmpty()) {
-            return;
-        }
-
-        $resolver = new EntityLinkResolver($this->importer->getTeamId());
-
-        foreach ($entityLinkMappings as $mapping) {
-            $this->resolveEntityLinkMapping($mapping, $resolver);
-        }
-    }
-
-    private function resolveEntityLinkMapping(ColumnData $mapping, EntityLinkResolver $resolver): void
-    {
-        $context = $mapping->resolveEntityLinkContext($this->importer);
-
-        if ($context === null) {
-            return;
-        }
-
-        $link = $context['link'];
-        $matcher = $context['matcher'];
-        $jsonPath = '$.'.$mapping->source;
-
-        $uniqueValues = $this->store->query()
-            ->selectRaw('DISTINCT json_extract(raw_data, ?) as value', [$jsonPath])
-            ->pluck('value')
-            ->filter()
-            ->values()
-            ->all();
-
-        if ($uniqueValues === []) {
-            return;
-        }
-
-        $resolvedMap = $matcher->behavior === MatchBehavior::AlwaysCreate
-            ? array_fill_keys($uniqueValues, null)
-            : $resolver->batchResolve($link, $matcher, $uniqueValues);
-
-        $rows = $this->store->query()
-            ->whereRaw('json_extract(raw_data, ?) IS NOT NULL', [$jsonPath])
-            ->whereRaw("json_extract(raw_data, ?) != ''", [$jsonPath])
-            ->get();
-
-        $connection = $this->store->connection();
-
-        foreach ($rows as $row) {
-            $value = $row->raw_data->get($mapping->source);
-
-            if (blank($value)) {
-                continue;
-            }
-
-            $resolvedId = $resolvedMap[trim((string) $value)] ?? null;
-
-            if ($resolvedId === null && $matcher->behavior === MatchBehavior::UpdateOnly) {
-                continue;
-            }
-
-            $match = $resolvedId !== null
-                ? RelationshipMatch::existing($link->key, (string) $resolvedId)
-                : RelationshipMatch::create($link->key, (string) $value);
-
-            $relationships = $row->relationships?->toArray() ?? [];
-            $relationships[] = $match->toArray();
-
-            $connection->statement(
-                'UPDATE import_rows SET relationships = ? WHERE row_number = ?',
-                [json_encode($relationships), $row->row_number]
-            );
         }
     }
 }

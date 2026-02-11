@@ -14,10 +14,12 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Store\ImportRow;
@@ -109,14 +111,47 @@ final class ReviewStep extends Component
         return $batch->id;
     }
 
+    private function clearRelationshipsForReentry(): void
+    {
+        $this->connection()->statement('UPDATE import_rows SET relationships = NULL');
+    }
+
+    private function dispatchMatchResolution(): string
+    {
+        $store = $this->store();
+
+        $batch = Bus::batch([
+            new ResolveMatchesJob(
+                importId: $store->id(),
+                teamId: $store->teamId(),
+            ),
+        ])
+            ->name('Match resolution')
+            ->dispatch();
+
+        return $batch->id;
+    }
+
     public function mount(): void
     {
         $this->columns = $this->store()->columnMappings();
         $this->selectedColumn = $this->columns->first();
 
+        if (! $this->hasMappingsChanged()) {
+            return;
+        }
+
+        $this->clearRelationshipsForReentry();
+
         foreach ($this->columns as $column) {
             $this->batchIds[$column->source] = $this->validateColumnAsync($column);
         }
+
+        $this->batchIds['__match_resolution'] = $this->dispatchMatchResolution();
+
+        $this->store()->updateMeta([
+            'mappings_hash' => $this->currentMappingsHash(),
+        ]);
     }
 
     public function hydrate(): void
@@ -217,6 +252,10 @@ final class ReviewStep extends Component
         $this->selectedColumn = $updated;
 
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
+
+        $this->store()->updateMeta([
+            'mappings_hash' => $this->currentMappingsHash(),
+        ]);
     }
 
     /** @return array<string, string> */
@@ -334,6 +373,21 @@ final class ReviewStep extends Component
             return;
         }
 
+        $this->store()->setStatus(ImportStatus::Previewing);
         $this->dispatch('completed');
+    }
+
+    private function currentMappingsHash(): string
+    {
+        $mappings = $this->store()->meta()['column_mappings'] ?? [];
+
+        return md5((string) json_encode($mappings));
+    }
+
+    private function hasMappingsChanged(): bool
+    {
+        $storedHash = $this->store()->meta()['mappings_hash'] ?? null;
+
+        return $storedHash !== $this->currentMappingsHash();
     }
 }

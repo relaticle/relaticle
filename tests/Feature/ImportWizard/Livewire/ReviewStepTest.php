@@ -14,6 +14,7 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Livewire\Steps\ReviewStep;
 use Relaticle\ImportWizard\Store\ImportStore;
 
@@ -264,4 +265,40 @@ it('dispatches completed even when unresolved validation errors exist', function
 
     $component->call('continueToPreview')
         ->assertDispatched('completed');
+});
+
+it('dispatches ResolveMatchesJob batch on mount', function (): void {
+    $component = mountReviewStep($this);
+
+    Bus::assertBatched(function ($batch) {
+        return $batch->jobs->contains(fn ($job) => $job instanceof ResolveMatchesJob);
+    });
+});
+
+it('includes __match_resolution key in batchIds', function (): void {
+    $component = mountReviewStep($this);
+
+    expect($component->get('batchIds'))->toHaveKey('__match_resolution');
+});
+
+it('blocks continueToPreview while match resolution is running', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', ['__match_resolution' => 'fake-batch-id']);
+
+    $component->call('continueToPreview')
+        ->assertNotDispatched('completed');
+});
+
+it('clears relationships column on mount', function (): void {
+    $this->store->connection()->statement("
+        UPDATE import_rows SET relationships = '[{\"relationship\":\"company\",\"action\":\"create\",\"name\":\"Stale\"}]'
+    ");
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+    expect($row->relationships)->not->toBeNull();
+
+    mountReviewStep($this);
+
+    $freshRow = $this->store->query()->where('row_number', 2)->first();
+    expect($freshRow->relationships)->toBeNull();
 });
