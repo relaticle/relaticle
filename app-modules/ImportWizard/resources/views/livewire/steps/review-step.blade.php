@@ -1,4 +1,10 @@
-@php use Relaticle\ImportWizard\Enums\DateFormat;use Relaticle\ImportWizard\Enums\NumberFormat;use Relaticle\ImportWizard\Enums\ReviewFilter;use Relaticle\ImportWizard\Enums\SortField;use Relaticle\ImportWizard\Enums\SortDirection; @endphp
+@php
+    use Relaticle\ImportWizard\Enums\DateFormat;
+    use Relaticle\ImportWizard\Enums\NumberFormat;
+    use Relaticle\ImportWizard\Enums\ReviewFilter;
+    use Relaticle\ImportWizard\Enums\SortField;
+    use Relaticle\ImportWizard\Enums\SortDirection;
+@endphp
 <div
     class="flex flex-col h-full overflow-hidden"
     @if (count($batchIds) > 0) wire:poll.2s="checkProgress" @endif
@@ -182,72 +188,70 @@
                             </div>
 
                             {{-- Sort Dropdown --}}
-                        <div x-data="{ open: false }" class="relative">
-                            <button
-                                @click="open = !open"
-                                @click.outside="open = false"
-                                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <x-filament::icon :icon="$sortDirection->getIcon()" class="w-4 h-4"/>
-                                <span>{{ $sortField->getLabel() }}</span>
-                                <x-filament::icon icon="heroicon-m-chevron-down" class="w-3 h-3"/>
-                            </button>
+                            <div x-data="{ open: false }" class="relative">
+                                <button
+                                    @click="open = !open"
+                                    @click.outside="open = false"
+                                    class="flex items-center gap-1.5 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <x-filament::icon :icon="$sortDirection->getIcon()" class="w-4 h-4"/>
+                                    <span>{{ $sortField->getLabel() }}</span>
+                                    <x-filament::icon icon="heroicon-m-chevron-down" class="w-3 h-3"/>
+                                </button>
 
-                            <div
-                                x-show="open"
-                                x-transition:enter="transition ease-out duration-100"
-                                x-transition:enter-start="opacity-0 scale-95"
-                                x-transition:enter-end="opacity-100 scale-100"
-                                x-transition:leave="transition ease-in duration-75"
-                                x-transition:leave-start="opacity-100 scale-100"
-                                x-transition:leave-end="opacity-0 scale-95"
-                                class="absolute right-0 mt-1 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-10"
-                            >
-                                {{-- Sort Field Section --}}
-                                <div class="p-1 border-b border-gray-100 dark:border-gray-700">
-                                    @foreach (SortField::cases() as $field)
-                                        <button
-                                            wire:click="setSortField('{{ $field->value }}')"
-                                            @class([
-                                                'w-full flex items-center justify-between px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700',
-                                                'text-primary-600 dark:text-primary-400' => $sortField === $field,
-                                                'text-gray-700 dark:text-gray-300' => $sortField !== $field,
-                                            ])
-                                        >
-                                            <span class="flex items-center gap-2">
-                                                <x-filament::icon :icon="$field->getIcon()" class="w-4 h-4"/>
-                                                {{ $field->getLabel() }}
-                                            </span>
-                                            @if ($sortField === $field)
-                                                <x-filament::icon icon="heroicon-m-check" class="w-4 h-4"/>
-                                            @endif
-                                        </button>
-                                    @endforeach
-                                </div>
+                                <div
+                                    x-show="open"
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    class="absolute right-0 mt-1 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-10"
+                                >
+                                    <div class="p-1 border-b border-gray-100 dark:border-gray-700">
+                                        @foreach(SortField::cases() as $field)
+                                            <button
+                                                wire:click="setSortField('{{ $field->value }}')"
+                                                @class([
+                                                    'w-full flex items-center justify-between px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700',
+                                                    'text-primary-600 dark:text-primary-400' => $sortField === $field,
+                                                    'text-gray-700 dark:text-gray-300' => $sortField !== $field,
+                                                ])
+                                            >
+                                                <span class="flex items-center gap-2">
+                                                    <x-filament::icon :icon="$field->getIcon()" class="w-4 h-4"/>
+                                                    {{ $field->getLabel() }}
+                                                </span>
+                                                @if($sortField === $field)
+                                                    <x-filament::icon icon="heroicon-m-check" class="w-4 h-4"/>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    </div>
 
-                                {{-- Sort Direction Section --}}
-                                <div class="p-1">
-                                    @foreach (SortDirection::cases() as $direction)
-                                        <button
-                                            wire:click="setSortDirection('{{ $direction->value }}')"
-                                            @class([
-                                                'w-full flex items-center justify-between px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700',
-                                                'text-primary-600 dark:text-primary-400' => $sortDirection === $direction,
-                                                'text-gray-700 dark:text-gray-300' => $sortDirection !== $direction,
-                                            ])
-                                        >
-                                            <span class="flex items-center gap-2">
-                                                <x-filament::icon :icon="$direction->getIcon()" class="w-4 h-4"/>
-                                                {{ $direction->getLabel() }}
-                                            </span>
-                                            @if ($sortDirection === $direction)
-                                                <x-filament::icon icon="heroicon-m-check" class="w-4 h-4"/>
-                                            @endif
-                                        </button>
-                                    @endforeach
+                                    <div class="p-1">
+                                        @foreach(SortDirection::cases() as $direction)
+                                            <button
+                                                wire:click="setSortDirection('{{ $direction->value }}')"
+                                                @class([
+                                                    'w-full flex items-center justify-between px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700',
+                                                    'text-primary-600 dark:text-primary-400' => $sortDirection === $direction,
+                                                    'text-gray-700 dark:text-gray-300' => $sortDirection !== $direction,
+                                                ])
+                                            >
+                                                <span class="flex items-center gap-2">
+                                                    <x-filament::icon :icon="$direction->getIcon()" class="w-4 h-4"/>
+                                                    {{ $direction->getLabel() }}
+                                                </span>
+                                                @if($sortDirection === $direction)
+                                                    <x-filament::icon icon="heroicon-m-check" class="w-4 h-4"/>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         </div>
                     </div>
                 </div>
@@ -377,7 +381,10 @@
         <x-filament::button color="gray" wire:click="$parent.goBack()">
             Back
         </x-filament::button>
-        <x-filament::button wire:click="continueToPreview" class="data-[loading]:opacity-50">
+        <x-filament::button
+            wire:click="continueToPreview"
+            :disabled="count($batchIds) > 0"
+        >
             Continue
         </x-filament::button>
     </div>

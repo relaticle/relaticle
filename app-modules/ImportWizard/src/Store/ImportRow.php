@@ -82,10 +82,6 @@ final class ImportRow extends Model
         ];
     }
 
-    // =========================================================================
-    // QUERY SCOPES
-    // =========================================================================
-
     /**
      * @param  Builder<static>  $query
      */
@@ -198,13 +194,7 @@ final class ImportRow extends Model
         };
     }
 
-    // =========================================================================
-    // QUERY METHODS
-    // =========================================================================
-
     /**
-     * Count unique values for each filter type in a single query.
-     *
      * @param  Builder<static>  $query
      * @return array<string, int>
      */
@@ -241,15 +231,13 @@ final class ImportRow extends Model
     }
 
     /**
-     * Get error status for multiple columns in a single query.
-     *
      * @param  Builder<static>  $query
      * @param  array<string>  $columns
      * @return array<string, bool>
      */
     public static function getColumnErrorStatuses(Builder $query, array $columns): array
     {
-        if (empty($columns)) {
+        if ($columns === []) {
             return [];
         }
 
@@ -272,27 +260,23 @@ final class ImportRow extends Model
         return $statuses;
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
-
     public function hasErrors(): bool
     {
-        return $this->validation?->isNotEmpty() === true;
+        return $this->validation?->isNotEmpty() ?? false;
     }
 
     public function hasCorrections(): bool
     {
-        return $this->corrections?->isNotEmpty() === true;
+        return $this->corrections?->isNotEmpty() ?? false;
     }
 
-    /**
-     * Get the final value for a column (corrected or original).
-     * Returns null for skipped values.
-     */
     public function getFinalValue(string $column): mixed
     {
         if ($this->isValueSkipped($column)) {
+            return null;
+        }
+
+        if ($this->hasValidationError($column)) {
             return null;
         }
 
@@ -303,19 +287,17 @@ final class ImportRow extends Model
         return $this->raw_data->get($column);
     }
 
-    /**
-     * Check if a specific column value is marked as skipped.
-     */
     public function isValueSkipped(string $column): bool
     {
-        return $this->skipped?->has($column) === true;
+        return $this->skipped?->has($column) ?? false;
     }
 
-    /**
-     * Get all final values (with corrections applied).
-     *
-     * @return array<string, mixed>
-     */
+    public function hasValidationError(string $column): bool
+    {
+        return $this->validation?->has($column) ?? false;
+    }
+
+    /** @return array<string, mixed> */
     public function getFinalData(): array
     {
         return $this->raw_data->merge($this->corrections ?? [])->all();

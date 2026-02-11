@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
+use Filament\Actions\Action;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Support\Enums\Width;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -11,28 +17,20 @@ use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
+use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
-use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\DataTypeInferencer;
 
-/**
- * Step 2: Column mapping.
- *
- * Maps CSV columns to entity fields with auto-detection and manual adjustment.
- * Uses a unified ColumnData DTO keyed by source (CSV column).
- */
-final class MappingStep extends Component
+final class MappingStep extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
+    use InteractsWithForms;
     use WithImportStore;
 
-    /**
-     * Unified column mappings array.
-     *
-     * @var array<string, array<string, mixed>>
-     */
+    /** @var array<string, array<string, mixed>> */
     public array $columns = [];
 
     private ?BaseImporter $importer = null;
@@ -55,33 +53,19 @@ final class MappingStep extends Component
         ]);
     }
 
-    // =========================================================================
-    // COMPUTED PROPERTIES
-    // =========================================================================
-
-    /**
-     * Get all importable fields (standard + custom).
-     */
     #[Computed]
     public function allFields(): ImportFieldCollection
     {
         return $this->getImporter()->allFields();
     }
 
-    /**
-     * Get entity link definitions (relationships and Record custom fields).
-     *
-     * @return array<string, EntityLink>
-     */
+    /** @return array<string, EntityLink> */
     #[Computed]
     public function entityLinks(): array
     {
         return $this->getImporter()->entityLinks();
     }
 
-    /**
-     * Get required fields that are not mapped.
-     */
     #[Computed]
     public function unmappedRequired(): ImportFieldCollection
     {
@@ -92,20 +76,13 @@ final class MappingStep extends Component
         );
     }
 
-    /**
-     * Check if there are any entity links defined.
-     */
     #[Computed]
     public function hasEntityLinks(): bool
     {
         return $this->entityLinks() !== [];
     }
 
-    /**
-     * Get field keys that are currently mapped (excludes entity link mappings).
-     *
-     * @return list<string>
-     */
+    /** @return list<string> */
     #[Computed]
     public function mappedFieldKeys(): array
     {
@@ -117,30 +94,17 @@ final class MappingStep extends Component
             ->all();
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
-
-    /**
-     * Check if a CSV column is mapped.
-     */
     public function isMapped(string $source): bool
     {
         return isset($this->columns[$source]);
     }
 
-    /**
-     * Check if a target (field key) is already mapped to any source.
-     */
     public function isTargetMapped(string $target): bool
     {
         return collect($this->columns)
             ->contains(fn (array $m): bool => $m['target'] === $target && ($m['entityLink'] ?? null) === null);
     }
 
-    /**
-     * Get the mapping for a CSV column.
-     */
     public function getMapping(string $source): ?ColumnData
     {
         if (! isset($this->columns[$source])) {
@@ -150,9 +114,6 @@ final class MappingStep extends Component
         return ColumnData::from($this->columns[$source]);
     }
 
-    /**
-     * Get the CSV column that is mapped to a specific field key.
-     */
     public function getSourceForTarget(string $target): ?string
     {
         return collect($this->columns)
@@ -161,54 +122,45 @@ final class MappingStep extends Component
             ->first();
     }
 
-    /**
-     * Get the field for a CSV column, or null if not mapped.
-     */
     public function getFieldForSource(string $source): ?ImportField
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof ColumnData || $mapping->isEntityLinkMapping()) {
+        if ($mapping === null || $mapping->isEntityLinkMapping()) {
             return null;
         }
 
         return $this->allFields()->get($mapping->target);
     }
 
-    /**
-     * Get entity link mapping for a CSV column, or null.
-     *
-     * @return array{linkKey: string, link: EntityLink, matcherKey: string}|null
-     */
+    /** @return array{linkKey: string, link: EntityLink, matcherKey: string}|null */
     public function getEntityLinkForSource(string $source): ?array
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof ColumnData || $mapping->isFieldMapping()) {
+        if ($mapping === null || $mapping->isFieldMapping()) {
             return null;
         }
 
         $link = $this->entityLinks()[$mapping->entityLink] ?? null;
 
-        return $link !== null
-            ? ['linkKey' => $mapping->entityLink, 'link' => $link, 'matcherKey' => $mapping->target]
-            : null;
+        if ($link === null) {
+            return null;
+        }
+
+        return ['linkKey' => $mapping->entityLink, 'link' => $link, 'matcherKey' => $mapping->target];
     }
 
-    /**
-     * Get preview values for a CSV column.
-     *
-     * @return array<string>
-     */
+    /** @return array<string> */
     public function previewValues(string $column, int $limit = 5): array
     {
         $store = $this->store();
-        if (! $store instanceof ImportStore) {
+
+        if ($store === null) {
             return [];
         }
 
-        return $store
-            ->query()
+        return $store->query()
             ->limit($limit)
             ->get()
             ->pluck('raw_data')
@@ -216,21 +168,11 @@ final class MappingStep extends Component
             ->all();
     }
 
-    /**
-     * Check if user can proceed (all required fields mapped).
-     */
     public function canProceed(): bool
     {
         return $this->unmappedRequired()->isEmpty();
     }
 
-    // =========================================================================
-    // AUTO-MAPPING
-    // =========================================================================
-
-    /**
-     * Run auto-mapping for all unmapped columns.
-     */
     public function autoMap(): void
     {
         $this->autoMapByHeaders();
@@ -238,9 +180,6 @@ final class MappingStep extends Component
         $this->inferDataTypes();
     }
 
-    /**
-     * Auto-map columns based on header name matching.
-     */
     private function autoMapByHeaders(): void
     {
         $headers = $this->headers();
@@ -258,9 +197,6 @@ final class MappingStep extends Component
         }
     }
 
-    /**
-     * Auto-map entity link columns based on guesses.
-     */
     private function autoMapEntityLinks(): void
     {
         $headers = $this->headers();
@@ -291,18 +227,12 @@ final class MappingStep extends Component
         }
     }
 
-    /**
-     * Check if an entity link is already mapped.
-     */
     public function isEntityLinkMapped(string $linkKey): bool
     {
         return collect($this->columns)
             ->contains(fn (array $m): bool => ($m['entityLink'] ?? null) === $linkKey);
     }
 
-    /**
-     * Infer data types for unmapped columns and auto-map high-confidence matches.
-     */
     private function inferDataTypes(): void
     {
         $headers = $this->headers();
@@ -333,68 +263,95 @@ final class MappingStep extends Component
         }
     }
 
-    // =========================================================================
-    // ACTIONS
-    // =========================================================================
-
-    /**
-     * Map a CSV column to a field.
-     */
     public function mapToField(string $source, string $target): void
     {
         if ($target === '') {
             unset($this->columns[$source]);
-        } elseif (! $this->isTargetMapped($target)) {
+
+            return;
+        }
+
+        if (! $this->isTargetMapped($target)) {
             $this->columns[$source] = ColumnData::toField($source, $target)->toArray();
         }
     }
 
-    /**
-     * Map a CSV column to an entity link.
-     */
     public function mapToEntityLink(string $source, string $matcherKey, string $entityLinkKey): void
     {
         $this->columns[$source] = ColumnData::toEntityLink($source, $matcherKey, $entityLinkKey)->toArray();
     }
 
-    /**
-     * Clear mapping for a CSV column.
-     */
     public function unmapColumn(string $source): void
     {
         unset($this->columns[$source]);
     }
 
-    /**
-     * Continue to review step after validating mappings.
-     */
-    public function continueToReview(): void
+    public function continueAction(): Action
     {
-        if (! $this->canProceed()) {
-            return;
+        $needsConfirmation = ! $this->hasMatchableFieldMapped();
+
+        $action = Action::make('continue')
+            ->label('Continue')
+            ->color('primary')
+            ->disabled(fn (): bool => ! $this->canProceed())
+            ->action(function (): void {
+                $this->saveMappings();
+                $this->store()?->setStatus(ImportStatus::Reviewing);
+                $this->dispatch('completed');
+            });
+
+        if ($needsConfirmation) {
+            $action
+                ->requiresConfirmation()
+                ->modalWidth(Width::Large)
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalIconColor('warning')
+                ->modalHeading('Avoid creating duplicate records')
+                ->modalDescription($this->buildMatchWarningDescription())
+                ->modalSubmitActionLabel('Continue without mapping')
+                ->modalCancelActionLabel('Go Back');
         }
 
-        $this->saveMappings();
-
-        $store = $this->store();
-        if ($store instanceof ImportStore) {
-            $store->setStatus(ImportStatus::Reviewing);
-        }
-
-        $this->dispatch('completed');
+        return $action;
     }
 
-    // =========================================================================
-    // PERSISTENCE
-    // =========================================================================
+    public function hasMatchableFieldMapped(): bool
+    {
+        $matchableFields = collect($this->getImporter()->matchableFields())
+            ->reject(fn (MatchableField $field): bool => $field->isAlwaysCreate());
 
-    /**
-     * Save mappings to store.
-     */
+        if ($matchableFields->isEmpty()) {
+            return true;
+        }
+
+        $mappedKeys = $this->mappedFieldKeys();
+
+        return $matchableFields
+            ->contains(fn (MatchableField $field): bool => in_array($field->field, $mappedKeys, true));
+    }
+
+    private function buildMatchWarningDescription(): string
+    {
+        $matchableFields = collect($this->getImporter()->matchableFields())
+            ->reject(fn (MatchableField $field): bool => $field->isAlwaysCreate())
+            ->sortByDesc(fn (MatchableField $field): int => $field->priority);
+
+        $fieldLabels = $matchableFields
+            ->map(fn (MatchableField $field): string => $field->label)
+            ->values()
+            ->all();
+
+        $entityLabel = $this->entityType->label();
+        $fieldList = implode(' or ', $fieldLabels);
+
+        return "To avoid creating duplicate records, make sure you map a column that uniquely identifies each record.\n\nFor {$entityLabel}, map a {$fieldList} column.";
+    }
+
     private function saveMappings(): void
     {
         $store = $this->store();
-        if (! $store instanceof ImportStore) {
+
+        if ($store === null) {
             return;
         }
 
@@ -405,36 +362,24 @@ final class MappingStep extends Component
         $store->setColumnMappings($mappings);
     }
 
-    /**
-     * Load mappings from store.
-     */
     private function loadMappings(): void
     {
         $store = $this->store();
-        if (! $store instanceof ImportStore) {
+
+        if ($store === null) {
             return;
         }
 
-        $stored = $store->columnMappings();
-
-        $this->columns = $stored
+        $this->columns = $store->columnMappings()
             ->keyBy('source')
             ->map(fn (ColumnData $m): array => $m->toArray())
             ->all();
     }
 
-    // =========================================================================
-    // PRIVATE HELPERS
-    // =========================================================================
-
-    /**
-     * Get the importer instance.
-     */
     private function getImporter(): BaseImporter
     {
-        if (! $this->importer instanceof BaseImporter) {
-            $store = $this->store();
-            $teamId = $store?->teamId() ?? (string) filament()->getTenant()?->getKey();
+        if ($this->importer === null) {
+            $teamId = $this->store()?->teamId() ?? (string) filament()->getTenant()?->getKey();
             $this->importer = $this->entityType->importer($teamId);
         }
 

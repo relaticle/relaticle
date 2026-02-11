@@ -29,14 +29,10 @@ final class ColumnData extends Data implements Wireable
 {
     use WireableData;
 
-    /**
-     * Hydrated at runtime by ImportStore - not stored in JSON.
-     */
+    /** Hydrated at runtime by ImportStore, not persisted. */
     public ?ImportField $importField = null;
 
-    /**
-     * Hydrated at runtime by ImportStore - not stored in JSON.
-     */
+    /** Hydrated at runtime by ImportStore, not persisted. */
     public ?EntityLink $entityLinkField = null;
 
     public function __construct(
@@ -47,9 +43,6 @@ final class ColumnData extends Data implements Wireable
         public readonly ?NumberFormat $numberFormat = null,
     ) {}
 
-    /**
-     * Create a field mapping.
-     */
     public static function toField(string $source, string $target): self
     {
         return new self(
@@ -58,13 +51,6 @@ final class ColumnData extends Data implements Wireable
         );
     }
 
-    /**
-     * Create an entity link mapping (relationship or Record custom field).
-     *
-     * @param  string  $source  CSV column header
-     * @param  string  $matcherKey  The field to match on (e.g., 'name', 'email', 'id')
-     * @param  string  $entityLinkKey  The entity link key (e.g., 'company', 'custom_fields_linked_company')
-     */
     public static function toEntityLink(
         string $source,
         string $matcherKey,
@@ -93,9 +79,6 @@ final class ColumnData extends Data implements Wireable
         return $this->getType()->isMultiChoiceField() && ! ($this->importField?->acceptsArbitraryValues ?? false);
     }
 
-    /**
-     * Check if this is a SINGLE_CHOICE field with predefined options.
-     */
     public function isSingleChoicePredefined(): bool
     {
         return $this->getType()->isChoiceField() && ! $this->getType()->isMultiChoiceField();
@@ -103,14 +86,10 @@ final class ColumnData extends Data implements Wireable
 
     public function isMultiChoiceArbitrary(): bool
     {
-        return $this->getType()->isMultiChoiceField() && $this->importField?->acceptsArbitraryValues ?? false;
+        return $this->getType()->isMultiChoiceField() && ($this->importField?->acceptsArbitraryValues ?? false);
     }
 
-    /**
-     * Get validation rules for this field.
-     *
-     * @return array<string>
-     */
+    /** @return array<string> */
     public function getRules(): array
     {
         return $this->importField?->rules ?? [];
@@ -175,14 +154,14 @@ final class ColumnData extends Data implements Wireable
 
         $matcher = $link->getMatcher($this->target);
 
-        return $matcher !== null ? ['link' => $link, 'matcher' => $matcher] : null;
+        if ($matcher === null) {
+            return null;
+        }
+
+        return ['link' => $link, 'matcher' => $matcher];
     }
 
-    /**
-     * Serialize for JSON storage - excludes transient fields (importField, entityLinkField).
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

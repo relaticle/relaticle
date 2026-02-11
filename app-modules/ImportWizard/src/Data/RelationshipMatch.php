@@ -7,11 +7,6 @@ namespace Relaticle\ImportWizard\Data;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Spatie\LaravelData\Data;
 
-/**
- * Represents the match result for a relationship during import.
- *
- * Tracks whether a related record exists or needs to be created.
- */
 final class RelationshipMatch extends Data
 {
     public function __construct(
@@ -21,9 +16,6 @@ final class RelationshipMatch extends Data
         public readonly ?string $name = null,
     ) {}
 
-    /**
-     * Create a match for an existing related record.
-     */
     public static function existing(string $relationship, string $id): self
     {
         return new self(
@@ -33,9 +25,6 @@ final class RelationshipMatch extends Data
         );
     }
 
-    /**
-     * Create a match indicating a new related record will be created.
-     */
     public static function create(string $relationship, string $name): self
     {
         return new self(

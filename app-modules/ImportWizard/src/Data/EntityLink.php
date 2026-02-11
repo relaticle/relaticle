@@ -20,16 +20,6 @@ use Relaticle\ImportWizard\Support\EntityLinkStorage\MorphToManyStorage;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Data;
 
-/**
- * Unified entity link definition for import mapping.
- *
- * EntityLinks represent connections to other entities, replacing the separate
- * RelationshipField system. They can come from two sources:
- * - Hardcoded relationship definitions in importers
- * - Record-type custom fields from the database
- *
- * Both are displayed in a unified "Link to Records" UI section.
- */
 final class EntityLink extends Data
 {
     /**
@@ -66,11 +56,7 @@ final class EntityLink extends Data
         public readonly ?int $sortOrder = null,
     ) {}
 
-    /**
-     * Create new instance with selective property overrides.
-     *
-     * @param  array<string, mixed>  $overrides
-     */
+    /** @param  array<string, mixed>  $overrides */
     private function cloneWith(array $overrides): self
     {
         return new self(
@@ -91,15 +77,7 @@ final class EntityLink extends Data
         );
     }
 
-    // =========================================================================
-    // FACTORY METHODS
-    // =========================================================================
-
-    /**
-     * Create a belongsTo relationship link.
-     *
-     * @param  class-string<Model>  $modelClass
-     */
+    /** @param  class-string<Model>  $modelClass */
     public static function belongsTo(string $name, string $modelClass): self
     {
         return new self(
@@ -112,11 +90,7 @@ final class EntityLink extends Data
         );
     }
 
-    /**
-     * Create a morphToMany relationship link.
-     *
-     * @param  class-string<Model>  $modelClass
-     */
+    /** @param  class-string<Model>  $modelClass */
     public static function morphToMany(string $name, string $modelClass): self
     {
         return new self(
@@ -131,14 +105,9 @@ final class EntityLink extends Data
         );
     }
 
-    /**
-     * Create an entity link from a Record-type custom field.
-     */
     public static function fromCustomField(CustomField $customField): self
     {
         $lookupType = $customField->lookup_type;
-
-        // Use Laravel's morph map to resolve lookup_type to model class
         $modelClass = Relation::getMorphedModel($lookupType);
 
         if ($modelClass === null) {
@@ -154,6 +123,7 @@ final class EntityLink extends Data
             storageType: EntityLinkStorage::CustomFieldValue,
             label: $customField->name,
             allowMultiple: $customField->typeData->supportsMultiValue ?? false,
+            canCreate: $modelClass !== Opportunity::class,
             customFieldCode: $customField->code,
             guesses: [
                 $customField->code,
@@ -165,13 +135,6 @@ final class EntityLink extends Data
         );
     }
 
-    // =========================================================================
-    // PRE-CONFIGURED ENTITY LINKS (replacing RelationshipField statics)
-    // =========================================================================
-
-    /**
-     * Pre-configured company relationship.
-     */
     public static function company(): self
     {
         return self::belongsTo('company', Company::class)
@@ -181,15 +144,13 @@ final class EntityLink extends Data
                 MatchableField::name(),
             ])
             ->foreignKey('company_id')
+            ->canCreate()
             ->guess([
                 'company', 'company_name', 'organization', 'account',
                 'employer', 'company id', 'company_id',
             ]);
     }
 
-    /**
-     * Pre-configured contact relationship.
-     */
     public static function contact(): self
     {
         return self::belongsTo('contact', People::class)
@@ -200,15 +161,13 @@ final class EntityLink extends Data
                 MatchableField::name(),
             ])
             ->foreignKey('contact_id')
+            ->canCreate()
             ->guess([
                 'contact', 'contact_name', 'person', 'contact_id',
                 'person_id', 'people_id',
             ]);
     }
 
-    /**
-     * Pre-configured polymorphic companies relationship.
-     */
     public static function polymorphicCompanies(): self
     {
         return self::morphToMany('companies', Company::class)
@@ -217,14 +176,12 @@ final class EntityLink extends Data
                 MatchableField::domain('custom_fields_domains'),
                 MatchableField::name(),
             ])
+            ->canCreate()
             ->guess([
                 'company', 'companies', 'company_name', 'company_id',
             ]);
     }
 
-    /**
-     * Pre-configured polymorphic people relationship.
-     */
     public static function polymorphicPeople(): self
     {
         return self::morphToMany('people', People::class)
@@ -234,14 +191,12 @@ final class EntityLink extends Data
                 MatchableField::phone('custom_fields_phone_number'),
                 MatchableField::name(),
             ])
+            ->canCreate()
             ->guess([
                 'person', 'people', 'contact', 'contact_name', 'person_id',
             ]);
     }
 
-    /**
-     * Pre-configured polymorphic opportunities relationship.
-     */
     public static function polymorphicOpportunities(): self
     {
         return self::morphToMany('opportunities', Opportunity::class)
@@ -253,69 +208,38 @@ final class EntityLink extends Data
             ]);
     }
 
-    // =========================================================================
-    // BUILDER METHODS (immutable)
-    // =========================================================================
-
-    /**
-     * Set matchable fields for this entity link.
-     *
-     * @param  array<MatchableField>  $matchableFields
-     */
+    /** @param  array<MatchableField>  $matchableFields */
     public function matchableFields(array $matchableFields): self
     {
         return $this->cloneWith(['matchableFields' => $matchableFields]);
     }
 
-    /**
-     * Set the foreign key column.
-     */
     public function foreignKey(string $foreignKey): self
     {
         return $this->cloneWith(['foreignKey' => $foreignKey]);
     }
 
-    /**
-     * Set the morph relation name.
-     */
     public function morphRelation(string $relation): self
     {
         return $this->cloneWith(['morphRelation' => $relation]);
     }
 
-    /**
-     * Set column name aliases for auto-mapping.
-     *
-     * @param  array<string>  $guesses
-     */
+    /** @param  array<string>  $guesses */
     public function guess(array $guesses): self
     {
         return $this->cloneWith(['guesses' => $guesses]);
     }
 
-    /**
-     * Set whether new related records can be created.
-     */
     public function canCreate(bool $canCreate = true): self
     {
         return $this->cloneWith(['canCreate' => $canCreate]);
     }
 
-    /**
-     * Set the display label.
-     */
     public function label(string $label): self
     {
         return $this->cloneWith(['label' => $label]);
     }
 
-    // =========================================================================
-    // QUERY METHODS
-    // =========================================================================
-
-    /**
-     * Get the highest priority matchable field.
-     */
     public function getHighestPriorityMatcher(): ?MatchableField
     {
         if ($this->matchableFields === []) {
@@ -327,18 +251,12 @@ final class EntityLink extends Data
             ->first();
     }
 
-    /**
-     * Get a matchable field by key.
-     */
     public function getMatcher(string $field): ?MatchableField
     {
         return collect($this->matchableFields)
             ->first(fn (MatchableField $m): bool => $m->field === $field);
     }
 
-    /**
-     * Check if this entity link matches a given column header.
-     */
     public function matchesHeader(string $header): bool
     {
         $normalized = strtolower(trim($header));
@@ -354,57 +272,36 @@ final class EntityLink extends Data
         return array_any($this->guesses, fn ($guess): bool => strtolower($guess) === $normalized);
     }
 
-    /**
-     * Get the icon for this entity link from the Entities registry.
-     */
     public function icon(): string
     {
         return Entities::getEntity($this->targetEntity)?->getIcon() ?? 'heroicon-o-link';
     }
 
-    /**
-     * Check if this is a belongsTo (foreign key) storage type.
-     */
     public function isForeignKey(): bool
     {
         return $this->storageType === EntityLinkStorage::ForeignKey;
     }
 
-    /**
-     * Check if this is a morphToMany storage type.
-     */
     public function isMorphToMany(): bool
     {
         return $this->storageType === EntityLinkStorage::MorphToMany;
     }
 
-    /**
-     * Check if this is a custom field value storage type.
-     */
     public function isCustomFieldValue(): bool
     {
         return $this->storageType === EntityLinkStorage::CustomFieldValue;
     }
 
-    /**
-     * Check if this link comes from a relationship definition.
-     */
     public function isFromRelationship(): bool
     {
         return $this->source === EntityLinkSource::Relationship;
     }
 
-    /**
-     * Check if this link comes from a custom field.
-     */
     public function isFromCustomField(): bool
     {
         return $this->source === EntityLinkSource::CustomField;
     }
 
-    /**
-     * Get the appropriate storage strategy for this entity link.
-     */
     public function getStorageStrategy(): EntityLinkStorageInterface
     {
         return match ($this->storageType) {
@@ -414,15 +311,7 @@ final class EntityLink extends Data
         };
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
-
-    /**
-     * Get the entity alias for a model class.
-     *
-     * @param  class-string<Model>  $modelClass
-     */
+    /** @param  class-string<Model>  $modelClass */
     private static function getEntityAliasForModel(string $modelClass): string
     {
         return match ($modelClass) {
@@ -434,11 +323,6 @@ final class EntityLink extends Data
     }
 
     /**
-     * Get only unique identifier matchable fields for Record-type custom fields.
-     *
-     * For Record-type custom fields, we only allow matching by truly unique
-     * identifiers (id, email, domain) - not by name which is not unique.
-     *
      * @param  class-string<Model>  $modelClass
      * @return array<MatchableField>
      */

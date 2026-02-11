@@ -82,8 +82,6 @@ function mountReviewStep(object $context): \Livewire\Features\SupportTesting\Tes
     ]);
 }
 
-// ─── Mount ──────────────────────────────────────────────────────────────────
-
 it('renders with correct columns', function (): void {
     $component = mountReviewStep($this);
 
@@ -100,8 +98,6 @@ it('selects first column by default on mount', function (): void {
     expect($component->get('selectedColumn.source'))->toBe('Name');
 });
 
-// ─── Column Selection ───────────────────────────────────────────────────────
-
 it('changes selected column via selectColumn', function (): void {
     $component = mountReviewStep($this);
 
@@ -109,8 +105,6 @@ it('changes selected column via selectColumn', function (): void {
 
     expect($component->get('selectedColumn.source'))->toBe('Emails');
 });
-
-// ─── Text Correction ────────────────────────────────────────────────────────
 
 it('stores text correction in SQLite via updateMappedValue', function (): void {
     $component = mountReviewStep($this);
@@ -131,8 +125,6 @@ it('stores validation error for invalid text correction', function (): void {
     expect($row->corrections->get('Emails'))->toBe('not-an-email')
         ->and($row->validation->get('Emails'))->not->toBeNull();
 });
-
-// ─── Multi-Value Validation ─────────────────────────────────────────────────
 
 it('returns empty errors for valid emails in multi-value field', function (): void {
     $component = mountReviewStep($this);
@@ -156,8 +148,6 @@ it('returns per-item errors for invalid emails in multi-value field', function (
         ->and($row->validation->get('Emails'))->not->toBeNull();
 });
 
-// ─── Skip / Unskip ─────────────────────────────────────────────────────────
-
 it('marks value as skipped via skipValue', function (): void {
     $component = mountReviewStep($this);
 
@@ -177,8 +167,6 @@ it('removes skip flag via unskipValue', function (): void {
     expect($row->skipped?->get('Name'))->toBeNull();
 });
 
-// ─── Undo Correction ───────────────────────────────────────────────────────
-
 it('removes correction and re-validates raw value via undoCorrection', function (): void {
     $component = mountReviewStep($this);
 
@@ -188,8 +176,6 @@ it('removes correction and re-validates raw value via undoCorrection', function 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->corrections?->get('Name'))->toBeNull();
 });
-
-// ─── Filter, Sort & Search ──────────────────────────────────────────────────
 
 it('setFilter changes filter and resets pagination', function (): void {
     $component = mountReviewStep($this);
@@ -247,4 +233,35 @@ it('columnErrorStatuses reflects validation state', function (): void {
 
     $statuses = $component->get('columnErrorStatuses');
     expect($statuses['Name'])->toBeTrue();
+});
+
+it('dispatches completed event when continueToPreview is called', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', []);
+
+    $component->call('continueToPreview')
+        ->assertDispatched('completed');
+});
+
+it('does not dispatch completed while validation batches are still running', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', ['Name' => 'fake-batch-id']);
+
+    $component->call('continueToPreview')
+        ->assertNotDispatched('completed');
+});
+
+it('dispatches completed even when unresolved validation errors exist', function (): void {
+    $jsonPath = '$.Name';
+    $this->store->connection()->statement("
+        UPDATE import_rows
+        SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+        WHERE json_extract(raw_data, ?) = ?
+    ", [$jsonPath, 'Required field', $jsonPath, 'John']);
+
+    $component = mountReviewStep($this);
+    $component->set('batchIds', []);
+
+    $component->call('continueToPreview')
+        ->assertDispatched('completed');
 });

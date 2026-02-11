@@ -68,8 +68,6 @@ function mountMappingStep(object $context): \Livewire\Features\SupportTesting\Te
     ]);
 }
 
-// ─── Mount & Auto-Mapping ───────────────────────────────────────────────────
-
 it('renders with correct headers from store', function (): void {
     createStoreWithHeaders($this, ['Name', 'Phone', 'Notes']);
 
@@ -100,8 +98,6 @@ it('auto-maps Company header to company entity link', function (): void {
     expect($columns)->toHaveKey('Company')
         ->and($columns['Company']['entityLink'])->toBe('company');
 });
-
-// ─── Manual Mapping ─────────────────────────────────────────────────────────
 
 it('mapToField updates column mapping', function (): void {
     createStoreWithHeaders($this, ['Full Name', 'Notes']);
@@ -162,8 +158,6 @@ it('unmapColumn removes mapping', function (): void {
     expect($component->get('columns'))->not->toHaveKey('Name');
 });
 
-// ─── canProceed ─────────────────────────────────────────────────────────────
-
 it('canProceed returns false when required field is unmapped', function (): void {
     createStoreWithHeaders($this, ['Notes', 'Phone']);
 
@@ -186,14 +180,12 @@ it('canProceed returns true when all required fields are mapped', function (): v
         ->assertReturned(true);
 });
 
-// ─── Continue to Review ─────────────────────────────────────────────────────
-
-it('continueToReview saves mappings to store', function (): void {
+it('continue action saves mappings to store', function (): void {
     createStoreWithHeaders($this, ['Name', 'Notes']);
 
     $component = mountMappingStep($this);
     $component->call('mapToField', 'Name', 'name');
-    $component->call('continueToReview');
+    $component->callAction('continue');
 
     $freshStore = ImportStore::load($this->store->id(), (string) $this->team->id);
     $savedMappings = $freshStore->columnMappings();
@@ -202,40 +194,36 @@ it('continueToReview saves mappings to store', function (): void {
         ->and($savedMappings->first()->target)->toBe('name');
 });
 
-it('continueToReview sets status to Reviewing', function (): void {
+it('continue action sets status to Reviewing', function (): void {
     createStoreWithHeaders($this, ['Name']);
 
     $component = mountMappingStep($this);
     $component->call('mapToField', 'Name', 'name');
-    $component->call('continueToReview');
+    $component->callAction('continue');
 
     $freshStore = ImportStore::load($this->store->id(), (string) $this->team->id);
     expect($freshStore->status())->toBe(ImportStatus::Reviewing);
 });
 
-it('continueToReview dispatches completed event', function (): void {
+it('continue action dispatches completed event', function (): void {
     createStoreWithHeaders($this, ['Name']);
 
     $component = mountMappingStep($this);
     $component->call('mapToField', 'Name', 'name');
-    $component->call('continueToReview');
+    $component->callAction('continue');
 
     $component->assertDispatched('completed');
 });
 
-it('continueToReview blocked when canProceed is false', function (): void {
+it('continue action is disabled when required fields are unmapped', function (): void {
     createStoreWithHeaders($this, ['Notes', 'Phone']);
 
     $component = mountMappingStep($this);
     $component->call('unmapColumn', 'Notes');
     $component->call('unmapColumn', 'Phone');
-    $component->call('continueToReview');
 
-    $component->assertNotDispatched('completed');
-    expect($this->store->status())->toBe(ImportStatus::Mapping);
+    $component->assertActionDisabled('continue');
 });
-
-// ─── Preview Values ─────────────────────────────────────────────────────────
 
 it('previewValues returns sample values from SQLite', function (): void {
     createStoreWithHeaders($this, ['Name', 'Email'], [

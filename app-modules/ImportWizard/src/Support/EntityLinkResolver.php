@@ -6,15 +6,10 @@ namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 
-/**
- * Resolves import values to record IDs for entity links.
- *
- * Performs efficient batch lookups against the database to find matching
- * records based on the selected matcher field (id, email, domain, name, etc.).
- */
 final class EntityLinkResolver
 {
     private const CUSTOM_FIELD_PREFIX = 'custom_fields_';
@@ -26,14 +21,11 @@ final class EntityLinkResolver
         private readonly string $teamId,
     ) {}
 
-    /**
-     * Resolve a single value to record ID.
-     */
     public function resolve(EntityLink $link, MatchableField $matcher, mixed $value): int|string|null
     {
         $value = $this->normalizeValue($value);
 
-        if ($value === '' || $value === null) {
+        if ($value === null) {
             return null;
         }
 
@@ -49,17 +41,14 @@ final class EntityLinkResolver
     }
 
     /**
-     * Resolve multiple values at once, returning map of value => ID.
-     *
      * @param  array<mixed>  $values
      * @return array<string, int|string|null>
      */
     public function resolveMany(EntityLink $link, MatchableField $matcher, array $values): array
     {
-        $normalized = array_map(fn ($v) => $this->normalizeValue($v), $values);
-        $uniqueValues = array_filter(array_unique($normalized), fn ($v) => $v !== '' && $v !== null);
+        $uniqueValues = $this->normalizeUniqueValues($values);
 
-        if (empty($uniqueValues)) {
+        if ($uniqueValues === []) {
             return [];
         }
 
@@ -68,30 +57,29 @@ final class EntityLinkResolver
         $toFetch = [];
 
         foreach ($uniqueValues as $value) {
-            if (isset($this->cache[$cacheKey][$value])) {
-                $results[$value] = $this->cache[$cacheKey][$value];
-            } else {
+            if (! isset($this->cache[$cacheKey][$value])) {
                 $toFetch[] = $value;
+
+                continue;
             }
+
+            $results[$value] = $this->cache[$cacheKey][$value];
         }
 
-        if (! empty($toFetch)) {
-            $fetched = $this->batchResolve($link, $matcher, $toFetch);
-            $results = array_merge($results, $fetched);
+        if ($toFetch !== []) {
+            $results = array_merge($results, $this->batchResolve($link, $matcher, $toFetch));
         }
 
         return $results;
     }
 
     /**
-     * Batch resolve unique values to record IDs with a single database query.
-     *
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string|null>
      */
     public function batchResolve(EntityLink $link, MatchableField $matcher, array $uniqueValues): array
     {
-        if (empty($uniqueValues)) {
+        if ($uniqueValues === []) {
             return [];
         }
 
@@ -102,19 +90,15 @@ final class EntityLinkResolver
             ? $this->resolveViaCustomField($link, $field, $uniqueValues)
             : $this->resolveViaColumn($link, $field, $uniqueValues);
 
+        $normalizedResults = [];
+        foreach ($results as $dbValue => $id) {
+            $normalizedResults[$this->normalizeForComparison((string) $dbValue)] = $id;
+        }
+
         $resolved = [];
 
         foreach ($uniqueValues as $value) {
-            $normalizedValue = $this->normalizeForComparison($value);
-            $matchedId = null;
-
-            foreach ($results as $dbValue => $id) {
-                if ($this->normalizeForComparison((string) $dbValue) === $normalizedValue) {
-                    $matchedId = $id;
-                    break;
-                }
-            }
-
+            $matchedId = $normalizedResults[$this->normalizeForComparison($value)] ?? null;
             $resolved[$value] = $matchedId;
             $this->cache[$cacheKey][$value] = $matchedId;
         }
@@ -123,24 +107,30 @@ final class EntityLinkResolver
     }
 
     /**
-     * Check if the field is a custom field accessor.
+     * @param  array<mixed>  $values
+     * @return array<string>
      */
+    private function normalizeUniqueValues(array $values): array
+    {
+        return collect($values)
+            ->map(fn (mixed $v): ?string => $this->normalizeValue($v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     private function isCustomField(string $field): bool
     {
         return str_starts_with($field, self::CUSTOM_FIELD_PREFIX);
     }
 
-    /**
-     * Extract custom field code from accessor name.
-     */
     private function getCustomFieldCode(string $field): string
     {
         return substr($field, strlen(self::CUSTOM_FIELD_PREFIX));
     }
 
     /**
-     * Resolve values via a regular database column.
-     *
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string>
      */
@@ -157,8 +147,6 @@ final class EntityLinkResolver
     }
 
     /**
-     * Resolve values via custom field values table.
-     *
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string>
      */
@@ -177,34 +165,58 @@ final class EntityLinkResolver
             return [];
         }
 
-        return CustomFieldValue::query()
+        $valueColumn = $customField->getValueColumn();
+
+        $baseQuery = CustomFieldValue::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)
             ->where('custom_field_id', $customField->id)
-            ->where('entity_type', $link->targetEntity)
-            ->whereIn('string_value', $uniqueValues)
-            ->pluck('entity_id', 'string_value')
+            ->where('entity_type', $link->targetEntity);
+
+        if ($valueColumn === 'json_value') {
+            return $this->resolveViaJsonColumn($baseQuery, $uniqueValues);
+        }
+
+        return (clone $baseQuery)
+            ->whereIn($valueColumn, $uniqueValues)
+            ->pluck('entity_id', $valueColumn)
             ->all();
     }
 
     /**
-     * Preload cache with values for a specific entity link/matcher combination.
-     *
-     * @param  array<mixed>  $values
+     * @param  Builder<CustomFieldValue>  $baseQuery
+     * @param  array<string>  $uniqueValues
+     * @return array<string, int|string>
      */
-    public function preloadCache(EntityLink $link, MatchableField $matcher, array $values): void
+    private function resolveViaJsonColumn(Builder $baseQuery, array $uniqueValues): array
     {
-        $normalized = array_map(fn ($v) => $this->normalizeValue($v), $values);
-        $uniqueValues = array_filter(array_unique($normalized), fn ($v) => $v !== '' && $v !== null);
+        $results = [];
 
-        if (! empty($uniqueValues)) {
-            $this->batchResolve($link, $matcher, $uniqueValues);
+        foreach ($uniqueValues as $value) {
+            $entityId = (clone $baseQuery)
+                ->whereJsonContains('json_value', $value)
+                ->value('entity_id');
+
+            if ($entityId !== null) {
+                $results[$value] = $entityId;
+            }
         }
+
+        return $results;
     }
 
-    /**
-     * Get a resolved ID from cache (returns null if not cached).
-     */
+    /** @param  array<mixed>  $values */
+    public function preloadCache(EntityLink $link, MatchableField $matcher, array $values): void
+    {
+        $uniqueValues = $this->normalizeUniqueValues($values);
+
+        if ($uniqueValues === []) {
+            return;
+        }
+
+        $this->batchResolve($link, $matcher, $uniqueValues);
+    }
+
     public function getCachedId(EntityLink $link, MatchableField $matcher, mixed $value): int|string|null
     {
         $cacheKey = $this->getCacheKey($link, $matcher);
@@ -213,9 +225,6 @@ final class EntityLinkResolver
         return $this->cache[$cacheKey][$normalized] ?? null;
     }
 
-    /**
-     * Clear the in-memory cache.
-     */
     public function clearCache(): void
     {
         $this->cache = [];
@@ -232,7 +241,9 @@ final class EntityLinkResolver
             return null;
         }
 
-        return trim((string) $value);
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     private function normalizeForComparison(string $value): string
