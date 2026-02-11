@@ -14,6 +14,8 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportStore;
 
+mutates(ImportWizard::class);
+
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
     Bus::fake();

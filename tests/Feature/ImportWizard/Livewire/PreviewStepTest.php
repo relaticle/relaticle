@@ -20,6 +20,8 @@ use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
 
+mutates(PreviewStep::class, MatchResolver::class);
+
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
 

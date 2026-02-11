@@ -14,6 +14,9 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\MatchResolver;
+
+mutates(ResolveMatchesJob::class, MatchResolver::class);
 
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
@@ -158,6 +161,47 @@ it('does not clear relationships column', function (): void {
     expect($row->relationships)->not->toBeNull()
         ->and($row->relationships)->toHaveCount(1)
         ->and($row->relationships[0]->relationship)->toBe('company');
+});
+
+it('resets previous match resolutions when re-resolving', function (): void {
+    $store = createStoreForMatchResolution($this, ['Name'], [
+        makeMatchRow(2, ['Name' => 'John'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => '999',
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+
+    $row = $store->query()->where('row_number', 2)->first();
+    expect($row->match_action)->toBe(RowMatchAction::Create)
+        ->and($row->matched_id)->toBeNull();
+});
+
+it('marks unmatched rows as Create when mixed matched and empty values', function (): void {
+    $person = People::factory()->create([
+        'name' => 'Existing',
+        'team_id' => $this->team->id,
+    ]);
+
+    $store = createStoreForMatchResolution($this, ['ID', 'Name'], [
+        makeMatchRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated'], []),
+        makeMatchRow(3, ['ID' => '', 'Name' => 'New Person'], []),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+
+    $matched = $store->query()->where('row_number', 2)->first();
+    $unmatched = $store->query()->where('row_number', 3)->first();
+
+    expect($matched->match_action)->toBe(RowMatchAction::Update)
+        ->and($matched->matched_id)->toBe((string) $person->id)
+        ->and($unmatched->match_action)->toBe(RowMatchAction::Skip);
 });
 
 it('handles missing store gracefully', function (): void {

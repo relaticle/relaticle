@@ -18,6 +18,8 @@ use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Livewire\Steps\ReviewStep;
 use Relaticle\ImportWizard\Store\ImportStore;
 
+mutates(ReviewStep::class);
+
 beforeEach(function (): void {
     // Override the global Event::fake() from Pest.php to allow TeamCreated through,
     // so CreateTeamCustomFields listener runs and creates email/phone custom fields.

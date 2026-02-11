@@ -16,6 +16,9 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\EntityLinkResolver;
+
+mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
@@ -509,4 +512,64 @@ it('auto-created records have correct team and creation source', function (): vo
         ->and($autoCreatedCompany->creation_source)->toBe(CreationSource::IMPORT)
         ->and((string) $autoCreatedCompany->team_id)->toBe((string) $this->team->id)
         ->and((string) $autoCreatedCompany->creator_id)->toBe((string) $this->user->id);
+});
+
+it('skips Update row when matched record no longer exists', function (): void {
+    createImportReadyStore($this, ['ID', 'Name'], [
+        makeRow(2, ['ID' => '99999', 'Name' => 'Ghost'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => '99999',
+        ]),
+        makeRow(3, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $results = $store->results();
+
+    expect($results['skipped'])->toBe(1)
+        ->and($results['created'])->toBe(1);
+});
+
+it('processes row with multiple entity links', function (): void {
+    $company = Company::factory()->create(['name' => 'Multi Corp', 'team_id' => $this->team->id]);
+    $person = People::factory()->create(['name' => 'Contact Person', 'team_id' => $this->team->id]);
+
+    $relationships = json_encode([
+        ['relationship' => 'companies', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
+        ['relationship' => 'people', 'action' => 'update', 'id' => (string) $person->id, 'name' => null],
+    ]);
+
+    createImportReadyStore($this, ['Title', 'Company', 'Contact'], [
+        makeRow(2, ['Title' => 'Multi-link task', 'Company' => 'Multi Corp', 'Contact' => 'Contact Person'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'companies'),
+        ColumnData::toEntityLink(source: 'Contact', matcherKey: 'name', entityLinkKey: 'people'),
+    ], ImportEntityType::Task);
+
+    runImportJob($this);
+
+    $task = Task::where('team_id', $this->team->id)->where('title', 'Multi-link task')->first();
+    expect($task)->not->toBeNull();
+
+    expect($task->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all())
+        ->toContain((string) $company->id);
+
+    expect($task->people()->pluck('people.id')->map(fn ($id) => (string) $id)->all())
+        ->toContain((string) $person->id);
+});
+
+it('handles nonexistent store gracefully', function (): void {
+    $job = new ExecuteImportJob('nonexistent-id', (string) $this->team->id);
+    $job->handle();
+
+    expect(true)->toBeTrue();
 });

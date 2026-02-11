@@ -13,6 +13,8 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\UploadStep;
 use Relaticle\ImportWizard\Store\ImportStore;
 
+mutates(UploadStep::class);
+
 function makeCsvFile(string $content, string $name = 'test.csv'): UploadedFile
 {
     return UploadedFile::fake()->createWithContent($name, $content);

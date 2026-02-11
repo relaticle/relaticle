@@ -7,10 +7,15 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\ImportField;
+use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
 use Relaticle\ImportWizard\Store\ImportStore;
+
+mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
 
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
