@@ -15,12 +15,14 @@ return [
      * Login links will only work in these hosts. In all
      * other hosts, an exception will be thrown.
      */
-    'allowed_hosts' => [
+    'allowed_hosts' => array_filter([
         'localhost',
         '127.0.0.1',
         'relaticle.test',
         'app.relaticle.test',
-    ],
+        parse_url(config('app.url'), PHP_URL_HOST),
+        'app.'.parse_url(config('app.url'), PHP_URL_HOST),
+    ]),
 
     /*
      * The package will automatically create a user model when trying
