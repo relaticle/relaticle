@@ -27,6 +27,7 @@ boost.json
 /.idea
 /.vscode
 /.claude
+/.superset
 /.cursor
 /.junie
 /.playwright-mcp
