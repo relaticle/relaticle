@@ -12,6 +12,9 @@ use Relaticle\CustomFields\Models\Scopes\SortOrderScope;
 use Relaticle\CustomFields\Models\Scopes\TenantScope;
 use Relaticle\CustomFields\Observers\CustomFieldObserver;
 
+/**
+ * @property string $tenant_id
+ */
 #[ScopedBy([TenantScope::class, SortOrderScope::class])]
 #[ObservedBy(CustomFieldObserver::class)]
 final class CustomField extends BaseCustomField
