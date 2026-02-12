@@ -36,6 +36,8 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public ?string $batchId = null;
 
+    public ?string $matchResolutionBatchId = null;
+
     public bool $isCompleted = false;
 
     public string $activeTab = 'all';
@@ -44,6 +46,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
     {
         $this->mountWithImportStore($storeId, $entityType);
         $this->syncCompletionState();
+        $this->syncMatchResolutionState();
     }
 
     public function setActiveTab(string $tab): void
@@ -281,9 +284,10 @@ final class PreviewStep extends Component implements HasActions, HasForms
     public function startImportAction(): Action
     {
         return Action::make('startImport')
-            ->label('Start Import')
+            ->label($this->matchResolutionBatchId !== null ? 'Resolving matches...' : 'Start Import')
             ->color('primary')
-            ->icon(Heroicon::OutlinedPlay)
+            ->icon($this->matchResolutionBatchId !== null ? Heroicon::OutlinedArrowPath : Heroicon::OutlinedPlay)
+            ->disabled(fn (): bool => $this->matchResolutionBatchId !== null)
             ->requiresConfirmation()
             ->modalHeading('Start import')
             ->modalDescription('Are you sure that you want to start running this import?')
@@ -334,9 +338,18 @@ final class PreviewStep extends Component implements HasActions, HasForms
         }, 'failed-rows.csv', ['Content-Type' => 'text/csv']);
     }
 
+    public function checkMatchResolution(): void
+    {
+        $this->syncMatchResolutionState();
+
+        if ($this->matchResolutionBatchId === null) {
+            $this->dispatch('match-resolution-complete');
+        }
+    }
+
     public function startImport(): void
     {
-        if ($this->batchId !== null || $this->isCompleted) {
+        if ($this->matchResolutionBatchId !== null || $this->batchId !== null || $this->isCompleted) {
             return;
         }
 
@@ -381,6 +394,31 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ImportStatus::Completed,
             ImportStatus::Failed,
         ], true);
+    }
+
+    private function syncMatchResolutionState(): void
+    {
+        if ($this->matchResolutionBatchId !== null) {
+            $batch = Bus::findBatch($this->matchResolutionBatchId);
+
+            if ($batch === null || $batch->finished()) {
+                $this->matchResolutionBatchId = null;
+            }
+
+            return;
+        }
+
+        $batchId = $this->store()->meta()['match_resolution_batch_id'] ?? null;
+
+        if ($batchId === null) {
+            return;
+        }
+
+        $batch = Bus::findBatch($batchId);
+
+        $this->matchResolutionBatchId = ($batch !== null && ! $batch->finished())
+            ? $batchId
+            : null;
     }
 
     private function relationshipGroupByClause(): string

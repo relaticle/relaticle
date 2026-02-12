@@ -56,7 +56,7 @@ final class ReviewStep extends Component
 
     private function selectedColumnJsonPath(): string
     {
-        return '$.'.$this->selectedColumn->source;
+        return "$.{$this->selectedColumn->source}";
     }
 
     private function validateValue(ColumnData $column, string $value, bool $isCorrection = false): ?string
@@ -363,6 +363,15 @@ final class ReviewStep extends Component
         return isset($this->batchIds[$this->selectedColumn->source]);
     }
 
+    #[Computed]
+    public function isValidating(): bool
+    {
+        return array_any(
+            array_keys($this->batchIds),
+            fn (string $key): bool => $key !== '__match_resolution'
+        );
+    }
+
     /** @return array<string, bool> */
     #[Computed(persist: true, seconds: 60)]
     public function columnErrorStatuses(): array
@@ -374,8 +383,14 @@ final class ReviewStep extends Component
 
     public function continueToPreview(): void
     {
-        if ($this->batchIds !== []) {
+        if ($this->isValidating()) {
             return;
+        }
+
+        $matchBatchId = $this->batchIds['__match_resolution'] ?? null;
+
+        if ($matchBatchId !== null) {
+            $this->store()->updateMeta(['match_resolution_batch_id' => $matchBatchId]);
         }
 
         $this->store()->setStatus(ImportStatus::Previewing);

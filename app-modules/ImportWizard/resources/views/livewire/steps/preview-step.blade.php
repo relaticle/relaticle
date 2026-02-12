@@ -1,11 +1,16 @@
 <div
     class="flex flex-col h-full overflow-hidden"
-    x-data="{ timer: null }"
+    x-data="{ timer: null, matchTimer: null }"
     x-init="
         let poll = () => setInterval(() => $wire.checkImportProgress(), 2000);
         if (@js($this->isImporting)) { timer = poll(); }
         $wire.on('import-polling-start', () => { if (!timer) { timer = poll(); } });
         $wire.on('import-polling-complete', () => { clearInterval(timer); timer = null; });
+
+        if (@js($this->matchResolutionBatchId !== null)) {
+            matchTimer = setInterval(() => $wire.checkMatchResolution(), 1000);
+        }
+        $wire.on('match-resolution-complete', () => { clearInterval(matchTimer); matchTimer = null; });
     "
 >
     <div class="flex-1 flex flex-col overflow-hidden min-h-[20rem]">

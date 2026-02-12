@@ -389,7 +389,7 @@
         </x-filament::button>
         <x-filament::button
             wire:click="continueToPreview"
-            :disabled="count($batchIds) > 0"
+            :disabled="$this->isValidating"
         >
             Continue
         </x-filament::button>
