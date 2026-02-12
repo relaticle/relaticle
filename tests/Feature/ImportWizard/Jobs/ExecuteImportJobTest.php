@@ -154,6 +154,66 @@ it('sets custom field values on created records', function (): void {
     }
 });
 
+it('resolves multiple custom field values via batch JSON query', function (): void {
+    $emailField = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if ($emailField === null) {
+        $this->markTestSkipped('No emails custom field configured');
+    }
+
+    $existingPeople = [];
+    $emails = ['alice@test.com', 'bob@test.com', 'carol@test.com', 'dave@test.com', 'eve@test.com'];
+
+    foreach ($emails as $email) {
+        $person = People::factory()->create([
+            'name' => "Person {$email}",
+            'team_id' => $this->team->id,
+        ]);
+
+        \App\Models\CustomFieldValue::create([
+            'custom_field_id' => $emailField->id,
+            'entity_type' => 'people',
+            'entity_id' => $person->id,
+            'tenant_id' => $this->team->id,
+            'json_value' => [$email],
+        ]);
+
+        $existingPeople[$email] = $person;
+    }
+
+    $rows = [];
+    foreach ($emails as $i => $email) {
+        $rows[] = makeRow($i + 2, ['Name' => "Updated {$email}", 'Email' => $email], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $existingPeople[$email]->id,
+        ]);
+    }
+
+    createImportReadyStore($this, ['Name', 'Email'], $rows, [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    expect($store->status())->toBe(ImportStatus::Completed);
+
+    $results = $store->results();
+    expect($results['updated'])->toBe(5)
+        ->and($results['failed'])->toBe(0);
+
+    foreach ($emails as $email) {
+        $person = $existingPeople[$email]->refresh();
+        expect($person->name)->toBe("Updated {$email}");
+    }
+});
+
 it('updates existing People records for rows with match_action=Update', function (): void {
     $person = People::factory()->create([
         'name' => 'Old Name',
@@ -665,3 +725,191 @@ it('records failed rows with row number and error message', function (): void {
         ->and($results['skipped'])->toBe(1)
         ->and($store->failedRows())->toBeEmpty();
 });
+
+it('handles Japanese characters in name fields', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => '田中太郎'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => '佐藤花子'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    expect($store->status())->toBe(ImportStatus::Completed);
+
+    expect(People::where('team_id', $this->team->id)->where('name', '田中太郎')->exists())->toBeTrue()
+        ->and(People::where('team_id', $this->team->id)->where('name', '佐藤花子')->exists())->toBeTrue();
+});
+
+it('handles Arabic characters in name fields', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'محمد أحمد'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'محمد أحمد')->first();
+    expect($person)->not->toBeNull()
+        ->and($person->name)->toBe('محمد أحمد');
+});
+
+it('handles emoji characters in name fields', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'Test User 🚀'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Test User 🚀')->first();
+    expect($person)->not->toBeNull()
+        ->and($person->name)->toBe('Test User 🚀');
+});
+
+it('handles accented Latin characters in name fields', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'José García'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'François Müller'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'José García')->exists())->toBeTrue()
+        ->and(People::where('team_id', $this->team->id)->where('name', 'François Müller')->exists())->toBeTrue();
+});
+
+it('handles international data with entity link auto-creation', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => '株式会社テスト'],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Company'], [
+        makeRow(2, ['Name' => '田中太郎', 'Company' => '株式会社テスト'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', '田中太郎')->first();
+    expect($person)->not->toBeNull();
+
+    $company = Company::where('team_id', $this->team->id)->where('name', '株式会社テスト')->first();
+    expect($company)->not->toBeNull()
+        ->and((string) $person->company_id)->toBe((string) $company->id);
+});
+
+it('processes 1000 row create import', function (): void {
+    $rows = [];
+    for ($i = 2; $i <= 1001; $i++) {
+        $rows[] = makeRow($i, ['Name' => "Person {$i}"], ['match_action' => RowMatchAction::Create->value]);
+    }
+
+    createImportReadyStore($this, ['Name'], $rows, [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    expect($store->status())->toBe(ImportStatus::Completed);
+
+    $results = $store->results();
+    expect($results['created'])->toBe(1000)
+        ->and($results['failed'])->toBe(0);
+})->group('slow');
+
+it('processes 1000 row mixed operations import', function (): void {
+    $existingPeople = People::factory()->count(100)->create([
+        'team_id' => $this->team->id,
+    ]);
+
+    $rows = [];
+    $rowNumber = 2;
+
+    foreach ($existingPeople as $person) {
+        $rows[] = makeRow($rowNumber++, ['ID' => (string) $person->id, 'Name' => "Updated {$person->name}"], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]);
+    }
+
+    for ($i = 0; $i < 50; $i++) {
+        $rows[] = makeRow($rowNumber++, ['ID' => (string) (900000 + $i), 'Name' => "Ghost {$i}"], [
+            'match_action' => RowMatchAction::Skip->value,
+        ]);
+    }
+
+    for ($i = 0; $i < 850; $i++) {
+        $rows[] = makeRow($rowNumber++, ['ID' => '', 'Name' => "New Person {$i}"], [
+            'match_action' => RowMatchAction::Create->value,
+        ]);
+    }
+
+    createImportReadyStore($this, ['ID', 'Name'], $rows, [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $results = $store->results();
+
+    expect($results['created'])->toBe(850)
+        ->and($results['updated'])->toBe(100)
+        ->and($results['skipped'])->toBe(50)
+        ->and($results['failed'])->toBe(0)
+        ->and($store->status())->toBe(ImportStatus::Completed);
+})->group('slow');
+
+it('processes 1000 rows with entity link relationships and deduplication', function (): void {
+    $companyNames = [];
+    for ($i = 0; $i < 20; $i++) {
+        $companyNames[] = "Company {$i}";
+    }
+
+    $rows = [];
+    for ($i = 2; $i <= 1001; $i++) {
+        $companyName = $companyNames[($i - 2) % count($companyNames)];
+        $relationships = json_encode([
+            ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => $companyName],
+        ]);
+
+        $rows[] = makeRow($i, ['Name' => "Person {$i}", 'Company' => $companyName], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]);
+    }
+
+    createImportReadyStore($this, ['Name', 'Company'], $rows, [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $results = $store->results();
+
+    expect($results['created'])->toBe(1000)
+        ->and($results['failed'])->toBe(0)
+        ->and($store->status())->toBe(ImportStatus::Completed);
+
+    $companies = Company::where('team_id', $this->team->id)
+        ->whereIn('name', $companyNames)
+        ->get();
+
+    expect($companies)->toHaveCount(20);
+})->group('slow');

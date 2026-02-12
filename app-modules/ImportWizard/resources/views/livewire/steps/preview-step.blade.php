@@ -23,6 +23,10 @@
                             <span class="text-gray-500 dark:text-gray-400">failed</span>
                         </span>
                     </div>
+
+                    @if(($this->results['failed'] ?? 0) > 0)
+                        {{ $this->downloadFailedRowsAction }}
+                    @endif
                 @endif
             </div>
         @elseif($this->isImporting)

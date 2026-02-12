@@ -11,6 +11,7 @@ use Illuminate\Database\Connectors\ConnectionFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -150,6 +151,30 @@ final class ImportStore
     public function setStatus(ImportStatus $status): void
     {
         $this->updateMeta(['status' => $status->value]);
+    }
+
+    public function transitionToImporting(): bool
+    {
+        $lock = Cache::lock("import-{$this->id}-start", 10);
+
+        if (! $lock->get()) {
+            return false;
+        }
+
+        try {
+            $this->refreshMeta();
+            $currentStatus = $this->status();
+
+            if (in_array($currentStatus, [ImportStatus::Importing, ImportStatus::Completed, ImportStatus::Failed], true)) {
+                return false;
+            }
+
+            $this->setStatus(ImportStatus::Importing);
+
+            return true;
+        } finally {
+            $lock->release();
+        }
     }
 
     public function entityType(): ImportEntityType
