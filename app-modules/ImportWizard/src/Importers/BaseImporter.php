@@ -101,9 +101,7 @@ abstract class BaseImporter implements ImporterContract
         return [];
     }
 
-    /**
-     * @return EloquentCollection<int, CustomField>
-     */
+    /** @return EloquentCollection<int, \Relaticle\CustomFields\Models\CustomField> */
     protected function getRecordCustomFields(): EloquentCollection
     {
         return CustomField::query()

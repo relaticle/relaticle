@@ -26,8 +26,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Relaticle\CustomFields\CustomFields;
-use Relaticle\ImportWizard\Models\Export;
-use Relaticle\ImportWizard\Models\Import;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class AppServiceProvider extends ServiceProvider
@@ -130,13 +128,7 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
-            'import' => Import::class,
-            'export' => Export::class,
         ]);
-
-        // Bind our custom Import and Export models to the Filament models
-        $this->app->bind(\Filament\Actions\Imports\Models\Import::class, Import::class);
-        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         // Use custom models for custom-fields package
         CustomFields::useCustomFieldModel(CustomField::class);

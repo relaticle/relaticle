@@ -42,7 +42,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /**
      * Personal team ID
      */
-    protected ?int $teamId = null;
+    protected ?string $teamId = null;
 
     /**
      * Initialize the seeder and auto-detect entity type if not set
@@ -61,7 +61,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /**
      * Set team ID for custom fields retrieval
      */
-    protected function setTeamId(int $teamId): void
+    protected function setTeamId(string $teamId): void
     {
         $this->teamId = $teamId;
     }
@@ -73,7 +73,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
      */
     public function customFields(): Collection
     {
-        if ($this->teamId === null || $this->teamId === 0) {
+        if ($this->teamId === null) {
             return collect();
         }
 

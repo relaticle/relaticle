@@ -206,15 +206,9 @@ final class EntityLinkResolver
             $rows = $query->get(['entity_id', 'json_value']);
 
             foreach ($rows as $row) {
-                $rawJson = $row->json_value;
-                $jsonValues = match (true) {
-                    $rawJson instanceof \Illuminate\Support\Collection => $rawJson->all(),
-                    is_array($rawJson) => $rawJson,
-                    is_string($rawJson) => json_decode($rawJson, true),
-                    default => null,
-                };
+                $jsonValues = $row->json_value?->all();
 
-                if (! is_array($jsonValues)) {
+                if ($jsonValues === null) {
                     continue;
                 }
 

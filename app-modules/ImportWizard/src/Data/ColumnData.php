@@ -76,7 +76,7 @@ final class ColumnData extends Data implements Wireable
      */
     public function isMultiChoicePredefined(): bool
     {
-        return $this->getType()->isMultiChoiceField() && ! ($this->importField?->acceptsArbitraryValues ?? false);
+        return $this->getType()->isMultiChoiceField() && ! ($this->importField->acceptsArbitraryValues ?? false);
     }
 
     public function isSingleChoicePredefined(): bool
@@ -86,13 +86,13 @@ final class ColumnData extends Data implements Wireable
 
     public function isMultiChoiceArbitrary(): bool
     {
-        return $this->getType()->isMultiChoiceField() && ($this->importField?->acceptsArbitraryValues ?? false);
+        return $this->getType()->isMultiChoiceField() && ($this->importField->acceptsArbitraryValues ?? false);
     }
 
     /** @return array<string> */
     public function getRules(): array
     {
-        return $this->importField?->rules ?? [];
+        return $this->importField->rules ?? [];
     }
 
     public function getLabel(): string
@@ -110,7 +110,7 @@ final class ColumnData extends Data implements Wireable
             return $this->entityLinkField?->icon() ?? 'heroicon-o-link';
         }
 
-        return $this->importField?->icon ?? 'heroicon-o-squares-2x2';
+        return $this->importField->icon ?? 'heroicon-o-squares-2x2';
     }
 
     public function getMatcher(): ?MatchableField
