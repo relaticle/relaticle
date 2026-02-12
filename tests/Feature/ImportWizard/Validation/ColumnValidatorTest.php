@@ -322,6 +322,35 @@ it('formats choice error message without truncation for few options', function (
         ->not->toContain('...');
 });
 
+it('validates single choice case-insensitively', function (): void {
+    $column = makeColumnData(
+        FieldDataType::SINGLE_CHOICE,
+        options: [
+            ['label' => 'Active', 'value' => 'active'],
+            ['label' => 'Inactive', 'value' => 'inactive'],
+        ],
+    );
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, 'Active'))->toBeNull()
+        ->and($validator->validate($column, 'ACTIVE'))->toBeNull()
+        ->and($validator->validate($column, 'active'))->toBeNull();
+});
+
+it('validates multi-choice predefined case-insensitively', function (): void {
+    $column = makeColumnData(
+        FieldDataType::MULTI_CHOICE,
+        options: [
+            ['label' => 'Red', 'value' => 'red'],
+            ['label' => 'Blue', 'value' => 'blue'],
+        ],
+    );
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, 'Red, BLUE'))->toBeNull()
+        ->and($validator->validate($column, 'RED, blue'))->toBeNull();
+});
+
 it('formats choice error message with exactly 5 options without ellipsis', function (): void {
     $options = [];
     for ($i = 1; $i <= 5; $i++) {

@@ -82,15 +82,15 @@
             clearTimeout(this.submenuTimeout);
         },
         selectField(fieldKey) {
-            this.$dispatch('field-selected', { column: '{{ addslashes($column) }}', fieldKey });
+            this.$dispatch('field-selected', { column: {{ Js::from($column) }}, fieldKey });
             this.close();
         },
         selectEntityLink(entityLinkKey, matcherKey) {
-            this.$dispatch('entity-link-selected', { column: '{{ addslashes($column) }}', entityLinkKey, matcherKey });
+            this.$dispatch('entity-link-selected', { column: {{ Js::from($column) }}, entityLinkKey, matcherKey });
             this.close();
         },
         clear() {
-            this.$dispatch('field-cleared', { column: '{{ addslashes($column) }}' });
+            this.$dispatch('field-cleared', { column: {{ Js::from($column) }} });
         }
     }"
     @click.outside="close()"
@@ -188,7 +188,7 @@
                         type="button"
                         role="option"
                         :aria-selected="{{ $isSelected ? 'true' : 'false' }}"
-                        x-show="!search || '{{ strtolower($field->label) }}'.includes(search.toLowerCase())"
+                        x-show="!search || {{ Js::from(strtolower($field->label)) }}.includes(search.toLowerCase())"
                         @click="selectField('{{ $field->key }}')"
                         {{ $isMapped ? 'disabled' : '' }}
                         class="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
@@ -211,7 +211,7 @@
                         $isLinkMapped = in_array($linkKey, $mappedEntityLinks) && !$isLinkSelected;
                     @endphp
                     <div
-                        x-show="!search || '{{ strtolower($link->label) }}'.includes(search.toLowerCase())"
+                        x-show="!search || {{ Js::from(strtolower($link->label)) }}.includes(search.toLowerCase())"
                         @if (!$isLinkMapped)
                             @mouseenter="showSubmenu('{{ $linkKey }}', $event)"
                             @mouseleave="hideSubmenu()"

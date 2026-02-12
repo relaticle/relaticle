@@ -1,6 +1,6 @@
 <div
     class="flex flex-col h-full overflow-hidden"
-    x-data="{ hoveredColumn: '{{ $headers[0] ?? '' }}' }"
+    x-data="{ hoveredColumn: {{ Js::from($headers[0] ?? '') }} }"
     @field-selected.window="$wire.mapToField($event.detail.column, $event.detail.fieldKey)"
     @entity-link-selected.window="$wire.mapToEntityLink($event.detail.column, $event.detail.matcherKey, $event.detail.entityLinkKey)"
     @field-cleared.window="$wire.unmapColumn($event.detail.column)"
@@ -36,8 +36,8 @@
                         <div
                             wire:key="row-{{ md5($header) }}"
                             class="flex items-center py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0 px-3 transition-colors"
-                            :class="hoveredColumn === '{{ addslashes($header) }}' ? 'bg-primary-50/50 dark:bg-primary-950/20' : ''"
-                            @mouseenter="hoveredColumn = '{{ addslashes($header) }}'"
+                            :class="hoveredColumn === {{ Js::from($header) }} ? 'bg-primary-50/50 dark:bg-primary-950/20' : ''"
+                            @mouseenter="hoveredColumn = {{ Js::from($header) }}"
                         >
                             {{-- File Column Name --}}
                             <div class="flex-1 min-w-0">
@@ -82,7 +82,7 @@
                 </div>
                 <div class="flex-1 overflow-y-auto">
                     @foreach ($headers as $header)
-                        <div x-show="hoveredColumn === '{{ addslashes($header) }}'" x-cloak>
+                        <div x-show="hoveredColumn === {{ Js::from($header) }}" x-cloak>
                             @foreach ($this->previewValues($header, 50) as $value)
                                 <div
                                     class="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0 text-xs text-gray-600 dark:text-gray-300 truncate">

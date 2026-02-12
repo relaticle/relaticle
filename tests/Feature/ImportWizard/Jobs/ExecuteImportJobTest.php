@@ -8,6 +8,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -651,6 +652,25 @@ it('handles nonexistent store gracefully', function (): void {
     $job->handle();
 
     expect(true)->toBeTrue();
+});
+
+it('filters out unexpected attributes from CSV data before saving', function (): void {
+    createImportReadyStore($this, ['Name', 'Malicious'], [
+        makeRow(2, ['Name' => 'Safe Person', 'Malicious' => 'hacked'], [
+            'match_action' => RowMatchAction::Create->value,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Malicious', target: 'is_admin'),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Safe Person')->first();
+    expect($person)->not->toBeNull();
+
+    $raw = DB::table('people')->where('id', $person->id)->first();
+    expect($raw)->not->toHaveProperty('is_admin', 'hacked');
 });
 
 it('persists failed row details in store metadata', function (): void {

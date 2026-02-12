@@ -61,7 +61,7 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $store = ImportStore::load($this->importId, $this->teamId);
 
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 
@@ -71,14 +71,15 @@ final class ExecuteImportJob implements ShouldQueue
         $mappings = $store->columnMappings();
 
         $results = $store->results() ?? ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+        $allowedKeys = $this->allowedAttributeKeys($importer);
 
         try {
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(100, function (Collection $rows) use ($importer, $mappings, &$results, $store): void {
+                ->chunkById(500, function (Collection $rows) use ($importer, $mappings, $allowedKeys, &$results, $store): void {
                     foreach ($rows as $row) {
-                        $this->processRow($row, $importer, $mappings, $results, $store);
+                        $this->processRow($row, $importer, $mappings, $allowedKeys, $results, $store);
                     }
 
                     $this->persistResults($store, $results);
@@ -101,12 +102,14 @@ final class ExecuteImportJob implements ShouldQueue
 
     /**
      * @param  Collection<int, ColumnData>  $mappings
+     * @param  array<string, true>  $allowedKeys
      * @param  array<string, int>  $results
      */
     private function processRow(
         ImportRow $row,
         BaseImporter $importer,
         Collection $mappings,
+        array $allowedKeys,
         array &$results,
         ImportStore $store,
     ): void {
@@ -121,7 +124,7 @@ final class ExecuteImportJob implements ShouldQueue
             $data = $this->buildDataFromRow($row, $mappings);
             $existing = $row->isUpdate() ? $this->findExistingRecord($importer, $row->matched_id) : null;
 
-            if ($row->isUpdate() && ! $existing instanceof \Illuminate\Database\Eloquent\Model) {
+            if ($row->isUpdate() && ! $existing instanceof Model) {
                 $results['skipped']++;
                 $this->markProcessed($row);
 
@@ -135,11 +138,12 @@ final class ExecuteImportJob implements ShouldQueue
 
             $isCreate = $row->isCreate();
 
-            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, &$results): void {
+            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, &$results): void {
                 $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
 
                 $prepared = $importer->prepareForSave($data, $existing, $context);
                 $customFieldData = $this->extractCustomFieldData($prepared);
+                $prepared = array_intersect_key($prepared, $allowedKeys);
 
                 $record = $isCreate
                     ? new ($importer->modelClass())
@@ -231,6 +235,24 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         return $customFieldData;
+    }
+
+    /** @return array<string, true> */
+    private function allowedAttributeKeys(BaseImporter $importer): array
+    {
+        $keys = collect($importer->allFields())
+            ->reject(fn ($field): bool => $field->key === 'id')
+            ->pluck('key')
+            ->merge(['team_id', 'creator_id', 'creation_source'])
+            ->merge(
+                collect($importer->entityLinks())
+                    ->pluck('foreignKey')
+                    ->filter()
+            )
+            ->all();
+
+        /** @var array<string, true> */
+        return array_fill_keys($keys, true);
     }
 
     private function findExistingRecord(BaseImporter $importer, ?string $matchedId): ?Model

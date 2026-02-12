@@ -48,7 +48,6 @@
         disabled: @js($disabled),
         searchable: @js($searchable),
         activeIndex: -1,
-        documentClickListener: null,
 
         init() {
             this.$watch('open', (isOpen) => {
@@ -65,19 +64,6 @@
                     this.search = '';
                 }
             });
-
-            this.documentClickListener = (event) => {
-                if (this.open && !this.$el.contains(event.target)) {
-                    this.close();
-                }
-            };
-            document.addEventListener('click', this.documentClickListener);
-        },
-
-        destroy() {
-            if (this.documentClickListener) {
-                document.removeEventListener('click', this.documentClickListener);
-            }
         },
 
         get selected() {

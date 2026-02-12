@@ -50,21 +50,22 @@ final class ColumnValidator
 
     private function validateSingleChoice(ColumnData $column, string $value): ?ValidationError
     {
-        $validValues = $this->getValidChoiceValues($column);
+        $originalValues = $this->getChoiceValues($column);
+        $lowercasedValues = $this->lowercaseValues($originalValues);
 
-        if (in_array($value, $validValues, true)) {
+        if (in_array(mb_strtolower($value), $lowercasedValues, true)) {
             return null;
         }
 
-        return ValidationError::message($this->formatInvalidChoiceMessage($validValues));
+        return ValidationError::message($this->formatInvalidChoiceMessage($originalValues));
     }
 
     private function validateMultiChoicePredefined(ColumnData $column, string $value): ?ValidationError
     {
-        $validValues = $this->getValidChoiceValues($column);
+        $lowercasedValues = $this->lowercaseValues($this->getChoiceValues($column));
 
         $errors = $this->parseCommaSeparated($value)
-            ->reject(fn (string $item): bool => in_array($item, $validValues, true))
+            ->reject(fn (string $item): bool => in_array(mb_strtolower($item), $lowercasedValues, true))
             ->mapWithKeys(fn (string $item): array => [$item => 'Not a valid option'])
             ->all();
 
@@ -123,9 +124,20 @@ final class ColumnValidator
     }
 
     /** @return array<int, string> */
-    private function getValidChoiceValues(ColumnData $column): array
+    private function getChoiceValues(ColumnData $column): array
     {
-        return collect($column->importField->options ?? [])->pluck('value')->all();
+        return collect($column->importField->options ?? [])
+            ->pluck('value')
+            ->all();
+    }
+
+    /**
+     * @param  array<int, string>  $values
+     * @return array<int, string>
+     */
+    private function lowercaseValues(array $values): array
+    {
+        return array_map(mb_strtolower(...), $values);
     }
 
     /** @param array<int, string> $validValues */

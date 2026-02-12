@@ -66,6 +66,10 @@ final class ImportStore
     /** @throws FileNotFoundException */
     public static function load(string $id, string $expectedTeamId): ?self
     {
+        if (! Str::isUlid($id)) {
+            return null;
+        }
+
         $store = new self($id);
 
         if (! File::exists($store->metaPath())) {
@@ -110,7 +114,7 @@ final class ImportStore
     {
         if ($this->metaCache === null) {
             $content = File::get($this->metaPath());
-            $this->metaCache = json_decode($content, true);
+            $this->metaCache = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
         }
 
         return $this->metaCache;

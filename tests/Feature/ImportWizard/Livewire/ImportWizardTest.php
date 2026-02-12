@@ -255,6 +255,17 @@ it('resets storeId when store not found', function (): void {
         ->and($component->get('storeId'))->toBeNull();
 });
 
+it('rejects path traversal storeId values', function (string $maliciousId): void {
+    expect(ImportStore::load($maliciousId, 'any-team-id'))->toBeNull();
+})->with([
+    '../../etc/passwd',
+    '../../../secret',
+    'valid-but-has-slashes/nested',
+    '',
+    'short',
+    str_repeat('A', 27),
+]);
+
 it('resets storeId when store belongs to different team', function (): void {
     $otherUser = User::factory()->withPersonalTeam()->create();
     $otherTeam = $otherUser->personalTeam();

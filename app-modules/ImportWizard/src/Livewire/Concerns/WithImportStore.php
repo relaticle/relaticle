@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Store\ImportStore;
@@ -26,19 +27,25 @@ trait WithImportStore
     {
         $this->storeId = $storeId;
         $this->entityType = $entityType;
-        $this->store = ImportStore::load($storeId, $this->getCurrentTeamId());
+        $this->store = ImportStore::load($storeId, $this->getCurrentTeamId() ?? '');
     }
 
-    protected function store(): ?ImportStore
+    protected function store(): ImportStore
     {
-        return $this->store ??= ImportStore::load($this->storeId, $this->getCurrentTeamId());
+        $store = $this->store ??= ImportStore::load($this->storeId, $this->getCurrentTeamId() ?? '');
+
+        if ($store === null) {
+            abort(404, 'Import session not found or expired.');
+        }
+
+        return $store;
     }
 
     private function getCurrentTeamId(): ?string
     {
         $tenant = filament()->getTenant();
 
-        return $tenant instanceof \Illuminate\Database\Eloquent\Model ? (string) $tenant->getKey() : null;
+        return $tenant instanceof Model ? (string) $tenant->getKey() : null;
     }
 
     /**
@@ -48,11 +55,11 @@ trait WithImportStore
      */
     protected function headers(): array
     {
-        return $this->store()?->headers() ?? [];
+        return $this->store()->headers();
     }
 
     protected function rowCount(): int
     {
-        return $this->store()?->rowCount() ?? 0;
+        return $this->store()->rowCount();
     }
 }
