@@ -25,6 +25,7 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
+use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -306,29 +307,23 @@ final class PreviewStep extends Component implements HasActions, HasForms
     {
         $import = $this->import();
         $headers = $import->headers ?? [];
-        $failedRows = $import->failed_rows_data ?? [];
-        $failedRowNumbers = collect($failedRows)->pluck('row')->all();
-        $errorsByRow = collect($failedRows)->keyBy('row');
 
-        return response()->streamDownload(function () use ($failedRowNumbers, $headers, $errorsByRow): void {
-            /** @var resource $handle */
+        return response()->streamDownload(function () use ($import, $headers): void {
             $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, [...$headers, 'Import Error'], escape: '\\');
 
-            $this->store()->query()
-                ->whereIn('row_number', $failedRowNumbers)
-                ->orderBy('row_number')
-                ->chunk(100, function (Collection $rows) use ($handle, $headers, $errorsByRow): void {
-                    foreach ($rows as $row) {
-                        $values = [];
+            $import->failedRows()
+                ->lazyById(100)
+                ->each(function (FailedImportRow $row) use ($handle, $headers): void {
+                    $values = [];
 
-                        foreach ($headers as $header) {
-                            $values[] = $row->raw_data->get($header, '');
-                        }
-
-                        $values[] = $errorsByRow[$row->row_number]['error'] ?? '';
-                        fputcsv($handle, $values, escape: '\\');
+                    foreach ($headers as $header) {
+                        $values[] = $row->data[$header] ?? '';
                     }
+
+                    $values[] = $row->validation_error ?? '';
+                    fputcsv($handle, $values, escape: '\\');
                 });
 
             fclose($handle);
