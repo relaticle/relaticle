@@ -17,6 +17,7 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
 
@@ -36,6 +37,9 @@ afterEach(function (): void {
     if (isset($this->store)) {
         $this->store->destroy();
     }
+    if (isset($this->import)) {
+        $this->import->delete();
+    }
 });
 
 function createPreviewReadyStore(
@@ -45,22 +49,23 @@ function createPreviewReadyStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): ImportStore {
-    $store = ImportStore::create(
-        teamId: (string) $context->team->id,
-        userId: (string) $context->user->id,
-        entityType: $entityType,
-        originalFilename: 'test.csv',
-    );
+    $import = Import::create([
+        'team_id' => (string) $context->team->id,
+        'user_id' => (string) $context->user->id,
+        'entity_type' => $entityType,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Reviewing,
+        'total_rows' => count($rows),
+        'headers' => $headers,
+        'column_mappings' => collect($mappings)->map(fn (ColumnData $m) => $m->toArray())->all(),
+    ]);
 
-    $store->setHeaders($headers);
-    $store->setColumnMappings($mappings);
-
+    $store = ImportStore::create($import->id);
     $store->query()->insert($rows);
-    $store->setRowCount(count($rows));
-    $store->setStatus(ImportStatus::Reviewing);
 
-    (new MatchResolver($store, $store->getImporter()))->resolve();
+    (new MatchResolver($store, $import, $import->getImporter()))->resolve();
 
+    $context->import = $import;
     $context->store = $store;
 
     return $store;
@@ -363,8 +368,8 @@ it('startImport dispatches ExecuteImportJob and sets status to Importing', funct
             && $batch->jobs->first() instanceof ExecuteImportJob;
     });
 
-    $freshStore = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($freshStore->status())->toBe(ImportStatus::Importing);
+    $freshImport = $this->import->fresh();
+    expect($freshImport->status)->toBe(ImportStatus::Importing);
 });
 
 it('startImport proceeds even when rows have validation errors', function (): void {
@@ -611,8 +616,10 @@ it('checkImportProgress detects completion', function (): void {
 
     $component = mountPreviewStep($this);
 
-    $this->store->setStatus(ImportStatus::Completed);
-    $this->store->setResults(['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0]);
+    $this->import->update([
+        'status' => ImportStatus::Completed,
+        'results' => ['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0],
+    ]);
 
     $component->set('batchId', 'fake-batch-id');
     $component->call('checkImportProgress');
@@ -661,7 +668,7 @@ it('startImport is a no-op when status is already Importing', function (): void 
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $this->store->setStatus(ImportStatus::Importing);
+    $this->import->update(['status' => ImportStatus::Importing]);
 
     $component = mountPreviewStep($this);
     $component->call('startImport');
@@ -676,9 +683,10 @@ it('downloadFailedRows action is visible when there are failed rows', function (
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $this->store->setStatus(ImportStatus::Completed);
-    $this->store->setResults(['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 1]);
-    $this->store->updateMeta(['failed_rows' => [['row' => 2, 'error' => 'Something went wrong']]]);
+    $this->import->update([
+        'status' => ImportStatus::Completed,
+        'results' => ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 1],
+    ]);
 
     $component = mountPreviewStep($this);
 
@@ -692,8 +700,10 @@ it('downloadFailedRows action is hidden when there are no failed rows', function
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $this->store->setStatus(ImportStatus::Completed);
-    $this->store->setResults(['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0]);
+    $this->import->update([
+        'status' => ImportStatus::Completed,
+        'results' => ['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0],
+    ]);
 
     $component = mountPreviewStep($this);
 

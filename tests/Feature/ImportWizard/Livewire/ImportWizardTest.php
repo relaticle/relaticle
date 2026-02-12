@@ -12,6 +12,7 @@ use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 mutates(ImportWizard::class);
@@ -31,7 +32,8 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     foreach ($this->createdStoreIds as $storeId) {
-        ImportStore::load($storeId, (string) $this->team->id)?->destroy();
+        ImportStore::load($storeId)?->destroy();
+        Import::find($storeId)?->delete();
     }
 });
 
@@ -45,23 +47,25 @@ function mountImportWizard(object $context, ?string $returnUrl = null): \Livewir
 
 function createFullTestStore(object $context): ImportStore
 {
-    $store = ImportStore::create(
-        teamId: (string) $context->team->id,
-        userId: (string) $context->user->id,
-        entityType: ImportEntityType::People,
-        originalFilename: 'test.csv',
-    );
+    $import = Import::create([
+        'team_id' => (string) $context->team->id,
+        'user_id' => (string) $context->user->id,
+        'entity_type' => ImportEntityType::People,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Reviewing,
+        'total_rows' => 1,
+        'headers' => ['Name', 'Email'],
+    ]);
 
-    $store->setHeaders(['Name', 'Email']);
-    $store->setColumnMappings([
+    $import->setColumnMappings([
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
+
+    $store = ImportStore::create($import->id);
     $store->query()->insert([
         'row_number' => 2,
         'raw_data' => json_encode(['Name' => 'John', 'Email' => 'john@test.com']),
     ]);
-    $store->setRowCount(1);
-    $store->setStatus(ImportStatus::Reviewing);
 
     $context->createdStoreIds[] = $store->id();
 
@@ -137,7 +141,7 @@ it('cancelImport destroys store and redirects', function (): void {
 
     $component->assertRedirect($returnUrl);
 
-    expect(ImportStore::load($store->id(), (string) $this->team->id))->toBeNull();
+    expect(ImportStore::load($store->id()))->toBeNull();
 
     markStoreAsDestroyed($this, $store);
 });
@@ -158,7 +162,7 @@ it('startOver resets to step 1', function (): void {
         ->and($component->get('rowCount'))->toBe(0)
         ->and($component->get('columnCount'))->toBe(0);
 
-    expect(ImportStore::load($store->id(), (string) $this->team->id))->toBeNull();
+    expect(ImportStore::load($store->id()))->toBeNull();
 
     markStoreAsDestroyed($this, $store);
 });
@@ -187,7 +191,8 @@ it('getStepDescription returns correct description per step', function (): void 
 
 it('restores to mapping step when store status is Mapping', function (): void {
     $store = createFullTestStore($this);
-    $store->setStatus(ImportStatus::Mapping);
+    $import = Import::find($store->id());
+    $import->update(['status' => ImportStatus::Mapping]);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
         ->test(ImportWizard::class, [
@@ -202,7 +207,8 @@ it('restores to mapping step when store status is Mapping', function (): void {
 
 it('restores to review step when store status is Reviewing', function (): void {
     $store = createFullTestStore($this);
-    $store->setStatus(ImportStatus::Reviewing);
+    $import = Import::find($store->id());
+    $import->update(['status' => ImportStatus::Reviewing]);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
         ->test(ImportWizard::class, [
@@ -215,7 +221,8 @@ it('restores to review step when store status is Reviewing', function (): void {
 
 it('restores to preview step with locked navigation when store status is Completed', function (): void {
     $store = createFullTestStore($this);
-    $store->setStatus(ImportStatus::Completed);
+    $import = Import::find($store->id());
+    $import->update(['status' => ImportStatus::Completed]);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
         ->test(ImportWizard::class, [
@@ -229,7 +236,8 @@ it('restores to preview step with locked navigation when store status is Complet
 
 it('blocks navigation when import has started', function (): void {
     $store = createFullTestStore($this);
-    $store->setStatus(ImportStatus::Importing);
+    $import = Import::find($store->id());
+    $import->update(['status' => ImportStatus::Importing]);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
         ->test(ImportWizard::class, [
@@ -256,7 +264,7 @@ it('resets storeId when store not found', function (): void {
 });
 
 it('rejects path traversal storeId values', function (string $maliciousId): void {
-    expect(ImportStore::load($maliciousId, 'any-team-id'))->toBeNull();
+    expect(ImportStore::load($maliciousId))->toBeNull();
 })->with([
     '../../etc/passwd',
     '../../../secret',
@@ -270,15 +278,17 @@ it('resets storeId when store belongs to different team', function (): void {
     $otherUser = User::factory()->withPersonalTeam()->create();
     $otherTeam = $otherUser->personalTeam();
 
-    $store = ImportStore::create(
-        teamId: (string) $otherTeam->id,
-        userId: (string) $otherUser->id,
-        entityType: ImportEntityType::People,
-        originalFilename: 'test.csv',
-    );
-    $store->setHeaders(['Name', 'Email']);
-    $store->setRowCount(1);
-    $store->setStatus(ImportStatus::Mapping);
+    $import = Import::create([
+        'team_id' => (string) $otherTeam->id,
+        'user_id' => (string) $otherUser->id,
+        'entity_type' => ImportEntityType::People,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Mapping,
+        'total_rows' => 1,
+        'headers' => ['Name', 'Email'],
+    ]);
+
+    $store = ImportStore::create($import->id);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
         ->test(ImportWizard::class, [
@@ -289,4 +299,5 @@ it('resets storeId when store belongs to different team', function (): void {
         ->and($component->get('storeId'))->toBeNull();
 
     $store->destroy();
+    $import->delete();
 });
