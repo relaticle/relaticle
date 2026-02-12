@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\TeamObserver;
 use App\Services\AvatarService;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,13 +19,17 @@ use Laravel\Jetstream\Team as JetstreamTeam;
 
 /**
  * @property string $name
+ * @property string $slug
  */
+#[ObservedBy(TeamObserver::class)]
 final class Team extends JetstreamTeam implements HasAvatar
 {
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
 
     use HasUlids;
+
+    public const string SLUG_REGEX = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
      * The attributes that are mass assignable.
@@ -32,6 +38,7 @@ final class Team extends JetstreamTeam implements HasAvatar
      */
     protected $fillable = [
         'name',
+        'slug',
         'personal_team',
     ];
 

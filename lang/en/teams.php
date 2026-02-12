@@ -7,6 +7,10 @@ return [
         'team_name' => [
             'label' => 'Team Name',
         ],
+        'team_slug' => [
+            'label' => 'Team Slug',
+            'helper_text' => 'Only lowercase letters, numbers, and hyphens. This appears in your team URL.',
+        ],
         'email' => [
             'label' => 'Email',
         ],

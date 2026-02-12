@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Team>
@@ -27,9 +29,13 @@ final class TeamFactory extends Factory
         ];
     }
 
-    public function configure(): Factory
+    public function configure(): static
     {
-        return $this->sequence(fn (Sequence $sequence): array => [
+        return $this->afterMaking(function (Team $team): void {
+            if (blank($team->slug)) {
+                $team->slug = Str::slug($team->name) . '-' . Str::lower(Str::random(5));
+            }
+        })->sequence(fn (Sequence $sequence): array => [
             'created_at' => now()->subMinutes($sequence->index),
             'updated_at' => now()->subMinutes($sequence->index),
         ]);
