@@ -34,7 +34,7 @@ final readonly class ImportDateRule implements ValidationRule
             return;
         }
 
-        if ($this->format->parse($value) === null) {
+        if (! $this->format->parse($value) instanceof \Carbon\Carbon) {
             $fail(__('import-wizard-new::validation.invalid_date', [
                 'format' => $this->format->getLabel(),
             ]));

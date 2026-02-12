@@ -10,9 +10,9 @@ use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 
-final class EntityLinkValidator
+final readonly class EntityLinkValidator
 {
-    private readonly EntityLinkResolver $resolver;
+    private EntityLinkResolver $resolver;
 
     public function __construct(string $teamId)
     {

@@ -25,7 +25,7 @@ return new class extends Migration
 
     private function backfillSlugs(): void
     {
-        $teams = DB::table('teams')->orderBy('created_at')->get();
+        $teams = DB::table('teams')->oldest()->get();
         $usedSlugs = [];
 
         foreach ($teams as $team) {

@@ -38,11 +38,12 @@ trait WithImportStore
     {
         $tenant = filament()->getTenant();
 
-        return $tenant !== null ? (string) $tenant->getKey() : null;
+        return $tenant instanceof \Illuminate\Database\Eloquent\Model ? (string) $tenant->getKey() : null;
     }
 
     /**
      * @return list<string>
+     *
      * @throws FileNotFoundException
      */
     protected function headers(): array

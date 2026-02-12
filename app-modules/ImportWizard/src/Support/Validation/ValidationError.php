@@ -66,7 +66,7 @@ final readonly class ValidationError
      */
     public function toStorageFormat(): string
     {
-        if (! empty($this->itemErrors)) {
+        if ($this->itemErrors !== []) {
             return json_encode($this->itemErrors, JSON_THROW_ON_ERROR);
         }
 
@@ -75,7 +75,7 @@ final readonly class ValidationError
 
     public function hasItemErrors(): bool
     {
-        return ! empty($this->itemErrors);
+        return $this->itemErrors !== [];
     }
 
     public function getMessage(): ?string

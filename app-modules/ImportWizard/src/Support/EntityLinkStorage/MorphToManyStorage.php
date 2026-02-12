@@ -16,7 +16,7 @@ final class MorphToManyStorage implements EntityLinkStorageInterface
 {
     public function store(Model $record, EntityLink $link, array $resolvedIds, array $context): void
     {
-        if (empty($resolvedIds)) {
+        if ($resolvedIds === []) {
             return;
         }
 

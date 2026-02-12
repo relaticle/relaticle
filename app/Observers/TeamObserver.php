@@ -12,11 +12,11 @@ final readonly class TeamObserver
     public function creating(Team $team): void
     {
         if (blank($team->slug)) {
-            $team->slug = self::generateUniqueSlug($team->name);
+            $team->slug = $this->generateUniqueSlug($team->name);
         }
     }
 
-    private static function generateUniqueSlug(string $name): string
+    private function generateUniqueSlug(string $name): string
     {
         $baseSlug = Str::slug($name);
 

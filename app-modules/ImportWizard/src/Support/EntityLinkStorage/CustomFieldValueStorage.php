@@ -22,7 +22,7 @@ final class CustomFieldValueStorage implements EntityLinkStorageInterface
 
     public function prepareData(array $data, EntityLink $link, array $resolvedIds): array
     {
-        if (empty($resolvedIds) || $link->customFieldCode === null) {
+        if ($resolvedIds === [] || $link->customFieldCode === null) {
             return $data;
         }
 

@@ -61,7 +61,7 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $store = ImportStore::load($this->importId, $this->teamId);
 
-        if ($store === null) {
+        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
             return;
         }
 
@@ -121,7 +121,7 @@ final class ExecuteImportJob implements ShouldQueue
             $data = $this->buildDataFromRow($row, $mappings);
             $existing = $row->isUpdate() ? $this->findExistingRecord($importer, $row->matched_id) : null;
 
-            if ($row->isUpdate() && $existing === null) {
+            if ($row->isUpdate() && ! $existing instanceof \Illuminate\Database\Eloquent\Model) {
                 $results['skipped']++;
                 $this->markProcessed($row);
 
@@ -329,7 +329,7 @@ final class ExecuteImportJob implements ShouldQueue
     /** @param  array<string, int>  $results */
     private function notifyUser(ImportStore $store, array $results, bool $failed = false): void
     {
-        $user = User::find($store->userId());
+        $user = User::query()->find($store->userId());
 
         if ($user === null) {
             return;

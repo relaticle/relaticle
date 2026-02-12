@@ -103,7 +103,7 @@ enum DateFormat: string implements HasLabel
 
         foreach ($this->getParseFormats($withTime) as $format) {
             try {
-                $date = Carbon::createFromFormat($format, $value);
+                $date = \Illuminate\Support\Facades\Date::createFromFormat($format, $value);
 
                 if ($date instanceof Carbon) {
                     return $date;

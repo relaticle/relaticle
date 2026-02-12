@@ -34,12 +34,12 @@ final class ResolveMatchesJob implements ShouldQueue
     {
         $store = ImportStore::load($this->importId, $this->teamId);
 
-        if ($store === null) {
+        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
             return;
         }
 
         $importer = $store->getImporter();
 
-        (new MatchResolver($store, $importer))->resolve();
+        new MatchResolver($store, $importer)->resolve();
     }
 }

@@ -298,7 +298,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->color('danger')
             ->icon(Heroicon::OutlinedArrowDownTray)
             ->visible(fn (): bool => $this->isCompleted && ($this->results()['failed'] ?? 0) > 0)
-            ->action(fn () => $this->downloadFailedRows());
+            ->action(fn (): \Symfony\Component\HttpFoundation\StreamedResponse => $this->downloadFailedRows());
     }
 
     public function downloadFailedRows(): StreamedResponse
@@ -312,7 +312,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return response()->streamDownload(function () use ($store, $failedRowNumbers, $headers, $errorsByRow): void {
             /** @var resource $handle */
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, [...$headers, 'Import Error']);
+            fputcsv($handle, [...$headers, 'Import Error'], escape: '\\');
 
             $store->query()
                 ->whereIn('row_number', $failedRowNumbers)
@@ -326,7 +326,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
                         }
 
                         $values[] = $errorsByRow[$row->row_number]['error'] ?? '';
-                        fputcsv($handle, $values);
+                        fputcsv($handle, $values, escape: '\\');
                     }
                 });
 

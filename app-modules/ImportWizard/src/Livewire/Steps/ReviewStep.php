@@ -65,9 +65,9 @@ final class ReviewStep extends Component
         }
 
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
-            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) === null
-                ? 'Invalid date format'
-                : null;
+            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof \Carbon\Carbon
+                ? null
+                : 'Invalid date format';
         }
 
         return (new ColumnValidator)->validate($column, $value)?->toStorageFormat();

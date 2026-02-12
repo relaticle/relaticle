@@ -190,7 +190,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
         $store = ImportStore::load($this->storeId, $teamId);
 
-        if ($store === null) {
+        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
             $this->storeId = null;
 
             return;
@@ -248,6 +248,6 @@ final class ImportWizard extends Component implements HasActions, HasForms
     {
         $tenant = filament()->getTenant();
 
-        return $tenant !== null ? (string) $tenant->getKey() : null;
+        return $tenant instanceof \Illuminate\Database\Eloquent\Model ? (string) $tenant->getKey() : null;
     }
 }

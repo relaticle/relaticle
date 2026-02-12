@@ -30,7 +30,7 @@ final class ColumnValidator
     {
         $format = $column->dateFormat ?? DateFormat::ISO;
 
-        if ($format->parse($value, $column->getType()->isTimestamp()) === null) {
+        if (! $format->parse($value, $column->getType()->isTimestamp()) instanceof \Carbon\Carbon) {
             return ValidationError::message("Invalid date format. Expected: {$format->getLabel()}");
         }
 
@@ -64,8 +64,8 @@ final class ColumnValidator
         $validValues = $this->getValidChoiceValues($column);
 
         $errors = $this->parseCommaSeparated($value)
-            ->reject(fn (string $item) => in_array($item, $validValues, true))
-            ->mapWithKeys(fn (string $item) => [$item => 'Not a valid option'])
+            ->reject(fn (string $item): bool => in_array($item, $validValues, true))
+            ->mapWithKeys(fn (string $item): array => [$item => 'Not a valid option'])
             ->all();
 
         if ($errors !== []) {
@@ -84,7 +84,7 @@ final class ColumnValidator
         }
 
         $errors = $this->parseCommaSeparated($value)
-            ->mapWithKeys(fn (string $item) => [$item => $this->runValidator($item, $rules)])
+            ->mapWithKeys(fn (string $item): array => [$item => $this->runValidator($item, $rules)])
             ->filter()
             ->all();
 
@@ -117,7 +117,7 @@ final class ColumnValidator
     {
         return str($value)
             ->explode(',')
-            ->map(fn (string $v) => trim($v))
+            ->map(fn (string $v): string => trim($v))
             ->filter()
             ->values();
     }
@@ -141,7 +141,7 @@ final class ColumnValidator
     private function getPreviewRules(ColumnData $column): array
     {
         return collect($column->getRules())
-            ->reject(fn (string $rule) => in_array($rule, ['required', 'nullable'], true))
+            ->reject(fn (string $rule): bool => in_array($rule, ['required', 'nullable'], true))
             ->values()
             ->all();
     }

@@ -186,7 +186,7 @@ abstract class BaseImporter implements ImporterContract
             ->orderBy('sort_order')
             ->get();
 
-        $validationService = app(ValidationService::class);
+        $validationService = resolve(ValidationService::class);
 
         $fields = $customFields->map(function (CustomField $customField) use ($validationService): ImportField {
             // For multi-value arbitrary fields (email, phone), use item-level rules
@@ -203,7 +203,7 @@ abstract class BaseImporter implements ImporterContract
 
             // Load options for real choice fields (not email/phone which accept arbitrary values)
             $options = $this->shouldLoadOptions($customField)
-                ? $customField->options->map(fn ($o) => ['label' => $o->name, 'value' => $o->name])->all()
+                ? $customField->options->map(fn ($o): array => ['label' => $o->name, 'value' => $o->name])->all()
                 : null;
 
             return ImportField::make("custom_fields_{$customField->code}")
@@ -306,7 +306,7 @@ abstract class BaseImporter implements ImporterContract
     {
         $team = $this->getTeam();
 
-        if ($team === null) {
+        if (! $team instanceof \App\Models\Team) {
             return;
         }
 

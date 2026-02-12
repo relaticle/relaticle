@@ -33,7 +33,7 @@ final class TeamFactory extends Factory
     {
         return $this->afterMaking(function (Team $team): void {
             if (blank($team->slug)) {
-                $team->slug = Str::slug($team->name) . '-' . Str::lower(Str::random(5));
+                $team->slug = Str::slug($team->name).'-'.Str::lower(Str::random(5));
             }
         })->sequence(fn (Sequence $sequence): array => [
             'created_at' => now()->subMinutes($sequence->index),

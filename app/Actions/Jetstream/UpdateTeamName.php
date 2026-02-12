@@ -23,7 +23,7 @@ final readonly class UpdateTeamName implements UpdatesTeamNames
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'min:3', 'regex:' . Team::SLUG_REGEX, "unique:teams,slug,{$team->id}"],
+            'slug' => ['required', 'string', 'max:255', 'min:3', 'regex:'.Team::SLUG_REGEX, "unique:teams,slug,{$team->id}"],
         ])->validateWithBag('updateTeamName');
 
         $team->update([

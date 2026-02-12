@@ -6,7 +6,6 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -49,7 +48,7 @@ final class UploadStep extends Component implements HasForms
             ? ImportStore::load($storeId, $this->getCurrentTeamId())
             : null;
 
-        if ($this->store === null) {
+        if (! $this->store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
             return;
         }
 
@@ -62,7 +61,7 @@ final class UploadStep extends Component implements HasForms
     {
         $tenant = filament()->getTenant();
 
-        return $tenant !== null ? (string) $tenant->getKey() : null;
+        return $tenant instanceof \Illuminate\Database\Eloquent\Model ? (string) $tenant->getKey() : null;
     }
 
     public function render(): View
@@ -78,7 +77,7 @@ final class UploadStep extends Component implements HasForms
 
     private function validateFile(): void
     {
-        if ($this->uploadedFile === null) {
+        if (! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
             return;
         }
 
@@ -130,7 +129,7 @@ final class UploadStep extends Component implements HasForms
 
     public function continueToMapping(): void
     {
-        if (! $this->isParsed || $this->uploadedFile === null) {
+        if (! $this->isParsed || ! $this->uploadedFile instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
             $this->addError('uploadedFile', 'File no longer available. Please re-upload.');
             $this->reset(['headers', 'rowCount', 'isParsed']);
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Commands;
 
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -50,7 +49,7 @@ final class CleanupImportsCommand extends Command
                 continue;
             }
 
-            $updatedAt = Carbon::parse($meta['updated_at']);
+            $updatedAt = \Illuminate\Support\Facades\Date::parse($meta['updated_at']);
             $status = ImportStatus::tryFrom($meta['status'] ?? '');
 
             $isTerminal = in_array($status, [ImportStatus::Completed, ImportStatus::Failed], true);

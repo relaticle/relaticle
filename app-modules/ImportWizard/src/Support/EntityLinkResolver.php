@@ -12,7 +12,7 @@ use Relaticle\ImportWizard\Data\MatchableField;
 
 final class EntityLinkResolver
 {
-    private const CUSTOM_FIELD_PREFIX = 'custom_fields_';
+    private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
     /** @var array<string, array<string, int|string|null>> */
     private array $cache = [];
@@ -67,7 +67,7 @@ final class EntityLinkResolver
         }
 
         if ($toFetch !== []) {
-            $results = array_merge($results, $this->batchResolve($link, $matcher, $toFetch));
+            return array_merge($results, $this->batchResolve($link, $matcher, $toFetch));
         }
 
         return $results;
@@ -206,7 +206,6 @@ final class EntityLinkResolver
             $rows = $query->get(['entity_id', 'json_value']);
 
             foreach ($rows as $row) {
-                /** @var mixed $rawJson */
                 $rawJson = $row->json_value;
                 $jsonValues = match (true) {
                     $rawJson instanceof \Illuminate\Support\Collection => $rawJson->all(),
@@ -219,7 +218,7 @@ final class EntityLinkResolver
                     continue;
                 }
 
-                $stringValues = array_map('strval', $jsonValues);
+                $stringValues = array_map(strval(...), $jsonValues);
 
                 foreach ($chunk as $value) {
                     if (! isset($results[$value]) && in_array($value, $stringValues, true)) {

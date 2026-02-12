@@ -61,7 +61,7 @@ final class UpdateTeamName extends BaseLivewireComponent
                             ->string()
                             ->maxLength(255)
                             ->required()
-                            ->rules(['min:3', 'regex:' . Team::SLUG_REGEX])
+                            ->rules(['min:3', 'regex:'.Team::SLUG_REGEX])
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (): void {
                                 $this->slugManuallyEdited = true;

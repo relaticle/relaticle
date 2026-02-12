@@ -110,9 +110,7 @@ final class EntityLink extends Data
         $lookupType = $customField->lookup_type;
         $modelClass = Relation::getMorphedModel($lookupType);
 
-        if ($modelClass === null) {
-            throw new \InvalidArgumentException("Unknown lookup type: {$lookupType}");
-        }
+        throw_if($modelClass === null, \InvalidArgumentException::class, "Unknown lookup type: {$lookupType}");
 
         return new self(
             key: "custom_fields_{$customField->code}",

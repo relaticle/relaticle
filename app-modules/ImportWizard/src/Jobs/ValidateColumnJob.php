@@ -40,7 +40,7 @@ final class ValidateColumnJob implements ShouldQueue
     {
         $store = ImportStore::load($this->importId, $this->teamId);
 
-        if ($store === null) {
+        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
             return;
         }
 
@@ -57,7 +57,7 @@ final class ValidateColumnJob implements ShouldQueue
 
         $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
 
-        if (empty($uniqueValues)) {
+        if ($uniqueValues === []) {
             return;
         }
 
@@ -70,7 +70,7 @@ final class ValidateColumnJob implements ShouldQueue
     {
         $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
 
-        if (empty($uniqueValues)) {
+        if ($uniqueValues === []) {
             return;
         }
 
@@ -208,7 +208,7 @@ final class ValidateColumnJob implements ShouldQueue
 
     private function hydrateColumnField(ImportStore $store): void
     {
-        if ($this->column->importField !== null) {
+        if ($this->column->importField instanceof \Relaticle\ImportWizard\Data\ImportField) {
             return;
         }
 

@@ -20,8 +20,8 @@ return [
         '127.0.0.1',
         'relaticle.test',
         'app.relaticle.test',
-        parse_url(config('app.url'), PHP_URL_HOST),
-        'app.'.parse_url(config('app.url'), PHP_URL_HOST),
+        parse_url((string) config('app.url'), PHP_URL_HOST),
+        'app.'.parse_url((string) config('app.url'), PHP_URL_HOST),
     ]),
 
     /*

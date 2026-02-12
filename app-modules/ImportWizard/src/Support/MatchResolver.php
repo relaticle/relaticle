@@ -32,7 +32,7 @@ final readonly class MatchResolver
 
         $matchField = $this->importer->getMatchFieldForMappedColumns($mappedFieldKeys);
 
-        if ($matchField !== null && $matchField->behavior !== MatchBehavior::AlwaysCreate) {
+        if ($matchField instanceof \Relaticle\ImportWizard\Data\MatchableField && $matchField->behavior !== MatchBehavior::AlwaysCreate) {
             $this->resolveWithLookup($matchField, $mappings);
         }
 
