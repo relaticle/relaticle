@@ -283,12 +283,16 @@ it('includes __match_resolution key in batchIds', function (): void {
     expect($component->get('batchIds'))->toHaveKey('__match_resolution');
 });
 
-it('blocks continueToPreview while match resolution is running', function (): void {
+it('allows continueToPreview while only match resolution is running', function (): void {
     $component = mountReviewStep($this);
     $component->set('batchIds', ['__match_resolution' => 'fake-batch-id']);
 
     $component->call('continueToPreview')
-        ->assertNotDispatched('completed');
+        ->assertDispatched('completed');
+
+    $this->store->refreshMeta();
+
+    expect($this->store->meta()['match_resolution_batch_id'])->toBe('fake-batch-id');
 });
 
 it('clears relationships column on mount', function (): void {
