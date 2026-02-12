@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\View\View;
@@ -174,7 +175,7 @@ final class ReviewStep extends Component
         return $this->store()->query()
             ->uniqueValuesFor($column)
             ->forFilter($this->filter, $column)
-            ->when(filled($this->search), fn ($q) => $q->searchValue($column, $this->search))
+            ->when(filled($this->search), fn (Builder $q) => $q->searchValue($column, $this->search))
             ->orderBy($this->sortField->value, $this->sortDirection->value)
             ->paginate(100);
     }
@@ -381,7 +382,7 @@ final class ReviewStep extends Component
     {
         $mappings = $this->store()->meta()['column_mappings'] ?? [];
 
-        return md5((string) json_encode($mappings));
+        return hash('xxh128', (string) json_encode($mappings));
     }
 
     private function hasMappingsChanged(): bool

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -203,7 +204,7 @@ abstract class BaseImporter implements ImporterContract
 
             // Load options for real choice fields (not email/phone which accept arbitrary values)
             $options = $this->shouldLoadOptions($customField)
-                ? $customField->options->map(fn ($o): array => ['label' => $o->name, 'value' => $o->name])->all()
+                ? $customField->options->map(fn (CustomFieldOption $o): array => ['label' => $o->name, 'value' => $o->name])->all()
                 : null;
 
             return ImportField::make("custom_fields_{$customField->code}")

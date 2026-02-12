@@ -202,6 +202,6 @@ final class ImportField extends Data
             return true;
         }
 
-        return array_any($this->guesses, fn ($guess): bool => strtolower($guess) === $normalized);
+        return array_any($this->guesses, fn (string $guess): bool => strtolower($guess) === $normalized);
     }
 }

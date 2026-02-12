@@ -76,7 +76,7 @@ final class ExecuteImportJob implements ShouldQueue
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(100, function ($rows) use ($importer, $mappings, &$results, $store): void {
+                ->chunkById(100, function (Collection $rows) use ($importer, $mappings, &$results, $store): void {
                     foreach ($rows as $row) {
                         $this->processRow($row, $importer, $mappings, $results, $store);
                     }

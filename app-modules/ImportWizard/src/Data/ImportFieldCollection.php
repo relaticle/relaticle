@@ -16,13 +16,8 @@ use Illuminate\Support\Collection;
  */
 final class ImportFieldCollection extends Collection
 {
-    /**
-     * Get a field by its key.
-     *
-     * @param  mixed  $key
-     * @param  mixed  $default
-     */
-    public function get($key, $default = null): ?ImportField
+    /** @phpstan-param ImportField|null $default */
+    public function get(mixed $key, mixed $default = null): ?ImportField
     {
         return $this->first(fn (ImportField $f): bool => $f->key === $key) ?? $default;
     }

@@ -317,7 +317,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             $store->query()
                 ->whereIn('row_number', $failedRowNumbers)
                 ->orderBy('row_number')
-                ->chunk(100, function ($rows) use ($handle, $headers, $errorsByRow): void {
+                ->chunk(100, function (Collection $rows) use ($handle, $headers, $errorsByRow): void {
                     foreach ($rows as $row) {
                         $values = [];
 

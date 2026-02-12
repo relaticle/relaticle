@@ -10,6 +10,7 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Enums\Width;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -164,7 +165,7 @@ final class MappingStep extends Component implements HasActions, HasForms
             ->limit($limit)
             ->get()
             ->pluck('raw_data')
-            ->map(fn ($data): string => (string) ($data[$column] ?? ''))
+            ->map(fn (Collection $data): string => (string) ($data[$column] ?? ''))
             ->all();
     }
 

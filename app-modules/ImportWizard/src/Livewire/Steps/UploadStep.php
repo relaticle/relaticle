@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Livewire\Steps;
 
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Illuminate\Support\LazyCollection;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -166,7 +167,7 @@ final class UploadStep extends Component implements HasForms
                     ];
                 })
                 ->chunk($this->chunkSize())
-                ->each(fn ($chunk) => $this->store->query()->insert($chunk->all()));
+                ->each(fn (LazyCollection $chunk) => $this->store->query()->insert($chunk->all()));
 
             if ($rowCount === 0) {
                 $this->store->destroy();
