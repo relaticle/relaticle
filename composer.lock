@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "48f3dfe1aa150c09e9374b487ded8a5b",
+    "content-hash": "b456a6bb8050cb2d039213b34d93067a",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -7073,16 +7073,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "3.0.0-beta5",
+            "version": "3.0.0-beta6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Relaticle/custom-fields.git",
-                "reference": "4a62b20e29b79bd913ca5d093b32d6f63099c812"
+                "reference": "5a462dd784f3b97a610632f057ce65cef05e0ec8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Relaticle/custom-fields/zipball/4a62b20e29b79bd913ca5d093b32d6f63099c812",
-                "reference": "4a62b20e29b79bd913ca5d093b32d6f63099c812",
+                "url": "https://api.github.com/repos/Relaticle/custom-fields/zipball/5a462dd784f3b97a610632f057ce65cef05e0ec8",
+                "reference": "5a462dd784f3b97a610632f057ce65cef05e0ec8",
                 "shasum": ""
             },
             "require": {
@@ -7168,7 +7168,7 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-02-09T15:14:19+00:00"
+            "time": "2026-02-12T13:45:52+00:00"
         },
         {
             "name": "relaticle/flowforge",
@@ -8410,16 +8410,16 @@
         },
         {
             "name": "spatie/laravel-medialibrary",
-            "version": "11.18.2",
+            "version": "11.19.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-medialibrary.git",
-                "reference": "ab6d9099fb1cfc4573ca2ff66a75be424ad3ca65"
+                "reference": "4a5e91ca72f5fe61d3a3d620120e330e927627e2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/ab6d9099fb1cfc4573ca2ff66a75be424ad3ca65",
-                "reference": "ab6d9099fb1cfc4573ca2ff66a75be424ad3ca65",
+                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/4a5e91ca72f5fe61d3a3d620120e330e927627e2",
+                "reference": "4a5e91ca72f5fe61d3a3d620120e330e927627e2",
                 "shasum": ""
             },
             "require": {
@@ -8504,7 +8504,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-medialibrary/issues",
-                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.18.2"
+                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.19.0"
             },
             "funding": [
                 {
@@ -8516,7 +8516,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-09T21:26:46+00:00"
+            "time": "2026-02-12T13:06:03+00:00"
         },
         {
             "name": "spatie/laravel-package-tools",
@@ -13425,16 +13425,16 @@
         },
         {
             "name": "laravel/boost",
-            "version": "v2.1.2",
+            "version": "v2.1.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/boost.git",
-                "reference": "81ecf79e82c979efd92afaeac012605cc7b2f31f"
+                "reference": "b96e0ab547d51d3810498dcc4d5535486991df6f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/boost/zipball/81ecf79e82c979efd92afaeac012605cc7b2f31f",
-                "reference": "81ecf79e82c979efd92afaeac012605cc7b2f31f",
+                "url": "https://api.github.com/repos/laravel/boost/zipball/b96e0ab547d51d3810498dcc4d5535486991df6f",
+                "reference": "b96e0ab547d51d3810498dcc4d5535486991df6f",
                 "shasum": ""
             },
             "require": {
@@ -13445,7 +13445,7 @@
                 "illuminate/support": "^11.45.3|^12.41.1",
                 "laravel/mcp": "^0.5.1",
                 "laravel/prompts": "^0.3.10",
-                "laravel/roster": "^0.2.9",
+                "laravel/roster": "^0.4.0",
                 "php": "^8.2"
             },
             "require-dev": {
@@ -13487,7 +13487,7 @@
                 "issues": "https://github.com/laravel/boost/issues",
                 "source": "https://github.com/laravel/boost"
             },
-            "time": "2026-02-10T17:40:45+00:00"
+            "time": "2026-02-11T19:22:04+00:00"
         },
         {
             "name": "laravel/mcp",
@@ -13711,31 +13711,31 @@
         },
         {
             "name": "laravel/roster",
-            "version": "v0.2.9",
+            "version": "v0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/roster.git",
-                "reference": "82bbd0e2de614906811aebdf16b4305956816fa6"
+                "reference": "77e6c1187952d0eef50a54922db47893f5e7c986"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/roster/zipball/82bbd0e2de614906811aebdf16b4305956816fa6",
-                "reference": "82bbd0e2de614906811aebdf16b4305956816fa6",
+                "url": "https://api.github.com/repos/laravel/roster/zipball/77e6c1187952d0eef50a54922db47893f5e7c986",
+                "reference": "77e6c1187952d0eef50a54922db47893f5e7c986",
                 "shasum": ""
             },
             "require": {
-                "illuminate/console": "^10.0|^11.0|^12.0",
-                "illuminate/contracts": "^10.0|^11.0|^12.0",
-                "illuminate/routing": "^10.0|^11.0|^12.0",
-                "illuminate/support": "^10.0|^11.0|^12.0",
-                "php": "^8.1|^8.2",
-                "symfony/yaml": "^6.4|^7.2"
+                "illuminate/console": "^11.0|^12.0|^13.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/routing": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "symfony/yaml": "^7.2|^8.0"
             },
             "require-dev": {
                 "laravel/pint": "^1.14",
                 "mockery/mockery": "^1.6",
-                "orchestra/testbench": "^8.22.0|^9.0|^10.0",
-                "pestphp/pest": "^2.0|^3.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.0|^4.1",
                 "phpstan/phpstan": "^2.0"
             },
             "type": "library",
@@ -13768,7 +13768,7 @@
                 "issues": "https://github.com/laravel/roster/issues",
                 "source": "https://github.com/laravel/roster"
             },
-            "time": "2025-10-20T09:56:46+00:00"
+            "time": "2026-02-11T07:24:41+00:00"
         },
         {
             "name": "laravel/sail",
@@ -16486,7 +16486,7 @@
     "aliases": [],
     "minimum-stability": "beta",
     "stability-flags": {
-        "relaticle/custom-fields": 20,
+        "relaticle/custom-fields": 10,
         "relaticle/flowforge": 20
     },
     "prefer-stable": true,

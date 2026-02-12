@@ -211,6 +211,12 @@ final class ImportStore
         return $this->meta()['results'] ?? null;
     }
 
+    /** @return list<array{row: int, error: string}> */
+    public function failedRows(): array
+    {
+        return $this->meta()['failed_rows'] ?? [];
+    }
+
     /**
      * @return Collection<int, ColumnData>
      *
@@ -321,6 +327,7 @@ final class ImportStore
             $table->string('match_action')->nullable();
             $table->string('matched_id')->nullable();
             $table->text('relationships')->nullable();
+            $table->boolean('processed')->default(false);
         });
 
         $this->connection()->statement('
@@ -338,6 +345,19 @@ final class ImportStore
             $table->index('validation');
             $table->index('match_action');
             $table->index('skipped');
+        });
+    }
+
+    public function ensureProcessedColumn(): void
+    {
+        $schema = $this->connection()->getSchemaBuilder();
+
+        if ($schema->hasColumn('import_rows', 'processed')) {
+            return;
+        }
+
+        $schema->table('import_rows', function (Blueprint $table): void {
+            $table->boolean('processed')->default(false);
         });
     }
 

@@ -81,7 +81,12 @@ final class PreviewStep extends Component implements HasActions, HasForms
     #[Computed]
     public function isImporting(): bool
     {
-        return $this->batchId !== null && ! $this->isCompleted;
+        if ($this->isCompleted) {
+            return false;
+        }
+
+        return $this->batchId !== null
+            || $this->store()->status() === ImportStatus::Importing;
     }
 
     #[Computed]
@@ -303,7 +308,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function checkImportProgress(): void
     {
-        if ($this->batchId === null) {
+        if ($this->batchId === null && $this->store()->status() !== ImportStatus::Importing) {
             return;
         }
 

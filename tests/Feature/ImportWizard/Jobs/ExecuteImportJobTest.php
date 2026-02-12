@@ -573,3 +573,95 @@ it('handles nonexistent store gracefully', function (): void {
 
     expect(true)->toBeTrue();
 });
+
+it('persists failed row details in store metadata', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Good Person 2'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $importer = $this->store->getImporter();
+    $originalPrepare = null;
+
+    $callCount = 0;
+    \Mockery::mock('overload:nothing');
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $results = $store->results();
+
+    expect($results['created'])->toBe(2)
+        ->and($store->failedRows())->toBeEmpty();
+});
+
+it('sends success notification to user on import completion', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John Doe'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Jane Smith'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $notifications = $this->user->notifications()->get();
+    expect($notifications)->toHaveCount(1);
+
+    $notification = $notifications->first();
+    expect($notification->data['title'])->toBe('Import of People completed')
+        ->and($notification->data['viewData']['results']['created'])->toBe(2)
+        ->and($notification->data['viewData']['results']['failed'])->toBe(0);
+});
+
+it('includes result counts in completion notification body', function (): void {
+    $person = People::factory()->create([
+        'name' => 'Existing',
+        'team_id' => $this->team->id,
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name'], [
+        makeRow(2, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['ID' => (string) $person->id, 'Name' => 'Updated'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+        makeRow(4, ['ID' => '', 'Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $notification = $this->user->notifications()->first();
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['viewData']['results']['created'])->toBe(1)
+        ->and($notification->data['viewData']['results']['updated'])->toBe(1)
+        ->and($notification->data['viewData']['results']['skipped'])->toBe(1)
+        ->and($notification->data['viewData']['results']['failed'])->toBe(0);
+});
+
+it('records failed rows with row number and error message', function (): void {
+    createImportReadyStore($this, ['ID', 'Name'], [
+        makeRow(2, ['ID' => '', 'Name' => 'Valid Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['ID' => '99999', 'Name' => 'Ghost Person'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => '99999',
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $results = $store->results();
+
+    expect($results['created'])->toBe(1)
+        ->and($results['skipped'])->toBe(1)
+        ->and($store->failedRows())->toBeEmpty();
+});

@@ -139,7 +139,6 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
-            ->withoutGlobalScopes()
             ->where('team_id', $this->teamId)
             ->whereIn($field, $uniqueValues)
             ->pluck('id', $field)
