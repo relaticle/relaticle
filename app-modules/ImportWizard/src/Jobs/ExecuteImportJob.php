@@ -110,7 +110,7 @@ final class ExecuteImportJob implements ShouldQueue
         array &$results,
         ImportStore $store,
     ): void {
-        if ($row->isSkip()) {
+        if (! $row->isCreate() && ! $row->isUpdate()) {
             $results['skipped']++;
             $this->markProcessed($row);
 

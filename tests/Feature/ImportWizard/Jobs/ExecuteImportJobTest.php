@@ -350,6 +350,25 @@ it('sets store status to Completed on success', function (): void {
     expect($store->status())->toBe(ImportStatus::Completed);
 });
 
+it('skips rows with null match_action without crashing', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Null Action'], ['match_action' => null]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    runImportJob($this);
+
+    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    expect($store->status())->toBe(ImportStatus::Completed);
+
+    $results = $store->results();
+    expect($results['created'])->toBe(1)
+        ->and($results['skipped'])->toBe(1)
+        ->and($results['failed'])->toBe(0);
+});
+
 it('stores results with counts in meta', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing',
