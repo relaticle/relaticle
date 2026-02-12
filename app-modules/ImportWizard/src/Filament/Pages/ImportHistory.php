@@ -6,11 +6,13 @@ namespace Relaticle\ImportWizard\Filament\Pages;
 
 use BackedEnum;
 use Filament\Pages\Page;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\URL;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
@@ -96,6 +98,17 @@ final class ImportHistory extends Page implements HasTable
                         ImportStatus::Failed->value => 'Failed',
                         ImportStatus::Importing->value => 'Importing',
                     ]),
+            ])
+            ->actions([
+                Action::make('downloadFailedRows')
+                    ->label('Failed Rows')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('danger')
+                    ->url(fn (Import $record): string => URL::signedRoute(
+                        'import-history.failed-rows.download',
+                        ['import' => $record],
+                    ), shouldOpenInNewTab: true)
+                    ->visible(fn (Import $record): bool => $record->failedRows()->exists()),
             ])
             ->defaultSort('created_at', 'desc')
             ->poll('10s');
