@@ -53,7 +53,7 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
     private array $createdRecords = [];
 
-    /** @var list<array{row: int, error: string}> */
+    /** @var list<array{row: int, error: string, data?: array<string, mixed>}> */
     private array $failedRows = [];
 
     /** @var list<int> */
@@ -107,11 +107,16 @@ final class ExecuteImportJob implements ShouldQueue
                     $this->persistResults($import, $results);
                 });
 
+            $failedRowsSummary = array_map(
+                fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
+                $this->failedRows,
+            );
+
             $import->update([
                 'status' => ImportStatus::Completed,
                 'completed_at' => now(),
                 'results' => $results,
-                'failed_rows_data' => $this->failedRows,
+                'failed_rows_data' => $failedRowsSummary,
                 'created_rows' => $results['created'],
                 'updated_rows' => $results['updated'],
                 'skipped_rows' => $results['skipped'],
@@ -212,7 +217,7 @@ final class ExecuteImportJob implements ShouldQueue
             $this->markProcessed($row);
         } catch (\Throwable $e) {
             $results['failed']++;
-            $this->recordFailedRow($row->row_number, $e);
+            $this->recordFailedRow($row->row_number, $row->raw_data->all(), $e);
             report($e);
         }
     }
@@ -343,7 +348,8 @@ final class ExecuteImportJob implements ShouldQueue
             ->all();
     }
 
-    private function recordFailedRow(int $rowNumber, \Throwable $e): void
+    /** @param array<string, mixed> $rawData */
+    private function recordFailedRow(int $rowNumber, array $rawData, \Throwable $e): void
     {
         if (count($this->failedRows) >= self::MAX_STORED_ERRORS) {
             return;
@@ -352,6 +358,7 @@ final class ExecuteImportJob implements ShouldQueue
         $this->failedRows[] = [
             'row' => $rowNumber,
             'error' => Str::limit($e->getMessage(), 500),
+            'data' => $rawData,
         ];
     }
 
@@ -360,7 +367,10 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $import->update([
             'results' => $results,
-            'failed_rows_data' => $this->failedRows,
+            'failed_rows_data' => array_map(
+                fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
+                $this->failedRows,
+            ),
         ]);
     }
 
@@ -370,13 +380,16 @@ final class ExecuteImportJob implements ShouldQueue
             return;
         }
 
+        $now = now();
+
         $rows = collect($this->failedRows)->map(fn (array $row): array => [
+            'id' => (string) Str::ulid(),
             'import_id' => $import->id,
             'team_id' => $this->teamId,
-            'data' => json_encode(['row_number' => $row['row']]),
+            'data' => json_encode($row['data'] ?? ['row_number' => $row['row']]),
             'validation_error' => $row['error'],
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
 
         foreach ($rows->chunk(100) as $chunk) {

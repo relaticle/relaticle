@@ -18,21 +18,20 @@ final class DownloadFailedRowsController
             403,
         );
 
-        $firstFailedRow = $import->failedRows()->first();
-        $columnHeaders = $firstFailedRow ? array_keys($firstFailedRow->data) : [];
-        $columnHeaders[] = 'Import Error';
+        $columnHeaders = $import->headers ?? [];
+        $csvHeaders = [...$columnHeaders, 'Import Error'];
 
-        return response()->streamDownload(function () use ($import, $columnHeaders): void {
+        return response()->streamDownload(function () use ($import, $columnHeaders, $csvHeaders): void {
             $handle = fopen('php://output', 'w');
 
-            // UTF-8 BOM
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, $columnHeaders, escape: '\\');
+            fputcsv($handle, $csvHeaders, escape: '\\');
 
             $import->failedRows()
                 ->lazyById(100)
-                ->each(function (FailedImportRow $row) use ($handle): void {
-                    $values = array_values($row->data);
+                ->each(function (FailedImportRow $row) use ($handle, $columnHeaders): void {
+                    $data = $row->data;
+                    $values = array_map(fn (string $header) => $data[$header] ?? '', $columnHeaders);
                     $values[] = $row->validation_error ?? 'System error';
                     fputcsv($handle, $values, escape: '\\');
                 });

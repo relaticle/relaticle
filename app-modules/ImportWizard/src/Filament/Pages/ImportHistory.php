@@ -104,8 +104,9 @@ final class ImportHistory extends Page implements HasTable
                     ->label('Failed Rows')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('danger')
-                    ->url(fn (Import $record): string => URL::signedRoute(
+                    ->url(fn (Import $record): string => URL::temporarySignedRoute(
                         'import-history.failed-rows.download',
+                        now()->addHour(),
                         ['import' => $record],
                     ), shouldOpenInNewTab: true)
                     ->visible(fn (Import $record): bool => $record->failedRows()->exists()),
