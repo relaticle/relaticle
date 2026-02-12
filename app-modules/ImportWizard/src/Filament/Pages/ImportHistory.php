@@ -31,6 +31,8 @@ final class ImportHistory extends Page implements HasTable
 
     protected static ?int $navigationSort = 100;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     public function table(Table $table): Table
     {
         return $table
