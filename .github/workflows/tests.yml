@@ -138,10 +138,7 @@ jobs:
           cp .env.ci .env
           php artisan key:generate
 
-      - name: Cache compiled views
-        run: php artisan view:cache
-
       - name: Tests
-        run: composer test:pest:ci:shard || composer test:pest:ci:shard
+        run: composer test:pest:ci:shard
         env:
           SHARD: ${{ matrix.shard }}/7
