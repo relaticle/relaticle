@@ -14,8 +14,12 @@ jobs:
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.composer/cache/files
-          key: dependencies-php-composer-${{ hashFiles('composer.lock') }}
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -50,46 +54,39 @@ jobs:
       fail-fast: false
       matrix:
         php: [8.4]
-        shard: [1, 2, 3, 4, 5, 6, 7]
+        shard: [1, 2, 3, 4, 5]
 
-    name: Tests (Shard ${{ matrix.shard }}/7)
+    name: Tests (Shard ${{ matrix.shard }}/5)
 
-    # Service containers to run with `runner-job`
     services:
-      # Label used to access the service container
       postgres:
-        # Docker Hub image
-        image: postgres
-        # Provide the password for postgres
+        image: postgres:alpine
         env:
-          # optional (defaults to `postgres`)
           POSTGRES_DB: relaticle_testing
-          # required
           POSTGRES_PASSWORD: postgres
-          # optional (defaults to `5432`)
           POSTGRES_PORT: 5432
-          # optional (defaults to `postgres`)
           POSTGRES_USER: postgres
-
-        # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          # Maps tcp port 5432 on service container to the host
           - 5432:5432
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.composer/cache/files
-          key: dependencies-php-composer-${{ hashFiles('composer.lock') }}
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -97,7 +94,7 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: json, dom, curl, libxml, mbstring, zip
           tools: composer:v2
-          coverage: xdebug
+          coverage: none
 
       - name: Set up Node & NPM
         uses: actions/setup-node@v5
@@ -127,8 +124,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: npm install
+        run: npm ci
 
       - name: Build dependencies
         run: npm run build
@@ -141,4 +137,4 @@ jobs:
       - name: Tests
         run: composer test:pest:ci:shard
         env:
-          SHARD: ${{ matrix.shard }}/7
+          SHARD: ${{ matrix.shard }}/5

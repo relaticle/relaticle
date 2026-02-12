@@ -113,7 +113,7 @@
         "test:pest": "pest --parallel",
         "test:pest:shard": "pest --parallel --shard=${SHARD}",
         "test:pest:ci": "pest --parallel --configuration phpunit.ci.xml",
-        "test:pest:ci:shard": "pest --configuration phpunit.ci.xml --shard=${SHARD}",
+        "test:pest:ci:shard": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD}",
         "test": [
             "@test:lint",
             "@test:refactor",
