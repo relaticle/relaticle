@@ -21,7 +21,7 @@ Relaticle's import wizard lets you bulk import data from CSV files into your CRM
 | Format | CSV (comma-separated values) |
 | Encoding | UTF-8 |
 | Max Rows | 10,000 per file |
-| Max Size | 50MB |
+| Max Size | 10MB |
 | Headers | Required in first row |
 
 **Tip**: In Excel, use "Save As" → "CSV UTF-8 (Comma delimited)".
@@ -34,7 +34,7 @@ Relaticle's import wizard lets you bulk import data from CSV files into your CRM
 | People | Name |
 | Opportunities | Name |
 | Tasks | Title |
-| Notes | Title |
+| Notes | Content |
 
 ---
 
@@ -58,17 +58,15 @@ The wizard automatically matches CSV columns to Relaticle fields by comparing co
 
 **Manual Adjustment**: Click any dropdown to change the mapping or select "Don't Import" to skip a column.
 
+**Linking Related Records**: When mapping a column to a relationship (like Company or Contact), a submenu appears where you choose the match method — by Record ID, Domain, Email, or Name.
+
 ### Step 3: Review Values
 
-The wizard analyzes your data and shows validation issues.
-
-**Issue Types**:
-- **Errors** (red): Must be fixed or skipped before import
-- **Warnings** (yellow): Optional to fix, won't block import
+The wizard analyzes your data and flags validation issues.
 
 **Actions You Can Take**:
-- **Fix**: Enter a corrected value to apply to all rows with this value
-- **Skip**: Click the skip icon to exclude this value. The row will still be imported, but this field will be empty
+- **Fix**: Enter a corrected value to apply to all rows with that value
+- **Skip**: Click the skip icon to exclude a value. The row will still be imported, but this field will be empty
 - **Change Date Format**: For date columns, select the correct format if auto-detection is uncertain
 
 ### Step 4: Preview & Import
@@ -76,7 +74,6 @@ The wizard analyzes your data and shows validation issues.
 Review what will happen:
 - **New**: Records that will be created
 - **Update**: Existing records that will be modified
-- **New Companies**: Companies auto-created (People imports only)
 
 Click **Start Import** when ready. Large imports process in the background.
 
@@ -120,29 +117,30 @@ In Step 3 (Review Values), date columns show a format dropdown:
 
 ---
 
-## Duplicate Handling
+## Matching Existing Records
 
-### How Duplicates Are Detected
+When you map a field that uniquely identifies records (like email or domain), the wizard automatically finds matches in your existing data. How matching works depends on the match method you choose in Step 2.
 
-| Entity | Detection Method |
-|--------|------------------|
-| Companies | Domain (from custom_fields_domains) |
-| People | Email (from custom_fields_emails) |
-| Opportunities | Record ID only |
-| Tasks | Record ID only |
-| Notes | Record ID only |
+### Match Methods
 
-**Note**: Opportunities, Tasks, and Notes only match by Record ID. To update existing records, include the `id` column from a previous export.
+| Method | Behavior | Available For |
+|--------|----------|---------------|
+| **Record ID** | Updates the exact record. Skips if ID not found. | All entities |
+| **Domain** | Finds existing company by domain, or creates new. | Companies |
+| **Email** | Finds existing person by email, or creates new. | People |
+| **Phone** | Finds existing person by phone, or creates new. | People |
+| **Name** | Always creates a new record (names aren't unique). | Companies, People |
 
-### Duplicate Strategies
+### What Happens in Preview
 
-Choose how to handle matched records:
+After the wizard resolves matches, Step 4 shows the result:
+- Rows matched to existing records → **Update**
+- Rows with no match (or using Name matching) → **Create new**
+- Rows with an ID that doesn't exist → **Skip**
 
-| Strategy | Behavior |
-|----------|----------|
-| **Skip** (default) | Keep existing record, ignore CSV row |
-| **Update** | Overwrite existing record with CSV data |
-| **Create New** | Always create new record (allows duplicates) |
+### No Unique Field Mapped?
+
+If you don't map any matchable field, the wizard shows a warning: all rows will be created as new records. You can go back and map a field, or continue anyway.
 
 ---
 
@@ -165,8 +163,8 @@ id,name,custom_fields_industry
 ```
 
 **Preview shows**:
-- Rows with valid IDs: "Update by ID" (blue badge)
-- Rows without IDs: "New" (green badge)
+- Rows with valid IDs → "Update"
+- Rows without IDs → "New"
 
 ### Mixed Imports
 
@@ -184,97 +182,91 @@ id,name
 
 ### Companies
 
-**Columns**:
+**Fields**:
 - `name` (required) - Company name
 - `account_owner_email` - Team member email for ownership
 - Custom fields with `custom_fields_` prefix
 
-**Duplicate Detection**: By domain (custom_fields_domains field)
+**Matching**: By domain (`custom_fields_domains`) or Record ID
 
 ```
-name,account_owner_email,custom_fields_industry
-Acme Corporation,owner@yourcompany.com,Technology
+name,account_owner_email,custom_fields_industry,custom_fields_domains
+Acme Corporation,owner@yourcompany.com,Technology,acme.com
 ```
 
 ### People
 
-**Columns**:
+**Fields**:
 - `name` (required) - Person's full name
-- `company_id` - Link to company by Record ID
-- `company_domain` - Link to company by domain
-- `company_name` - Create new company by name
-- `custom_fields_emails` - Email addresses (for duplicate detection)
-- Other custom fields
+- Custom fields with `custom_fields_` prefix
 
-**Duplicate Detection**: By email address
+**Relationships** (mapped in Step 2):
+- **Company** - Link to a company. Match by Record ID, Domain, or Name (creates new).
 
-**Company Linking Priority**:
-1. `company_id` - Direct ID match (highest priority)
-2. `company_domain` - Direct domain match
-3. Automatic domain match - From person's email domain (invisible)
-4. `company_name` - Create new company (name is not unique)
+**Matching**: By email (`custom_fields_emails`), phone (`custom_fields_phone_number`), or Record ID
 
 ```
-name,company_name,custom_fields_emails,custom_fields_title
-John Doe,Acme Corporation,john@acme.com,CEO
-Jane Smith,Acme Corporation,jane@acme.com,CTO
+name,company,custom_fields_emails,custom_fields_title
+John Doe,acme.com,john@acme.com,CEO
+Jane Smith,acme.com,jane@acme.com,CTO
 ```
 
-**Note**: `company_name` always creates a new company since names are not unique. To link to existing companies, use `company_id` or `company_domain`. If the person has an email address mapped, the system will automatically try to match by email domain before creating a new company.
+**Note**: In the example above, the `company` column is mapped to the Company relationship. In Step 2, choose "Match by Domain" so `acme.com` links to the existing company. If you choose "Match by Name", a new company will always be created.
 
 ### Opportunities
 
-**Columns**:
+**Fields**:
 - `name` (required) - Opportunity name
-- `company_id` - Link to company by Record ID
-- `company_domain` - Link to company by domain
-- `company_name` - Create new company by name
-- `contact_id` - Link to contact by Record ID
-- `contact_email` - Link to contact by email
-- `contact_name` - Create new contact by name
 - Custom fields (amount, stage, close_date, etc.)
 
-**Duplicate Detection**: Record ID only
+**Relationships** (mapped in Step 2):
+- **Company** - Link to a company. Match by Record ID, Domain, or Name.
+- **Contact** - Link to a person. Match by Record ID, Email, Phone, or Name.
 
-**Company Linking**: Same as People (ID → Domain → Name creates new)
-
-**Contact Linking Priority**:
-1. `contact_id` - Direct ID match (highest priority)
-2. `contact_email` - Match by email address
-3. `contact_name` - Create new contact (name is not unique)
+**Matching**: Record ID only
 
 ```
-name,company_name,contact_name,custom_fields_amount,custom_fields_stage
-Q1 Enterprise Deal,Acme Corporation,John Doe,50000,Proposal
+name,company,contact,custom_fields_amount,custom_fields_stage
+Q1 Enterprise Deal,acme.com,john@acme.com,50000,Proposal
 ```
 
-**Note**: `contact_name` always creates a new contact since names are not unique. To link to existing contacts, use `contact_id` or `contact_email`.
+**Note**: Map the `company` column to Company → Domain and the `contact` column to Contact → Email for the best matching results.
 
 ### Tasks
 
-**Columns**:
+**Fields**:
 - `title` (required) - Task title
+- `description` - Task details
 - `assignee_email` - Team member to assign
-- Custom fields (due_date, priority, status, etc.)
 
-**Duplicate Detection**: Record ID only
+**Relationships** (mapped in Step 2):
+- **Companies** - Link to one or more companies
+- **People** - Link to one or more people
+- **Opportunities** - Link to one or more opportunities
+
+**Matching**: Record ID only
 
 ```
-title,assignee_email,custom_fields_due_date,custom_fields_priority
-Follow up with client,assignee@yourcompany.com,2024-03-15,High
+title,description,assignee_email,company,custom_fields_due_date,custom_fields_priority
+Follow up with client,Discuss proposal details,assignee@yourcompany.com,acme.com,2024-03-15,High
 ```
 
 ### Notes
 
-**Columns**:
-- `title` (required) - Note title
-- Custom fields (content, etc.)
+**Fields**:
+- `title` - Note title
+- `content` (required) - Note body
 
-**Duplicate Detection**: Record ID only
+**Relationships** (mapped in Step 2):
+- **Companies** - Link to one or more companies
+- **People** - Link to one or more people
+- **Opportunities** - Link to one or more opportunities
+
+**Matching**: None. Notes are always created as new records.
 
 ```
-title,custom_fields_content
-Meeting Notes - Q1 Review,Discussed expansion plans for Q2
+title,content,company
+Meeting Notes,Discussed expansion plans for Q2,acme.com
 ```
 
 ---
@@ -372,14 +364,14 @@ The wizard accepts multiple date formats, but consistency is key:
 |---------|----------|
 | Stuck at "Processing" | Large imports take time; check back in a few minutes |
 | Some rows failed | Download failed rows, fix errors, re-import |
-| Unexpected duplicates | Use ID-based updates for precise matching |
+| Unexpected duplicates | Map a unique field (email, domain, or ID) in Step 2 |
 
 ---
 
 ## FAQ
 
 **Can I import multiple entity types at once?**
-No, each entity imports separately. When importing People, related companies are auto-created.
+No, each entity imports separately. When importing People, related companies can be auto-created if you choose "Match by Name" for the Company relationship.
 
 **What happens if my import fails halfway?**
 Successful rows remain. Failed rows can be downloaded, fixed, and re-imported.
@@ -388,7 +380,7 @@ Successful rows remain. Failed rows can be downloaded, fixed, and re-imported.
 No automatic undo. Test with small samples first and backup important data.
 
 **How do I update existing records?**
-Include the `id` column from a previous export. For People, email matching also works.
+Include the `id` column from a previous export. For People, email or phone matching also works. For Companies, domain matching works.
 
 **What date formats are supported?**
 ISO (YYYY-MM-DD), European (DD/MM/YYYY), and American (MM/DD/YYYY). The wizard auto-detects the format.
@@ -397,10 +389,16 @@ ISO (YYYY-MM-DD), European (DD/MM/YYYY), and American (MM/DD/YYYY). The wizard a
 You'll see a warning. Use the format dropdown to select European or American interpretation.
 
 **What's the maximum file size?**
-50MB or 10,000 rows per file. Split larger datasets into multiple imports.
+10MB or 10,000 rows per file. Split larger datasets into multiple imports.
 
 **Do imports run in real-time?**
 Small imports complete immediately. Large imports process in the background with progress updates.
+
+**How does the wizard match existing records?**
+It depends on which match method you choose in Step 2. Record ID updates exact records. Domain and email find existing records or create new ones. Name always creates new records.
+
+**Can Notes be updated via import?**
+No. Notes are always created as new records regardless of whether you include an ID column.
 
 ---
 
@@ -416,30 +414,30 @@ id,name,account_owner_email,custom_fields_industry,custom_fields_domains
 
 ### People Template
 ```
-id,name,company_domain,custom_fields_emails,custom_fields_title
+id,name,company,custom_fields_emails,custom_fields_title
 ,John Doe,acme.com,john@acme.com,CEO
 ```
 
-**Tip**: Use `company_domain` to link to existing companies. Use `company_name` only when you want to create new companies.
+**Tip**: Map the `company` column to Company → Domain to link to existing companies. Choose "Match by Name" only when you want to create new companies.
 
 ### Opportunity Template
 ```
-id,name,company_domain,contact_email,custom_fields_amount,custom_fields_stage
+id,name,company,contact,custom_fields_amount,custom_fields_stage
 ,Q1 Enterprise Deal,acme.com,john@acme.com,50000,Proposal
 ```
 
-**Tip**: Use `company_domain` and `contact_email` to link to existing records. Use `company_name` and `contact_name` only when you want to create new records.
+**Tip**: Map `company` to Company → Domain and `contact` to Contact → Email to link to existing records.
 
 ### Task Template
 ```
-id,title,assignee_email,custom_fields_due_date,custom_fields_priority
-,Follow up with client,assignee@yourcompany.com,2024-03-15,High
+id,title,description,assignee_email,custom_fields_due_date,custom_fields_priority
+,Follow up with client,Discuss proposal details,assignee@yourcompany.com,2024-03-15,High
 ```
 
 ### Note Template
 ```
-id,title,custom_fields_content
-,Meeting Notes,Discussed expansion plans
+title,content
+Meeting Notes,Discussed expansion plans for Q2
 ```
 
 **Tip**: Export any existing record to get a template with all your workspace's custom fields already included.
