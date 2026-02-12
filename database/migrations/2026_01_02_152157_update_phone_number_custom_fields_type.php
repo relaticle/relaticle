@@ -27,11 +27,13 @@ return new class extends Migration
 
         // Migrate values from text_value to json_value (as JSON array)
         // Phone type uses multiChoice schema which stores values in json_value
+        // NOTE: Uses lazyById() instead of each() to avoid OFFSET pagination bug
+        // where updating rows causes them to drop from the result set, skipping subsequent rows.
         DB::table('custom_field_values')
             ->whereIn('custom_field_id', $phoneFieldIds)
             ->whereNotNull('text_value')
             ->whereNull('json_value')
-            ->orderBy('id')
+            ->lazyById(100)
             ->each(function (object $row): void {
                 DB::table('custom_field_values')
                     ->where('id', $row->id)

@@ -351,6 +351,10 @@ final class ReviewStep extends Component
         if ($hasCompleted) {
             unset($this->columnErrorStatuses);
         }
+
+        if ($this->batchIds === []) {
+            $this->dispatch('polling-complete');
+        }
     }
 
     #[Computed]

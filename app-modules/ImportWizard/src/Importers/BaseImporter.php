@@ -33,24 +33,20 @@ abstract class BaseImporter implements ImporterContract
     /** @var array<string, EntityLink>|null */
     private ?array $entityLinksCache = null;
 
+    private ?Team $teamCache = null;
+
     public function __construct(
         protected readonly string $teamId,
     ) {}
 
-    /**
-     * Get the team ID for this import.
-     */
     public function getTeamId(): string
     {
         return $this->teamId;
     }
 
-    /**
-     * Get the team model for this import.
-     */
     public function getTeam(): ?Team
     {
-        return Team::query()->find($this->teamId);
+        return $this->teamCache ??= Team::query()->find($this->teamId);
     }
 
     /**
@@ -249,9 +245,6 @@ abstract class BaseImporter implements ImporterContract
         return $record?->getKey();
     }
 
-    /**
-     * Resolve a team member by email address.
-     */
     protected function resolveTeamMemberByEmail(?string $email): ?User
     {
         if (blank($email)) {
@@ -296,25 +289,17 @@ abstract class BaseImporter implements ImporterContract
         return $data;
     }
 
-    /**
-     * Save custom field values after the record is saved.
-     *
-     * This hook ensures custom field data is persisted with proper team context.
-     */
     protected function saveCustomFieldValues(Model $record): void
     {
         $team = $this->getTeam();
 
-        if (! $team instanceof \App\Models\Team) {
+        if (! $team) {
             return;
         }
 
         CustomFields::importer()->forModel($record)->saveValues($team);
     }
 
-    /**
-     * Create a new model instance.
-     */
     protected function newModelInstance(): Model
     {
         /** @var class-string<Model> $modelClass */

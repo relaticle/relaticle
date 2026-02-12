@@ -354,19 +354,20 @@ final class PreviewStep extends Component implements HasActions, HasForms
         ])->dispatch();
 
         $this->batchId = $batch->id;
+        $this->dispatch('import-polling-start');
         $this->dispatch('import-started')->to(ImportWizard::class);
     }
 
     public function checkImportProgress(): void
     {
-        if ($this->batchId === null && $this->store()->status() !== ImportStatus::Importing) {
-            return;
-        }
-
         $this->store()->refreshMeta();
         $this->syncCompletionState();
 
-        unset($this->results, $this->progressPercent, $this->processedCount);
+        unset($this->results, $this->progressPercent, $this->processedCount, $this->isImporting);
+
+        if ($this->isCompleted) {
+            $this->dispatch('import-polling-complete');
+        }
     }
 
     public function render(): View
