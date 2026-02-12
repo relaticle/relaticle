@@ -511,7 +511,7 @@ final class ExecuteImportJob implements ShouldQueue
             return null;
         }
 
-        $dedupKey = "{$link->key}:" . mb_strtolower(trim($match->name));
+        $dedupKey = "{$link->key}:".mb_strtolower(trim($match->name));
 
         if (isset($this->createdRecords[$dedupKey])) {
             return $this->createdRecords[$dedupKey];

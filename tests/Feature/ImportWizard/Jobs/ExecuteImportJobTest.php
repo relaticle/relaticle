@@ -856,6 +856,30 @@ it('handles international data with entity link auto-creation', function (): voi
         ->and((string) $person->company_id)->toBe((string) $company->id);
 });
 
+it('persists results to Import model on completion', function (): void {
+    $headers = ['Name', 'Email'];
+    $rows = [
+        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Jane', 'Email' => 'jane@test.com'], ['match_action' => RowMatchAction::Create->value]),
+    ];
+    $mappings = [
+        ColumnData::toField('Name', 'name'),
+        ColumnData::toField('Email', 'email'),
+    ];
+
+    [$import, $store] = createImportReadyStore($this, $headers, $rows, $mappings);
+
+    runImportJob($this);
+
+    $import->refresh();
+    expect($import->status)->toBe(ImportStatus::Completed)
+        ->and($import->completed_at)->not->toBeNull()
+        ->and($import->created_rows)->toBe(2)
+        ->and($import->updated_rows)->toBe(0)
+        ->and($import->skipped_rows)->toBe(0)
+        ->and($import->results)->toBe(['created' => 2, 'updated' => 0, 'skipped' => 0, 'failed' => 0]);
+});
+
 it('processes 1000 row create import', function (): void {
     $rows = [];
     for ($i = 2; $i <= 1001; $i++) {

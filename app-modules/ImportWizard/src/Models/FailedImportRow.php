@@ -32,6 +32,6 @@ final class FailedImportRow extends Model
     /** @return \Illuminate\Database\Eloquent\Builder<static> */
     public function prunable(): \Illuminate\Database\Eloquent\Builder
     {
-        return static::where('created_at', '<=', now()->subMonth());
+        return self::where('created_at', '<=', now()->subMonth());
     }
 }
