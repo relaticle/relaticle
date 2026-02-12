@@ -79,7 +79,7 @@ final class AppPanelProvider extends PanelProvider
             ->domain('app.'.parse_url((string) config('app.url'))['host'])
             ->homeUrl(fn (): string => CompanyResource::getUrl())
             ->brandName('Relaticle')
-            ->brandLogo(fn (): \Illuminate\Contracts\View\View|\Illuminate\Contracts\View\Factory => Auth::check() ? view('filament.app.logo-empty') : view('filament.app.logo'))
+            ->brandLogo(fn (): View|Factory => Auth::check() ? view('filament.app.logo-empty') : view('filament.app.logo'))
             ->brandLogoHeight('2.6rem')
             ->login(Login::class)
             ->registration(Register::class)
@@ -118,7 +118,6 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            ->discoverPages(in: base_path('app-modules/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
             ->discoverPages(in: base_path('app-modules/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
@@ -191,7 +190,7 @@ final class AppPanelProvider extends PanelProvider
 
         if (Features::hasTeamFeatures()) {
             $panel
-                ->tenant(Team::class, ownershipRelationship: 'team')
+                ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
                 ->tenantRegistration(CreateTeam::class)
                 ->tenantProfile(EditTeam::class);
         }
