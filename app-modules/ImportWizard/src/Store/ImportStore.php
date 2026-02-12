@@ -11,6 +11,7 @@ use Illuminate\Database\Connectors\ConnectionFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -152,6 +153,30 @@ final class ImportStore
         $this->updateMeta(['status' => $status->value]);
     }
 
+    public function transitionToImporting(): bool
+    {
+        $lock = Cache::lock("import-{$this->id}-start", 10);
+
+        if (! $lock->get()) {
+            return false;
+        }
+
+        try {
+            $this->refreshMeta();
+            $currentStatus = $this->status();
+
+            if (in_array($currentStatus, [ImportStatus::Importing, ImportStatus::Completed, ImportStatus::Failed], true)) {
+                return false;
+            }
+
+            $this->setStatus(ImportStatus::Importing);
+
+            return true;
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function entityType(): ImportEntityType
     {
         return ImportEntityType::from($this->meta()['entity_type']);
@@ -209,6 +234,12 @@ final class ImportStore
     public function results(): ?array
     {
         return $this->meta()['results'] ?? null;
+    }
+
+    /** @return list<array{row: int, error: string}> */
+    public function failedRows(): array
+    {
+        return $this->meta()['failed_rows'] ?? [];
     }
 
     /**
@@ -321,6 +352,7 @@ final class ImportStore
             $table->string('match_action')->nullable();
             $table->string('matched_id')->nullable();
             $table->text('relationships')->nullable();
+            $table->boolean('processed')->default(false);
         });
 
         $this->connection()->statement('
@@ -338,6 +370,19 @@ final class ImportStore
             $table->index('validation');
             $table->index('match_action');
             $table->index('skipped');
+        });
+    }
+
+    public function ensureProcessedColumn(): void
+    {
+        $schema = $this->connection()->getSchemaBuilder();
+
+        if ($schema->hasColumn('import_rows', 'processed')) {
+            return;
+        }
+
+        $schema->table('import_rows', function (Blueprint $table): void {
+            $table->boolean('processed')->default(false);
         });
     }
 

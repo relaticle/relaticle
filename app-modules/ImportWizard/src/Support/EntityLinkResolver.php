@@ -139,7 +139,6 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
-            ->withoutGlobalScopes()
             ->where('team_id', $this->teamId)
             ->whereIn($field, $uniqueValues)
             ->pluck('id', $field)
@@ -190,15 +189,43 @@ final class EntityLinkResolver
      */
     private function resolveViaJsonColumn(Builder $baseQuery, array $uniqueValues): array
     {
+        if ($uniqueValues === []) {
+            return [];
+        }
+
         $results = [];
 
-        foreach ($uniqueValues as $value) {
-            $entityId = (clone $baseQuery)
-                ->whereJsonContains('json_value', $value)
-                ->value('entity_id');
+        foreach (array_chunk($uniqueValues, 50) as $chunk) {
+            $query = clone $baseQuery;
+            $query->where(function (Builder $q) use ($chunk): void {
+                foreach ($chunk as $value) {
+                    $q->orWhereJsonContains('json_value', $value);
+                }
+            });
 
-            if ($entityId !== null) {
-                $results[$value] = $entityId;
+            $rows = $query->get(['entity_id', 'json_value']);
+
+            foreach ($rows as $row) {
+                /** @var mixed $rawJson */
+                $rawJson = $row->json_value;
+                $jsonValues = match (true) {
+                    $rawJson instanceof \Illuminate\Support\Collection => $rawJson->all(),
+                    is_array($rawJson) => $rawJson,
+                    is_string($rawJson) => json_decode($rawJson, true),
+                    default => null,
+                };
+
+                if (! is_array($jsonValues)) {
+                    continue;
+                }
+
+                $stringValues = array_map('strval', $jsonValues);
+
+                foreach ($chunk as $value) {
+                    if (! isset($results[$value]) && in_array($value, $stringValues, true)) {
+                        $results[$value] = $row->entity_id;
+                    }
+                }
             }
         }
 

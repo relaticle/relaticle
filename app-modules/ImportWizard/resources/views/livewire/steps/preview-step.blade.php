@@ -19,10 +19,14 @@
                             <span class="text-gray-500 dark:text-gray-400">updated</span>
                         </span>
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-gray-600 dark:text-gray-300">{{ number_format($this->results['skipped'] ?? 0) }}</span>
-                            <span class="text-gray-500 dark:text-gray-400">skipped</span>
+                            <span class="font-semibold text-danger-700 dark:text-danger-300">{{ number_format($this->results['failed'] ?? 0) }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">failed</span>
                         </span>
                     </div>
+
+                    @if(($this->results['failed'] ?? 0) > 0)
+                        {{ $this->downloadFailedRowsAction }}
+                    @endif
                 @endif
             </div>
         @elseif($this->isImporting)

@@ -30,6 +30,7 @@ use Spatie\LaravelData\DataCollection;
  * @property RowMatchAction|null $match_action
  * @property string|null $matched_id
  * @property DataCollection<int, RelationshipMatch>|null $relationships
+ * @property bool $processed
  *
  * @method static Builder<static> withErrors(string $column)
  * @method static Builder<static> withCorrections(string $column)
@@ -65,6 +66,7 @@ final class ImportRow extends Model
         'match_action',
         'matched_id',
         'relationships',
+        'processed',
     ];
 
     /**
@@ -79,6 +81,7 @@ final class ImportRow extends Model
             'skipped' => AsCollection::class,
             'match_action' => RowMatchAction::class,
             'relationships' => DataCollection::class.':'.RelationshipMatch::class,
+            'processed' => 'boolean',
         ];
     }
 

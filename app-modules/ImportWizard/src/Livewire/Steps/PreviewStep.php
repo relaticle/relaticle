@@ -25,6 +25,7 @@ use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportRow;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class PreviewStep extends Component implements HasActions, HasForms
 {
@@ -81,7 +82,12 @@ final class PreviewStep extends Component implements HasActions, HasForms
     #[Computed]
     public function isImporting(): bool
     {
-        return $this->batchId !== null && ! $this->isCompleted;
+        if ($this->isCompleted) {
+            return false;
+        }
+
+        return $this->batchId !== null
+            || $this->store()->status() === ImportStatus::Importing;
     }
 
     #[Computed]
@@ -285,10 +291,60 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->action(fn () => $this->startImport());
     }
 
-    public function startImport(): void
+    public function downloadFailedRowsAction(): Action
+    {
+        return Action::make('downloadFailedRows')
+            ->label('Download Failed Rows')
+            ->color('danger')
+            ->icon(Heroicon::OutlinedArrowDownTray)
+            ->visible(fn (): bool => $this->isCompleted && ($this->results()['failed'] ?? 0) > 0)
+            ->action(fn () => $this->downloadFailedRows());
+    }
+
+    public function downloadFailedRows(): StreamedResponse
     {
         $store = $this->store();
-        $store->setStatus(ImportStatus::Importing);
+        $failedRows = $store->failedRows();
+        $headers = $store->headers();
+        $failedRowNumbers = collect($failedRows)->pluck('row')->all();
+        $errorsByRow = collect($failedRows)->keyBy('row');
+
+        return response()->streamDownload(function () use ($store, $failedRowNumbers, $headers, $errorsByRow): void {
+            /** @var resource $handle */
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [...$headers, 'Import Error']);
+
+            $store->query()
+                ->whereIn('row_number', $failedRowNumbers)
+                ->orderBy('row_number')
+                ->chunk(100, function ($rows) use ($handle, $headers, $errorsByRow): void {
+                    foreach ($rows as $row) {
+                        $values = [];
+
+                        foreach ($headers as $header) {
+                            $values[] = $row->raw_data->get($header, '');
+                        }
+
+                        $values[] = $errorsByRow[$row->row_number]['error'] ?? '';
+                        fputcsv($handle, $values);
+                    }
+                });
+
+            fclose($handle);
+        }, 'failed-rows.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function startImport(): void
+    {
+        if ($this->batchId !== null || $this->isCompleted) {
+            return;
+        }
+
+        $store = $this->store();
+
+        if (! $store->transitionToImporting()) {
+            return;
+        }
 
         $batch = Bus::batch([
             new ExecuteImportJob(
@@ -303,7 +359,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function checkImportProgress(): void
     {
-        if ($this->batchId === null) {
+        if ($this->batchId === null && $this->store()->status() !== ImportStatus::Importing) {
             return;
         }
 

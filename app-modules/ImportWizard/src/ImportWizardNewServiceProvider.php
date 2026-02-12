@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Commands\CleanupImportsCommand;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
@@ -22,10 +23,18 @@ final class ImportWizardNewServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerCommands();
         $this->registerRoutes();
         $this->registerViews();
         $this->registerTranslations();
         $this->registerLivewireComponents();
+    }
+
+    private function registerCommands(): void
+    {
+        $this->commands([
+            CleanupImportsCommand::class,
+        ]);
     }
 
     private function registerRoutes(): void

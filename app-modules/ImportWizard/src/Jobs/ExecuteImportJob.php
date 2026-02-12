@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Jobs;
 
 use App\Enums\CreationSource;
+use App\Models\User;
+use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -34,12 +37,20 @@ final class ExecuteImportJob implements ShouldQueue
 
     public int $timeout = 300;
 
-    public int $tries = 1;
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [10, 30];
 
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
+    private const int MAX_STORED_ERRORS = 100;
+
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
     private array $createdRecords = [];
+
+    /** @var list<array{row: int, error: string}> */
+    private array $failedRows = [];
 
     public function __construct(
         private readonly string $importId,
@@ -54,26 +65,35 @@ final class ExecuteImportJob implements ShouldQueue
             return;
         }
 
+        $store->ensureProcessedColumn();
+
         $importer = $store->getImporter();
         $mappings = $store->columnMappings();
 
-        $results = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+        $results = $store->results() ?? ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
 
         try {
             $store->query()
+                ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunk(100, function ($rows) use ($importer, $mappings, &$results, $store): void {
+                ->chunkById(100, function ($rows) use ($importer, $mappings, &$results, $store): void {
                     foreach ($rows as $row) {
                         $this->processRow($row, $importer, $mappings, $results, $store);
                     }
 
-                    $store->setResults($results);
+                    $this->persistResults($store, $results);
                 });
 
             $store->setStatus(ImportStatus::Completed);
+            $this->notifyUser($store, $results);
         } catch (\Throwable $e) {
-            $store->setResults($results);
+            $this->persistResults($store, $results);
             $store->setStatus(ImportStatus::Failed);
+
+            try {
+                $this->notifyUser($store, $results, failed: true);
+            } catch (\Throwable) {
+            }
 
             throw $e;
         }
@@ -90,8 +110,9 @@ final class ExecuteImportJob implements ShouldQueue
         array &$results,
         ImportStore $store,
     ): void {
-        if ($row->isSkip()) {
+        if (! $row->isCreate() && ! $row->isUpdate()) {
             $results['skipped']++;
+            $this->markProcessed($row);
 
             return;
         }
@@ -102,6 +123,7 @@ final class ExecuteImportJob implements ShouldQueue
 
             if ($row->isUpdate() && $existing === null) {
                 $results['skipped']++;
+                $this->markProcessed($row);
 
                 return;
             }
@@ -111,30 +133,64 @@ final class ExecuteImportJob implements ShouldQueue
                 'creator_id' => $store->userId(),
             ];
 
-            $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
+            $isCreate = $row->isCreate();
 
-            $prepared = $importer->prepareForSave($data, $existing, $context);
-            $customFieldData = $this->extractCustomFieldData($prepared);
+            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, &$results): void {
+                $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
 
-            $record = $row->isCreate()
-                ? new ($importer->modelClass())
-                : $existing;
+                $prepared = $importer->prepareForSave($data, $existing, $context);
+                $customFieldData = $this->extractCustomFieldData($prepared);
 
-            if ($customFieldData !== []) {
-                ImportDataStorage::setMultiple($record, $customFieldData);
-            }
+                $record = $isCreate
+                    ? new ($importer->modelClass())
+                    : $existing;
 
-            $record->forceFill($prepared);
-            $record->save();
+                if ($customFieldData !== []) {
+                    ImportDataStorage::setMultiple($record, $customFieldData);
+                }
 
-            $this->storeEntityLinkRelationships($record, $pendingRelationships, $context);
+                $record->forceFill($prepared);
+                $record->save();
 
-            $results[$row->isCreate() ? 'created' : 'updated']++;
+                $this->storeEntityLinkRelationships($record, $pendingRelationships, $context);
 
-            $importer->afterSave($record, $context);
+                $results[$isCreate ? 'created' : 'updated']++;
+
+                $importer->afterSave($record, $context);
+            });
+
+            $this->markProcessed($row);
         } catch (\Throwable $e) {
             $results['failed']++;
+            $this->recordFailedRow($row->row_number, $e);
             report($e);
+        }
+    }
+
+    private function markProcessed(ImportRow $row): void
+    {
+        $row->updateQuietly(['processed' => true]);
+    }
+
+    private function recordFailedRow(int $rowNumber, \Throwable $e): void
+    {
+        if (count($this->failedRows) >= self::MAX_STORED_ERRORS) {
+            return;
+        }
+
+        $this->failedRows[] = [
+            'row' => $rowNumber,
+            'error' => Str::limit($e->getMessage(), 500),
+        ];
+    }
+
+    /** @param  array<string, int>  $results */
+    private function persistResults(ImportStore $store, array $results): void
+    {
+        $store->setResults($results);
+
+        if ($this->failedRows !== []) {
+            $store->updateMeta(['failed_rows' => $this->failedRows]);
         }
     }
 
@@ -165,8 +221,13 @@ final class ExecuteImportJob implements ShouldQueue
                 continue;
             }
 
-            $customFieldData[Str::after($key, self::CUSTOM_FIELD_PREFIX)] = $value;
             unset($prepared[$key]);
+
+            if (blank($value)) {
+                continue;
+            }
+
+            $customFieldData[Str::after($key, self::CUSTOM_FIELD_PREFIX)] = $value;
         }
 
         return $customFieldData;
@@ -181,7 +242,6 @@ final class ExecuteImportJob implements ShouldQueue
         $modelClass = $importer->modelClass();
 
         return $modelClass::query()
-            ->withoutGlobalScopes()
             ->find($matchedId);
     }
 
@@ -264,6 +324,29 @@ final class ExecuteImportJob implements ShouldQueue
         $this->createdRecords[$dedupKey] = $id;
 
         return $id;
+    }
+
+    /** @param  array<string, int>  $results */
+    private function notifyUser(ImportStore $store, array $results, bool $failed = false): void
+    {
+        $user = User::find($store->userId());
+
+        if ($user === null) {
+            return;
+        }
+
+        $entityLabel = $store->entityType()->label();
+        $status = $failed ? 'failed' : 'completed';
+
+        $notification = Notification::make()
+            ->title("Import of {$entityLabel} {$status}")
+            ->viewData(['results' => $results]);
+
+        $failed
+            ? $notification->danger()
+            : $notification->success();
+
+        $notification->sendToDatabase($user);
     }
 
     /**

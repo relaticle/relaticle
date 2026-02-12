@@ -619,3 +619,83 @@ it('checkImportProgress detects completion', function (): void {
 
     expect($component->get('isCompleted'))->toBeTrue();
 });
+
+it('startImport is a no-op when batchId is already set', function (): void {
+    Bus::fake();
+
+    createPreviewReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $component = mountPreviewStep($this);
+    $component->set('batchId', 'existing-batch-id');
+    $component->call('startImport');
+
+    Bus::assertNothingBatched();
+});
+
+it('startImport is a no-op when already completed', function (): void {
+    Bus::fake();
+
+    createPreviewReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $component = mountPreviewStep($this);
+    $component->set('isCompleted', true);
+    $component->call('startImport');
+
+    Bus::assertNothingBatched();
+});
+
+it('startImport is a no-op when status is already Importing', function (): void {
+    Bus::fake();
+
+    createPreviewReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->store->setStatus(ImportStatus::Importing);
+
+    $component = mountPreviewStep($this);
+    $component->call('startImport');
+
+    Bus::assertNothingBatched();
+});
+
+it('downloadFailedRows action is visible when there are failed rows', function (): void {
+    createPreviewReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->store->setStatus(ImportStatus::Completed);
+    $this->store->setResults(['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 1]);
+    $this->store->updateMeta(['failed_rows' => [['row' => 2, 'error' => 'Something went wrong']]]);
+
+    $component = mountPreviewStep($this);
+
+    $component->assertSee('Download Failed Rows');
+});
+
+it('downloadFailedRows action is hidden when there are no failed rows', function (): void {
+    createPreviewReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->store->setStatus(ImportStatus::Completed);
+    $this->store->setResults(['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0]);
+
+    $component = mountPreviewStep($this);
+
+    $component->assertDontSee('Download Failed Rows');
+});
