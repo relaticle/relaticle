@@ -14,6 +14,8 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportStore;
 
+mutates(ImportWizard::class);
+
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
     Bus::fake();
@@ -57,12 +59,6 @@ function createFullTestStore(object $context): ImportStore
     $store->query()->insert([
         'row_number' => 2,
         'raw_data' => json_encode(['Name' => 'John', 'Email' => 'john@test.com']),
-        'validation' => null,
-        'corrections' => null,
-        'skipped' => null,
-        'match_action' => null,
-        'matched_id' => null,
-        'relationships' => null,
     ]);
     $store->setRowCount(1);
     $store->setStatus(ImportStatus::Reviewing);
@@ -72,7 +68,13 @@ function createFullTestStore(object $context): ImportStore
     return $store;
 }
 
-// ─── Mount ──────────────────────────────────────────────────────────────────
+function markStoreAsDestroyed(object $context, ImportStore $store): void
+{
+    $context->createdStoreIds = array_filter(
+        $context->createdStoreIds,
+        fn (string $id): bool => $id !== $store->id(),
+    );
+}
 
 it('mounts at step 1 (Upload)', function (): void {
     $component = mountImportWizard($this);
@@ -80,8 +82,6 @@ it('mounts at step 1 (Upload)', function (): void {
     $component->assertOk();
     expect($component->get('currentStep'))->toBe(1);
 });
-
-// ─── Upload Completed Event ─────────────────────────────────────────────────
 
 it('onUploadCompleted advances to step 2 with store data', function (): void {
     $store = createFullTestStore($this);
@@ -94,8 +94,6 @@ it('onUploadCompleted advances to step 2 with store data', function (): void {
         ->and($component->get('rowCount'))->toBe(5)
         ->and($component->get('columnCount'))->toBe(3);
 });
-
-// ─── Step Navigation (step 1 stays on step 1, no child rendering issues) ──
 
 it('goBack caps at step 1', function (): void {
     $component = mountImportWizard($this);
@@ -129,8 +127,6 @@ it('goToStep navigates to completed step', function (): void {
     expect($component->get('currentStep'))->toBe(2);
 });
 
-// ─── Cancel & Start Over ───────────────────────────────────────────────────
-
 it('cancelImport destroys store and redirects', function (): void {
     $store = createFullTestStore($this);
     $returnUrl = '/dashboard';
@@ -141,13 +137,9 @@ it('cancelImport destroys store and redirects', function (): void {
 
     $component->assertRedirect($returnUrl);
 
-    $reloadedStore = ImportStore::load($store->id(), (string) $this->team->id);
-    expect($reloadedStore)->toBeNull();
+    expect(ImportStore::load($store->id(), (string) $this->team->id))->toBeNull();
 
-    $this->createdStoreIds = array_filter(
-        $this->createdStoreIds,
-        fn ($id) => $id !== $store->id()
-    );
+    markStoreAsDestroyed($this, $store);
 });
 
 it('startOver resets to step 1', function (): void {
@@ -166,16 +158,10 @@ it('startOver resets to step 1', function (): void {
         ->and($component->get('rowCount'))->toBe(0)
         ->and($component->get('columnCount'))->toBe(0);
 
-    $reloadedStore = ImportStore::load($store->id(), (string) $this->team->id);
-    expect($reloadedStore)->toBeNull();
+    expect(ImportStore::load($store->id(), (string) $this->team->id))->toBeNull();
 
-    $this->createdStoreIds = array_filter(
-        $this->createdStoreIds,
-        fn ($id) => $id !== $store->id()
-    );
+    markStoreAsDestroyed($this, $store);
 });
-
-// ─── Step Titles ────────────────────────────────────────────────────────────
 
 it('getStepTitle returns correct title for Upload step', function (): void {
     $component = mountImportWizard($this);
@@ -197,4 +183,99 @@ it('getStepDescription returns correct description per step', function (): void 
 
     $component->call('getStepDescription')
         ->assertReturned('Upload your CSV file to import People');
+});
+
+it('restores to mapping step when store status is Mapping', function (): void {
+    $store = createFullTestStore($this);
+    $store->setStatus(ImportStatus::Mapping);
+
+    $component = Livewire::withQueryParams(['import' => $store->id()])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('currentStep'))->toBe(2)
+        ->and($component->get('storeId'))->toBe($store->id())
+        ->and($component->get('rowCount'))->toBe(1)
+        ->and($component->get('columnCount'))->toBe(2);
+});
+
+it('restores to review step when store status is Reviewing', function (): void {
+    $store = createFullTestStore($this);
+    $store->setStatus(ImportStatus::Reviewing);
+
+    $component = Livewire::withQueryParams(['import' => $store->id()])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('currentStep'))->toBe(3)
+        ->and($component->get('storeId'))->toBe($store->id());
+});
+
+it('restores to preview step with locked navigation when store status is Completed', function (): void {
+    $store = createFullTestStore($this);
+    $store->setStatus(ImportStatus::Completed);
+
+    $component = Livewire::withQueryParams(['import' => $store->id()])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('currentStep'))->toBe(4)
+        ->and($component->get('storeId'))->toBe($store->id())
+        ->and($component->get('importStarted'))->toBeTrue();
+});
+
+it('blocks navigation when import has started', function (): void {
+    $store = createFullTestStore($this);
+    $store->setStatus(ImportStatus::Importing);
+
+    $component = Livewire::withQueryParams(['import' => $store->id()])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('importStarted'))->toBeTrue();
+
+    $component->call('goToStep', 2);
+    expect($component->get('currentStep'))->toBe(4);
+
+    $component->call('goBack');
+    expect($component->get('currentStep'))->toBe(4);
+});
+
+it('resets storeId when store not found', function (): void {
+    $component = Livewire::withQueryParams(['import' => 'nonexistent-id'])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('currentStep'))->toBe(1)
+        ->and($component->get('storeId'))->toBeNull();
+});
+
+it('resets storeId when store belongs to different team', function (): void {
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherUser->personalTeam();
+
+    $store = ImportStore::create(
+        teamId: (string) $otherTeam->id,
+        userId: (string) $otherUser->id,
+        entityType: ImportEntityType::People,
+        originalFilename: 'test.csv',
+    );
+    $store->setHeaders(['Name', 'Email']);
+    $store->setRowCount(1);
+    $store->setStatus(ImportStatus::Mapping);
+
+    $component = Livewire::withQueryParams(['import' => $store->id()])
+        ->test(ImportWizard::class, [
+            'entityType' => ImportEntityType::People,
+        ]);
+
+    expect($component->get('currentStep'))->toBe(1)
+        ->and($component->get('storeId'))->toBeNull();
+
+    $store->destroy();
 });

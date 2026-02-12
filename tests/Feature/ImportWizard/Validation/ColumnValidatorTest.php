@@ -5,8 +5,12 @@ declare(strict_types=1);
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\ImportField;
+use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 use Relaticle\ImportWizard\Support\Validation\ValidationError;
+
+mutates(ColumnValidator::class);
 
 function makeColumnData(
     FieldDataType $type,
@@ -193,4 +197,141 @@ it('rejects invalid date format', function (): void {
     expect($error)
         ->toBeInstanceOf(ValidationError::class)
         ->getMessage()->toContain('Invalid date format');
+});
+
+it('validates date with custom European format', function (): void {
+    $column = makeColumnData(FieldDataType::DATE);
+    $column = $column->withDateFormat(DateFormat::EUROPEAN);
+
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, '15/05/2024'))->toBeNull();
+    expect($validator->validate($column, '2024-05-15'))
+        ->toBeInstanceOf(ValidationError::class)
+        ->getMessage()->toContain('European');
+});
+
+it('validates date with custom American format', function (): void {
+    $column = makeColumnData(FieldDataType::DATE);
+    $column = $column->withDateFormat(DateFormat::AMERICAN);
+
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, '05/15/2024'))->toBeNull();
+});
+
+// ─── Number Validation ─────────────────────────────────────────────────────
+
+it('passes valid number with point format', function (): void {
+    $column = makeColumnData(FieldDataType::FLOAT);
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, '1234.56'))->toBeNull();
+});
+
+it('rejects invalid number value', function (): void {
+    $column = makeColumnData(FieldDataType::FLOAT);
+    $validator = new ColumnValidator;
+
+    $error = $validator->validate($column, 'not-a-number');
+
+    expect($error)
+        ->toBeInstanceOf(ValidationError::class)
+        ->getMessage()->toContain('Invalid number format');
+});
+
+it('validates number with custom comma format', function (): void {
+    $column = makeColumnData(FieldDataType::FLOAT);
+    $column = $column->withNumberFormat(NumberFormat::COMMA);
+
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, '1.234,56'))->toBeNull();
+    expect($validator->validate($column, 'abc'))
+        ->toBeInstanceOf(ValidationError::class)
+        ->getMessage()->toContain('Comma');
+});
+
+// ─── Edge Cases ────────────────────────────────────────────────────────────
+
+it('strips required and nullable from preview rules', function (): void {
+    $column = makeColumnData(FieldDataType::STRING, rules: ['required', 'email', 'nullable']);
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, 'valid@test.com'))->toBeNull();
+    expect($validator->validate($column, 'not-an-email'))
+        ->toBeInstanceOf(ValidationError::class);
+});
+
+it('returns valid for text with only required/nullable rules', function (): void {
+    $column = makeColumnData(FieldDataType::STRING, rules: ['required', 'nullable']);
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, 'anything'))->toBeNull();
+});
+
+it('returns valid for multi-choice arbitrary with only required rule', function (): void {
+    $column = makeColumnData(
+        FieldDataType::MULTI_CHOICE,
+        rules: ['required'],
+        arbitrary: true,
+    );
+    $validator = new ColumnValidator;
+
+    expect($validator->validate($column, 'anything, goes'))->toBeNull();
+});
+
+it('formats choice error message with truncation for many options', function (): void {
+    $options = [];
+    for ($i = 1; $i <= 7; $i++) {
+        $options[] = ['label' => "Option {$i}", 'value' => "opt{$i}"];
+    }
+
+    $column = makeColumnData(FieldDataType::SINGLE_CHOICE, options: $options);
+    $validator = new ColumnValidator;
+
+    $error = $validator->validate($column, 'invalid');
+
+    expect($error)->toBeInstanceOf(ValidationError::class);
+
+    $message = $error->getMessage();
+    expect($message)
+        ->toContain('opt1')
+        ->toContain('opt5')
+        ->not->toContain('opt6')
+        ->toContain('...');
+});
+
+it('formats choice error message without truncation for few options', function (): void {
+    $options = [
+        ['label' => 'A', 'value' => 'a'],
+        ['label' => 'B', 'value' => 'b'],
+        ['label' => 'C', 'value' => 'c'],
+    ];
+
+    $column = makeColumnData(FieldDataType::SINGLE_CHOICE, options: $options);
+    $validator = new ColumnValidator;
+
+    $error = $validator->validate($column, 'invalid');
+
+    $message = $error->getMessage();
+    expect($message)
+        ->toContain('a')
+        ->toContain('b')
+        ->toContain('c')
+        ->not->toContain('...');
+});
+
+it('formats choice error message with exactly 5 options without ellipsis', function (): void {
+    $options = [];
+    for ($i = 1; $i <= 5; $i++) {
+        $options[] = ['label' => "Option {$i}", 'value' => "opt{$i}"];
+    }
+
+    $column = makeColumnData(FieldDataType::SINGLE_CHOICE, options: $options);
+    $validator = new ColumnValidator;
+
+    $error = $validator->validate($column, 'invalid');
+
+    expect($error->getMessage())->not->toContain('...');
 });

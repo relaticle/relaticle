@@ -17,7 +17,6 @@
     $selectedMatcher = $selectedEntityLink?->getMatcher($selected->target);
     $hasValue = $selectedField !== null || $selectedEntityLink !== null;
 
-    // Merge fields and entity links into sorted collection
     $sortedItems = collect($fields->all())
         ->map(fn($f) => (object)[
             'type' => 'field',
@@ -296,7 +295,7 @@
                                 <span class="text-sm font-medium {{ $isMatcherSelected ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white' }}">
                                     {{ $matcher->label }}
                                 </span>
-                                @if ($matcher->createsNew)
+                                @if ($matcher->isAlwaysCreate())
                                     <span class="px-1.5 py-0.5 text-[9px] font-medium rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 ml-auto">creates</span>
                                 @endif
                             </div>

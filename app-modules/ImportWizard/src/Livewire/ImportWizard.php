@@ -12,22 +12,13 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
+use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Store\ImportStore;
 
-/**
- * Parent orchestrator for the 4-step import wizard.
- *
- * This component manages navigation between steps and holds shared state.
- * Each step is a separate child component that communicates via events or $parent.
- *
- * Steps:
- * 1. Upload - File upload with row/column counts (dispatches @completed event)
- * 2. Map Columns - Auto-detection + manual adjustment (uses $parent.nextStep())
- * 3. Review Values - See unique values, fix invalid data (uses $parent.nextStep())
- * 4. Preview/Import - Summary of creates/updates before committing
- */
 final class ImportWizard extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
@@ -49,16 +40,21 @@ final class ImportWizard extends Component implements HasActions, HasForms
     #[Locked]
     public ?string $returnUrl = null;
 
+    #[Url(as: 'import')]
     public ?string $storeId = null;
 
     public int $rowCount = 0;
 
     public int $columnCount = 0;
 
+    public bool $importStarted = false;
+
     public function mount(ImportEntityType $entityType, ?string $returnUrl = null): void
     {
         $this->entityType = $entityType;
         $this->returnUrl = $returnUrl;
+
+        $this->restoreFromStore();
     }
 
     public function render(): View
@@ -66,9 +62,6 @@ final class ImportWizard extends Component implements HasActions, HasForms
         return view('import-wizard-new::livewire.import-wizard');
     }
 
-    /**
-     * Called via @completed event on UploadStep component tag.
-     */
     public function onUploadCompleted(string $storeId, int $rowCount, int $columnCount): void
     {
         $this->storeId = $storeId;
@@ -77,27 +70,27 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->nextStep();
     }
 
-    /**
-     * Called via @completed event OR directly via $parent.nextStep() from children.
-     */
     public function nextStep(): void
     {
         $this->currentStep = min($this->currentStep + 1, self::STEP_PREVIEW);
     }
 
-    /**
-     * Called directly via $parent.goBack() from children.
-     */
     public function goBack(): void
     {
+        if ($this->importStarted) {
+            return;
+        }
+
         $this->currentStep = max($this->currentStep - 1, self::STEP_UPLOAD);
+        $this->syncStepStatus();
     }
 
-    /**
-     * Navigate directly to a specific step (only for completed steps).
-     */
     public function goToStep(int $step): void
     {
+        if ($this->importStarted) {
+            return;
+        }
+
         if ($step < self::STEP_UPLOAD || $step >= $this->currentStep) {
             return;
         }
@@ -109,6 +102,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         }
 
         $this->currentStep = $step;
+        $this->syncStepStatus();
     }
 
     public function getStepTitle(): string
@@ -124,9 +118,12 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public function getStepDescription(): string
     {
+        $label = $this->entityType->label();
+        $singular = $this->entityType->singular();
+
         return match ($this->currentStep) {
-            self::STEP_UPLOAD => 'Upload your CSV file to import '.$this->entityType->label(),
-            self::STEP_MAP => 'Match CSV columns to '.$this->entityType->singular().' fields',
+            self::STEP_UPLOAD => "Upload your CSV file to import {$label}",
+            self::STEP_MAP => "Match CSV columns to {$singular} fields",
             self::STEP_REVIEW => 'Review and fix any data issues',
             self::STEP_PREVIEW => 'Preview changes and start import',
             default => '',
@@ -142,6 +139,12 @@ final class ImportWizard extends Component implements HasActions, HasForms
         if ($this->returnUrl !== null) {
             $this->redirect($this->returnUrl);
         }
+    }
+
+    #[On('import-started')]
+    public function onImportStarted(): void
+    {
+        $this->importStarted = true;
     }
 
     public function startOverAction(): Action
@@ -167,7 +170,78 @@ final class ImportWizard extends Component implements HasActions, HasForms
         $this->storeId = null;
         $this->rowCount = 0;
         $this->columnCount = 0;
+        $this->importStarted = false;
         $this->currentStep = self::STEP_UPLOAD;
+    }
+
+    private function restoreFromStore(): void
+    {
+        if ($this->storeId === null) {
+            return;
+        }
+
+        $teamId = $this->getCurrentTeamId();
+
+        if ($teamId === null) {
+            $this->storeId = null;
+
+            return;
+        }
+
+        $store = ImportStore::load($this->storeId, $teamId);
+
+        if ($store === null) {
+            $this->storeId = null;
+
+            return;
+        }
+
+        $status = $store->status();
+
+        $this->rowCount = $store->rowCount();
+        $this->columnCount = count($store->headers());
+        $this->currentStep = $this->stepFromStatus($status);
+        $this->importStarted = in_array($status, [
+            ImportStatus::Importing,
+            ImportStatus::Completed,
+            ImportStatus::Failed,
+        ], true);
+    }
+
+    private function syncStepStatus(): void
+    {
+        if ($this->storeId === null) {
+            return;
+        }
+
+        $teamId = $this->getCurrentTeamId();
+
+        if ($teamId === null) {
+            return;
+        }
+
+        $store = ImportStore::load($this->storeId, $teamId);
+        $store?->setStatus($this->statusForStep($this->currentStep));
+    }
+
+    private function statusForStep(int $step): ImportStatus
+    {
+        return match ($step) {
+            self::STEP_UPLOAD => ImportStatus::Uploading,
+            self::STEP_MAP => ImportStatus::Mapping,
+            self::STEP_REVIEW => ImportStatus::Reviewing,
+            default => ImportStatus::Previewing,
+        };
+    }
+
+    private function stepFromStatus(ImportStatus $status): int
+    {
+        return match ($status) {
+            ImportStatus::Uploading => self::STEP_UPLOAD,
+            ImportStatus::Mapping => self::STEP_MAP,
+            ImportStatus::Reviewing => self::STEP_REVIEW,
+            ImportStatus::Previewing, ImportStatus::Importing, ImportStatus::Completed, ImportStatus::Failed => self::STEP_PREVIEW,
+        };
     }
 
     private function getCurrentTeamId(): ?string

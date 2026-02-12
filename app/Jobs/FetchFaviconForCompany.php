@@ -16,24 +16,13 @@ use Illuminate\Support\Str;
 
 final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, Queueable;
+    use Dispatchable;
+    use Queueable;
 
-    /**
-     * Delete the job if its models no longer exist.
-     */
     public bool $deleteWhenMissingModels = true;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(public readonly Company $company)
-    {
-        //
-    }
+    public function __construct(public readonly Company $company) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         try {
@@ -41,9 +30,8 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 ->whereBelongsTo($this->company->team)
                 ->where('code', CompanyField::DOMAINS->value)
                 ->first();
-            $domains = $this->company->getCustomFieldValue($customFieldDomain);
 
-            // Domains is now an array - use the first domain for favicon
+            $domains = $this->company->getCustomFieldValue($customFieldDomain);
             $domainName = is_array($domains) ? ($domains[0] ?? null) : $domains;
 
             if ($domainName === null || $domainName === '') {
@@ -87,9 +75,6 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    /**
-     * Get the unique ID for the job.
-     */
     public function uniqueId(): string
     {
         return (string) $this->company->getKey();

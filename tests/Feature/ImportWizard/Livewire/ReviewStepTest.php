@@ -14,8 +14,11 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\ReviewFilter;
 use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Livewire\Steps\ReviewStep;
 use Relaticle\ImportWizard\Store\ImportStore;
+
+mutates(ReviewStep::class);
 
 beforeEach(function (): void {
     // Override the global Event::fake() from Pest.php to allow TeamCreated through,
@@ -82,8 +85,6 @@ function mountReviewStep(object $context): \Livewire\Features\SupportTesting\Tes
     ]);
 }
 
-// ─── Mount ──────────────────────────────────────────────────────────────────
-
 it('renders with correct columns', function (): void {
     $component = mountReviewStep($this);
 
@@ -100,8 +101,6 @@ it('selects first column by default on mount', function (): void {
     expect($component->get('selectedColumn.source'))->toBe('Name');
 });
 
-// ─── Column Selection ───────────────────────────────────────────────────────
-
 it('changes selected column via selectColumn', function (): void {
     $component = mountReviewStep($this);
 
@@ -109,8 +108,6 @@ it('changes selected column via selectColumn', function (): void {
 
     expect($component->get('selectedColumn.source'))->toBe('Emails');
 });
-
-// ─── Text Correction ────────────────────────────────────────────────────────
 
 it('stores text correction in SQLite via updateMappedValue', function (): void {
     $component = mountReviewStep($this);
@@ -131,8 +128,6 @@ it('stores validation error for invalid text correction', function (): void {
     expect($row->corrections->get('Emails'))->toBe('not-an-email')
         ->and($row->validation->get('Emails'))->not->toBeNull();
 });
-
-// ─── Multi-Value Validation ─────────────────────────────────────────────────
 
 it('returns empty errors for valid emails in multi-value field', function (): void {
     $component = mountReviewStep($this);
@@ -156,8 +151,6 @@ it('returns per-item errors for invalid emails in multi-value field', function (
         ->and($row->validation->get('Emails'))->not->toBeNull();
 });
 
-// ─── Skip / Unskip ─────────────────────────────────────────────────────────
-
 it('marks value as skipped via skipValue', function (): void {
     $component = mountReviewStep($this);
 
@@ -177,8 +170,6 @@ it('removes skip flag via unskipValue', function (): void {
     expect($row->skipped?->get('Name'))->toBeNull();
 });
 
-// ─── Undo Correction ───────────────────────────────────────────────────────
-
 it('removes correction and re-validates raw value via undoCorrection', function (): void {
     $component = mountReviewStep($this);
 
@@ -188,8 +179,6 @@ it('removes correction and re-validates raw value via undoCorrection', function 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->corrections?->get('Name'))->toBeNull();
 });
-
-// ─── Filter, Sort & Search ──────────────────────────────────────────────────
 
 it('setFilter changes filter and resets pagination', function (): void {
     $component = mountReviewStep($this);
@@ -247,4 +236,71 @@ it('columnErrorStatuses reflects validation state', function (): void {
 
     $statuses = $component->get('columnErrorStatuses');
     expect($statuses['Name'])->toBeTrue();
+});
+
+it('dispatches completed event when continueToPreview is called', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', []);
+
+    $component->call('continueToPreview')
+        ->assertDispatched('completed');
+});
+
+it('does not dispatch completed while validation batches are still running', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', ['Name' => 'fake-batch-id']);
+
+    $component->call('continueToPreview')
+        ->assertNotDispatched('completed');
+});
+
+it('dispatches completed even when unresolved validation errors exist', function (): void {
+    $jsonPath = '$.Name';
+    $this->store->connection()->statement("
+        UPDATE import_rows
+        SET validation = json_set(COALESCE(validation, '{}'), ?, ?)
+        WHERE json_extract(raw_data, ?) = ?
+    ", [$jsonPath, 'Required field', $jsonPath, 'John']);
+
+    $component = mountReviewStep($this);
+    $component->set('batchIds', []);
+
+    $component->call('continueToPreview')
+        ->assertDispatched('completed');
+});
+
+it('dispatches ResolveMatchesJob batch on mount', function (): void {
+    $component = mountReviewStep($this);
+
+    Bus::assertBatched(function ($batch) {
+        return $batch->jobs->contains(fn ($job) => $job instanceof ResolveMatchesJob);
+    });
+});
+
+it('includes __match_resolution key in batchIds', function (): void {
+    $component = mountReviewStep($this);
+
+    expect($component->get('batchIds'))->toHaveKey('__match_resolution');
+});
+
+it('blocks continueToPreview while match resolution is running', function (): void {
+    $component = mountReviewStep($this);
+    $component->set('batchIds', ['__match_resolution' => 'fake-batch-id']);
+
+    $component->call('continueToPreview')
+        ->assertNotDispatched('completed');
+});
+
+it('clears relationships column on mount', function (): void {
+    $this->store->connection()->statement("
+        UPDATE import_rows SET relationships = '[{\"relationship\":\"company\",\"action\":\"create\",\"name\":\"Stale\"}]'
+    ");
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+    expect($row->relationships)->not->toBeNull();
+
+    mountReviewStep($this);
+
+    $freshRow = $this->store->query()->where('row_number', 2)->first();
+    expect($freshRow->relationships)->toBeNull();
 });

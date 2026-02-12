@@ -57,9 +57,17 @@ enum ImportEntityType: string
         };
     }
 
-    /**
-     * Create an importer instance for this entity type.
-     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Company => 'heroicon-o-building-office',
+            self::People => 'heroicon-o-users',
+            self::Opportunity => 'heroicon-o-currency-dollar',
+            self::Task => 'heroicon-o-clipboard-document-check',
+            self::Note => 'heroicon-o-document-text',
+        };
+    }
+
     public function importer(string $teamId): BaseImporter
     {
         $class = $this->importerClass();

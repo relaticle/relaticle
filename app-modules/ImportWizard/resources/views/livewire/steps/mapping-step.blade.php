@@ -101,9 +101,7 @@
         {{-- Required Fields Warning --}}
         @if ($this->unmappedRequired->isNotEmpty())
             @php
-                $unmappedLabels = collect($this->unmappedRequired->all())
-                    ->map(fn ($field) => $field->label)
-                    ->values();
+                $unmappedLabels = $this->unmappedRequired->pluck('label');
             @endphp
             <div
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 dark:bg-warning-950/50 border border-warning-200 dark:border-warning-800">
@@ -116,6 +114,8 @@
         @endif
     </div>
 
+    <x-filament-actions::modals />
+
     {{-- Navigation --}}
     <div class="shrink-0 flex justify-end gap-3 pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <x-filament::button
@@ -124,11 +124,6 @@
         >
             Start over
         </x-filament::button>
-        <x-filament::button
-            wire:click="continueToReview"
-            :disabled="!$this->canProceed()"
-        >
-            Continue
-        </x-filament::button>
+        {{ $this->continueAction }}
     </div>
 </div>

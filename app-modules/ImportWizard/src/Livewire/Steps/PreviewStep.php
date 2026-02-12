@@ -4,31 +4,341 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
+use Filament\Actions\Action;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\WithPagination;
+use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
+use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Livewire\ImportWizard;
+use Relaticle\ImportWizard\Store\ImportRow;
 
-/**
- * Step 4: Preview and import.
- *
- * Shows a summary of creates/updates before committing the import.
- * Navigation uses $parent.goBack() directly. Final step has no "next".
- */
-final class PreviewStep extends Component
+final class PreviewStep extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
+    use InteractsWithForms;
     use WithImportStore;
+    use WithPagination;
+
+    public ?string $batchId = null;
+
+    public bool $isCompleted = false;
+
+    public string $activeTab = 'all';
 
     public function mount(string $storeId, ImportEntityType $entityType): void
     {
         $this->mountWithImportStore($storeId, $entityType);
+        $this->syncCompletionState();
+    }
+
+    public function setActiveTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+        $this->resetPage();
+    }
+
+    #[Computed]
+    public function createCount(): int
+    {
+        return $this->store()->query()->toCreate()->count();
+    }
+
+    #[Computed]
+    public function updateCount(): int
+    {
+        return $this->store()->query()->toUpdate()->count();
+    }
+
+    #[Computed]
+    public function skipCount(): int
+    {
+        return $this->store()->query()->toSkip()->count();
+    }
+
+    #[Computed]
+    public function errorCount(): int
+    {
+        return $this->store()->query()
+            ->whereNotNull('validation')
+            ->where('validation', '!=', '{}')
+            ->count();
+    }
+
+    #[Computed]
+    public function isImporting(): bool
+    {
+        return $this->batchId !== null && ! $this->isCompleted;
+    }
+
+    #[Computed]
+    public function progressPercent(): int
+    {
+        if ($this->isCompleted) {
+            return 100;
+        }
+
+        $processed = $this->processedCount();
+        $total = $this->totalRowCount();
+
+        if ($processed === 0 || $total === 0) {
+            return 0;
+        }
+
+        return (int) min(round(($processed / $total) * 100), 99);
+    }
+
+    #[Computed]
+    public function processedCount(): int
+    {
+        $results = $this->results();
+
+        if ($results === null) {
+            return 0;
+        }
+
+        return array_sum($results);
+    }
+
+    #[Computed]
+    public function matchField(): ?string
+    {
+        $mappedFieldKeys = $this->columns()
+            ->filter(fn (ColumnData $col): bool => $col->isFieldMapping())
+            ->pluck('target')
+            ->all();
+
+        return $this->store()->getImporter()
+            ->getMatchFieldForMappedColumns($mappedFieldKeys)
+            ?->label;
+    }
+
+    #[Computed]
+    public function totalRowCount(): int
+    {
+        return $this->store()->query()->count();
+    }
+
+    /**
+     * @return Collection<int, ColumnData>
+     */
+    #[Computed]
+    public function columns(): Collection
+    {
+        return $this->store()->columnMappings();
+    }
+
+    /** @return LengthAwarePaginator<int, ImportRow> */
+    #[Computed]
+    public function previewRows(): LengthAwarePaginator
+    {
+        $query = $this->store()->query()->orderBy('row_number');
+
+        if ($this->activeTab !== 'all') {
+            $query->whereRaw(
+                "EXISTS (SELECT 1 FROM json_each(relationships) WHERE json_extract(value, '$.relationship') = ?)",
+                [$this->activeTab]
+            );
+        }
+
+        return $query->paginate(25);
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, icon: string, count: int}>
+     */
+    #[Computed]
+    public function relationshipTabs(): array
+    {
+        $connection = $this->store()->connection();
+
+        return $this->columns()
+            ->filter(fn (ColumnData $col): bool => $col->isEntityLinkMapping())
+            ->map(function (ColumnData $col) use ($connection): array {
+                $uniqueCount = $connection->selectOne(
+                    "SELECT COUNT(*) as total FROM ({$this->uniqueRelationshipSubquery()}) sub",
+                    [$col->entityLink],
+                );
+
+                return [
+                    'key' => $col->entityLink,
+                    'label' => $col->getLabel(),
+                    'icon' => $col->getIcon(),
+                    'count' => (int) $uniqueCount->total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @phpstan-ignore missingType.generics */
+    #[Computed]
+    public function relationshipSummary(): Paginator
+    {
+        if ($this->activeTab === 'all') {
+            return new Paginator([], 0, 25);
+        }
+
+        $perPage = 25;
+        $page = $this->getPage();
+        $offset = ($page - 1) * $perPage;
+        $connection = $this->store()->connection();
+        $groupBy = $this->relationshipGroupByClause();
+
+        $rows = $connection->select("
+            SELECT
+                json_extract(je.value, '$.action') as action,
+                COALESCE(json_extract(je.value, '$.name'), 'Record #' || json_extract(je.value, '$.id')) as name,
+                json_extract(je.value, '$.id') as id,
+                COUNT(*) as count
+            FROM import_rows, json_each(import_rows.relationships) AS je
+            WHERE json_extract(je.value, '$.relationship') = ?
+            GROUP BY action, {$groupBy}
+            ORDER BY count DESC
+            LIMIT ? OFFSET ?
+        ", [$this->activeTab, $perPage, $offset]);
+
+        $total = $connection->selectOne(
+            "SELECT COUNT(*) as total FROM ({$this->uniqueRelationshipSubquery()}) sub",
+            [$this->activeTab],
+        );
+
+        /** @var list<array{action: string, name: string, id: string|null, count: int}> $items */
+        $items = array_map(fn (\stdClass $row): array => [
+            'action' => $row->action === 'update' ? 'link' : 'create',
+            'name' => $row->name,
+            'id' => $row->id,
+            'count' => (int) $row->count,
+        ], $rows);
+
+        return new Paginator(
+            $items,
+            $total->total,
+            $perPage,
+            $page,
+        );
+    }
+
+    /** @return array{link: int, create: int} */
+    #[Computed]
+    public function relationshipStats(): array
+    {
+        if ($this->activeTab === 'all') {
+            return ['link' => 0, 'create' => 0];
+        }
+
+        $rows = $this->store()->connection()->select("
+            SELECT action, COUNT(*) as count FROM (
+                SELECT json_extract(je.value, '$.action') as action
+                FROM import_rows, json_each(import_rows.relationships) AS je
+                WHERE json_extract(je.value, '$.relationship') = ?
+                GROUP BY action, {$this->relationshipGroupByClause()}
+            )
+            GROUP BY action
+        ", [$this->activeTab]);
+
+        $stats = ['link' => 0, 'create' => 0];
+
+        foreach ($rows as $row) {
+            if ($row->action === 'update') {
+                $stats['link'] = (int) $row->count;
+            } else {
+                $stats['create'] = (int) $row->count;
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @return array<string, int>|null
+     */
+    #[Computed]
+    public function results(): ?array
+    {
+        return $this->store()->results();
+    }
+
+    public function startImportAction(): Action
+    {
+        return Action::make('startImport')
+            ->label('Start Import')
+            ->color('primary')
+            ->icon(Heroicon::OutlinedPlay)
+            ->requiresConfirmation()
+            ->modalHeading('Start import')
+            ->modalDescription('Are you sure that you want to start running this import?')
+            ->modalSubmitActionLabel('Start import')
+            ->action(fn () => $this->startImport());
+    }
+
+    public function startImport(): void
+    {
+        $store = $this->store();
+        $store->setStatus(ImportStatus::Importing);
+
+        $batch = Bus::batch([
+            new ExecuteImportJob(
+                importId: $store->id(),
+                teamId: $store->teamId(),
+            ),
+        ])->dispatch();
+
+        $this->batchId = $batch->id;
+        $this->dispatch('import-started')->to(ImportWizard::class);
+    }
+
+    public function checkImportProgress(): void
+    {
+        if ($this->batchId === null) {
+            return;
+        }
+
+        $this->store()->refreshMeta();
+        $this->syncCompletionState();
+
+        unset($this->results, $this->progressPercent, $this->processedCount);
     }
 
     public function render(): View
     {
-        return view('import-wizard-new::livewire.steps.preview-step', [
-            'headers' => $this->headers(),
-            'rowCount' => $this->rowCount(),
-        ]);
+        return view('import-wizard-new::livewire.steps.preview-step');
+    }
+
+    private function syncCompletionState(): void
+    {
+        $this->isCompleted = in_array($this->store()->status(), [
+            ImportStatus::Completed,
+            ImportStatus::Failed,
+        ], true);
+    }
+
+    private function relationshipGroupByClause(): string
+    {
+        return "CASE
+            WHEN json_extract(je.value, '$.action') = 'update' THEN json_extract(je.value, '$.id')
+            ELSE json_extract(je.value, '$.name')
+        END";
+    }
+
+    private function uniqueRelationshipSubquery(): string
+    {
+        return "SELECT 1
+            FROM import_rows, json_each(import_rows.relationships) AS je
+            WHERE json_extract(je.value, '$.relationship') = ?
+            GROUP BY json_extract(je.value, '$.action'), {$this->relationshipGroupByClause()}";
     }
 }
