@@ -7,7 +7,13 @@
 @endphp
 <div
     class="flex flex-col h-full overflow-hidden"
-    @if (count($batchIds) > 0) wire:poll.2s="checkProgress" @endif
+    x-data="{ timer: null }"
+    x-init="
+        if (@js(count($batchIds) > 0)) {
+            timer = setInterval(() => $wire.checkProgress(), 2000);
+        }
+        $wire.on('polling-complete', () => { clearInterval(timer); timer = null; });
+    "
 >
     {{-- Main Content --}}
     <div class="flex-1 flex gap-4 overflow-hidden min-h-[12rem]">

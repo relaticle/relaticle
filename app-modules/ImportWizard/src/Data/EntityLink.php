@@ -56,6 +56,9 @@ final class EntityLink extends Data
         public readonly ?int $sortOrder = null,
     ) {}
 
+    /** @var array<string, EntityLinkStorageInterface> */
+    private static array $storageStrategies = [];
+
     /** @param  array<string, mixed>  $overrides */
     private function cloneWith(array $overrides): self
     {
@@ -302,7 +305,7 @@ final class EntityLink extends Data
 
     public function getStorageStrategy(): EntityLinkStorageInterface
     {
-        return match ($this->storageType) {
+        return self::$storageStrategies[$this->storageType->value] ??= match ($this->storageType) {
             EntityLinkStorage::ForeignKey => new ForeignKeyStorage,
             EntityLinkStorage::MorphToMany => new MorphToManyStorage,
             EntityLinkStorage::CustomFieldValue => new CustomFieldValueStorage,
