@@ -1,6 +1,12 @@
 <div
     class="flex flex-col h-full overflow-hidden"
-    @if($this->isImporting) wire:poll.2s="checkImportProgress" @endif
+    x-data="{ timer: null }"
+    x-init="
+        let poll = () => setInterval(() => $wire.checkImportProgress(), 2000);
+        if (@js($this->isImporting)) { timer = poll(); }
+        $wire.on('import-polling-start', () => { if (!timer) { timer = poll(); } });
+        $wire.on('import-polling-complete', () => { clearInterval(timer); timer = null; });
+    "
 >
     <div class="flex-1 flex flex-col overflow-hidden min-h-[20rem]">
         @if($this->isCompleted)

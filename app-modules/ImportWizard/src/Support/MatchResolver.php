@@ -32,7 +32,7 @@ final readonly class MatchResolver
 
         $matchField = $this->importer->getMatchFieldForMappedColumns($mappedFieldKeys);
 
-        if ($matchField instanceof \Relaticle\ImportWizard\Data\MatchableField && $matchField->behavior !== MatchBehavior::AlwaysCreate) {
+        if ($matchField instanceof MatchableField && $matchField->behavior !== MatchBehavior::AlwaysCreate) {
             $this->resolveWithLookup($matchField, $mappings);
         }
 
@@ -124,7 +124,9 @@ final readonly class MatchResolver
             }
 
             if ($inserts !== []) {
-                $connection->table('temp_match_results')->insert($inserts);
+                foreach (array_chunk($inserts, 5000) as $chunk) {
+                    $connection->table('temp_match_results')->insert($chunk);
+                }
 
                 $connection->statement('
                     UPDATE import_rows

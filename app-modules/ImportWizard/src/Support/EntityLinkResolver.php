@@ -6,7 +6,6 @@ namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
-use Illuminate\Database\Eloquent\Builder;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 
@@ -166,58 +165,85 @@ final class EntityLinkResolver
 
         $valueColumn = $customField->getValueColumn();
 
-        $baseQuery = CustomFieldValue::query()
+        if ($valueColumn === 'json_value') {
+            return $this->resolveViaJsonColumn($link->targetEntity, $customField->getKey(), $uniqueValues);
+        }
+
+        return CustomFieldValue::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)
             ->where('custom_field_id', $customField->id)
-            ->where('entity_type', $link->targetEntity);
-
-        if ($valueColumn === 'json_value') {
-            return $this->resolveViaJsonColumn($baseQuery, $uniqueValues);
-        }
-
-        return (clone $baseQuery)
+            ->where('entity_type', $link->targetEntity)
             ->whereIn($valueColumn, $uniqueValues)
             ->pluck('entity_id', $valueColumn)
             ->all();
     }
 
     /**
-     * @param  Builder<CustomFieldValue>  $baseQuery
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string>
      */
-    private function resolveViaJsonColumn(Builder $baseQuery, array $uniqueValues): array
+    private function resolveViaJsonColumn(string $entityType, int|string $customFieldId, array $uniqueValues): array
     {
         if ($uniqueValues === []) {
             return [];
         }
 
+        $model = new CustomFieldValue;
+        $connection = $model->getConnection();
+        $table = $model->getTable();
+        $driver = $connection->getDriverName();
+        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
         $results = [];
 
-        foreach (array_chunk($uniqueValues, 50) as $chunk) {
-            $query = clone $baseQuery;
-            $query->where(function (Builder $q) use ($chunk): void {
-                foreach ($chunk as $value) {
-                    $q->orWhereJsonContains('json_value', $value);
-                }
-            });
+        foreach (array_chunk($uniqueValues, 5000) as $chunk) {
+            $lowerChunk = array_map(fn (string $v): string => mb_strtolower($v), $chunk);
+            $placeholders = implode(',', array_fill(0, count($lowerChunk), '?'));
 
-            $rows = $query->get(['entity_id', 'json_value']);
+            $sql = match ($driver) {
+                'sqlite' => "SELECT cfv.entity_id, je.value AS matched_value
+                   FROM {$table} cfv, json_each(
+                       CASE WHEN JSON_TYPE(cfv.json_value) = 'array'
+                           THEN cfv.json_value
+                           ELSE JSON_ARRAY(cfv.json_value)
+                       END
+                   ) je
+                   WHERE cfv.{$tenantKey} = ?
+                     AND cfv.custom_field_id = ?
+                     AND cfv.entity_type = ?
+                     AND LOWER(CAST(je.value AS TEXT)) IN ({$placeholders})",
+                'pgsql' => "SELECT cfv.entity_id, LOWER(je.value) AS matched_value
+                   FROM {$table} cfv
+                   CROSS JOIN LATERAL jsonb_array_elements_text(
+                       CASE WHEN jsonb_typeof(cfv.json_value) = 'array'
+                           THEN cfv.json_value
+                           ELSE jsonb_build_array(cfv.json_value)
+                       END
+                   ) AS je(value)
+                   WHERE cfv.{$tenantKey} = ?
+                     AND cfv.custom_field_id = ?
+                     AND cfv.entity_type = ?
+                     AND LOWER(je.value) IN ({$placeholders})",
+                default => "SELECT cfv.entity_id, jt.val AS matched_value
+                   FROM {$table} cfv
+                   JOIN JSON_TABLE(
+                       IF(JSON_TYPE(cfv.json_value) = 'ARRAY', cfv.json_value, JSON_ARRAY(cfv.json_value)),
+                       '\$[*]' COLUMNS(val TEXT PATH '\$')
+                   ) AS jt
+                   WHERE cfv.{$tenantKey} = ?
+                     AND cfv.custom_field_id = ?
+                     AND cfv.entity_type = ?
+                     AND LOWER(jt.val) IN ({$placeholders})",
+            };
+
+            $bindings = array_merge([$this->teamId, $customFieldId, $entityType], $lowerChunk);
+            $rows = $connection->select($sql, $bindings);
 
             foreach ($rows as $row) {
-                $jsonValues = $row->json_value?->all();
+                $key = mb_strtolower($row->matched_value);
 
-                if ($jsonValues === null) {
-                    continue;
-                }
-
-                $stringValues = array_map(strval(...), $jsonValues);
-
-                foreach ($chunk as $value) {
-                    if (! isset($results[$value]) && in_array($value, $stringValues, true)) {
-                        $results[$value] = $row->entity_id;
-                    }
+                if (! isset($results[$key])) {
+                    $results[$key] = $row->entity_id;
                 }
             }
         }

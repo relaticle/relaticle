@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Jobs;
 
 use App\Enums\CreationSource;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
@@ -18,6 +19,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
+use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
@@ -52,6 +55,12 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var list<array{row: int, error: string}> */
     private array $failedRows = [];
 
+    /** @var list<int> */
+    private array $processedRows = [];
+
+    /** @var list<array<string, mixed>> */
+    private array $pendingCustomFieldValues = [];
+
     public function __construct(
         private readonly string $importId,
         private readonly string $teamId,
@@ -72,16 +81,27 @@ final class ExecuteImportJob implements ShouldQueue
 
         $results = $store->results() ?? ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
         $allowedKeys = $this->allowedAttributeKeys($importer);
+        $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
+        $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
+
+        $context = [
+            'team_id' => $this->teamId,
+            'creator_id' => $store->userId(),
+        ];
 
         try {
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(500, function (Collection $rows) use ($importer, $mappings, $allowedKeys, &$results, $store): void {
+                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, &$results, $store): void {
+                    $existingRecords = $this->preloadExistingRecords($rows, $importer);
+
                     foreach ($rows as $row) {
-                        $this->processRow($row, $importer, $mappings, $allowedKeys, $results, $store);
+                        $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, $results, $existingRecords);
                     }
 
+                    $this->flushProcessedRows($store);
+                    $this->flushCustomFieldValues();
                     $this->persistResults($store, $results);
                 });
 
@@ -101,17 +121,22 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
-     * @param  Collection<int, ColumnData>  $mappings
+     * @param  Collection<int, ColumnData>  $fieldMappings
      * @param  array<string, true>  $allowedKeys
+     * @param  Collection<string, CustomField>  $customFieldDefs
+     * @param  array<string, mixed>  $context
      * @param  array<string, int>  $results
+     * @param  array<string, Model>  $existingRecords
      */
     private function processRow(
         ImportRow $row,
         BaseImporter $importer,
-        Collection $mappings,
+        Collection $fieldMappings,
         array $allowedKeys,
+        Collection $customFieldDefs,
+        array $context,
         array &$results,
-        ImportStore $store,
+        array $existingRecords = [],
     ): void {
         if (! $row->isCreate() && ! $row->isUpdate()) {
             $results['skipped']++;
@@ -121,8 +146,10 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         try {
-            $data = $this->buildDataFromRow($row, $mappings);
-            $existing = $row->isUpdate() ? $this->findExistingRecord($importer, $row->matched_id) : null;
+            $data = $this->buildDataFromRow($row, $fieldMappings);
+            $existing = $row->isUpdate()
+                ? ($existingRecords[(string) $row->matched_id] ?? $this->findExistingRecord($importer, $row->matched_id))
+                : null;
 
             if ($row->isUpdate() && ! $existing instanceof Model) {
                 $results['skipped']++;
@@ -131,14 +158,9 @@ final class ExecuteImportJob implements ShouldQueue
                 return;
             }
 
-            $context = [
-                'team_id' => $this->teamId,
-                'creator_id' => $store->userId(),
-            ];
-
             $isCreate = $row->isCreate();
 
-            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, &$results): void {
+            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, $customFieldDefs, &$results): void {
                 $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
 
                 $prepared = $importer->prepareForSave($data, $existing, $context);
@@ -160,6 +182,19 @@ final class ExecuteImportJob implements ShouldQueue
 
                 $results[$isCreate ? 'created' : 'updated']++;
 
+                // Pull custom field data from WeakMap so we can batch upsert
+                // non-record fields instead of saving them one-by-one.
+                // Record-type fields are put back for afterSave() to handle.
+                $storedCustomFieldData = ImportDataStorage::pull($record);
+                $batchableData = array_intersect_key($storedCustomFieldData, $customFieldDefs->all());
+                $remainingData = array_diff_key($storedCustomFieldData, $batchableData);
+
+                $this->collectCustomFieldValues($record, $batchableData, $customFieldDefs);
+
+                if ($remainingData !== []) {
+                    ImportDataStorage::setMultiple($record, $remainingData);
+                }
+
                 $importer->afterSave($record, $context);
             });
 
@@ -171,9 +206,130 @@ final class ExecuteImportJob implements ShouldQueue
         }
     }
 
+    /** @return Collection<string, CustomField> keyed by code */
+    private function loadCustomFieldDefinitions(BaseImporter $importer): Collection
+    {
+        return CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->teamId)
+            ->where('entity_type', $importer->entityName())
+            ->where('type', '!=', 'record')
+            ->active()
+            ->get()
+            ->keyBy('code');
+    }
+
+    /**
+     * @param  array<string, mixed>  $customFieldData
+     * @param  Collection<string, CustomField>  $customFieldDefs
+     */
+    private function collectCustomFieldValues(
+        Model $record,
+        array $customFieldData,
+        Collection $customFieldDefs,
+    ): void {
+        if ($customFieldData === []) {
+            return;
+        }
+
+        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+
+        foreach ($customFieldData as $code => $value) {
+            $cf = $customFieldDefs->get($code);
+
+            if ($cf === null) {
+                continue;
+            }
+
+            $valueColumn = CustomFieldValue::getValueColumn($cf->type);
+            $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
+
+            $row = [
+                'id' => (string) Str::ulid(),
+                'entity_type' => $record->getMorphClass(),
+                'entity_id' => $record->getKey(),
+                'custom_field_id' => $cf->getKey(),
+                $tenantKey => $this->teamId,
+                'string_value' => null,
+                'text_value' => null,
+                'integer_value' => null,
+                'float_value' => null,
+                'json_value' => null,
+                'boolean_value' => null,
+                'date_value' => null,
+                'datetime_value' => null,
+            ];
+
+            $row[$valueColumn] = $valueColumn === 'json_value' && $safeValue !== null
+                ? json_encode($safeValue)
+                : $safeValue;
+
+            $this->pendingCustomFieldValues[] = $row;
+        }
+    }
+
+    private function flushCustomFieldValues(): void
+    {
+        if ($this->pendingCustomFieldValues === []) {
+            return;
+        }
+
+        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+        $table = config('custom-fields.database.table_names.custom_field_values');
+        $uniqueBy = ['entity_type', 'entity_id', 'custom_field_id', $tenantKey];
+        $updateColumns = [
+            'string_value', 'text_value', 'integer_value', 'float_value',
+            'json_value', 'boolean_value', 'date_value', 'datetime_value',
+        ];
+
+        foreach (array_chunk($this->pendingCustomFieldValues, 500) as $chunk) {
+            DB::table($table)->upsert($chunk, $uniqueBy, $updateColumns);
+        }
+
+        $this->pendingCustomFieldValues = [];
+    }
+
     private function markProcessed(ImportRow $row): void
     {
-        $row->updateQuietly(['processed' => true]);
+        $this->processedRows[] = $row->row_number;
+    }
+
+    private function flushProcessedRows(ImportStore $store): void
+    {
+        if ($this->processedRows === []) {
+            return;
+        }
+
+        $store->connection()->table('import_rows')
+            ->whereIn('row_number', $this->processedRows)
+            ->update(['processed' => true]);
+
+        $this->processedRows = [];
+    }
+
+    /**
+     * @param  Collection<int, ImportRow>  $rows
+     * @return array<string, Model>
+     */
+    private function preloadExistingRecords(Collection $rows, BaseImporter $importer): array
+    {
+        $updateIds = $rows
+            ->filter(fn (ImportRow $row): bool => $row->isUpdate() && $row->matched_id !== null)
+            ->pluck('matched_id')
+            ->unique()
+            ->all();
+
+        if ($updateIds === []) {
+            return [];
+        }
+
+        $modelClass = $importer->modelClass();
+
+        return $modelClass::query()
+            ->whereIn((new $modelClass)->getKeyName(), $updateIds)
+            ->get()
+            ->keyBy(fn (Model $model): string => (string) $model->getKey())
+            ->all();
     }
 
     private function recordFailedRow(int $rowNumber, \Throwable $e): void
@@ -199,13 +355,12 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
-     * @param  Collection<int, ColumnData>  $mappings
+     * @param  Collection<int, ColumnData>  $fieldMappings
      * @return array<string, mixed>
      */
-    private function buildDataFromRow(ImportRow $row, Collection $mappings): array
+    private function buildDataFromRow(ImportRow $row, Collection $fieldMappings): array
     {
-        return $mappings
-            ->filter(fn (ColumnData $mapping): bool => $mapping->isFieldMapping())
+        return $fieldMappings
             ->mapWithKeys(fn (ColumnData $mapping): array => [
                 $mapping->target => $row->getFinalValue($mapping->source),
             ])
@@ -326,7 +481,7 @@ final class ExecuteImportJob implements ShouldQueue
             return null;
         }
 
-        $dedupKey = "{$link->key}:".mb_strtolower(trim($match->name));
+        $dedupKey = "{$link->key}:" . mb_strtolower(trim($match->name));
 
         if (isset($this->createdRecords[$dedupKey])) {
             return $this->createdRecords[$dedupKey];
@@ -364,9 +519,11 @@ final class ExecuteImportJob implements ShouldQueue
             ->title("Import of {$entityLabel} {$status}")
             ->viewData(['results' => $results]);
 
-        $failed
-            ? $notification->danger()
-            : $notification->success();
+        if ($failed) {
+            $notification->danger();
+        } else {
+            $notification->success();
+        }
 
         $notification->sendToDatabase($user);
     }
