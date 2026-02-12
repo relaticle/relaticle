@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
@@ -38,9 +39,10 @@ final class ValidateColumnJob implements ShouldQueue
 
     public function handle(): void
     {
-        $store = ImportStore::load($this->importId, $this->teamId);
+        $import = Import::findOrFail($this->importId);
+        $store = ImportStore::load($this->importId);
 
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
+        if ($store === null) {
             return;
         }
 
@@ -48,7 +50,7 @@ final class ValidateColumnJob implements ShouldQueue
         $jsonPath = '$.'.$this->column->source;
 
         if ($this->column->isEntityLinkMapping()) {
-            $this->validateEntityLink($store, $connection, $jsonPath);
+            $this->validateEntityLink($import, $store, $connection, $jsonPath);
 
             return;
         }
@@ -61,12 +63,12 @@ final class ValidateColumnJob implements ShouldQueue
             return;
         }
 
-        $results = $this->validateValues($store, $uniqueValues);
+        $results = $this->validateValues($import, $uniqueValues);
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
     }
 
-    private function validateEntityLink(ImportStore $store, Connection $connection, string $jsonPath): void
+    private function validateEntityLink(Import $import, ImportStore $store, Connection $connection, string $jsonPath): void
     {
         $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
 
@@ -74,8 +76,8 @@ final class ValidateColumnJob implements ShouldQueue
             return;
         }
 
-        $validator = new EntityLinkValidator($store->teamId());
-        $errorMap = $validator->batchValidateFromColumn($this->column, $store->getImporter(), $uniqueValues);
+        $validator = new EntityLinkValidator($import->team_id);
+        $errorMap = $validator->batchValidateFromColumn($this->column, $import->getImporter(), $uniqueValues);
 
         $results = [];
         foreach ($errorMap as $value => $error) {
@@ -86,18 +88,19 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
-        $this->writeEntityLinkRelationships($store, $connection, $jsonPath, $validator, $uniqueValues);
+        $this->writeEntityLinkRelationships($import, $store, $connection, $jsonPath, $validator, $uniqueValues);
     }
 
     /** @param array<int, string> $uniqueValues */
     private function writeEntityLinkRelationships(
+        Import $import,
         ImportStore $store,
         Connection $connection,
         string $jsonPath,
         EntityLinkValidator $validator,
         array $uniqueValues,
     ): void {
-        $context = $this->column->resolveEntityLinkContext($store->getImporter());
+        $context = $this->column->resolveEntityLinkContext($import->getImporter());
 
         if ($context === null) {
             return;
@@ -171,9 +174,7 @@ final class ValidateColumnJob implements ShouldQueue
         ", [$jsonPath, $jsonPath]);
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     private function fetchUncorrectedUniqueValues(ImportStore $store, string $jsonPath): array
     {
         return $store->query()
@@ -188,9 +189,9 @@ final class ValidateColumnJob implements ShouldQueue
      * @param  array<int, string>  $uniqueValues
      * @return array<int, array{raw_value: string, validation_error: string|null}>
      */
-    private function validateValues(ImportStore $store, array $uniqueValues): array
+    private function validateValues(Import $import, array $uniqueValues): array
     {
-        $this->hydrateColumnField($store);
+        $this->hydrateColumnField($import);
 
         $validator = new ColumnValidator;
         $results = [];
@@ -206,13 +207,13 @@ final class ValidateColumnJob implements ShouldQueue
         return $results;
     }
 
-    private function hydrateColumnField(ImportStore $store): void
+    private function hydrateColumnField(Import $import): void
     {
         if ($this->column->importField instanceof \Relaticle\ImportWizard\Data\ImportField) {
             return;
         }
 
-        $importer = $store->getImporter();
+        $importer = $import->getImporter();
         $this->column->importField = $importer->allFields()->get($this->column->target);
     }
 

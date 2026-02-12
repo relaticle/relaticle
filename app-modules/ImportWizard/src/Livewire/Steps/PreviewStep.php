@@ -14,6 +14,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -90,7 +91,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
         }
 
         return $this->batchId !== null
-            || $this->store()->status() === ImportStatus::Importing;
+            || $this->import()->status === ImportStatus::Importing;
     }
 
     #[Computed]
@@ -130,7 +131,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->pluck('target')
             ->all();
 
-        return $this->store()->getImporter()
+        return $this->import()->getImporter()
             ->getMatchFieldForMappedColumns($mappedFieldKeys)
             ?->label;
     }
@@ -141,13 +142,11 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return $this->store()->query()->count();
     }
 
-    /**
-     * @return Collection<int, ColumnData>
-     */
+    /** @return Collection<int, ColumnData> */
     #[Computed]
     public function columns(): Collection
     {
-        return $this->store()->columnMappings();
+        return $this->import()->columnMappings();
     }
 
     /** @return LengthAwarePaginator<int, ImportRow> */
@@ -272,13 +271,11 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return $stats;
     }
 
-    /**
-     * @return array<string, int>|null
-     */
+    /** @return array<string, int>|null */
     #[Computed]
     public function results(): ?array
     {
-        return $this->store()->results();
+        return $this->import()->results;
     }
 
     public function startImportAction(): Action
@@ -302,23 +299,23 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->color('danger')
             ->icon(Heroicon::OutlinedArrowDownTray)
             ->visible(fn (): bool => $this->isCompleted && ($this->results()['failed'] ?? 0) > 0)
-            ->action(fn (): \Symfony\Component\HttpFoundation\StreamedResponse => $this->downloadFailedRows());
+            ->action(fn (): StreamedResponse => $this->downloadFailedRows());
     }
 
     public function downloadFailedRows(): StreamedResponse
     {
-        $store = $this->store();
-        $failedRows = $store->failedRows();
-        $headers = $store->headers();
+        $import = $this->import();
+        $headers = $import->headers ?? [];
+        $failedRows = $import->failed_rows_data ?? [];
         $failedRowNumbers = collect($failedRows)->pluck('row')->all();
         $errorsByRow = collect($failedRows)->keyBy('row');
 
-        return response()->streamDownload(function () use ($store, $failedRowNumbers, $headers, $errorsByRow): void {
+        return response()->streamDownload(function () use ($failedRowNumbers, $headers, $errorsByRow): void {
             /** @var resource $handle */
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [...$headers, 'Import Error'], escape: '\\');
 
-            $store->query()
+            $this->store()->query()
                 ->whereIn('row_number', $failedRowNumbers)
                 ->orderBy('row_number')
                 ->chunk(100, function (Collection $rows) use ($handle, $headers, $errorsByRow): void {
@@ -353,16 +350,14 @@ final class PreviewStep extends Component implements HasActions, HasForms
             return;
         }
 
-        $store = $this->store();
-
-        if (! $store->transitionToImporting()) {
+        if (! $this->import()->transitionToImporting()) {
             return;
         }
 
         $batch = Bus::batch([
             new ExecuteImportJob(
-                importId: $store->id(),
-                teamId: $store->teamId(),
+                importId: $this->import()->id,
+                teamId: $this->import()->team_id,
             ),
         ])->dispatch();
 
@@ -373,7 +368,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function checkImportProgress(): void
     {
-        $this->store()->refreshMeta();
+        $this->import = null;
         $this->syncCompletionState();
 
         unset($this->results, $this->progressPercent, $this->processedCount, $this->isImporting);
@@ -390,7 +385,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     private function syncCompletionState(): void
     {
-        $this->isCompleted = in_array($this->store()->status(), [
+        $this->isCompleted = in_array($this->import()->status, [
             ImportStatus::Completed,
             ImportStatus::Failed,
         ], true);
@@ -408,7 +403,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             return;
         }
 
-        $batchId = $this->store()->meta()['match_resolution_batch_id'] ?? null;
+        $batchId = Cache::get("import-{$this->storeId}-match-resolution-batch");
 
         if ($batchId === null) {
             return;

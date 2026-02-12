@@ -9,6 +9,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -49,6 +50,8 @@ final class ReviewStep extends Component
     /** @var array<string, string> Column source => batch ID */
     public array $batchIds = [];
 
+    public ?string $previousMappingsHash = null;
+
     private function connection(): Connection
     {
         return $this->store()->connection();
@@ -76,10 +79,9 @@ final class ReviewStep extends Component
 
     private function validateEntityLinkValue(ColumnData $column, string $value): ?string
     {
-        $store = $this->store();
-        $validator = new EntityLinkValidator($store->teamId());
+        $validator = new EntityLinkValidator($this->import()->team_id);
 
-        return $validator->validateFromColumn($column, $store->getImporter(), $value);
+        return $validator->validateFromColumn($column, $this->import()->getImporter(), $value);
     }
 
     private function updateValidationForRawValue(string $jsonPath, string $rawValue, ?string $error): void
@@ -104,7 +106,7 @@ final class ReviewStep extends Component
     private function validateColumnAsync(ColumnData $column): string
     {
         $batch = Bus::batch([
-            new ValidateColumnJob($this->store()->id(), $column, $this->store()->teamId()),
+            new ValidateColumnJob($this->import()->id, $column, $this->import()->team_id),
         ])
             ->name("Validate {$column->source}")
             ->dispatch();
@@ -119,12 +121,10 @@ final class ReviewStep extends Component
 
     private function dispatchMatchResolution(): string
     {
-        $store = $this->store();
-
         $batch = Bus::batch([
             new ResolveMatchesJob(
-                importId: $store->id(),
-                teamId: $store->teamId(),
+                importId: $this->import()->id,
+                teamId: $this->import()->team_id,
             ),
         ])
             ->name('Match resolution')
@@ -135,7 +135,7 @@ final class ReviewStep extends Component
 
     public function mount(): void
     {
-        $this->columns = $this->store()->columnMappings();
+        $this->columns = $this->import()->columnMappings();
         $this->selectedColumn = $this->columns->first();
 
         if (! $this->hasMappingsChanged()) {
@@ -150,15 +150,13 @@ final class ReviewStep extends Component
 
         $this->batchIds['__match_resolution'] = $this->dispatchMatchResolution();
 
-        $this->store()->updateMeta([
-            'mappings_hash' => $this->currentMappingsHash(),
-        ]);
+        $this->previousMappingsHash = $this->currentMappingsHash();
     }
 
     public function hydrate(): void
     {
-        $this->columns = $this->store()->columnMappings();
-        $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
+        $this->columns = $this->import()->columnMappings();
+        $this->selectedColumn = $this->import()->getColumnMapping($this->selectedColumn->source);
     }
 
     public function render(): View
@@ -245,7 +243,7 @@ final class ReviewStep extends Component
             default => throw new \InvalidArgumentException("Unknown format type: {$type}"),
         };
 
-        $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
+        $this->import()->updateColumnMapping($this->selectedColumn->source, $updated);
 
         $this->columns = $this->columns->map(
             fn (ColumnData $col): ColumnData => $col->source === $updated->source ? $updated : $col
@@ -254,9 +252,7 @@ final class ReviewStep extends Component
 
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
 
-        $this->store()->updateMeta([
-            'mappings_hash' => $this->currentMappingsHash(),
-        ]);
+        $this->previousMappingsHash = $this->currentMappingsHash();
     }
 
     /** @return array<string, string> */
@@ -390,24 +386,26 @@ final class ReviewStep extends Component
         $matchBatchId = $this->batchIds['__match_resolution'] ?? null;
 
         if ($matchBatchId !== null) {
-            $this->store()->updateMeta(['match_resolution_batch_id' => $matchBatchId]);
+            Cache::put(
+                "import-{$this->storeId}-match-resolution-batch",
+                $matchBatchId,
+                now()->addHour(),
+            );
         }
 
-        $this->store()->setStatus(ImportStatus::Previewing);
+        $this->import()->update(['status' => ImportStatus::Previewing]);
         $this->dispatch('completed');
     }
 
     private function currentMappingsHash(): string
     {
-        $mappings = $this->store()->meta()['column_mappings'] ?? [];
+        $mappings = $this->import()->column_mappings ?? [];
 
         return hash('xxh128', (string) json_encode($mappings));
     }
 
     private function hasMappingsChanged(): bool
     {
-        $storedHash = $this->store()->meta()['mappings_hash'] ?? null;
-
-        return $storedHash !== $this->currentMappingsHash();
+        return $this->previousMappingsHash !== $this->currentMappingsHash();
     }
 }

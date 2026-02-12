@@ -12,12 +12,14 @@ use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Importers\BaseImporter;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 final readonly class MatchResolver
 {
     public function __construct(
         private ImportStore $store,
+        private Import $import,
         private BaseImporter $importer,
     ) {}
 
@@ -25,7 +27,7 @@ final readonly class MatchResolver
     {
         $this->resetPreviousResolutions();
 
-        $mappings = $this->store->columnMappings();
+        $mappings = $this->import->columnMappings();
         $mappedFieldKeys = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping())
             ->pluck('target')
             ->all();
@@ -89,7 +91,7 @@ final readonly class MatchResolver
             return;
         }
 
-        $resolver = new EntityLinkResolver($this->importer->getTeamId());
+        $resolver = new EntityLinkResolver($this->import->team_id);
         $selfLink = new EntityLink(
             key: 'self',
             source: EntityLinkSource::Relationship,

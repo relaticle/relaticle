@@ -127,7 +127,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isEntityLinkMapping()) {
+        if (! $mapping instanceof ColumnData || $mapping->isEntityLinkMapping()) {
             return null;
         }
 
@@ -139,7 +139,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     {
         $mapping = $this->getMapping($source);
 
-        if (! $mapping instanceof \Relaticle\ImportWizard\Data\ColumnData || $mapping->isFieldMapping()) {
+        if (! $mapping instanceof ColumnData || $mapping->isFieldMapping()) {
             return null;
         }
 
@@ -155,13 +155,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     /** @return array<string> */
     public function previewValues(string $column, int $limit = 5): array
     {
-        $store = $this->store();
-
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
-            return [];
-        }
-
-        return $store->query()
+        return $this->store()->query()
             ->limit($limit)
             ->get()
             ->pluck('raw_data')
@@ -239,7 +233,7 @@ final class MappingStep extends Component implements HasActions, HasForms
         $headers = $this->headers();
         $inferencer = new DataTypeInferencer(
             entityName: $this->entityType->value,
-            teamId: $this->store()?->teamId(),
+            teamId: $this->import()->team_id,
         );
         $allFields = $this->allFields();
 
@@ -297,7 +291,7 @@ final class MappingStep extends Component implements HasActions, HasForms
             ->disabled(fn (): bool => ! $this->canProceed())
             ->action(function (): void {
                 $this->saveMappings();
-                $this->store()?->setStatus(ImportStatus::Reviewing);
+                $this->import()->update(['status' => ImportStatus::Reviewing]);
                 $this->dispatch('completed');
             });
 
@@ -350,28 +344,16 @@ final class MappingStep extends Component implements HasActions, HasForms
 
     private function saveMappings(): void
     {
-        $store = $this->store();
-
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
-            return;
-        }
-
         $mappings = collect($this->columns)
             ->map(fn (array $data): ColumnData => ColumnData::from($data))
             ->values();
 
-        $store->setColumnMappings($mappings);
+        $this->import()->setColumnMappings($mappings);
     }
 
     private function loadMappings(): void
     {
-        $store = $this->store();
-
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
-            return;
-        }
-
-        $this->columns = $store->columnMappings()
+        $this->columns = $this->import()->columnMappings()
             ->keyBy('source')
             ->map(fn (ColumnData $m): array => $m->toArray())
             ->all();
@@ -379,11 +361,6 @@ final class MappingStep extends Component implements HasActions, HasForms
 
     private function getImporter(): BaseImporter
     {
-        if (! $this->importer instanceof \Relaticle\ImportWizard\Importers\BaseImporter) {
-            $teamId = $this->store()?->teamId() ?? (string) filament()->getTenant()?->getKey();
-            $this->importer = $this->entityType->importer($teamId);
-        }
-
-        return $this->importer;
+        return $this->importer ??= $this->import()->getImporter();
     }
 }
