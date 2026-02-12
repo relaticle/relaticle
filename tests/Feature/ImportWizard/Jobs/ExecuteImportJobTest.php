@@ -16,6 +16,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
 
@@ -32,8 +33,9 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    if (isset($this->store)) {
-        $this->store->destroy();
+    if (isset($this->import)) {
+        ImportStore::load($this->import->id)?->destroy();
+        $this->import->delete();
     }
 });
 
@@ -43,30 +45,31 @@ function createImportReadyStore(
     array $rows,
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
-): ImportStore {
-    $store = ImportStore::create(
-        teamId: (string) $context->team->id,
-        userId: (string) $context->user->id,
-        entityType: $entityType,
-        originalFilename: 'test.csv',
-    );
+): array {
+    $import = Import::create([
+        'team_id' => (string) $context->team->id,
+        'user_id' => (string) $context->user->id,
+        'entity_type' => $entityType,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Importing,
+        'total_rows' => count($rows),
+        'headers' => $headers,
+        'column_mappings' => collect($mappings)->map(fn (ColumnData $m) => $m->toArray())->all(),
+    ]);
 
-    $store->setHeaders($headers);
-    $store->setColumnMappings($mappings);
-
+    $store = ImportStore::create($import->id);
     $store->query()->insert($rows);
-    $store->setRowCount(count($rows));
-    $store->setStatus(ImportStatus::Importing);
 
+    $context->import = $import;
     $context->store = $store;
 
-    return $store;
+    return [$import, $store];
 }
 
 function runImportJob(object $context): void
 {
     $job = new ExecuteImportJob(
-        importId: $context->store->id(),
+        importId: $context->import->id,
         teamId: (string) $context->team->id,
     );
 
@@ -202,10 +205,10 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $store->results();
+    $results = $import->results;
     expect($results['updated'])->toBe(5)
         ->and($results['failed'])->toBe(0);
 
@@ -347,8 +350,8 @@ it('sets store status to Completed on success', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 });
 
 it('skips rows with null match_action without crashing', function (): void {
@@ -361,10 +364,10 @@ it('skips rows with null match_action without crashing', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $store->results();
+    $results = $import->results;
     expect($results['created'])->toBe(1)
         ->and($results['skipped'])->toBe(1)
         ->and($results['failed'])->toBe(0);
@@ -390,8 +393,8 @@ it('stores results with counts in meta', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results)->not->toBeNull()
         ->and($results['created'])->toBe(1)
@@ -406,17 +409,17 @@ it('sets store status to Failed on exception', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ], ImportEntityType::People);
 
-    $this->store->updateMeta(['entity_type' => 'nonexistent']);
+    DB::table('imports')->where('id', $this->import->id)->update(['entity_type' => 'nonexistent']);
 
     try {
         runImportJob($this);
     } catch (\Throwable) {
     }
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
+    $import = $this->import->fresh();
 
-    if ($store !== null) {
-        expect($store->status()->value)->toBeIn([ImportStatus::Failed->value, ImportStatus::Importing->value]);
+    if ($import !== null) {
+        expect($import->status->value)->toBeIn([ImportStatus::Failed->value, ImportStatus::Importing->value]);
     }
 });
 
@@ -430,10 +433,10 @@ it('handles empty import where all rows are skipped', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $store->results();
+    $results = $import->results;
     expect($results['created'])->toBe(0)
         ->and($results['updated'])->toBe(0)
         ->and($results['skipped'])->toBe(2);
@@ -451,10 +454,10 @@ it('processes rows in chunks without issues', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $store->results();
+    $results = $import->results;
     expect($results['created'])->toBe(50);
 });
 
@@ -608,8 +611,8 @@ it('skips Update row when matched record no longer exists', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results['skipped'])->toBe(1)
         ->and($results['created'])->toBe(1);
@@ -647,11 +650,15 @@ it('processes row with multiple entity links', function (): void {
         ->toContain((string) $person->id);
 });
 
-it('handles nonexistent store gracefully', function (): void {
+it('handles nonexistent import gracefully', function (): void {
     $job = new ExecuteImportJob('nonexistent-id', (string) $this->team->id);
-    $job->handle();
 
-    expect(true)->toBeTrue();
+    try {
+        $job->handle();
+        expect(false)->toBeTrue('Expected exception was not thrown');
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        expect($e->getModel())->toBe(Import::class);
+    }
 });
 
 it('filters out unexpected attributes from CSV data before saving', function (): void {
@@ -681,7 +688,7 @@ it('persists failed row details in store metadata', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $importer = $this->store->getImporter();
+    $importer = $this->import->getImporter();
     $originalPrepare = null;
 
     $callCount = 0;
@@ -689,11 +696,11 @@ it('persists failed row details in store metadata', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results['created'])->toBe(2)
-        ->and($store->failedRows())->toBeEmpty();
+        ->and($import->failedRows)->toBeEmpty();
 });
 
 it('sends success notification to user on import completion', function (): void {
@@ -757,12 +764,12 @@ it('records failed rows with row number and error message', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results['created'])->toBe(1)
         ->and($results['skipped'])->toBe(1)
-        ->and($store->failedRows())->toBeEmpty();
+        ->and($import->failedRows)->toBeEmpty();
 });
 
 it('handles Japanese characters in name fields', function (): void {
@@ -775,8 +782,8 @@ it('handles Japanese characters in name fields', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
     expect(People::where('team_id', $this->team->id)->where('name', '田中太郎')->exists())->toBeTrue()
         ->and(People::where('team_id', $this->team->id)->where('name', '佐藤花子')->exists())->toBeTrue();
@@ -861,10 +868,10 @@ it('processes 1000 row create import', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($store->status())->toBe(ImportStatus::Completed);
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $store->results();
+    $results = $import->results;
     expect($results['created'])->toBe(1000)
         ->and($results['failed'])->toBe(0);
 })->group('slow');
@@ -903,14 +910,14 @@ it('processes 1000 row mixed operations import', function (): void {
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results['created'])->toBe(850)
         ->and($results['updated'])->toBe(100)
         ->and($results['skipped'])->toBe(50)
         ->and($results['failed'])->toBe(0)
-        ->and($store->status())->toBe(ImportStatus::Completed);
+        ->and($import->status)->toBe(ImportStatus::Completed);
 })->group('slow');
 
 it('processes 1000 rows with entity link relationships and deduplication', function (): void {
@@ -939,12 +946,12 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
 
     runImportJob($this);
 
-    $store = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $results = $store->results();
+    $import = $this->import->fresh();
+    $results = $import->results;
 
     expect($results['created'])->toBe(1000)
         ->and($results['failed'])->toBe(0)
-        ->and($store->status())->toBe(ImportStatus::Completed);
+        ->and($import->status)->toBe(ImportStatus::Completed);
 
     $companies = Company::where('team_id', $this->team->id)
         ->whereIn('name', $companyNames)

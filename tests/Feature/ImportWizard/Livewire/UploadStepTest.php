@@ -11,6 +11,7 @@ use Livewire\Livewire;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\UploadStep;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 mutates(UploadStep::class);
@@ -34,7 +35,7 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     foreach ($this->createdStoreIds as $storeId) {
-        ImportStore::load($storeId, (string) $this->team->id)?->destroy();
+        ImportStore::load($storeId)?->destroy();
     }
 });
 
@@ -139,11 +140,14 @@ it('continueToMapping creates ImportStore with rows', function (): void {
     $component->assertDispatched('completed', function (string $event, array $params): bool {
         $this->createdStoreIds[] = $params['storeId'];
 
-        $store = ImportStore::load($params['storeId'], (string) $this->team->id);
-        expect($store)->not->toBeNull()
-            ->and($store->headers())->toBe(['Name', 'Email'])
-            ->and($store->rowCount())->toBe(2)
-            ->and($store->status())->toBe(ImportStatus::Mapping);
+        $import = Import::find($params['storeId']);
+        $store = ImportStore::load($params['storeId']);
+
+        expect($import)->not->toBeNull()
+            ->and($store)->not->toBeNull()
+            ->and($import->headers)->toBe(['Name', 'Email'])
+            ->and($import->total_rows)->toBe(2)
+            ->and($import->status)->toBe(ImportStatus::Mapping);
 
         $rows = $store->query()->get();
         expect($rows)->toHaveCount(2);
