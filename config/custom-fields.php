@@ -79,7 +79,7 @@ return [
             CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_VALIDATION_RULES,
             CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,
-            CustomFieldsFeature::SYSTEM_SECTIONS_ENABLED,
+            CustomFieldsFeature::SYSTEM_SECTIONS,
         ),
 
     /*
