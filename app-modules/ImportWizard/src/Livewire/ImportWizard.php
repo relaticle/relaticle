@@ -51,6 +51,8 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public bool $importStarted = false;
 
+    public bool $validationInProgress = false;
+
     public function mount(ImportEntityType $entityType, ?string $returnUrl = null): void
     {
         $this->entityType = $entityType;
@@ -79,7 +81,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public function goBack(): void
     {
-        if ($this->importStarted) {
+        if ($this->importStarted || $this->validationInProgress) {
             return;
         }
 
@@ -89,7 +91,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     public function goToStep(int $step): void
     {
-        if ($this->importStarted) {
+        if ($this->importStarted || $this->validationInProgress) {
             return;
         }
 
@@ -147,6 +149,12 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function onImportStarted(): void
     {
         $this->importStarted = true;
+    }
+
+    #[On('validation-state-changed')]
+    public function onValidationStateChanged(bool $inProgress): void
+    {
+        $this->validationInProgress = $inProgress;
     }
 
     public function startOverAction(): Action

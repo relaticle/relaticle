@@ -25,6 +25,7 @@ use Relaticle\ImportWizard\Enums\SortField;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
@@ -150,6 +151,8 @@ final class ReviewStep extends Component
         }
 
         $this->batchIds['__match_resolution'] = $this->dispatchMatchResolution();
+
+        $this->dispatch('validation-state-changed', inProgress: true)->to(ImportWizard::class);
 
         $this->previousMappingsHash = $this->currentMappingsHash();
     }
@@ -352,6 +355,9 @@ final class ReviewStep extends Component
         if ($this->batchIds === []) {
             $this->dispatch('polling-complete');
         }
+
+        $this->dispatch('validation-state-changed', inProgress: $this->isValidating())
+            ->to(ImportWizard::class);
     }
 
     #[Computed]
