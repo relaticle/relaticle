@@ -1,8 +1,17 @@
 <div
     class="flex flex-col h-full overflow-hidden"
-    x-data="{ timer: null, matchTimer: null }"
+    x-data="{
+        timer: null,
+        matchTimer: null,
+        poll() {
+            return setInterval(() => $wire.checkImportProgress(), 2000);
+        },
+        destroy() {
+            if (this.timer) { clearInterval(this.timer); this.timer = null; }
+            if (this.matchTimer) { clearInterval(this.matchTimer); this.matchTimer = null; }
+        }
+    }"
     x-init="
-        let poll = () => setInterval(() => $wire.checkImportProgress(), 2000);
         if (@js($this->isImporting)) { timer = poll(); }
         $wire.on('import-polling-start', () => { if (!timer) { timer = poll(); } });
         $wire.on('import-polling-complete', () => { clearInterval(timer); timer = null; });

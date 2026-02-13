@@ -7,12 +7,23 @@
 @endphp
 <div
     class="flex flex-col h-full overflow-hidden"
-    x-data="{ timer: null }"
-    x-init="
-        if (@js(count($batchIds) > 0)) {
-            timer = setInterval(() => $wire.checkProgress(), 2000);
+    x-data="{
+        timer: null,
+        startPolling() {
+            if (!this.timer) {
+                this.timer = setInterval(() => $wire.checkProgress(), 2000);
+            }
+        },
+        stopPolling() {
+            if (this.timer) { clearInterval(this.timer); this.timer = null; }
+        },
+        destroy() {
+            this.stopPolling();
         }
-        $wire.on('polling-complete', () => { clearInterval(timer); timer = null; });
+    }"
+    x-init="
+        if (@js(count($batchIds) > 0)) { startPolling(); }
+        $wire.on('polling-complete', () => stopPolling());
     "
 >
     {{-- Main Content --}}
@@ -122,19 +133,25 @@
             @if ($this->isSelectedColumnValidating)
                 {{-- Loading State with Fake Progress Animation --}}
                 <div
-                    x-data="{ progress: 5 }"
-                    x-init="
-                        let interval = setInterval(() => {
-                            if (progress < 90) {
-                                progress += Math.random() * 8;
-                                if (progress > 90) progress = 90;
-                            }
-                        }, 200);
-                        $wire.on('validation-complete', () => {
-                            clearInterval(interval);
-                            progress = 100;
-                        });
-                    "
+                    x-data="{
+                        progress: 5,
+                        interval: null,
+                        init() {
+                            this.interval = setInterval(() => {
+                                if (this.progress < 90) {
+                                    this.progress += Math.random() * 8;
+                                    if (this.progress > 90) this.progress = 90;
+                                }
+                            }, 200);
+                            $wire.on('validation-complete', () => {
+                                clearInterval(this.interval);
+                                this.progress = 100;
+                            });
+                        },
+                        destroy() {
+                            if (this.interval) { clearInterval(this.interval); }
+                        }
+                    }"
                     class="flex-1 flex items-center justify-center"
                 >
                     <div class="flex flex-col items-center text-center max-w-sm">
