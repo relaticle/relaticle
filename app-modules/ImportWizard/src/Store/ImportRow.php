@@ -176,7 +176,8 @@ final class ImportRow extends Model
     #[Scope]
     protected function searchValue(Builder $query, string $column, string $search): void
     {
-        $query->whereRaw('json_extract(raw_data, ?) LIKE ?', ['$.'.$column, '%'.$search.'%']);
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+        $query->whereRaw('json_extract(raw_data, ?) LIKE ? ESCAPE ?', ['$.'.$column, "%{$escaped}%", '\\']);
     }
 
     /**

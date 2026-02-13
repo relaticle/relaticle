@@ -54,7 +54,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function mount(ImportEntityType $entityType, ?string $returnUrl = null): void
     {
         $this->entityType = $entityType;
-        $this->returnUrl = $returnUrl;
+        $this->returnUrl = $this->sanitizeReturnUrl($returnUrl);
 
         $this->restoreFromStore();
     }
@@ -243,8 +243,31 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function destroyImportAndStore(string $importId): void
     {
-        Import::query()->where('id', $importId)->delete();
+        $teamId = $this->getCurrentTeamId();
+
+        if ($teamId === null) {
+            return;
+        }
+
+        Import::query()
+            ->forTeam($teamId)
+            ->where('id', $importId)
+            ->delete();
+
         ImportStore::load($importId)?->destroy();
+    }
+
+    private function sanitizeReturnUrl(?string $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+
+        if (str_starts_with($url, '/') && ! str_starts_with($url, '//')) {
+            return $url;
+        }
+
+        return null;
     }
 
     private function getCurrentTeamId(): ?string
