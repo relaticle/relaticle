@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -64,7 +67,7 @@ function createStoreForMatchResolution(
 
 function makeMatchRow(int $rowNumber, array $rawData, array $overrides = []): array
 {
-    return array_merge([
+    return [
         'row_number' => $rowNumber,
         'raw_data' => json_encode($rawData),
         'validation' => null,
@@ -73,7 +76,8 @@ function makeMatchRow(int $rowNumber, array $rawData, array $overrides = []): ar
         'match_action' => null,
         'matched_id' => null,
         'relationships' => null,
-    ], $overrides);
+        ...$overrides,
+    ];
 }
 
 it('resolves all rows as Create when no match field mapped', function (): void {
@@ -97,7 +101,7 @@ it('resolves Update when email matches existing record', function (): void {
         'team_id' => $this->team->id,
     ]);
 
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -105,7 +109,7 @@ it('resolves Update when email matches existing record', function (): void {
         ->first();
 
     if ($emailField) {
-        \App\Models\CustomFieldValue::create([
+        CustomFieldValue::create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
@@ -207,13 +211,46 @@ it('marks unmatched rows as Create when mixed matched and empty values', functio
         ->and($unmatched->match_action)->toBe(RowMatchAction::Skip);
 });
 
-it('handles missing import gracefully', function (): void {
-    $job = new ResolveMatchesJob('nonexistent-id', (string) $this->team->id);
+it('resolves Update when CSV email column contains comma-separated values matching existing record', function (): void {
+    $person = People::factory()->create([
+        'name' => 'Existing Person',
+        'team_id' => $this->team->id,
+    ]);
 
-    try {
-        $job->handle();
-        expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-        expect($e->getModel())->toBe(Import::class);
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if (! $emailField) {
+        $this->markTestSkipped('No email custom field seeded for team');
     }
+
+    CustomFieldValue::create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'json_value' => ['existing@test.com', 'other@test.com'],
+    ]);
+
+    createStoreForMatchResolution($this, ['Name', 'Email'], [
+        makeMatchRow(2, ['Name' => 'John', 'Email' => 'existing@test.com, new@test.com']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->match_action)->toBe(RowMatchAction::Update)
+        ->and($row->matched_id)->toBe((string) $person->id);
 });
+
+it('handles missing import gracefully', function (): void {
+    (new ResolveMatchesJob('nonexistent-id', (string) $this->team->id))->handle();
+})->throws(ModelNotFoundException::class);

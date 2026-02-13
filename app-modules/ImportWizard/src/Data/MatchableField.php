@@ -14,6 +14,7 @@ final class MatchableField extends Data
         public readonly string $label,
         public readonly int $priority = 0,
         public readonly ?MatchBehavior $behavior = null,
+        public readonly bool $multiValue = false,
     ) {}
 
     public static function id(): self
@@ -32,6 +33,7 @@ final class MatchableField extends Data
             field: $fieldKey,
             label: 'Email',
             priority: 90,
+            multiValue: true,
         );
     }
 
@@ -41,6 +43,7 @@ final class MatchableField extends Data
             field: $fieldKey,
             label: 'Domain',
             priority: 80,
+            multiValue: true,
         );
     }
 
@@ -50,6 +53,7 @@ final class MatchableField extends Data
             field: $fieldKey,
             label: 'Phone',
             priority: 70,
+            multiValue: true,
         );
     }
 

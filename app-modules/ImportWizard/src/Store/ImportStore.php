@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Relaticle\ImportWizard\Enums\RowMatchAction;
 
 final class ImportStore
 {
@@ -92,6 +93,52 @@ final class ImportStore
         $schema->table('import_rows', function (Blueprint $table): void {
             $table->boolean('processed')->default(false);
         });
+    }
+
+    /**
+     * @param  array<string, int|string|null>  $resolvedMap
+     */
+    public function bulkUpdateMatches(string $jsonPath, array $resolvedMap, RowMatchAction $unmatchedAction): void
+    {
+        $connection = $this->connection();
+
+        $connection->statement('
+            CREATE TEMPORARY TABLE IF NOT EXISTS temp_match_results (
+                lookup_value TEXT,
+                match_action TEXT,
+                matched_id TEXT
+            )
+        ');
+
+        try {
+            $inserts = collect($resolvedMap)
+                ->map(fn (int|string|null $id, int|string $value): array => [
+                    'lookup_value' => (string) $value,
+                    'match_action' => $id !== null ? RowMatchAction::Update->value : $unmatchedAction->value,
+                    'matched_id' => $id !== null ? (string) $id : null,
+                ])
+                ->values()
+                ->all();
+
+            if ($inserts === []) {
+                return;
+            }
+
+            foreach (array_chunk($inserts, 5000) as $chunk) {
+                $connection->table('temp_match_results')->insert($chunk);
+            }
+
+            $connection->statement('
+                UPDATE import_rows
+                SET match_action = temp.match_action,
+                    matched_id = temp.matched_id
+                FROM temp_match_results AS temp
+                WHERE json_extract(import_rows.raw_data, ?) = temp.lookup_value
+                  AND import_rows.match_action IS NULL
+            ', [$jsonPath]);
+        } finally {
+            $connection->statement('DROP TABLE IF EXISTS temp_match_results');
+        }
     }
 
     public function destroy(): void

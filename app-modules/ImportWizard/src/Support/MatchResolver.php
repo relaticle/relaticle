@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Support;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
@@ -38,7 +39,7 @@ final readonly class MatchResolver
             $this->resolveWithLookup($matchField, $mappings);
         }
 
-        $this->markRemainingAsCreate();
+        $this->markRemainingAs(RowMatchAction::Create);
     }
 
     private function resetPreviousResolutions(): void
@@ -48,11 +49,6 @@ final readonly class MatchResolver
             SET match_action = NULL,
                 matched_id = NULL
         ');
-    }
-
-    private function markRemainingAsCreate(): void
-    {
-        $this->markRemainingAs(RowMatchAction::Create);
     }
 
     private function markRemainingAs(RowMatchAction $action): void
@@ -67,30 +63,54 @@ final readonly class MatchResolver
     /** @param  Collection<int, ColumnData>  $mappings */
     private function resolveWithLookup(MatchableField $matchField, Collection $mappings): void
     {
-        $sourceColumn = $mappings->first(fn (ColumnData $col): bool => $col->isFieldMapping() && $col->target === $matchField->field);
+        $sourceColumn = $this->findSourceColumn($matchField, $mappings);
 
         if ($sourceColumn === null) {
-            $this->markRemainingAsCreate();
-
             return;
         }
 
         $jsonPath = '$.'.$sourceColumn->source;
+        $uniqueValues = $this->extractUniqueValues($jsonPath);
 
-        $uniqueValues = $this->store->query()
+        if ($uniqueValues === []) {
+            return;
+        }
+
+        $resolvedMap = $this->resolveMatchIds($matchField, $uniqueValues);
+        $unmatchedAction = $matchField->behavior === MatchBehavior::UpdateOnly
+            ? RowMatchAction::Skip
+            : RowMatchAction::Create;
+
+        $this->store->bulkUpdateMatches($jsonPath, $resolvedMap, $unmatchedAction);
+        $this->markRemainingAs($unmatchedAction);
+    }
+
+    /** @param  Collection<int, ColumnData>  $mappings */
+    private function findSourceColumn(MatchableField $matchField, Collection $mappings): ?ColumnData
+    {
+        return $mappings->first(
+            fn (ColumnData $col): bool => $col->isFieldMapping() && $col->target === $matchField->field,
+        );
+    }
+
+    /** @return array<string> */
+    private function extractUniqueValues(string $jsonPath): array
+    {
+        return $this->store->query()
             ->whereNull('match_action')
             ->selectRaw('DISTINCT json_extract(raw_data, ?) as value', [$jsonPath])
             ->pluck('value')
             ->filter()
             ->values()
             ->all();
+    }
 
-        if ($uniqueValues === []) {
-            $this->markRemainingAsCreate();
-
-            return;
-        }
-
+    /**
+     * @param  array<string>  $uniqueValues
+     * @return array<string, int|string|null>
+     */
+    private function resolveMatchIds(MatchableField $matchField, array $uniqueValues): array
+    {
         $resolver = new EntityLinkResolver($this->import->team_id);
         $selfLink = new EntityLink(
             key: 'self',
@@ -99,50 +119,36 @@ final readonly class MatchResolver
             targetModelClass: $this->importer->modelClass(),
         );
 
-        $resolvedMap = $resolver->batchResolve($selfLink, $matchField, $uniqueValues);
+        return $matchField->multiValue
+            ? $this->resolveMultiValueField($resolver, $selfLink, $matchField, $uniqueValues)
+            : $resolver->batchResolve($selfLink, $matchField, $uniqueValues);
+    }
 
-        $connection = $this->store->connection();
+    /**
+     * @param  array<string>  $csvValues
+     * @return array<string, int|string|null>
+     */
+    private function resolveMultiValueField(
+        EntityLinkResolver $resolver,
+        EntityLink $selfLink,
+        MatchableField $matchField,
+        array $csvValues,
+    ): array {
+        $allParts = collect($csvValues)
+            ->flatMap(fn (string $csv) => Str::of($csv)->explode(',')->map(fn (string $v): string => trim($v))->filter())
+            ->unique()
+            ->values()
+            ->all();
 
-        $connection->statement('
-            CREATE TEMPORARY TABLE IF NOT EXISTS temp_match_results (
-                lookup_value TEXT,
-                match_action TEXT,
-                matched_id TEXT
-            )
-        ');
+        $batchResults = $resolver->batchResolve($selfLink, $matchField, $allParts);
 
-        try {
-            $unmatchedAction = $matchField->behavior === MatchBehavior::UpdateOnly
-                ? RowMatchAction::Skip
-                : RowMatchAction::Create;
-
-            $inserts = [];
-            foreach ($resolvedMap as $value => $id) {
-                $inserts[] = [
-                    'lookup_value' => (string) $value,
-                    'match_action' => $id !== null ? RowMatchAction::Update->value : $unmatchedAction->value,
-                    'matched_id' => $id !== null ? (string) $id : null,
-                ];
-            }
-
-            if ($inserts !== []) {
-                foreach (array_chunk($inserts, 5000) as $chunk) {
-                    $connection->table('temp_match_results')->insert($chunk);
-                }
-
-                $connection->statement('
-                    UPDATE import_rows
-                    SET match_action = temp.match_action,
-                        matched_id = temp.matched_id
-                    FROM temp_match_results AS temp
-                    WHERE json_extract(import_rows.raw_data, ?) = temp.lookup_value
-                      AND import_rows.match_action IS NULL
-                ', [$jsonPath]);
-            }
-
-            $this->markRemainingAs($unmatchedAction);
-        } finally {
-            $connection->statement('DROP TABLE IF EXISTS temp_match_results');
-        }
+        return collect($csvValues)
+            ->mapWithKeys(fn (string $csv): array => [
+                $csv => Str::of($csv)->explode(',')->map(fn (string $v): string => trim($v))->filter()
+                    ->map(fn (string $part) => $batchResults[$part] ?? null)
+                    ->filter()
+                    ->first(),
+            ])
+            ->all();
     }
 }
