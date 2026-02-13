@@ -115,13 +115,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
     #[Computed]
     public function processedCount(): int
     {
-        $results = $this->results();
-
-        if ($results === null) {
-            return 0;
-        }
-
-        return array_sum($results);
+        return array_sum($this->results());
     }
 
     #[Computed]
@@ -272,11 +266,18 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return $stats;
     }
 
-    /** @return array<string, int>|null */
+    /** @return array{created: int, updated: int, skipped: int, failed: int} */
     #[Computed]
-    public function results(): ?array
+    public function results(): array
     {
-        return $this->import()->results;
+        $import = $this->import();
+
+        return [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
     }
 
     public function startImportAction(): Action
@@ -299,7 +300,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->label('Download Failed Rows')
             ->color('danger')
             ->icon(Heroicon::OutlinedArrowDownTray)
-            ->visible(fn (): bool => $this->isCompleted && ($this->results()['failed'] ?? 0) > 0)
+            ->visible(fn (): bool => $this->isCompleted && $this->import()->failed_rows > 0)
             ->action(fn (): StreamedResponse => $this->downloadFailedRows());
     }
 

@@ -83,6 +83,11 @@ final class ImportHistory extends Page implements HasTable
                     ->numeric()
                     ->color('gray'),
 
+                TextColumn::make('failed_rows')
+                    ->label('Failed')
+                    ->numeric()
+                    ->color('danger'),
+
                 TextColumn::make('user.name')
                     ->label('User'),
 

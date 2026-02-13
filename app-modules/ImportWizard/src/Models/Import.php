@@ -33,15 +33,12 @@ final class Import extends Model
             'status' => ImportStatus::class,
             'headers' => 'array',
             'column_mappings' => 'array',
-            'results' => 'array',
-            'failed_rows_data' => 'array',
             'completed_at' => 'datetime',
             'total_rows' => 'integer',
-            'processed_rows' => 'integer',
-            'successful_rows' => 'integer',
             'created_rows' => 'integer',
             'updated_rows' => 'integer',
             'skipped_rows' => 'integer',
+            'failed_rows' => 'integer',
         ];
     }
 

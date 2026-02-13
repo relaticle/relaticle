@@ -208,9 +208,8 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $import->results;
-    expect($results['updated'])->toBe(5)
-        ->and($results['failed'])->toBe(0);
+    expect($import->updated_rows)->toBe(5)
+        ->and($import->failed_rows)->toBe(0);
 
     foreach ($emails as $email) {
         $person = $existingPeople[$email]->refresh();
@@ -367,10 +366,9 @@ it('skips rows with null match_action without crashing', function (): void {
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $import->results;
-    expect($results['created'])->toBe(1)
-        ->and($results['skipped'])->toBe(1)
-        ->and($results['failed'])->toBe(0);
+    expect($import->created_rows)->toBe(1)
+        ->and($import->skipped_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
 });
 
 it('stores results with counts in meta', function (): void {
@@ -394,12 +392,10 @@ it('stores results with counts in meta', function (): void {
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
 
-    expect($results)->not->toBeNull()
-        ->and($results['created'])->toBe(1)
-        ->and($results['updated'])->toBe(1)
-        ->and($results['skipped'])->toBe(1);
+    expect($import->created_rows)->toBe(1)
+        ->and($import->updated_rows)->toBe(1)
+        ->and($import->skipped_rows)->toBe(1);
 });
 
 it('sets store status to Failed on exception', function (): void {
@@ -436,10 +432,9 @@ it('handles empty import where all rows are skipped', function (): void {
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $import->results;
-    expect($results['created'])->toBe(0)
-        ->and($results['updated'])->toBe(0)
-        ->and($results['skipped'])->toBe(2);
+    expect($import->created_rows)->toBe(0)
+        ->and($import->updated_rows)->toBe(0)
+        ->and($import->skipped_rows)->toBe(2);
 });
 
 it('processes rows in chunks without issues', function (): void {
@@ -457,8 +452,7 @@ it('processes rows in chunks without issues', function (): void {
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $import->results;
-    expect($results['created'])->toBe(50);
+    expect($import->created_rows)->toBe(50);
 });
 
 it('auto-creates company when entity link value is unresolved', function (): void {
@@ -612,10 +606,9 @@ it('skips Update row when matched record no longer exists', function (): void {
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
 
-    expect($results['skipped'])->toBe(1)
-        ->and($results['created'])->toBe(1);
+    expect($import->skipped_rows)->toBe(1)
+        ->and($import->created_rows)->toBe(1);
 });
 
 it('processes row with multiple entity links', function (): void {
@@ -697,9 +690,8 @@ it('persists failed row details in store metadata', function (): void {
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
 
-    expect($results['created'])->toBe(2)
+    expect($import->created_rows)->toBe(2)
         ->and($import->failedRows)->toBeEmpty();
 });
 
@@ -765,10 +757,9 @@ it('records failed rows with row number and error message', function (): void {
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
 
-    expect($results['created'])->toBe(1)
-        ->and($results['skipped'])->toBe(1)
+    expect($import->created_rows)->toBe(1)
+        ->and($import->skipped_rows)->toBe(1)
         ->and($import->failedRows)->toBeEmpty();
 });
 
@@ -877,7 +868,7 @@ it('persists results to Import model on completion', function (): void {
         ->and($import->created_rows)->toBe(2)
         ->and($import->updated_rows)->toBe(0)
         ->and($import->skipped_rows)->toBe(0)
-        ->and($import->results)->toBe(['created' => 2, 'updated' => 0, 'skipped' => 0, 'failed' => 0]);
+        ->and($import->failed_rows)->toBe(0);
 });
 
 it('processes 1000 row create import', function (): void {
@@ -895,9 +886,8 @@ it('processes 1000 row create import', function (): void {
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    $results = $import->results;
-    expect($results['created'])->toBe(1000)
-        ->and($results['failed'])->toBe(0);
+    expect($import->created_rows)->toBe(1000)
+        ->and($import->failed_rows)->toBe(0);
 })->group('slow');
 
 it('processes 1000 row mixed operations import', function (): void {
@@ -935,12 +925,10 @@ it('processes 1000 row mixed operations import', function (): void {
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
-
-    expect($results['created'])->toBe(850)
-        ->and($results['updated'])->toBe(100)
-        ->and($results['skipped'])->toBe(50)
-        ->and($results['failed'])->toBe(0)
+    expect($import->created_rows)->toBe(850)
+        ->and($import->updated_rows)->toBe(100)
+        ->and($import->skipped_rows)->toBe(50)
+        ->and($import->failed_rows)->toBe(0)
         ->and($import->status)->toBe(ImportStatus::Completed);
 })->group('slow');
 
@@ -971,10 +959,8 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
     runImportJob($this);
 
     $import = $this->import->fresh();
-    $results = $import->results;
-
-    expect($results['created'])->toBe(1000)
-        ->and($results['failed'])->toBe(0)
+    expect($import->created_rows)->toBe(1000)
+        ->and($import->failed_rows)->toBe(0)
         ->and($import->status)->toBe(ImportStatus::Completed);
 
     $companies = Company::where('team_id', $this->team->id)

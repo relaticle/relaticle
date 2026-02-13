@@ -81,7 +81,12 @@ final class ExecuteImportJob implements ShouldQueue
         $importer = $import->getImporter();
         $mappings = $import->columnMappings();
 
-        $results = $import->results ?? ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+        $results = [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
         $allowedKeys = $this->allowedAttributeKeys($importer);
         $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
@@ -110,13 +115,10 @@ final class ExecuteImportJob implements ShouldQueue
             $import->update([
                 'status' => ImportStatus::Completed,
                 'completed_at' => now(),
-                'results' => $results,
-                'failed_rows_data' => $this->failedRowsSummary(),
                 'created_rows' => $results['created'],
                 'updated_rows' => $results['updated'],
                 'skipped_rows' => $results['skipped'],
-                'successful_rows' => $results['created'] + $results['updated'],
-                'processed_rows' => array_sum($results),
+                'failed_rows' => $results['failed'],
             ]);
 
             $this->writeFailedRowsToDb($import);
@@ -361,18 +363,11 @@ final class ExecuteImportJob implements ShouldQueue
     private function persistResults(Import $import, array $results): void
     {
         $import->update([
-            'results' => $results,
-            'failed_rows_data' => $this->failedRowsSummary(),
+            'created_rows' => $results['created'],
+            'updated_rows' => $results['updated'],
+            'skipped_rows' => $results['skipped'],
+            'failed_rows' => $results['failed'],
         ]);
-    }
-
-    /** @return list<array{row: int, error: string}> */
-    private function failedRowsSummary(): array
-    {
-        return array_map(
-            fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
-            $this->failedRows,
-        );
     }
 
     private function writeFailedRowsToDb(Import $import): void

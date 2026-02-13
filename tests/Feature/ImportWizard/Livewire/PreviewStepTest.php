@@ -618,7 +618,10 @@ it('checkImportProgress detects completion', function (): void {
 
     $this->import->update([
         'status' => ImportStatus::Completed,
-        'results' => ['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0],
+        'created_rows' => 1,
+        'updated_rows' => 0,
+        'skipped_rows' => 0,
+        'failed_rows' => 0,
     ]);
 
     $component->set('batchId', 'fake-batch-id');
@@ -685,7 +688,10 @@ it('downloadFailedRows action is visible when there are failed rows', function (
 
     $this->import->update([
         'status' => ImportStatus::Completed,
-        'results' => ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 1],
+        'created_rows' => 0,
+        'updated_rows' => 0,
+        'skipped_rows' => 0,
+        'failed_rows' => 1,
     ]);
 
     $component = mountPreviewStep($this);
@@ -702,7 +708,10 @@ it('downloadFailedRows action is hidden when there are no failed rows', function
 
     $this->import->update([
         'status' => ImportStatus::Completed,
-        'results' => ['created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0],
+        'created_rows' => 1,
+        'updated_rows' => 0,
+        'skipped_rows' => 0,
+        'failed_rows' => 0,
     ]);
 
     $component = mountPreviewStep($this);
