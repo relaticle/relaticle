@@ -987,3 +987,443 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
 
     expect($companies)->toHaveCount(20);
 })->group('slow');
+
+// --- Custom Field Import Tests ---
+
+function createTestCustomField(object $context, string $code, string $type, string $entityType = 'people', array $options = []): \App\Models\CustomField
+{
+    $cf = \App\Models\CustomField::forceCreate([
+        'tenant_id' => $context->team->id,
+        'code' => $code,
+        'name' => ucfirst(str_replace('_', ' ', $code)),
+        'type' => $type,
+        'entity_type' => $entityType,
+        'sort_order' => 1,
+        'active' => true,
+        'system_defined' => false,
+        'validation_rules' => [],
+        'settings' => new \Relaticle\CustomFields\Data\CustomFieldSettingsData,
+    ]);
+
+    foreach ($options as $i => $optionName) {
+        $cf->options()->forceCreate([
+            'custom_field_id' => $cf->id,
+            'tenant_id' => $context->team->id,
+            'name' => $optionName,
+            'sort_order' => $i + 1,
+        ]);
+    }
+
+    return $cf->fresh();
+}
+
+function getTestCustomFieldValue(object $context, string $entityId, string $customFieldId): ?\App\Models\CustomFieldValue
+{
+    return \App\Models\CustomFieldValue::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $context->team->id)
+        ->where('entity_id', $entityId)
+        ->where('custom_field_id', $customFieldId)
+        ->first();
+}
+
+it('imports text custom field value', function (): void {
+    $cf = createTestCustomField($this, 'website_notes', 'text');
+
+    createImportReadyStore($this, ['Name', 'Notes'], [
+        makeRow(2, ['Name' => 'John', 'Notes' => 'Some important text'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    expect($person)->not->toBeNull();
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('Some important text');
+});
+
+it('imports number custom field as integer', function (): void {
+    $cf = createTestCustomField($this, 'employee_count', 'number');
+
+    createImportReadyStore($this, ['Name', 'Employees'], [
+        makeRow(2, ['Name' => 'Acme', 'Employees' => '42'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Employees', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->integer_value)->toBe(42);
+});
+
+it('imports currency custom field with point decimal format', function (): void {
+    $cf = createTestCustomField($this, 'revenue', 'currency');
+
+    createImportReadyStore($this, ['Name', 'Revenue'], [
+        makeRow(2, ['Name' => 'Acme', 'Revenue' => '1234.56'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Revenue', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->float_value)->toBe(1234.56);
+});
+
+it('imports currency custom field with comma decimal format', function (): void {
+    $cf = createTestCustomField($this, 'revenue_eu', 'currency');
+
+    createImportReadyStore($this, ['Name', 'Revenue'], [
+        makeRow(2, ['Name' => 'Acme', 'Revenue' => '1.234,56'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        (new ColumnData(
+            source: 'Revenue',
+            target: "custom_fields_{$cf->code}",
+            numberFormat: \Relaticle\ImportWizard\Enums\NumberFormat::COMMA,
+        )),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->float_value)->toBe(1234.56);
+});
+
+it('imports date custom field with ISO format', function (): void {
+    $cf = createTestCustomField($this, 'start_date', 'date');
+
+    createImportReadyStore($this, ['Name', 'Start'], [
+        makeRow(2, ['Name' => 'John', 'Start' => '2024-05-15'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
+});
+
+it('imports date custom field with European format', function (): void {
+    $cf = createTestCustomField($this, 'start_date_eu', 'date');
+
+    createImportReadyStore($this, ['Name', 'Start'], [
+        makeRow(2, ['Name' => 'John', 'Start' => '15/05/2024'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        (new ColumnData(
+            source: 'Start',
+            target: "custom_fields_{$cf->code}",
+            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::EUROPEAN,
+        )),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
+});
+
+it('imports date custom field with American format', function (): void {
+    $cf = createTestCustomField($this, 'start_date_us', 'date');
+
+    createImportReadyStore($this, ['Name', 'Start'], [
+        makeRow(2, ['Name' => 'John', 'Start' => '05/15/2024'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        (new ColumnData(
+            source: 'Start',
+            target: "custom_fields_{$cf->code}",
+            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::AMERICAN,
+        )),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
+});
+
+it('imports datetime custom field with ISO format including time', function (): void {
+    $cf = createTestCustomField($this, 'meeting_at', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Meeting'], [
+        makeRow(2, ['Name' => 'John', 'Meeting' => '2024-05-15 14:30:00'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->datetime_value->format('Y-m-d H:i:s'))->toBe('2024-05-15 14:30:00');
+});
+
+it('imports datetime custom field with European format including time', function (): void {
+    $cf = createTestCustomField($this, 'meeting_at_eu', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Meeting'], [
+        makeRow(2, ['Name' => 'John', 'Meeting' => '15/05/2024 14:30'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        (new ColumnData(
+            source: 'Meeting',
+            target: "custom_fields_{$cf->code}",
+            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::EUROPEAN,
+        )),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->datetime_value->format('Y-m-d H:i'))->toBe('2024-05-15 14:30');
+});
+
+it('imports boolean custom field with truthy values', function (): void {
+    $cf = createTestCustomField($this, 'is_vip', 'checkbox');
+
+    createImportReadyStore($this, ['Name', 'VIP'], [
+        makeRow(2, ['Name' => 'John', 'VIP' => '1'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'VIP', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->boolean_value)->toBeTrue();
+});
+
+it('imports select custom field with option name resolved to ID', function (): void {
+    $cf = createTestCustomField($this, 'priority', 'select', 'people', ['Low', 'Medium', 'High']);
+    $mediumOption = $cf->options->firstWhere('name', 'Medium');
+
+    createImportReadyStore($this, ['Name', 'Priority'], [
+        makeRow(2, ['Name' => 'John', 'Priority' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->string_value)->toBe((string) $mediumOption->id);
+});
+
+it('imports multi-select custom field with option names resolved to IDs', function (): void {
+    $cf = createTestCustomField($this, 'tags_field', 'multi-select', 'people', ['Urgent', 'Follow-up', 'VIP']);
+    $urgentOption = $cf->options->firstWhere('name', 'Urgent');
+    $vipOption = $cf->options->firstWhere('name', 'VIP');
+
+    createImportReadyStore($this, ['Name', 'Tags'], [
+        makeRow(2, ['Name' => 'John', 'Tags' => 'Urgent, VIP'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Tags', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = $cfv->json_value;
+    expect($jsonValue)->toContain((string) $urgentOption->id)
+        ->toContain((string) $vipOption->id);
+});
+
+it('imports tags-input custom field with comma-separated values', function (): void {
+    $cf = createTestCustomField($this, 'labels', 'tags-input');
+
+    createImportReadyStore($this, ['Name', 'Labels'], [
+        makeRow(2, ['Name' => 'John', 'Labels' => 'tag1, tag2, tag3'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Labels', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = $cfv->json_value;
+    expect($jsonValue)->toContain('tag1')
+        ->toContain('tag2')
+        ->toContain('tag3');
+});
+
+it('skips blank custom field values without creating custom_field_values row', function (): void {
+    $cf = createTestCustomField($this, 'optional_notes', 'text');
+
+    createImportReadyStore($this, ['Name', 'Notes'], [
+        makeRow(2, ['Name' => 'John', 'Notes' => ''], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    expect($person)->not->toBeNull();
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->toBeNull();
+});
+
+it('updates existing custom field value on record update', function (): void {
+    $cf = createTestCustomField($this, 'note_field', 'text');
+
+    $person = People::factory()->create([
+        'name' => 'John',
+        'team_id' => $this->team->id,
+    ]);
+
+    \App\Models\CustomFieldValue::forceCreate([
+        'custom_field_id' => $cf->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'text_value' => 'old value',
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name', 'Notes'], [
+        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => 'new value'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('new value');
+});
+
+it('imports email custom field with comma-separated addresses as array', function (): void {
+    $cf = createTestCustomField($this, 'contact_emails', 'email');
+
+    createImportReadyStore($this, ['Name', 'Emails'], [
+        makeRow(2, ['Name' => 'John', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Emails', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = collect($cfv->json_value)->all();
+    expect($jsonValue)->toBeArray()
+        ->toContain('a@b.com')
+        ->toContain('c@d.com');
+});
+
+it('imports select custom field with case-insensitive option name', function (): void {
+    $cf = createTestCustomField($this, 'priority_ci', 'select', 'people', ['Low', 'Medium', 'High']);
+    $mediumOption = $cf->options->firstWhere('name', 'Medium');
+
+    createImportReadyStore($this, ['Name', 'Priority'], [
+        makeRow(2, ['Name' => 'John', 'Priority' => 'medium'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->string_value)->toBe((string) $mediumOption->id);
+});
+
+it('imports select custom field with value already being an option ID', function (): void {
+    $cf = createTestCustomField($this, 'priority_id', 'select', 'people', ['Low', 'Medium', 'High']);
+    $mediumOption = $cf->options->firstWhere('name', 'Medium');
+
+    createImportReadyStore($this, ['Name', 'Priority'], [
+        makeRow(2, ['Name' => 'John', 'Priority' => (string) $mediumOption->id], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->string_value)->toBe((string) $mediumOption->id);
+});
+
+it('imports multi-select custom field with mixed option names resolved to IDs', function (): void {
+    $cf = createTestCustomField($this, 'categories', 'multi-select', 'people', ['Alpha', 'Beta', 'Gamma']);
+    $alphaOption = $cf->options->firstWhere('name', 'Alpha');
+    $gammaOption = $cf->options->firstWhere('name', 'Gamma');
+
+    createImportReadyStore($this, ['Name', 'Categories'], [
+        makeRow(2, ['Name' => 'John', 'Categories' => 'Alpha, Gamma'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Categories', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = collect($cfv->json_value)->all();
+    expect($jsonValue)->toBeArray()
+        ->toContain((string) $alphaOption->id)
+        ->toContain((string) $gammaOption->id)
+        ->not->toContain('Alpha')
+        ->not->toContain('Gamma');
+});

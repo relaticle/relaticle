@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Jobs;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -18,13 +19,18 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
+use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
@@ -68,6 +74,11 @@ final class ExecuteImportJob implements ShouldQueue
     public function handle(): void
     {
         $import = Import::query()->findOrFail($this->importId);
+
+        if ($import->team_id !== $this->teamId) {
+            return;
+        }
+
         $store = ImportStore::load($this->importId);
 
         if (! $store instanceof ImportStore) {
@@ -88,6 +99,7 @@ final class ExecuteImportJob implements ShouldQueue
         $allowedKeys = $this->allowedAttributeKeys($importer);
         $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
+        $customFieldFormatMap = $this->buildCustomFieldFormatMap($fieldMappings);
 
         $context = [
             'team_id' => $this->teamId,
@@ -98,11 +110,11 @@ final class ExecuteImportJob implements ShouldQueue
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, &$results, $store, $import): void {
+                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $context, &$results, $store, $import): void {
                     $existingRecords = $this->preloadExistingRecords($rows, $importer);
 
                     foreach ($rows as $row) {
-                        $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, $results, $existingRecords);
+                        $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $context, $results, $existingRecords);
                     }
 
                     $this->flushProcessedRows($store);
@@ -164,6 +176,7 @@ final class ExecuteImportJob implements ShouldQueue
      * @param  Collection<int, ColumnData>  $fieldMappings
      * @param  array<string, true>  $allowedKeys
      * @param  Collection<string, CustomField>  $customFieldDefs
+     * @param  array<string, ColumnData>  $customFieldFormatMap
      * @param  array<string, mixed>  $context
      * @param  array<string, int>  $results
      * @param  array<string, Model>  $existingRecords
@@ -174,6 +187,7 @@ final class ExecuteImportJob implements ShouldQueue
         Collection $fieldMappings,
         array $allowedKeys,
         Collection $customFieldDefs,
+        array $customFieldFormatMap,
         array $context,
         array &$results,
         array $existingRecords = [],
@@ -200,12 +214,16 @@ final class ExecuteImportJob implements ShouldQueue
 
             $isCreate = $row->isCreate();
 
-            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, $customFieldDefs, &$results): void {
+            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, $customFieldDefs, $customFieldFormatMap, &$results): void {
                 $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
 
                 $prepared = $importer->prepareForSave($data, $existing, $context);
                 $customFieldData = $this->extractCustomFieldData($prepared);
                 $prepared = array_intersect_key($prepared, $allowedKeys);
+
+                if (! $isCreate) {
+                    unset($prepared['team_id'], $prepared['creator_id'], $prepared['creation_source']);
+                }
 
                 $record = $isCreate
                     ? new ($importer->modelClass())
@@ -226,7 +244,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $batchableData = array_intersect_key($storedCustomFieldData, $customFieldDefs->all());
                 $remainingData = array_diff_key($storedCustomFieldData, $batchableData);
 
-                $this->collectCustomFieldValues($record, $batchableData, $customFieldDefs);
+                $this->collectCustomFieldValues($record, $batchableData, $customFieldDefs, $customFieldFormatMap);
 
                 if ($remainingData !== []) {
                     ImportDataStorage::setMultiple($record, $remainingData);
@@ -249,6 +267,7 @@ final class ExecuteImportJob implements ShouldQueue
         /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
+            ->with(['options' => fn ($q) => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $importer->entityName())
             ->where('type', '!=', 'record')
@@ -260,11 +279,13 @@ final class ExecuteImportJob implements ShouldQueue
     /**
      * @param  array<string, mixed>  $customFieldData
      * @param  Collection<string, CustomField>  $customFieldDefs
+     * @param  array<string, ColumnData>  $customFieldFormatMap
      */
     private function collectCustomFieldValues(
         Model $record,
         array $customFieldData,
         Collection $customFieldDefs,
+        array $customFieldFormatMap = [],
     ): void {
         if ($customFieldData === []) {
             return;
@@ -278,6 +299,8 @@ final class ExecuteImportJob implements ShouldQueue
             if ($cf === null) {
                 continue;
             }
+
+            $value = $this->convertCustomFieldValue($value, $cf, $customFieldFormatMap[$code] ?? null);
 
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
             $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
@@ -364,6 +387,7 @@ final class ExecuteImportJob implements ShouldQueue
         $modelClass = $importer->modelClass();
 
         return $modelClass::query()
+            ->where('team_id', $this->teamId)
             ->whereIn((new $modelClass)->getKeyName(), $updateIds)
             ->get()
             ->keyBy(fn (Model $model): string => (string) $model->getKey())
@@ -454,6 +478,108 @@ final class ExecuteImportJob implements ShouldQueue
         return $customFieldData;
     }
 
+    /**
+     * Build a map from custom field code to its ColumnData for format lookups.
+     *
+     * @param  Collection<int, ColumnData>  $fieldMappings
+     * @return array<string, ColumnData>
+     */
+    private function buildCustomFieldFormatMap(Collection $fieldMappings): array
+    {
+        return $fieldMappings
+            ->filter(fn (ColumnData $m): bool => str_starts_with($m->target, self::CUSTOM_FIELD_PREFIX))
+            ->mapWithKeys(fn (ColumnData $m): array => [
+                Str::after($m->target, self::CUSTOM_FIELD_PREFIX) => $m,
+            ])
+            ->all();
+    }
+
+    /**
+     * Apply format-aware conversion for date/datetime and float custom field values.
+     */
+    private function convertCustomFieldValue(mixed $value, CustomField $cf, ?ColumnData $columnData): mixed
+    {
+        if (! is_string($value) || $value === '') {
+            return $value;
+        }
+
+        $dataType = $cf->typeData->dataType;
+
+        if ($dataType === FieldDataType::DATE || $dataType === FieldDataType::DATE_TIME) {
+            $format = $columnData instanceof ColumnData ? ($columnData->dateFormat ?? DateFormat::ISO) : DateFormat::ISO;
+            $parsed = $format->parse($value, $dataType->isTimestamp());
+
+            if (! $parsed instanceof Carbon) {
+                return $value;
+            }
+
+            return $dataType === FieldDataType::DATE
+                ? $parsed->format('Y-m-d')
+                : $parsed->format('Y-m-d H:i:s');
+        }
+
+        if ($dataType === FieldDataType::FLOAT) {
+            $format = $columnData instanceof ColumnData ? ($columnData->numberFormat ?? NumberFormat::POINT) : NumberFormat::POINT;
+
+            return $format->parse($value);
+        }
+
+        if ($dataType === FieldDataType::SINGLE_CHOICE) {
+            return $this->resolveChoiceValue($cf, $value);
+        }
+
+        if ($dataType === FieldDataType::MULTI_CHOICE) {
+            return $this->resolveMultiChoiceValue($cf, $value);
+        }
+
+        return $value;
+    }
+
+    private function resolveChoiceValue(CustomField $cf, string $value): int|string
+    {
+        $option = $cf->options->firstWhere('name', $value);
+
+        if (! $option) {
+            $option = $cf->options->first(
+                fn (CustomFieldOption $opt): bool => mb_strtolower((string) $opt->name) === mb_strtolower($value)
+            );
+        }
+
+        if ($option) {
+            $key = $option->getKey();
+
+            return CustomFields::optionModelUsesStringKeys() ? (string) $key : $key;
+        }
+
+        $isExistingId = $cf->options->contains(fn (CustomFieldOption $opt): bool => (string) $opt->getKey() === $value);
+
+        if ($isExistingId) {
+            return CustomFields::optionModelUsesStringKeys() ? $value : (int) $value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return array<int, int|string>
+     */
+    private function resolveMultiChoiceValue(CustomField $cf, string $value): array
+    {
+        $items = array_map(trim(...), explode(',', $value));
+
+        if ($cf->typeData->acceptsArbitraryValues) {
+            return $items;
+        }
+
+        $resolved = [];
+
+        foreach ($items as $item) {
+            $resolved[] = $this->resolveChoiceValue($cf, $item);
+        }
+
+        return $resolved;
+    }
+
     /** @return array<string, true> */
     private function allowedAttributeKeys(BaseImporter $importer): array
     {
@@ -481,6 +607,7 @@ final class ExecuteImportJob implements ShouldQueue
         $modelClass = $importer->modelClass();
 
         return $modelClass::query()
+            ->where('team_id', $this->teamId)
             ->find($matchedId);
     }
 
