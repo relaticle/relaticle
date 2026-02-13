@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
@@ -69,7 +70,7 @@ final class ReviewStep extends Component
         }
 
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
-            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof \Carbon\Carbon
+            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof Carbon
                 ? null
                 : 'Invalid date format';
         }

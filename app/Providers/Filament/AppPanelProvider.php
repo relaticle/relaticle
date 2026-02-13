@@ -27,6 +27,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Size;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -197,7 +198,7 @@ final class AppPanelProvider extends PanelProvider
                 ->tenantMenuItems([
                     Action::make('import_history')
                         ->label('Import History')
-                        ->icon('heroicon-o-clock')
+                        ->icon(Heroicon::OutlinedClock)
                         ->url(fn (): string => ImportHistory::getUrl()),
                 ]);
         }

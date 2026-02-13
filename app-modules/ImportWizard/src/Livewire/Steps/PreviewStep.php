@@ -363,7 +363,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function checkImportProgress(): void
     {
-        $this->import = null;
+        $this->refreshImport();
         $this->syncCompletionState();
 
         unset($this->results, $this->progressPercent, $this->processedCount, $this->isImporting);

@@ -107,16 +107,11 @@ final class ExecuteImportJob implements ShouldQueue
                     $this->persistResults($import, $results);
                 });
 
-            $failedRowsSummary = array_map(
-                fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
-                $this->failedRows,
-            );
-
             $import->update([
                 'status' => ImportStatus::Completed,
                 'completed_at' => now(),
                 'results' => $results,
-                'failed_rows_data' => $failedRowsSummary,
+                'failed_rows_data' => $this->failedRowsSummary(),
                 'created_rows' => $results['created'],
                 'updated_rows' => $results['updated'],
                 'skipped_rows' => $results['skipped'],
@@ -367,11 +362,17 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $import->update([
             'results' => $results,
-            'failed_rows_data' => array_map(
-                fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
-                $this->failedRows,
-            ),
+            'failed_rows_data' => $this->failedRowsSummary(),
         ]);
+    }
+
+    /** @return list<array{row: int, error: string}> */
+    private function failedRowsSummary(): array
+    {
+        return array_map(
+            fn (array $row): array => ['row' => $row['row'], 'error' => $row['error']],
+            $this->failedRows,
+        );
     }
 
     private function writeFailedRowsToDb(Import $import): void
@@ -562,11 +563,9 @@ final class ExecuteImportJob implements ShouldQueue
             ->title("Import of {$entityLabel} {$status}")
             ->viewData(['results' => $results]);
 
-        if ($failed) {
-            $notification->danger();
-        } else {
-            $notification->success();
-        }
+        $failed
+            ? $notification->danger()
+            : $notification->success();
 
         $notification->sendToDatabase($user);
     }

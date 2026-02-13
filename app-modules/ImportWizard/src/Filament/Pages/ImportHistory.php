@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Filament\Pages;
 
 use BackedEnum;
-use Filament\Pages\Page;
 use Filament\Actions\Action;
+use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -23,7 +24,7 @@ final class ImportHistory extends Page implements HasTable
 
     protected string $view = 'import-wizard-new::filament.pages.import-history';
 
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-clock';
+    protected static string|null|BackedEnum $navigationIcon = Heroicon::OutlinedClock;
 
     protected static ?string $navigationLabel = 'Import History';
 
@@ -104,7 +105,7 @@ final class ImportHistory extends Page implements HasTable
             ->actions([
                 Action::make('downloadFailedRows')
                     ->label('Failed Rows')
-                    ->icon('heroicon-o-arrow-down-tray')
+                    ->icon(Heroicon::OutlinedArrowDownTray)
                     ->color('danger')
                     ->url(fn (Import $record): string => URL::temporarySignedRoute(
                         'import-history.failed-rows.download',

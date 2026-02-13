@@ -24,6 +24,8 @@ final class Import extends Model
 
     protected $guarded = [];
 
+    private ?BaseImporter $importerCache = null;
+
     protected function casts(): array
     {
         return [
@@ -83,8 +85,6 @@ final class Import extends Model
     {
         return storage_path("app/imports/{$this->id}");
     }
-
-    private ?BaseImporter $importerCache = null;
 
     public function getImporter(): BaseImporter
     {

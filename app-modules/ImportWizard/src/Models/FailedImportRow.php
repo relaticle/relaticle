@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
@@ -29,8 +30,8 @@ final class FailedImportRow extends Model
         return $this->belongsTo(Import::class);
     }
 
-    /** @return \Illuminate\Database\Eloquent\Builder<static> */
-    public function prunable(): \Illuminate\Database\Eloquent\Builder
+    /** @return Builder<static> */
+    public function prunable(): Builder
     {
         return self::where('created_at', '<=', now()->subMonth());
     }

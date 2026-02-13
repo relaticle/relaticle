@@ -39,6 +39,13 @@ trait WithImportStore
         return $this->import;
     }
 
+    protected function refreshImport(): Import
+    {
+        $this->import = null;
+
+        return $this->import();
+    }
+
     protected function store(): ImportStore
     {
         $store = $this->store ??= ImportStore::load($this->storeId);

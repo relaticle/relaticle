@@ -236,8 +236,6 @@ final class UploadStep extends Component implements HasForms
     }
 
     /**
-     * Normalize row values to match header count.
-     *
      * @param  array<string, mixed>  $row
      * @return list<string>
      */

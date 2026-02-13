@@ -178,34 +178,18 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function restoreFromStore(): void
     {
-        if ($this->storeId === null) {
-            return;
-        }
+        $import = $this->findCurrentImport();
 
-        $teamId = $this->getCurrentTeamId();
-
-        if ($teamId === null) {
+        if ($import === null) {
             $this->storeId = null;
 
             return;
         }
-
-        $import = Import::query()
-            ->forTeam($teamId)
-            ->find($this->storeId);
-
-        if (! $import instanceof Import) {
-            $this->storeId = null;
-
-            return;
-        }
-
-        $status = $import->status;
 
         $this->rowCount = $import->total_rows;
         $this->columnCount = count($import->headers ?? []);
-        $this->currentStep = $this->stepFromStatus($status);
-        $this->importStarted = in_array($status, [
+        $this->currentStep = $this->stepFromStatus($import->status);
+        $this->importStarted = in_array($import->status, [
             ImportStatus::Importing,
             ImportStatus::Completed,
             ImportStatus::Failed,
@@ -214,21 +198,27 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function syncStepStatus(): void
     {
+        $this->findCurrentImport()
+            ?->update(['status' => $this->statusForStep($this->currentStep)]);
+    }
+
+    private function findCurrentImport(): ?Import
+    {
         if ($this->storeId === null) {
-            return;
+            return null;
         }
 
         $teamId = $this->getCurrentTeamId();
 
         if ($teamId === null) {
-            return;
+            return null;
         }
 
         $import = Import::query()
             ->forTeam($teamId)
             ->find($this->storeId);
 
-        $import?->update(['status' => $this->statusForStep($this->currentStep)]);
+        return $import instanceof Import ? $import : null;
     }
 
     private function statusForStep(int $step): ImportStatus
