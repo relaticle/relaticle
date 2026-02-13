@@ -27,6 +27,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Size;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Relaticle\CustomFields\CustomFieldsPlugin;
+use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
 {
@@ -192,7 +194,13 @@ final class AppPanelProvider extends PanelProvider
             $panel
                 ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
                 ->tenantRegistration(CreateTeam::class)
-                ->tenantProfile(EditTeam::class);
+                ->tenantProfile(EditTeam::class)
+                ->tenantMenuItems([
+                    Action::make('import_history')
+                        ->label('Import History')
+                        ->icon(Heroicon::OutlinedClock)
+                        ->url(fn (): string => ImportHistory::getUrl()),
+                ]);
         }
 
         return $panel;

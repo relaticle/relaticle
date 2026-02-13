@@ -26,6 +26,7 @@ use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Importers\BaseImporter;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkStorage\EntityLinkStorageInterface;
@@ -47,12 +48,10 @@ final class ExecuteImportJob implements ShouldQueue
 
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
-    private const int MAX_STORED_ERRORS = 100;
-
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
     private array $createdRecords = [];
 
-    /** @var list<array{row: int, error: string}> */
+    /** @var list<array{row: int, error: string, data?: array<string, mixed>}> */
     private array $failedRows = [];
 
     /** @var list<int> */
@@ -68,7 +67,8 @@ final class ExecuteImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        $store = ImportStore::load($this->importId, $this->teamId);
+        $import = Import::query()->findOrFail($this->importId);
+        $store = ImportStore::load($this->importId);
 
         if (! $store instanceof ImportStore) {
             return;
@@ -76,24 +76,29 @@ final class ExecuteImportJob implements ShouldQueue
 
         $store->ensureProcessedColumn();
 
-        $importer = $store->getImporter();
-        $mappings = $store->columnMappings();
+        $importer = $import->getImporter();
+        $mappings = $import->columnMappings();
 
-        $results = $store->results() ?? ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+        $results = [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
         $allowedKeys = $this->allowedAttributeKeys($importer);
         $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
 
         $context = [
             'team_id' => $this->teamId,
-            'creator_id' => $store->userId(),
+            'creator_id' => $import->user_id,
         ];
 
         try {
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, &$results, $store): void {
+                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $context, &$results, $store, $import): void {
                     $existingRecords = $this->preloadExistingRecords($rows, $importer);
 
                     foreach ($rows as $row) {
@@ -102,21 +107,56 @@ final class ExecuteImportJob implements ShouldQueue
 
                     $this->flushProcessedRows($store);
                     $this->flushCustomFieldValues();
-                    $this->persistResults($store, $results);
+                    $this->flushFailedRows($import);
+                    $this->persistResults($import, $results);
                 });
 
-            $store->setStatus(ImportStatus::Completed);
-            $this->notifyUser($store, $results);
+            $import->update([
+                'status' => ImportStatus::Completed,
+                'completed_at' => now(),
+                'created_rows' => $results['created'],
+                'updated_rows' => $results['updated'],
+                'skipped_rows' => $results['skipped'],
+                'failed_rows' => $results['failed'],
+            ]);
+
+            $this->notifyUser($import, $results);
         } catch (\Throwable $e) {
-            $this->persistResults($store, $results);
-            $store->setStatus(ImportStatus::Failed);
+            $this->flushFailedRows($import);
+            $this->persistResults($import, $results);
+            $import->update(['status' => ImportStatus::Failed]);
 
             try {
-                $this->notifyUser($store, $results, failed: true);
+                $this->notifyUser($import, $results, failed: true);
             } catch (\Throwable) {
             }
 
             throw $e;
+        }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $import = Import::query()->find($this->importId);
+
+        if ($import === null) {
+            return;
+        }
+
+        if (! in_array($import->status, [ImportStatus::Completed, ImportStatus::Failed], true)) {
+            $import->update(['status' => ImportStatus::Failed]);
+        }
+
+        $this->flushFailedRows($import);
+
+        try {
+            $this->notifyUser($import, [
+                'created' => $import->created_rows,
+                'updated' => $import->updated_rows,
+                'skipped' => $import->skipped_rows,
+                'failed' => $import->failed_rows,
+            ], failed: true);
+        } catch (\Throwable) {
         }
     }
 
@@ -182,9 +222,6 @@ final class ExecuteImportJob implements ShouldQueue
 
                 $results[$isCreate ? 'created' : 'updated']++;
 
-                // Pull custom field data from WeakMap so we can batch upsert
-                // non-record fields instead of saving them one-by-one.
-                // Record-type fields are put back for afterSave() to handle.
                 $storedCustomFieldData = ImportDataStorage::pull($record);
                 $batchableData = array_intersect_key($storedCustomFieldData, $customFieldDefs->all());
                 $remainingData = array_diff_key($storedCustomFieldData, $batchableData);
@@ -201,14 +238,15 @@ final class ExecuteImportJob implements ShouldQueue
             $this->markProcessed($row);
         } catch (\Throwable $e) {
             $results['failed']++;
-            $this->recordFailedRow($row->row_number, $e);
+            $this->recordFailedRow($row->row_number, $row->raw_data->all(), $e);
             report($e);
         }
     }
 
-    /** @return Collection<string, CustomField> keyed by code */
+    /** @return Collection<string, CustomField> */
     private function loadCustomFieldDefinitions(BaseImporter $importer): Collection
     {
+        /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)
@@ -332,26 +370,50 @@ final class ExecuteImportJob implements ShouldQueue
             ->all();
     }
 
-    private function recordFailedRow(int $rowNumber, \Throwable $e): void
+    /** @param array<string, mixed> $rawData */
+    private function recordFailedRow(int $rowNumber, array $rawData, \Throwable $e): void
     {
-        if (count($this->failedRows) >= self::MAX_STORED_ERRORS) {
-            return;
-        }
-
         $this->failedRows[] = [
             'row' => $rowNumber,
             'error' => Str::limit($e->getMessage(), 500),
+            'data' => $rawData,
         ];
     }
 
     /** @param  array<string, int>  $results */
-    private function persistResults(ImportStore $store, array $results): void
+    private function persistResults(Import $import, array $results): void
     {
-        $store->setResults($results);
+        $import->update([
+            'created_rows' => $results['created'],
+            'updated_rows' => $results['updated'],
+            'skipped_rows' => $results['skipped'],
+            'failed_rows' => $results['failed'],
+        ]);
+    }
 
-        if ($this->failedRows !== []) {
-            $store->updateMeta(['failed_rows' => $this->failedRows]);
+    private function flushFailedRows(Import $import): void
+    {
+        if ($this->failedRows === []) {
+            return;
         }
+
+        $now = now();
+
+        $rows = collect($this->failedRows)->map(fn (array $row): array => [
+            'id' => (string) Str::ulid(),
+            'import_id' => $import->id,
+            'team_id' => $this->teamId,
+            'data' => json_encode($row['data'] ?? ['row_number' => $row['row']]),
+            'validation_error' => $row['error'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach ($rows->chunk(100) as $chunk) {
+            $import->failedRows()->insert($chunk->all());
+        }
+
+        $this->failedRows = [];
     }
 
     /**
@@ -481,7 +543,7 @@ final class ExecuteImportJob implements ShouldQueue
             return null;
         }
 
-        $dedupKey = "{$link->key}:" . mb_strtolower(trim($match->name));
+        $dedupKey = "{$link->key}:".mb_strtolower(trim($match->name));
 
         if (isset($this->createdRecords[$dedupKey])) {
             return $this->createdRecords[$dedupKey];
@@ -504,26 +566,24 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /** @param  array<string, int>  $results */
-    private function notifyUser(ImportStore $store, array $results, bool $failed = false): void
+    private function notifyUser(Import $import, array $results, bool $failed = false): void
     {
-        $user = User::query()->find($store->userId());
+        $user = User::query()->find($import->user_id);
 
         if ($user === null) {
             return;
         }
 
-        $entityLabel = $store->entityType()->label();
+        $entityLabel = $import->entity_type->label();
         $status = $failed ? 'failed' : 'completed';
 
         $notification = Notification::make()
             ->title("Import of {$entityLabel} {$status}")
             ->viewData(['results' => $results]);
 
-        if ($failed) {
-            $notification->danger();
-        } else {
-            $notification->success();
-        }
+        $failed
+            ? $notification->danger()
+            : $notification->success();
 
         $notification->sendToDatabase($user);
     }

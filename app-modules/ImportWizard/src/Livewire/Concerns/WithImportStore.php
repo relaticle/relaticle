@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Concerns;
 
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
-/**
- * Shared functionality for wizard step components that need ImportStore access.
- */
 trait WithImportStore
 {
     #[Locked]
@@ -21,22 +18,39 @@ trait WithImportStore
     #[Locked]
     public ImportEntityType $entityType;
 
+    private ?Import $import = null;
+
     private ?ImportStore $store = null;
 
     public function mountWithImportStore(string $storeId, ImportEntityType $entityType): void
     {
         $this->storeId = $storeId;
         $this->entityType = $entityType;
-        $this->store = ImportStore::load($storeId, $this->getCurrentTeamId() ?? '');
+    }
+
+    protected function import(): Import
+    {
+        if ($this->import === null) {
+            $this->import = Import::query()
+                ->forTeam($this->getCurrentTeamId() ?? '')
+                ->findOrFail($this->storeId);
+        }
+
+        return $this->import;
+    }
+
+    protected function refreshImport(): Import
+    {
+        $this->import = null;
+
+        return $this->import();
     }
 
     protected function store(): ImportStore
     {
-        $store = $this->store ??= ImportStore::load($this->storeId, $this->getCurrentTeamId() ?? '');
+        $store = $this->store ??= ImportStore::load($this->storeId);
 
-        if ($store === null) {
-            abort(404, 'Import session not found or expired.');
-        }
+        abort_if(! $store instanceof ImportStore, 404, 'Import session not found or expired.');
 
         return $store;
     }
@@ -48,18 +62,14 @@ trait WithImportStore
         return $tenant instanceof Model ? (string) $tenant->getKey() : null;
     }
 
-    /**
-     * @return list<string>
-     *
-     * @throws FileNotFoundException
-     */
+    /** @return list<string> */
     protected function headers(): array
     {
-        return $this->store()->headers();
+        return $this->import()->headers ?? [];
     }
 
     protected function rowCount(): int
     {
-        return $this->store()->rowCount();
+        return $this->import()->total_rows;
     }
 }

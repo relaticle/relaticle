@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Livewire;
@@ -16,6 +17,7 @@ use Relaticle\ImportWizard\Enums\SortDirection;
 use Relaticle\ImportWizard\Enums\SortField;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Livewire\Steps\ReviewStep;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 mutates(ReviewStep::class);
@@ -31,18 +33,21 @@ beforeEach(function (): void {
 
     Filament::setTenant($this->team);
 
-    $this->store = ImportStore::create(
-        teamId: (string) $this->team->id,
-        userId: (string) $this->user->id,
-        entityType: ImportEntityType::People,
-        originalFilename: 'test.csv',
-    );
-
-    $this->store->setHeaders(['Name', 'Emails']);
-    $this->store->setColumnMappings([
-        ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'Emails', target: 'custom_fields_emails'),
+    $this->import = Import::create([
+        'team_id' => (string) $this->team->id,
+        'user_id' => (string) $this->user->id,
+        'entity_type' => ImportEntityType::People,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Reviewing,
+        'total_rows' => 2,
+        'headers' => ['Name', 'Emails'],
+        'column_mappings' => collect([
+            ColumnData::toField(source: 'Name', target: 'name'),
+            ColumnData::toField(source: 'Emails', target: 'custom_fields_emails'),
+        ])->map(fn (ColumnData $m) => $m->toArray())->all(),
     ]);
+
+    $this->store = ImportStore::create($this->import->id);
 
     $this->store->query()->insert([
         [
@@ -67,12 +72,12 @@ beforeEach(function (): void {
         ],
     ]);
 
-    $this->store->setRowCount(2);
-    $this->store->setStatus(ImportStatus::Reviewing);
+    Cache::forget("import-{$this->import->id}-validation");
 });
 
 afterEach(function (): void {
     $this->store->destroy();
+    $this->import->delete();
 });
 
 function mountReviewStep(object $context): \Livewire\Features\SupportTesting\Testable
@@ -290,9 +295,9 @@ it('allows continueToPreview while only match resolution is running', function (
     $component->call('continueToPreview')
         ->assertDispatched('completed');
 
-    $this->store->refreshMeta();
+    $cachedBatchId = \Illuminate\Support\Facades\Cache::get("import-{$this->store->id()}-match-resolution-batch");
 
-    expect($this->store->meta()['match_resolution_batch_id'])->toBe('fake-batch-id');
+    expect($cachedBatchId)->toBe('fake-batch-id');
 });
 
 it('clears relationships column on mount', function (): void {
@@ -307,4 +312,34 @@ it('clears relationships column on mount', function (): void {
 
     $freshRow = $this->store->query()->where('row_number', 2)->first();
     expect($freshRow->relationships)->toBeNull();
+});
+
+it('skips dispatching batches when cache hash matches', function (): void {
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
+
+    Bus::fake();
+
+    mountReviewStep($this);
+
+    Bus::assertNothingBatched();
+});
+
+it('dispatches new batches when mappings hash changes', function (): void {
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
+
+    $this->import->update([
+        'column_mappings' => collect([
+            ColumnData::toField(source: 'Name', target: 'name'),
+        ])->map(fn (ColumnData $m) => $m->toArray())->all(),
+    ]);
+
+    Bus::fake();
+
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
 });

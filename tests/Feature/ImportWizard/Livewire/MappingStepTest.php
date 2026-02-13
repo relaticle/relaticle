@@ -13,6 +13,7 @@ use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
@@ -26,23 +27,27 @@ beforeEach(function (): void {
 
     Filament::setTenant($this->team);
 
-    $this->store = ImportStore::create(
-        teamId: (string) $this->team->id,
-        userId: (string) $this->user->id,
-        entityType: ImportEntityType::People,
-        originalFilename: 'test.csv',
-    );
+    $this->import = Import::create([
+        'team_id' => (string) $this->team->id,
+        'user_id' => (string) $this->user->id,
+        'entity_type' => ImportEntityType::People,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Mapping,
+        'total_rows' => 0,
+        'headers' => [],
+    ]);
 
-    $this->store->setStatus(ImportStatus::Mapping);
+    $this->store = ImportStore::create($this->import->id);
 });
 
 afterEach(function (): void {
     $this->store->destroy();
+    $this->import->delete();
 });
 
 function createStoreWithHeaders(object $context, array $headers, array $rows = []): void
 {
-    $context->store->setHeaders($headers);
+    $context->import->update(['headers' => $headers]);
 
     if ($rows === []) {
         $rowData = array_combine($headers, array_fill(0, count($headers), 'sample'));
@@ -62,7 +67,7 @@ function createStoreWithHeaders(object $context, array $headers, array $rows = [
         ]);
     }
 
-    $context->store->setRowCount(count($rows));
+    $context->import->update(['total_rows' => count($rows)]);
 }
 
 function mountMappingStep(object $context): \Livewire\Features\SupportTesting\Testable
@@ -192,8 +197,8 @@ it('continue action saves mappings to store', function (): void {
     $component->call('mapToField', 'Name', 'name');
     $component->callAction('continue');
 
-    $freshStore = ImportStore::load($this->store->id(), (string) $this->team->id);
-    $savedMappings = $freshStore->columnMappings();
+    $freshImport = $this->import->fresh();
+    $savedMappings = $freshImport->columnMappings();
     expect($savedMappings)->toHaveCount(1)
         ->and($savedMappings->first()->source)->toBe('Name')
         ->and($savedMappings->first()->target)->toBe('name');
@@ -206,8 +211,8 @@ it('continue action sets status to Reviewing', function (): void {
     $component->call('mapToField', 'Name', 'name');
     $component->callAction('continue');
 
-    $freshStore = ImportStore::load($this->store->id(), (string) $this->team->id);
-    expect($freshStore->status())->toBe(ImportStatus::Reviewing);
+    $freshImport = $this->import->fresh();
+    expect($freshImport->status)->toBe(ImportStatus::Reviewing);
 });
 
 it('continue action dispatches completed event', function (): void {

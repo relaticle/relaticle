@@ -10,6 +10,7 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -17,6 +18,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
 final class ImportWizard extends Component implements HasActions, HasForms
@@ -133,7 +135,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function cancelImport(): void
     {
         if ($this->storeId !== null) {
-            ImportStore::load($this->storeId, $this->getCurrentTeamId())?->destroy();
+            $this->destroyImportAndStore($this->storeId);
         }
 
         if ($this->returnUrl !== null) {
@@ -164,7 +166,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function startOver(): void
     {
         if ($this->storeId !== null) {
-            ImportStore::load($this->storeId, $this->getCurrentTeamId())?->destroy();
+            $this->destroyImportAndStore($this->storeId);
         }
 
         $this->storeId = null;
@@ -176,32 +178,18 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function restoreFromStore(): void
     {
-        if ($this->storeId === null) {
-            return;
-        }
+        $import = $this->findCurrentImport();
 
-        $teamId = $this->getCurrentTeamId();
-
-        if ($teamId === null) {
+        if (! $import instanceof Import) {
             $this->storeId = null;
 
             return;
         }
 
-        $store = ImportStore::load($this->storeId, $teamId);
-
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
-            $this->storeId = null;
-
-            return;
-        }
-
-        $status = $store->status();
-
-        $this->rowCount = $store->rowCount();
-        $this->columnCount = count($store->headers());
-        $this->currentStep = $this->stepFromStatus($status);
-        $this->importStarted = in_array($status, [
+        $this->rowCount = $import->total_rows;
+        $this->columnCount = count($import->headers ?? []);
+        $this->currentStep = $this->stepFromStatus($import->status);
+        $this->importStarted = in_array($import->status, [
             ImportStatus::Importing,
             ImportStatus::Completed,
             ImportStatus::Failed,
@@ -210,18 +198,27 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function syncStepStatus(): void
     {
+        $this->findCurrentImport()
+            ?->update(['status' => $this->statusForStep($this->currentStep)]);
+    }
+
+    private function findCurrentImport(): ?Import
+    {
         if ($this->storeId === null) {
-            return;
+            return null;
         }
 
         $teamId = $this->getCurrentTeamId();
 
         if ($teamId === null) {
-            return;
+            return null;
         }
 
-        $store = ImportStore::load($this->storeId, $teamId);
-        $store?->setStatus($this->statusForStep($this->currentStep));
+        $import = Import::query()
+            ->forTeam($teamId)
+            ->find($this->storeId);
+
+        return $import instanceof Import ? $import : null;
     }
 
     private function statusForStep(int $step): ImportStatus
@@ -244,10 +241,16 @@ final class ImportWizard extends Component implements HasActions, HasForms
         };
     }
 
+    private function destroyImportAndStore(string $importId): void
+    {
+        Import::query()->where('id', $importId)->delete();
+        ImportStore::load($importId)?->destroy();
+    }
+
     private function getCurrentTeamId(): ?string
     {
         $tenant = filament()->getTenant();
 
-        return $tenant instanceof \Illuminate\Database\Eloquent\Model ? (string) $tenant->getKey() : null;
+        return $tenant instanceof Model ? (string) $tenant->getKey() : null;
     }
 }

@@ -293,7 +293,7 @@ abstract class BaseImporter implements ImporterContract
     {
         $team = $this->getTeam();
 
-        if (! $team) {
+        if (! $team instanceof Team) {
             return;
         }
 

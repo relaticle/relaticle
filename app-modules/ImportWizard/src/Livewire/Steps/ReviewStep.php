@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -66,7 +68,7 @@ final class ReviewStep extends Component
         }
 
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
-            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof \Carbon\Carbon
+            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof Carbon
                 ? null
                 : 'Invalid date format';
         }
@@ -76,10 +78,9 @@ final class ReviewStep extends Component
 
     private function validateEntityLinkValue(ColumnData $column, string $value): ?string
     {
-        $store = $this->store();
-        $validator = new EntityLinkValidator($store->teamId());
+        $validator = new EntityLinkValidator($this->import()->team_id);
 
-        return $validator->validateFromColumn($column, $store->getImporter(), $value);
+        return $validator->validateFromColumn($column, $this->import()->getImporter(), $value);
     }
 
     private function updateValidationForRawValue(string $jsonPath, string $rawValue, ?string $error): void
@@ -104,7 +105,7 @@ final class ReviewStep extends Component
     private function validateColumnAsync(ColumnData $column): string
     {
         $batch = Bus::batch([
-            new ValidateColumnJob($this->store()->id(), $column, $this->store()->teamId()),
+            new ValidateColumnJob($this->import()->id, $column),
         ])
             ->name("Validate {$column->source}")
             ->dispatch();
@@ -119,12 +120,9 @@ final class ReviewStep extends Component
 
     private function dispatchMatchResolution(): string
     {
-        $store = $this->store();
-
         $batch = Bus::batch([
             new ResolveMatchesJob(
-                importId: $store->id(),
-                teamId: $store->teamId(),
+                importId: $this->import()->id,
             ),
         ])
             ->name('Match resolution')
@@ -135,13 +133,19 @@ final class ReviewStep extends Component
 
     public function mount(): void
     {
-        $this->columns = $this->store()->columnMappings();
+        $this->columns = $this->import()->columnMappings();
         $this->selectedColumn = $this->columns->first();
 
-        if (! $this->hasMappingsChanged()) {
+        $currentHash = $this->currentMappingsHash();
+        $cached = Cache::get($this->validationCacheKey());
+
+        if ($cached !== null && $cached['hash'] === $currentHash) {
+            $this->batchIds = $this->filterRunningBatches($cached['batch_ids']);
+
             return;
         }
 
+        $this->cancelOldBatches($cached);
         $this->clearRelationshipsForReentry();
 
         foreach ($this->columns as $column) {
@@ -150,15 +154,13 @@ final class ReviewStep extends Component
 
         $this->batchIds['__match_resolution'] = $this->dispatchMatchResolution();
 
-        $this->store()->updateMeta([
-            'mappings_hash' => $this->currentMappingsHash(),
-        ]);
+        $this->cacheValidationState($currentHash);
     }
 
     public function hydrate(): void
     {
-        $this->columns = $this->store()->columnMappings();
-        $this->selectedColumn = $this->store()->getColumnMapping($this->selectedColumn->source);
+        $this->columns = $this->import()->columnMappings();
+        $this->selectedColumn = $this->import()->getColumnMapping($this->selectedColumn->source);
     }
 
     public function render(): View
@@ -245,18 +247,22 @@ final class ReviewStep extends Component
             default => throw new \InvalidArgumentException("Unknown format type: {$type}"),
         };
 
-        $this->store()->updateColumnMapping($this->selectedColumn->source, $updated);
+        $this->import()->updateColumnMapping($this->selectedColumn->source, $updated);
 
         $this->columns = $this->columns->map(
             fn (ColumnData $col): ColumnData => $col->source === $updated->source ? $updated : $col
         );
         $this->selectedColumn = $updated;
 
+        $oldBatchId = $this->batchIds[$this->selectedColumn->source] ?? null;
+
+        if ($oldBatchId !== null) {
+            Bus::findBatch($oldBatchId)?->cancel();
+        }
+
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
 
-        $this->store()->updateMeta([
-            'mappings_hash' => $this->currentMappingsHash(),
-        ]);
+        $this->cacheValidationState($this->currentMappingsHash());
     }
 
     /** @return array<string, string> */
@@ -350,6 +356,7 @@ final class ReviewStep extends Component
 
         if ($hasCompleted) {
             unset($this->columnErrorStatuses);
+            $this->cacheValidationState($this->currentMappingsHash());
         }
 
         if ($this->batchIds === []) {
@@ -390,24 +397,59 @@ final class ReviewStep extends Component
         $matchBatchId = $this->batchIds['__match_resolution'] ?? null;
 
         if ($matchBatchId !== null) {
-            $this->store()->updateMeta(['match_resolution_batch_id' => $matchBatchId]);
+            Cache::put(
+                "import-{$this->storeId}-match-resolution-batch",
+                $matchBatchId,
+                now()->addHour(),
+            );
         }
 
-        $this->store()->setStatus(ImportStatus::Previewing);
+        $this->import()->update(['status' => ImportStatus::Previewing]);
         $this->dispatch('completed');
     }
 
     private function currentMappingsHash(): string
     {
-        $mappings = $this->store()->meta()['column_mappings'] ?? [];
+        $mappings = $this->import()->column_mappings ?? [];
 
         return hash('xxh128', (string) json_encode($mappings));
     }
 
-    private function hasMappingsChanged(): bool
+    private function validationCacheKey(): string
     {
-        $storedHash = $this->store()->meta()['mappings_hash'] ?? null;
+        return "import-{$this->storeId}-validation";
+    }
 
-        return $storedHash !== $this->currentMappingsHash();
+    private function cacheValidationState(string $hash): void
+    {
+        Cache::put($this->validationCacheKey(), [
+            'hash' => $hash,
+            'batch_ids' => $this->batchIds,
+        ], now()->addHour());
+    }
+
+    /**
+     * @param  array<string, string>  $batchIds
+     * @return array<string, string>
+     */
+    private function filterRunningBatches(array $batchIds): array
+    {
+        return array_filter($batchIds, function (string $batchId): bool {
+            $batch = Bus::findBatch($batchId);
+
+            return $batch !== null && ! $batch->finished();
+        });
+    }
+
+    /** @param array{hash: string, batch_ids: array<string, string>}|null $cached */
+    private function cancelOldBatches(?array $cached): void
+    {
+        if ($cached === null) {
+            return;
+        }
+
+        foreach ($cached['batch_ids'] as $batchId) {
+            Bus::findBatch($batchId)?->cancel();
+        }
     }
 }

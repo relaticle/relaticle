@@ -16,6 +16,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Spatie\SimpleExcel\SimpleExcelReader;
 
@@ -40,22 +41,29 @@ final class UploadStep extends Component implements HasForms
 
     public bool $isParsed = false;
 
+    private ?Import $import = null;
+
     private ?ImportStore $store = null;
 
     public function mount(ImportEntityType $entityType, ?string $storeId = null): void
     {
         $this->entityType = $entityType;
         $this->storeId = $storeId;
-        $this->store = $storeId !== null
-            ? ImportStore::load($storeId, $this->getCurrentTeamId())
-            : null;
 
-        if (! $this->store instanceof ImportStore) {
+        if ($storeId === null) {
             return;
         }
 
-        $this->headers = $this->store->headers();
-        $this->rowCount = $this->store->rowCount();
+        $this->import = Import::query()
+            ->forTeam($this->getCurrentTeamId() ?? '')
+            ->find($storeId);
+
+        if (! $this->import instanceof Import) {
+            return;
+        }
+
+        $this->headers = $this->import->headers ?? [];
+        $this->rowCount = $this->import->total_rows;
         $this->isParsed = true;
     }
 
@@ -83,8 +91,7 @@ final class UploadStep extends Component implements HasForms
             return;
         }
 
-        $this->store?->destroy();
-        $this->store = null;
+        $this->cleanupExisting();
         $this->reset(['headers', 'rowCount', 'isParsed']);
 
         try {
@@ -147,16 +154,18 @@ final class UploadStep extends Component implements HasForms
         }
 
         try {
-            $this->store = ImportStore::create(
-                teamId: $teamId,
-                userId: (string) auth()->id(),
-                entityType: $this->entityType,
-                originalFilename: $this->uploadedFile->getClientOriginalName(),
-            );
+            $this->import = Import::query()->create([
+                'team_id' => $teamId,
+                'user_id' => (string) auth()->id(),
+                'entity_type' => $this->entityType,
+                'file_name' => $this->uploadedFile->getClientOriginalName(),
+                'status' => ImportStatus::Uploading,
+                'total_rows' => 0,
+                'headers' => $this->headers,
+            ]);
 
-            $this->store->setHeaders($this->headers);
+            $this->store = ImportStore::create($this->import->id);
 
-            // Stream directly from CSV to SQLite - never loads all rows into memory
             $rowCount = 0;
 
             SimpleExcelReader::create($this->uploadedFile->getRealPath())
@@ -181,20 +190,32 @@ final class UploadStep extends Component implements HasForms
             if ($rowCount === 0) {
                 $this->store->destroy();
                 $this->store = null;
+                $this->import->delete();
+                $this->import = null;
                 $this->addError('uploadedFile', 'Could not read file. Please re-upload.');
                 $this->reset(['headers', 'rowCount', 'isParsed']);
 
                 return;
             }
 
-            $this->store->setRowCount($rowCount);
-            $this->store->setStatus(ImportStatus::Mapping);
+            $this->import->update([
+                'total_rows' => $rowCount,
+                'status' => ImportStatus::Mapping,
+            ]);
 
-            $this->dispatch('completed', storeId: $this->store->id(), rowCount: $rowCount, columnCount: count($this->headers));
+            $this->dispatch('completed', storeId: $this->import->id, rowCount: $rowCount, columnCount: count($this->headers));
         } catch (\Exception $e) {
             report($e);
-            $this->store?->destroy();
-            $this->store = null;
+
+            if ($this->store !== null) { /** @phpstan-ignore notIdentical.alwaysFalse */
+                $this->store->destroy();
+                $this->store = null;
+            }
+
+            if ($this->import !== null) { /** @phpstan-ignore notIdentical.alwaysTrue */
+                $this->import->delete();
+                $this->import = null;
+            }
             $this->addError('uploadedFile', 'Unable to process this file. Please try again or use a different file.');
         }
     }
@@ -221,8 +242,6 @@ final class UploadStep extends Component implements HasForms
     }
 
     /**
-     * Normalize row values to match header count.
-     *
      * @param  array<string, mixed>  $row
      * @return list<string>
      */
@@ -236,9 +255,21 @@ final class UploadStep extends Component implements HasForms
 
     public function removeFile(): void
     {
-        $this->store?->destroy();
-        $this->store = null;
+        $this->cleanupExisting();
         $this->reset(['storeId', 'uploadedFile', 'headers', 'rowCount', 'isParsed']);
+    }
+
+    private function cleanupExisting(): void
+    {
+        if ($this->store instanceof ImportStore) {
+            $this->store->destroy();
+            $this->store = null;
+        }
+
+        if ($this->import instanceof Import) {
+            $this->import->delete();
+            $this->import = null;
+        }
     }
 
     private function maxRows(): int

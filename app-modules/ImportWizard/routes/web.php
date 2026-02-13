@@ -2,4 +2,9 @@
 
 declare(strict_types=1);
 
-// Routes will be added as we build the wizard
+use Illuminate\Support\Facades\Route;
+use Relaticle\ImportWizard\Http\Controllers\DownloadFailedRowsController;
+
+Route::get('imports/{import}/failed-rows/download', DownloadFailedRowsController::class)
+    ->name('import-history.failed-rows.download')
+    ->middleware('signed');

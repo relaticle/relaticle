@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
 
@@ -27,19 +28,23 @@ final class ResolveMatchesJob implements ShouldQueue
 
     public function __construct(
         private readonly string $importId,
-        private readonly string $teamId,
     ) {}
 
     public function handle(): void
     {
-        $store = ImportStore::load($this->importId, $this->teamId);
-
-        if (! $store instanceof \Relaticle\ImportWizard\Store\ImportStore) {
+        if ($this->batch()?->cancelled()) {
             return;
         }
 
-        $importer = $store->getImporter();
+        $import = Import::query()->findOrFail($this->importId);
+        $store = ImportStore::load($this->importId);
 
-        new MatchResolver($store, $importer)->resolve();
+        if (! $store instanceof ImportStore) {
+            return;
+        }
+
+        $importer = $import->getImporter();
+
+        new MatchResolver($store, $import, $importer)->resolve();
     }
 }

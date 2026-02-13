@@ -13,6 +13,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
 
@@ -29,8 +30,9 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    if (isset($this->store)) {
-        $this->store->destroy();
+    if (isset($this->import)) {
+        ImportStore::load($this->import->id)?->destroy();
+        $this->import->delete();
     }
 });
 
@@ -39,24 +41,25 @@ function createStoreForMatchResolution(
     array $headers,
     array $rows,
     array $mappings,
-): ImportStore {
-    $store = ImportStore::create(
-        teamId: (string) $context->team->id,
-        userId: (string) $context->user->id,
-        entityType: ImportEntityType::People,
-        originalFilename: 'test.csv',
-    );
+): array {
+    $import = Import::create([
+        'team_id' => (string) $context->team->id,
+        'user_id' => (string) $context->user->id,
+        'entity_type' => ImportEntityType::People,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Reviewing,
+        'total_rows' => count($rows),
+        'headers' => $headers,
+        'column_mappings' => collect($mappings)->map(fn (ColumnData $m) => $m->toArray())->all(),
+    ]);
 
-    $store->setHeaders($headers);
-    $store->setColumnMappings($mappings);
-
+    $store = ImportStore::create($import->id);
     $store->query()->insert($rows);
-    $store->setRowCount(count($rows));
-    $store->setStatus(ImportStatus::Reviewing);
 
+    $context->import = $import;
     $context->store = $store;
 
-    return $store;
+    return [$import, $store];
 }
 
 function makeMatchRow(int $rowNumber, array $rawData, array $overrides = []): array
@@ -74,16 +77,16 @@ function makeMatchRow(int $rowNumber, array $rawData, array $overrides = []): ar
 }
 
 it('resolves all rows as Create when no match field mapped', function (): void {
-    $store = createStoreForMatchResolution($this, ['Name'], [
+    createStoreForMatchResolution($this, ['Name'], [
         makeMatchRow(2, ['Name' => 'John']),
         makeMatchRow(3, ['Name' => 'Jane']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $rows = $store->query()->get();
+    $rows = $this->store->query()->get();
     expect($rows)->toHaveCount(2)
         ->and($rows->every(fn ($row) => $row->match_action === RowMatchAction::Create))->toBeTrue();
 });
@@ -111,16 +114,16 @@ it('resolves Update when email matches existing record', function (): void {
         ]);
     }
 
-    $store = createStoreForMatchResolution($this, ['Name', 'Email'], [
+    createStoreForMatchResolution($this, ['Name', 'Email'], [
         makeMatchRow(2, ['Name' => 'John', 'Email' => 'existing@test.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $row = $store->query()->where('row_number', 2)->first();
+    $row = $this->store->query()->where('row_number', 2)->first();
 
     if ($emailField) {
         expect($row->match_action)->toBe(RowMatchAction::Update)
@@ -131,23 +134,23 @@ it('resolves Update when email matches existing record', function (): void {
 });
 
 it('resolves Skip when id does not match existing record', function (): void {
-    $store = createStoreForMatchResolution($this, ['ID', 'Name'], [
+    createStoreForMatchResolution($this, ['ID', 'Name'], [
         makeMatchRow(2, ['ID' => '99999', 'Name' => 'Ghost']),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $row = $store->query()->where('row_number', 2)->first();
+    $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->match_action)->toBe(RowMatchAction::Skip);
 });
 
 it('does not clear relationships column', function (): void {
     $companyMatch = RelationshipMatch::create('company', 'Acme Corp');
 
-    $store = createStoreForMatchResolution($this, ['Name'], [
+    createStoreForMatchResolution($this, ['Name'], [
         makeMatchRow(2, ['Name' => 'John'], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
@@ -155,16 +158,16 @@ it('does not clear relationships column', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $row = $store->query()->where('row_number', 2)->first();
+    $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->not->toBeNull()
         ->and($row->relationships)->toHaveCount(1)
         ->and($row->relationships[0]->relationship)->toBe('company');
 });
 
 it('resets previous match resolutions when re-resolving', function (): void {
-    $store = createStoreForMatchResolution($this, ['Name'], [
+    createStoreForMatchResolution($this, ['Name'], [
         makeMatchRow(2, ['Name' => 'John'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => '999',
@@ -173,9 +176,9 @@ it('resets previous match resolutions when re-resolving', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $row = $store->query()->where('row_number', 2)->first();
+    $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->match_action)->toBe(RowMatchAction::Create)
         ->and($row->matched_id)->toBeNull();
 });
@@ -186,7 +189,7 @@ it('marks unmatched rows as Create when mixed matched and empty values', functio
         'team_id' => $this->team->id,
     ]);
 
-    $store = createStoreForMatchResolution($this, ['ID', 'Name'], [
+    createStoreForMatchResolution($this, ['ID', 'Name'], [
         makeMatchRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated'], []),
         makeMatchRow(3, ['ID' => '', 'Name' => 'New Person'], []),
     ], [
@@ -194,18 +197,23 @@ it('marks unmatched rows as Create when mixed matched and empty values', functio
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    (new ResolveMatchesJob($store->id(), $store->teamId()))->handle();
+    (new ResolveMatchesJob($this->import->id, (string) $this->team->id))->handle();
 
-    $matched = $store->query()->where('row_number', 2)->first();
-    $unmatched = $store->query()->where('row_number', 3)->first();
+    $matched = $this->store->query()->where('row_number', 2)->first();
+    $unmatched = $this->store->query()->where('row_number', 3)->first();
 
     expect($matched->match_action)->toBe(RowMatchAction::Update)
         ->and($matched->matched_id)->toBe((string) $person->id)
         ->and($unmatched->match_action)->toBe(RowMatchAction::Skip);
 });
 
-it('handles missing store gracefully', function (): void {
+it('handles missing import gracefully', function (): void {
     $job = new ResolveMatchesJob('nonexistent-id', (string) $this->team->id);
 
-    $job->handle();
-})->throwsNoExceptions();
+    try {
+        $job->handle();
+        expect(false)->toBeTrue('Expected exception was not thrown');
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        expect($e->getModel())->toBe(Import::class);
+    }
+});
