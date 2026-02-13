@@ -141,10 +141,10 @@ abstract class BaseImporter implements ImporterContract
      * Override this to add custom data transformations.
      *
      * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  &$context
      * @return array<string, mixed>
      */
-    public function prepareForSave(array $data, ?Model $existing, array $context): array
+    public function prepareForSave(array $data, ?Model $existing, array &$context): array
     {
         unset($data['id']);
 
@@ -222,29 +222,6 @@ abstract class BaseImporter implements ImporterContract
             && ! $customField->typeData->acceptsArbitraryValues;
     }
 
-    /**
-     * Resolve a BelongsTo relationship by a single field.
-     *
-     * @param  class-string<Model>  $modelClass
-     */
-    protected function resolveBelongsTo(
-        string $modelClass,
-        string $field,
-        mixed $value,
-    ): ?string {
-        if (blank($value)) {
-            return null;
-        }
-
-        /** @var Model|null $record */
-        $record = $modelClass::query()
-            ->where('team_id', $this->teamId)
-            ->where($field, $value)
-            ->first();
-
-        return $record?->getKey();
-    }
-
     protected function resolveTeamMemberByEmail(?string $email): ?User
     {
         if (blank($email)) {
@@ -255,21 +232,6 @@ abstract class BaseImporter implements ImporterContract
             ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $this->teamId))
             ->where('email', trim($email))
             ->first();
-    }
-
-    /**
-     * Sync a MorphToMany relationship.
-     *
-     * @param  array<string>  $ids
-     */
-    protected function syncMorphToMany(
-        Model $record,
-        string $relation,
-        array $ids,
-    ): void {
-        if (method_exists($record, $relation)) {
-            $record->{$relation}()->syncWithoutDetaching($ids);
-        }
     }
 
     /**
@@ -298,14 +260,6 @@ abstract class BaseImporter implements ImporterContract
         }
 
         CustomFields::importer()->forModel($record)->saveValues($team);
-    }
-
-    protected function newModelInstance(): Model
-    {
-        /** @var class-string<Model> $modelClass */
-        $modelClass = $this->modelClass();
-
-        return new $modelClass;
     }
 
     /**

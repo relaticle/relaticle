@@ -92,10 +92,10 @@ final class TaskImporter extends BaseImporter
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  &$context
      * @return array<string, mixed>
      */
-    public function prepareForSave(array $data, ?Model $existing, array $context): array
+    public function prepareForSave(array $data, ?Model $existing, array &$context): array
     {
         $data = parent::prepareForSave($data, $existing, $context);
 
@@ -108,10 +108,6 @@ final class TaskImporter extends BaseImporter
                 $context['assignee_id'] = $user->getKey();
             }
         }
-
-        $context = $this->extractPolymorphicIds($data, $context);
-
-        unset($data['companies'], $data['people'], $data['opportunities']);
 
         if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
@@ -128,32 +124,9 @@ final class TaskImporter extends BaseImporter
         parent::afterSave($record, $context);
 
         $this->syncAssignee($record, $context);
-        $this->syncPolymorphicRelationships($record, $context);
     }
 
     /**
-     * Extract polymorphic relationship IDs from data into context.
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
-     * @return array<string, mixed>
-     */
-    private function extractPolymorphicIds(array $data, array $context): array
-    {
-        foreach (['companies', 'people', 'opportunities'] as $relation) {
-            $ids = $data[$relation] ?? null;
-
-            if (filled($ids)) {
-                $context["{$relation}_ids"] = is_array($ids) ? $ids : [$ids];
-            }
-        }
-
-        return $context;
-    }
-
-    /**
-     * Sync assignee relationship.
-     *
      * @param  array<string, mixed>  $context
      */
     private function syncAssignee(Model $record, array $context): void
@@ -166,21 +139,5 @@ final class TaskImporter extends BaseImporter
 
         /** @var Task $record */
         $record->assignees()->syncWithoutDetaching([$assigneeId]);
-    }
-
-    /**
-     * Sync polymorphic relationships.
-     *
-     * @param  array<string, mixed>  $context
-     */
-    private function syncPolymorphicRelationships(Model $record, array $context): void
-    {
-        foreach (['companies', 'people', 'opportunities'] as $relation) {
-            $ids = $context["{$relation}_ids"] ?? null;
-
-            if (filled($ids) && is_array($ids)) {
-                $this->syncMorphToMany($record, $relation, $ids);
-            }
-        }
     }
 }

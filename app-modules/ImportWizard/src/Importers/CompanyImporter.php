@@ -72,10 +72,10 @@ final class CompanyImporter extends BaseImporter
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  &$context
      * @return array<string, mixed>
      */
-    public function prepareForSave(array $data, ?Model $existing, array $context): array
+    public function prepareForSave(array $data, ?Model $existing, array &$context): array
     {
         $data = parent::prepareForSave($data, $existing, $context);
 

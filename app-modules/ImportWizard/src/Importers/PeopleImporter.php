@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Importers;
 
-use App\Models\Company;
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\ImportWizard\Data\EntityLink;
@@ -73,50 +72,15 @@ final class PeopleImporter extends BaseImporter
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  &$context
      * @return array<string, mixed>
      */
-    public function prepareForSave(array $data, ?Model $existing, array $context): array
+    public function prepareForSave(array $data, ?Model $existing, array &$context): array
     {
         $data = parent::prepareForSave($data, $existing, $context);
 
-        $data = $this->resolveCompanyRelationship($data, $context);
-
-        if (! $existing instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
-        }
-
-        return $data;
-    }
-
-    /**
-     * Resolve company relationship from import data.
-     *
-     * Uses the highest priority match field that was mapped.
-     *
-     * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $context
-     * @return array<string, mixed>
-     */
-    private function resolveCompanyRelationship(array $data, array $context): array
-    {
-        $companyValue = $data['company'] ?? null;
-        unset($data['company']);
-
-        if (blank($companyValue)) {
-            return $data;
-        }
-
-        $matchField = $context['company_match_field'] ?? 'name';
-
-        $companyId = $this->resolveBelongsTo(
-            Company::class,
-            $matchField,
-            $companyValue,
-        );
-
-        if ($companyId !== null) {
-            $data['company_id'] = $companyId;
         }
 
         return $data;

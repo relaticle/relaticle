@@ -76,10 +76,10 @@ interface ImporterContract
      *
      * @param  array<string, mixed>  $data  The mapped row data
      * @param  Model|null  $existing  The existing record if updating
-     * @param  array<string, mixed>  $context  Additional context (e.g., match field info)
+     * @param  array<string, mixed>  &$context  Additional context (e.g., match field info), passed by reference
      * @return array<string, mixed> The prepared data ready for fill()
      */
-    public function prepareForSave(array $data, ?Model $existing, array $context): array;
+    public function prepareForSave(array $data, ?Model $existing, array &$context): array;
 
     /**
      * Perform post-save operations.
