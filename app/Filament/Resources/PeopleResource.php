@@ -31,7 +31,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -102,9 +101,10 @@ final class PeopleResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('avatar')->label('')->size(24)->circular(),
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Person')
+                    ->searchable()
+                    ->view('filament.tables.columns.avatar-name-column'),
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
