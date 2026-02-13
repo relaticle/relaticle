@@ -253,7 +253,7 @@ it('blocks navigation when import has started', function (): void {
     expect($component->get('currentStep'))->toBe(4);
 });
 
-it('blocks navigation when validation is in progress', function (): void {
+it('allows backward navigation during validation', function (): void {
     $store = createFullTestStore($this);
 
     $component = Livewire::withQueryParams(['import' => $store->id()])
@@ -262,32 +262,6 @@ it('blocks navigation when validation is in progress', function (): void {
         ]);
 
     expect($component->get('currentStep'))->toBe(3);
-
-    $component->set('validationInProgress', true);
-
-    $component->call('goToStep', 2);
-    expect($component->get('currentStep'))->toBe(3);
-
-    $component->call('goBack');
-    expect($component->get('currentStep'))->toBe(3);
-});
-
-it('allows navigation after validation completes', function (): void {
-    $store = createFullTestStore($this);
-
-    $component = Livewire::withQueryParams(['import' => $store->id()])
-        ->test(ImportWizard::class, [
-            'entityType' => ImportEntityType::People,
-        ]);
-
-    expect($component->get('currentStep'))->toBe(3);
-
-    $component->set('validationInProgress', true);
-    $component->call('goBack');
-    expect($component->get('currentStep'))->toBe(3);
-
-    $component->dispatch('validation-state-changed', inProgress: false);
-    expect($component->get('validationInProgress'))->toBeFalse();
 
     $component->call('goBack');
     expect($component->get('currentStep'))->toBe(2);

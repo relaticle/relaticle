@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Livewire;
@@ -70,6 +71,8 @@ beforeEach(function (): void {
             'relationships' => null,
         ],
     ]);
+
+    Cache::forget("import-{$this->import->id}-validation");
 });
 
 afterEach(function (): void {
@@ -309,4 +312,34 @@ it('clears relationships column on mount', function (): void {
 
     $freshRow = $this->store->query()->where('row_number', 2)->first();
     expect($freshRow->relationships)->toBeNull();
+});
+
+it('skips dispatching batches when cache hash matches', function (): void {
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
+
+    Bus::fake();
+
+    mountReviewStep($this);
+
+    Bus::assertNothingBatched();
+});
+
+it('dispatches new batches when mappings hash changes', function (): void {
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
+
+    $this->import->update([
+        'column_mappings' => collect([
+            ColumnData::toField(source: 'Name', target: 'name'),
+        ])->map(fn (ColumnData $m) => $m->toArray())->all(),
+    ]);
+
+    Bus::fake();
+
+    mountReviewStep($this);
+
+    Bus::assertBatched(fn () => true);
 });

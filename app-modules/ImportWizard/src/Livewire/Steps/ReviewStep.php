@@ -25,7 +25,6 @@ use Relaticle\ImportWizard\Enums\SortField;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
-use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
@@ -51,8 +50,6 @@ final class ReviewStep extends Component
 
     /** @var array<string, string> Column source => batch ID */
     public array $batchIds = [];
-
-    public ?string $previousMappingsHash = null;
 
     private function connection(): Connection
     {
@@ -108,7 +105,7 @@ final class ReviewStep extends Component
     private function validateColumnAsync(ColumnData $column): string
     {
         $batch = Bus::batch([
-            new ValidateColumnJob($this->import()->id, $column, $this->import()->team_id),
+            new ValidateColumnJob($this->import()->id, $column),
         ])
             ->name("Validate {$column->source}")
             ->dispatch();
@@ -126,7 +123,6 @@ final class ReviewStep extends Component
         $batch = Bus::batch([
             new ResolveMatchesJob(
                 importId: $this->import()->id,
-                teamId: $this->import()->team_id,
             ),
         ])
             ->name('Match resolution')
@@ -140,10 +136,16 @@ final class ReviewStep extends Component
         $this->columns = $this->import()->columnMappings();
         $this->selectedColumn = $this->columns->first();
 
-        if (! $this->hasMappingsChanged()) {
+        $currentHash = $this->currentMappingsHash();
+        $cached = Cache::get($this->validationCacheKey());
+
+        if ($cached !== null && $cached['hash'] === $currentHash) {
+            $this->batchIds = $this->filterRunningBatches($cached['batch_ids']);
+
             return;
         }
 
+        $this->cancelOldBatches($cached);
         $this->clearRelationshipsForReentry();
 
         foreach ($this->columns as $column) {
@@ -152,9 +154,7 @@ final class ReviewStep extends Component
 
         $this->batchIds['__match_resolution'] = $this->dispatchMatchResolution();
 
-        $this->dispatch('validation-state-changed', inProgress: true)->to(ImportWizard::class);
-
-        $this->previousMappingsHash = $this->currentMappingsHash();
+        $this->cacheValidationState($currentHash);
     }
 
     public function hydrate(): void
@@ -254,9 +254,15 @@ final class ReviewStep extends Component
         );
         $this->selectedColumn = $updated;
 
+        $oldBatchId = $this->batchIds[$this->selectedColumn->source] ?? null;
+
+        if ($oldBatchId !== null) {
+            Bus::findBatch($oldBatchId)?->cancel();
+        }
+
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
 
-        $this->previousMappingsHash = $this->currentMappingsHash();
+        $this->cacheValidationState($this->currentMappingsHash());
     }
 
     /** @return array<string, string> */
@@ -350,14 +356,12 @@ final class ReviewStep extends Component
 
         if ($hasCompleted) {
             unset($this->columnErrorStatuses);
+            $this->cacheValidationState($this->currentMappingsHash());
         }
 
         if ($this->batchIds === []) {
             $this->dispatch('polling-complete');
         }
-
-        $this->dispatch('validation-state-changed', inProgress: $this->isValidating())
-            ->to(ImportWizard::class);
     }
 
     #[Computed]
@@ -411,8 +415,41 @@ final class ReviewStep extends Component
         return hash('xxh128', (string) json_encode($mappings));
     }
 
-    private function hasMappingsChanged(): bool
+    private function validationCacheKey(): string
     {
-        return $this->previousMappingsHash !== $this->currentMappingsHash();
+        return "import-{$this->storeId}-validation";
+    }
+
+    private function cacheValidationState(string $hash): void
+    {
+        Cache::put($this->validationCacheKey(), [
+            'hash' => $hash,
+            'batch_ids' => $this->batchIds,
+        ], now()->addHour());
+    }
+
+    /**
+     * @param  array<string, string>  $batchIds
+     * @return array<string, string>
+     */
+    private function filterRunningBatches(array $batchIds): array
+    {
+        return array_filter($batchIds, function (string $batchId): bool {
+            $batch = Bus::findBatch($batchId);
+
+            return $batch !== null && ! $batch->finished();
+        });
+    }
+
+    /** @param array{hash: string, batch_ids: array<string, string>}|null $cached */
+    private function cancelOldBatches(?array $cached): void
+    {
+        if ($cached === null) {
+            return;
+        }
+
+        foreach ($cached['batch_ids'] as $batchId) {
+            Bus::findBatch($batchId)?->cancel();
+        }
     }
 }
