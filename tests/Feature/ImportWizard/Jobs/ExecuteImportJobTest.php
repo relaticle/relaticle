@@ -932,6 +932,24 @@ it('processes 1000 row mixed operations import', function (): void {
         ->and($import->status)->toBe(ImportStatus::Completed);
 })->group('slow');
 
+it('marks import as Failed when job exhausts retries via failed() handler', function (): void {
+    createImportReadyStore($this, ['Name'], [
+        makeRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $job = new ExecuteImportJob(
+        importId: $this->import->id,
+        teamId: (string) $this->team->id,
+    );
+
+    $job->failed(new \RuntimeException('Queue worker gave up'));
+
+    $import = $this->import->fresh();
+    expect($import->status)->toBe(ImportStatus::Failed);
+});
+
 it('processes 1000 rows with entity link relationships and deduplication', function (): void {
     $companyNames = [];
     for ($i = 0; $i < 20; $i++) {

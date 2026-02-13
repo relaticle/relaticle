@@ -48,8 +48,6 @@ final class ExecuteImportJob implements ShouldQueue
 
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
-    private const int MAX_STORED_ERRORS = 100;
-
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
     private array $createdRecords = [];
 
@@ -109,6 +107,7 @@ final class ExecuteImportJob implements ShouldQueue
 
                     $this->flushProcessedRows($store);
                     $this->flushCustomFieldValues();
+                    $this->flushFailedRows($import);
                     $this->persistResults($import, $results);
                 });
 
@@ -121,9 +120,9 @@ final class ExecuteImportJob implements ShouldQueue
                 'failed_rows' => $results['failed'],
             ]);
 
-            $this->writeFailedRowsToDb($import);
             $this->notifyUser($import, $results);
         } catch (\Throwable $e) {
+            $this->flushFailedRows($import);
             $this->persistResults($import, $results);
             $import->update(['status' => ImportStatus::Failed]);
 
@@ -133,6 +132,31 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             throw $e;
+        }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $import = Import::query()->find($this->importId);
+
+        if ($import === null) {
+            return;
+        }
+
+        if (! in_array($import->status, [ImportStatus::Completed, ImportStatus::Failed], true)) {
+            $import->update(['status' => ImportStatus::Failed]);
+        }
+
+        $this->flushFailedRows($import);
+
+        try {
+            $this->notifyUser($import, [
+                'created' => $import->created_rows,
+                'updated' => $import->updated_rows,
+                'skipped' => $import->skipped_rows,
+                'failed' => $import->failed_rows,
+            ], failed: true);
+        } catch (\Throwable) {
         }
     }
 
@@ -348,10 +372,6 @@ final class ExecuteImportJob implements ShouldQueue
     /** @param array<string, mixed> $rawData */
     private function recordFailedRow(int $rowNumber, array $rawData, \Throwable $e): void
     {
-        if (count($this->failedRows) >= self::MAX_STORED_ERRORS) {
-            return;
-        }
-
         $this->failedRows[] = [
             'row' => $rowNumber,
             'error' => Str::limit($e->getMessage(), 500),
@@ -370,7 +390,7 @@ final class ExecuteImportJob implements ShouldQueue
         ]);
     }
 
-    private function writeFailedRowsToDb(Import $import): void
+    private function flushFailedRows(Import $import): void
     {
         if ($this->failedRows === []) {
             return;
@@ -391,6 +411,8 @@ final class ExecuteImportJob implements ShouldQueue
         foreach ($rows->chunk(100) as $chunk) {
             $import->failedRows()->insert($chunk->all());
         }
+
+        $this->failedRows = [];
     }
 
     /**
