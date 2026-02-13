@@ -67,10 +67,10 @@ final class ExecuteImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        $import = Import::findOrFail($this->importId);
+        $import = Import::query()->findOrFail($this->importId);
         $store = ImportStore::load($this->importId);
 
-        if ($store === null) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 
@@ -243,9 +243,10 @@ final class ExecuteImportJob implements ShouldQueue
         }
     }
 
-    /** @return Collection<string, CustomField> keyed by code */
+    /** @return Collection<string, CustomField> */
     private function loadCustomFieldDefinitions(BaseImporter $importer): Collection
     {
+        /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)

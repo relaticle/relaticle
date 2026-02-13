@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Models;
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,22 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 
+/**
+ * @property string $id
+ * @property string $team_id
+ * @property string $user_id
+ * @property ImportEntityType $entity_type
+ * @property string $file_name
+ * @property ImportStatus $status
+ * @property list<string> $headers
+ * @property list<array<string, mixed>> $column_mappings
+ * @property \Illuminate\Support\Carbon|null $completed_at
+ * @property int $total_rows
+ * @property int $created_rows
+ * @property int $updated_rows
+ * @property int $skipped_rows
+ * @property int $failed_rows
+ */
 final class Import extends Model
 {
     use HasUlids;
@@ -61,19 +78,22 @@ final class Import extends Model
     }
 
     /** @param Builder<Import> $query */
-    public function scopeCompleted(Builder $query): void
+    #[Scope]
+    protected function completed(Builder $query): void
     {
         $query->where('status', ImportStatus::Completed);
     }
 
     /** @param Builder<Import> $query */
-    public function scopeFailed(Builder $query): void
+    #[Scope]
+    protected function failed(Builder $query): void
     {
         $query->where('status', ImportStatus::Failed);
     }
 
     /** @param Builder<Import> $query */
-    public function scopeForTeam(Builder $query, string $teamId): void
+    #[Scope]
+    protected function forTeam(Builder $query, string $teamId): void
     {
         $query->where('team_id', $teamId);
     }

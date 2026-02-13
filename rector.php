@@ -8,6 +8,7 @@ use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPrivateMethodRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Privatization\Rector\ClassMethod\PrivatizeFinalClassMethodRector;
+use RectorLaravel\Rector\Class_\AddHasFactoryToModelsRector;
 use RectorLaravel\Rector\Class_\UseForwardsCallsTraitRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
 use RectorLaravel\Set\LaravelSetList;
@@ -41,6 +42,9 @@ return RectorConfig::configure()
         ArrowFunctionDelegatingCallToFirstClassCallableRector::class => [
             // class_exists has optional bool param that conflicts with Collection::first signature
             __DIR__.'/app/Providers/AppServiceProvider.php',
+        ],
+        AddHasFactoryToModelsRector::class => [
+            __DIR__.'/app-modules/ImportWizard/src/Models/*',
         ],
     ])
     ->withSets([

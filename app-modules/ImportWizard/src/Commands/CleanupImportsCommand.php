@@ -43,7 +43,7 @@ final class CleanupImportsCommand extends Command
         foreach ($terminalImports as $import) {
             $store = ImportStore::load($import->id);
 
-            if ($store === null) {
+            if (! $store instanceof ImportStore) {
                 continue;
             }
 
@@ -84,9 +84,9 @@ final class CleanupImportsCommand extends Command
         }
 
         foreach (File::directories($importsPath) as $directory) {
-            $id = basename($directory);
+            $id = basename((string) $directory);
 
-            if (Import::where('id', $id)->exists()) {
+            if (Import::query()->where('id', $id)->exists()) {
                 continue;
             }
 

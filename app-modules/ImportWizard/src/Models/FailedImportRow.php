@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $import_id
+ * @property string $team_id
+ * @property array<string, mixed> $data
+ * @property string|null $validation_error
+ */
 final class FailedImportRow extends Model
 {
     use HasUlids;
@@ -33,6 +40,6 @@ final class FailedImportRow extends Model
     /** @return Builder<static> */
     public function prunable(): Builder
     {
-        return self::where('created_at', '<=', now()->subMonth());
+        return self::query()->where('created_at', '<=', now()->subMonth());
     }
 }

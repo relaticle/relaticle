@@ -28,15 +28,18 @@ final class ResolveMatchesJob implements ShouldQueue
 
     public function __construct(
         private readonly string $importId,
-        private readonly string $teamId,
     ) {}
 
     public function handle(): void
     {
-        $import = Import::findOrFail($this->importId);
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
+        $import = Import::query()->findOrFail($this->importId);
         $store = ImportStore::load($this->importId);
 
-        if ($store === null) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 

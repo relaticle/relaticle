@@ -154,7 +154,7 @@ final class UploadStep extends Component implements HasForms
         }
 
         try {
-            $this->import = Import::create([
+            $this->import = Import::query()->create([
                 'team_id' => $teamId,
                 'user_id' => (string) auth()->id(),
                 'entity_type' => $this->entityType,
@@ -206,10 +206,16 @@ final class UploadStep extends Component implements HasForms
             $this->dispatch('completed', storeId: $this->import->id, rowCount: $rowCount, columnCount: count($this->headers));
         } catch (\Exception $e) {
             report($e);
-            $this->store?->destroy();
-            $this->store = null;
-            $this->import?->delete();
-            $this->import = null;
+
+            if ($this->store !== null) { /** @phpstan-ignore notIdentical.alwaysFalse */
+                $this->store->destroy();
+                $this->store = null;
+            }
+
+            if ($this->import !== null) { /** @phpstan-ignore notIdentical.alwaysTrue */
+                $this->import->delete();
+                $this->import = null;
+            }
             $this->addError('uploadedFile', 'Unable to process this file. Please try again or use a different file.');
         }
     }
@@ -255,12 +261,12 @@ final class UploadStep extends Component implements HasForms
 
     private function cleanupExisting(): void
     {
-        if ($this->store !== null) {
+        if ($this->store instanceof ImportStore) {
             $this->store->destroy();
             $this->store = null;
         }
 
-        if ($this->import !== null) {
+        if ($this->import instanceof Import) {
             $this->import->delete();
             $this->import = null;
         }

@@ -50,9 +50,7 @@ trait WithImportStore
     {
         $store = $this->store ??= ImportStore::load($this->storeId);
 
-        if ($store === null) {
-            abort(404, 'Import session not found or expired.');
-        }
+        abort_if(! $store instanceof ImportStore, 404, 'Import session not found or expired.');
 
         return $store;
     }

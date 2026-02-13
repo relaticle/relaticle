@@ -307,10 +307,15 @@ final class PreviewStep extends Component implements HasActions, HasForms
     public function downloadFailedRows(): StreamedResponse
     {
         $import = $this->import();
-        $headers = $import->headers ?? [];
+        $headers = $import->headers;
 
         return response()->streamDownload(function () use ($import, $headers): void {
             $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
             fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, [...$headers, 'Import Error'], escape: '\\');
 

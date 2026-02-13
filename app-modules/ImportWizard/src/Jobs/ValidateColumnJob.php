@@ -34,15 +34,18 @@ final class ValidateColumnJob implements ShouldQueue
     public function __construct(
         private readonly string $importId,
         private readonly ColumnData $column,
-        private readonly ?string $teamId = null,
     ) {}
 
     public function handle(): void
     {
-        $import = Import::findOrFail($this->importId);
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
+        $import = Import::query()->findOrFail($this->importId);
         $store = ImportStore::load($this->importId);
 
-        if ($store === null) {
+        if (! $store instanceof ImportStore) {
             return;
         }
 
@@ -88,13 +91,12 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
-        $this->writeEntityLinkRelationships($import, $store, $connection, $jsonPath, $validator, $uniqueValues);
+        $this->writeEntityLinkRelationships($import, $connection, $jsonPath, $validator, $uniqueValues);
     }
 
     /** @param array<int, string> $uniqueValues */
     private function writeEntityLinkRelationships(
         Import $import,
-        ImportStore $store,
         Connection $connection,
         string $jsonPath,
         EntityLinkValidator $validator,

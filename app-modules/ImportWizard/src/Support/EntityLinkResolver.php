@@ -197,7 +197,7 @@ final class EntityLinkResolver
         $results = [];
 
         foreach (array_chunk($uniqueValues, 5000) as $chunk) {
-            $lowerChunk = array_map(fn (string $v): string => mb_strtolower($v), $chunk);
+            $lowerChunk = array_map(mb_strtolower(...), $chunk);
             $placeholders = implode(',', array_fill(0, count($lowerChunk), '?'));
 
             $sql = match ($driver) {
@@ -240,7 +240,7 @@ final class EntityLinkResolver
             $rows = $connection->select($sql, $bindings);
 
             foreach ($rows as $row) {
-                $key = mb_strtolower($row->matched_value);
+                $key = mb_strtolower((string) $row->matched_value);
 
                 if (! isset($results[$key])) {
                     $results[$key] = $row->entity_id;
