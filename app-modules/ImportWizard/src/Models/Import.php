@@ -39,7 +39,22 @@ final class Import extends Model
 {
     use HasUlids;
 
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = [
+        'team_id',
+        'user_id',
+        'entity_type',
+        'file_name',
+        'status',
+        'total_rows',
+        'headers',
+        'column_mappings',
+        'created_rows',
+        'updated_rows',
+        'skipped_rows',
+        'failed_rows',
+        'completed_at',
+    ];
 
     private ?BaseImporter $importerCache = null;
 

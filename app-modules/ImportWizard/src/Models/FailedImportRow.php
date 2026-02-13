@@ -22,7 +22,13 @@ final class FailedImportRow extends Model
     use HasUlids;
     use MassPrunable;
 
-    protected $guarded = [];
+    /** @var list<string> */
+    protected $fillable = [
+        'import_id',
+        'team_id',
+        'data',
+        'validation_error',
+    ];
 
     protected function casts(): array
     {

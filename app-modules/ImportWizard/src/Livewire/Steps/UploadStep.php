@@ -230,6 +230,8 @@ final class UploadStep extends Component implements HasForms
         $headers = collect($rawHeaders)
             ->values()
             ->map(fn (string $h, int $i): string => filled($h) ? $h : 'Column_'.($i + 1))
+            ->map(fn (string $h): string => preg_replace('/[^a-zA-Z0-9_ \-]/', '', $h))
+            ->map(fn (string $h, int $i): string => filled($h) ? $h : 'Column_'.($i + 1))
             ->all();
 
         if (count($headers) !== count(array_unique($headers))) {
