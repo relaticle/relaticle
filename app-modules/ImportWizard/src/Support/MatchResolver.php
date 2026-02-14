@@ -35,7 +35,7 @@ final readonly class MatchResolver
 
         $matchField = $this->importer->getMatchFieldForMappedColumns($mappedFieldKeys);
 
-        if ($matchField instanceof MatchableField && $matchField->behavior !== MatchBehavior::AlwaysCreate) {
+        if ($matchField instanceof MatchableField && $matchField->behavior !== MatchBehavior::Create) {
             $this->resolveWithLookup($matchField, $mappings);
         }
 
@@ -77,7 +77,7 @@ final readonly class MatchResolver
         }
 
         $resolvedMap = $this->resolveMatchIds($matchField, $uniqueValues);
-        $unmatchedAction = $matchField->behavior === MatchBehavior::UpdateOnly
+        $unmatchedAction = $matchField->behavior === MatchBehavior::MatchOnly
             ? RowMatchAction::Skip
             : RowMatchAction::Create;
 
