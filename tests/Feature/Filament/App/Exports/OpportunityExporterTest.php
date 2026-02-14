@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\App\Exports;
 
-use App\Enums\CustomFields\CompanyField;
-use App\Filament\Exports\CompanyExporter;
-use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
-use App\Models\Company;
+use App\Enums\CustomFields\OpportunityField;
+use App\Filament\Exports\OpportunityExporter;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Models\CustomField;
 use App\Models\Export;
+use App\Models\Opportunity;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -34,8 +34,8 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
-test('exports company records', function () {
-    Livewire::test(ListCompanies::class)
+test('exports opportunity records', function () {
+    Livewire::test(ListOpportunities::class)
         ->assertActionExists('export')
         ->callAction('export')
         ->assertHasNoFormErrors();
@@ -43,7 +43,7 @@ test('exports company records', function () {
     $export = Export::latest()->first();
 
     expect($export)->not->toBeNull()
-        ->and($export->exporter)->toBe(CompanyExporter::class)
+        ->and($export->exporter)->toBe(OpportunityExporter::class)
         ->and($export->file_disk)->toBe('local')
         ->and($export->team_id)->toBe($this->team->id);
 });
@@ -52,7 +52,7 @@ test('exports respect team scoping', function () {
     $otherTeam = Team::factory()->create(['personal_team' => false]);
     $this->user->teams()->attach($otherTeam);
 
-    Livewire::test(ListCompanies::class)
+    Livewire::test(ListOpportunities::class)
         ->callAction('export')
         ->assertHasNoFormErrors();
 
@@ -64,10 +64,10 @@ test('exports respect team scoping', function () {
 test('export columns include system-seeded custom fields', function () {
     TenantContextService::setTenantId($this->team->id);
 
-    $columns = CompanyExporter::getColumns();
+    $columns = OpportunityExporter::getColumns();
     $columnLabels = collect($columns)->map(fn ($column) => $column->getLabel())->all();
 
-    foreach (CompanyField::cases() as $field) {
+    foreach (OpportunityField::cases() as $field) {
         expect($columnLabels)->toContain($field->getDisplayName());
     }
 });
@@ -76,10 +76,10 @@ test('export columns include user-created custom fields', function () {
     TenantContextService::setTenantId($this->team->id);
 
     CustomField::forceCreate([
-        'name' => 'Company Size',
-        'code' => 'company_size',
-        'type' => 'text',
-        'entity_type' => 'company',
+        'name' => 'Win Probability',
+        'code' => 'win_probability',
+        'type' => 'number',
+        'entity_type' => 'opportunity',
         'tenant_id' => $this->team->id,
         'sort_order' => 99,
         'active' => true,
@@ -87,21 +87,21 @@ test('export columns include user-created custom fields', function () {
         'settings' => new CustomFieldSettingsData,
     ]);
 
-    $columns = CompanyExporter::getColumns();
+    $columns = OpportunityExporter::getColumns();
     $columnLabels = collect($columns)->map(fn ($column) => $column->getLabel())->all();
 
-    expect($columnLabels)->toContain('Company Size');
+    expect($columnLabels)->toContain('Win Probability');
 });
 
 test('export generates CSV with correct data', function () {
     Storage::fake('local');
 
-    Company::factory()->create([
+    Opportunity::factory()->create([
         'team_id' => $this->team->id,
-        'name' => 'Acme Corp',
+        'name' => 'Big Deal',
     ]);
 
-    Livewire::test(ListCompanies::class)
+    Livewire::test(ListOpportunities::class)
         ->callAction('export')
         ->assertHasNoFormErrors();
 
@@ -111,7 +111,7 @@ test('export generates CSV with correct data', function () {
     $headers = Storage::disk('local')->get("{$directory}/headers.csv");
     $data = Storage::disk('local')->get("{$directory}/0000000000000001.csv");
 
-    expect($headers)->toContain('Company Name')
-        ->and($headers)->toContain('ICP')
-        ->and($data)->toContain('Acme Corp');
+    expect($headers)->toContain('Opportunity Name')
+        ->and($headers)->toContain('Amount')
+        ->and($data)->toContain('Big Deal');
 });

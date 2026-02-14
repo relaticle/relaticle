@@ -7,12 +7,13 @@ namespace App\Filament\Exports;
 use App\Models\Opportunity;
 use Carbon\Carbon;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Relaticle\CustomFields\Facades\CustomFields;
 
-final class OpportunityExporter extends Exporter
+final class OpportunityExporter extends BaseExporter
 {
+    protected static ?string $model = Opportunity::class;
+
     public static function getColumns(): array
     {
         return [

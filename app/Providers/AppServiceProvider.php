@@ -36,6 +36,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
+        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, \App\Models\Export::class);
     }
 
     /**
