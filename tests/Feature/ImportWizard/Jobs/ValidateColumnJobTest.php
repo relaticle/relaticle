@@ -78,7 +78,7 @@ function makeValidationRow(int $rowNumber, array $rawData, array $overrides = []
     ], $overrides);
 }
 
-it('writes RelationshipMatch create for AlwaysCreate entity links', function (): void {
+it('writes RelationshipMatch create for Create entity links', function (): void {
     $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company');
 
     createValidationStore($this, ['Name', 'Company'], [
@@ -123,7 +123,7 @@ it('writes RelationshipMatch existing when resolved to existing record', functio
         ->and($row->relationships[0]->id)->toBe((string) $company->id);
 });
 
-it('skips relationship for UpdateOnly when no match found', function (): void {
+it('skips relationship for MatchOnly when no match found', function (): void {
     $column = ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company');
 
     createValidationStore($this, ['Name', 'Company ID'], [

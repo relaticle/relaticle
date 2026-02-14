@@ -31,7 +31,7 @@ beforeEach(function (): void {
     );
 });
 
-it('returns no validation errors for AlwaysCreate matcher', function (): void {
+it('returns no validation errors for Create matcher', function (): void {
     Company::factory()->create([
         'name' => 'Acme Corp',
         'team_id' => $this->team->id,
@@ -45,7 +45,7 @@ it('returns no validation errors for AlwaysCreate matcher', function (): void {
     expect($error)->toBeNull();
 });
 
-it('batch validates with no errors for AlwaysCreate matcher', function (): void {
+it('batch validates with no errors for Create matcher', function (): void {
     Company::factory()->create([
         'name' => 'Acme Corp',
         'team_id' => $this->team->id,
@@ -63,7 +63,7 @@ it('batch validates with no errors for AlwaysCreate matcher', function (): void 
     ]);
 });
 
-it('returns validation error for UpdateOnly matcher when record not found', function (): void {
+it('returns validation error for MatchOnly matcher when record not found', function (): void {
     $validator = new EntityLinkValidator((string) $this->team->id);
     $matcher = MatchableField::id();
 
