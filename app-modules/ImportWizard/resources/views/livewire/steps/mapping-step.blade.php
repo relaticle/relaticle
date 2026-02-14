@@ -26,11 +26,14 @@
                     @foreach ($headers as $index => $header)
                         @php
                             $mapping = $this->getMapping($header);
-                            $mappedEntityLinkKeys = collect($this->entityLinks)
-                                ->keys()
-                                ->filter(fn ($key) => $this->isEntityLinkMapped($key) && !($mapping?->entityLink === $key))
-                                ->values()
-                                ->all();
+                            $allMappedMatchers = $this->getMappedEntityLinkMatchers();
+                            $mappedEntityLinkMatchers = [];
+                            foreach ($allMappedMatchers as $lk => $matcherFields) {
+                                $currentMappingMatcher = ($mapping?->entityLink === $lk) ? $mapping?->target : null;
+                                $mappedEntityLinkMatchers[$lk] = array_values(
+                                    array_filter($matcherFields, fn ($f) => $f !== $currentMappingMatcher)
+                                );
+                            }
                         @endphp
 
                         <div
@@ -57,7 +60,7 @@
                                     :entity-links="$this->entityLinks"
                                     :selected="$mapping"
                                     :mapped-field-keys="$this->mappedFieldKeys"
-                                    :mapped-entity-links="$mappedEntityLinkKeys"
+                                    :mapped-entity-link-matchers="$mappedEntityLinkMatchers"
                                     :column="$header"
                                 />
                             </div>

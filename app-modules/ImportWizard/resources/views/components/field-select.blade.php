@@ -3,7 +3,7 @@
     'entityLinks' => [],
     'selected' => null,
     'mappedFieldKeys' => [],
-    'mappedEntityLinks' => [],
+    'mappedEntityLinkMatchers' => [],
     'column',
     'placeholder' => 'Select attribute',
 ])
@@ -208,11 +208,12 @@
                         $linkKey = $entry->key;
                         $link = $entry->item;
                         $isLinkSelected = $isEntityLinkMapping && $selected->entityLink === $linkKey;
-                        $isLinkMapped = in_array($linkKey, $mappedEntityLinks) && !$isLinkSelected;
+                        $linkMappedMatchers = $mappedEntityLinkMatchers[$linkKey] ?? [];
+                        $isLinkFullyMapped = count($linkMappedMatchers) >= count($link->matchableFields) && !$isLinkSelected;
                     @endphp
                     <div
                         x-show="!search || {{ Js::from(strtolower($link->label)) }}.includes(search.toLowerCase())"
-                        @if (!$isLinkMapped)
+                        @if (!$isLinkFullyMapped)
                             @mouseenter="showSubmenu('{{ $linkKey }}', $event)"
                             @mouseleave="hideSubmenu()"
                         @endif
@@ -221,8 +222,8 @@
                             type="button"
                             role="option"
                             aria-haspopup="menu"
-                            {{ $isLinkMapped ? 'disabled aria-disabled=true' : '' }}
-                            @if (!$isLinkMapped)
+                            {{ $isLinkFullyMapped ? 'disabled aria-disabled=true' : '' }}
+                            @if (!$isLinkFullyMapped)
                                 @focus="showSubmenu('{{ $linkKey }}', $event)"
                                 @blur="hideSubmenu()"
                                 @keydown.enter.prevent="showSubmenu('{{ $linkKey }}', $event)"
@@ -231,11 +232,11 @@
                             @endif
                             class="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
                                 {{ $isLinkSelected ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
-                                {{ $isLinkMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
+                                {{ $isLinkFullyMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
                         >
                             <x-filament::icon icon="{{ $link->icon() }}" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span class="flex-1 text-left">{{ $link->label }}</span>
-                            @if ($isLinkMapped)
+                            @if ($isLinkFullyMapped)
                                 <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
                             @else
                                 @if ($isLinkSelected)
@@ -279,6 +280,8 @@
                     @foreach ($link->matchableFields as $matcher)
                         @php
                             $isMatcherSelected = $isLinkSelected && $selected->target === $matcher->field;
+                            $globalMappedMatchers = $mappedEntityLinkMatchers[$linkKey] ?? [];
+                            $isMatcherUsed = in_array($matcher->field, $globalMappedMatchers) && !$isMatcherSelected;
                         @endphp
                         <button
                             type="button"
@@ -286,8 +289,10 @@
                             @click="selectEntityLink('{{ $linkKey }}', '{{ $matcher->field }}')"
                             @keydown.enter.prevent="selectEntityLink('{{ $linkKey }}', '{{ $matcher->field }}')"
                             @keydown.space.prevent="selectEntityLink('{{ $linkKey }}', '{{ $matcher->field }}')"
+                            {{ $isMatcherUsed ? 'disabled' : '' }}
                             class="w-full px-2.5 py-2 text-left rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
-                                {{ $isMatcherSelected ? 'bg-primary-50 dark:bg-primary-950/50' : 'hover:bg-gray-50 dark:hover:bg-gray-800' }}"
+                                {{ $isMatcherSelected ? 'bg-primary-50 dark:bg-primary-950/50' : 'hover:bg-gray-50 dark:hover:bg-gray-800' }}
+                                {{ $isMatcherUsed ? 'opacity-40 cursor-not-allowed' : '' }}"
                         >
                             <div class="flex items-center gap-1.5">
                                 @if ($isMatcherSelected)
@@ -296,7 +301,10 @@
                                 <span class="text-sm font-medium {{ $isMatcherSelected ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white' }}">
                                     {{ $matcher->label }}
                                 </span>
-                                @if ($matcher->isAlwaysCreate())
+                                @if($isMatcherUsed)
+                                    <span class="text-[9px] text-gray-400 dark:text-gray-500 italic ml-auto">in use</span>
+                                @endif
+                                @if ($matcher->isCreate())
                                     <span class="px-1.5 py-0.5 text-[9px] font-medium rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 ml-auto">creates</span>
                                 @endif
                             </div>
