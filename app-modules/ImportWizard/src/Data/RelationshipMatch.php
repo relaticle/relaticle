@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Data;
 
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Spatie\LaravelData\Data;
 
@@ -14,23 +15,26 @@ final class RelationshipMatch extends Data
         public readonly RowMatchAction $action,
         public readonly ?string $id = null,
         public readonly ?string $name = null,
+        public readonly ?MatchBehavior $behavior = null,
     ) {}
 
-    public static function existing(string $relationship, string $id): self
+    public static function existing(string $relationship, string $id, ?MatchBehavior $behavior = null): self
     {
         return new self(
             relationship: $relationship,
             action: RowMatchAction::Update,
             id: $id,
+            behavior: $behavior,
         );
     }
 
-    public static function create(string $relationship, string $name): self
+    public static function create(string $relationship, string $name, ?MatchBehavior $behavior = null): self
     {
         return new self(
             relationship: $relationship,
             action: RowMatchAction::Create,
             name: $name,
+            behavior: $behavior,
         );
     }
 
