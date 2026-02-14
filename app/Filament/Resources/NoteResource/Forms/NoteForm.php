@@ -42,7 +42,7 @@ final class NoteForm
                 ->nullable();
         }
 
-        $components[] = CustomFields::form()->forSchema($schema)->build()
+        $components[] = CustomFields::form()->build()
             ->columnSpanFull()
             ->columns(1);
 
