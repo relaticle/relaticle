@@ -237,10 +237,11 @@
                             <span class="flex-1 text-left">{{ $link->label }}</span>
                             @if ($isLinkMapped)
                                 <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
-                            @elseif ($isLinkSelected)
-                                <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
                             @else
-                                <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                @if ($isLinkSelected)
+                                    <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
+                                @endif
+                                <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 shrink-0 {{ $isLinkSelected ? 'text-primary-400' : 'text-gray-400' }}" />
                             @endif
                         </button>
                     </div>
