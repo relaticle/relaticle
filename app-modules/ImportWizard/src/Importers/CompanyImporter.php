@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Importers;
 
 use App\Models\Company;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\MatchableField;
 
-/**
- * Importer for Company entities.
- *
- * Companies are standalone entities with domain-based matching support.
- */
 final class CompanyImporter extends BaseImporter
 {
     public function modelClass(): string
@@ -45,23 +42,30 @@ final class CompanyImporter extends BaseImporter
                 ])
                 ->example('Acme Corporation')
                 ->icon('heroicon-o-building-office-2'),
+        ]);
+    }
 
-            ImportField::make('account_owner_email')
-                ->label('Account Owner Email')
-                ->rules(['nullable', 'email'])
+    /** @return array<string, EntityLink> */
+    protected function defineEntityLinks(): array
+    {
+        return [
+            'account_owner' => EntityLink::belongsTo('account_owner', User::class)
+                ->matchableFields([
+                    MatchableField::id(),
+                    MatchableField::email('email'),
+                ])
+                ->foreignKey('account_owner_id')
+                ->label('Account Owner')
                 ->guess([
                     'account_owner', 'owner_email', 'owner', 'assigned_to', 'account_manager',
                     'owner email', 'sales rep', 'sales_rep', 'rep', 'salesperson', 'sales_owner',
                     'account_rep', 'assigned_user', 'manager_email', 'contact_owner',
-                ])
-                ->example('owner@company.com')
-                ->icon('heroicon-o-envelope'),
-        ]);
+                    'account_owner_email', 'owner_id',
+                ]),
+        ];
     }
 
-    /**
-     * @return array<MatchableField>
-     */
+    /** @return array<MatchableField> */
     public function matchableFields(): array
     {
         return [
@@ -79,38 +83,10 @@ final class CompanyImporter extends BaseImporter
     {
         $data = parent::prepareForSave($data, $existing, $context);
 
-        $accountOwnerEmail = $data['account_owner_email'] ?? null;
-        unset($data['account_owner_email']);
-
-        if (filled($accountOwnerEmail)) {
-            $user = $this->resolveTeamMemberByEmail($accountOwnerEmail);
-            if ($user instanceof \App\Models\User) {
-                $context['account_owner_id'] = $user->getKey();
-            }
-        }
-
         if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
         }
 
         return $data;
-    }
-
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    public function afterSave(Model $record, array $context): void
-    {
-        parent::afterSave($record, $context);
-
-        $accountOwnerId = $context['account_owner_id'] ?? null;
-
-        if ($accountOwnerId === null) {
-            return;
-        }
-
-        /** @var Company $record */
-        $record->account_owner_id = $accountOwnerId;
-        $record->saveQuietly();
     }
 }

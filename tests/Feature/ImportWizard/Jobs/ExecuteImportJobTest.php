@@ -1644,15 +1644,22 @@ it('imports color-picker custom field value as text', function (): void {
 
 // --- Entity-Specific Importer Tests ---
 
-it('imports company with account_owner_email resolved to user', function (): void {
+it('imports company with account_owner resolved by email via entity link', function (): void {
     $owner = User::factory()->create();
     $this->team->users()->attach($owner, ['role' => 'editor']);
 
+    $relationships = json_encode([
+        ['relationship' => 'account_owner', 'action' => 'update', 'id' => (string) $owner->id, 'name' => null],
+    ]);
+
     createImportReadyStore($this, ['Name', 'Owner Email'], [
-        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => $owner->email], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => $owner->email], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'Owner Email', target: 'account_owner_email'),
+        ColumnData::toEntityLink(source: 'Owner Email', matcherKey: 'email', entityLinkKey: 'account_owner'),
     ], ImportEntityType::Company);
 
     runImportJob($this);
@@ -1662,12 +1669,14 @@ it('imports company with account_owner_email resolved to user', function (): voi
         ->and((string) $company->account_owner_id)->toBe((string) $owner->id);
 });
 
-it('imports company with unknown account_owner_email ignoring the field', function (): void {
+it('imports company with unmatched account_owner email skipping silently', function (): void {
     createImportReadyStore($this, ['Name', 'Owner Email'], [
-        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => 'nonexistent@example.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => 'nonexistent@example.com'], [
+            'match_action' => RowMatchAction::Create->value,
+        ]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'Owner Email', target: 'account_owner_email'),
+        ColumnData::toEntityLink(source: 'Owner Email', matcherKey: 'email', entityLinkKey: 'account_owner'),
     ], ImportEntityType::Company);
 
     runImportJob($this);
@@ -1675,6 +1684,28 @@ it('imports company with unknown account_owner_email ignoring the field', functi
     $company = Company::where('team_id', $this->team->id)->where('name', 'Test Corp')->first();
     expect($company)->not->toBeNull()
         ->and($company->account_owner_id)->toBeNull();
+});
+
+it('imports company with account_owner resolved for team owner', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'account_owner', 'action' => 'update', 'id' => (string) $this->user->id, 'name' => null],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Owner Email'], [
+        makeRow(2, ['Name' => 'Owner Corp', 'Owner Email' => $this->user->email], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Owner Email', matcherKey: 'email', entityLinkKey: 'account_owner'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Owner Corp')->first();
+    expect($company)->not->toBeNull()
+        ->and((string) $company->account_owner_id)->toBe((string) $this->user->id);
 });
 
 it('imports task with assignee_email resolved and synced', function (): void {
