@@ -113,7 +113,7 @@ final class ImportStore
         try {
             $inserts = collect($resolvedMap)
                 ->map(fn (int|string|null $id, int|string $value): array => [
-                    'lookup_value' => (string) $value,
+                    'lookup_value' => $value,
                     'match_action' => $id !== null ? RowMatchAction::Update->value : $unmatchedAction->value,
                     'matched_id' => $id !== null ? (string) $id : null,
                 ])
