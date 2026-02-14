@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\User;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 
@@ -85,9 +86,11 @@ final class EntityLinkResolver
         $field = $matcher->field;
         $cacheKey = $this->getCacheKey($link, $matcher);
 
-        $results = $this->isCustomField($field)
-            ? $this->resolveViaCustomField($link, $field, $uniqueValues)
-            : $this->resolveViaColumn($link, $field, $uniqueValues);
+        $results = match (true) {
+            $link->targetModelClass === User::class => $this->resolveViaTeamMember($field, $uniqueValues),
+            $this->isCustomField($field) => $this->resolveViaCustomField($link, $field, $uniqueValues),
+            default => $this->resolveViaColumn($link, $field, $uniqueValues),
+        };
 
         $normalizedResults = [];
         foreach ($results as $dbValue => $id) {
@@ -140,6 +143,22 @@ final class EntityLinkResolver
         return $modelClass::query()
             ->where('team_id', $this->teamId)
             ->whereIn($field, $uniqueValues)
+            ->pluck('id', $field)
+            ->all();
+    }
+
+    /**
+     * @param  array<string>  $uniqueValues
+     * @return array<string, int|string>
+     */
+    private function resolveViaTeamMember(string $field, array $uniqueValues): array
+    {
+        return User::query()
+            ->whereIn($field, $uniqueValues)
+            ->where(function (\Illuminate\Database\Eloquent\Builder $query): void {
+                $query->whereHas('teams', fn (\Illuminate\Database\Eloquent\Builder $q) => $q->where('teams.id', $this->teamId))
+                    ->orWhereHas('ownedTeams', fn (\Illuminate\Database\Eloquent\Builder $q) => $q->where('teams.id', $this->teamId));
+            })
             ->pluck('id', $field)
             ->all();
     }
