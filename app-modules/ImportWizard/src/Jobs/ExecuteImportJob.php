@@ -30,6 +30,7 @@ use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
@@ -628,14 +629,16 @@ final class ExecuteImportJob implements ShouldQueue
         $entityLinks = $importer->entityLinks();
         $pending = [];
 
-        foreach ($row->relationships as $match) {
-            $link = $entityLinks[$match->relationship] ?? null;
+        $grouped = collect($row->relationships->all())->groupBy('relationship');
+
+        foreach ($grouped as $linkKey => $matches) {
+            $link = $entityLinks[$linkKey] ?? null;
 
             if ($link === null) {
                 continue;
             }
 
-            $resolvedId = $this->resolveMatchId($match, $link, $context);
+            $resolvedId = $this->resolveGroupedMatches($matches, $link, $context);
 
             if ($resolvedId === null) {
                 continue;
@@ -654,22 +657,28 @@ final class ExecuteImportJob implements ShouldQueue
         return $pending;
     }
 
-    /** @param  array<string, mixed>  $context */
-    private function resolveMatchId(RelationshipMatch $match, EntityLink $link, array $context): ?string
-    {
-        if ($match->isExisting() && $match->id !== null) {
-            return $match->id;
+    /**
+     * @param  Collection<int, RelationshipMatch>  $matches
+     * @param  array<string, mixed>  $context
+     */
+    private function resolveGroupedMatches(
+        Collection $matches,
+        EntityLink $link,
+        array $context,
+    ): ?string {
+        foreach ($matches as $match) {
+            if ($match->isExisting() && $match->id !== null) {
+                return $match->id;
+            }
         }
 
-        if (! $match->isCreate()) {
+        $creationName = $this->resolveCreationName($matches);
+
+        if ($creationName === null) {
             return null;
         }
 
-        if (! $link->canCreate || blank($match->name)) {
-            return null;
-        }
-
-        $dedupKey = "{$link->key}:".mb_strtolower(trim($match->name));
+        $dedupKey = "{$link->key}:".mb_strtolower(trim($creationName));
 
         if (isset($this->createdRecords[$dedupKey])) {
             return $this->createdRecords[$dedupKey];
@@ -678,7 +687,7 @@ final class ExecuteImportJob implements ShouldQueue
         /** @var Model $record */
         $record = new $link->targetModelClass;
         $record->forceFill([
-            'name' => $match->name,
+            'name' => $creationName,
             'team_id' => $context['team_id'],
             'creator_id' => $context['creator_id'],
             'creation_source' => CreationSource::IMPORT,
@@ -689,6 +698,32 @@ final class ExecuteImportJob implements ShouldQueue
         $this->createdRecords[$dedupKey] = $id;
 
         return $id;
+    }
+
+    /** @param  Collection<int, RelationshipMatch>  $matches */
+    private function resolveCreationName(Collection $matches): ?string
+    {
+        $createMatch = $matches->first(
+            fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::Create
+        );
+
+        $matchOrCreate = $matches->first(
+            fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::MatchOrCreate
+        );
+
+        if ($matchOrCreate !== null && $createMatch !== null) {
+            return blank($createMatch->name) ? null : $createMatch->name;
+        }
+
+        if ($createMatch !== null) {
+            return blank($createMatch->name) ? null : $createMatch->name;
+        }
+
+        if ($matchOrCreate !== null) {
+            return blank($matchOrCreate->name) ? null : $matchOrCreate->name;
+        }
+
+        return null;
     }
 
     /** @param  array<string, int>  $results */
