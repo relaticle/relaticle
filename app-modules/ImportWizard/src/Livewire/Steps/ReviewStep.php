@@ -241,6 +241,16 @@ final class ReviewStep extends Component
 
     public function setColumnFormat(string $type, string $value): void
     {
+        $currentValue = match ($type) {
+            'date' => $this->selectedColumn->dateFormat?->value,
+            'number' => $this->selectedColumn->numberFormat?->value,
+            default => null,
+        };
+
+        if ($currentValue === $value) {
+            return;
+        }
+
         $updated = match ($type) {
             'date' => $this->selectedColumn->withDateFormat(DateFormat::from($value)),
             'number' => $this->selectedColumn->withNumberFormat(NumberFormat::from($value)),

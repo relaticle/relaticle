@@ -489,9 +489,14 @@
                             </span>
                         </template>
 
-                        {{-- Valid option: plain text --}}
+                        {{-- Valid option: label + description --}}
                         <template x-if="!option.invalid">
-                            <span class="truncate flex-1 text-xs" :title="option.label" x-text="option.label"></span>
+                            <span class="truncate flex-1 min-w-0">
+                                <span class="text-xs block truncate" :title="option.label" x-text="option.label"></span>
+                                <template x-if="option.description">
+                                    <span class="text-[10px] text-gray-400 dark:text-gray-500 block truncate" x-text="option.description"></span>
+                                </template>
+                            </span>
                         </template>
 
                         {{-- Spacer to push checkmark right --}}

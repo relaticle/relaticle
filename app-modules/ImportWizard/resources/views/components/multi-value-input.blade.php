@@ -78,6 +78,10 @@
             return Math.max(0, this.values.length - this.maxVisibleValues);
         },
 
+        get hiddenErrorCount() {
+            return this.values.slice(this.maxVisibleValues).filter(v => this.hasError(v)).length;
+        },
+
         get commaSeparated() {
             return this.values.join(', ');
         },
@@ -208,23 +212,18 @@
                 </span>
             </template>
 
-            {{-- "+N more" indicator --}}
+            {{-- "+N more" indicator (turns red when hidden items have errors) --}}
             <template x-if="hiddenCount > 0">
-                <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                <span
+                    :class="hiddenErrorCount > 0
+                        ? 'text-danger-600 dark:text-danger-400 font-medium'
+                        : 'text-gray-500 dark:text-gray-400'"
+                    class="text-xs shrink-0"
+                >
                     +<span x-text="hiddenCount"></span>
                 </span>
             </template>
         </div>
-
-        {{-- Error count badge --}}
-        <template x-if="hasErrors">
-            <span
-                x-tooltip="{ content: errorCount + ' invalid ' + (errorCount === 1 ? 'value' : 'values'), theme: $store.theme }"
-                class="inline-flex items-center justify-center size-5 text-xs font-medium rounded-full bg-danger-100 text-danger-600 dark:bg-danger-900/50 dark:text-danger-400 shrink-0"
-            >
-                <span x-text="errorCount"></span>
-            </span>
-        </template>
 
         {{-- Chevron indicator --}}
         <x-heroicon-m-chevron-down
