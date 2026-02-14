@@ -61,8 +61,7 @@ final class OpportunityResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->getStateUsing(fn (Opportunity $record): string => $record->created_by)
-                    ->color(fn (Opportunity $record): string => $record->isSystemCreated() ? 'secondary' : 'primary'),
+                    ->getStateUsing(fn (Opportunity $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()

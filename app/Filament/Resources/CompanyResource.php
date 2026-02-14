@@ -80,8 +80,7 @@ final class CompanyResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->getStateUsing(fn (Company $record): string => $record->created_by)
-                    ->color(fn (Company $record): string => $record->isSystemCreated() ? 'secondary' : 'primary'),
+                    ->getStateUsing(fn (Company $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()

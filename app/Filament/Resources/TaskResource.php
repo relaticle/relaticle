@@ -80,8 +80,7 @@ final class TaskResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->getStateUsing(fn (Task $record): string => $record->createdBy)
-                    ->color(fn (Task $record): string => $record->isSystemCreated() ? 'secondary' : 'primary'),
+                    ->getStateUsing(fn (Task $record): string => $record->createdBy),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
