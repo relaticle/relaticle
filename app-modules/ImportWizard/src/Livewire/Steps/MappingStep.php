@@ -228,6 +228,17 @@ final class MappingStep extends Component implements HasActions, HasForms
             ->contains(fn (array $m): bool => ($m['entityLink'] ?? null) === $linkKey);
     }
 
+    /** @return array<string, list<string>> */
+    public function getMappedEntityLinkMatchers(): array
+    {
+        /** @var array<string, list<string>> */
+        return collect($this->columns)
+            ->filter(fn (array $m): bool => ($m['entityLink'] ?? null) !== null)
+            ->groupBy(fn (array $m): string => $m['entityLink'])
+            ->map(fn (Collection $group): array => $group->pluck('target')->values()->all())
+            ->all();
+    }
+
     private function inferDataTypes(): void
     {
         $headers = $this->headers();
@@ -313,7 +324,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     public function hasMatchableFieldMapped(): bool
     {
         $matchableFields = collect($this->getImporter()->matchableFields())
-            ->reject(fn (MatchableField $field): bool => $field->isAlwaysCreate());
+            ->reject(fn (MatchableField $field): bool => $field->isCreate());
 
         if ($matchableFields->isEmpty()) {
             return true;
@@ -328,7 +339,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     private function buildMatchWarningDescription(): string
     {
         $matchableFields = collect($this->getImporter()->matchableFields())
-            ->reject(fn (MatchableField $field): bool => $field->isAlwaysCreate())
+            ->reject(fn (MatchableField $field): bool => $field->isCreate())
             ->sortByDesc(fn (MatchableField $field): int => $field->priority);
 
         $fieldLabels = $matchableFields
