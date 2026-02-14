@@ -115,9 +115,8 @@ final class ExecuteImportJob implements ShouldQueue
 
                     foreach ($rows as $row) {
                         $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $context, $results, $existingRecords);
+                        $this->flushProcessedRows($store);
                     }
-
-                    $this->flushProcessedRows($store);
                     $this->flushCustomFieldValues();
                     $this->flushFailedRows($import);
                     $this->persistResults($import, $results);

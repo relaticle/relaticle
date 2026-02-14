@@ -36,24 +36,14 @@ final class NoteImporter extends BaseImporter
 
             ImportField::make('title')
                 ->label('Title')
-                ->rules(['nullable', 'string', 'max:255'])
+                ->required()
+                ->rules(['required', 'string', 'max:255'])
                 ->guess([
                     'title', 'subject', 'note_title', 'heading',
                     'note subject', 'summary',
                 ])
                 ->example('Meeting Notes')
                 ->icon('heroicon-o-pencil-square'),
-
-            ImportField::make('content')
-                ->label('Content')
-                ->required()
-                ->rules(['required', 'string'])
-                ->guess([
-                    'content', 'body', 'text', 'note', 'notes',
-                    'note content', 'note body', 'description', 'details',
-                ])
-                ->example('Discussed project timeline and deliverables.')
-                ->icon('heroicon-o-document-text'),
         ]);
     }
 

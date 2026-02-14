@@ -48,9 +48,6 @@ final class Task extends Model implements HasCustomFields
     protected $fillable = [
         'user_id',
         'title',
-        'description',
-        'status',
-        'priority',
         'creation_source',
     ];
 

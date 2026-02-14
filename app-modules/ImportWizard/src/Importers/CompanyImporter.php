@@ -85,14 +85,32 @@ final class CompanyImporter extends BaseImporter
         if (filled($accountOwnerEmail)) {
             $user = $this->resolveTeamMemberByEmail($accountOwnerEmail);
             if ($user instanceof \App\Models\User) {
-                $data['account_owner_id'] = $user->getKey();
+                $context['account_owner_id'] = $user->getKey();
             }
         }
 
-        if (! $existing instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function afterSave(Model $record, array $context): void
+    {
+        parent::afterSave($record, $context);
+
+        $accountOwnerId = $context['account_owner_id'] ?? null;
+
+        if ($accountOwnerId === null) {
+            return;
+        }
+
+        /** @var Company $record */
+        $record->account_owner_id = $accountOwnerId;
+        $record->saveQuietly();
     }
 }

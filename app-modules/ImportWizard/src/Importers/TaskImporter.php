@@ -46,16 +46,6 @@ final class TaskImporter extends BaseImporter
                 ->example('Follow up with client')
                 ->icon('heroicon-o-check-circle'),
 
-            ImportField::make('description')
-                ->label('Description')
-                ->rules(['nullable', 'string'])
-                ->guess([
-                    'description', 'details', 'notes', 'body',
-                    'task description', 'task details',
-                ])
-                ->example('Schedule a follow-up call to discuss proposal')
-                ->icon('heroicon-o-document-text'),
-
             ImportField::make('assignee_email')
                 ->label('Assignee Email')
                 ->rules(['nullable', 'email'])

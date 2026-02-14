@@ -1427,3 +1427,415 @@ it('imports multi-select custom field with mixed option names resolved to IDs', 
         ->not->toContain('Alpha')
         ->not->toContain('Gamma');
 });
+
+// --- Missing Custom Field Type Tests ---
+
+it('imports phone custom field with comma-separated numbers as array', function (): void {
+    $cf = createTestCustomField($this, 'phones', 'phone');
+
+    createImportReadyStore($this, ['Name', 'Phones'], [
+        makeRow(2, ['Name' => 'John', 'Phones' => '+1-555-0101, +44-20-7946-0958'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Phones', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = collect($cfv->json_value)->all();
+    expect($jsonValue)->toBeArray()
+        ->toContain('+1-555-0101')
+        ->toContain('+44-20-7946-0958');
+});
+
+it('imports link custom field with URL value', function (): void {
+    $cf = createTestCustomField($this, 'website', 'link');
+
+    createImportReadyStore($this, ['Name', 'Website'], [
+        makeRow(2, ['Name' => 'John', 'Website' => 'https://example.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Website', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = collect($cfv->json_value)->all();
+    expect($jsonValue)->toContain('https://example.com');
+});
+
+it('imports toggle custom field with truthy values', function (): void {
+    $cf = createTestCustomField($this, 'is_active', 'toggle');
+
+    createImportReadyStore($this, ['Name', 'Active'], [
+        makeRow(2, ['Name' => 'John', 'Active' => 'yes'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Active', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->boolean_value)->toBeTrue();
+});
+
+it('imports toggle custom field with falsy values', function (): void {
+    $cf = createTestCustomField($this, 'opted_out', 'toggle');
+
+    createImportReadyStore($this, ['Name', 'OptedOut'], [
+        makeRow(2, ['Name' => 'John', 'OptedOut' => '0'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'OptedOut', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->boolean_value)->toBeFalse();
+});
+
+it('imports textarea custom field value', function (): void {
+    $cf = createTestCustomField($this, 'bio', 'textarea');
+
+    createImportReadyStore($this, ['Name', 'Bio'], [
+        makeRow(2, ['Name' => 'John', 'Bio' => 'A long biography text that spans multiple lines conceptually.'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Bio', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('A long biography text that spans multiple lines conceptually.');
+});
+
+it('imports rich-editor custom field value as text', function (): void {
+    $cf = createTestCustomField($this, 'detailed_notes', 'rich-editor');
+
+    createImportReadyStore($this, ['Name', 'Notes'], [
+        makeRow(2, ['Name' => 'John', 'Notes' => '<p>Bold statement</p>'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('<p>Bold statement</p>');
+});
+
+it('imports markdown-editor custom field value as text', function (): void {
+    $cf = createTestCustomField($this, 'readme', 'markdown-editor');
+
+    createImportReadyStore($this, ['Name', 'Readme'], [
+        makeRow(2, ['Name' => 'John', 'Readme' => '# Heading\n\nSome **bold** text'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Readme', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('# Heading\n\nSome **bold** text');
+});
+
+it('imports checkbox-list custom field with option names resolved to IDs', function (): void {
+    $cf = createTestCustomField($this, 'interests', 'checkbox-list', 'people', ['Sports', 'Music', 'Tech']);
+    $sportsOption = $cf->options->firstWhere('name', 'Sports');
+    $techOption = $cf->options->firstWhere('name', 'Tech');
+
+    createImportReadyStore($this, ['Name', 'Interests'], [
+        makeRow(2, ['Name' => 'John', 'Interests' => 'Sports, Tech'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Interests', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull();
+
+    $jsonValue = collect($cfv->json_value)->all();
+    expect($jsonValue)->toBeArray()
+        ->toContain((string) $sportsOption->id)
+        ->toContain((string) $techOption->id);
+});
+
+it('imports radio custom field with option name resolved to ID', function (): void {
+    $cf = createTestCustomField($this, 'size', 'radio', 'people', ['Small', 'Medium', 'Large']);
+    $mediumOption = $cf->options->firstWhere('name', 'Medium');
+
+    createImportReadyStore($this, ['Name', 'Size'], [
+        makeRow(2, ['Name' => 'John', 'Size' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Size', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->string_value)->toBe((string) $mediumOption->id);
+});
+
+it('imports toggle-buttons custom field with option name resolved to ID', function (): void {
+    $cf = createTestCustomField($this, 'urgency', 'toggle-buttons', 'people', ['Low', 'Normal', 'Urgent']);
+    $urgentOption = $cf->options->firstWhere('name', 'Urgent');
+
+    createImportReadyStore($this, ['Name', 'Urgency'], [
+        makeRow(2, ['Name' => 'John', 'Urgency' => 'Urgent'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Urgency', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->string_value)->toBe((string) $urgentOption->id);
+});
+
+it('imports color-picker custom field value as text', function (): void {
+    $cf = createTestCustomField($this, 'brand_color', 'color-picker');
+
+    createImportReadyStore($this, ['Name', 'Color'], [
+        makeRow(2, ['Name' => 'John', 'Color' => '#ff5733'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Color', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBe('#ff5733');
+});
+
+// --- Entity-Specific Importer Tests ---
+
+it('imports company with account_owner_email resolved to user', function (): void {
+    $owner = User::factory()->create();
+    $this->team->users()->attach($owner, ['role' => 'editor']);
+
+    createImportReadyStore($this, ['Name', 'Owner Email'], [
+        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => $owner->email], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Owner Email', target: 'account_owner_email'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Test Corp')->first();
+    expect($company)->not->toBeNull()
+        ->and((string) $company->account_owner_id)->toBe((string) $owner->id);
+});
+
+it('imports company with unknown account_owner_email ignoring the field', function (): void {
+    createImportReadyStore($this, ['Name', 'Owner Email'], [
+        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => 'nonexistent@example.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Owner Email', target: 'account_owner_email'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Test Corp')->first();
+    expect($company)->not->toBeNull()
+        ->and($company->account_owner_id)->toBeNull();
+});
+
+it('imports task with assignee_email resolved and synced', function (): void {
+    $assignee = User::factory()->create();
+    $this->team->users()->attach($assignee, ['role' => 'editor']);
+
+    createImportReadyStore($this, ['Title', 'Assignee Email'], [
+        makeRow(2, ['Title' => 'Test Task', 'Assignee Email' => $assignee->email], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+        ColumnData::toField(source: 'Assignee Email', target: 'assignee_email'),
+    ], ImportEntityType::Task);
+
+    runImportJob($this);
+
+    $task = Task::where('team_id', $this->team->id)->where('title', 'Test Task')->first();
+    expect($task)->not->toBeNull();
+
+    $assigneeIds = $task->assignees()->pluck('users.id')->map(fn ($id) => (string) $id)->all();
+    expect($assigneeIds)->toContain((string) $assignee->id);
+});
+
+it('imports task with unknown assignee_email without crashing', function (): void {
+    createImportReadyStore($this, ['Title', 'Assignee Email'], [
+        makeRow(2, ['Title' => 'Orphan Task', 'Assignee Email' => 'ghost@nowhere.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+        ColumnData::toField(source: 'Assignee Email', target: 'assignee_email'),
+    ], ImportEntityType::Task);
+
+    runImportJob($this);
+
+    $task = Task::where('team_id', $this->team->id)->where('title', 'Orphan Task')->first();
+    expect($task)->not->toBeNull()
+        ->and($task->assignees()->count())->toBe(0);
+});
+
+it('imports opportunity with company and contact entity links', function (): void {
+    $company = Company::factory()->create(['name' => 'Deal Corp', 'team_id' => $this->team->id]);
+    $contact = People::factory()->create(['name' => 'Deal Contact', 'team_id' => $this->team->id]);
+
+    $relationships = json_encode([
+        ['relationship' => 'company', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
+        ['relationship' => 'contact', 'action' => 'update', 'id' => (string) $contact->id, 'name' => null],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Company', 'Contact'], [
+        makeRow(2, ['Name' => 'Big Deal', 'Company' => 'Deal Corp', 'Contact' => 'Deal Contact'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
+        ColumnData::toEntityLink(source: 'Contact', matcherKey: 'name', entityLinkKey: 'contact'),
+    ], ImportEntityType::Opportunity);
+
+    runImportJob($this);
+
+    $opportunity = \App\Models\Opportunity::where('team_id', $this->team->id)->where('name', 'Big Deal')->first();
+    expect($opportunity)->not->toBeNull()
+        ->and((string) $opportunity->company_id)->toBe((string) $company->id)
+        ->and((string) $opportunity->contact_id)->toBe((string) $contact->id);
+});
+
+it('imports note with polymorphic entity links to company and person', function (): void {
+    $company = Company::factory()->create(['name' => 'Note Corp', 'team_id' => $this->team->id]);
+    $person = People::factory()->create(['name' => 'Note Person', 'team_id' => $this->team->id]);
+
+    $relationships = json_encode([
+        ['relationship' => 'companies', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
+        ['relationship' => 'people', 'action' => 'update', 'id' => (string) $person->id, 'name' => null],
+    ]);
+
+    createImportReadyStore($this, ['Title', 'Company', 'Person'], [
+        makeRow(2, ['Title' => 'Meeting Notes', 'Company' => 'Note Corp', 'Person' => 'Note Person'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'companies'),
+        ColumnData::toEntityLink(source: 'Person', matcherKey: 'name', entityLinkKey: 'people'),
+    ], ImportEntityType::Note);
+
+    runImportJob($this);
+
+    $note = \App\Models\Note::where('team_id', $this->team->id)->where('title', 'Meeting Notes')->first();
+    expect($note)->not->toBeNull();
+
+    expect($note->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all())
+        ->toContain((string) $company->id);
+
+    expect($note->people()->pluck('people.id')->map(fn ($id) => (string) $id)->all())
+        ->toContain((string) $person->id);
+});
+
+it('imports note with title field only', function (): void {
+    createImportReadyStore($this, ['Title'], [
+        makeRow(2, ['Title' => 'Quick note'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+    ], ImportEntityType::Note);
+
+    runImportJob($this);
+
+    $note = \App\Models\Note::where('team_id', $this->team->id)->where('title', 'Quick note')->first();
+    expect($note)->not->toBeNull()
+        ->and($note->creation_source)->toBe(CreationSource::IMPORT);
+});
+
+it('imports task with custom field values for select fields', function (): void {
+    $statusCf = createTestCustomField($this, 'task_status', 'select', 'task', ['To do', 'In progress', 'Done']);
+    $priorityCf = createTestCustomField($this, 'task_priority', 'select', 'task', ['Low', 'Medium', 'High']);
+    $inProgressOption = $statusCf->options->firstWhere('name', 'In progress');
+    $highOption = $priorityCf->options->firstWhere('name', 'High');
+
+    createImportReadyStore($this, ['Title', 'Status', 'Priority'], [
+        makeRow(2, ['Title' => 'Urgent Task', 'Status' => 'In progress', 'Priority' => 'High'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Title', target: 'title'),
+        ColumnData::toField(source: 'Status', target: "custom_fields_{$statusCf->code}"),
+        ColumnData::toField(source: 'Priority', target: "custom_fields_{$priorityCf->code}"),
+    ], ImportEntityType::Task);
+
+    runImportJob($this);
+
+    $task = Task::where('team_id', $this->team->id)->where('title', 'Urgent Task')->first();
+    expect($task)->not->toBeNull();
+
+    $statusCfv = getTestCustomFieldValue($this, (string) $task->id, (string) $statusCf->id);
+    expect($statusCfv)->not->toBeNull()
+        ->and($statusCfv->string_value)->toBe((string) $inProgressOption->id);
+
+    $priorityCfv = getTestCustomFieldValue($this, (string) $task->id, (string) $priorityCf->id);
+    expect($priorityCfv)->not->toBeNull()
+        ->and($priorityCfv->string_value)->toBe((string) $highOption->id);
+});
+
+it('imports company with custom field values for toggle and link', function (): void {
+    $icpCf = createTestCustomField($this, 'is_icp', 'toggle', 'company');
+    $linkedinCf = createTestCustomField($this, 'linkedin_url', 'link', 'company');
+
+    createImportReadyStore($this, ['Name', 'ICP', 'LinkedIn'], [
+        makeRow(2, ['Name' => 'Great Corp', 'ICP' => 'true', 'LinkedIn' => 'https://linkedin.com/company/great'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'ICP', target: "custom_fields_{$icpCf->code}"),
+        ColumnData::toField(source: 'LinkedIn', target: "custom_fields_{$linkedinCf->code}"),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Great Corp')->first();
+    expect($company)->not->toBeNull();
+
+    $icpCfv = getTestCustomFieldValue($this, (string) $company->id, (string) $icpCf->id);
+    expect($icpCfv)->not->toBeNull()
+        ->and($icpCfv->boolean_value)->toBeTrue();
+
+    $linkedinCfv = getTestCustomFieldValue($this, (string) $company->id, (string) $linkedinCf->id);
+    expect($linkedinCfv)->not->toBeNull()
+        ->and(collect($linkedinCfv->json_value)->all())->toContain('https://linkedin.com/company/great');
+});
