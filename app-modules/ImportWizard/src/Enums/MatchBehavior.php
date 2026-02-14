@@ -4,16 +4,28 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Enums;
 
-/**
- * Defines special matching behavior during import resolution.
- *
- * Fields without a MatchBehavior use the default: find existing or create new.
- *
- * - AlwaysCreate: Never look up existing records; always create new (e.g. name).
- * - UpdateOnly: Only update existing records; skip if no match found (e.g. Record ID).
- */
 enum MatchBehavior: string
 {
-    case AlwaysCreate = 'always_create';
-    case UpdateOnly = 'update_only';
+    case MatchOnly = 'match_only';
+    case MatchOrCreate = 'match_or_create';
+    case Create = 'create';
+
+    public function description(): string
+    {
+        return match ($this) {
+            self::MatchOnly => 'Only update existing records. Skip if not found.',
+            self::MatchOrCreate => 'Find existing record or create new if not found.',
+            self::Create => 'Always create a new record (no lookup).',
+        };
+    }
+
+    public function performsLookup(): bool
+    {
+        return $this !== self::Create;
+    }
+
+    public function createsOnNoMatch(): bool
+    {
+        return $this === self::MatchOrCreate || $this === self::Create;
+    }
 }
