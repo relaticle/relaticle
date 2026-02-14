@@ -170,6 +170,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
         return $this->columns()
             ->filter(fn (ColumnData $col): bool => $col->isEntityLinkMapping())
+            ->unique(fn (ColumnData $col): string => $col->entityLink)
             ->map(function (ColumnData $col) use ($connection): array {
                 $uniqueCount = $connection->selectOne(
                     "SELECT COUNT(*) as total FROM ({$this->uniqueRelationshipSubquery()}) sub",
