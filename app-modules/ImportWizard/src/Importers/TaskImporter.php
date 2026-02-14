@@ -11,6 +11,7 @@ use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\MatchableField;
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 
 /**
  * Importer for Task entities.
@@ -61,7 +62,7 @@ final class TaskImporter extends BaseImporter
             'assignees' => EntityLink::morphToMany('assignees', User::class)
                 ->matchableFields([
                     MatchableField::id(),
-                    MatchableField::email('email'),
+                    MatchableField::email('email', MatchBehavior::MatchOnly),
                 ])
                 ->label('Assignee')
                 ->guess([

@@ -11,6 +11,7 @@ use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Data\MatchableField;
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 
 final class CompanyImporter extends BaseImporter
 {
@@ -52,7 +53,7 @@ final class CompanyImporter extends BaseImporter
             'account_owner' => EntityLink::belongsTo('account_owner', User::class)
                 ->matchableFields([
                     MatchableField::id(),
-                    MatchableField::email('email'),
+                    MatchableField::email('email', MatchBehavior::MatchOnly),
                 ])
                 ->foreignKey('account_owner_id')
                 ->label('Account Owner')
