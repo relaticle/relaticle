@@ -13,7 +13,7 @@ final class MatchableField extends Data
         public readonly string $field,
         public readonly string $label,
         public readonly int $priority = 0,
-        public readonly ?MatchBehavior $behavior = null,
+        public readonly MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
         public readonly bool $multiValue = false,
     ) {}
 
@@ -23,36 +23,45 @@ final class MatchableField extends Data
             field: 'id',
             label: 'Record ID',
             priority: 100,
-            behavior: MatchBehavior::UpdateOnly,
+            behavior: MatchBehavior::MatchOnly,
         );
     }
 
-    public static function email(string $fieldKey = 'custom_fields_emails'): self
-    {
+    public static function email(
+        string $fieldKey = 'custom_fields_emails',
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
+    ): self {
         return new self(
             field: $fieldKey,
             label: 'Email',
             priority: 90,
+            behavior: $behavior,
             multiValue: true,
         );
     }
 
-    public static function domain(string $fieldKey = 'custom_fields_domains'): self
-    {
+    public static function domain(
+        string $fieldKey = 'custom_fields_domains',
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
+    ): self {
         return new self(
             field: $fieldKey,
             label: 'Domain',
             priority: 80,
+            behavior: $behavior,
             multiValue: true,
         );
     }
 
-    public static function phone(string $fieldKey = 'custom_fields_phone_number'): self
-    {
+    public static function phone(
+        string $fieldKey = 'custom_fields_phone_number',
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
+    ): self {
         return new self(
             field: $fieldKey,
             label: 'Phone',
             priority: 70,
+            behavior: $behavior,
             multiValue: true,
         );
     }
@@ -63,21 +72,17 @@ final class MatchableField extends Data
             field: 'name',
             label: 'Name',
             priority: 10,
-            behavior: MatchBehavior::AlwaysCreate,
+            behavior: MatchBehavior::Create,
         );
     }
 
     public function description(): string
     {
-        return match ($this->behavior) {
-            MatchBehavior::UpdateOnly => 'Only update existing records. Skip if not found.',
-            MatchBehavior::AlwaysCreate => 'Always create a new record (no lookup).',
-            default => 'Find existing record or create new if not found.',
-        };
+        return $this->behavior->description();
     }
 
-    public function isAlwaysCreate(): bool
+    public function isCreate(): bool
     {
-        return $this->behavior === MatchBehavior::AlwaysCreate;
+        return $this->behavior === MatchBehavior::Create;
     }
 }
