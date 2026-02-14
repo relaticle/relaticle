@@ -19,6 +19,8 @@ beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();
     $this->imports = [];
+
+    File::cleanDirectory(storage_path('app/imports'));
 });
 
 afterEach(function (): void {
