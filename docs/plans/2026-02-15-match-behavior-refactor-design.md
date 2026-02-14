@@ -18,9 +18,9 @@ This causes two bugs:
 ```php
 enum MatchBehavior: string
 {
-    case UpdateOnly = 'update_only';       // Record ID. Lookup, skip if not found.
-    case FindOrCreate = 'find_or_create';  // Email/Domain/Phone. Lookup, create if not found.
-    case AlwaysCreate = 'always_create';   // Name. No lookup, always create.
+    case MatchOnly = 'match_only';           // Record ID. Lookup, skip if not found.
+    case MatchOrCreate = 'match_or_create';  // Email/Domain/Phone. Lookup, create if not found.
+    case Create = 'create';                  // Name. No lookup, always create.
 }
 ```
 
@@ -30,13 +30,13 @@ No more `null` default. `?MatchBehavior` becomes `MatchBehavior` (non-nullable).
 
 | Matcher | Default Behavior | Description |
 |---------|-----------------|-------------|
-| Record ID | UpdateOnly | "Only update existing records. Skip if not found." |
-| Email | FindOrCreate | "Find existing record or create new if not found." |
-| Domain | FindOrCreate | "Find existing record or create new if not found." |
-| Phone | FindOrCreate | "Find existing record or create new if not found." |
-| Name | AlwaysCreate | "Always create a new record (no lookup)." |
+| Record ID | MatchOnly | "Only update existing records. Skip if not found." |
+| Email | MatchOrCreate | "Find existing record or create new if not found." |
+| Domain | MatchOrCreate | "Find existing record or create new if not found." |
+| Phone | MatchOrCreate | "Find existing record or create new if not found." |
+| Name | Create | "Always create a new record (no lookup)." |
 
-Descriptions match the existing UI. Email/Domain/Phone factory methods accept an optional `$behavior` parameter to override the default (e.g., `UpdateOnly` for User-targeting links).
+Descriptions match the existing UI. Email/Domain/Phone factory methods accept an optional `$behavior` parameter to override the default (e.g., `MatchOnly` for User-targeting links).
 
 ### Eliminate `EntityLink.canCreate`
 
@@ -52,20 +52,20 @@ enum MatchBehavior: string
     public function description(): string
     {
         return match ($this) {
-            self::UpdateOnly => 'Only update existing records. Skip if not found.',
-            self::FindOrCreate => 'Find existing record or create new if not found.',
-            self::AlwaysCreate => 'Always create a new record (no lookup).',
+            self::MatchOnly => 'Only update existing records. Skip if not found.',
+            self::MatchOrCreate => 'Find existing record or create new if not found.',
+            self::Create => 'Always create a new record (no lookup).',
         };
     }
 
     public function performsLookup(): bool
     {
-        return $this !== self::AlwaysCreate;
+        return $this !== self::Create;
     }
 
     public function createsOnNoMatch(): bool
     {
-        return $this === self::FindOrCreate || $this === self::AlwaysCreate;
+        return $this === self::MatchOrCreate || $this === self::Create;
     }
 }
 ```
@@ -76,8 +76,8 @@ Allow multiple CSV columns to map to the same entity link, each using a differen
 
 **Example flow:**
 - CSV columns: `company_domain`, `company_name`
-- Column A → Company > Domain (FindOrCreate)
-- Column B → Company > Name (AlwaysCreate)
+- Column A → Company > Domain (MatchOrCreate)
+- Column B → Company > Name (Create)
 
 **Per-row processing:**
 1. Domain lookup finds match → use existing Company (ignore Name column)
@@ -102,8 +102,8 @@ final class RelationshipMatch extends Data
 Each `ValidateColumnJob` writes a `RelationshipMatch` with the matcher's behavior. `ExecuteImportJob` groups entries by relationship key and applies merge logic:
 
 1. **Existing match wins**: If any entry is `existing` (lookup found a record), use that ID
-2. **AlwaysCreate provides name**: Among `create` entries, prefer AlwaysCreate's name for record creation
-3. **Fallback**: FindOrCreate without a sibling AlwaysCreate uses the lookup value as name (acceptable — user chose not to provide a Name column)
+2. **Create provides name**: Among `create` entries, prefer the Create matcher's name for record creation
+3. **Fallback**: MatchOrCreate without a sibling Create matcher uses the lookup value as name (acceptable — user chose not to provide a Name column)
 
 **UI changes — per-matcher mapping state:**
 
@@ -111,38 +111,38 @@ Instead of disabling an entire entity link when one column maps to it, show whic
 
 ### Importer changes
 
-User-targeting entity links explicitly set Email to UpdateOnly:
+User-targeting entity links explicitly set Email to MatchOnly:
 
 | Importer | Entity Link | Email Behavior |
 |----------|-------------|---------------|
-| CompanyImporter | account_owner → User | `UpdateOnly` |
-| TaskImporter | assignees → User | `UpdateOnly` |
+| CompanyImporter | account_owner → User | `MatchOnly` |
+| TaskImporter | assignees → User | `MatchOnly` |
 
 Custom field entity links via `getUniqueMatchableFieldsForEntity()` gain Name matcher for Company/People targets, enabling multi-column mapping:
 
 | Target | Matchers |
 |--------|----------|
-| Company | `[id(UpdateOnly), domain(FindOrCreate), name(AlwaysCreate)]` |
-| People | `[id(UpdateOnly), email(FindOrCreate), name(AlwaysCreate)]` |
-| Opportunity | `[id(UpdateOnly)]` |
+| Company | `[id(MatchOnly), domain(MatchOrCreate), name(Create)]` |
+| People | `[id(MatchOnly), email(MatchOrCreate), name(Create)]` |
+| Opportunity | `[id(MatchOnly)]` |
 
 ## Files to modify
 
 | File | Change |
 |------|--------|
-| `MatchBehavior.php` | 3 cases + `description()`, `performsLookup()`, `createsOnNoMatch()` |
-| `MatchableField.php` | `?MatchBehavior` → `MatchBehavior`. Factory methods explicit. `$behavior` param on email/domain/phone. `description()` delegates to enum. |
+| `MatchBehavior.php` | 3 cases: `MatchOnly`, `MatchOrCreate`, `Create` + `description()`, `performsLookup()`, `createsOnNoMatch()` |
+| `MatchableField.php` | `?MatchBehavior` → `MatchBehavior`. Factory methods explicit. `$behavior` param on email/domain/phone. `description()` delegates to enum. `isAlwaysCreate()` → `isCreate()`. |
 | `RelationshipMatch.php` | Add `?MatchBehavior $behavior` property. Update factory methods. |
 | `EntityLink.php` | Remove `canCreate` property, fluent method, all calls. Add Name to `getUniqueMatchableFieldsForEntity()`. |
-| `MatchResolver.php:38,80` | `AlwaysCreate` stays. Replace `UpdateOnly` check. Add `FindOrCreate` handling. |
-| `ValidateColumnJob.php:114,129` | Update for 3 behaviors. Pass behavior to `RelationshipMatch`. |
+| `MatchResolver.php:38,80` | Replace `AlwaysCreate` → `Create`, `UpdateOnly` → `MatchOnly`. |
+| `ValidateColumnJob.php:114,129` | Replace `AlwaysCreate` → `Create`, `UpdateOnly` → `MatchOnly`. Pass behavior to `RelationshipMatch`. |
 | `ExecuteImportJob.php:618-692` | Group relationships by key. Multi-column merge logic. Remove `$link->canCreate`. |
 | `MappingStep.php:225-229` | Replace `isEntityLinkMapped()` with per-matcher mapping tracking. |
-| `field-select.blade.php:211,280-305` | Per-matcher "in use" state instead of whole-link disable. |
-| `CompanyImporter.php:55` | `MatchableField::email('email', MatchBehavior::UpdateOnly)` |
-| `TaskImporter.php:64` | `MatchableField::email('email', MatchBehavior::UpdateOnly)` |
-| `EntityLinkValidator.php` | No changes (only uses `AlwaysCreate`). |
-| `MappingStep.php:316,331` | `isAlwaysCreate()` stays (same case name). |
+| `field-select.blade.php:211,280-305` | Per-matcher "in use" state instead of whole-link disable. `isAlwaysCreate()` → `isCreate()`. |
+| `CompanyImporter.php:55` | `MatchableField::email('email', MatchBehavior::MatchOnly)` |
+| `TaskImporter.php:64` | `MatchableField::email('email', MatchBehavior::MatchOnly)` |
+| `EntityLinkValidator.php:24,47` | Replace `AlwaysCreate` → `Create`. |
+| `MappingStep.php:316,331` | `isAlwaysCreate()` → `isCreate()`. |
 
 ## Verification
 
@@ -152,4 +152,4 @@ Custom field entity links via `getUniqueMatchableFieldsForEntity()` gain Name ma
 4. Manual UI check: Domain matcher on Company should show "Find existing record or create new if not found."
 5. Manual UI check: Email matcher on Account Owner should show "Only update existing records. Skip if not found."
 6. Manual UI check: Map two columns to same Company link (Domain + Name) — both should appear mapped.
-7. Manual import: FindOrCreate with Name column → unmatched domain creates Company with proper name.
+7. Manual import: MatchOrCreate with Name column → unmatched domain creates Company with proper name.

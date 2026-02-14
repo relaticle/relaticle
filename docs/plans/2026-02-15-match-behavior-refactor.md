@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Replace the split `MatchBehavior(null)` + `EntityLink.canCreate` system with 3 explicit enum cases (`UpdateOnly`, `FindOrCreate`, `AlwaysCreate`), enable multi-column entity link mapping, and eliminate garbage data creation.
+**Goal:** Replace the split `MatchBehavior(null)` + `EntityLink.canCreate` system with 3 explicit enum cases (`MatchOnly`, `MatchOrCreate`, `Create`), enable multi-column entity link mapping, and eliminate garbage data creation.
 
 **Architecture:** `MatchBehavior` becomes the single source of truth for matcher behavior. Every `MatchableField` gets an explicit non-nullable `MatchBehavior`. `EntityLink.canCreate` is eliminated. Multi-column entity links allow mapping both a lookup column (Domain) and a creation-data column (Name) to the same relationship.
 
@@ -30,27 +30,27 @@ namespace Relaticle\ImportWizard\Enums;
 
 enum MatchBehavior: string
 {
-    case UpdateOnly = 'update_only';
-    case FindOrCreate = 'find_or_create';
-    case AlwaysCreate = 'always_create';
+    case MatchOnly = 'match_only';
+    case MatchOrCreate = 'match_or_create';
+    case Create = 'create';
 
     public function description(): string
     {
         return match ($this) {
-            self::UpdateOnly => 'Only update existing records. Skip if not found.',
-            self::FindOrCreate => 'Find existing record or create new if not found.',
-            self::AlwaysCreate => 'Always create a new record (no lookup).',
+            self::MatchOnly => 'Only update existing records. Skip if not found.',
+            self::MatchOrCreate => 'Find existing record or create new if not found.',
+            self::Create => 'Always create a new record (no lookup).',
         };
     }
 
     public function performsLookup(): bool
     {
-        return $this !== self::AlwaysCreate;
+        return $this !== self::Create;
     }
 
     public function createsOnNoMatch(): bool
     {
-        return $this === self::FindOrCreate || $this === self::AlwaysCreate;
+        return $this === self::MatchOrCreate || $this === self::Create;
     }
 }
 ```
@@ -64,7 +64,7 @@ Expected: PASS (consumers will break — that's expected at this stage)
 
 ```bash
 git add app-modules/ImportWizard/src/Enums/MatchBehavior.php
-git commit -m "refactor: add FindOrCreate case to MatchBehavior enum"
+git commit -m "refactor: replace MatchBehavior with MatchOnly, MatchOrCreate, Create cases"
 ```
 
 ---
@@ -94,7 +94,7 @@ final class MatchableField extends Data
         public readonly string $field,
         public readonly string $label,
         public readonly int $priority = 0,
-        public readonly MatchBehavior $behavior = MatchBehavior::FindOrCreate,
+        public readonly MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
         public readonly bool $multiValue = false,
     ) {}
 
@@ -104,13 +104,13 @@ final class MatchableField extends Data
             field: 'id',
             label: 'Record ID',
             priority: 100,
-            behavior: MatchBehavior::UpdateOnly,
+            behavior: MatchBehavior::MatchOnly,
         );
     }
 
     public static function email(
         string $fieldKey = 'custom_fields_emails',
-        MatchBehavior $behavior = MatchBehavior::FindOrCreate,
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
     ): self {
         return new self(
             field: $fieldKey,
@@ -123,7 +123,7 @@ final class MatchableField extends Data
 
     public static function domain(
         string $fieldKey = 'custom_fields_domains',
-        MatchBehavior $behavior = MatchBehavior::FindOrCreate,
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
     ): self {
         return new self(
             field: $fieldKey,
@@ -136,7 +136,7 @@ final class MatchableField extends Data
 
     public static function phone(
         string $fieldKey = 'custom_fields_phone_number',
-        MatchBehavior $behavior = MatchBehavior::FindOrCreate,
+        MatchBehavior $behavior = MatchBehavior::MatchOrCreate,
     ): self {
         return new self(
             field: $fieldKey,
@@ -153,7 +153,7 @@ final class MatchableField extends Data
             field: 'name',
             label: 'Name',
             priority: 10,
-            behavior: MatchBehavior::AlwaysCreate,
+            behavior: MatchBehavior::Create,
         );
     }
 
@@ -162,19 +162,19 @@ final class MatchableField extends Data
         return $this->behavior->description();
     }
 
-    public function isAlwaysCreate(): bool
+    public function isCreate(): bool
     {
-        return $this->behavior === MatchBehavior::AlwaysCreate;
+        return $this->behavior === MatchBehavior::Create;
     }
 }
 ```
 
 Key changes:
 - `?MatchBehavior` → `MatchBehavior` (non-nullable)
-- Default changed from `null` to `MatchBehavior::FindOrCreate`
+- Default changed from `null` to `MatchBehavior::MatchOrCreate`
 - `email()`, `domain()`, `phone()` accept optional `$behavior` parameter
 - `description()` delegates to enum
-- All factory methods set explicit behavior
+- `isAlwaysCreate()` renamed to `isCreate()`
 
 **Step 2: Commit**
 
@@ -331,7 +331,7 @@ git commit -m "refactor: remove canCreate from EntityLink, add Name matcher to c
 - Modify: `app-modules/ImportWizard/src/Importers/CompanyImporter.php`
 - Modify: `app-modules/ImportWizard/src/Importers/TaskImporter.php`
 
-**Step 1: CompanyImporter — set Email to UpdateOnly for account_owner**
+**Step 1: CompanyImporter — set Email to MatchOnly for account_owner**
 
 In `defineEntityLinks()`, change:
 ```php
@@ -339,16 +339,16 @@ MatchableField::email('email'),
 ```
 To:
 ```php
-MatchableField::email('email', MatchBehavior::UpdateOnly),
+MatchableField::email('email', MatchBehavior::MatchOnly),
 ```
 
 Add `use Relaticle\ImportWizard\Enums\MatchBehavior;` import.
 
-**Step 2: TaskImporter — set Email to UpdateOnly for assignees**
+**Step 2: TaskImporter — set Email to MatchOnly for assignees**
 
 Same change in `defineEntityLinks()`:
 ```php
-MatchableField::email('email', MatchBehavior::UpdateOnly),
+MatchableField::email('email', MatchBehavior::MatchOnly),
 ```
 
 Add `use Relaticle\ImportWizard\Enums\MatchBehavior;` import.
@@ -357,7 +357,7 @@ Add `use Relaticle\ImportWizard\Enums\MatchBehavior;` import.
 
 ```bash
 git add app-modules/ImportWizard/src/Importers/CompanyImporter.php app-modules/ImportWizard/src/Importers/TaskImporter.php
-git commit -m "refactor: set Email to UpdateOnly for User-targeting entity links"
+git commit -m "refactor: set Email to MatchOnly for User-targeting entity links"
 ```
 
 ---
@@ -369,12 +369,16 @@ git commit -m "refactor: set Email to UpdateOnly for User-targeting entity links
 
 **Step 1: Update writeEntityLinkRelationships()**
 
-Line 114 — `AlwaysCreate` check stays (same case name, no change needed).
-
-Line 129 — Replace `UpdateOnly` check to skip for both `UpdateOnly` (unchanged):
+Line 114 — Replace `AlwaysCreate` with `Create`:
 ```php
-// No change needed — UpdateOnly still exists as a case
-if ($resolvedId === null && $matcher->behavior === MatchBehavior::UpdateOnly) {
+$resolvedMap = $matcher->behavior === MatchBehavior::Create
+    ? array_fill_keys($uniqueValues, null)
+    : $validator->getResolver()->batchResolve($link, $matcher, $uniqueValues);
+```
+
+Line 129 — Replace `UpdateOnly` with `MatchOnly`:
+```php
+if ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly) {
     continue;
 }
 ```
@@ -390,7 +394,7 @@ $match = $resolvedId !== null
 
 ```bash
 git add app-modules/ImportWizard/src/Jobs/ValidateColumnJob.php
-git commit -m "refactor: pass matcher behavior to RelationshipMatch in ValidateColumnJob"
+git commit -m "refactor: update ValidateColumnJob for new MatchBehavior cases"
 ```
 
 ---
@@ -400,22 +404,48 @@ git commit -m "refactor: pass matcher behavior to RelationshipMatch in ValidateC
 **Files:**
 - Modify: `app-modules/ImportWizard/src/Support/MatchResolver.php`
 
-**Step 1: Replace UpdateOnly in unmatched action logic**
+**Step 1: Replace enum case references**
 
-Line 38 — No change needed (checks `AlwaysCreate`, which still exists).
-
-Line 80 — `UpdateOnly` still exists, so the check is the same:
+Line 38 — Replace `AlwaysCreate` with `Create`:
 ```php
-$unmatchedAction = $matchField->behavior === MatchBehavior::UpdateOnly
+if ($matchField->behavior === MatchBehavior::Create) {
+```
+
+Line 80 — Replace `UpdateOnly` with `MatchOnly`:
+```php
+$unmatchedAction = $matchField->behavior === MatchBehavior::MatchOnly
     ? RowMatchAction::Skip
     : RowMatchAction::Create;
 ```
 
-No change needed. Verify by reading the file.
+**Step 2: Commit**
+
+```bash
+git add app-modules/ImportWizard/src/Support/MatchResolver.php
+git commit -m "refactor: update MatchResolver for new MatchBehavior cases"
+```
 
 ---
 
-### Task 8: Update ExecuteImportJob — Multi-Column Merge Logic
+### Task 8: Update EntityLinkValidator
+
+**Files:**
+- Modify: `app-modules/ImportWizard/src/Support/EntityLinkValidator.php`
+
+**Step 1: Replace AlwaysCreate with Create**
+
+Lines 24 and 47 — Replace `MatchBehavior::AlwaysCreate` with `MatchBehavior::Create`.
+
+**Step 2: Commit**
+
+```bash
+git add app-modules/ImportWizard/src/Support/EntityLinkValidator.php
+git commit -m "refactor: update EntityLinkValidator for new MatchBehavior cases"
+```
+
+---
+
+### Task 9: Update ExecuteImportJob — Multi-Column Merge Logic
 
 **Files:**
 - Modify: `app-modules/ImportWizard/src/Jobs/ExecuteImportJob.php`
@@ -517,24 +547,24 @@ private function resolveGroupedMatches(
 /** @param  Collection<int, RelationshipMatch>  $matches */
 private function resolveCreationName(Collection $matches): ?string
 {
-    $alwaysCreate = $matches->first(
-        fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::AlwaysCreate
+    $createMatch = $matches->first(
+        fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::Create
     );
 
-    $findOrCreate = $matches->first(
-        fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::FindOrCreate
+    $matchOrCreate = $matches->first(
+        fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::MatchOrCreate
     );
 
-    if ($findOrCreate !== null && $alwaysCreate !== null) {
-        return blank($alwaysCreate->name) ? null : $alwaysCreate->name;
+    if ($matchOrCreate !== null && $createMatch !== null) {
+        return blank($createMatch->name) ? null : $createMatch->name;
     }
 
-    if ($alwaysCreate !== null) {
-        return blank($alwaysCreate->name) ? null : $alwaysCreate->name;
+    if ($createMatch !== null) {
+        return blank($createMatch->name) ? null : $createMatch->name;
     }
 
-    if ($findOrCreate !== null) {
-        return blank($findOrCreate->name) ? null : $findOrCreate->name;
+    if ($matchOrCreate !== null) {
+        return blank($matchOrCreate->name) ? null : $matchOrCreate->name;
     }
 
     return null;
@@ -558,7 +588,7 @@ git commit -m "refactor: multi-column merge logic in ExecuteImportJob, remove ca
 
 ---
 
-### Task 9: Update MappingStep — Allow Multi-Column Entity Links
+### Task 10: Update MappingStep — Allow Multi-Column Entity Links
 
 **Files:**
 - Modify: `app-modules/ImportWizard/src/Livewire/Steps/MappingStep.php`
@@ -579,20 +609,24 @@ public function getMappedEntityLinkMatchers(): array
 }
 ```
 
-**Step 2: Keep isEntityLinkMapped() for auto-mapping**
+**Step 2: Rename isAlwaysCreate() references to isCreate()**
+
+Lines 316, 331 — Replace `isAlwaysCreate()` with `isCreate()`.
+
+**Step 3: Keep isEntityLinkMapped() for auto-mapping**
 
 `isEntityLinkMapped()` stays as-is — it's used by `autoMapEntityLinks()` to prevent auto-mapping when a link already has a column. This is correct behavior for auto-mapping (map one column per link automatically). Users can manually add more.
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
 git add app-modules/ImportWizard/src/Livewire/Steps/MappingStep.php
-git commit -m "refactor: add getMappedEntityLinkMatchers for per-matcher tracking"
+git commit -m "refactor: add getMappedEntityLinkMatchers, rename isAlwaysCreate to isCreate"
 ```
 
 ---
 
-### Task 10: Update Blade Templates — Per-Matcher Mapping State
+### Task 11: Update Blade Templates — Per-Matcher Mapping State
 
 **Files:**
 - Modify: `app-modules/ImportWizard/resources/views/livewire/steps/mapping-step.blade.php`
@@ -605,9 +639,9 @@ Change the `$mappedEntityLinkKeys` computation (lines 29-33) to pass per-matcher
 ```php
 $allMappedMatchers = $this->getMappedEntityLinkMatchers();
 $mappedEntityLinkMatchers = [];
-foreach ($allMappedMatchers as $linkKey => $matcherFields) {
-    $currentMappingMatcher = ($mapping?->entityLink === $linkKey) ? $mapping?->target : null;
-    $mappedEntityLinkMatchers[$linkKey] = array_values(
+foreach ($allMappedMatchers as $lk => $matcherFields) {
+    $currentMappingMatcher = ($mapping?->entityLink === $lk) ? $mapping?->target : null;
+    $mappedEntityLinkMatchers[$lk] = array_values(
         array_filter($matcherFields, fn ($f) => $f !== $currentMappingMatcher)
     );
 }
@@ -637,22 +671,13 @@ Replace the `$isLinkMapped` check (line 211):
 ```php
 $linkMappedMatchers = $mappedEntityLinkMatchers[$linkKey] ?? [];
 $isLinkFullyMapped = count($linkMappedMatchers) >= count($link->matchableFields) && !$isLinkSelected;
-$isLinkPartiallyMapped = count($linkMappedMatchers) > 0 && !$isLinkFullyMapped;
 ```
 
 Use `$isLinkFullyMapped` instead of `$isLinkMapped` for the disabled state on the entity link button. Only fully-mapped links (all matchers used) are disabled.
 
 **Step 4: Update matcher submenu — disable used matchers**
 
-In the matcher loop (line 279-305), add per-matcher disabled state:
-
-```php
-$isMatcherMappedElsewhere = in_array($matcher->field, $linkMappedMatchers ?? []);
-```
-
-Note: `$linkMappedMatchers` is not available inside the teleported submenu since it's computed per-row. Pass it via the component or compute it at the template level. Since the submenus are in a `@foreach ($entityLinks ...)` loop outside the rows, we need to get the matchers from the parent context. Use `$this->getMappedEntityLinkMatchers()[$linkKey] ?? []` directly.
-
-Update the matcher button to be disabled when already mapped by another column:
+In the matcher loop (line 279-305), add per-matcher disabled state. Since the submenus are teleported outside the per-row loop, use `$this->getMappedEntityLinkMatchers()` directly:
 
 ```php
 @php
@@ -661,29 +686,21 @@ Update the matcher button to be disabled when already mapped by another column:
 @endphp
 ```
 
-Apply disabled state to the button (similar pattern to field "in use"):
+Apply disabled state to the button:
 - Add `{{ $isMatcherUsed ? 'disabled' : '' }}`
 - Add opacity/cursor classes when disabled
 - Show "in use" badge when mapped elsewhere
 
-**Step 5: Commit**
+**Step 5: Rename isAlwaysCreate() to isCreate()**
+
+Line 299 — Replace `$matcher->isAlwaysCreate()` with `$matcher->isCreate()`.
+
+**Step 6: Commit**
 
 ```bash
 git add app-modules/ImportWizard/resources/views/livewire/steps/mapping-step.blade.php app-modules/ImportWizard/resources/views/components/field-select.blade.php
 git commit -m "feat: allow multi-column entity link mapping with per-matcher tracking"
 ```
-
----
-
-### Task 11: Update EntityLinkValidator (Verify — No Changes Needed)
-
-**Files:**
-- Verify: `app-modules/ImportWizard/src/Support/EntityLinkValidator.php`
-
-Lines 24 and 47 check `MatchBehavior::AlwaysCreate` — this case still exists.
-Lines do NOT reference `UpdateOnly`, `FindOrCreate`, or `canCreate`.
-
-Verify by reading the file. No changes needed.
 
 ---
 
@@ -694,13 +711,10 @@ Verify by reading the file. No changes needed.
 Run: `php artisan test --compact --filter=ImportWizard`
 
 Expected failures to fix:
-- `'returns validation error for UpdateOnly matcher when record not found'` — test name references `UpdateOnly`, which still exists. Test should pass. If it doesn't, investigate.
-- `'skips relationship for UpdateOnly when no match found'` — should still pass.
-- `'skips auto-creation when canCreate is false'` — will fail if the test relies on `canCreate` being false on the Opportunity entity link. The Opportunity link now only has `UpdateOnly` matchers, so `ValidateColumnJob` wouldn't produce a `create` entry. Update the test: the scenario is now about an `UpdateOnly` matcher that doesn't produce create entries.
-
-Fix the `canCreate` test:
-- Rename to `'does not create records for UpdateOnly matchers'`
-- Ensure the RelationshipMatch JSON in the test reflects the new behavior (behavior field, or null for backward compat)
+- Tests referencing `UpdateOnly` → rename to `MatchOnly`
+- Tests referencing `AlwaysCreate` → rename to `Create`
+- Tests referencing `isAlwaysCreate()` → rename to `isCreate()`
+- `'skips auto-creation when canCreate is false'` → update: Opportunity link now only has `MatchOnly` matchers. Rename test, ensure RelationshipMatch JSON reflects the new behavior.
 
 **Step 2: Run PHPStan**
 
@@ -709,6 +723,7 @@ Run: `vendor/bin/phpstan analyse app-modules/ImportWizard/src/`
 Fix any type errors from the refactor. Common issues:
 - `canCreate` property access on EntityLink
 - Nullable `?MatchBehavior` where non-nullable expected
+- Removed `isAlwaysCreate()` method calls
 
 **Step 3: Run Pint**
 
@@ -745,16 +760,16 @@ Report what changed and any edge cases to watch for.
 
 | File | What changes |
 |------|-------------|
-| `MatchBehavior.php` | Add `FindOrCreate` case. Add `description()`, `performsLookup()`, `createsOnNoMatch()`. |
-| `MatchableField.php` | `?MatchBehavior` → `MatchBehavior`. Default `FindOrCreate`. `$behavior` param on email/domain/phone. `description()` delegates to enum. |
+| `MatchBehavior.php` | `UpdateOnly` → `MatchOnly`. `AlwaysCreate` → `Create`. Add `MatchOrCreate`. Add `description()`, `performsLookup()`, `createsOnNoMatch()`. |
+| `MatchableField.php` | `?MatchBehavior` → `MatchBehavior`. Default `MatchOrCreate`. `$behavior` param on email/domain/phone. `description()` delegates to enum. `isAlwaysCreate()` → `isCreate()`. |
 | `RelationshipMatch.php` | Add `?MatchBehavior $behavior` property. Update factory methods. |
 | `EntityLink.php` | Remove `canCreate` property, fluent method, all `->canCreate()` calls, `fromCustomField()` canCreate logic. Add Name to `getUniqueMatchableFieldsForEntity()`. |
-| `CompanyImporter.php:55` | `MatchableField::email('email', MatchBehavior::UpdateOnly)` |
-| `TaskImporter.php:64` | `MatchableField::email('email', MatchBehavior::UpdateOnly)` |
-| `ValidateColumnJob.php:133-135` | Pass `$matcher->behavior` to `RelationshipMatch` factory methods. |
-| `MatchResolver.php` | No changes (`UpdateOnly` and `AlwaysCreate` cases still exist). |
-| `ExecuteImportJob.php` | Group-and-merge logic. New `resolveGroupedMatches()` + `resolveCreationName()`. Remove `resolveMatchId()`. |
-| `MappingStep.php` | Add `getMappedEntityLinkMatchers()`. |
+| `CompanyImporter.php:55` | `MatchableField::email('email', MatchBehavior::MatchOnly)` |
+| `TaskImporter.php:64` | `MatchableField::email('email', MatchBehavior::MatchOnly)` |
+| `ValidateColumnJob.php` | `AlwaysCreate` → `Create`, `UpdateOnly` → `MatchOnly`. Pass `$matcher->behavior` to `RelationshipMatch`. |
+| `MatchResolver.php` | `AlwaysCreate` → `Create`, `UpdateOnly` → `MatchOnly`. |
+| `EntityLinkValidator.php` | `AlwaysCreate` → `Create`. |
+| `ExecuteImportJob.php` | Group-and-merge logic. New `resolveGroupedMatches()` + `resolveCreationName()`. Remove `resolveMatchId()` + `$link->canCreate`. |
+| `MappingStep.php` | Add `getMappedEntityLinkMatchers()`. `isAlwaysCreate()` → `isCreate()`. |
 | `mapping-step.blade.php` | Pass per-matcher mapping data to field-select. |
-| `field-select.blade.php` | Per-matcher "in use" state. Allow selecting unused matchers on partially-mapped links. |
-| `EntityLinkValidator.php` | No changes (only uses `AlwaysCreate`). |
+| `field-select.blade.php` | Per-matcher "in use" state. `isAlwaysCreate()` → `isCreate()`. Allow selecting unused matchers on partially-mapped links. |
