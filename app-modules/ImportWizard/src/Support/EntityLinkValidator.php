@@ -21,7 +21,7 @@ final readonly class EntityLinkValidator
 
     public function validate(EntityLink $link, MatchableField $matcher, mixed $value): ?string
     {
-        if ($matcher->behavior === MatchBehavior::AlwaysCreate) {
+        if ($matcher->behavior === MatchBehavior::Create) {
             return null;
         }
 
@@ -44,7 +44,7 @@ final readonly class EntityLinkValidator
      */
     public function batchValidate(EntityLink $link, MatchableField $matcher, array $uniqueValues): array
     {
-        if ($matcher->behavior === MatchBehavior::AlwaysCreate) {
+        if ($matcher->behavior === MatchBehavior::Create) {
             return array_fill_keys($uniqueValues, null);
         }
 
