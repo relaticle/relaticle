@@ -117,12 +117,37 @@
     @apply rounded-xl shadow-sm;
 }
 
-.fi-ta-content {
-    @apply rounded-xl overflow-hidden;
+/* Compact table density */
+.fi-ta-header-cell {
+    @apply py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400;
 }
 
-.fi-ta-table {
-    /*@apply rounded-xl overflow-hidden;*/
+.fi-ta-text:not(.fi-inline),
+.fi-ta-icon:not(.fi-inline),
+.fi-ta-color:not(.fi-inline),
+.fi-ta-image:not(.fi-inline) {
+    @apply px-3 py-2;
+}
+
+.fi-ta-cell:has(.fi-ta-actions) {
+    @apply px-3 py-2;
+}
+
+.fi-ta-cell:has(.fi-ta-record-checkbox) {
+    @apply py-2;
+}
+
+.fi-ta-cell.fi-ta-selection-cell {
+    @apply py-2 text-start first-of-type:ps-4 sm:first-of-type:ps-4;
+}
+
+/* Column borders on body rows only (header uses resize handle's visual separator) */
+.fi-ta-table tbody td:not(:last-child):not(.fi-ta-selection-cell) {
+    @apply border-r border-gray-100 dark:border-gray-800;
+}
+
+.fi-ta-content {
+    @apply rounded-xl overflow-hidden;
 }
 
 .fi-ta-table thead {

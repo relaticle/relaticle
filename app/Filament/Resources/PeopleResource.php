@@ -104,6 +104,7 @@ final class PeopleResource extends Resource
                 TextColumn::make('name')
                     ->label('Person')
                     ->searchable()
+                    ->sortable()
                     ->view('filament.tables.columns.avatar-name-column'),
                 TextColumn::make('company.name')
                     ->label('Company')

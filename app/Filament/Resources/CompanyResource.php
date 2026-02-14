@@ -24,7 +24,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -66,10 +65,11 @@ final class CompanyResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('logo')->label('')->imageSize(28)->square(),
                 TextColumn::make('name')
+                    ->label('Company')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->view('filament.tables.columns.logo-name-column'),
                 TextColumn::make('accountOwner.name')
                     ->label('Account Owner')
                     ->searchable()

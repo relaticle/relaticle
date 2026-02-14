@@ -6,6 +6,7 @@ namespace App\Filament\Resources\NoteResource\Pages;
 
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource;
+use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
@@ -18,6 +19,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 
 final class ManageNotes extends ManageRecords
 {
+    use HasResizableColumn;
     use InteractsWithCustomFields;
 
     protected static string $resource = NoteResource::class;

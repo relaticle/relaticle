@@ -6,6 +6,7 @@ namespace App\Filament\Resources\PeopleResource\Pages;
 
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
+use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
@@ -18,6 +19,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 final class ListPeople extends ListRecords
 {
+    use HasResizableColumn;
     use InteractsWithCustomFields;
 
     protected static string $resource = PeopleResource::class;

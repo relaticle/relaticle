@@ -26,7 +26,7 @@ it('can render the view page', function (): void {
 it('can render `:dataset` column', function (string $column): void {
     livewire(App\Filament\Resources\CompanyResource\Pages\ListCompanies::class)
         ->assertCanRenderTableColumn($column);
-})->with(['logo', 'name', 'accountOwner.name', 'creator.name', 'created_at', 'updated_at']);
+})->with(['name', 'accountOwner.name', 'creator.name', 'created_at', 'updated_at']);
 
 it('cannot render `:dataset` column', function (string $column): void {
     livewire(App\Filament\Resources\CompanyResource\Pages\ListCompanies::class)
@@ -36,12 +36,12 @@ it('cannot render `:dataset` column', function (string $column): void {
 it('has `:dataset` column', function (string $column): void {
     livewire(App\Filament\Resources\CompanyResource\Pages\ListCompanies::class)
         ->assertTableColumnExists($column);
-})->with(['logo', 'name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+})->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('shows `:dataset` column', function (string $column): void {
     livewire(App\Filament\Resources\CompanyResource\Pages\ListCompanies::class)
         ->assertTableColumnVisible($column);
-})->with(['logo', 'name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+})->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
     $records = App\Models\Company::factory(3)->for($this->user->personalTeam())->create();

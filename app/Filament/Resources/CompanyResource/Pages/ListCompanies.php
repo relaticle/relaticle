@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
+use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
@@ -18,6 +19,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 
 final class ListCompanies extends ListRecords
 {
+    use HasResizableColumn;
     use InteractsWithCustomFields;
 
     /** @var class-string<CompanyResource> */

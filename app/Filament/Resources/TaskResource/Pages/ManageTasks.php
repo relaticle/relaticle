@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
+use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
@@ -18,6 +19,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class ManageTasks extends ManageRecords
 {
+    use HasResizableColumn;
     use InteractsWithCustomFields;
 
     protected static string $resource = TaskResource::class;

@@ -6,6 +6,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource;
+use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
@@ -18,6 +19,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 
 final class ListOpportunities extends ListRecords
 {
+    use HasResizableColumn;
     use InteractsWithCustomFields;
 
     protected static string $resource = OpportunityResource::class;

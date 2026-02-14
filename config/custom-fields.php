@@ -2,10 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\PeopleResource;
+use App\Filament\Resources\TaskResource;
+use App\Models\Company;
+use App\Models\Note;
 use App\Models\People;
+use App\Models\Task;
 use Relaticle\CustomFields\EntitySystem\EntityConfigurator;
 use Relaticle\CustomFields\EntitySystem\EntityModel;
+use Relaticle\CustomFields\Enums\AvatarShape;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\FeatureSystem\FeatureConfigurator;
 use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
@@ -30,10 +37,22 @@ return [
                 avatarConfiguration: EntityModel::avatar(attribute: 'avatar'),
             ),
             EntityModel::configure(
-                modelClass: \App\Models\Company::class,
+                modelClass: Company::class,
                 primaryAttribute: 'name',
-                resourceClass: \App\Filament\Resources\CompanyResource::class,
-                avatarConfiguration: EntityModel::avatar(attribute: 'logo', shape: \Relaticle\CustomFields\Enums\AvatarShape::Square),
+                resourceClass: CompanyResource::class,
+                avatarConfiguration: EntityModel::avatar(attribute: 'logo', shape: AvatarShape::Square),
+            ),
+            EntityModel::configure(
+                modelClass: Note::class,
+                primaryAttribute: 'title',
+                resourceClass: NoteResource::class,
+                recordPage: null,
+            ),
+            EntityModel::configure(
+                modelClass: Task::class,
+                primaryAttribute: 'title',
+                resourceClass: TaskResource::class,
+                recordPage: null,
             ),
         ])
         ->cache(),

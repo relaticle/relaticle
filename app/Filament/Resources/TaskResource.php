@@ -67,7 +67,6 @@ final class TaskResource extends Resource
             ->columns([
                 TextColumn::make('title')
                     ->searchable()
-                    ->wrap()
                     ->limit(50)
                     ->weight('medium'),
                 TextColumn::make('assignees.name')

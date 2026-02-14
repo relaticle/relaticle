@@ -1,0 +1,46 @@
+/* Resized Column Styles */
+.column-resize-handle-bar {
+    position: absolute;
+    top: 50%;
+    height: 66.666667%;
+    transform: translateY(-50%);
+    width: 1rem;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    right: -0.5rem;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+}
+
+.column-resize-handle-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: rgb(209 213 219);
+    transform: translateX(1px);
+    transition-property: all;
+    transition-duration: 300ms;
+}
+
+.dark .column-resize-handle-bar::before {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.column-resize-handle-bar:hover::before,
+.column-resize-handle-bar.active::before {
+    width: 2px;
+    background-color: rgb(var(--primary-500));
+}
+
+/* Active resize handle */
+.column-resize-handle-bar.active::before {
+    width: 4px !important;
+}
+/* Table header cell styles */
+.fi-ta-header-cell {
+    position: relative;
+}
