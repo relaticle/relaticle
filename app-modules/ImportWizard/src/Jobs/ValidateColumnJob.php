@@ -111,7 +111,7 @@ final class ValidateColumnJob implements ShouldQueue
         $link = $context['link'];
         $matcher = $context['matcher'];
 
-        $resolvedMap = $matcher->behavior === MatchBehavior::AlwaysCreate
+        $resolvedMap = $matcher->behavior === MatchBehavior::Create
             ? array_fill_keys($uniqueValues, null)
             : $validator->getResolver()->batchResolve($link, $matcher, $uniqueValues);
 
@@ -126,13 +126,13 @@ final class ValidateColumnJob implements ShouldQueue
             $inserts = [];
 
             foreach ($resolvedMap as $value => $resolvedId) {
-                if ($resolvedId === null && $matcher->behavior === MatchBehavior::UpdateOnly) {
+                if ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly) {
                     continue;
                 }
 
                 $match = $resolvedId !== null
-                    ? RelationshipMatch::existing($link->key, (string) $resolvedId)
-                    : RelationshipMatch::create($link->key, (string) $value);
+                    ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior)
+                    : RelationshipMatch::create($link->key, (string) $value, $matcher->behavior);
 
                 $inserts[] = [
                     'lookup_value' => (string) $value,
