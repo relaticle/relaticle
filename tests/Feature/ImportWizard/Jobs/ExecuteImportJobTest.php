@@ -1708,15 +1708,22 @@ it('imports company with account_owner resolved for team owner', function (): vo
         ->and((string) $company->account_owner_id)->toBe((string) $this->user->id);
 });
 
-it('imports task with assignee_email resolved and synced', function (): void {
+it('imports task with assignee resolved by email via entity link', function (): void {
     $assignee = User::factory()->create();
     $this->team->users()->attach($assignee, ['role' => 'editor']);
 
+    $relationships = json_encode([
+        ['relationship' => 'assignees', 'action' => 'update', 'id' => (string) $assignee->id, 'name' => null],
+    ]);
+
     createImportReadyStore($this, ['Title', 'Assignee Email'], [
-        makeRow(2, ['Title' => 'Test Task', 'Assignee Email' => $assignee->email], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(2, ['Title' => 'Test Task', 'Assignee Email' => $assignee->email], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
     ], [
         ColumnData::toField(source: 'Title', target: 'title'),
-        ColumnData::toField(source: 'Assignee Email', target: 'assignee_email'),
+        ColumnData::toEntityLink(source: 'Assignee Email', matcherKey: 'email', entityLinkKey: 'assignees'),
     ], ImportEntityType::Task);
 
     runImportJob($this);
@@ -1728,12 +1735,14 @@ it('imports task with assignee_email resolved and synced', function (): void {
     expect($assigneeIds)->toContain((string) $assignee->id);
 });
 
-it('imports task with unknown assignee_email without crashing', function (): void {
+it('imports task with unmatched assignee email skipping silently', function (): void {
     createImportReadyStore($this, ['Title', 'Assignee Email'], [
-        makeRow(2, ['Title' => 'Orphan Task', 'Assignee Email' => 'ghost@nowhere.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(2, ['Title' => 'Orphan Task', 'Assignee Email' => 'ghost@nowhere.com'], [
+            'match_action' => RowMatchAction::Create->value,
+        ]),
     ], [
         ColumnData::toField(source: 'Title', target: 'title'),
-        ColumnData::toField(source: 'Assignee Email', target: 'assignee_email'),
+        ColumnData::toEntityLink(source: 'Assignee Email', matcherKey: 'email', entityLinkKey: 'assignees'),
     ], ImportEntityType::Task);
 
     runImportJob($this);

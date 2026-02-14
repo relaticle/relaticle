@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Importers;
 
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -14,8 +15,8 @@ use Relaticle\ImportWizard\Data\MatchableField;
 /**
  * Importer for Task entities.
  *
- * Tasks have polymorphic relationships with companies, people, and opportunities.
- * They can only be matched by ID.
+ * Tasks have polymorphic relationships with companies, people, opportunities,
+ * and assignees (users). They can only be matched by ID.
  */
 final class TaskImporter extends BaseImporter
 {
@@ -45,16 +46,6 @@ final class TaskImporter extends BaseImporter
                 ])
                 ->example('Follow up with client')
                 ->icon('heroicon-o-check-circle'),
-
-            ImportField::make('assignee_email')
-                ->label('Assignee Email')
-                ->rules(['nullable', 'email'])
-                ->guess([
-                    'assignee', 'assigned_to', 'owner', 'assignee_email',
-                    'assigned_email', 'owner_email', 'responsible',
-                ])
-                ->example('user@company.com')
-                ->icon('heroicon-o-envelope'),
         ]);
     }
 
@@ -67,6 +58,16 @@ final class TaskImporter extends BaseImporter
             'companies' => EntityLink::polymorphicCompanies(),
             'people' => EntityLink::polymorphicPeople(),
             'opportunities' => EntityLink::polymorphicOpportunities(),
+            'assignees' => EntityLink::morphToMany('assignees', User::class)
+                ->matchableFields([
+                    MatchableField::id(),
+                    MatchableField::email('email'),
+                ])
+                ->label('Assignee')
+                ->guess([
+                    'assignee', 'assigned_to', 'owner', 'assignee_email',
+                    'assigned_email', 'owner_email', 'responsible',
+                ]),
         ];
     }
 
@@ -89,45 +90,10 @@ final class TaskImporter extends BaseImporter
     {
         $data = parent::prepareForSave($data, $existing, $context);
 
-        $assigneeEmail = $data['assignee_email'] ?? null;
-        unset($data['assignee_email']);
-
-        if (filled($assigneeEmail)) {
-            $user = $this->resolveTeamMemberByEmail($assigneeEmail);
-            if ($user instanceof \App\Models\User) {
-                $context['assignee_id'] = $user->getKey();
-            }
-        }
-
         if (! $existing instanceof Model) {
             return $this->initializeNewRecordData($data, $context['creator_id'] ?? null);
         }
 
         return $data;
-    }
-
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    public function afterSave(Model $record, array $context): void
-    {
-        parent::afterSave($record, $context);
-
-        $this->syncAssignee($record, $context);
-    }
-
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    private function syncAssignee(Model $record, array $context): void
-    {
-        $assigneeId = $context['assignee_id'] ?? null;
-
-        if ($assigneeId === null) {
-            return;
-        }
-
-        /** @var Task $record */
-        $record->assignees()->syncWithoutDetaching([$assigneeId]);
     }
 }
