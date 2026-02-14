@@ -7,8 +7,6 @@ namespace Relaticle\ImportWizard\Importers;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\Team;
-use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -220,18 +218,6 @@ abstract class BaseImporter implements ImporterContract
     {
         return $customField->typeData->dataType->isChoiceField()
             && ! $customField->typeData->acceptsArbitraryValues;
-    }
-
-    protected function resolveTeamMemberByEmail(?string $email): ?User
-    {
-        if (blank($email)) {
-            return null;
-        }
-
-        return User::query()
-            ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $this->teamId))
-            ->where('email', trim($email))
-            ->first();
     }
 
     /**

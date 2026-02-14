@@ -139,13 +139,11 @@ it('skips relationship for UpdateOnly when no match found', function (): void {
     expect($row->relationships)->toBeNull();
 });
 
-it('writes validation errors for invalid email field values', function (): void {
-    $column = ColumnData::toField(source: 'Owner Email', target: 'account_owner_email');
+it('writes validation errors for unresolvable account owner entity link', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Owner Email', matcherKey: 'email', entityLinkKey: 'account_owner');
 
     createValidationStore($this, ['Name', 'Owner Email'], [
-        makeValidationRow(1, ['Name' => 'Acme', 'Owner Email' => 'valid@example.com']),
-        makeValidationRow(2, ['Name' => 'Beta', 'Owner Email' => 'not-an-email']),
-        makeValidationRow(3, ['Name' => 'Gamma', 'Owner Email' => 'also@valid.org']),
+        makeValidationRow(1, ['Name' => 'Acme', 'Owner Email' => 'nonexistent@example.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         $column,
@@ -153,9 +151,9 @@ it('writes validation errors for invalid email field values', function (): void 
 
     (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
 
-    $invalidRow = $this->store->query()->where('row_number', 2)->first();
+    $row = $this->store->query()->where('row_number', 1)->first();
 
-    expect($invalidRow->hasValidationError('Owner Email'))->toBeTrue();
+    expect($row->hasValidationError('Owner Email'))->toBeTrue();
 });
 
 it('writes validation errors for entity link column with invalid id', function (): void {
