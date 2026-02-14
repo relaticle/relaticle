@@ -14,6 +14,7 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Models\Import;
@@ -457,7 +458,7 @@ it('processes rows in chunks without issues', function (): void {
 
 it('auto-creates company when entity link value is unresolved', function (): void {
     $relationships = json_encode([
-        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'New Corp'],
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'New Corp', 'behavior' => MatchBehavior::Create->value],
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
@@ -482,7 +483,7 @@ it('auto-creates company when entity link value is unresolved', function (): voi
 
 it('deduplicates auto-created companies across multiple rows', function (): void {
     $relationships = json_encode([
-        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'Same Corp'],
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'Same Corp', 'behavior' => MatchBehavior::Create->value],
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
@@ -516,9 +517,9 @@ it('deduplicates auto-created companies across multiple rows', function (): void
     });
 });
 
-it('skips auto-creation when canCreate is false', function (): void {
+it('skips auto-creation for entity links with only MatchOnly matchers', function (): void {
     $relationships = json_encode([
-        ['relationship' => 'opportunities', 'action' => 'create', 'id' => null, 'name' => 'Big Deal'],
+        ['relationship' => 'opportunities', 'action' => 'create', 'id' => null, 'name' => 'Big Deal', 'behavior' => MatchBehavior::MatchOnly->value],
     ]);
 
     createImportReadyStore($this, ['Title', 'Opportunity'], [
@@ -569,7 +570,7 @@ it('calls store() for MorphToMany entity links after record save', function (): 
 
 it('auto-created records have correct team and creation source', function (): void {
     $relationships = json_encode([
-        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'Auto Corp'],
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'Auto Corp', 'behavior' => MatchBehavior::Create->value],
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
@@ -824,7 +825,7 @@ it('handles accented Latin characters in name fields', function (): void {
 
 it('handles international data with entity link auto-creation', function (): void {
     $relationships = json_encode([
-        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => '株式会社テスト'],
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => '株式会社テスト', 'behavior' => MatchBehavior::Create->value],
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
@@ -960,7 +961,7 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
     for ($i = 2; $i <= 1001; $i++) {
         $companyName = $companyNames[($i - 2) % count($companyNames)];
         $relationships = json_encode([
-            ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => $companyName],
+            ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => $companyName, 'behavior' => MatchBehavior::Create->value],
         ]);
 
         $rows[] = makeRow($i, ['Name' => "Person {$i}", 'Company' => $companyName], [
