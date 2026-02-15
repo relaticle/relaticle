@@ -110,16 +110,6 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Whether this entity requires a unique identifier for matching.
-     *
-     * Override to change this behavior.
-     */
-    public function requiresUniqueIdentifier(): bool
-    {
-        return true;
-    }
-
-    /**
      * Get fields that can be used to match imported rows to existing records.
      *
      * Override in child classes to specify entity-specific matching fields.
@@ -202,7 +192,7 @@ abstract class BaseImporter implements ImporterContract
 
             return ImportField::make("custom_fields_{$customField->code}")
                 ->label($customField->name)
-                ->guess(self::buildCustomFieldGuesses($customField->code, $customField->name))
+                ->guess($this->buildCustomFieldGuesses($customField->code, $customField->name))
                 ->required($validationService->isRequired($customField))
                 ->rules($importRules)
                 ->asCustomField()
@@ -225,7 +215,7 @@ abstract class BaseImporter implements ImporterContract
     /**
      * @return array<string>
      */
-    private static function buildCustomFieldGuesses(string $code, string $name): array
+    private function buildCustomFieldGuesses(string $code, string $name): array
     {
         $guesses = [$code, $name];
 

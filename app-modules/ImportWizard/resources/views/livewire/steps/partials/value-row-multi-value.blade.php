@@ -5,7 +5,8 @@
     $storedError = $valueData->validation_error;
     $validationError = ValidationError::fromStorageFormat($storedError);
     $perValueErrors = $validationError?->getItemErrors() ?? [];
-    $hasErrors = !empty($perValueErrors);
+    $simpleMessage = $validationError?->getMessage();
+    $hasErrors = !empty($perValueErrors) || $simpleMessage !== null;
 
     $inputType = match(true) {
         str_contains(strtolower($selectedColumn->target), 'email') => 'email',
@@ -38,6 +39,14 @@
     x-on:multi-value-change.debounce.300ms="handleChange($event.detail)"
     class="flex-1 min-w-0 flex items-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
 >
+    @if ($simpleMessage !== null)
+        <span
+            x-tooltip="{ content: @js($simpleMessage), theme: $store.theme }"
+            class="ml-2 cursor-help shrink-0"
+        >
+            <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500"/>
+        </span>
+    @endif
     <div class="flex-1 min-w-0" wire:ignore>
         <x-import-wizard-new::multi-value-input
             :value="$mappedValue"

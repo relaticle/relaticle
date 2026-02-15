@@ -27,11 +27,14 @@ use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\EntityLinkStorage;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
+use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
@@ -58,11 +61,17 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
     private array $createdRecords = [];
 
+    /** @var array<string, string> Matchable value => record ID for intra-import dedup */
+    private array $matchableValueCache = [];
+
     /** @var list<array{row: int, error: string, data?: array<string, mixed>}> */
     private array $failedRows = [];
 
     /** @var list<int> */
     private array $processedRows = [];
+
+    /** @var list<int> Row numbers promoted from Create to Update by intra-import dedup */
+    private array $dedupedRows = [];
 
     /** @var list<array<string, mixed>> */
     private array $pendingCustomFieldValues = [];
@@ -102,6 +111,11 @@ final class ExecuteImportJob implements ShouldQueue
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
         $customFieldFormatMap = $this->buildCustomFieldFormatMap($fieldMappings);
 
+        $matchField = $this->resolveMatchField($importer, $fieldMappings);
+        $matchSourceColumn = $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField
+            ? $this->findMatchSourceColumn($matchField, $fieldMappings)
+            : null;
+
         $context = [
             'team_id' => $this->teamId,
             'creator_id' => $import->user_id,
@@ -111,11 +125,11 @@ final class ExecuteImportJob implements ShouldQueue
             $store->query()
                 ->where('processed', false)
                 ->orderBy('row_number')
-                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $context, &$results, $store, $import): void {
+                ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, $store, $import): void {
                     $existingRecords = $this->preloadExistingRecords($rows, $importer);
 
                     foreach ($rows as $row) {
-                        $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $context, $results, $existingRecords);
+                        $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, $results, $existingRecords);
                         $this->flushProcessedRows($store);
                     }
                     $this->flushCustomFieldValues();
@@ -188,6 +202,8 @@ final class ExecuteImportJob implements ShouldQueue
         array $allowedKeys,
         Collection $customFieldDefs,
         array $customFieldFormatMap,
+        ?MatchableField $matchField,
+        ?string $matchSourceColumn,
         array $context,
         array &$results,
         array $existingRecords = [],
@@ -199,22 +215,38 @@ final class ExecuteImportJob implements ShouldQueue
             return;
         }
 
+        $effectiveAction = $row->match_action;
+        $effectiveMatchedId = $row->matched_id;
+
+        if ($effectiveAction === RowMatchAction::Create
+            && $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField
+            && $matchSourceColumn !== null
+        ) {
+            $cachedRecordId = $this->lookupMatchableValueCache($row, $matchField, $matchSourceColumn);
+
+            if ($cachedRecordId !== null) {
+                $effectiveAction = RowMatchAction::Update;
+                $effectiveMatchedId = $cachedRecordId;
+                $this->dedupedRows[] = $row->row_number;
+            }
+        }
+
+        $isCreate = $effectiveAction === RowMatchAction::Create;
+
         try {
             $data = $this->buildDataFromRow($row, $fieldMappings);
-            $existing = $row->isUpdate()
-                ? ($existingRecords[(string) $row->matched_id] ?? $this->findExistingRecord($importer, $row->matched_id))
-                : null;
+            $existing = $isCreate
+                ? (null)
+                : $existingRecords[(string) $effectiveMatchedId] ?? $this->findExistingRecord($importer, $effectiveMatchedId);
 
-            if ($row->isUpdate() && ! $existing instanceof Model) {
+            if (! $isCreate && ! $existing instanceof Model) {
                 $results['skipped']++;
                 $this->markProcessed($row);
 
                 return;
             }
 
-            $isCreate = $row->isCreate();
-
-            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $allowedKeys, $customFieldDefs, $customFieldFormatMap, &$results): void {
+            DB::transaction(function () use ($row, $importer, $data, $existing, $context, $isCreate, $matchField, $matchSourceColumn, $allowedKeys, $customFieldDefs, $customFieldFormatMap, &$results): void {
                 $pendingRelationships = $this->resolveEntityLinkRelationships($row, $data, $importer, $context);
 
                 $prepared = $importer->prepareForSave($data, $existing, $context);
@@ -223,6 +255,7 @@ final class ExecuteImportJob implements ShouldQueue
 
                 if (! $isCreate) {
                     unset($prepared['team_id'], $prepared['creator_id'], $prepared['creation_source']);
+                    $prepared = array_filter($prepared, filled(...));
                 }
 
                 $record = $isCreate
@@ -236,6 +269,10 @@ final class ExecuteImportJob implements ShouldQueue
                 $record->forceFill($prepared);
                 $record->save();
 
+                if ($isCreate && $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField && $matchSourceColumn !== null) {
+                    $this->registerInMatchableValueCache($row, $matchField, $matchSourceColumn, (string) $record->getKey());
+                }
+
                 $this->storeEntityLinkRelationships($record, $pendingRelationships, $context);
 
                 $results[$isCreate ? 'created' : 'updated']++;
@@ -244,7 +281,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $batchableData = array_intersect_key($storedCustomFieldData, $customFieldDefs->all());
                 $remainingData = array_diff_key($storedCustomFieldData, $batchableData);
 
-                $this->collectCustomFieldValues($record, $batchableData, $customFieldDefs, $customFieldFormatMap);
+                $this->collectCustomFieldValues($record, $batchableData, $customFieldDefs, $customFieldFormatMap, $isCreate);
 
                 if ($remainingData !== []) {
                     ImportDataStorage::setMultiple($record, $remainingData);
@@ -286,6 +323,7 @@ final class ExecuteImportJob implements ShouldQueue
         array $customFieldData,
         Collection $customFieldDefs,
         array $customFieldFormatMap = [],
+        bool $isCreate = true,
     ): void {
         if ($customFieldData === []) {
             return;
@@ -304,6 +342,10 @@ final class ExecuteImportJob implements ShouldQueue
 
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
             $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
+
+            if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
+                $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
+            }
 
             $row = [
                 'id' => (string) Str::ulid(),
@@ -327,6 +369,53 @@ final class ExecuteImportJob implements ShouldQueue
 
             $this->pendingCustomFieldValues[] = $row;
         }
+    }
+
+    /**
+     * @param  array<int, int|string>  $newValues
+     * @return array<int, int|string>
+     */
+    private function mergeWithExistingMultiChoiceValues(
+        Model $record,
+        CustomField $cf,
+        array $newValues,
+        string $tenantKey,
+    ): array {
+        $entityType = $record->getMorphClass();
+        $entityId = $record->getKey();
+        $cfId = $cf->getKey();
+
+        $existingValues = [];
+
+        foreach ($this->pendingCustomFieldValues as $pending) {
+            if ($pending['entity_type'] === $entityType
+                && (string) $pending['entity_id'] === (string) $entityId
+                && (string) $pending['custom_field_id'] === (string) $cfId
+                && $pending['json_value'] !== null
+            ) {
+                $existingValues = json_decode($pending['json_value'], true) ?? [];
+            }
+        }
+
+        if ($existingValues === []) {
+            $table = config('custom-fields.database.table_names.custom_field_values');
+            $dbRow = DB::table($table)
+                ->where('entity_type', $entityType)
+                ->where('entity_id', $entityId)
+                ->where('custom_field_id', $cfId)
+                ->where($tenantKey, $this->teamId)
+                ->value('json_value');
+
+            if ($dbRow !== null) {
+                $existingValues = json_decode($dbRow, true) ?? [];
+            }
+        }
+
+        if ($existingValues === []) {
+            return $newValues;
+        }
+
+        return array_values(array_unique([...$existingValues, ...$newValues]));
     }
 
     private function flushCustomFieldValues(): void
@@ -357,6 +446,14 @@ final class ExecuteImportJob implements ShouldQueue
 
     private function flushProcessedRows(ImportStore $store): void
     {
+        if ($this->dedupedRows !== []) {
+            $store->connection()->table('import_rows')
+                ->whereIn('row_number', $this->dedupedRows)
+                ->update(['match_action' => RowMatchAction::Update->value]);
+
+            $this->dedupedRows = [];
+        }
+
         if ($this->processedRows === []) {
             return;
         }
@@ -612,6 +709,83 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
+     * Resolve the highest-priority matchable field from the mapped columns.
+     *
+     * Returns null if no matchable field is mapped or the match behavior is Create-only.
+     *
+     * @param  Collection<int, ColumnData>  $fieldMappings
+     */
+    private function resolveMatchField(BaseImporter $importer, Collection $fieldMappings): ?MatchableField
+    {
+        $mappedFieldKeys = $fieldMappings->pluck('target')->all();
+        $matchField = $importer->getMatchFieldForMappedColumns($mappedFieldKeys);
+
+        if (! $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField || $matchField->isCreate()) {
+            return null;
+        }
+
+        return $matchField;
+    }
+
+    /**
+     * Find the CSV source column name that maps to the given matchable field.
+     *
+     * @param  Collection<int, ColumnData>  $fieldMappings
+     */
+    private function findMatchSourceColumn(MatchableField $matchField, Collection $fieldMappings): ?string
+    {
+        $mapping = $fieldMappings->first(
+            fn (ColumnData $col): bool => $col->target === $matchField->field
+        );
+
+        return $mapping?->source;
+    }
+
+    private function lookupMatchableValueCache(ImportRow $row, MatchableField $matchField, string $sourceColumn): ?string
+    {
+        foreach ($this->normalizeMatchableValues($row, $matchField, $sourceColumn) as $normalized) {
+            if (isset($this->matchableValueCache[$normalized])) {
+                return $this->matchableValueCache[$normalized];
+            }
+        }
+
+        return null;
+    }
+
+    private function registerInMatchableValueCache(ImportRow $row, MatchableField $matchField, string $sourceColumn, string $recordId): void
+    {
+        foreach ($this->normalizeMatchableValues($row, $matchField, $sourceColumn) as $normalized) {
+            $this->matchableValueCache[$normalized] = $recordId;
+        }
+    }
+
+    /**
+     * Extract and normalize the matchable values from a row's source column.
+     *
+     * For multi-value fields (email, phone), splits on commas.
+     * Returns lowercased, trimmed, non-empty strings.
+     *
+     * @return list<string>
+     */
+    private function normalizeMatchableValues(ImportRow $row, MatchableField $matchField, string $sourceColumn): array
+    {
+        $rawValue = $row->getFinalValue($sourceColumn);
+
+        if (blank($rawValue)) {
+            return [];
+        }
+
+        $parts = $matchField->multiValue
+            ? explode(',', (string) $rawValue)
+            : [(string) $rawValue];
+
+        return array_values(array_filter(
+            array_map(fn (string $part): string => mb_strtolower(trim($part)), $parts),
+            fn (string $v): bool => $v !== '',
+        ));
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $context
      * @return array<int, array{link: EntityLink, strategy: EntityLinkStorageInterface, ids: array<int|string>}>
@@ -678,10 +852,20 @@ final class ExecuteImportJob implements ShouldQueue
             return null;
         }
 
-        $dedupKey = "{$link->key}:".mb_strtolower(trim($creationName));
+        $creationName = trim($creationName);
+
+        if ($creationName === '') {
+            return null;
+        }
+
+        $dedupKey = "{$link->key}:".mb_strtolower($creationName);
 
         if (isset($this->createdRecords[$dedupKey])) {
             return $this->createdRecords[$dedupKey];
+        }
+
+        if ($link->storageType === EntityLinkStorage::CustomFieldValue) {
+            return $this->resolveRecordFieldByName($link, $creationName, $context, $dedupKey);
         }
 
         /** @var Model $record */
@@ -703,27 +887,45 @@ final class ExecuteImportJob implements ShouldQueue
     /** @param  Collection<int, RelationshipMatch>  $matches */
     private function resolveCreationName(Collection $matches): ?string
     {
-        $createMatch = $matches->first(
+        $preferred = $matches->first(
             fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::Create
         );
 
-        $matchOrCreate = $matches->first(
+        $preferred ??= $matches->first(
             fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::MatchOrCreate
         );
 
-        if ($matchOrCreate !== null && $createMatch !== null) {
-            return blank($createMatch->name) ? null : $createMatch->name;
+        if ($preferred === null || blank($preferred->name)) {
+            return null;
         }
 
-        if ($createMatch !== null) {
-            return blank($createMatch->name) ? null : $createMatch->name;
+        return $preferred->name;
+    }
+
+    /**
+     * Record custom fields should never auto-create target entities, only match existing ones.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function resolveRecordFieldByName(
+        EntityLink $link,
+        string $name,
+        array $context,
+        string $dedupKey,
+    ): ?string {
+        $record = $link->targetModelClass::query()
+            ->where('team_id', $context['team_id'])
+            ->where('name', $name)
+            ->first();
+
+        if ($record === null) {
+            return null;
         }
 
-        if ($matchOrCreate !== null) {
-            return blank($matchOrCreate->name) ? null : $matchOrCreate->name;
-        }
+        $id = (string) $record->getKey();
+        $this->createdRecords[$dedupKey] = $id;
 
-        return null;
+        return $id;
     }
 
     /** @param  array<string, int>  $results */

@@ -247,14 +247,14 @@ final class EntityLink extends Data
 
     public function matchesHeader(string $header): bool
     {
-        $normalized = self::normalizeHeader($header);
+        $normalized = $this->normalizeHeader($header);
 
         $candidates = array_merge([$this->key, $this->label], $this->guesses);
 
-        return array_any($candidates, fn (string $candidate): bool => self::normalizeHeader($candidate) === $normalized);
+        return array_any($candidates, fn (string $candidate): bool => $this->normalizeHeader($candidate) === $normalized);
     }
 
-    private static function normalizeHeader(string $value): string
+    private function normalizeHeader(string $value): string
     {
         return str($value)->lower()->replace(['-', '_'], ' ')->squish()->toString();
     }

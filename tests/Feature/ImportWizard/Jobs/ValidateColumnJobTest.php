@@ -88,7 +88,7 @@ it('writes RelationshipMatch create for Create entity links', function (): void 
         $column,
     ]);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->not->toBeNull()
@@ -113,7 +113,7 @@ it('writes RelationshipMatch existing when resolved to existing record', functio
         $column,
     ]);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->not->toBeNull()
@@ -133,7 +133,7 @@ it('skips relationship for MatchOnly when no match found', function (): void {
         $column,
     ]);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->toBeNull();
@@ -149,7 +149,7 @@ it('writes validation errors for unresolvable account owner entity link', functi
         $column,
     ], ImportEntityType::Company);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 1)->first();
 
@@ -166,7 +166,7 @@ it('writes validation errors for entity link column with invalid id', function (
         $column,
     ]);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 1)->first();
 
@@ -195,7 +195,7 @@ it('clears validation for corrected date fields', function (): void {
         $column,
     ], ImportEntityType::Task);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $correctedRow = $this->store->query()->where('row_number', 1)->first();
     $uncorrectedRow = $this->store->query()->where('row_number', 2)->first();
@@ -207,7 +207,7 @@ it('clears validation for corrected date fields', function (): void {
 it('skips validation when import does not exist', function (): void {
     $column = ColumnData::toField(source: 'Name', target: 'name');
 
-    $job = new ValidateColumnJob('nonexistent-import-id', $column, (string) $this->team->id);
+    $job = new ValidateColumnJob('nonexistent-import-id', $column);
 
     try {
         $job->handle();
@@ -227,7 +227,7 @@ it('skips validation when all values are empty', function (): void {
         $column,
     ], ImportEntityType::Company);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 1)->first();
     expect($row->validation)->toBeNull();
@@ -251,10 +251,37 @@ it('appends to existing relationships array without overwriting', function (): v
         $column,
     ]);
 
-    (new ValidateColumnJob($this->import->id, $column, (string) $this->team->id))->handle();
+    (new ValidateColumnJob($this->import->id, $column))->handle();
 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->toHaveCount(2)
         ->and($row->relationships[0]->relationship)->toBe('contact')
         ->and($row->relationships[1]->relationship)->toBe('company');
+});
+
+it('validates color picker hex format', function (): void {
+    $column = ColumnData::toField(source: 'Color', target: 'custom_fields_brand_color');
+    $column->importField = new ImportField(
+        key: 'custom_fields_brand_color',
+        label: 'Brand Color',
+        rules: ['regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+        isCustomField: true,
+        type: FieldDataType::STRING,
+    );
+
+    createValidationStore($this, ['Name', 'Color'], [
+        makeValidationRow(1, ['Name' => 'John', 'Color' => 'not-a-color']),
+        makeValidationRow(2, ['Name' => 'Jane', 'Color' => '#ff5733']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $invalidRow = $this->store->query()->where('row_number', 1)->first();
+    $validRow = $this->store->query()->where('row_number', 2)->first();
+
+    expect($invalidRow->hasValidationError('Color'))->toBeTrue()
+        ->and($validRow->hasValidationError('Color'))->toBeFalse();
 });

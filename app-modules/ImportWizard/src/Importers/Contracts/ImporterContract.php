@@ -64,11 +64,6 @@ interface ImporterContract
     public function getMatchFieldForMappedColumns(array $mappedFields): ?\Relaticle\ImportWizard\Data\MatchableField;
 
     /**
-     * Whether this entity requires a unique identifier for matching.
-     */
-    public function requiresUniqueIdentifier(): bool;
-
-    /**
      * Prepare data for saving to the database.
      *
      * This method transforms the mapped CSV data into model-ready data.

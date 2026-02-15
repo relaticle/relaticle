@@ -682,12 +682,6 @@ it('persists failed row details in store metadata', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $importer = $this->import->getImporter();
-    $originalPrepare = null;
-
-    $callCount = 0;
-    \Mockery::mock('overload:nothing');
-
     runImportJob($this);
 
     $import = $this->import->fresh();
@@ -1879,4 +1873,237 @@ it('imports company with custom field values for toggle and link', function (): 
     $linkedinCfv = getTestCustomFieldValue($this, (string) $company->id, (string) $linkedinCf->id);
     expect($linkedinCfv)->not->toBeNull()
         ->and(collect($linkedinCfv->json_value)->all())->toContain('https://linkedin.com/company/great');
+});
+
+// --- Intra-Import Dedup Tests ---
+
+it('deduplicates Create rows with same matchable email value', function (): void {
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'Lay', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Ray', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->updated_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
+
+    $people = People::where('team_id', $this->team->id)->whereIn('name', ['Lay', 'Ray'])->get();
+    expect($people)->toHaveCount(1)
+        ->and($people->first()->name)->toBe('Ray');
+
+    $row3 = $this->store->query()->where('row_number', 3)->first();
+    expect($row3->match_action)->toBe(RowMatchAction::Update);
+});
+
+it('does not dedup Create rows with different matchable values', function (): void {
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'Alice', 'Email' => 'alice@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Bob', 'Email' => 'bob@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(2)
+        ->and($import->updated_rows)->toBe(0);
+
+    $people = People::where('team_id', $this->team->id)->whereIn('name', ['Alice', 'Bob'])->get();
+    expect($people)->toHaveCount(2);
+});
+
+it('deduplicates Create rows with multi-value matchable field', function (): void {
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'First', 'Email' => 'shared@acme.com, extra@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Second', 'Email' => 'shared@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->updated_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
+
+    $people = People::where('team_id', $this->team->id)->whereIn('name', ['First', 'Second'])->get();
+    expect($people)->toHaveCount(1)
+        ->and($people->first()->name)->toBe('Second');
+});
+
+it('deduplicates company Create rows by domain', function (): void {
+    createImportReadyStore($this, ['Name', 'Domain'], [
+        makeRow(2, ['Name' => 'Acme Inc', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Acme Corp', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->updated_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
+
+    $companies = Company::where('team_id', $this->team->id)->whereIn('name', ['Acme Inc', 'Acme Corp'])->get();
+    expect($companies)->toHaveCount(1)
+        ->and($companies->first()->name)->toBe('Acme Corp');
+});
+
+// --- Multi-Choice Merge Tests ---
+
+it('merges multi-choice custom field values during update', function (): void {
+    $cf = createTestCustomField($this, 'merge_emails', 'email');
+
+    $person = People::factory()->create([
+        'name' => 'Merge Test',
+        'team_id' => $this->team->id,
+    ]);
+
+    \App\Models\CustomFieldValue::create([
+        'custom_field_id' => $cf->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'json_value' => ['old@work.com'],
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name', 'Email'], [
+        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Merge Test', 'Email' => 'new@work.com'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->updated_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and(collect($cfv->json_value)->all())->toBe(['old@work.com', 'new@work.com']);
+});
+
+it('merges multi-choice custom field values during dedup', function (): void {
+    $emailField = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if ($emailField === null) {
+        $this->markTestSkipped('No emails custom field configured');
+    }
+
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'Dedup A', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Dedup B', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->updated_rows)->toBe(1);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'Dedup B')->first();
+    expect($person)->not->toBeNull();
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $emailField->id);
+    expect($cfv)->not->toBeNull()
+        ->and(collect($cfv->json_value)->all())->toBe(['a@test.com']);
+});
+
+it('does not duplicate existing multi-choice values during merge', function (): void {
+    $cf = createTestCustomField($this, 'dedup_emails', 'email');
+
+    $person = People::factory()->create([
+        'name' => 'Dedup Merge',
+        'team_id' => $this->team->id,
+    ]);
+
+    \App\Models\CustomFieldValue::create([
+        'custom_field_id' => $cf->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'json_value' => ['shared@work.com'],
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name', 'Email'], [
+        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Dedup Merge', 'Email' => 'shared@work.com, new@work.com'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->updated_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(0);
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and(collect($cfv->json_value)->all())->toBe(['shared@work.com', 'new@work.com']);
+});
+
+it('does not auto-create record for custom field entity link', function (): void {
+    $recordCf = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('type', 'record')
+        ->first();
+
+    if ($recordCf === null) {
+        $this->markTestSkipped('No record-type custom field configured for people');
+    }
+
+    $companyCountBefore = Company::where('team_id', $this->team->id)->count();
+
+    $relationships = json_encode([
+        ['relationship' => "cf_{$recordCf->code}", 'action' => 'create', 'id' => null, 'name' => 'Nonexistent Corp', 'behavior' => MatchBehavior::MatchOrCreate->value],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Related Company'], [
+        makeRow(2, ['Name' => 'Test Person', 'Related Company' => 'Nonexistent Corp'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Related Company', matcherKey: 'name', entityLinkKey: "cf_{$recordCf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $companyCountAfter = Company::where('team_id', $this->team->id)->count();
+    expect($companyCountAfter)->toBe($companyCountBefore);
 });

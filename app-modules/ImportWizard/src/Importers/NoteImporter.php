@@ -70,14 +70,6 @@ final class NoteImporter extends BaseImporter
     }
 
     /**
-     * Notes don't require unique identifiers - always create new.
-     */
-    public function requiresUniqueIdentifier(): bool
-    {
-        return false;
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  &$context
      * @return array<string, mixed>
