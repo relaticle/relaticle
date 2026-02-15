@@ -24,7 +24,7 @@ final class TopTeamsTableWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $pollingInterval = null;
+    private ?string $pollingInterval = null;
 
     /** @var array<int, string> */
     private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];

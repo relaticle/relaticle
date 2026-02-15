@@ -22,7 +22,7 @@ final class Dashboard extends BaseDashboard
 
     protected static ?string $navigationLabel = 'Dashboard';
 
-    public function getColumns(): int|array
+    public function getColumns(): array
     {
         return [
             'default' => 1,

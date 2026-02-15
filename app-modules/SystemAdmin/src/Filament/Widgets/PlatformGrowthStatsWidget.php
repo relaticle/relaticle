@@ -167,13 +167,13 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
                 $query = $modelClass::query()->whereBetween('created_at', [$segmentStart, $segmentEnd]);
 
-                if ($scope) {
+                if ($scope instanceof \Closure) {
                     $scope($query);
                 }
 
                 return $query->count();
             })
-            ->toArray();
+            ->all();
     }
 
     /**
@@ -200,7 +200,7 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
                         ->count()
                 );
             })
-            ->toArray();
+            ->all();
     }
 
     private function calculateChange(int $current, int $previous): float

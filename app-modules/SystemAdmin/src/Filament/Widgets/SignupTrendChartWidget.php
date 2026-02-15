@@ -60,14 +60,14 @@ final class SignupTrendChartWidget extends ChartWidget
             fn (array $interval): int => User::query()
                 ->whereBetween('created_at', [$interval['start'], $interval['end']])
                 ->count()
-        )->toArray();
+        )->all();
 
         $teamCounts = $intervals->map(
             fn (array $interval): int => Team::query()
                 ->where('personal_team', false)
                 ->whereBetween('created_at', [$interval['start'], $interval['end']])
                 ->count()
-        )->toArray();
+        )->all();
 
         return [
             'datasets' => [
