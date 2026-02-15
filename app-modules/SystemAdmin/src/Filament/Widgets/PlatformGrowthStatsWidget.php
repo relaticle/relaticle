@@ -29,6 +29,9 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
     protected ?string $pollingInterval = null;
 
+    /** @var array<int, class-string> */
+    private const array ENTITY_CLASSES = [Company::class, People::class, Task::class, Note::class, Opportunity::class];
+
     protected function getStats(): array
     {
         [$currentStart, $currentEnd, $previousStart, $previousEnd] = $this->getPeriodDates();
@@ -128,9 +131,7 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
     private function countRecordsInPeriod(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        $entityClasses = [Company::class, People::class, Task::class, Note::class, Opportunity::class];
-
-        return collect($entityClasses)->sum(
+        return collect(self::ENTITY_CLASSES)->sum(
             fn (string $class): int => $class::query()
                 ->where('creation_source', '!=', CreationSource::SYSTEM)
                 ->whereBetween('created_at', [$start, $end])
@@ -182,18 +183,17 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
     {
         $days = (int) $start->diffInDays($end);
         $points = min($days, 7);
-        $entityClasses = [Company::class, People::class, Task::class, Note::class, Opportunity::class];
 
         if ($points <= 0) {
             return [0];
         }
 
         return collect(range($points - 1, 0))
-            ->map(function (int $i) use ($start, $days, $points, $entityClasses): int {
+            ->map(function (int $i) use ($start, $days, $points): int {
                 $segmentStart = $start->addDays((int) (($points - 1 - $i) * ($days / $points)));
                 $segmentEnd = $start->addDays((int) (($points - $i) * ($days / $points)));
 
-                return collect($entityClasses)->sum(
+                return collect(self::ENTITY_CLASSES)->sum(
                     fn (string $class): int => $class::query()
                         ->where('creation_source', '!=', CreationSource::SYSTEM)
                         ->whereBetween('created_at', [$segmentStart, $segmentEnd])

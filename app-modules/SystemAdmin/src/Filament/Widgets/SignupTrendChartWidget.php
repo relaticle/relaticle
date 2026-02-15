@@ -9,6 +9,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Support\Collection;
 
 final class SignupTrendChartWidget extends ChartWidget
 {
@@ -96,9 +97,9 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
      */
-    private function buildIntervals(CarbonImmutable $start, CarbonImmutable $end, int $days): \Illuminate\Support\Collection
+    private function buildIntervals(CarbonImmutable $start, CarbonImmutable $end, int $days): Collection
     {
         if ($days <= 30) {
             return $this->buildDailyIntervals($start, $days);
@@ -112,9 +113,9 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
      */
-    private function buildDailyIntervals(CarbonImmutable $start, int $days): \Illuminate\Support\Collection
+    private function buildDailyIntervals(CarbonImmutable $start, int $days): Collection
     {
         return collect(range(0, $days - 1))->map(fn (int $i): array => [
             'label' => $start->addDays($i)->format('M j'),
@@ -124,9 +125,9 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
      */
-    private function buildWeeklyIntervals(CarbonImmutable $start, CarbonImmutable $end): \Illuminate\Support\Collection
+    private function buildWeeklyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
     {
         $intervals = collect();
         $current = $start->startOfWeek();
@@ -145,9 +146,9 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
      */
-    private function buildMonthlyIntervals(CarbonImmutable $start, CarbonImmutable $end): \Illuminate\Support\Collection
+    private function buildMonthlyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
     {
         $intervals = collect();
         $current = $start->startOfMonth();

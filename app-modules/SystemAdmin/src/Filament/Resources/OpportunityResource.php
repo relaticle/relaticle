@@ -42,7 +42,9 @@ final class OpportunityResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
+        $count = self::getModel()::query()->count();
+
+        return $count > 0 ? (string) $count : null;
     }
 
     #[Override]
