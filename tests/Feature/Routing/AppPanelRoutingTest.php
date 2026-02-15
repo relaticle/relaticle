@@ -122,6 +122,18 @@ describe('getPublicUrl macro', function () {
         expect(url()->getPublicUrl('about'))->toBe('https://example.com/about');
     });
 
+    it('returns clean base URL when path is empty', function () {
+        config(['app.url' => 'https://example.com']);
+
+        expect(url()->getPublicUrl())->toBe('https://example.com');
+    });
+
+    it('preserves port in URL', function () {
+        config(['app.url' => 'http://localhost:8080']);
+
+        expect(url()->getPublicUrl('about'))->toBe('http://localhost:8080/about');
+    });
+
     it('is not affected by app panel domain config', function () {
         config(['app.app_panel_domain' => 'app.example.com']);
         config(['app.url' => 'https://example.com']);
