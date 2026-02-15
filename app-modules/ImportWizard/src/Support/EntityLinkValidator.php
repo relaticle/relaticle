@@ -4,18 +4,30 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Support;
 
+use App\Models\CustomField;
+use Illuminate\Support\Facades\Validator;
+use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 
-final readonly class EntityLinkValidator
+final class EntityLinkValidator
 {
-    private EntityLinkResolver $resolver;
+    private readonly EntityLinkResolver $resolver;
+
+    private readonly string $teamId;
+
+    /** @var array<string, array<int, string>> */
+    private array $formatRulesCache = [];
+
+    /** @var array<string, string> */
+    private array $lastFormatErrors = [];
 
     public function __construct(string $teamId)
     {
+        $this->teamId = $teamId;
         $this->resolver = new EntityLinkResolver($teamId);
     }
 
@@ -44,12 +56,15 @@ final readonly class EntityLinkValidator
      */
     public function batchValidate(EntityLink $link, MatchableField $matcher, array $uniqueValues): array
     {
+        $this->lastFormatErrors = [];
+
         if ($matcher->behavior === MatchBehavior::Create) {
             return array_fill_keys($uniqueValues, null);
         }
 
         $results = [];
         $toValidate = [];
+        $formatRules = $this->getMatchFieldFormatRules($link, $matcher);
 
         foreach ($uniqueValues as $value) {
             $trimmed = trim($value);
@@ -58,6 +73,17 @@ final readonly class EntityLinkValidator
                 $results[$value] = null;
 
                 continue;
+            }
+
+            if ($formatRules !== []) {
+                $formatError = $this->validateFormat($trimmed, $matcher, $formatRules);
+
+                if ($formatError !== null) {
+                    $results[$value] = $formatError;
+                    $this->lastFormatErrors[$value] = $formatError;
+
+                    continue;
+                }
             }
 
             $toValidate[] = $trimmed;
@@ -121,6 +147,73 @@ final readonly class EntityLinkValidator
     public function getResolver(): EntityLinkResolver
     {
         return $this->resolver;
+    }
+
+    /** @return array<string, string> */
+    public function getLastFormatErrors(): array
+    {
+        return $this->lastFormatErrors;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getMatchFieldFormatRules(EntityLink $link, MatchableField $matcher): array
+    {
+        if (! str_starts_with($matcher->field, 'custom_fields_')) {
+            return [];
+        }
+
+        $cacheKey = "{$link->targetEntity}:{$matcher->field}";
+
+        if (isset($this->formatRulesCache[$cacheKey])) {
+            return $this->formatRulesCache[$cacheKey];
+        }
+
+        $code = substr($matcher->field, strlen('custom_fields_'));
+
+        $customField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->teamId)
+            ->where('entity_type', $link->targetEntity)
+            ->where('code', $code)
+            ->first();
+
+        if ($customField === null) {
+            return $this->formatRulesCache[$cacheKey] = [];
+        }
+
+        $fieldTypeInstance = CustomFieldsType::getFieldTypeInstance($customField->type);
+
+        if ($fieldTypeInstance === null) {
+            return $this->formatRulesCache[$cacheKey] = [];
+        }
+
+        return $this->formatRulesCache[$cacheKey] = $fieldTypeInstance->configure()->getDefaultItemValidationRules();
+    }
+
+    /**
+     * @param  array<int, string>  $rules
+     */
+    private function validateFormat(string $value, MatchableField $matcher, array $rules): ?string
+    {
+        $items = $matcher->multiValue
+            ? array_map(trim(...), explode(',', $value))
+            : [$value];
+
+        foreach ($items as $item) {
+            if ($item === '') {
+                continue;
+            }
+
+            $validator = Validator::make(['value' => $item], ['value' => $rules]);
+
+            if ($validator->fails()) {
+                return "Invalid format: '{$item}'";
+            }
+        }
+
+        return null;
     }
 
     private function buildErrorMessage(EntityLink $link, MatchableField $matcher, string $value): string

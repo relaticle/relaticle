@@ -91,16 +91,20 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
-        $this->writeEntityLinkRelationships($import, $connection, $jsonPath, $validator, $uniqueValues);
+        $this->writeEntityLinkRelationships($import, $connection, $jsonPath, $validator, $uniqueValues, $validator->getLastFormatErrors());
     }
 
-    /** @param array<int, string> $uniqueValues */
+    /**
+     * @param  array<int, string>  $uniqueValues
+     * @param  array<string, string|null>  $errorMap
+     */
     private function writeEntityLinkRelationships(
         Import $import,
         Connection $connection,
         string $jsonPath,
         EntityLinkValidator $validator,
         array $uniqueValues,
+        array $errorMap = [],
     ): void {
         $context = $this->column->resolveEntityLinkContext($import->getImporter());
 
@@ -111,9 +115,11 @@ final class ValidateColumnJob implements ShouldQueue
         $link = $context['link'];
         $matcher = $context['matcher'];
 
+        $validValues = array_filter($uniqueValues, fn (string $v): bool => ($errorMap[$v] ?? null) === null);
+
         $resolvedMap = $matcher->behavior === MatchBehavior::Create
-            ? array_fill_keys($uniqueValues, null)
-            : $validator->getResolver()->batchResolve($link, $matcher, $uniqueValues);
+            ? array_fill_keys($validValues, null)
+            : $validator->getResolver()->batchResolve($link, $matcher, $validValues);
 
         $connection->statement('
             CREATE TEMPORARY TABLE IF NOT EXISTS temp_relationships (

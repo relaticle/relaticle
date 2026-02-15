@@ -285,3 +285,135 @@ it('validates color picker hex format', function (): void {
     expect($invalidRow->hasValidationError('Color'))->toBeTrue()
         ->and($validRow->hasValidationError('Color'))->toBeFalse();
 });
+
+// --- Entity Link Format Validation Tests ---
+
+function ensureCustomFieldExists(object $context, string $code, string $type, string $entityType = 'people'): \App\Models\CustomField
+{
+    $existing = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $context->team->id)
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->first();
+
+    if ($existing !== null) {
+        return $existing;
+    }
+
+    return \App\Models\CustomField::forceCreate([
+        'tenant_id' => $context->team->id,
+        'code' => $code,
+        'name' => ucfirst(str_replace('_', ' ', $code)),
+        'type' => $type,
+        'entity_type' => $entityType,
+        'sort_order' => 1,
+        'active' => true,
+        'system_defined' => false,
+        'validation_rules' => [],
+        'settings' => new \Relaticle\CustomFields\Data\CustomFieldSettingsData,
+    ]);
+}
+
+it('rejects invalid domain format in entity link and prevents relationship creation', function (): void {
+    ensureCustomFieldExists($this, 'domains', 'link', 'company');
+
+    $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company' => 'GlobalHealth Inc']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->hasValidationError('Company'))->toBeTrue()
+        ->and($row->relationships)->toBeNull();
+});
+
+it('accepts valid domain format in entity link and creates relationship', function (): void {
+    ensureCustomFieldExists($this, 'domains', 'link', 'company');
+
+    $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company' => 'globalhealth.io']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->relationships)->not->toBeNull()
+        ->and($row->relationships)->toHaveCount(1)
+        ->and($row->relationships[0]->isCreate())->toBeTrue()
+        ->and($row->relationships[0]->name)->toBe('globalhealth.io');
+});
+
+it('rejects invalid email format in entity link', function (): void {
+    ensureCustomFieldExists($this, 'emails', 'email');
+
+    $column = ColumnData::toEntityLink(source: 'Contact', matcherKey: 'custom_fields_emails', entityLinkKey: 'contact');
+
+    createValidationStore($this, ['Name', 'Contact'], [
+        makeValidationRow(2, ['Name' => 'Deal', 'Contact' => 'not-an-email']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ], ImportEntityType::Opportunity);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->hasValidationError('Contact'))->toBeTrue()
+        ->and($row->relationships)->toBeNull();
+});
+
+it('accepts valid email format in entity link and creates relationship', function (): void {
+    ensureCustomFieldExists($this, 'emails', 'email');
+
+    $column = ColumnData::toEntityLink(source: 'Contact', matcherKey: 'custom_fields_emails', entityLinkKey: 'contact');
+
+    createValidationStore($this, ['Name', 'Contact'], [
+        makeValidationRow(2, ['Name' => 'Deal', 'Contact' => 'john@example.com']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ], ImportEntityType::Opportunity);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->relationships)->not->toBeNull()
+        ->and($row->relationships)->toHaveCount(1)
+        ->and($row->relationships[0]->isCreate())->toBeTrue()
+        ->and($row->relationships[0]->name)->toBe('john@example.com');
+});
+
+it('skips format validation for name matcher on entity link', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company' => 'Acme Corp']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+
+    expect($row->hasValidationError('Company'))->toBeFalse()
+        ->and($row->relationships)->not->toBeNull()
+        ->and($row->relationships)->toHaveCount(1);
+});
