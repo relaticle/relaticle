@@ -22,6 +22,13 @@ use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ViewTeam;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\CompaniesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\MembersRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\NotesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\OpportunitiesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\PeopleRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\TasksRelationManager;
 
 final class TeamResource extends Resource
 {
@@ -114,7 +121,14 @@ final class TeamResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            MembersRelationManager::class,
+            CompaniesRelationManager::class,
+            PeopleRelationManager::class,
+            TasksRelationManager::class,
+            OpportunitiesRelationManager::class,
+            NotesRelationManager::class,
+        ];
     }
 
     #[Override]
@@ -123,6 +137,7 @@ final class TeamResource extends Resource
         return [
             'index' => ListTeams::route('/'),
             'create' => CreateTeam::route('/create'),
+            'view' => ViewTeam::route('/{record}'),
             'edit' => EditTeam::route('/{record}/edit'),
         ];
     }
