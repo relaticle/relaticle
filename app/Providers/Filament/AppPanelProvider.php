@@ -82,10 +82,11 @@ final class AppPanelProvider extends PanelProvider
 
         if ($domain = config('app.app_panel_domain')) {
             $panel->domain($domain);
+        } else {
+            $panel->path(config('app.app_panel_path', 'app'));
         }
 
         $panel
-            ->path(config('app.app_panel_path', 'app'))
             ->homeUrl(fn (): string => CompanyResource::getUrl())
             ->brandName('Relaticle')
             ->brandLogo(fn (): View|Factory => Auth::check() ? view('filament.app.logo-empty') : view('filament.app.logo'))

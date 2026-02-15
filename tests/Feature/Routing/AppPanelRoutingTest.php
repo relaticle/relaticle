@@ -2,6 +2,25 @@
 
 declare(strict_types=1);
 
+use Filament\Facades\Filament;
+
+describe('app panel configuration - path mode (default)', function () {
+    it('registers panel with path prefix and no domain constraint', function () {
+        $panel = Filament::getPanel('app');
+
+        expect($panel->getDomains())->toBeEmpty()
+            ->and($panel->getPath())->toBe(config('app.app_panel_path', 'app'));
+    });
+
+    it('serves login page at the panel path', function () {
+        $panelPath = config('app.app_panel_path', 'app');
+
+        $response = test()->get("/{$panelPath}/login");
+
+        $response->assertOk();
+    });
+});
+
 describe('getAppUrl macro - path mode', function () {
     beforeEach(function () {
         config(['app.app_panel_domain' => null]);
