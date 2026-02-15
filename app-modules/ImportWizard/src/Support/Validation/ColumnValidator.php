@@ -19,6 +19,7 @@ final class ColumnValidator
         return match (true) {
             $type->isDateOrDateTime() => $this->validateDate($column, $value),
             $type->isFloat() => $this->validateNumber($column, $value),
+            $type->isBoolean() => $this->validateBoolean($value),
             $column->isMultiChoiceArbitrary() => $this->validateMultiChoiceArbitrary($column, $value),
             $column->isMultiChoicePredefined() => $this->validateMultiChoicePredefined($column, $value),
             $column->isSingleChoicePredefined() => $this->validateSingleChoice($column, $value),
@@ -94,6 +95,17 @@ final class ColumnValidator
         }
 
         return null;
+    }
+
+    private function validateBoolean(string $value): ?ValidationError
+    {
+        $normalized = strtolower(trim($value));
+
+        if (in_array($normalized, ['1', '0', 'true', 'false', 'yes', 'no', 'on', 'off'], true)) {
+            return null;
+        }
+
+        return ValidationError::message('The value must be true or false (accepted: true, false, 1, 0, yes, no).');
     }
 
     private function validateText(ColumnData $column, string $value): ?ValidationError

@@ -7122,16 +7122,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "3.0.0-beta8",
+            "version": "3.0.0-beta9",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Relaticle/custom-fields.git",
-                "reference": "fc47c403233eb0ef0f8d87a8afd6c39b7320f6cc"
+                "reference": "0e6d8e7e6231a37c7a9b0323184928086235c050"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Relaticle/custom-fields/zipball/fc47c403233eb0ef0f8d87a8afd6c39b7320f6cc",
-                "reference": "fc47c403233eb0ef0f8d87a8afd6c39b7320f6cc",
+                "url": "https://api.github.com/repos/Relaticle/custom-fields/zipball/0e6d8e7e6231a37c7a9b0323184928086235c050",
+                "reference": "0e6d8e7e6231a37c7a9b0323184928086235c050",
                 "shasum": ""
             },
             "require": {
@@ -7217,7 +7217,7 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-02-15T11:40:47+00:00"
+            "time": "2026-02-15T13:00:28+00:00"
         },
         {
             "name": "relaticle/flowforge",
