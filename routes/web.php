@@ -30,17 +30,11 @@ Route::middleware('guest')->group(function () {
         ->name('auth.socialite.callback')
         ->middleware('throttle:10,1');
 
-    Route::get('/login', function () {
-        return redirect()->to(url()->getAppUrl('login'));
-    })->name('login');
+    Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 
-    Route::get('/register', function () {
-        return redirect()->to(url()->getAppUrl('register'));
-    })->name('register');
+    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('register')))->name('register');
 
-    Route::get('/forgot-password', function () {
-        return redirect()->to(url()->getAppUrl('forgot-password'));
-    })->name('password.request');
+    Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
 
 Route::get('/', HomeController::class);
