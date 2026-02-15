@@ -64,29 +64,28 @@ describe('Documentation pages', function () {
 });
 
 describe('Authentication redirects', function () {
-    it('redirects login to app subdomain', function () {
+    it('redirects login to app panel', function () {
         $response = $this->get('/login');
 
         $response->assertRedirect(url()->getAppUrl('login'));
     });
 
-    it('redirects register to app subdomain', function () {
+    it('redirects register to app panel', function () {
         $response = $this->get('/register');
 
         $response->assertRedirect(url()->getAppUrl('register'));
     });
 
-    it('redirects forgot password to app subdomain', function () {
+    it('redirects forgot password to app panel', function () {
         $response = $this->get('/forgot-password');
 
         $response->assertRedirect(url()->getAppUrl('forgot-password'));
     });
 
-    it('redirects dashboard to app subdomain', function () {
+    it('redirects dashboard to app panel', function () {
         $response = $this->get('/dashboard');
 
-        $expectedUrl = rtrim(url()->getAppUrl(), '/');
-        $response->assertRedirect($expectedUrl);
+        $response->assertRedirect(url()->getAppUrl());
     });
 });
 

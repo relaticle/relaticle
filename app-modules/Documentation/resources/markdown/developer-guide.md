@@ -23,7 +23,7 @@ Visit `http://localhost:8000` to access the application.
 | Backend | PHP 8.4, Laravel 12                   |
 | Admin UI | Filament 5                            |
 | Frontend | Livewire 4, Alpine.js, Tailwind CSS 4 |
-| Database | PostgreSQL (recommended), MySQL       |
+| Database | PostgreSQL                             |
 | Queue | Laravel Horizon                       |
 | Testing | Pest v4                               |
 | Static Analysis | PHPStan (Level 7)                     |
@@ -64,7 +64,7 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 ### Requirements
 
 - **PHP 8.4+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
-- **PostgreSQL 13+** or MySQL 8.0+
+- **PostgreSQL 17+**
 - **Node.js 20+**
 - **Composer 2+**
 
@@ -151,6 +151,8 @@ cp .env.example .env
 # Edit .env with production settings
 docker compose up -d
 ```
+
+By default, the CRM panel is available at `{APP_URL}/app` (path mode). For subdomain routing, set `APP_PANEL_DOMAIN` in your `.env` (e.g., `APP_PANEL_DOMAIN=app.example.com`).
 
 Included services:
 - **app** - Web server (nginx + php-fpm) on port 8080

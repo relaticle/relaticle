@@ -52,7 +52,7 @@ Visit our [website](https://relaticle.com) to learn more about Relaticle's capab
 # Requirements
 
 - PHP 8.4+
-- PostgreSQL 15+
+- PostgreSQL 17+
 - Composer 2 and Node.js 20+
 - Redis for queues (optional for development)
 
