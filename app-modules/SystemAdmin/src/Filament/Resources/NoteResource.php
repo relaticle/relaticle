@@ -11,10 +11,12 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\CreateNote;
@@ -38,6 +40,13 @@ final class NoteResource extends Resource
 
     protected static ?string $slug = 'notes';
 
+    public static function getNavigationBadge(): ?string
+    {
+        $count = self::getModel()::query()->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
     #[Override]
     public static function form(Schema $schema): Schema
     {
@@ -45,7 +54,10 @@ final class NoteResource extends Resource
             ->components([
                 Select::make('team_id')
                     ->relationship('team', 'name')
+                    ->searchable()
                     ->required(),
+                TextInput::make('title')
+                    ->maxLength(255),
                 Select::make('creation_source')
                     ->options(CreationSource::class)
                     ->default(CreationSource::WEB),
@@ -56,10 +68,20 @@ final class NoteResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
+                TextColumn::make('title')
+                    ->searchable()
+                    ->sortable()
+                    ->limit(50),
                 TextColumn::make('team.name')
-                    ->numeric()
-                    ->sortable(),
+                    ->label('Team')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('creator.name')
+                    ->label('Created by')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->color(fn (CreationSource $state): string => match ($state) {
@@ -71,16 +93,23 @@ final class NoteResource extends Resource
                     ->toggleable(),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                TrashedFilter::make(),
+                SelectFilter::make('team')
+                    ->relationship('team', 'name')
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label('Source')
                     ->options(CreationSource::class)
                     ->multiple(),
             ])
@@ -98,9 +127,7 @@ final class NoteResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     #[Override]

@@ -11,10 +11,12 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\CreateOpportunity;
@@ -36,12 +38,14 @@ final class OpportunityResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Opportunities';
 
+    protected static ?string $slug = 'opportunities';
+
     public static function getNavigationBadge(): ?string
     {
-        return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
-    }
+        $count = self::getModel()::query()->count();
 
-    protected static ?string $slug = 'opportunities';
+        return $count > 0 ? (string) $count : null;
+    }
 
     #[Override]
     public static function form(Schema $schema): Schema
@@ -50,7 +54,17 @@ final class OpportunityResource extends Resource
             ->components([
                 Select::make('team_id')
                     ->relationship('team', 'name')
+                    ->searchable()
                     ->required(),
+                TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+                Select::make('company_id')
+                    ->relationship('company', 'name')
+                    ->searchable(),
+                Select::make('contact_id')
+                    ->relationship('contact', 'name')
+                    ->searchable(),
                 Select::make('creation_source')
                     ->options(CreationSource::class)
                     ->default(CreationSource::WEB),
@@ -61,10 +75,26 @@ final class OpportunityResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('team.name')
-                    ->numeric()
+                TextColumn::make('name')
+                    ->searchable()
                     ->sortable(),
+                TextColumn::make('company.name')
+                    ->label('Company')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('contact.name')
+                    ->label('Contact')
+                    ->sortable(),
+                TextColumn::make('team.name')
+                    ->label('Team')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('creator.name')
+                    ->label('Created by')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->color(fn (CreationSource $state): string => match ($state) {
@@ -74,22 +104,29 @@ final class OpportunityResource extends Resource
                     })
                     ->label('Source')
                     ->toggleable(),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                TrashedFilter::make(),
+                SelectFilter::make('team')
+                    ->relationship('team', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('company')
+                    ->relationship('company', 'name')
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label('Source')
                     ->options(CreationSource::class)
                     ->multiple(),
             ])
@@ -107,9 +144,7 @@ final class OpportunityResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     #[Override]
