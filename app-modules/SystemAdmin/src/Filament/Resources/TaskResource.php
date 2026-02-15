@@ -16,7 +16,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\CreateTask;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\EditTask;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\ListTasks;
@@ -36,53 +38,48 @@ final class TaskResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Tasks';
 
+    protected static ?string $slug = 'tasks';
+
     public static function getNavigationBadge(): ?string
     {
         return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
     }
 
-    protected static ?string $slug = 'tasks';
-
+    #[Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Select::make('team_id')
                     ->relationship('team', 'name')
+                    ->searchable()
                     ->required(),
-                Select::make('user_id')
-                    ->relationship('user', 'name'),
-                Select::make('assignee_id')
-                    ->relationship('assignee', 'name'),
                 TextInput::make('title')
                     ->required()
                     ->maxLength(255),
-                TextInput::make('order_column')
-                    ->numeric(),
                 Select::make('creation_source')
                     ->options(CreationSource::class)
                     ->default(CreationSource::WEB),
             ]);
     }
 
+    #[Override]
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('team.name')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('user.name')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('assignee.name')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('title')
-                    ->searchable(),
-                TextColumn::make('order_column')
-                    ->numeric()
+                    ->searchable()
                     ->sortable(),
+                TextColumn::make('team.name')
+                    ->label('Team')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('creator.name')
+                    ->label('Created by')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->color(fn (CreationSource $state): string => match ($state) {
@@ -94,22 +91,23 @@ final class TaskResource extends Resource
                     ->toggleable(),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('updated_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('assignees')
-                    ->relationship('assignees', 'name'),
+                TrashedFilter::make(),
+                SelectFilter::make('team')
+                    ->relationship('team', 'name')
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label('Source')
                     ->options(CreationSource::class)
                     ->multiple(),
             ])
@@ -124,13 +122,13 @@ final class TaskResource extends Resource
             ]);
     }
 
+    #[Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
+    #[Override]
     public static function getPages(): array
     {
         return [

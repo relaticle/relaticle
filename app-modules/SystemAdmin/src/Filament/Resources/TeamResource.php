@@ -8,13 +8,17 @@ use App\Models\Team;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
@@ -23,51 +27,76 @@ final class TeamResource extends Resource
 {
     protected static ?string $model = Team::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
 
     protected static string|\UnitEnum|null $navigationGroup = 'User Management';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
+    protected static ?string $modelLabel = 'Team';
+
+    protected static ?string $pluralModelLabel = 'Teams';
+
+    protected static ?string $slug = 'teams';
+
+    public static function getNavigationBadge(): ?string
+    {
+        return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
+    }
+
+    #[Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                TextInput::make('user_id')
-                    ->required()
-                    ->numeric(),
+                Select::make('user_id')
+                    ->relationship('owner', 'name')
+                    ->label('Owner')
+                    ->searchable()
+                    ->required(),
                 TextInput::make('name')
                     ->required()
+                    ->maxLength(255),
+                TextInput::make('slug')
                     ->maxLength(255),
                 Toggle::make('personal_team')
                     ->required(),
             ]);
     }
 
+    #[Override]
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('user_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('slug')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('owner.name')
+                    ->label('Owner')
+                    ->searchable()
+                    ->sortable(),
                 IconColumn::make('personal_team')
+                    ->label('Personal')
                     ->boolean(),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('updated_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
             ->filters([
-                //
+                TernaryFilter::make('personal_team')
+                    ->label('Personal Team'),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([
@@ -77,13 +106,13 @@ final class TeamResource extends Resource
             ]);
     }
 
+    #[Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
+    #[Override]
     public static function getPages(): array
     {
         return [

@@ -11,11 +11,12 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
@@ -39,6 +40,12 @@ final class UserResource extends Resource
 
     protected static ?string $slug = 'users';
 
+    public static function getNavigationBadge(): ?string
+    {
+        return self::getModel()::query()->count() > 0 ? (string) self::getModel()::query()->count() : null;
+    }
+
+    #[Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -49,23 +56,17 @@ final class UserResource extends Resource
                 TextInput::make('email')
                     ->email()
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
                 DateTimePicker::make('email_verified_at'),
                 TextInput::make('password')
                     ->password()
-                    ->maxLength(255),
-                Textarea::make('two_factor_secret')
-                    ->disabled()
-                    ->columnSpanFull(),
-                Textarea::make('two_factor_recovery_codes')
-                    ->disabled()
-                    ->columnSpanFull(),
-                DateTimePicker::make('two_factor_confirmed_at'),
+                    ->maxLength(255)
+                    ->dehydrated(filled(...))
+                    ->required(fn (string $operation): bool => $operation === 'create'),
                 Select::make('current_team_id')
                     ->searchable()
                     ->relationship('currentTeam', 'name'),
-                TextInput::make('profile_photo_path')
-                    ->maxLength(2048),
             ]);
     }
 
@@ -73,28 +74,34 @@ final class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('email')
-                    ->searchable(),
-                TextColumn::make('email_verified_at')
-                    ->dateTime()
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('current_team_id')
-                    ->numeric()
+                TextColumn::make('email')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable(),
+                IconColumn::make('email_verified_at')
+                    ->label('Verified')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-x-mark'),
+                TextColumn::make('currentTeam.name')
+                    ->label('Current Team')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->sortable(),
                 TextColumn::make('updated_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
             ->filters([
-                //
+                TernaryFilter::make('email_verified_at')
+                    ->label('Email Verified')
+                    ->nullable(),
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -110,9 +117,7 @@ final class UserResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     #[Override]
