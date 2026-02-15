@@ -78,8 +78,14 @@ final class AppPanelProvider extends PanelProvider
     {
         $panel
             ->default()
-            ->id('app')
-            ->domain('app.'.(parse_url((string) config('app.url'), PHP_URL_HOST) ?? 'localhost'))
+            ->id('app');
+
+        if ($domain = config('app.app_panel_domain')) {
+            $panel->domain($domain);
+        }
+
+        $panel
+            ->path(config('app.app_panel_path', 'app'))
             ->homeUrl(fn (): string => CompanyResource::getUrl())
             ->brandName('Relaticle')
             ->brandLogo(fn (): View|Factory => Auth::check() ? view('filament.app.logo-empty') : view('filament.app.logo'))
