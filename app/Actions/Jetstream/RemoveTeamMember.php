@@ -10,7 +10,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Contracts\RemovesTeamMembers;
-use Laravel\Jetstream\Events\TeamMemberRemoved;
 
 final readonly class RemoveTeamMember implements RemovesTeamMembers
 {
@@ -25,7 +24,7 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
 
         $team->removeUser($teamMember);
 
-        TeamMemberRemoved::dispatch($team, $teamMember);
+        event(new \Laravel\Jetstream\Events\TeamMemberRemoved($team, $teamMember));
     }
 
     /**
@@ -33,10 +32,8 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
      */
     private function authorize(User $user, Team $team, User $teamMember): void
     {
-        if (! Gate::forUser($user)->check('removeTeamMember', $team) &&
-            $user->id !== $teamMember->id) {
-            throw new AuthorizationException;
-        }
+        throw_if(! Gate::forUser($user)->check('removeTeamMember', $team) &&
+            $user->id !== $teamMember->id, AuthorizationException::class);
     }
 
     /**

@@ -39,25 +39,25 @@ return [
     |
     */
     'documents' => [
-        'business' => [
-            'title' => 'Business Guide',
-            'file' => 'business-guide.md',
-            'description' => 'Documentation for business users and stakeholders.',
+        'getting-started' => [
+            'title' => 'Getting Started',
+            'file' => 'getting-started.md',
+            'description' => 'Set up your account and learn the basics.',
         ],
-        'technical' => [
-            'title' => 'Technical Guide',
-            'file' => 'technical-guide.md',
-            'description' => 'Technical documentation for developers and system administrators.',
+        'import' => [
+            'title' => 'Import Guide',
+            'file' => 'import-guide.md',
+            'description' => 'Import data from CSV files.',
         ],
-        'quickstart' => [
-            'title' => 'Quick Start Guide',
-            'file' => 'quick-start-guide.md',
-            'description' => 'Get started quickly with essential information.',
+        'developer' => [
+            'title' => 'Developer Guide',
+            'file' => 'developer-guide.md',
+            'description' => 'Installation, architecture, and contributing.',
         ],
         'api' => [
-            'title' => 'API Documentation',
+            'title' => 'API Reference',
             'file' => 'api-guide.md',
-            'description' => 'API reference and integration documentation.',
+            'description' => 'REST API documentation (coming soon).',
         ],
     ],
 

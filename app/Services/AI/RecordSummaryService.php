@@ -55,15 +55,13 @@ final readonly class RecordSummaryService
     {
         $teamId = Filament::getTenant()?->getKey();
 
-        if ($teamId === null) {
-            throw new RuntimeException('No team context available for caching AI summary');
-        }
+        throw_if($teamId === null, RuntimeException::class, 'No team context available for caching AI summary');
 
         if (method_exists($record, 'aiSummary')) {
             $record->aiSummary()->delete();
         }
 
-        return AiSummary::create([
+        return AiSummary::query()->create([
             'team_id' => $teamId,
             'summarizable_type' => $record->getMorphClass(),
             'summarizable_id' => $record->getKey(),
@@ -118,7 +116,7 @@ PROMPT;
      */
     private function addBasicInfo(\Illuminate\Support\Collection $parts, array $context): void
     {
-        if (empty($context['basic_info'])) {
+        if (blank($context['basic_info'])) {
             return;
         }
 
@@ -142,7 +140,7 @@ PROMPT;
      */
     private function addRelationships(\Illuminate\Support\Collection $parts, array $context): void
     {
-        if (empty($context['relationships'])) {
+        if (blank($context['relationships'] ?? [])) {
             return;
         }
 
@@ -159,7 +157,7 @@ PROMPT;
     private function addOpportunities(\Illuminate\Support\Collection $parts, array $context): void
     {
         $opportunities = Arr::get($context, 'opportunities.items', []);
-        if (empty($opportunities)) {
+        if (blank($opportunities)) {
             return;
         }
 
@@ -185,7 +183,7 @@ PROMPT;
     private function addNotes(\Illuminate\Support\Collection $parts, array $context): void
     {
         $notes = Arr::get($context, 'notes.items', []);
-        if (empty($notes)) {
+        if (blank($notes)) {
             return;
         }
 
@@ -212,7 +210,7 @@ PROMPT;
     private function addTasks(\Illuminate\Support\Collection $parts, array $context): void
     {
         $tasks = Arr::get($context, 'tasks.items', []);
-        if (empty($tasks)) {
+        if (blank($tasks)) {
             return;
         }
 

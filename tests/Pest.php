@@ -19,8 +19,11 @@ use Illuminate\Support\Facades\Event;
 pest()->extend(Tests\TestCase::class)
     ->use(RefreshDatabase::class)
     ->beforeEach(function () {
-        // Globally disable events to prevent demo record creation during tests
-        Event::fake();
+        // Globally disable events to prevent demo record creation during tests.
+        // Allow the Team creating event so the TeamObserver can generate slugs.
+        Event::fake()->except([
+            'eloquent.creating: App\\Models\\Team',
+        ]);
     })
     ->in('Feature', 'Unit');
 
@@ -39,6 +42,17 @@ expect()->extend('toBeOne', function () {
     return $this->toBe(1);
 });
 
+/**
+ * Livewire testing helper - replacement for pest-plugin-livewire.
+ *
+ * @param  class-string  $component
+ * @param  array<string, mixed>  $params
+ */
+function livewire(string $component, array $params = []): \Livewire\Features\SupportTesting\Testable
+{
+    return \Livewire\Livewire::test($component, $params);
+}
+
 /*
 |--------------------------------------------------------------------------
 | Functions
@@ -49,8 +63,3 @@ expect()->extend('toBeOne', function () {
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
-
-function something()
-{
-    // ..
-}

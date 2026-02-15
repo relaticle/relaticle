@@ -11,13 +11,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('companies', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
 
-            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
-            $table->foreignId('creator_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignUlid('team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignUlid('creator_id')->nullable()->constrained('users')->onDelete('set null');
 
             // Account Owner For Companies: Your team member responsible for managing the company account
-            $table->foreignId('account_owner_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignUlid('account_owner_id')->nullable()->constrained('users')->onDelete('set null');
 
             $table->string('name');
 

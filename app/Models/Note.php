@@ -11,6 +11,7 @@ use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -32,6 +33,7 @@ final class Note extends Model implements HasCustomFields
     use HasFactory;
 
     use HasTeam;
+    use HasUlids;
     use InvalidatesRelatedAiSummaries;
     use SoftDeletes;
     use UsesCustomFields;

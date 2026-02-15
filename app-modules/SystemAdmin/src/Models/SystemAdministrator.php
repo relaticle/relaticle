@@ -10,6 +10,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -18,7 +19,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 
 /**
- * @property int $id
+ * @property string $id
  * @property string $name
  * @property string $email
  * @property string $password
@@ -35,6 +36,7 @@ final class SystemAdministrator extends Authenticatable implements FilamentUser,
     /** @use HasFactory<SystemAdministratorFactory> */
     use HasFactory;
 
+    use HasUlids;
     use Notifiable;
 
     protected $table = 'system_administrators';

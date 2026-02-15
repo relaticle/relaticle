@@ -12,6 +12,8 @@ enum CustomFieldType: string
 {
     case TEXT = 'text';
     case NUMBER = 'number';
+    case EMAIL = 'email';
+    case PHONE = 'phone';
     case LINK = 'link';
     case TEXTAREA = 'textarea';
     case CHECKBOX = 'checkbox';

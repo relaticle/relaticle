@@ -43,7 +43,7 @@ final class CreateSystemAdminCommand extends Command
 
         try {
             // Check if any system administrators exist
-            $existingCount = SystemAdministrator::count();
+            $existingCount = SystemAdministrator::query()->count();
             if ($existingCount > 0) {
                 $this->warn("There are currently {$existingCount} system administrator(s).");
 
@@ -78,7 +78,7 @@ final class CreateSystemAdminCommand extends Command
                         return 'Please enter a valid email address';
                     }
 
-                    if (SystemAdministrator::where('email', $value)->exists()) {
+                    if (SystemAdministrator::query()->where('email', $value)->exists()) {
                         return "An administrator with email '{$value}' already exists";
                     }
 
@@ -94,7 +94,7 @@ final class CreateSystemAdminCommand extends Command
                     return self::FAILURE;
                 }
 
-                if (SystemAdministrator::where('email', $email)->exists()) {
+                if (SystemAdministrator::query()->where('email', $email)->exists()) {
                     $this->error("An administrator with email '{$email}' already exists.");
 
                     return self::FAILURE;
@@ -137,7 +137,7 @@ final class CreateSystemAdminCommand extends Command
             }
 
             // Create the system administrator
-            $admin = SystemAdministrator::create([
+            $admin = SystemAdministrator::query()->create([
                 'name' => $name,
                 'email' => $email,
                 'password' => bcrypt($password),

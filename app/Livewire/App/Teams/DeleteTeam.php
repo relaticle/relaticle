@@ -60,7 +60,7 @@ final class DeleteTeam extends BaseLivewireComponent
 
     public function deleteTeam(Team $team): void
     {
-        app(DeleteTeamAction::class)->delete($team);
+        resolve(DeleteTeamAction::class)->delete($team);
 
         Filament::setTenant(Auth::guard('web')->user()->personalTeam());
 

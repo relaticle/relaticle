@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\OnboardSeed\Support;
 
 use App\Enums\CreationSource;
+use App\Models\CustomField;
 use App\Models\Team;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Relaticle\CustomFields\Models\CustomField;
+use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 
 abstract class BaseModelSeeder implements ModelSeederInterface
@@ -42,7 +43,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /**
      * Personal team ID
      */
-    protected ?int $teamId = null;
+    protected ?string $teamId = null;
 
     /**
      * Initialize the seeder and auto-detect entity type if not set
@@ -61,7 +62,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /**
      * Set team ID for custom fields retrieval
      */
-    protected function setTeamId(int $teamId): void
+    protected function setTeamId(string $teamId): void
     {
         $this->teamId = $teamId;
     }
@@ -73,7 +74,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
      */
     public function customFields(): Collection
     {
-        if ($this->teamId === null || $this->teamId === 0) {
+        if ($this->teamId === null) {
             return collect();
         }
 
@@ -118,10 +119,9 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /**
      * Apply custom fields to a model
      *
-     * @param  object  $model  The model to apply fields to
      * @param  array<string, mixed>  $data  The field data
      */
-    protected function applyCustomFields(object $model, array $data): void
+    protected function applyCustomFields(HasCustomFields $model, array $data): void
     {
         foreach ($data as $code => $value) {
             if (isset($this->customFieldDefinitions[$code])) {
@@ -272,7 +272,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
             ...$this->getGlobalAttributes(),
         ]);
 
-        $entity = app($this->modelClass)->create($attributes);
+        $entity = resolve($this->modelClass)->create($attributes);
         $this->applyCustomFields($entity, $customFields);
 
         // Register the entity in the registry

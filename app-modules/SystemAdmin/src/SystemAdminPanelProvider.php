@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin;
 
-use Awcodes\Overlook\OverlookPlugin;
-use Awcodes\Overlook\Widgets\OverlookWidget;
 use Exception;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -70,22 +68,8 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-            ->widgets([
-                OverlookWidget::class,
-            ])
-            ->plugins([
-                OverlookPlugin::make()
-                    ->sort(0)
-                    ->abbreviateCount(false)
-                    ->columns([
-                        'default' => 1,
-                        'sm' => 2,
-                        'md' => 3,
-                        'lg' => 4,
-                        'xl' => 5,
-                        '2xl' => null,
-                    ]),
-            ])
+            ->widgets([])
+            ->plugins([])
             ->databaseNotifications()
             ->middleware([
                 EncryptCookies::class,

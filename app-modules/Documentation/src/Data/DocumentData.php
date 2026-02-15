@@ -48,15 +48,13 @@ final class DocumentData extends Data
 
         abort_if($resourcePath === false, 500, 'Unable to determine resource path');
 
-        if ($realPath === '0' || $realPath === false || ! str_starts_with($realPath, $resourcePath) || ! file_exists($realPath)) {
-            abort(404, 'Document not found');
-        }
+        abort_if($realPath === '0' || $realPath === false || ! str_starts_with($realPath, $resourcePath) || ! file_exists($realPath), 404, 'Document not found');
 
         $content = file_get_contents($realPath);
 
         abort_if($content === false, 500, 'Unable to read document content');
 
-        $renderedContent = app(MarkdownRenderer::class)->toHtml($content);
+        $renderedContent = resolve(MarkdownRenderer::class)->toHtml($content);
 
         $tableOfContents = self::extractTableOfContents($renderedContent);
 
@@ -80,7 +78,7 @@ final class DocumentData extends Data
 
         preg_match_all('/<h2.*><a.*id="([^"]+)".*>#<\/a>([^<]+)/', $contents, $matches);
 
-        if (empty($matches[1]) || empty($matches[2])) {
+        if (blank($matches[1]) || blank($matches[2])) {
             return [];
         }
 

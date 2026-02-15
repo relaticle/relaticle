@@ -10,6 +10,9 @@ use Laravel\Jetstream\Membership as JetstreamMembership;
 
 final class Membership extends JetstreamMembership
 {
+    /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+
     /**
      * Indicates if the IDs are auto-incrementing.
      *
@@ -33,7 +36,7 @@ final class Membership extends JetstreamMembership
         return $this->belongsTo(Team::class);
     }
 
-    public function getRoleNameAttribute(): string
+    protected function getRoleNameAttribute(): string
     {
         // @phpstan-ignore-next-line nullCoalesce.expr
         return Jetstream::findRole($this->role)?->name ?? 'Unknown';

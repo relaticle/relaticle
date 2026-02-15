@@ -2,7 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\NoteResource;
+use App\Filament\Resources\PeopleResource;
+use App\Filament\Resources\TaskResource;
+use App\Models\Company;
+use App\Models\Note;
+use App\Models\People;
+use App\Models\Task;
 use Relaticle\CustomFields\EntitySystem\EntityConfigurator;
+use Relaticle\CustomFields\EntitySystem\EntityModel;
+use Relaticle\CustomFields\Enums\AvatarShape;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\FeatureSystem\FeatureConfigurator;
 use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
@@ -19,12 +29,31 @@ return [
     */
     'entity_configuration' => EntityConfigurator::configure()
         ->discover(app_path('Models'))
-        ->include([
-            App\Models\People::class,
-            App\Models\Company::class,
-            App\Models\Opportunity::class,
-            App\Models\Task::class,
-            App\Models\Note::class,
+        ->models([
+            EntityModel::configure(
+                modelClass: People::class,
+                primaryAttribute: 'name',
+                resourceClass: PeopleResource::class,
+                avatarConfiguration: EntityModel::avatar(attribute: 'avatar'),
+            ),
+            EntityModel::configure(
+                modelClass: Company::class,
+                primaryAttribute: 'name',
+                resourceClass: CompanyResource::class,
+                avatarConfiguration: EntityModel::avatar(attribute: 'logo', shape: AvatarShape::Square),
+            ),
+            EntityModel::configure(
+                modelClass: Note::class,
+                primaryAttribute: 'title',
+                resourceClass: NoteResource::class,
+                recordPage: null,
+            ),
+            EntityModel::configure(
+                modelClass: Task::class,
+                primaryAttribute: 'title',
+                resourceClass: TaskResource::class,
+                recordPage: null,
+            ),
         ])
         ->cache(),
 
@@ -55,14 +84,21 @@ return [
     */
     'features' => FeatureConfigurator::configure()
         ->enable(
-            CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_ENCRYPTION,
             CustomFieldsFeature::FIELD_OPTION_COLORS,
+            CustomFieldsFeature::FIELD_MULTI_VALUE,
+            CustomFieldsFeature::FIELD_UNIQUE_VALUE,
+            CustomFieldsFeature::FIELD_CODE_AUTO_GENERATE,
             CustomFieldsFeature::UI_TABLE_COLUMNS,
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
-            CustomFieldsFeature::SYSTEM_MULTI_TENANCY
+            CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
+        )->disable(
+            CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
+            CustomFieldsFeature::FIELD_VALIDATION_RULES,
+            CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,
+            CustomFieldsFeature::SYSTEM_SECTIONS,
         ),
 
     /*

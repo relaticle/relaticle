@@ -6,6 +6,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\Team;
 use BackedEnum;
@@ -16,13 +18,12 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
@@ -47,45 +48,73 @@ final class TasksBoard extends BoardPage
      */
     public function board(Board $board): Board
     {
+        $statusField = $this->statusCustomField();
+        $valueColumn = $statusField->getValueColumn();
+
+        $customFields = CustomFields::infolist()
+            ->forModel(Task::class)
+            ->only(['description', 'priority', 'due_date'])
+            ->hiddenLabels()
+            ->visibleWhenFilled()
+            ->withoutSections()
+            ->values()
+            ->keyBy(fn (mixed $field): string => $field->getName());
+
         return $board
             ->query(
                 Task::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join): void {
+                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($statusField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $this->statusCustomField()->getKey());
+                            ->where('cfv.custom_field_id', '=', $statusField->getKey());
                     })
-                    ->select('tasks.*', 'cfv.integer_value')
+                    ->with(['assignees'])
+                    ->select('tasks.*', 'cfv.'.$valueColumn)
             )
             ->recordTitleAttribute('title')
-            ->columnIdentifier('cfv.integer_value')
+            ->columnIdentifier('cfv.'.$valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['title'])
             ->columns($this->getColumns())
-            ->cardSchema(function (Schema $schema): Schema {
-                $descriptionCustomField = CustomFields::infolist()
-                    ->forSchema($schema)
-                    ->only(['description'])
-                    ->hiddenLabels()
-                    ->visibleWhenFilled()
-                    ->withoutSections()
-                    ->values()
-                    ->first()
+            ->cardSchema(function (Schema $schema) use ($customFields): Schema {
+                $descriptionCustomField = $customFields->get('custom_fields.description')
                     ?->columnSpanFull()
-                    ->visible(filled(...))
-                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString());
+                    ->visible(fn (?string $state): bool => filled($state))
+                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString())
+                    ->extraAttributes(['class' => 'mb-4']);
 
-                return $schema->components([
-                    CardFlex::make([
+                $priorityField = $customFields->get('custom_fields.priority')
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->grow(false)
+                    ->badge()
+                    ->hiddenLabel()
+                    ->icon('heroicon-o-flag');
+
+                $dueDateField = $customFields->get('custom_fields.due_date')
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->badge()
+                    ->color('gray')
+                    ->icon('heroicon-o-calendar')
+                    ->grow(false)
+                    ->hiddenLabel()
+                    ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
+
+                return $schema
+                    ->inline()
+                    ->gap(false)
+                    ->components([
                         $descriptionCustomField,
-                    ]),
-                    ImageEntry::make('assignees.profile_photo_url')
-                        ->hiddenLabel()
-                        ->alignLeft()
-                        ->imageHeight(24)
-                        ->circular()
-                        ->visible(filled(...))
-                        ->stacked(),
-                ]);
+                        CardFlex::make([
+                            $priorityField,
+                            $dueDateField,
+                            ImageEntry::make('assignees.profile_photo_url')
+                                ->hiddenLabel()
+                                ->alignLeft()
+                                ->imageHeight(20)
+                                ->circular()
+                                ->visible(fn (?string $state): bool => filled($state))
+                                ->stacked(),
+                        ])->align('center'),
+                    ]);
             })
             ->columnActions([
                 CreateAction::make()
@@ -105,7 +134,7 @@ final class TasksBoard extends BoardPage
 
                         $statusField = $this->statusCustomField();
                         $task->saveCustomFieldValue($statusField, $arguments['column']);
-                        $task->order_column = $this->getBoardPositionInColumn((string) $arguments['column']);
+                        $task->order_column = (float) $this->getBoardPositionInColumn((string) $arguments['column']);
 
                         return $task;
                     }),
@@ -117,7 +146,9 @@ final class TasksBoard extends BoardPage
                     ->modalWidth(Width::ThreeExtraLarge)
                     ->icon('heroicon-o-pencil-square')
                     ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-                    ->fillForm(fn (Task $record): array => $record->toArray())
+                    ->fillForm(fn (Task $record): array => [
+                        'title' => $record->title,
+                    ])
                     ->action(function (Task $record, array $data): void {
                         $record->update($data);
                     }),
@@ -140,7 +171,10 @@ final class TasksBoard extends BoardPage
     }
 
     /**
-     * Move card to new position using Rank-based positioning.
+     * Move card to new position using DecimalPosition service.
+     *
+     * Overrides the default Flowforge implementation to properly handle
+     * custom field columns which are stored in a polymorphic table.
      *
      * @throws Throwable
      */
@@ -153,17 +187,13 @@ final class TasksBoard extends BoardPage
         $board = $this->getBoard();
         $query = $board->getQuery();
 
-        if (! $query instanceof \Illuminate\Database\Eloquent\Builder) {
-            throw new InvalidArgumentException('Board query not available');
-        }
+        throw_unless($query instanceof \Illuminate\Database\Eloquent\Builder, InvalidArgumentException::class, 'Board query not available');
 
         /** @var Task|null $card */
-        $card = (clone $query)->find($cardId);
-        if (! $card) {
-            throw new InvalidArgumentException("Card not found: {$cardId}");
-        }
+        $card = (clone $query)->with(['assignees'])->find($cardId);
+        throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
 
-        // Calculate new position using Rank service
+        // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
         // Use transaction for data consistency
@@ -200,13 +230,35 @@ final class TasksBoard extends BoardPage
         )->toArray();
     }
 
+    /**
+     * Format a due date value for badge display.
+     *
+     * Shows relative dates (Today/Tomorrow) for immediate items,
+     * and full dates with year for all other cases.
+     */
+    private function formatDueDateBadge(?string $state): string
+    {
+        if (blank($state)) {
+            return '';
+        }
+
+        $date = \Illuminate\Support\Facades\Date::parse($state);
+
+        return match (true) {
+            $date->isPast() => $date->format('M j, Y').' (Overdue)',
+            $date->isToday() => 'Due Today',
+            $date->isTomorrow() => 'Due Tomorrow',
+            default => $date->format('M j, Y'),
+        };
+    }
+
     private function statusCustomField(): ?CustomField
     {
         /** @var CustomField|null */
-        return CustomField::query()
+        return once(fn () => CustomField::query()
             ->forEntity(Task::class)
             ->where('code', TaskCustomField::STATUS)
-            ->first();
+            ->first());
     }
 
     /**

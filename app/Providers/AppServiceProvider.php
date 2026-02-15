@@ -6,7 +6,10 @@ namespace App\Providers;
 
 use App\Http\Responses\LoginResponse;
 use App\Models\Company;
-use App\Models\Import;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
+use App\Models\CustomFieldSection;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
+use Relaticle\CustomFields\CustomFields;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class AppServiceProvider extends ServiceProvider
@@ -32,6 +36,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
+        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, \App\Models\Export::class);
     }
 
     /**
@@ -113,7 +118,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureModels(): void
     {
         Model::unguard();
-        //        Model::shouldBeStrict(! $this->app->isProduction()); // TODO: Uncomment this line to enable strict mode in production
+        //        Model::shouldBeStrict(! $this->app->isProduction()); // TODO: Uncomment this line to enable strict mode in local env
 
         Relation::enforceMorphMap([
             'team' => Team::class,
@@ -124,11 +129,13 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
-            'import' => Import::class,
         ]);
 
-        // Bind our custom Import model to the Filament Import model
-        $this->app->bind(\Filament\Actions\Imports\Models\Import::class, Import::class);
+        // Use custom models for custom-fields package
+        CustomFields::useCustomFieldModel(CustomField::class);
+        CustomFields::useSectionModel(CustomFieldSection::class);
+        CustomFields::useOptionModel(CustomFieldOption::class);
+        CustomFields::useValueModel(CustomFieldValue::class);
     }
 
     /**
@@ -154,7 +161,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         // Share GitHub stars count with the header component
         Facades\View::composer('components.layout.header', function (View $view): void {
-            $gitHubService = app(GitHubService::class);
+            $gitHubService = resolve(GitHubService::class);
             $starsCount = $gitHubService->getStarsCount();
             $formattedStarsCount = $gitHubService->getFormattedStarsCount();
 

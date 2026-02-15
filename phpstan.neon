@@ -5,6 +5,13 @@ includes:
 parameters:
     level: 7
 
+    ignoreErrors:
+        # Custom field model type covariance - App\Models\CustomField* extends Relaticle\CustomFields\Models\CustomField*
+        # Runtime model swapping is configured in AppServiceProvider but PHPStan doesn't know about it
+        -
+            identifier: argument.type
+            message: '#(Closure\(App\\Models\\CustomField|Relaticle\\CustomFields\\Models\\CustomField)(Option|Value|Section)?#'
+
     stubFiles:
         - stubs/Mailcoach.stub
 
@@ -21,4 +28,5 @@ parameters:
 
     configDirectories:
         - config
+        - app-modules/ImportWizard/config
         - app-modules/Documentation/config

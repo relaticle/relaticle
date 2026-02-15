@@ -16,9 +16,9 @@ enum CompanyField: string
     case ICP = 'icp';
 
     /**
-     * Domain Name: The website domain of the company (system field)
+     * Domains: Website domains of the company (system field)
      */
-    case DOMAIN_NAME = 'domain_name';
+    case DOMAINS = 'domains';
 
     /**
      * LinkedIn: The LinkedIn profile URL of the company
@@ -29,8 +29,8 @@ enum CompanyField: string
     {
         return match ($this) {
             self::ICP => 'ICP',
-            self::DOMAIN_NAME => 'Domain Name',
-            self::LINKEDIN => 'LinkedIn', // Fixed capitalization
+            self::DOMAINS => 'Domains',
+            self::LINKEDIN => 'LinkedIn',
         };
     }
 
@@ -38,14 +38,14 @@ enum CompanyField: string
     {
         return match ($this) {
             self::ICP => CustomFieldType::TOGGLE->value,
-            self::DOMAIN_NAME, self::LINKEDIN => CustomFieldType::LINK->value,
+            self::DOMAINS, self::LINKEDIN => CustomFieldType::LINK->value,
         };
     }
 
     public function isSystemDefined(): bool
     {
         return match ($this) {
-            self::DOMAIN_NAME => true,
+            self::DOMAINS => true,
             default => false,
         };
     }
@@ -53,7 +53,7 @@ enum CompanyField: string
     public function isListToggleableHidden(): bool
     {
         return match ($this) {
-            self::ICP, self::DOMAIN_NAME => false,
+            self::ICP, self::DOMAINS => false,
             default => true,
         };
     }
@@ -62,8 +62,24 @@ enum CompanyField: string
     {
         return match ($this) {
             self::ICP => 'Indicates whether this company is an Ideal Customer Profile',
-            self::DOMAIN_NAME => 'The website domain of the company (e.g., example.com)',
+            self::DOMAINS => 'Website domains of the company (e.g., example.com)',
             self::LINKEDIN => 'URL to the company\'s LinkedIn profile',
+        };
+    }
+
+    public function allowsMultipleValues(): bool
+    {
+        return match ($this) {
+            self::DOMAINS => true,
+            default => false,
+        };
+    }
+
+    public function isUniquePerEntityType(): bool
+    {
+        return match ($this) {
+            self::DOMAINS => true,
+            default => false,
         };
     }
 }

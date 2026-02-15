@@ -4,22 +4,21 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\File;
 
-beforeEach(function (): void {
-    // Back up existing .env file if it exists
-    if (File::exists(base_path('.env'))) {
-        File::copy(base_path('.env'), base_path('.env.backup'));
-    }
-});
+function createTempEnvFile(): string
+{
+    $tempEnv = sys_get_temp_dir().'/relaticle-test-'.uniqid().'.env';
+    File::copy(base_path('.env.example'), $tempEnv);
 
-afterEach(function (): void {
-    // Restore .env file if backup exists
-    if (File::exists(base_path('.env.backup'))) {
-        File::move(base_path('.env.backup'), base_path('.env'), true);
-    }
-});
+    return $tempEnv;
+}
 
 it('completes installation without demo data and system admin', function (): void {
-    $this->artisan('relaticle:install', ['--force' => true])
+    $tempEnv = createTempEnvFile();
+
+    $this->artisan('relaticle:install', [
+        '--force' => true,
+        '--env-file' => $tempEnv,
+    ])
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
@@ -33,12 +32,22 @@ it('completes installation without demo data and system admin', function (): voi
         ->expectsOutputToContain('Database completed')
         ->expectsOutputToContain('Relaticle installed successfully!')
         ->assertSuccessful();
+
+    // Verify .env was modified in temp file
+    expect(File::get($tempEnv))->toContain('DB_CONNECTION=sqlite');
+
+    File::delete($tempEnv);
 });
 
 it('completes installation with demo data but no system admin', function (): void {
     $this->markTestSkipped('Demo data seeding test needs investigation');
 
-    $this->artisan('relaticle:install', ['--force' => true])
+    $tempEnv = createTempEnvFile();
+
+    $this->artisan('relaticle:install', [
+        '--force' => true,
+        '--env-file' => $tempEnv,
+    ])
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
@@ -50,13 +59,20 @@ it('completes installation with demo data but no system admin', function (): voi
         ->expectsOutputToContain('Demo Data completed')
         ->expectsOutputToContain('Relaticle installed successfully!')
         ->assertExitCode(0);
+
+    File::delete($tempEnv);
 });
 
 it('creates system administrator when requested', function (): void {
+    $tempEnv = createTempEnvFile();
+
     // Clear any existing system administrators
     \Relaticle\SystemAdmin\Models\SystemAdministrator::query()->delete();
 
-    $this->artisan('relaticle:install', ['--force' => true])
+    $this->artisan('relaticle:install', [
+        '--force' => true,
+        '--env-file' => $tempEnv,
+    ])
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
@@ -74,9 +90,13 @@ it('creates system administrator when requested', function (): void {
 
     // Verify the system administrator was created
     expect(\Relaticle\SystemAdmin\Models\SystemAdministrator::where('email', 'test@example.com')->exists())->toBeTrue();
+
+    File::delete($tempEnv);
 });
 
 it('skips system admin creation if one already exists', function (): void {
+    $tempEnv = createTempEnvFile();
+
     // Ensure a system administrator exists
     \Relaticle\SystemAdmin\Models\SystemAdministrator::firstOrCreate(
         ['email' => 'existing@example.com'],
@@ -88,7 +108,10 @@ it('skips system admin creation if one already exists', function (): void {
         ]
     );
 
-    $this->artisan('relaticle:install', ['--force' => true])
+    $this->artisan('relaticle:install', [
+        '--force' => true,
+        '--env-file' => $tempEnv,
+    ])
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
@@ -101,4 +124,6 @@ it('skips system admin creation if one already exists', function (): void {
         ->expectsOutputToContain('System Administrator created')
         ->expectsOutputToContain('Relaticle installed successfully!')
         ->assertSuccessful();
+
+    File::delete($tempEnv);
 });

@@ -31,7 +31,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -70,7 +69,7 @@ final class PeopleResource extends Resource
                             ->suffixAction(
                                 Action::make('Create Company')
                                     ->model(Company::class)
-                                    ->schema(fn (Schema $schema): \Filament\Schemas\Schema => $schema->components([
+                                    ->schema(fn (Schema $schema): Schema => $schema->components([
                                         TextInput::make('name')
                                             ->required(),
                                         Select::make('account_owner_id')
@@ -79,19 +78,18 @@ final class PeopleResource extends Resource
                                             ->label('Account Owner')
                                             ->preload()
                                             ->searchable(),
-                                        CustomFields::form()->forSchema($schema)->build()->columns(1),
+                                        CustomFields::form()->forModel(Company::class)->build()->columns(1),
                                     ]))
                                     ->modalWidth(Width::Large)
                                     ->slideOver()
                                     ->icon('heroicon-o-plus')
                                     ->action(function (array $data, Set $set): void {
-                                        $company = Company::create($data);
+                                        $company = Company::query()->create($data);
                                         $set('company_id', $company->id);
                                     })
                             )
                             ->searchable()
                             ->preload()
-                            ->required()
                             ->columnSpan(5),
                     ])
                     ->columns(12),
@@ -103,9 +101,11 @@ final class PeopleResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('avatar')->label('')->size(24)->circular(),
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Person')
+                    ->searchable()
+                    ->sortable()
+                    ->view('filament.tables.columns.avatar-name-column'),
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
@@ -116,8 +116,7 @@ final class PeopleResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->getStateUsing(fn (People $record): string => $record->created_by)
-                    ->color(fn (People $record): string => $record->isSystemCreated() ? 'secondary' : 'primary'),
+                    ->getStateUsing(fn (People $record): string => $record->created_by),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

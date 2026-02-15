@@ -71,11 +71,11 @@ final class BusinessOverviewWidget extends BaseWidget
         $pipelineValue = $opportunities->sum('amount') ?? 0;
         $totalOpportunities = $opportunities->count();
 
-        $totalTasks = Task::where('creation_source', '!=', CreationSource::SYSTEM)->count();
+        $totalTasks = Task::query()->where('creation_source', '!=', CreationSource::SYSTEM)->count();
         $completedTasks = $this->countCompletedEntities('tasks', 'task', 'status');
         $completionRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
 
-        $totalCompanies = Company::where('creation_source', '!=', CreationSource::SYSTEM)->count();
+        $totalCompanies = Company::query()->where('creation_source', '!=', CreationSource::SYSTEM)->count();
 
         [$opportunitiesGrowth, $companiesGrowth] = $this->calculateMonthlyGrowth();
         $pipelineTrend = $this->generatePipelineTrend($opportunities);
@@ -117,17 +117,17 @@ final class BusinessOverviewWidget extends BaseWidget
         $currentMonth = now()->startOfMonth();
         $lastMonth = now()->subMonth()->startOfMonth();
 
-        $opportunitiesThisMonth = Opportunity::where('created_at', '>=', $currentMonth)
+        $opportunitiesThisMonth = Opportunity::query()->where('created_at', '>=', $currentMonth)
             ->where('creation_source', '!=', CreationSource::SYSTEM)
             ->count();
-        $opportunitiesLastMonth = Opportunity::whereBetween('created_at', [$lastMonth, $currentMonth])
+        $opportunitiesLastMonth = Opportunity::query()->whereBetween('created_at', [$lastMonth, $currentMonth])
             ->where('creation_source', '!=', CreationSource::SYSTEM)
             ->count();
 
-        $companiesThisMonth = Company::where('created_at', '>=', $currentMonth)
+        $companiesThisMonth = Company::query()->where('created_at', '>=', $currentMonth)
             ->where('creation_source', '!=', CreationSource::SYSTEM)
             ->count();
-        $companiesLastMonth = Company::whereBetween('created_at', [$lastMonth, $currentMonth])
+        $companiesLastMonth = Company::query()->whereBetween('created_at', [$lastMonth, $currentMonth])
             ->where('creation_source', '!=', CreationSource::SYSTEM)
             ->count();
 

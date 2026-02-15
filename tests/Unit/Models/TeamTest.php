@@ -8,6 +8,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -109,4 +110,96 @@ test('team events are dispatched', function () {
     Event::assertDispatched(TeamCreated::class);
     Event::assertDispatched(TeamUpdated::class);
     Event::assertDispatched(TeamDeleted::class);
+});
+
+test('observer generates slug from name on creation', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    $team = Team::query()->create([
+        'name' => 'Acme Corp',
+        'user_id' => $user->id,
+        'personal_team' => true,
+    ]);
+
+    expect($team->slug)->toBe('acme-corp');
+});
+
+test('observer generates unique slug when duplicate name exists', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => true]);
+    $second = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
+    $third = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
+
+    expect($second->slug)->toBe('acme-corp-2')
+        ->and($third->slug)->toBe('acme-corp-3');
+});
+
+test('observer handles special characters in slug', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    $team = Team::query()->create([
+        'name' => 'Héllo Wörld & Friends!',
+        'user_id' => $user->id,
+        'personal_team' => true,
+    ]);
+
+    expect($team->slug)->toBe('hello-world-friends');
+});
+
+test('observer does not overwrite explicitly provided slug', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    $team = Team::query()->create([
+        'name' => 'My Team',
+        'slug' => 'custom-slug',
+        'user_id' => $user->id,
+        'personal_team' => true,
+    ]);
+
+    expect($team->slug)->toBe('custom-slug');
+});
+
+test('observer generates random slug when name has no alphanumeric characters', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    $team = Team::query()->create([
+        'name' => '!!!***',
+        'user_id' => $user->id,
+        'personal_team' => true,
+    ]);
+
+    expect($team->slug)->not->toBeEmpty()
+        ->and($team->slug)->toHaveLength(8);
+});
+
+test('slug is stable when name is updated', function () {
+    $team = Team::factory()->create([
+        'name' => 'Original Name',
+        'slug' => 'original-name',
+    ]);
+
+    $team->update(['name' => 'Updated Name']);
+
+    expect($team->fresh()->slug)->toBe('original-name');
 });

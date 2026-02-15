@@ -21,7 +21,8 @@ use function Laravel\Prompts\warning;
 final class InstallCommand extends Command
 {
     protected $signature = 'relaticle:install
-                            {--force : Force installation even if already configured}';
+                            {--force : Force installation even if already configured}
+                            {--env-file= : Custom path to .env file (for testing)}';
 
     protected $description = 'Install and configure Relaticle';
 
@@ -65,7 +66,7 @@ final class InstallCommand extends Command
 
     private function isAlreadyInstalled(): bool
     {
-        return File::exists(base_path('.env')) &&
+        return File::exists($this->envPath()) &&
                config('app.key') &&
                File::exists(public_path('storage'));
     }
@@ -208,11 +209,11 @@ final class InstallCommand extends Command
     private function setupEnvironment(array $config): bool
     {
         // Create .env file
-        if (! File::exists(base_path('.env'))) {
+        if (! File::exists($this->envPath())) {
             if (! File::exists(base_path('.env.example'))) {
                 return false;
             }
-            File::copy(base_path('.env.example'), base_path('.env'));
+            File::copy(base_path('.env.example'), $this->envPath());
         }
 
         // Generate app key
@@ -226,7 +227,7 @@ final class InstallCommand extends Command
 
     private function configureDatabaseConnection(string $type): bool
     {
-        $envContent = File::get(base_path('.env'));
+        $envContent = File::get($this->envPath());
 
         if ($type === 'sqlite') {
             if (! File::exists(database_path())) {
@@ -256,7 +257,7 @@ final class InstallCommand extends Command
             $envContent = preg_replace("/^{$key}=.*/m", $line, (string) $envContent);
         }
 
-        File::put(base_path('.env'), $envContent);
+        File::put($this->envPath(), $envContent);
 
         return true;
     }
@@ -348,7 +349,7 @@ final class InstallCommand extends Command
     {
         try {
             // Check if system administrator already exists
-            if (SystemAdministrator::exists()) {
+            if (SystemAdministrator::query()->exists()) {
                 $this->warn('A System Administrator already exists.');
                 $overwrite = confirm(
                     label: 'Do you want to create another one?',
@@ -375,7 +376,7 @@ final class InstallCommand extends Command
             );
 
             // Check if email already exists
-            if (SystemAdministrator::where('email', $email)->exists()) {
+            if (SystemAdministrator::query()->where('email', $email)->exists()) {
                 $this->error("A System Administrator with email '{$email}' already exists.");
 
                 return false;
@@ -389,7 +390,7 @@ final class InstallCommand extends Command
             );
 
             // Create the system administrator
-            SystemAdministrator::create([
+            SystemAdministrator::query()->create([
                 'name' => $name,
                 'email' => $email,
                 'password' => bcrypt($password),
@@ -451,5 +452,10 @@ final class InstallCommand extends Command
         $this->newLine();
 
         $this->info('Happy CRM-ing! 🚀');
+    }
+
+    private function envPath(): string
+    {
+        return $this->option('env-file') ?: base_path('.env');
     }
 }

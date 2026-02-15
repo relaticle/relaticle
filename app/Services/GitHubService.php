@@ -58,7 +58,7 @@ final readonly class GitHubService
         $starsCount = $this->getStarsCount($owner, $repo, $cacheMinutes);
 
         if ($starsCount >= 1000) {
-            return Number::abbreviate($starsCount, 1) ?: (string) $starsCount;
+            return (string) Number::abbreviate($starsCount, 1);
         }
 
         return (string) $starsCount;

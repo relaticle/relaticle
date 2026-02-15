@@ -15,7 +15,7 @@ final readonly class CreatePersonalTeamListener
         /** @var User $user */
         $user = $event->getUser();
 
-        $user->ownedTeams()->save(Team::forceCreate([
+        $user->ownedTeams()->save(Team::query()->forceCreate([
             'user_id' => $user->getAuthIdentifier(),
             'name' => explode(' ', (string) $user->name, 2)[0]."'s Team",
             'personal_team' => true,

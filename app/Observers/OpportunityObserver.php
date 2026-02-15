@@ -11,7 +11,7 @@ final readonly class OpportunityObserver
     public function creating(Opportunity $opportunity): void
     {
         if (auth('web')->check()) {
-            $opportunity->creator_id = auth('web')->id();
+            $opportunity->creator_id = (string) auth('web')->id();
             $opportunity->team_id = auth('web')->user()->currentTeam->getKey();
         }
     }

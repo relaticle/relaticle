@@ -6,6 +6,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Team;
 use BackedEnum;
@@ -20,12 +22,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
-use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
 use UnitEnum;
 
@@ -46,18 +45,21 @@ final class OpportunitiesBoard extends BoardPage
      */
     public function board(Board $board): Board
     {
+        $stageField = $this->stageCustomField();
+        $valueColumn = $stageField->getValueColumn();
+
         return $board
             ->query(
                 Opportunity::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join): void {
+                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join) use ($stageField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $this->stageCustomField()->getKey());
+                            ->where('cfv.custom_field_id', '=', $stageField->getKey());
                     })
-                    ->select('opportunities.*', 'cfv.integer_value')
+                    ->select('opportunities.*', 'cfv.'.$valueColumn)
                     ->with(['company', 'contact'])
             )
             ->recordTitleAttribute('name')
-            ->columnIdentifier('cfv.integer_value')
+            ->columnIdentifier('cfv.'.$valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['name'])
             ->columns($this->getColumns())
@@ -71,11 +73,8 @@ final class OpportunitiesBoard extends BoardPage
                     ->values()
                     ->first()
                     ?->columnSpanFull()
-                    ->visible(filled(...))
+                    ->visible(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString()),
-                CardFlex::make([
-
-                ]),
             ]))
             ->columnActions([
                 CreateAction::make()
@@ -95,7 +94,7 @@ final class OpportunitiesBoard extends BoardPage
 
                         $stageField = $this->stageCustomField();
                         $opportunity->saveCustomFieldValue($stageField, $arguments['column']);
-                        $opportunity->order_column = $this->getBoardPositionInColumn((string) $arguments['column']);
+                        $opportunity->order_column = (float) $this->getBoardPositionInColumn((string) $arguments['column']);
 
                         return $opportunity;
                     }),
@@ -138,7 +137,10 @@ final class OpportunitiesBoard extends BoardPage
     }
 
     /**
-     * Move card to new position using Rank-based positioning.
+     * Move card to new position using DecimalPosition service.
+     *
+     * Overrides the default Flowforge implementation to properly handle
+     * custom field columns which are stored in a polymorphic table.
      *
      * @throws Throwable
      */
@@ -151,16 +153,12 @@ final class OpportunitiesBoard extends BoardPage
         $board = $this->getBoard();
         $query = $board->getQuery();
 
-        if (! $query instanceof \Illuminate\Database\Eloquent\Builder) {
-            throw new InvalidArgumentException('Board query not available');
-        }
+        throw_unless($query instanceof \Illuminate\Database\Eloquent\Builder, InvalidArgumentException::class, 'Board query not available');
 
         $card = (clone $query)->find($cardId);
-        if (! $card) {
-            throw new InvalidArgumentException("Card not found: {$cardId}");
-        }
+        throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
 
-        // Calculate new position using Rank service
+        // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
         // Use transaction for data consistency

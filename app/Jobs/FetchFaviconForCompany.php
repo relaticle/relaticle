@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Exception;
@@ -11,39 +12,33 @@ use Illuminate\Contracts\Broadcasting\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
 
 final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, Queueable;
+    use Dispatchable;
+    use Queueable;
 
-    /**
-     * Delete the job if its models no longer exist.
-     */
     public bool $deleteWhenMissingModels = true;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(public readonly Company $company)
-    {
-        //
-    }
+    public function __construct(public readonly Company $company) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         try {
             $customFieldDomain = $this->company->customFields()
                 ->whereBelongsTo($this->company->team)
-                ->where('code', 'domain_name')
+                ->where('code', CompanyField::DOMAINS->value)
                 ->first();
-            $domainName = $this->company->getCustomFieldValue($customFieldDomain);
 
-            if ($domainName === null) {
+            $domains = $this->company->getCustomFieldValue($customFieldDomain);
+            $domainName = is_array($domains) ? ($domains[0] ?? null) : $domains;
+
+            if ($domainName === null || $domainName === '') {
                 return;
             }
+
+            $domainName = Str::start($domainName, 'https://');
 
             $favicon = Favicon::driver('high-quality')->fetch($domainName);
             $url = $favicon?->getFaviconUrl();
@@ -57,7 +52,6 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 
             $filename = match ($extension) {
                 'svg' => 'logo.svg',
-                'png' => 'logo.png',
                 'webp' => 'logo.webp',
                 'jpg', 'jpeg' => 'logo.jpg',
                 default => 'logo.png',
@@ -68,6 +62,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 ->usingFileName($filename)
                 ->usingName('company_logo')
                 ->withCustomProperties([
+                    'domain' => $domainName,
                     'original_size' => $favicon->getIconSize(),
                     'icon_type' => $favicon->getIconType(),
                     'fetched_at' => now()->toIso8601String(),
@@ -80,9 +75,6 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    /**
-     * Get the unique ID for the job.
-     */
     public function uniqueId(): string
     {
         return (string) $this->company->getKey();

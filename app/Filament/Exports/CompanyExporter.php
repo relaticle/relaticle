@@ -50,7 +50,8 @@ final class CompanyExporter extends BaseExporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your company export has completed and '.number_format($export->successful_rows).' '.str('row')->plural($export->successful_rows).' exported.';
+        $successfulRows = $export->successful_rows ?? 0;
+        $body = 'Your company export has completed and '.number_format($successfulRows).' '.str('row')->plural($successfulRows).' exported.';
 
         if (($failedRowsCount = $export->getFailedRowsCount()) !== 0) {
             $body .= ' '.number_format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to export.';

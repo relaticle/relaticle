@@ -24,7 +24,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -58,20 +57,19 @@ final class CompanyResource extends Resource
                     ->preload()
                     ->searchable(),
 
-                CustomFields::form()->forSchema($schema)->build()->columns(1),
-            ])
-            ->columns(1)
-            ->inlineLabel();
+                CustomFields::form()->build()->columnSpanFull()->columns(1),
+            ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                ImageColumn::make('logo')->label('')->imageSize(28)->square(),
                 TextColumn::make('name')
+                    ->label('Company')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->view('filament.tables.columns.logo-name-column'),
                 TextColumn::make('accountOwner.name')
                     ->label('Account Owner')
                     ->searchable()
@@ -82,8 +80,7 @@ final class CompanyResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->getStateUsing(fn (Company $record): string => $record->created_by)
-                    ->color(fn (Company $record): string => $record->isSystemCreated() ? 'secondary' : 'primary'),
+                    ->getStateUsing(fn (Company $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()

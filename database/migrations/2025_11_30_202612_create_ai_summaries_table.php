@@ -14,9 +14,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('ai_summaries', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->morphs('summarizable');
+            $table->ulid('id')->primary();
+            $table->foreignUlid('team_id')->constrained()->cascadeOnDelete();
+            $table->ulidMorphs('summarizable');
             $table->text('summary');
             $table->string('model_used');
             $table->unsignedInteger('prompt_tokens')->nullable();

@@ -8,6 +8,7 @@ use App\Filament\Actions\GenerateRecordSummaryAction;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -28,8 +29,38 @@ final class ViewPeople extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
             ActionGroup::make([
-                EditAction::make(),
+                ActionGroup::make([
+                    Action::make('copyPageUrl')
+                        ->label('Copy page URL')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (People $record): void {
+                            $url = PeopleResource::getUrl('view', [$record]);
+                            $this->js("
+                            navigator.clipboard.writeText('{$url}').then(() => {
+                                new FilamentNotification()
+                                    .title('URL copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                    Action::make('copyRecordId')
+                        ->label('Copy record ID')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (People $record): void {
+                            $id = $record->getKey();
+                            $this->js("
+                            navigator.clipboard.writeText('{$id}').then(() => {
+                                new FilamentNotification()
+                                    .title('Record ID copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                ])->dropdown(false),
                 DeleteAction::make(),
             ]),
         ];

@@ -1,67 +1,71 @@
-# API Documentation
+# API Reference
 
-This guide provides documentation for the Relaticle API, allowing developers to integrate Relaticle's CRM capabilities with other applications.
+> **Coming Soon** — The REST API is under active development.
 
-## API Overview
+---
 
-Relaticle's API is currently under development. This section will be updated with comprehensive documentation once the API is available for use.
+## Overview
 
-## Planned API Features
+Relaticle will provide a comprehensive REST API for integrating with external applications and building custom workflows.
 
-The Relaticle API will include:
+---
 
-- REST API endpoints for all major resources (Companies, Contacts, Opportunities, Tasks, Notes)
-- Authentication via API tokens
-- Comprehensive query capabilities
-- Pagination and filtering options
+## Planned Features
 
-## Authentication
+| Feature | Description |
+|---------|-------------|
+| **Authentication** | API tokens via Laravel Sanctum |
+| **CRUD Endpoints** | Companies, People, Opportunities, Tasks, Notes |
+| **Filtering** | Query parameters for filtering and searching |
+| **Pagination** | Cursor-based pagination for large datasets |
+| **Rate Limiting** | Fair usage limits per token |
 
-Our authentication system will use API tokens for secure access to the API.
+---
 
-## Core Resources
+## Planned Endpoints
 
-The API will provide access to the following resources:
+```
+GET    /api/companies
+POST   /api/companies
+GET    /api/companies/{id}
+PUT    /api/companies/{id}
+DELETE /api/companies/{id}
 
-### Companies
+GET    /api/people
+POST   /api/people
+GET    /api/people/{id}
+PUT    /api/people/{id}
+DELETE /api/people/{id}
 
-The Companies endpoint will allow you to:
-- List companies
-- Retrieve company details
-- Create new companies
-- Update existing companies
-- Delete companies
+GET    /api/opportunities
+POST   /api/opportunities
+GET    /api/opportunities/{id}
+PUT    /api/opportunities/{id}
+DELETE /api/opportunities/{id}
 
-### Contacts (People)
+GET    /api/tasks
+POST   /api/tasks
+GET    /api/tasks/{id}
+PUT    /api/tasks/{id}
+DELETE /api/tasks/{id}
 
-The Contacts endpoint will allow you to:
-- List contacts
-- Retrieve contact details
-- Create new contacts
-- Update existing contacts
-- Delete contacts
+GET    /api/notes
+POST   /api/notes
+GET    /api/notes/{id}
+PUT    /api/notes/{id}
+DELETE /api/notes/{id}
+```
 
-### Opportunities
+---
 
-The Opportunities endpoint will allow you to:
-- List opportunities
-- Retrieve opportunity details
-- Create new opportunities
-- Update existing opportunities
-- Delete opportunities
+## Stay Updated
 
-### Tasks
+Follow the repository for release announcements:
 
-The Tasks endpoint will provide similar CRUD operations for tasks.
+[github.com/Relaticle/relaticle](https://github.com/Relaticle/relaticle)
 
-### Notes
+---
 
-The Notes endpoint will provide similar CRUD operations for notes.
+## Have Suggestions?
 
-## API Release Timeline
-
-We are actively working on our API. If you would like to be notified when it becomes available, please follow our GitHub repository for updates.
-
-## Contributing
-
-If you have suggestions for our upcoming API, please open an issue in our GitHub repository with your ideas and requirements. 
+Open an issue on GitHub to share your API requirements and use cases.

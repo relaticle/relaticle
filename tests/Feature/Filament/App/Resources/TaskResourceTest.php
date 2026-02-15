@@ -6,8 +6,6 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 
-use function Pest\Livewire\livewire;
-
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($this->user);

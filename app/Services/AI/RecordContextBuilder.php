@@ -139,7 +139,7 @@ final readonly class RecordContextBuilder
     private function getCompanyBasicInfo(Company $company): array
     {
         return collect([
-            'domain' => $this->getCustomFieldValue($company, CompanyField::DOMAIN_NAME->value),
+            'domain' => $this->getCustomFieldValue($company, CompanyField::DOMAINS->value),
             'is_icp' => (bool) $this->getCustomFieldValue($company, CompanyField::ICP->value),
             'account_owner' => $company->accountOwner?->name,
         ])->filter(fn (mixed $value): bool => filled($value))->all();
@@ -251,10 +251,10 @@ final readonly class RecordContextBuilder
             return null;
         }
 
-        /** @var Collection<int, \Relaticle\CustomFields\Models\CustomFieldValue> $customFieldValues */
+        /** @var Collection<int, \App\Models\CustomFieldValue> $customFieldValues */
         $customFieldValues = $model->customFieldValues; // @phpstan-ignore property.notFound
 
-        $customFieldValue = $customFieldValues->first(fn (\Relaticle\CustomFields\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === $code);
+        $customFieldValue = $customFieldValues->first(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === $code);
 
         if ($customFieldValue === null) {
             return null;

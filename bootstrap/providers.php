@@ -11,5 +11,6 @@ return [
     App\Providers\HorizonServiceProvider::class,
     App\Providers\JetstreamServiceProvider::class,
     Relaticle\Documentation\DocumentationServiceProvider::class,
+    Relaticle\ImportWizard\ImportWizardNewServiceProvider::class,
     App\Providers\FaviconServiceProvider::class,
 ];

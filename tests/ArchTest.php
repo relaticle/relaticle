@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
+use App\Filament\Pages\Import\ImportPage;
 use App\Livewire\BaseLivewireComponent;
 
 arch()->preset()->php();
@@ -34,6 +35,7 @@ arch('avoid open for extension')
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
+        ImportPage::class,
     ]);
 
 arch('ensure no extends')
@@ -45,6 +47,7 @@ arch('ensure no extends')
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
+        ImportPage::class,
     ]);
 
 arch('avoid mutation')
@@ -110,4 +113,25 @@ arch('SystemAdmin module must not depend on main app namespace')
     ->ignoring([
         'App\Models',
         'App\Enums',
+    ]);
+
+arch('must not use custom-fields package models directly')
+    ->expect([
+        'App',
+        'Relaticle\ImportWizard',
+        'Relaticle\OnboardSeed',
+        'Relaticle\Documentation',
+    ])
+    ->not
+    ->toUse([
+        'Relaticle\CustomFields\Models\CustomField',
+        'Relaticle\CustomFields\Models\CustomFieldOption',
+        'Relaticle\CustomFields\Models\CustomFieldSection',
+        'Relaticle\CustomFields\Models\CustomFieldValue',
+    ])
+    ->ignoring([
+        'App\Models\CustomField',
+        'App\Models\CustomFieldOption',
+        'App\Models\CustomFieldSection',
+        'App\Models\CustomFieldValue',
     ]);

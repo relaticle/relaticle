@@ -16,9 +16,9 @@ return new class extends Migration
         Schema::create('noteables', function (Blueprint $table): void {
             $table->id();
 
-            $table->foreignId('note_id');
+            $table->foreignUlid('note_id');
 
-            $table->morphs('noteable');
+            $table->ulidMorphs('noteable');
 
             $table->timestamps();
         });

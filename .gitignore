@@ -21,10 +21,13 @@ yarn-error.log
 CLAUDE.md
 AGENTS.md
 boost.json
+.mcp.json
 /.ai
 /.fleet
 /.idea
 /.vscode
 /.claude
+/.superset
 /.cursor
 /.junie
+/.playwright-mcp

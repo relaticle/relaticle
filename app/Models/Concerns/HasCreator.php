@@ -33,7 +33,7 @@ trait HasCreator
     /**
      * @return Attribute<string, never>
      */
-    public function createdBy(): Attribute
+    protected function createdBy(): Attribute
     {
         return Attribute::make(
             get: fn (): string => $this->creation_source === CreationSource::SYSTEM ?

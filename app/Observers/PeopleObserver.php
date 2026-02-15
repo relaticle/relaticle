@@ -11,7 +11,7 @@ final readonly class PeopleObserver
     public function creating(People $people): void
     {
         if (auth('web')->check()) {
-            $people->creator_id = auth('web')->id();
+            $people->creator_id = (string) auth('web')->id();
             $people->team_id = auth('web')->user()->currentTeam->getKey();
         }
     }

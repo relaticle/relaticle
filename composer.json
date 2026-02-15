@@ -15,19 +15,20 @@
     "require": {
         "php": "^8.4",
         "ashallendesign/favicon-fetcher": "^3.8",
-        "awcodes/overlook": "^v3.0",
+        "asmit/resized-column": "^2.1",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
-        "filament/filament": "^4.0",
+        "doctrine/dbal": "^4.4",
+        "filament/filament": "^5.0",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
-        "livewire/livewire": "^3.0",
+        "livewire/livewire": "^4.0",
         "prism-php/prism": "^0.98.5",
-        "relaticle/custom-fields": "^2.0",
+        "relaticle/custom-fields": "@dev",
         "relaticle/flowforge": "@dev",
         "sentry/sentry-laravel": "^4.13",
         "spatie/eloquent-sortable": "^4.4",
@@ -40,6 +41,7 @@
         "spatie/laravel-prefixed-ids": "^1.4",
         "spatie/laravel-settings": "^3.3",
         "spatie/laravel-sitemap": "^7.3",
+        "spatie/simple-excel": "^3.8",
         "symfony/http-client": "^7.2",
         "symfony/postmark-mailer": "^7.2",
         "symfony/yaml": "^7.2"
@@ -50,7 +52,7 @@
         "fakerphp/faker": "^1.23",
         "itsgoingd/clockwork": "^5.3",
         "larastan/larastan": "^3.0",
-        "laravel/boost": "^1.0",
+        "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.21",
         "laravel/sail": "^1.26",
@@ -58,11 +60,8 @@
         "nunomaduro/collision": "^8.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-livewire": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
-        "phpstan/phpstan": "2.1.33",
-        "rector/rector": "^2.0",
-        "spatie/laravel-horizon-watcher": "^1.1"
+        "rector/rector": "^2.0"
     },
     "autoload": {
         "psr-4": {
@@ -70,6 +69,7 @@
             "Relaticle\\SystemAdmin\\": "app-modules/SystemAdmin/src",
             "Relaticle\\Documentation\\": "app-modules/Documentation/src",
             "Relaticle\\OnboardSeed\\": "app-modules/OnboardSeed/src",
+            "Relaticle\\ImportWizard\\": "app-modules/ImportWizard/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
@@ -114,7 +114,7 @@
         "test:pest": "pest --parallel",
         "test:pest:shard": "pest --parallel --shard=${SHARD}",
         "test:pest:ci": "pest --parallel --configuration phpunit.ci.xml",
-        "test:pest:ci:shard": "pest --parallel --configuration phpunit.ci.xml --shard=${SHARD}",
+        "test:pest:ci:shard": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD}",
         "test": [
             "@test:lint",
             "@test:refactor",
@@ -145,6 +145,6 @@
             "cweagans/composer-patches": true
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "beta",
     "prefer-stable": true
 }

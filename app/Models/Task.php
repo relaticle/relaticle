@@ -11,6 +11,7 @@ use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -19,7 +20,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
-use Relaticle\CustomFields\Models\CustomField;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
@@ -39,6 +39,7 @@ final class Task extends Model implements HasCustomFields
     use HasFactory;
 
     use HasTeam;
+    use HasUlids;
     use InvalidatesRelatedAiSummaries;
     use SoftDeletes;
     use SortableTrait;
@@ -47,9 +48,6 @@ final class Task extends Model implements HasCustomFields
     protected $fillable = [
         'user_id',
         'title',
-        'description',
-        'status',
-        'priority',
         'creation_source',
     ];
 

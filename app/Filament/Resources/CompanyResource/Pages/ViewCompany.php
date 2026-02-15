@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
-use App\Enums\CustomFields\CompanyField;
 use App\Filament\Actions\GenerateRecordSummaryAction;
 use App\Filament\Components\Infolists\AvatarName;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
-use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -31,38 +30,41 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
             ActionGroup::make([
-                EditAction::make()
-                    ->after(function (Company $record, array $data): void {
-                        $this->dispatchFaviconFetchIfNeeded($record, $data);
-                    }),
+                ActionGroup::make([
+                    Action::make('copyPageUrl')
+                        ->label('Copy page URL')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (Company $record): void {
+                            $url = CompanyResource::getUrl('view', [$record]);
+                            $this->js("
+                            navigator.clipboard.writeText('{$url}').then(() => {
+                                new FilamentNotification()
+                                    .title('URL copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                    Action::make('copyRecordId')
+                        ->label('Copy record ID')
+                        ->icon('heroicon-o-clipboard-document')
+                        ->action(function (Company $record): void {
+                            $id = $record->getKey();
+                            $this->js("
+                            navigator.clipboard.writeText('{$id}').then(() => {
+                                new FilamentNotification()
+                                    .title('Record ID copied to clipboard')
+                                    .success()
+                                    .send()
+                            })
+                        ");
+                        }),
+                ])->dropdown(false),
                 DeleteAction::make(),
             ]),
         ];
-    }
-
-    /**
-     * Dispatch favicon fetch job if domain_name custom field has changed.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private function dispatchFaviconFetchIfNeeded(Company $company, array $data): void
-    {
-        $customFieldsData = $data['custom_fields'] ?? [];
-        $newDomain = $customFieldsData['domain_name'] ?? null;
-
-        // Get the old domain value from the database
-        $domainField = $company->customFields()
-            ->whereBelongsTo($company->team)
-            ->where('code', CompanyField::DOMAIN_NAME->value)
-            ->first();
-
-        $oldDomain = $domainField !== null ? $company->getCustomFieldValue($domainField) : null;
-
-        // Only dispatch if domain changed and new value is not empty
-        if (! in_array($newDomain, [$oldDomain, null, '', '0'], true)) {
-            FetchFaviconForCompany::dispatch($company)->afterCommit();
-        }
     }
 
     public function infolist(Schema $schema): Schema

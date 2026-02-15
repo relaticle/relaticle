@@ -99,6 +99,6 @@ final class GenerateRecordSummaryAction extends Action
 
     private function summaryService(): RecordSummaryService
     {
-        return app(RecordSummaryService::class);
+        return resolve(RecordSummaryService::class);
     }
 }

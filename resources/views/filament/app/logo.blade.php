@@ -1,5 +1,5 @@
-<div class="w-10 flex items-center">
-    <svg width="1158" height="1158" viewBox="0 0 1158 1158" fill="none" xmlns="http://www.w3.org/2000/svg">
+<div class="w-10 h-10 flex items-center overflow-hidden">
+    <svg class="w-full h-full" viewBox="0 0 1158 1158" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g clip-path="url(#clip0_38_20)">
             <path opacity="0.85" d="M157.909 412.818C245.12 412.818 315.818 342.12 315.818 254.909C315.818 167.698 245.12 97 157.909 97C70.6983 97 0 167.698 0 254.909C0 342.12 70.6983 412.818 157.909 412.818Z" fill="url(#paint0_linear_38_20)"/>
             <path opacity="0.75" d="M1035.18 412.818C1103.01 412.818 1158 357.83 1158 290C1158 222.169 1103.01 167.182 1035.18 167.182C967.351 167.182 912.364 222.169 912.364 290C912.364 357.83 967.351 412.818 1035.18 412.818Z" fill="url(#paint1_linear_38_20)"/>
