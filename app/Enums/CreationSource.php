@@ -31,9 +31,6 @@ enum CreationSource: string implements HasColor, HasLabel
      */
     case IMPORT = 'import';
 
-    /**
-     * Get the human-readable label for Filament UI components.
-     */
     public function getColor(): string
     {
         return match ($this) {
