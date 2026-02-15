@@ -152,6 +152,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
+By default, the CRM panel is available at `{APP_URL}/app` (path mode). For subdomain routing, set `APP_PANEL_DOMAIN` in your `.env` (e.g., `APP_PANEL_DOMAIN=app.example.com`).
+
 Included services:
 - **app** - Web server (nginx + php-fpm) on port 8080
 - **horizon** - Queue processing
