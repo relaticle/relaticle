@@ -15,8 +15,10 @@ final class MacroServiceProvider extends ServiceProvider
             $trimmedPath = ltrim($path, '/');
 
             if ($domain = config('app.app_panel_domain')) {
-                $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME) ?? 'https';
-                $base = "{$scheme}://{$domain}";
+                $parsed = parse_url((string) config('app.url'));
+                $scheme = $parsed['scheme'] ?? 'https';
+                $port = isset($parsed['port']) ? ":{$parsed['port']}" : '';
+                $base = "{$scheme}://{$domain}{$port}";
 
                 return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
             }

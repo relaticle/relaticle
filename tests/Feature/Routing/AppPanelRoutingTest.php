@@ -113,6 +113,14 @@ describe('getAppUrl macro - domain mode', function () {
 
         expect(url()->getAppUrl('/login'))->toBe('https://app.example.com/login');
     });
+
+    it('preserves port from APP_URL', function () {
+        config(['app.app_panel_domain' => 'app.localhost']);
+        config(['app.url' => 'http://localhost:8080']);
+
+        expect(url()->getAppUrl('login'))->toBe('http://app.localhost:8080/login')
+            ->and(url()->getAppUrl())->toBe('http://app.localhost:8080');
+    });
 });
 
 describe('getPublicUrl macro', function () {
