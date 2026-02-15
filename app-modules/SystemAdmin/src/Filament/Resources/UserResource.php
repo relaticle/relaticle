@@ -12,7 +12,10 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -23,6 +26,8 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 
 final class UserResource extends Resource
 {
@@ -73,6 +78,27 @@ final class UserResource extends Resource
     }
 
     #[Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make([
+                    TextEntry::make('name'),
+                    TextEntry::make('email'),
+                    IconEntry::make('email_verified_at')
+                        ->label('Verified')
+                        ->boolean(),
+                    TextEntry::make('currentTeam.name')
+                        ->label('Current Team'),
+                    TextEntry::make('created_at')
+                        ->dateTime(),
+                    TextEntry::make('updated_at')
+                        ->dateTime(),
+                ])->columnSpanFull()->columns(),
+            ]);
+    }
+
+    #[Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -119,7 +145,10 @@ final class UserResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            OwnedTeamsRelationManager::class,
+            TeamsRelationManager::class,
+        ];
     }
 
     #[Override]

@@ -97,11 +97,6 @@ final class OpportunityResource extends Resource
                     ->toggleable(),
                 TextColumn::make('creation_source')
                     ->badge()
-                    ->color(fn (CreationSource $state): string => match ($state) {
-                        CreationSource::WEB => 'info',
-                        CreationSource::SYSTEM => 'warning',
-                        CreationSource::IMPORT => 'success',
-                    })
                     ->label('Source')
                     ->toggleable(),
                 TextColumn::make('created_at')

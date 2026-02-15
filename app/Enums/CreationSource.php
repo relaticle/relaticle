@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 
-enum CreationSource: string implements HasLabel
+enum CreationSource: string implements HasColor, HasLabel
 {
     /**
      * Created through the web application interface by a user.
@@ -33,6 +34,15 @@ enum CreationSource: string implements HasLabel
     /**
      * Get the human-readable label for Filament UI components.
      */
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::WEB => 'info',
+            self::SYSTEM => 'warning',
+            self::IMPORT => 'success',
+        };
+    }
+
     public function getLabel(): string
     {
         return match ($this) {
