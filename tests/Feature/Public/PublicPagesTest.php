@@ -85,8 +85,7 @@ describe('Authentication redirects', function () {
     it('redirects dashboard to app panel', function () {
         $response = $this->get('/dashboard');
 
-        $expectedUrl = rtrim(url()->getAppUrl(), '/');
-        $response->assertRedirect($expectedUrl);
+        $response->assertRedirect(url()->getAppUrl());
     });
 });
 

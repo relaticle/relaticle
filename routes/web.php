@@ -48,7 +48,7 @@ Route::get('/', HomeController::class);
 Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
 Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
 
-Route::get('/dashboard', fn () => redirect()->to(rtrim(url()->getAppUrl(), '/')))->name('dashboard');
+Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
 Route::get('/team-invitations/{invitation}', [TeamInvitationController::class, 'accept'])
     ->middleware(['signed', 'verified', 'auth', AuthenticateSession::class])

@@ -31,7 +31,7 @@ describe('getAppUrl macro - path mode', function () {
         config(['app.url' => 'https://example.com']);
 
         expect(url()->getAppUrl('login'))->toBe('https://example.com/app/login')
-            ->and(url()->getAppUrl())->toBe('https://example.com/app/');
+            ->and(url()->getAppUrl())->toBe('https://example.com/app');
     });
 
     it('handles custom panel path', function () {
@@ -90,7 +90,7 @@ describe('getAppUrl macro - domain mode', function () {
         config(['app.url' => 'https://example.com']);
 
         expect(url()->getAppUrl('login'))->toBe('https://app.example.com/login')
-            ->and(url()->getAppUrl())->toBe('https://app.example.com/');
+            ->and(url()->getAppUrl())->toBe('https://app.example.com');
     });
 
     it('uses scheme from APP_URL', function () {
@@ -127,32 +127,5 @@ describe('getPublicUrl macro', function () {
         config(['app.url' => 'https://example.com']);
 
         expect(url()->getPublicUrl('about'))->toBe('https://example.com/about');
-    });
-});
-
-describe('authentication redirects', function () {
-    it('redirects /login to app panel', function () {
-        $response = test()->get('/login');
-
-        $response->assertRedirect(url()->getAppUrl('login'));
-    });
-
-    it('redirects /register to app panel', function () {
-        $response = test()->get('/register');
-
-        $response->assertRedirect(url()->getAppUrl('register'));
-    });
-
-    it('redirects /forgot-password to app panel', function () {
-        $response = test()->get('/forgot-password');
-
-        $response->assertRedirect(url()->getAppUrl('forgot-password'));
-    });
-
-    it('redirects /dashboard to app panel', function () {
-        $response = test()->get('/dashboard');
-
-        $expectedUrl = rtrim(url()->getAppUrl(), '/');
-        $response->assertRedirect($expectedUrl);
     });
 });

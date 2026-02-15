@@ -12,24 +12,26 @@ final class MacroServiceProvider extends ServiceProvider
     public function boot(): void
     {
         URL::macro('getAppUrl', function (string $path = ''): string {
+            $trimmedPath = ltrim($path, '/');
+
             if ($domain = config('app.app_panel_domain')) {
                 $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME) ?? 'https';
+                $base = "{$scheme}://{$domain}";
 
-                return "{$scheme}://{$domain}/".ltrim($path, '/');
+                return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
             }
 
             $panelPath = config('app.app_panel_path', 'app');
+            $base = rtrim((string) config('app.url'), '/')."/{$panelPath}";
 
-            return rtrim((string) config('app.url'), '/')."/{$panelPath}/".ltrim($path, '/');
+            return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
         });
 
         URL::macro('getPublicUrl', function (string $path = ''): string {
-            $baseUrl = config('app.url');
-            $parsed = parse_url((string) $baseUrl);
-            $scheme = $parsed['scheme'] ?? 'https';
-            $host = $parsed['host'] ?? 'localhost';
+            $base = rtrim((string) config('app.url'), '/');
+            $trimmedPath = ltrim($path, '/');
 
-            return $scheme.'://'.$host.'/'.ltrim($path, '/');
+            return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
         });
     }
 }
