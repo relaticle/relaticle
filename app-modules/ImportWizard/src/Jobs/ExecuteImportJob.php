@@ -855,7 +855,7 @@ final class ExecuteImportJob implements ShouldQueue
 
         $creationMatch = $this->resolveCreationMatch($matches);
 
-        if ($creationMatch === null || blank($creationMatch->name)) {
+        if (! $creationMatch instanceof RelationshipMatch || blank($creationMatch->name)) {
             return null;
         }
 

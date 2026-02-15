@@ -17,18 +17,15 @@ final class EntityLinkValidator
 {
     private readonly EntityLinkResolver $resolver;
 
-    private readonly string $teamId;
-
     /** @var array<string, array<int, string>> */
     private array $formatRulesCache = [];
 
     /** @var array<string, string> */
     private array $lastFormatErrors = [];
 
-    public function __construct(string $teamId)
+    public function __construct(private readonly string $teamId)
     {
-        $this->teamId = $teamId;
-        $this->resolver = new EntityLinkResolver($teamId);
+        $this->resolver = new EntityLinkResolver($this->teamId);
     }
 
     public function validate(EntityLink $link, MatchableField $matcher, mixed $value): ?string
