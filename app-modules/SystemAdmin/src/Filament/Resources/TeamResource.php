@@ -12,7 +12,10 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -73,6 +76,27 @@ final class TeamResource extends Resource
                     ->maxLength(255),
                 Toggle::make('personal_team')
                     ->required(),
+            ]);
+    }
+
+    #[Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make([
+                    TextEntry::make('name'),
+                    TextEntry::make('slug'),
+                    TextEntry::make('owner.name')
+                        ->label('Owner'),
+                    IconEntry::make('personal_team')
+                        ->label('Personal')
+                        ->boolean(),
+                    TextEntry::make('created_at')
+                        ->dateTime(),
+                    TextEntry::make('updated_at')
+                        ->dateTime(),
+                ])->columnSpanFull()->columns(),
             ]);
     }
 

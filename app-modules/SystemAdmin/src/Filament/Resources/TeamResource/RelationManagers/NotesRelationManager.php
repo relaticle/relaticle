@@ -8,12 +8,20 @@ use App\Enums\CreationSource;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 final class NotesRelationManager extends RelationManager
 {
     protected static string $relationship = 'notes';
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-document-text';
+
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        $count = $ownerRecord->notes()->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
 
     public function table(Table $table): Table
     {

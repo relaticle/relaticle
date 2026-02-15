@@ -13,6 +13,7 @@ use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 
 final class TopTeamsTableWidget extends BaseWidget
 {
@@ -56,7 +57,8 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->label('Team')
                     ->searchable()
                     ->sortable()
-                    ->weight('semibold'),
+                    ->weight('semibold')
+                    ->url(fn (Team $record): string => TeamResource::getUrl('view', ['record' => $record])),
 
                 TextColumn::make('owner.name')
                     ->label('Owner')
