@@ -14,6 +14,7 @@ use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
 final class TopTeamsTableWidget extends BaseWidget
 {
@@ -62,7 +63,8 @@ final class TopTeamsTableWidget extends BaseWidget
 
                 TextColumn::make('owner.name')
                     ->label('Owner')
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Team $record): string => UserResource::getUrl('view', ['record' => $record->owner])),
 
                 TextColumn::make('members_count')
                     ->label('Members')
