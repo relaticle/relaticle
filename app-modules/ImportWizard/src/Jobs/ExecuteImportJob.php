@@ -846,13 +846,13 @@ final class ExecuteImportJob implements ShouldQueue
             }
         }
 
-        $creationName = $this->resolveCreationName($matches);
+        $creationMatch = $this->resolveCreationMatch($matches);
 
-        if ($creationName === null) {
+        if ($creationMatch === null || blank($creationMatch->name)) {
             return null;
         }
 
-        $creationName = trim($creationName);
+        $creationName = trim($creationMatch->name);
 
         if ($creationName === '') {
             return null;
@@ -878,6 +878,8 @@ final class ExecuteImportJob implements ShouldQueue
         ]);
         $record->save();
 
+        $this->populateMatchingCustomField($record, $link, $creationMatch, $context);
+
         $id = (string) $record->getKey();
         $this->createdRecords[$dedupKey] = $id;
 
@@ -885,21 +887,68 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /** @param  Collection<int, RelationshipMatch>  $matches */
-    private function resolveCreationName(Collection $matches): ?string
+    private function resolveCreationMatch(Collection $matches): ?RelationshipMatch
     {
         $preferred = $matches->first(
             fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::Create
         );
 
-        $preferred ??= $matches->first(
+        return $preferred ?? $matches->first(
             fn (RelationshipMatch $m): bool => $m->isCreate() && $m->behavior === MatchBehavior::MatchOrCreate
         );
+    }
 
-        if ($preferred === null || blank($preferred->name)) {
-            return null;
+    /** @param  array<string, mixed>  $context */
+    private function populateMatchingCustomField(
+        Model $record,
+        EntityLink $link,
+        RelationshipMatch $match,
+        array $context,
+    ): void {
+        if ($match->matchField === null) {
+            return;
         }
 
-        return $preferred->name;
+        if (! str_starts_with($match->matchField, self::CUSTOM_FIELD_PREFIX)) {
+            return;
+        }
+
+        $fieldCode = Str::after($match->matchField, self::CUSTOM_FIELD_PREFIX);
+
+        $cf = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $context['team_id'])
+            ->where('entity_type', $link->targetEntity)
+            ->where('code', $fieldCode)
+            ->first();
+
+        if ($cf === null) {
+            return;
+        }
+
+        $valueColumn = CustomFieldValue::getValueColumn($cf->type);
+        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+        $value = $match->name;
+
+        $isJsonColumn = $valueColumn === 'json_value';
+        $safeValue = $isJsonColumn ? [$value] : $value;
+
+        $this->pendingCustomFieldValues[] = [
+            'id' => (string) Str::ulid(),
+            'entity_type' => $record->getMorphClass(),
+            'entity_id' => $record->getKey(),
+            'custom_field_id' => $cf->getKey(),
+            $tenantKey => $context['team_id'],
+            'string_value' => null,
+            'text_value' => null,
+            'integer_value' => null,
+            'float_value' => null,
+            'json_value' => null,
+            'boolean_value' => null,
+            'date_value' => null,
+            'datetime_value' => null,
+            $valueColumn => $isJsonColumn ? json_encode($safeValue) : $safeValue,
+        ];
     }
 
     /**

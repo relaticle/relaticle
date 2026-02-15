@@ -131,8 +131,8 @@ final class ValidateColumnJob implements ShouldQueue
                 }
 
                 $match = $resolvedId !== null
-                    ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior)
-                    : RelationshipMatch::create($link->key, (string) $value, $matcher->behavior);
+                    ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior, $matcher->field)
+                    : RelationshipMatch::create($link->key, (string) $value, $matcher->behavior, $matcher->field);
 
                 $inserts[] = [
                     'lookup_value' => (string) $value,

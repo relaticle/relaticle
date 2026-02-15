@@ -2074,6 +2074,138 @@ it('does not duplicate existing multi-choice values during merge', function (): 
         ->and(collect($cfv->json_value)->all())->toBe(['shared@work.com', 'new@work.com']);
 });
 
+it('populates matching custom field when auto-creating person via email MatchOrCreate', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'contact', 'action' => 'create', 'id' => null, 'name' => 'john@example.com', 'behavior' => MatchBehavior::MatchOrCreate->value, 'matchField' => 'custom_fields_emails'],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Contact'], [
+        makeRow(2, ['Name' => 'Test Opportunity', 'Contact' => 'john@example.com'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Contact', matcherKey: 'custom_fields_emails', entityLinkKey: 'contact'),
+    ], ImportEntityType::Opportunity);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'john@example.com')->first();
+    expect($person)->not->toBeNull();
+
+    $emailField = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    expect($emailField)->not->toBeNull();
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $emailField->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->json_value)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+        ->and($cfv->json_value->all())->toBe(['john@example.com']);
+});
+
+it('populates matching custom field when auto-creating company via domain MatchOrCreate', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'example.com', 'behavior' => MatchBehavior::MatchOrCreate->value, 'matchField' => 'custom_fields_domains'],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Company'], [
+        makeRow(2, ['Name' => 'John Doe', 'Company' => 'example.com'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'custom_fields_domains', entityLinkKey: 'company'),
+    ]);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'example.com')->first();
+    expect($company)->not->toBeNull();
+
+    $domainField = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    expect($domainField)->not->toBeNull();
+
+    $cfv = getTestCustomFieldValue($this, (string) $company->id, (string) $domainField->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->json_value)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+        ->and($cfv->json_value->all())->toBe(['example.com']);
+});
+
+it('does not populate custom field when auto-creating via name matcher', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'New Corp', 'behavior' => MatchBehavior::Create->value, 'matchField' => 'name'],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Company'], [
+        makeRow(2, ['Name' => 'John Doe', 'Company' => 'New Corp'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company'),
+    ]);
+
+    $cfCountBefore = DB::table(config('custom-fields.database.table_names.custom_field_values'))->count();
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'New Corp')->first();
+    expect($company)->not->toBeNull();
+
+    $cfCountAfter = DB::table(config('custom-fields.database.table_names.custom_field_values'))->count();
+    expect($cfCountAfter)->toBe($cfCountBefore);
+});
+
+it('deduplicates auto-created records while still populating matching custom field', function (): void {
+    $relationships = json_encode([
+        ['relationship' => 'contact', 'action' => 'create', 'id' => null, 'name' => 'jane@example.com', 'behavior' => MatchBehavior::MatchOrCreate->value, 'matchField' => 'custom_fields_emails'],
+    ]);
+
+    createImportReadyStore($this, ['Name', 'Contact'], [
+        makeRow(2, ['Name' => 'Opp One', 'Contact' => 'jane@example.com'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+        makeRow(3, ['Name' => 'Opp Two', 'Contact' => 'jane@example.com'], [
+            'match_action' => RowMatchAction::Create->value,
+            'relationships' => $relationships,
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toEntityLink(source: 'Contact', matcherKey: 'custom_fields_emails', entityLinkKey: 'contact'),
+    ], ImportEntityType::Opportunity);
+
+    runImportJob($this);
+
+    $people = People::where('team_id', $this->team->id)->where('name', 'jane@example.com')->get();
+    expect($people)->toHaveCount(1);
+
+    $emailField = \App\Models\CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    $cfv = getTestCustomFieldValue($this, (string) $people->first()->id, (string) $emailField->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->json_value->all())->toBe(['jane@example.com']);
+});
+
 it('does not auto-create record for custom field entity link', function (): void {
     $recordCf = \App\Models\CustomField::query()
         ->withoutGlobalScopes()

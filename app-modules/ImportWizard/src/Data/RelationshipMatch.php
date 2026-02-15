@@ -16,25 +16,28 @@ final class RelationshipMatch extends Data
         public readonly ?string $id = null,
         public readonly ?string $name = null,
         public readonly ?MatchBehavior $behavior = null,
+        public readonly ?string $matchField = null,
     ) {}
 
-    public static function existing(string $relationship, string $id, ?MatchBehavior $behavior = null): self
+    public static function existing(string $relationship, string $id, ?MatchBehavior $behavior = null, ?string $matchField = null): self
     {
         return new self(
             relationship: $relationship,
             action: RowMatchAction::Update,
             id: $id,
             behavior: $behavior,
+            matchField: $matchField,
         );
     }
 
-    public static function create(string $relationship, string $name, ?MatchBehavior $behavior = null): self
+    public static function create(string $relationship, string $name, ?MatchBehavior $behavior = null, ?string $matchField = null): self
     {
         return new self(
             relationship: $relationship,
             action: RowMatchAction::Create,
             name: $name,
             behavior: $behavior,
+            matchField: $matchField,
         );
     }
 
