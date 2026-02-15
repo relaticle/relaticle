@@ -36,9 +36,7 @@ body:
       label: Database
       description: Which database are you using?
       options:
-        - PostgreSQL 15+
-        - PostgreSQL 16+
-        - MySQL 8.0+
+        - PostgreSQL 17+
         - Other
     validations:
       required: true

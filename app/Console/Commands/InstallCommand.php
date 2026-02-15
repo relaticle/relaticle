@@ -81,7 +81,6 @@ final class InstallCommand extends Command
             options: [
                 'sqlite' => 'SQLite (Recommended for local development)',
                 'pgsql' => 'PostgreSQL (Recommended for production)',
-                'mysql' => 'MySQL/MariaDB',
             ],
             default: 'sqlite',
             hint: 'SQLite requires no additional setup'

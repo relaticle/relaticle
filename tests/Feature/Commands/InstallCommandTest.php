@@ -22,7 +22,6 @@ it('completes installation without demo data and system admin', function (): voi
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
-            'mysql' => 'MySQL/MariaDB',
         ])
         ->expectsConfirmation('Install demo data?', 'no')
         ->expectsConfirmation('Create system administrator account?', 'no')
@@ -51,7 +50,6 @@ it('completes installation with demo data but no system admin', function (): voi
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
-            'mysql' => 'MySQL/MariaDB',
         ])
         ->expectsConfirmation('Install demo data?', 'yes')
         ->expectsConfirmation('Create system administrator account?', 'no')
@@ -76,7 +74,6 @@ it('creates system administrator when requested', function (): void {
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
-            'mysql' => 'MySQL/MariaDB',
         ])
         ->expectsConfirmation('Install demo data?', 'no')
         ->expectsConfirmation('Create system administrator account?', 'yes')
@@ -115,7 +112,6 @@ it('skips system admin creation if one already exists', function (): void {
         ->expectsChoice('Which database would you like to use?', 'sqlite', [
             'sqlite' => 'SQLite (Recommended for local development)',
             'pgsql' => 'PostgreSQL (Recommended for production)',
-            'mysql' => 'MySQL/MariaDB',
         ])
         ->expectsConfirmation('Install demo data?', 'no')
         ->expectsConfirmation('Create system administrator account?', 'yes')
