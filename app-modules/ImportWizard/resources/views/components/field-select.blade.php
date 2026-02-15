@@ -9,7 +9,7 @@
 ])
 
 @php
-    $dropdownId = 'fs-' . md5($column);
+    $dropdownId = "fs-{$column}";
     $isFieldMapping = $selected?->isFieldMapping() ?? false;
     $isEntityLinkMapping = $selected?->isEntityLinkMapping() ?? false;
     $selectedField = $isFieldMapping ? $fields->get($selected->target) : null;
@@ -42,6 +42,7 @@
         activeSubmenu: null,
         submenuPosition: { top: 0, left: 0 },
         submenuTimeout: null,
+        dropdownId: {{ Js::from($dropdownId) }},
         init() {
             this.$watch('open', (isOpen) => {
                 if (isOpen) {
@@ -74,6 +75,30 @@
             const rect = event.currentTarget.getBoundingClientRect();
             this.submenuPosition = { top: rect.top, left: rect.right + 4 };
             this.activeSubmenu = name;
+
+            this.$nextTick(() => {
+                const el = document.querySelector('[data-submenu=' + CSS.escape(this.dropdownId + '-' + name) + ']');
+                if (!el) return;
+
+                const margin = 8;
+                const sh = el.offsetHeight;
+                const sw = el.offsetWidth;
+                const vh = window.innerHeight;
+                const vw = window.innerWidth;
+                let { top, left } = this.submenuPosition;
+
+                if (top + sh > vh - margin) {
+                    top = Math.max(margin, vh - sh - margin);
+                }
+
+                if (left + sw > vw - margin) {
+                    left = rect.left - sw - 4;
+                }
+
+                if (top !== this.submenuPosition.top || left !== this.submenuPosition.left) {
+                    this.submenuPosition = { top, left };
+                }
+            });
         },
         hideSubmenu() {
             this.submenuTimeout = setTimeout(() => { this.activeSubmenu = null; }, 150);
@@ -258,6 +283,7 @@
         @endphp
         <template x-teleport="body">
             <div
+                data-submenu="{{ $dropdownId }}-{{ $linkKey }}"
                 x-cloak
                 x-show="activeSubmenu === '{{ $linkKey }}'"
                 x-transition:enter="transition ease-out duration-100"
