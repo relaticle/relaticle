@@ -33,7 +33,7 @@ final class TopTeamsTableWidget extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => $this->buildQuery())
+            ->query(fn (): Builder => $this->buildQuery())
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')
