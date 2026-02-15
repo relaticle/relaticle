@@ -3,6 +3,6 @@ company: apple
 custom_fields:
   emails:
     - tim@apple.com
-  phone_number: 555-987-6543
+  phone_number: "+14155550103"
   job_title: CEO
   linkedin: https://www.linkedin.com/in/timcook/ 
