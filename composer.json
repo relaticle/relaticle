@@ -12,15 +12,6 @@
         "team-collaboration"
     ],
     "license": "AGPL-3.0",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../custom-fields",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "require": {
         "php": "^8.4",
         "ashallendesign/favicon-fetcher": "^3.8",
