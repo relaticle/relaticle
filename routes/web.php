@@ -30,17 +30,11 @@ Route::middleware('guest')->group(function () {
         ->name('auth.socialite.callback')
         ->middleware('throttle:10,1');
 
-    Route::get('/login', function () {
-        return redirect()->away(url()->getAppUrl('login'));
-    })->name('login');
+    Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 
-    Route::get('/register', function () {
-        return redirect()->away(url()->getAppUrl('register'));
-    })->name('register');
+    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('register')))->name('register');
 
-    Route::get('/forgot-password', function () {
-        return redirect()->away(url()->getAppUrl('forgot-password'));
-    })->name('password.request');
+    Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
 
 Route::get('/', HomeController::class);
@@ -48,7 +42,7 @@ Route::get('/', HomeController::class);
 Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
 Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
 
-Route::redirect('/dashboard', url()->getAppUrl())->name('dashboard');
+Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
 Route::get('/team-invitations/{invitation}', [TeamInvitationController::class, 'accept'])
     ->middleware(['signed', 'verified', 'auth', AuthenticateSession::class])

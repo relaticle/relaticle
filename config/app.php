@@ -72,6 +72,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Panel Configuration
+    |--------------------------------------------------------------------------
+    |
+    | These values configure how the main application (CRM) panel is accessed.
+    | By default, the panel uses path-based routing at /app. For subdomain
+    | routing, set APP_PANEL_DOMAIN (e.g., app.example.com).
+    |
+    */
+
+    'app_panel_domain' => env('APP_PANEL_DOMAIN'),
+    'app_panel_path' => env('APP_PANEL_PATH', 'app'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

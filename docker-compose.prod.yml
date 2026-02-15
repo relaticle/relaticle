@@ -15,6 +15,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       APP_URL: ${APP_URL:-http://localhost}
+      APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       DB_CONNECTION: pgsql
@@ -70,6 +71,7 @@ services:
       APP_KEY: ${APP_KEY:?APP_KEY is required}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
+      APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
@@ -109,6 +111,7 @@ services:
       APP_KEY: ${APP_KEY:?APP_KEY is required}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
+      APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
@@ -132,7 +135,7 @@ services:
       start_period: 10s
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-relaticle}
