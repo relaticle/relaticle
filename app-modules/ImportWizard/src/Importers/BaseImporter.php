@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Services\ValidationService;
@@ -201,6 +202,7 @@ abstract class BaseImporter implements ImporterContract
 
             return ImportField::make("custom_fields_{$customField->code}")
                 ->label($customField->name)
+                ->guess(self::buildCustomFieldGuesses($customField->code, $customField->name))
                 ->required($validationService->isRequired($customField))
                 ->rules($importRules)
                 ->asCustomField()
@@ -218,6 +220,26 @@ abstract class BaseImporter implements ImporterContract
     {
         return $customField->typeData->dataType->isChoiceField()
             && ! $customField->typeData->acceptsArbitraryValues;
+    }
+
+    /**
+     * @return array<string>
+     */
+    private static function buildCustomFieldGuesses(string $code, string $name): array
+    {
+        $guesses = [$code, $name];
+
+        $singularCode = Str::singular($code);
+        if ($singularCode !== $code) {
+            $guesses[] = $singularCode;
+        }
+
+        $singularName = Str::singular($name);
+        if ($singularName !== $name) {
+            $guesses[] = $singularName;
+        }
+
+        return $guesses;
     }
 
     /**

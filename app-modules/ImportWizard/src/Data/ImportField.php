@@ -189,19 +189,20 @@ final class ImportField extends Data
 
     /**
      * Check if this field matches a given column header.
+     *
+     * Normalizes spaces, dashes, and underscores as interchangeable (Filament convention).
      */
     public function matchesHeader(string $header): bool
     {
-        $normalized = strtolower(trim($header));
+        $normalized = self::normalizeHeader($header);
 
-        if ($normalized === strtolower($this->key)) {
-            return true;
-        }
+        $candidates = array_merge([$this->key, $this->label], $this->guesses);
 
-        if ($normalized === strtolower($this->label)) {
-            return true;
-        }
+        return array_any($candidates, fn (string $candidate): bool => self::normalizeHeader($candidate) === $normalized);
+    }
 
-        return array_any($this->guesses, fn (string $guess): bool => strtolower($guess) === $normalized);
+    private static function normalizeHeader(string $value): string
+    {
+        return str($value)->lower()->replace(['-', '_'], ' ')->squish()->toString();
     }
 }
