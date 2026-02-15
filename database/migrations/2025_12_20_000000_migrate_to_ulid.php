@@ -1059,7 +1059,7 @@ return new class extends Migration
                 \App\Models\Task::class => 'tasks',
                 \App\Models\Note::class => 'notes',
                 'App\\Models\\Import' => 'imports',
-                'App\\Models\\Export' => 'exports',
+                \App\Models\Export::class => 'exports',
                 'App\\Models\\SystemAdministrator' => 'system_administrators',
             ];
 

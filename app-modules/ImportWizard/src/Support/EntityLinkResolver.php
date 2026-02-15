@@ -234,9 +234,9 @@ final class EntityLinkResolver
                 'pgsql' => "SELECT cfv.entity_id, LOWER(je.value) AS matched_value
                    FROM {$table} cfv
                    CROSS JOIN LATERAL jsonb_array_elements_text(
-                       CASE WHEN jsonb_typeof(cfv.json_value) = 'array'
-                           THEN cfv.json_value
-                           ELSE jsonb_build_array(cfv.json_value)
+                       CASE WHEN jsonb_typeof(cfv.json_value::jsonb) = 'array'
+                           THEN cfv.json_value::jsonb
+                           ELSE jsonb_build_array(cfv.json_value::jsonb)
                        END
                    ) AS je(value)
                    WHERE cfv.{$tenantKey} = ?

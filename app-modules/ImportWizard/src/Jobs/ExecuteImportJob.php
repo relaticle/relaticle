@@ -432,7 +432,14 @@ final class ExecuteImportJob implements ShouldQueue
             'json_value', 'boolean_value', 'date_value', 'datetime_value',
         ];
 
-        foreach (array_chunk($this->pendingCustomFieldValues, 500) as $chunk) {
+        $deduplicated = [];
+
+        foreach ($this->pendingCustomFieldValues as $row) {
+            $key = $row['entity_type'].'|'.$row['entity_id'].'|'.$row['custom_field_id'].'|'.$row[$tenantKey];
+            $deduplicated[$key] = $row;
+        }
+
+        foreach (array_chunk(array_values($deduplicated), 500) as $chunk) {
             DB::table($table)->upsert($chunk, $uniqueBy, $updateColumns);
         }
 
