@@ -34,7 +34,7 @@ Relaticle's import wizard lets you bulk import data from CSV files into your CRM
 | People | Name |
 | Opportunities | Name |
 | Tasks | Title |
-| Notes | Content |
+| Notes | Title |
 
 ---
 
@@ -142,6 +142,14 @@ After the wizard resolves matches, Step 4 shows the result:
 
 If you don't map any matchable field, the wizard shows a warning: all rows will be created as new records. You can go back and map a field, or continue anyway.
 
+### Update Behavior
+
+When the wizard matches a CSV row to an existing record, updates follow these rules:
+
+- **Blank fields are ignored**: If a CSV column is empty, the existing value is preserved. You don't need to fill in every column — only include the fields you want to change.
+- **Multi-value fields merge**: For fields that accept multiple values (emails, phone numbers, tags, multi-select), new values are merged with existing ones rather than replacing them.
+- **Duplicates within the CSV**: If the same record appears multiple times in your file (e.g., two rows with the same email), the second row updates the first instead of creating a duplicate.
+
 ---
 
 ## ID-Based Updates
@@ -236,26 +244,26 @@ Q1 Enterprise Deal,acme.com,john@acme.com,50000,Proposal
 
 **Fields**:
 - `title` (required) - Task title
-- `description` - Task details
-- `assignee_email` - Team member to assign
 
 **Relationships** (mapped in Step 2):
 - **Companies** - Link to one or more companies
 - **People** - Link to one or more people
 - **Opportunities** - Link to one or more opportunities
+- **Assignees** - Assign to team members by email
 
 **Matching**: Record ID only
 
 ```
-title,description,assignee_email,company,custom_fields_due_date,custom_fields_priority
-Follow up with client,Discuss proposal details,assignee@yourcompany.com,acme.com,2024-03-15,High
+title,assignee,company,custom_fields_due_date,custom_fields_priority
+Follow up with client,assignee@yourcompany.com,acme.com,2024-03-15,High
 ```
+
+**Note**: The `assignee` column is mapped to the Assignees relationship in Step 2. Choose "Match by Email" to link to team members by their email address.
 
 ### Notes
 
 **Fields**:
-- `title` - Note title
-- `content` (required) - Note body
+- `title` (required) - Note title
 
 **Relationships** (mapped in Step 2):
 - **Companies** - Link to one or more companies
@@ -265,8 +273,8 @@ Follow up with client,Discuss proposal details,assignee@yourcompany.com,acme.com
 **Matching**: None. Notes are always created as new records.
 
 ```
-title,content,company
-Meeting Notes,Discussed expansion plans for Q2,acme.com
+title,company
+Meeting Notes,acme.com
 ```
 
 ---
@@ -430,14 +438,16 @@ id,name,company,contact,custom_fields_amount,custom_fields_stage
 
 ### Task Template
 ```
-id,title,description,assignee_email,custom_fields_due_date,custom_fields_priority
-,Follow up with client,Discuss proposal details,assignee@yourcompany.com,2024-03-15,High
+id,title,assignee,custom_fields_due_date,custom_fields_priority
+,Follow up with client,assignee@yourcompany.com,2024-03-15,High
 ```
+
+**Tip**: Map the `assignee` column to Assignees → Email to assign tasks to team members.
 
 ### Note Template
 ```
-title,content
-Meeting Notes,Discussed expansion plans for Q2
+title,company
+Meeting Notes,acme.com
 ```
 
 **Tip**: Export any existing record to get a template with all your workspace's custom fields already included.
