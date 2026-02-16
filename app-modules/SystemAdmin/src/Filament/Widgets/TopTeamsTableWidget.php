@@ -56,7 +56,14 @@ final class TopTeamsTableWidget extends BaseWidget
                 TextColumn::make('records_count')
                     ->label('Records')
                     ->numeric()
-                    ->sortable()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        [$sql, $bindings] = $this->buildRecordsCountExpression(
+                            CreationSource::SYSTEM->value,
+                            ...array_values($this->getDateRange()),
+                        );
+
+                        return $query->orderByRaw("({$sql}) {$direction}", $bindings);
+                    })
                     ->alignCenter()
                     ->badge()
                     ->color('info'),
@@ -88,14 +95,22 @@ final class TopTeamsTableWidget extends BaseWidget
             ->emptyStateIcon('heroicon-o-user-group');
     }
 
-    private function buildQuery(): Builder
+    /**
+     * @return array{string, string}
+     */
+    private function getDateRange(): array
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
         $end = CarbonImmutable::now();
         $start = $end->subDays($days);
+
+        return [$start->toDateTimeString(), $end->toDateTimeString()];
+    }
+
+    private function buildQuery(): Builder
+    {
         $systemSource = CreationSource::SYSTEM->value;
-        $startStr = $start->toDateTimeString();
-        $endStr = $end->toDateTimeString();
+        [$startStr, $endStr] = $this->getDateRange();
 
         [$recordsCountSql, $recordsBindings] = $this->buildRecordsCountExpression($systemSource, $startStr, $endStr);
         [$lastActivitySql, $lastActivityBindings] = $this->buildLastActivityExpression($systemSource);
