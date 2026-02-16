@@ -12,8 +12,6 @@ use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\Expression;
-use Illuminate\Support\Facades\DB;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
@@ -99,33 +97,48 @@ final class TopTeamsTableWidget extends BaseWidget
         $startStr = $start->toDateTimeString();
         $endStr = $end->toDateTimeString();
 
+        [$recordsCountSql, $recordsBindings] = $this->buildRecordsCountExpression($systemSource, $startStr, $endStr);
+        [$lastActivitySql, $lastActivityBindings] = $this->buildLastActivityExpression($systemSource);
+
         return Team::query()
             ->where('personal_team', false)
-            ->addSelect([
-                'teams.*',
-                $this->buildRecordsCountSelect($systemSource, $startStr, $endStr),
-                DB::raw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count'),
-                DB::raw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count'),
-                $this->buildLastActivitySelect($systemSource),
-            ])
-            ->having('records_count', '>', 0);
+            ->select(['teams.*'])
+            ->selectRaw("({$recordsCountSql}) as records_count", $recordsBindings)
+            ->selectRaw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count')
+            ->selectRaw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count')
+            ->selectRaw("{$lastActivitySql} as last_activity", $lastActivityBindings)
+            ->whereRaw("({$recordsCountSql}) > 0", $recordsBindings);
     }
 
-    private function buildRecordsCountSelect(string $systemSource, string $startStr, string $endStr): Expression
+    /**
+     * @return array{string, array<int, string>}
+     */
+    private function buildRecordsCountExpression(string $systemSource, string $startStr, string $endStr): array
     {
         $subqueries = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "(SELECT COUNT(*) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != '{$systemSource}' AND {$table}.created_at BETWEEN '{$startStr}' AND '{$endStr}')"
+            fn (string $table): string => "(SELECT COUNT(*) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != ? AND {$table}.created_at BETWEEN ? AND ?)"
         );
 
-        return DB::raw("({$subqueries->implode(' + ')}) as records_count");
+        $bindings = collect(self::ENTITY_TABLES)
+            ->flatMap(fn (): array => [$systemSource, $startStr, $endStr])
+            ->all();
+
+        return [$subqueries->implode(' + '), $bindings];
     }
 
-    private function buildLastActivitySelect(string $systemSource): Expression
+    /**
+     * @return array{string, array<int, string>}
+     */
+    private function buildLastActivityExpression(string $systemSource): array
     {
         $coalesces = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != '{$systemSource}'), TIMESTAMP '1970-01-01')"
+            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != ?), TIMESTAMP '1970-01-01')"
         );
 
-        return DB::raw("GREATEST({$coalesces->implode(', ')}) as last_activity");
+        $bindings = collect(self::ENTITY_TABLES)
+            ->map(fn (): string => $systemSource)
+            ->all();
+
+        return ["GREATEST({$coalesces->implode(', ')})", $bindings];
     }
 }
