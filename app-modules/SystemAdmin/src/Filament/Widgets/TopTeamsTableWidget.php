@@ -122,13 +122,8 @@ final class TopTeamsTableWidget extends BaseWidget
 
     private function buildLastActivitySelect(string $systemSource): Expression
     {
-        $fallback = match (DB::getDriverName()) {
-            'pgsql' => "TIMESTAMP '1970-01-01'",
-            default => "'1970-01-01'",
-        };
-
         $coalesces = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != '{$systemSource}'), {$fallback})"
+            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != '{$systemSource}'), TIMESTAMP '1970-01-01')"
         );
 
         return DB::raw("GREATEST({$coalesces->implode(', ')}) as last_activity");
