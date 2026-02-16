@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\CompanyField;
 use App\Models\AiSummary;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -16,6 +19,7 @@ use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\Testing\TextResponseFake;
 use Prism\Prism\ValueObjects\Usage;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -144,6 +148,39 @@ describe('RecordContextBuilder', function () {
             ->toHaveKey('total', 15)
             ->toHaveKey('has_more', true)
             ->and($context['notes']['items'])->toHaveCount(10);
+    });
+
+    it('handles multi-value custom fields as strings in basic info', function () {
+        $company = Company::factory()
+            ->for($this->user->personalTeam())
+            ->create();
+
+        $domainsField = CustomField::forceCreate([
+            'name' => 'Domains',
+            'code' => CompanyField::DOMAINS->value,
+            'type' => 'link',
+            'entity_type' => 'company',
+            'tenant_id' => $this->user->personalTeam()->getKey(),
+            'sort_order' => 1,
+            'active' => true,
+            'system_defined' => true,
+            'settings' => new CustomFieldSettingsData(allow_multiple: true),
+        ]);
+
+        CustomFieldValue::forceCreate([
+            'tenant_id' => $this->user->personalTeam()->getKey(),
+            'entity_type' => 'company',
+            'entity_id' => $company->getKey(),
+            'custom_field_id' => $domainsField->getKey(),
+            'json_value' => ['example.com', 'test.org'],
+        ]);
+
+        $builder = app(RecordContextBuilder::class);
+        $context = $builder->buildContext($company);
+
+        expect($context['basic_info']['domain'])
+            ->toBeString()
+            ->toBe('example.com, test.org');
     });
 
     it('throws exception for unsupported model', function () {

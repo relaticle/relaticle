@@ -122,7 +122,8 @@ PROMPT;
 
         $parts->push('', 'Basic Information:');
         foreach ($context['basic_info'] as $key => $value) {
-            $parts->push("- {$this->formatLabel($key)}: {$value}");
+            $displayValue = is_array($value) ? implode(', ', $value) : $value;
+            $parts->push("- {$this->formatLabel($key)}: {$displayValue}");
         }
 
         if (filled($context['company'] ?? null)) {

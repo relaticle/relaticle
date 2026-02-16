@@ -138,8 +138,10 @@ final readonly class RecordContextBuilder
      */
     private function getCompanyBasicInfo(Company $company): array
     {
+        $domains = $this->getCustomFieldValue($company, CompanyField::DOMAINS->value);
+
         return collect([
-            'domain' => $this->getCustomFieldValue($company, CompanyField::DOMAINS->value),
+            'domain' => is_array($domains) ? implode(', ', $domains) : $domains,
             'is_icp' => (bool) $this->getCustomFieldValue($company, CompanyField::ICP->value),
             'account_owner' => $company->accountOwner?->name,
         ])->filter(fn (mixed $value): bool => filled($value))->all();
