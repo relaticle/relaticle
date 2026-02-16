@@ -26,7 +26,7 @@ return [
      * Oh Dear, you can also have access to more advanced notification options.
      */
     'oh_dear_endpoint' => [
-        'enabled' => (bool) env('OH_DEAR_HEALTH_CHECK_SECRET'),
+        'enabled' => filled(env('OH_DEAR_HEALTH_CHECK_SECRET')),
         'always_send_fresh_results' => true,
         'secret' => env('OH_DEAR_HEALTH_CHECK_SECRET', ''),
         'url' => '/oh-dear-health-check-results',

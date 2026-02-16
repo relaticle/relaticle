@@ -163,6 +163,6 @@ return [
     |
     */
 
-    'health_checks_enabled' => env('HEALTH_CHECKS_ENABLED', false),
+    'health_checks_enabled' => (bool) env('HEALTH_CHECKS_ENABLED', false),
 
 ];

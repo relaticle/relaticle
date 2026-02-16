@@ -34,7 +34,9 @@ final class ValidateColumnJob implements ShouldQueue
     public function __construct(
         private readonly string $importId,
         private readonly ColumnData $column,
-    ) {}
+    ) {
+        $this->onQueue('imports');
+    }
 
     public function handle(): void
     {

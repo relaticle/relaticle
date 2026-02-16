@@ -79,7 +79,9 @@ final class ExecuteImportJob implements ShouldQueue
     public function __construct(
         private readonly string $importId,
         private readonly string $teamId,
-    ) {}
+    ) {
+        $this->onQueue('imports');
+    }
 
     public function handle(): void
     {

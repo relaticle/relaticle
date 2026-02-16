@@ -28,7 +28,9 @@ final class ResolveMatchesJob implements ShouldQueue
 
     public function __construct(
         private readonly string $importId,
-    ) {}
+    ) {
+        $this->onQueue('imports');
+    }
 
     public function handle(): void
     {

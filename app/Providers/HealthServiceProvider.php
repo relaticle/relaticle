@@ -58,7 +58,12 @@ final class HealthServiceProvider extends ServiceProvider
 
             HorizonCheck::new(),
 
-            QueueCheck::new(),
+            QueueCheck::new()
+                ->name('Queue: default'),
+
+            QueueCheck::new()
+                ->name('Queue: imports')
+                ->onQueue('imports'),
 
             UsedDiskSpaceCheck::new()
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
@@ -72,7 +77,8 @@ final class HealthServiceProvider extends ServiceProvider
 
             EnvironmentCheck::new(),
 
-            ScheduleCheck::new(),
+            ScheduleCheck::new()
+                ->heartbeatMaxAgeInMinutes(2),
 
             SecurityAdvisoriesCheck::new(),
 
