@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "084829638f65298ecbe8ff6c12affe24",
+    "content-hash": "07970890ad2cdf27e9d263c32d92253f",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -7762,6 +7762,71 @@
             "time": "2025-11-24T15:27:35+00:00"
         },
         {
+            "name": "spatie/cpu-load-health-check",
+            "version": "1.0.5",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/cpu-load-health-check.git",
+                "reference": "d2b89e406bd5e158bf9e3f5e9688b6d4afbf6ff1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/cpu-load-health-check/zipball/d2b89e406bd5e158bf9e3f5e9688b6d4afbf6ff1",
+                "reference": "d2b89e406bd5e158bf9e3f5e9688b6d4afbf6ff1",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "nunomaduro/collision": "^5.10|^6.1|^7.0|^8.0",
+                "pestphp/pest": "^1.21|^2.3|^3.0|4.0",
+                "pestphp/pest-plugin-laravel": "^1.21|^2.3|^3.0|^4.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0|^2.0",
+                "phpstan/phpstan-phpunit": "^1.0|^2.0",
+                "phpunit/phpunit": "^9.5|^10.5|^11.0|^12.0",
+                "spatie/laravel-health": "^1.2",
+                "spatie/laravel-ray": "^1.26"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\CpuLoadHealthCheck\\": "src",
+                    "Spatie\\CpuLoadHealthCheck\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A Laravel Health check to monitor CPU load",
+            "homepage": "https://github.com/spatie/cpu-load-health-check",
+            "keywords": [
+                "cpu-load-health-check",
+                "laravel",
+                "spatie"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/cpu-load-health-check/issues",
+                "source": "https://github.com/spatie/cpu-load-health-check/tree/1.0.5"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-11-12T10:37:29+00:00"
+        },
+        {
             "name": "spatie/crawler",
             "version": "8.4.7",
             "source": {
@@ -7902,6 +7967,82 @@
                 }
             ],
             "time": "2025-08-25T11:46:57+00:00"
+        },
+        {
+            "name": "spatie/enum",
+            "version": "3.13.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/enum.git",
+                "reference": "f1a0f464ba909491a53e60a955ce84ad7cd93a2c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/enum/zipball/f1a0f464ba909491a53e60a955ce84ad7cd93a2c",
+                "reference": "f1a0f464ba909491a53e60a955ce84ad7cd93a2c",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "fakerphp/faker": "^1.9.1",
+                "larapack/dd": "^1.1",
+                "phpunit/phpunit": "^9.0",
+                "vimeo/psalm": "^4.3"
+            },
+            "suggest": {
+                "fakerphp/faker": "To use the enum faker provider",
+                "phpunit/phpunit": "To use the enum assertions"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\Enum\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Brent Roose",
+                    "email": "brent@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Tom Witkowski",
+                    "email": "dev@gummibeer.de",
+                    "homepage": "https://gummibeer.de",
+                    "role": "Developer"
+                }
+            ],
+            "description": "PHP Enums",
+            "homepage": "https://github.com/spatie/enum",
+            "keywords": [
+                "enum",
+                "enumerable",
+                "spatie"
+            ],
+            "support": {
+                "docs": "https://docs.spatie.be/enum",
+                "issues": "https://github.com/spatie/enum/issues",
+                "source": "https://github.com/spatie/enum"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2022-04-22T08:51:55+00:00"
         },
         {
             "name": "spatie/image",
@@ -8171,6 +8312,99 @@
                 }
             ],
             "time": "2026-01-28T13:10:20+00:00"
+        },
+        {
+            "name": "spatie/laravel-health",
+            "version": "1.37.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/laravel-health.git",
+                "reference": "2d3a68ae2f855d3997a85deb819898a4b7720d49"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/laravel-health/zipball/2d3a68ae2f855d3997a85deb819898a4b7720d49",
+                "reference": "2d3a68ae2f855d3997a85deb819898a4b7720d49",
+                "shasum": ""
+            },
+            "require": {
+                "dragonmantank/cron-expression": "^3.3.1",
+                "guzzlehttp/guzzle": "^6.5|^7.4.5|^7.2",
+                "illuminate/console": "^11.0|^12.0",
+                "illuminate/contracts": "^11.0|^12.0",
+                "illuminate/database": "^11.0|^12.0",
+                "illuminate/notifications": "^11.0|^12.0",
+                "illuminate/support": "^11.0|^12.0",
+                "laravel/serializable-closure": "^1.3|^2.0",
+                "nunomaduro/termwind": "^1.0|^2.0",
+                "php": "^8.2",
+                "spatie/enum": "^3.13",
+                "spatie/laravel-package-tools": "^1.12.1",
+                "spatie/regex": "^3.1.1|^3.1",
+                "spatie/temporary-directory": "^2.2",
+                "symfony/process": "^5.4|^6.0|^7.0|^8.0"
+            },
+            "require-dev": {
+                "laravel/horizon": "^5.9.10",
+                "laravel/slack-notification-channel": "^2.4|^3.2",
+                "nunomaduro/collision": "^5.10|^6.2.1|^6.1|^8.0",
+                "orchestra/testbench": "^9.0|^10.0",
+                "pestphp/pest": "^2.34|^3.0|^4.0",
+                "pestphp/pest-plugin-laravel": "^2.3|^3.0|^4.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.1.1",
+                "phpunit/phpunit": "^9.5.21|^9.5.10|^10.5|^11.0|^12.0",
+                "spatie/laravel-ray": "^1.30",
+                "spatie/pest-plugin-snapshots": "^1.1|^2.3|^3.0",
+                "spatie/pest-plugin-test-time": "^1.1.1|^1.1|^2.0|^3.0",
+                "spatie/test-time": "^1.3|^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Health": "Spatie\\Health\\Facades\\Health"
+                    },
+                    "providers": [
+                        "Spatie\\Health\\HealthServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\Health\\": "src",
+                    "Spatie\\Health\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Monitor the health of a Laravel application",
+            "homepage": "https://github.com/spatie/laravel-health",
+            "keywords": [
+                "laravel",
+                "laravel-health",
+                "spatie"
+            ],
+            "support": {
+                "source": "https://github.com/spatie/laravel-health/tree/1.37.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-02-12T16:31:50+00:00"
         },
         {
             "name": "spatie/laravel-login-link",
@@ -8977,6 +9211,82 @@
             "time": "2026-01-31T05:27:38+00:00"
         },
         {
+            "name": "spatie/packagist-api",
+            "version": "2.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/packagist-api.git",
+                "reference": "0ce5b849df19338f44902008ebc1f9e9e166a1b6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/packagist-api/zipball/0ce5b849df19338f44902008ebc1f9e9e166a1b6",
+                "reference": "0ce5b849df19338f44902008ebc1f9e9e166a1b6",
+                "shasum": ""
+            },
+            "require": {
+                "composer/semver": "^3.0",
+                "ext-json": "*",
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.17.3",
+                "phpunit/phpunit": "^11.5 || ^12.0",
+                "spatie/phpunit-snapshot-assertions": "^5.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\Packagist\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Jolita Grazyte",
+                    "email": "jolita@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Mark Walet",
+                    "homepage": "https://markwalet.me",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Fetch package info from Packagist",
+            "homepage": "https://github.com/spatie/packagist-api",
+            "keywords": [
+                "api",
+                "packagist",
+                "spatie"
+            ],
+            "support": {
+                "source": "https://github.com/spatie/packagist-api/tree/2.1.1"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-03-21T09:22:04+00:00"
+        },
+        {
             "name": "spatie/php-structure-discoverer",
             "version": "2.3.3",
             "source": {
@@ -9056,6 +9366,69 @@
             "time": "2025-11-24T16:41:01+00:00"
         },
         {
+            "name": "spatie/regex",
+            "version": "3.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/regex.git",
+                "reference": "d543de2019a0068e7b80da0ba24f1c51c7469303"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/regex/zipball/d543de2019a0068e7b80da0ba24f1c51c7469303",
+                "reference": "d543de2019a0068e7b80da0ba24f1c51c7469303",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0|^8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\Regex\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastian De Deyne",
+                    "email": "sebastian@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A sane interface for php's built in preg_* functions",
+            "homepage": "https://github.com/spatie/regex",
+            "keywords": [
+                "expression",
+                "expressions",
+                "regex",
+                "regular",
+                "spatie"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/regex/issues",
+                "source": "https://github.com/spatie/regex/tree/3.1.1"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2021-11-30T21:13:59+00:00"
+        },
+        {
             "name": "spatie/robots-txt",
             "version": "2.5.3",
             "source": {
@@ -9114,6 +9487,67 @@
                 }
             ],
             "time": "2025-11-20T13:00:33+00:00"
+        },
+        {
+            "name": "spatie/security-advisories-health-check",
+            "version": "1.3.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/security-advisories-health-check.git",
+                "reference": "150a9ef1f90cedc7289bc34e6f2fa181d0d74765"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/security-advisories-health-check/zipball/150a9ef1f90cedc7289bc34e6f2fa181d0d74765",
+                "reference": "150a9ef1f90cedc7289bc34e6f2fa181d0d74765",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.3",
+                "spatie/packagist-api": "^2.1"
+            },
+            "require-dev": {
+                "nunomaduro/collision": "^8.0",
+                "pestphp/pest": "^4.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0",
+                "spatie/laravel-health": "^1.22.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Spatie\\SecurityAdvisoriesHealthCheck\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A Laravel Health check to security advisories for PHP packages",
+            "homepage": "https://github.com/spatie/security-advisories-health-check",
+            "keywords": [
+                "laravel",
+                "security-advisories-health-check",
+                "spatie"
+            ],
+            "support": {
+                "source": "https://github.com/spatie/security-advisories-health-check/tree/1.3.1"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-10-02T14:36:02+00:00"
         },
         {
             "name": "spatie/shiki-php",

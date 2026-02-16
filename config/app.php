@@ -153,4 +153,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Health Checks
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, Spatie Health will register all application health checks.
+    | Set the HEALTH_CHECKS_ENABLED environment variable to true to activate.
+    |
+    */
+
+    'health_checks_enabled' => env('HEALTH_CHECKS_ENABLED', false),
+
 ];
