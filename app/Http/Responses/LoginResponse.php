@@ -24,7 +24,7 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
         // For app panel, redirect to companies with tenant
         $user = $request->user('web');
         if ($user && $user->currentTeam) {
-            return redirect()->intended(CompanyResource::getUrl('index', ['tenant' => $user->currentTeam->getKey()]));
+            return redirect()->intended(CompanyResource::getUrl('index', ['tenant' => $user->currentTeam]));
         }
 
         return redirect()->intended(Filament::getUrl());
