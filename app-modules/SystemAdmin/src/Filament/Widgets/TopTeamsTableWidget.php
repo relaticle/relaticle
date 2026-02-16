@@ -123,7 +123,7 @@ final class TopTeamsTableWidget extends BaseWidget
     private function buildLastActivitySelect(string $systemSource): Expression
     {
         $coalesces = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != '{$systemSource}'), '1970-01-01')"
+            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.creation_source != '{$systemSource}'), TIMESTAMP '1970-01-01')"
         );
 
         return DB::raw("GREATEST({$coalesces->implode(', ')}) as last_activity");
