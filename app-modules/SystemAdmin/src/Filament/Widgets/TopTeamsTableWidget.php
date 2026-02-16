@@ -11,8 +11,11 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
 final class TopTeamsTableWidget extends BaseWidget
 {
@@ -24,43 +27,25 @@ final class TopTeamsTableWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    private ?string $pollingInterval = null;
-
     /** @var array<int, string> */
     private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
     public function table(Table $table): Table
     {
-        $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
-        $systemSource = CreationSource::SYSTEM->value;
-        $startStr = $start->toDateTimeString();
-        $endStr = $end->toDateTimeString();
-
         return $table
-            ->query(
-                Team::query()
-                    ->where('personal_team', false)
-                    ->addSelect([
-                        'teams.*',
-                        $this->buildRecordsCountSelect($systemSource, $startStr, $endStr),
-                        DB::raw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count'),
-                        DB::raw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count'),
-                        $this->buildLastActivitySelect($systemSource),
-                    ])
-                    ->having('records_count', '>', 0)
-            )
+            ->query(fn (): Builder => $this->buildQuery())
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')
                     ->searchable()
                     ->sortable()
-                    ->weight('semibold'),
+                    ->weight('semibold')
+                    ->url(fn (Team $record): string => TeamResource::getUrl('view', ['record' => $record])),
 
                 TextColumn::make('owner.name')
                     ->label('Owner')
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Team $record): string => UserResource::getUrl('view', ['record' => $record->owner])),
 
                 TextColumn::make('members_count')
                     ->label('Members')
@@ -103,6 +88,27 @@ final class TopTeamsTableWidget extends BaseWidget
             ->emptyStateHeading('No Active Teams')
             ->emptyStateDescription('Team activity will appear here once teams start creating records.')
             ->emptyStateIcon('heroicon-o-user-group');
+    }
+
+    private function buildQuery(): Builder
+    {
+        $days = (int) ($this->pageFilters['period'] ?? 30);
+        $end = CarbonImmutable::now();
+        $start = $end->subDays($days);
+        $systemSource = CreationSource::SYSTEM->value;
+        $startStr = $start->toDateTimeString();
+        $endStr = $end->toDateTimeString();
+
+        return Team::query()
+            ->where('personal_team', false)
+            ->addSelect([
+                'teams.*',
+                $this->buildRecordsCountSelect($systemSource, $startStr, $endStr),
+                DB::raw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count'),
+                DB::raw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count'),
+                $this->buildLastActivitySelect($systemSource),
+            ])
+            ->having('records_count', '>', 0);
     }
 
     private function buildRecordsCountSelect(string $systemSource, string $startStr, string $endStr): Expression
