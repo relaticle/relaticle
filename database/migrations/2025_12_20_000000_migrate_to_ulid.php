@@ -558,44 +558,75 @@ return new class extends Migration
     /**
      * B0: Drop ALL foreign key constraints and composite unique indexes.
      *
-     * MySQL requirements:
-     * - Cannot drop PRIMARY KEY if foreign keys reference it
-     * - Cannot drop column if it's part of a unique index
+     * MySQL: Cannot drop PRIMARY KEY if foreign keys reference it,
+     *        cannot drop column if it's part of a unique index.
+     * PostgreSQL: Same logical requirement, different SQL syntax.
      */
     private function phaseB_dropAllForeignKeyConstraints(): void
     {
-        // Drop foreign key constraints
-        $foreignKeys = DB::select('
-            SELECT TABLE_NAME, CONSTRAINT_NAME
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE REFERENCED_TABLE_NAME IS NOT NULL
-            AND TABLE_SCHEMA = DATABASE()
-        ');
+        $driver = DB::getDriverName();
 
-        foreach ($foreignKeys as $fk) {
-            try {
-                DB::statement("ALTER TABLE `{$fk->TABLE_NAME}` DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
-            } catch (\Throwable) {
-                // Constraint may have already been dropped
+        if ($driver === 'pgsql') {
+            $foreignKeys = DB::select("
+                SELECT tc.table_name, tc.constraint_name
+                FROM information_schema.table_constraints tc
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = 'public'
+            ");
+
+            foreach ($foreignKeys as $fk) {
+                try {
+                    DB::statement("ALTER TABLE \"{$fk->table_name}\" DROP CONSTRAINT IF EXISTS \"{$fk->constraint_name}\"");
+                } catch (\Throwable) {
+                }
             }
-        }
 
-        // Drop composite unique indexes that include foreign key columns we'll modify
-        $indexesToDrop = [
-            'team_invitations' => 'team_invitations_team_id_email_unique',
-            'team_user' => 'team_user_team_id_user_id_unique',
-            'ai_summaries' => 'ai_summaries_summarizable_type_summarizable_id_team_id_unique',
-            'custom_field_options' => 'custom_field_options_custom_field_id_name_tenant_id_unique',
-            'custom_field_sections' => 'custom_field_sections_entity_type_code_tenant_id_unique',
-            'custom_field_values' => 'custom_field_values_entity_type_unique',
-            'custom_fields' => 'custom_fields_code_entity_type_tenant_id_unique',
-        ];
+            $indexesToDrop = [
+                'team_invitations_team_id_email_unique',
+                'team_user_team_id_user_id_unique',
+                'ai_summaries_summarizable_type_summarizable_id_team_id_unique',
+                'custom_field_options_custom_field_id_name_tenant_id_unique',
+                'custom_field_sections_entity_type_code_tenant_id_unique',
+                'custom_field_values_entity_type_unique',
+                'custom_fields_code_entity_type_tenant_id_unique',
+            ];
 
-        foreach ($indexesToDrop as $table => $indexName) {
-            try {
-                DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$indexName}`");
-            } catch (\Throwable) {
-                // Index may not exist
+            foreach ($indexesToDrop as $indexName) {
+                try {
+                    DB::statement("DROP INDEX IF EXISTS \"{$indexName}\"");
+                } catch (\Throwable) {
+                }
+            }
+        } else {
+            $foreignKeys = DB::select('
+                SELECT TABLE_NAME, CONSTRAINT_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE REFERENCED_TABLE_NAME IS NOT NULL
+                AND TABLE_SCHEMA = DATABASE()
+            ');
+
+            foreach ($foreignKeys as $fk) {
+                try {
+                    DB::statement("ALTER TABLE `{$fk->TABLE_NAME}` DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
+                } catch (\Throwable) {
+                }
+            }
+
+            $indexesToDrop = [
+                'team_invitations' => 'team_invitations_team_id_email_unique',
+                'team_user' => 'team_user_team_id_user_id_unique',
+                'ai_summaries' => 'ai_summaries_summarizable_type_summarizable_id_team_id_unique',
+                'custom_field_options' => 'custom_field_options_custom_field_id_name_tenant_id_unique',
+                'custom_field_sections' => 'custom_field_sections_entity_type_code_tenant_id_unique',
+                'custom_field_values' => 'custom_field_values_entity_type_unique',
+                'custom_fields' => 'custom_fields_code_entity_type_tenant_id_unique',
+            ];
+
+            foreach ($indexesToDrop as $table => $indexName) {
+                try {
+                    DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$indexName}`");
+                } catch (\Throwable) {
+                }
             }
         }
     }
@@ -606,31 +637,7 @@ return new class extends Migration
     private function phaseB_cutoverCorePrimaryKeys(): void
     {
         foreach ($this->coreEntityTables as $table) {
-            // CRITICAL MySQL FIX: Remove AUTO_INCREMENT BEFORE dropping primary key
-            // MySQL Error 1075: "there can be only one auto column and it must be defined as a key"
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->unsignedBigInteger('id')->change();
-            });
-
-            // Now can safely drop primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropPrimary(['id']);
-            });
-
-            // Drop old integer id column
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropColumn('id');
-            });
-
-            // Rename ulid to id
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->renameColumn('ulid', 'id');
-            });
-
-            // Make new id column the primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->primary('id');
-            });
+            $this->cutoverPrimaryKey($table);
         }
     }
 
@@ -676,30 +683,7 @@ return new class extends Migration
     private function phaseB_cutoverOtherEntityTables(): void
     {
         foreach ($this->otherEntityTables as $table) {
-            // CRITICAL MySQL FIX: Remove AUTO_INCREMENT BEFORE dropping primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->unsignedBigInteger('id')->change();
-            });
-
-            // Now can safely drop primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropPrimary(['id']);
-            });
-
-            // Drop old integer id column
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropColumn('id');
-            });
-
-            // Rename ulid to id
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->renameColumn('ulid', 'id');
-            });
-
-            // Make new id column the primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->primary('id');
-            });
+            $this->cutoverPrimaryKey($table);
         }
 
         // Cutover foreign keys
@@ -770,32 +754,8 @@ return new class extends Migration
      */
     private function phaseB_cutoverCustomFieldTables(): void
     {
-        // Cutover primary keys for all custom field tables
         foreach ($this->customFieldTables as $table) {
-            // CRITICAL MySQL FIX: Remove AUTO_INCREMENT BEFORE dropping primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->unsignedBigInteger('id')->change();
-            });
-
-            // Now can safely drop primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropPrimary(['id']);
-            });
-
-            // Drop old integer id column
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropColumn('id');
-            });
-
-            // Rename ulid to id
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->renameColumn('ulid', 'id');
-            });
-
-            // Make new id column the primary key
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->primary('id');
-            });
+            $this->cutoverPrimaryKey($table);
         }
 
         // Cutover foreign keys
@@ -1079,6 +1039,39 @@ return new class extends Migration
     // =========================================================================
     // Helper Methods - Phase B (Cutover)
     // =========================================================================
+
+    /**
+     * Cutover a primary key from integer to ULID.
+     *
+     * MySQL requires removing AUTO_INCREMENT before dropping the primary key (Error 1075).
+     * PostgreSQL uses sequences — this step is unnecessary and skipped.
+     */
+    private function cutoverPrimaryKey(string $table): void
+    {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            Schema::table($table, function (Blueprint $blueprint): void {
+                $blueprint->unsignedBigInteger('id')->change();
+            });
+        }
+
+        Schema::table($table, function (Blueprint $blueprint): void {
+            $blueprint->dropPrimary(['id']);
+        });
+
+        Schema::table($table, function (Blueprint $blueprint): void {
+            $blueprint->dropColumn('id');
+        });
+
+        Schema::table($table, function (Blueprint $blueprint): void {
+            $blueprint->renameColumn('ulid', 'id');
+        });
+
+        Schema::table($table, function (Blueprint $blueprint): void {
+            $blueprint->primary('id');
+        });
+    }
 
     /**
      * Cutover a foreign key column: drop old, rename ULID column.
