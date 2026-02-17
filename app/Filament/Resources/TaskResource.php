@@ -238,6 +238,7 @@ final class TaskResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->with(['team'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

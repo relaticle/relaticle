@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace Relaticle\OnboardSeed;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Relaticle\OnboardSeed\ModelSeeders\NoteSeeder;
 use Relaticle\OnboardSeed\ModelSeeders\OpportunitySeeder;
 use Relaticle\OnboardSeed\ModelSeeders\PeopleSeeder;
 use Relaticle\OnboardSeed\ModelSeeders\TaskSeeder;
+use Relaticle\OnboardSeed\Support\FixtureRegistry;
 use Throwable;
 
 final class OnboardSeedManager
 {
-    /**
-     * The ordered sequence of model seeders to run
-     *
-     * @var array<class-string<ModelSeederInterface>>
-     */
+    /** @var array<class-string<ModelSeederInterface>> */
     private array $entitySeederSequence = [
         CompanySeeder::class,
         PeopleSeeder::class,
@@ -29,36 +28,26 @@ final class OnboardSeedManager
         NoteSeeder::class,
     ];
 
-    /**
-     * List of initialized seeders
-     *
-     * @var array<string, ModelSeederInterface>
-     */
+    /** @var array<string, ModelSeederInterface> */
     private array $seeders = [];
 
-    /**
-     * Generate demo data for a user's team
-     *
-     * @param  Authenticatable  $user  The user to create demo data for
-     * @return bool Whether the seeding was successful
-     */
-    public function generateFor(Authenticatable $user): bool
+    public function generateFor(Authenticatable $user, ?Team $team = null): bool
     {
-        /** @var User $user */
-        $team = $user->personalTeam();
+        if (! $team instanceof Team) {
+            /** @var User $user */
+            $user->loadMissing('ownedTeams');
+            $team = $user->personalTeam();
+        }
 
         try {
+            FixtureRegistry::clear();
             $this->initializeSeeders();
 
-            $seedingContext = [];
-
-            // Run seeders in sequence
-            foreach ($this->seeders as $seeder) {
-                $result = $seeder->seed($team, $user, $seedingContext);
-
-                // Merge new context data
-                $seedingContext = array_merge($seedingContext, $result);
-            }
+            Model::withoutEvents(function () use ($user, $team): void {
+                foreach ($this->seeders as $seeder) {
+                    $seeder->seed($team, $user);
+                }
+            });
 
             return true;
         } catch (Throwable $e) {
@@ -68,9 +57,6 @@ final class OnboardSeedManager
         }
     }
 
-    /**
-     * Initialize all seeders
-     */
     private function initializeSeeders(): void
     {
         foreach ($this->entitySeederSequence as $seederClass) {

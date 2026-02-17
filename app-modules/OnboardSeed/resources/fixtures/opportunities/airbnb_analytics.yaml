@@ -3,4 +3,4 @@ company: airbnb
 custom_fields:
   amount: 20000
   close_date: '{{ +4w }}'
-  stage: Initial Contact 
+  stage: Prospecting

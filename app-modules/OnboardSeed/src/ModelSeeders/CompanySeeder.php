@@ -22,27 +22,13 @@ final class CompanySeeder extends BaseModelSeeder
         CompanyCustomField::LINKEDIN->value,
     ];
 
-    /**
-     * Create company entities from fixtures
-     *
-     * @param  Team  $team  The team to create data for
-     * @param  Authenticatable  $user  The user creating the data
-     * @param  array<string, mixed>  $context  Context data from previous seeders
-     * @return array<string, mixed> Seeded data for use by subsequent seeders
-     */
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user, array $context = []): array
+    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
-        $companies = [];
 
         foreach ($fixtures as $key => $data) {
-            $company = $this->createCompanyFromFixture($team, $user, $key, $data);
-            $companies[$key] = $company;
+            $this->createCompanyFromFixture($team, $user, $key, $data);
         }
-
-        return [
-            'companies' => $companies,
-        ];
     }
 
     /**

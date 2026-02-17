@@ -25,18 +25,9 @@ final class OpportunitySeeder extends BaseModelSeeder
         OpportunityCustomField::STAGE->value,
     ];
 
-    /**
-     * Create opportunity entities from fixtures
-     *
-     * @param  Team  $team  The team to create data for
-     * @param  Authenticatable  $user  The user creating the data
-     * @param  array<string, mixed>  $context  Context data from previous seeders
-     * @return array<string, mixed> Seeded data for use by subsequent seeders
-     */
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user, array $context = []): array
+    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
-        $opportunities = [];
 
         foreach ($fixtures as $key => $data) {
             $companyKey = $data['company'] ?? null;
@@ -55,13 +46,8 @@ final class OpportunitySeeder extends BaseModelSeeder
                 continue;
             }
 
-            $opportunity = $this->createOpportunityFromFixture($team, $user, $company, $key, $data);
-            $opportunities[$key] = $opportunity;
+            $this->createOpportunityFromFixture($team, $user, $company, $key, $data);
         }
-
-        return [
-            'opportunities' => $opportunities,
-        ];
     }
 
     /**

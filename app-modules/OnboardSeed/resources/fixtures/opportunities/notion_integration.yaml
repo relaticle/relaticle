@@ -3,4 +3,4 @@ company: notion
 custom_fields:
   amount: 18000
   close_date: '{{ +3w }}'
-  stage: Discovery/Qualification 
+  stage: Qualification

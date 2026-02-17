@@ -131,12 +131,21 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
     private function countRecordsInPeriod(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        return collect(self::ENTITY_CLASSES)->sum(
-            fn (string $class): int => $class::query()
-                ->where('creation_source', '!=', CreationSource::SYSTEM)
-                ->whereBetween('created_at', [$start, $end])
-                ->count()
-        );
+        $unionParts = [];
+        $bindings = [];
+
+        foreach (self::ENTITY_CLASSES as $class) {
+            $table = (new $class)->getTable();
+            $unionParts[] = "SELECT COUNT(*) as cnt FROM \"{$table}\" WHERE \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
+            $bindings[] = CreationSource::SYSTEM->value;
+            $bindings[] = $start->toDateTimeString();
+            $bindings[] = $end->toDateTimeString();
+        }
+
+        $sql = implode(' UNION ALL ', $unionParts);
+        $result = DB::selectOne("SELECT SUM(cnt) as total FROM ({$sql}) as counts", $bindings);
+
+        return (int) ($result->total ?? 0);
     }
 
     private function countActiveUsers(CarbonImmutable $start, CarbonImmutable $end): int
@@ -160,20 +169,35 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
             return [0];
         }
 
-        return collect(range($points - 1, 0))
-            ->map(function (int $i) use ($modelClass, $start, $points, $days, $scope): int {
-                $segmentStart = $start->addDays((int) (($points - 1 - $i) * ($days / $points)));
-                $segmentEnd = $start->addDays((int) (($points - $i) * ($days / $points)));
+        $segmentSeconds = ($days / $points) * 86400;
+        $bucketExpr = $this->bucketExpression();
 
-                $query = $modelClass::query()->whereBetween('created_at', [$segmentStart, $segmentEnd]);
+        $query = $modelClass::query()
+            ->selectRaw("{$bucketExpr} AS bucket, COUNT(*) AS cnt", [
+                $start->toDateTimeString(),
+                $segmentSeconds,
+            ])
+            ->whereBetween('created_at', [$start, $end])
+            ->groupByRaw('1')
+            ->orderByRaw('1');
 
-                if ($scope instanceof \Closure) {
-                    $scope($query);
-                }
+        if ($scope instanceof \Closure) {
+            $scope($query);
+        }
 
-                return $query->count();
-            })
-            ->all();
+        $rows = $query->get();
+
+        $buckets = array_fill(0, $points, 0);
+
+        foreach ($rows as $row) {
+            $idx = (int) $row->bucket;
+
+            if ($idx >= 0 && $idx < $points) {
+                $buckets[$idx] = (int) $row->cnt;
+            }
+        }
+
+        return $buckets;
     }
 
     /**
@@ -188,19 +212,50 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
             return [0];
         }
 
-        return collect(range($points - 1, 0))
-            ->map(function (int $i) use ($start, $days, $points): int {
-                $segmentStart = $start->addDays((int) (($points - 1 - $i) * ($days / $points)));
-                $segmentEnd = $start->addDays((int) (($points - $i) * ($days / $points)));
+        $segmentSeconds = ($days / $points) * 86400;
+        $unionParts = [];
+        $bindings = [];
 
-                return collect(self::ENTITY_CLASSES)->sum(
-                    fn (string $class): int => $class::query()
-                        ->where('creation_source', '!=', CreationSource::SYSTEM)
-                        ->whereBetween('created_at', [$segmentStart, $segmentEnd])
-                        ->count()
-                );
-            })
-            ->all();
+        foreach (self::ENTITY_CLASSES as $class) {
+            $table = (new $class)->getTable();
+            $unionParts[] = "SELECT \"created_at\" FROM \"{$table}\" WHERE \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
+            $bindings[] = CreationSource::SYSTEM->value;
+            $bindings[] = $start->toDateTimeString();
+            $bindings[] = $end->toDateTimeString();
+        }
+
+        $unionSql = implode(' UNION ALL ', $unionParts);
+        $bucketExpr = $this->bucketExpression();
+        $sql = "SELECT {$bucketExpr} AS bucket, COUNT(*) AS cnt FROM ({$unionSql}) AS all_records GROUP BY 1 ORDER BY 1";
+
+        $rows = DB::select($sql, [$start->toDateTimeString(), $segmentSeconds, ...$bindings]);
+
+        $buckets = array_fill(0, $points, 0);
+
+        foreach ($rows as $row) {
+            $idx = (int) $row->bucket;
+
+            if ($idx >= 0 && $idx < $points) {
+                $buckets[$idx] = (int) $row->cnt;
+            }
+        }
+
+        return $buckets;
+    }
+
+    /**
+     * Build a database-agnostic bucket expression for time-series grouping.
+     *
+     * Uses EXTRACT(EPOCH) on PostgreSQL and julianday() on SQLite.
+     * Expects two positional bindings: start timestamp and segment seconds.
+     */
+    private function bucketExpression(): string
+    {
+        if (DB::getDriverName() === 'sqlite') {
+            return 'CAST((julianday("created_at") - julianday(?)) * 86400 / ? AS INTEGER)';
+        }
+
+        return 'FLOOR(EXTRACT(EPOCH FROM ("created_at" - ?::timestamp)) / ?)';
     }
 
     private function calculateChange(int $current, int $previous): float

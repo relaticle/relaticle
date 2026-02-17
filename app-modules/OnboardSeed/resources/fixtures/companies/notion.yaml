@@ -1,5 +1,5 @@
 name: Notion
 custom_fields:
-  domain_name: https://notion.com
+  domains: https://notion.com
   icp: true
   linkedin: https://www.linkedin.com/company/notion-so 

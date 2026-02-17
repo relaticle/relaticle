@@ -17,6 +17,8 @@ use Filament\Actions\CreateAction;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -40,9 +42,6 @@ final class OpportunitiesBoard extends BoardPage
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
-    /**
-     * Configure the board using the new Filament V4 architecture.
-     */
     public function board(Board $board): Board
     {
         $stageField = $this->stageCustomField();
@@ -51,7 +50,7 @@ final class OpportunitiesBoard extends BoardPage
         return $board
             ->query(
                 Opportunity::query()
-                    ->leftJoin('custom_field_values as cfv', function (\Illuminate\Database\Query\JoinClause $join) use ($stageField): void {
+                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($stageField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $stageField->getKey());
                     })
@@ -59,7 +58,7 @@ final class OpportunitiesBoard extends BoardPage
                     ->with(['company', 'contact'])
             )
             ->recordTitleAttribute('name')
-            ->columnIdentifier('cfv.'.$valueColumn)
+            ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['name'])
             ->columns($this->getColumns())
@@ -153,15 +152,13 @@ final class OpportunitiesBoard extends BoardPage
         $board = $this->getBoard();
         $query = $board->getQuery();
 
-        throw_unless($query instanceof \Illuminate\Database\Eloquent\Builder, InvalidArgumentException::class, 'Board query not available');
+        throw_unless($query instanceof Builder, InvalidArgumentException::class, 'Board query not available');
 
         $card = (clone $query)->find($cardId);
         throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
 
-        // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
-        // Use transaction for data consistency
         DB::transaction(function () use ($card, $board, $targetColumnId, $newPosition): void {
             $columnIdentifier = $board->getColumnIdentifierAttribute();
             $columnValue = $this->resolveStatusValue($card, $columnIdentifier, $targetColumnId);
@@ -173,7 +170,6 @@ final class OpportunitiesBoard extends BoardPage
             $card->saveCustomFieldValue($this->stageCustomField(), $columnValue);
         });
 
-        // Emit success event after successful transaction
         $this->dispatch('kanban-card-moved', [
             'cardId' => $cardId,
             'columnId' => $targetColumnId,
@@ -190,7 +186,7 @@ final class OpportunitiesBoard extends BoardPage
      */
     private function getColumns(): array
     {
-        return $this->stages()->map(fn (array $stage): \Relaticle\Flowforge\Column => Column::make((string) $stage['id'])
+        return $this->stages()->map(fn (array $stage): Column => Column::make((string) $stage['id'])
             ->color($stage['color'])
             ->label($stage['name'])
         )->toArray();
@@ -199,10 +195,10 @@ final class OpportunitiesBoard extends BoardPage
     private function stageCustomField(): ?CustomField
     {
         /** @var CustomField|null */
-        return CustomField::query()
+        return once(fn () => CustomField::query()
             ->forEntity(Opportunity::class)
             ->where('code', OpportunityCustomField::STAGE)
-            ->first();
+            ->first());
     }
 
     /**
@@ -216,7 +212,6 @@ final class OpportunitiesBoard extends BoardPage
             return collect();
         }
 
-        // Check if color options are enabled for this field
         $colorsEnabled = $field->settings->enable_option_colors ?? false;
 
         return $field->options->map(fn (CustomFieldOption $option): array => [

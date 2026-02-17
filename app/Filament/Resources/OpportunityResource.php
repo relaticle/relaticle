@@ -126,6 +126,7 @@ final class OpportunityResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->with(['team'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

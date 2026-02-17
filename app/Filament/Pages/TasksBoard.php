@@ -71,7 +71,7 @@ final class TasksBoard extends BoardPage
                     ->select('tasks.*', 'cfv.'.$valueColumn)
             )
             ->recordTitleAttribute('title')
-            ->columnIdentifier('cfv.'.$valueColumn)
+            ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
             ->searchable(['title'])
             ->columns($this->getColumns())

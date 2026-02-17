@@ -42,4 +42,9 @@ final class FixtureRegistry
     {
         return self::$registry[$type][$key] ?? null;
     }
+
+    public static function clear(): void
+    {
+        self::$registry = [];
+    }
 }

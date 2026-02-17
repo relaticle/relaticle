@@ -15,6 +15,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Features;
 use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
@@ -23,18 +24,13 @@ use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSectionData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\CustomFieldSectionType;
+use Relaticle\CustomFields\Models\CustomField;
+use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\OnboardSeed\OnboardSeeder;
 
-/**
- * Creates custom fields for a team when it's created
- */
 final readonly class CreateTeamCustomFields
 {
-    /**
-     * Maps model classes to their corresponding custom field enum classes
-     *
-     * @var array<class-string, class-string>
-     */
+    /** @var array<class-string, class-string> */
     private const array MODEL_ENUM_MAP = [
         Company::class => CompanyCustomField::class,
         Opportunity::class => OpportunityCustomField::class,
@@ -43,17 +39,11 @@ final readonly class CreateTeamCustomFields
         Task::class => TaskCustomField::class,
     ];
 
-    /**
-     * Create a new event listener instance
-     */
     public function __construct(
         private CustomsFieldsMigrators $migrator,
         private OnboardSeeder $onboardSeeder,
     ) {}
 
-    /**
-     * Handle the team created event
-     */
     public function handle(TeamCreated $event): void
     {
         if (! Features::hasTeamFeatures()) {
@@ -62,10 +52,8 @@ final readonly class CreateTeamCustomFields
 
         $team = $event->team;
 
-        // Set the tenant ID for the custom fields migrator
         $this->migrator->setTenantId($team->id);
 
-        // Create custom fields for all models defined in the map
         foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
             foreach ($enumClass::cases() as $enum) {
                 $this->createCustomField($modelClass, $enum);
@@ -73,21 +61,17 @@ final readonly class CreateTeamCustomFields
         }
 
         if ($team->isPersonalTeam()) {
+            $team->loadMissing('owner');
+
             /** @var Authenticatable $owner */
             $owner = $team->owner;
-            $this->onboardSeeder->run($owner);
+            $this->onboardSeeder->run($owner, $team);
         }
     }
 
-    /**
-     * Create a custom field using the provided enum configuration
-     *
-     * @param  class-string  $model  The model class name
-     * @param  CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField  $enum  The custom field enum instance
-     */
+    /** @param class-string $model */
     private function createCustomField(string $model, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
     {
-        // Extract field configuration from the enum
         $fieldData = new CustomFieldData(
             name: $enum->getDisplayName(),
             code: $enum->value,
@@ -108,46 +92,65 @@ final readonly class CreateTeamCustomFields
             )
         );
 
-        // Create the migrator for this field
         $migrator = $this->migrator->new(
             model: $model,
             fieldData: $fieldData
         );
 
-        // Add options for select-type fields if available
         $options = $enum->getOptions();
         if ($options !== null) {
             $migrator->options($options);
         }
 
-        // Create the field in the database
         $customField = $migrator->create();
 
-        // Apply colors to options if available
         $this->applyColorsToOptions($customField, $enum);
     }
 
-    /**
-     * Apply colors to field options based on enum configuration
-     *
-     * @param  mixed  $customField  The created custom field
-     * @param  CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField  $enum  The custom field enum instance
-     */
-    private function applyColorsToOptions(mixed $customField, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
+    private function applyColorsToOptions(CustomField $customField, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
     {
         $colorMapping = $enum->getOptionColors();
         if ($colorMapping === null) {
             return;
         }
 
-        // Get the created field options and apply colors
-        foreach ($customField->options as $option) {
-            $color = $colorMapping[$option->name] ?? null;
-            if ($color !== null) {
-                $option->update([
-                    'settings' => new CustomFieldOptionSettingsData(color: $color),
-                ]);
-            }
+        $options = $customField->options()->withoutGlobalScopes()->get();
+
+        $updates = $options
+            ->filter(fn (CustomFieldOption $option): bool => isset($colorMapping[$option->name]))
+            ->map(fn (CustomFieldOption $option): array => [
+                'id' => $option->getKey(),
+                'settings' => json_encode(new CustomFieldOptionSettingsData(color: $colorMapping[$option->name])),
+            ])
+            ->values()
+            ->all();
+
+        if ($updates === []) {
+            return;
         }
+
+        $table = $customField->options()->getModel()->getTable();
+        $ids = array_column($updates, 'id');
+        $cases = [];
+        $caseBindings = [];
+
+        foreach ($updates as $item) {
+            $cases[] = 'WHEN id = ? THEN ?';
+            $caseBindings[] = $item['id'];
+            $caseBindings[] = $item['settings'];
+        }
+
+        $casesSql = implode(' ', $cases);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        $caseExpr = "(CASE {$casesSql} END)";
+        if (DB::getDriverName() === 'pgsql') {
+            $caseExpr .= '::json';
+        }
+
+        DB::update(
+            "UPDATE \"{$table}\" SET \"settings\" = {$caseExpr}, \"updated_at\" = ? WHERE \"id\" IN ({$placeholders})",
+            [...$caseBindings, now(), ...$ids],
+        );
     }
 }

@@ -7,7 +7,6 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Models\Task;
 use App\Models\Team;
-use App\Models\User;
 use Exception;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
@@ -29,33 +28,17 @@ final class TaskSeeder extends BaseModelSeeder
         TaskCustomField::PRIORITY->value,
     ];
 
-    /**
-     * Create task entities from fixtures
-     *
-     * @param  Team  $team  The team to create data for
-     * @param  User  $user  The user creating the data
-     * @param  array<string, mixed>  $context  Context data from previous seeders
-     * @return array<string, mixed> Seeded data for use by subsequent seeders
-     */
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user, array $context = []): array
+    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
-        $tasks = [];
 
         foreach ($fixtures as $key => $data) {
             $task = $this->createTaskFromFixture($team, $user, $key, $data);
 
-            // Process people assignments if defined in the fixture
             if (isset($data['assigned_people']) && is_array($data['assigned_people'])) {
                 $this->assignPeopleToTask($task, $data['assigned_people']);
             }
-
-            $tasks[$key] = $task;
         }
-
-        return [
-            'tasks' => $tasks,
-        ];
     }
 
     /**

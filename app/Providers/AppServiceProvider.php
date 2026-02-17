@@ -118,7 +118,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureModels(): void
     {
         Model::unguard();
-        //        Model::shouldBeStrict(! $this->app->isProduction()); // TODO: Uncomment this line to enable strict mode in local env
+        Model::preventLazyLoading(! $this->app->isProduction());
 
         Relation::enforceMorphMap([
             'team' => Team::class,
