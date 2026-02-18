@@ -136,7 +136,7 @@ php artisan test --filter="test_method_name"
 Relaticle includes a custom fields system for extending entities without migrations.
 
 - **License**: AGPL-3.0 (free for open source) or Commercial
-- **Docs**: [custom-fields.relaticle.com](https://custom-fields.relaticle.com)
+- **Docs**: [Custom Fields Documentation](https://relaticle.github.io/custom-fields/)
 
 ---
 
