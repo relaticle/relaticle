@@ -17,7 +17,7 @@
             </div>
 
             <div>
-                <h3 class="text-lg font-medium text-black dark:text-white group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
+                <h3 class="font-display text-lg font-medium text-black dark:text-white group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
                     {{ $title }}
                 </h3>
                 <div class="mt-2 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">

@@ -2,7 +2,7 @@
     <div class="max-w-5xl mx-auto">
         <!-- Hero Text - Enhanced Typography -->
         <div class="text-center space-y-6 max-w-3xl mx-auto mb-12">
-            <h1 class="text-4xl sm:text-5xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
+            <h1 class="font-display text-4xl sm:text-5xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
                 <span class="relative inline-block">
                     <span class="relative z-10">Documentation</span>
                     <span class="absolute bottom-2 sm:left-0 right-1/4 w-1/2 sm:w-full h-3 bg-primary/10 dark:bg-primary/20 -rotate-1 z-0"></span>

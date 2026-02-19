@@ -28,7 +28,7 @@
 
             <!-- Hero Text - Enhanced Typography -->
             <div class="text-center space-y-6 max-w-3xl mx-auto">
-                <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
+                <h1 class="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
                     The Next-Generation<br class="hidden sm:block"/> <span class="relative inline-block">
                         <span class="relative z-10">Open-Source CRM</span>
                         <span

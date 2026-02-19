@@ -10,7 +10,7 @@
                 class="inline-block px-3 py-1 bg-gray-50 dark:bg-gray-900 rounded-full text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
                 Community
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
+            <h2 class="font-display mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
                 Collaborate and Grow Together
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
@@ -29,7 +29,7 @@
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
                             <x-icon-github class="w-6 h-6 text-primary dark:text-primary-400"/>
                         </div>
-                        <h3 class="text-xl font-semibold text-black dark:text-white mb-3">GitHub</h3>
+                        <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">GitHub</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Star our repo, report issues, and
                             contribute code. Relaticle is completely open source and free to use, modify and
                             distribute.</p>
@@ -54,7 +54,7 @@
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
                           <x-icon-discord class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
-                        <h3 class="text-xl font-semibold text-black dark:text-white mb-3">Discord Community</h3>
+                        <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Discord Community</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Chat with developers, get help, and
                             share ideas. Join our growing community and connect with other Relaticle users.</p>
                         <div class="mt-auto">
@@ -78,7 +78,7 @@
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
                             <x-heroicon-o-document class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
-                        <h3 class="text-xl font-semibold text-black dark:text-white mb-3">Documentation</h3>
+                        <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Documentation</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Learn how to use Relaticle and help
                             improve our docs. Comprehensive guides for users and developers alike.</p>
                         <div class="mt-auto">

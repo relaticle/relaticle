@@ -16,19 +16,17 @@
         <!-- Three-column layout: Logo | Nav (centered) | Actions -->
         <div class="flex items-center justify-between">
             <!-- Logo (Left Column) -->
-            <div class="flex-shrink-0 w-1/4">
-                <a href="{{ url('/') }}" class="flex items-center space-x-2.5 group" aria-label="Relaticle Home">
-                    <div class="relative overflow-hidden group-hover:scale-105 transition-transform duration-300">
-                        <img class="h-8 w-auto"
-                             src="{{ asset('relaticle-logomark.svg') }}" alt="Relaticle Logo">
-                    </div>
-                    <span
-                        class="font-bold text-lg text-black dark:text-white hidden sm:block transition-opacity duration-300 group-hover:opacity-80">Relaticle</span>
+            <div class="flex flex-1 items-center min-w-0">
+                <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
+                    <x-brand.logo-lockup
+                        size="md"
+                        class="text-black dark:text-white"
+                    />
                 </a>
             </div>
 
             <!-- Desktop Navigation (Center Column) -->
-            <div class="hidden md:flex flex-grow items-center justify-center">
+            <div class="hidden md:flex flex-1 items-center justify-center">
                 <nav class="flex items-center space-x-8">
                     <a href="{{ url('/#features') }}"
                        class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
@@ -56,7 +54,7 @@
             </div>
 
             <!-- Right Section: Auth and Settings (Right Column) -->
-            <div class="flex items-center justify-end space-x-5 w-1/4">
+            <div class="flex flex-1 items-center justify-end space-x-5">
                 <!-- Dark Mode Toggle -->
                 <button id="theme-toggle"
                         class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-transform duration-300 active:scale-90"

@@ -4,12 +4,9 @@
 <path opacity="0.75" d="M1035.18 412.818C1103.01 412.818 1158 357.83 1158 290C1158 222.169 1103.01 167.182 1035.18 167.182C967.351 167.182 912.364 222.169 912.364 290C912.364 357.83 967.351 412.818 1035.18 412.818Z" fill="url(#paint1_linear_38_20)"/>
 <path opacity="0.9" d="M965 1062C1061.9 1062 1140.45 983.446 1140.45 886.545C1140.45 789.644 1061.9 711.09 965 711.09C868.099 711.09 789.545 789.644 789.545 886.545C789.545 983.446 868.099 1062 965 1062Z" fill="url(#paint2_linear_38_20)"/>
 <path d="M579 869C743.732 869 877.273 735.459 877.273 570.727C877.273 405.996 743.732 272.455 579 272.455C414.269 272.455 280.727 405.996 280.727 570.727C280.727 735.459 414.269 869 579 869Z" fill="url(#paint3_linear_38_20)"/>
-<path d="M579 570.728L157.909 254.91Z" fill="black"/>
-<path d="M579 570.728L157.909 254.91" stroke="url(#paint4_linear_38_20)" stroke-opacity="0.75" stroke-width="54" stroke-linecap="round"/>
-<path d="M579 570.727L1035.18 290Z" fill="black"/>
-<path d="M579 570.727L1035.18 290" stroke="url(#paint5_linear_38_20)" stroke-opacity="0.75" stroke-width="54" stroke-linecap="round"/>
-<path d="M579 570.727L965 886.546Z" fill="black"/>
-<path d="M579 570.727L965 886.546" stroke="url(#paint6_linear_38_20)" stroke-opacity="0.75" stroke-width="54" stroke-linecap="round"/>
+<path d="M579 570.728L157.909 254.91" stroke="url(#paint4_linear_38_20)" stroke-width="70" stroke-linecap="round"/>
+<path d="M579 570.727L1035.18 290" stroke="url(#paint5_linear_38_20)" stroke-width="70" stroke-linecap="round"/>
+<path d="M579 570.727L965 886.546" stroke="url(#paint6_linear_38_20)" stroke-width="70" stroke-linecap="round"/>
 </g>
 <defs>
 <linearGradient id="paint0_linear_38_20" x1="0" y1="97" x2="31581.8" y2="31678.8" gradientUnits="userSpaceOnUse">

@@ -15,7 +15,7 @@
 
         <!-- Search header -->
         <div class="text-center space-y-5 mb-12">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
+            <h1 class="font-display text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
                 <span class="relative inline-block">
                     <span class="relative z-10">Search Results</span>
                     <span class="absolute bottom-1 left-0 w-full h-3 bg-primary-100 dark:bg-primary-800/40 -rotate-1 z-0"></span>
@@ -43,7 +43,7 @@
                         <x-heroicon-o-magnifying-glass class="h-8 w-8 text-gray-400 dark:text-gray-500" />
                     </div>
 
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    <h2 class="font-display text-xl font-semibold text-gray-900 dark:text-white">
                         No matches found
                     </h2>
 
@@ -55,7 +55,7 @@
                     <div class="mt-12 grid gap-5">
                         <!-- Tips card -->
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 text-left">
-                            <h3 class="text-sm font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-3">Search tips</h3>
+                            <h3 class="font-display text-sm font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-3">Search tips</h3>
 
                             <ul class="space-y-3 text-sm">
                                 <li class="flex items-start">
@@ -101,7 +101,7 @@
                             </div>
 
                             <!-- Title and excerpt -->
-                            <h2 class="text-lg font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition">
+                            <h2 class="font-display text-lg font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition">
                                 {{ $result->title }}
                             </h2>
 

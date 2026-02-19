@@ -99,7 +99,6 @@ final class AppPanelProvider extends PanelProvider
             ->emailVerification()
             ->strictAuthorization()
             ->databaseNotifications()
-            ->viteTheme('resources/css/app.css')
             ->colors([
                 'primary' => [
                     50 => 'oklch(0.969 0.016 293.756)',
@@ -117,7 +116,6 @@ final class AppPanelProvider extends PanelProvider
                 ],
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
-            ->font('Inter')
             ->userMenuItems([
                 Action::make('profile')
                     ->label('Profile')

@@ -5,12 +5,9 @@
             class="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8 pb-10 border-b border-gray-100 dark:border-gray-900">
             <!-- Company Info -->
             <div class="md:col-span-5 space-y-5">
-                <div class="flex items-center space-x-3">
-                    <div class="relative overflow-hidden">
-                        <img class="h-8 w-auto" src="{{ asset('relaticle-logo.svg') }}" alt="Relaticle Logo">
-                    </div>
-                    <span class="font-semibold text-lg text-black dark:text-white">Relaticle</span>
-                </div>
+                <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
+                    <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
+                </a>
                 <p class="text-gray-500 dark:text-gray-400 text-sm leading-relaxed max-w-md">
                     The Next-Generation Open-Source CRM Platform designed to streamline your customer relationships.
                     Built with modern technologies for businesses of all sizes.

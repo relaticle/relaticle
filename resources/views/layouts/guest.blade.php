@@ -25,10 +25,6 @@
     <meta name="twitter:image" content="{{ $ogImage ?? url('/images/og-image.jpg') }}" />
 
     <title>{{ $title ?? config('app.name', 'Relaticle - The Next-Generation Open-Source CRM Platform') }}</title>
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet"/>
-
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />
@@ -50,7 +46,7 @@
         <!-- / Fathom -->
     @endif
 </head>
-<body class="antialiased text-gray-800">
+<body class="font-sans antialiased text-gray-800">
 
 <x-layout.header/>
 

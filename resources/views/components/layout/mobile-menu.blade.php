@@ -11,13 +11,9 @@
     <div class="flex flex-col h-full">
         <!-- Refined Header -->
         <div class="flex items-center justify-between p-6 pb-4 flex-shrink-0 border-b border-gray-100/50 dark:border-gray-800/50">
-            <div class="flex items-center space-x-3">
-                <div class="relative overflow-hidden rounded-lg">
-                    <img class="h-8 w-auto transition-transform duration-300 hover:scale-105"
-                         src="{{ asset('relaticle-logomark.svg') }}" alt="Relaticle">
-                </div>
-                <span class="font-bold text-xl text-black dark:text-white tracking-tight">Relaticle</span>
-            </div>
+            <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
+                <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
+            </a>
             <button id="mobile-menu-close"
                     class="group p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all duration-200 rounded-xl hover:bg-gray-100/60 dark:hover:bg-gray-800/60 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/20"
                     aria-label="Close menu">

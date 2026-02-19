@@ -9,7 +9,7 @@
             <span class="inline-block px-3 py-1 bg-white dark:bg-gray-900 rounded-full text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
                 Features
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
+            <h2 class="font-display mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
                 Everything you need to manage relationships
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
@@ -79,7 +79,7 @@
                             </svg>
                         </div>
                     </div>
-                    <h3 class="text-lg font-medium text-black dark:text-white mb-2 group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
+                    <h3 class="font-display text-lg font-medium text-black dark:text-white mb-2 group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
                         {{ $feature['title'] }}
                     </h3>
                     <p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
@@ -92,7 +92,7 @@
         <!-- Call-to-action - Simplified -->
         <div class="mt-20 text-center">
             <div class="inline-block pt-10 px-4 md:px-8 border-t border-gray-200 dark:border-gray-800 max-w-2xl mx-auto">
-                <h3 class="text-xl font-semibold text-black dark:text-white mb-4">Ready to transform your customer relationships?</h3>
+                <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-4">Ready to transform your customer relationships?</h3>
                 <p class="text-gray-600 dark:text-gray-300 mb-6 text-base">Experience the power of Relaticle CRM today with a free account.</p>
                 <a href="{{ route('register') }}" class="group inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-600 text-white px-8 py-3.5 rounded-md font-medium text-base transition-all duration-300">
                     <span>Start for free</span>

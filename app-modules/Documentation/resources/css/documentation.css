@@ -3,6 +3,12 @@
 @import "~/css/theme.css";
 
 #documentation-content {
+    h1,
+    h2,
+    h3 {
+        @apply font-display;
+    }
+
     .heading-permalink {
         @apply mr-2 text-gray-700/10 dark:text-gray-600 hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary-400)] transition-colors;
     }

@@ -4,4 +4,5 @@
 /* Tailwind Typography Plugin */
 @plugin "@tailwindcss/typography";
 
+@import "./fonts.css";
 @import "./theme.css";
