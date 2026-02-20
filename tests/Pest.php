@@ -14,17 +14,9 @@ declare(strict_types=1);
 */
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 
 pest()->extend(Tests\TestCase::class)
     ->use(RefreshDatabase::class)
-    ->beforeEach(function () {
-        // Globally disable events to prevent demo record creation during tests.
-        // Allow the Team creating event so the TeamObserver can generate slugs.
-        Event::fake()->except([
-            'eloquent.creating: App\\Models\\Team',
-        ]);
-    })
     ->in('Feature', 'Unit');
 
 /*

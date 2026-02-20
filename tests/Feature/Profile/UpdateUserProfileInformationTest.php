@@ -21,7 +21,7 @@ beforeEach(function () {
 
 describe('profile component functionality', function () {
     test('profile information component renders correctly', function () {
-        $user = User::factory()->withPersonalTeam()->create([
+        $user = User::factory()->withTeam()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
@@ -37,7 +37,7 @@ describe('profile component functionality', function () {
     });
 
     test('can update profile through livewire component', function () {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
@@ -124,7 +124,7 @@ describe('photo upload', function () {
 
     test('can update profile through livewire component with photo', function () {
         Storage::fake('public');
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $this->actingAs($user);
 
         $photo = UploadedFile::fake()->image('avatar.jpg', 200, 200);
@@ -148,7 +148,7 @@ describe('photo upload', function () {
 
 describe('validation', function () {
     test('validates required fields through livewire component', function () {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
@@ -162,7 +162,7 @@ describe('validation', function () {
 
     test('rejects duplicate email through livewire component', function () {
         User::factory()->create(['email' => 'existing@example.com']);
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)

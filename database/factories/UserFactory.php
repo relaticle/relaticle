@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Laravel\Jetstream\Features;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
@@ -58,10 +57,6 @@ final class UserFactory extends Factory
      */
     public function withPersonalTeam(?callable $callback = null): UserFactory
     {
-        if (! Features::hasTeamFeatures()) {
-            return $this->state([]);
-        }
-
         return $this->afterCreating(function (User $user) use ($callback): void {
             $team = Team::factory()->create([
                 'name' => $user->name.'\'s Team',
@@ -75,6 +70,27 @@ final class UserFactory extends Factory
 
             // Update the relationship
             $user->ownedTeams()->save($team);
+        });
+    }
+
+    /**
+     * Indicate that the user should have a standard (non-personal) team.
+     */
+    public function withTeam(?callable $callback = null): static
+    {
+        return $this->afterCreating(function (User $user) use ($callback): void {
+            $team = Team::factory()->create([
+                'name' => $user->name."'s Team",
+                'user_id' => $user->id,
+                'personal_team' => false,
+            ]);
+
+            if (is_callable($callback)) {
+                $callback($team, $user);
+            }
+
+            $user->ownedTeams()->save($team);
+            $user->switchTeam($team);
         });
     }
 

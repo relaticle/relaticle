@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\OpportunityField;
 use App\Filament\Pages\OpportunitiesBoard;
-use App\Listeners\CreateTeamCustomFields;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Laravel\Jetstream\Events\TeamCreated;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
 
-    $this->team = $this->user->personalTeam();
-    app(CreateTeamCustomFields::class)->handle(new TeamCreated($this->team));
-
+    $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
 
     $this->stageField = CustomField::query()
@@ -57,8 +53,8 @@ it('displays opportunities in the correct board columns', function (): void {
 });
 
 it('does not show opportunities from other teams', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $otherOpportunity = Opportunity::factory()->for($otherUser->personalTeam())->create();
+    $otherUser = User::factory()->withTeam()->create();
+    $otherOpportunity = Opportunity::factory()->for($otherUser->currentTeam)->create();
 
     $board = getOpportunityBoard();
     $allRecordIds = collect($this->stageField->options)

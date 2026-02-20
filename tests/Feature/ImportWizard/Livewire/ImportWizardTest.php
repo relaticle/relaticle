@@ -21,9 +21,9 @@ beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
     Bus::fake();
 
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->personalTeam();
+    $this->team = $this->user->currentTeam;
 
     Filament::setTenant($this->team);
 
@@ -289,8 +289,8 @@ it('rejects path traversal storeId values', function (string $maliciousId): void
 ]);
 
 it('resets storeId when store belongs to different team', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $otherTeam = $otherUser->personalTeam();
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
 
     $import = Import::create([
         'team_id' => (string) $otherTeam->id,

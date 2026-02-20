@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Health\AnthropicModelCheck;
 use Illuminate\Support\ServiceProvider;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
@@ -83,6 +84,9 @@ final class HealthServiceProvider extends ServiceProvider
             SecurityAdvisoriesCheck::new(),
 
             CacheCheck::new(),
+
+            AnthropicModelCheck::new()
+                ->name('Anthropic: Summary Model'),
         ]);
     }
 

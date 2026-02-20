@@ -17,7 +17,6 @@ use App\Models\Task;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
-use Laravel\Jetstream\Features;
 use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
 use Relaticle\CustomFields\Data\CustomFieldData;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
@@ -46,10 +45,6 @@ final readonly class CreateTeamCustomFields
 
     public function handle(TeamCreated $event): void
     {
-        if (! Features::hasTeamFeatures()) {
-            return;
-        }
-
         $team = $event->team;
 
         $this->migrator->setTenantId($team->id);

@@ -53,7 +53,7 @@ test('callback from socialite provider creates new user when user does not exist
 
 test('callback from socialite provider logs in existing user when social account exists', function () {
     // Create a user and social account
-    $user = User::factory()->withPersonalTeam()->create([
+    $user = User::factory()->withTeam()->create([
         'email' => 'existing@example.com',
         'name' => 'Existing User',
     ]);
@@ -90,7 +90,7 @@ test('callback from socialite provider logs in existing user when social account
 
 test('callback from socialite provider links social account to existing user when email matches', function () {
     // Create a user without a social account
-    $user = User::factory()->withPersonalTeam()->create([
+    $user = User::factory()->withTeam()->create([
         'email' => 'existing@example.com',
         'name' => 'Existing User',
     ]);

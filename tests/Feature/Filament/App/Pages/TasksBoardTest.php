@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
 use App\Filament\Pages\TasksBoard;
-use App\Listeners\CreateTeamCustomFields;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Laravel\Jetstream\Events\TeamCreated;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
 
-    $this->team = $this->user->personalTeam();
-    app(CreateTeamCustomFields::class)->handle(new TeamCreated($this->team));
-
+    $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
 
     $this->statusField = CustomField::query()
@@ -57,8 +53,8 @@ it('displays tasks in the correct board columns', function (): void {
 });
 
 it('does not show tasks from other teams', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $otherTask = Task::factory()->for($otherUser->personalTeam())->create();
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTask = Task::factory()->for($otherUser->currentTeam)->create();
 
     $board = getTaskBoard();
     $allRecordIds = collect($this->statusField->options)

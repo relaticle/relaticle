@@ -8,7 +8,7 @@ use Laravel\Jetstream\Http\Livewire\DeleteTeamForm;
 use Livewire\Livewire;
 
 test('teams can be deleted', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     $user->ownedTeams()->save($team = Team::factory()->make([
         'personal_team' => false,
@@ -28,9 +28,9 @@ test('teams can be deleted', function () {
 test('personal teams cant be deleted', function () {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
-    Livewire::test(DeleteTeamForm::class, ['team' => $user->currentTeam])
+    Livewire::test(DeleteTeamForm::class, ['team' => $user->personalTeam()])
         ->call('deleteTeam')
         ->assertHasErrors(['team']);
 
-    expect($user->currentTeam->fresh())->not->toBeNull();
+    expect($user->personalTeam()->fresh())->not->toBeNull();
 });

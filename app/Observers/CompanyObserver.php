@@ -38,7 +38,7 @@ final readonly class CompanyObserver
             return;
         }
 
-        $company->load('customFieldValues');
+        $company->load('customFieldValues.customField');
 
         $domains = $company->getCustomFieldValue($domainField);
         $firstDomain = is_array($domains) ? ($domains[0] ?? null) : $domains;

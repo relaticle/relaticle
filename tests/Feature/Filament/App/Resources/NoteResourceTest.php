@@ -3,15 +3,14 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->personalTeam());
+    $this->team = $this->user->currentTeam;
+    Filament::setTenant($this->team);
 });
 
 it('can render the index page', function (): void {
@@ -40,7 +39,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = App\Models\Note::factory(3)->for($this->user->personalTeam())->create();
+    $records = App\Models\Note::factory(3)->for($this->team)->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Illuminate\Database\Eloquent\Model $record) => data_get($record, $column)->value
@@ -54,7 +53,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = App\Models\Note::factory(3)->for($this->user->personalTeam())->create();
+    $records = App\Models\Note::factory(3)->for($this->team)->create();
     $search = data_get($records->first(), $column);
 
     livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
@@ -64,8 +63,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['title', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = App\Models\Note::factory()->count(4)->for($this->user->personalTeam())->create();
-    $trashedRecords = App\Models\Note::factory()->trashed()->count(6)->for($this->user->personalTeam())->create();
+    $records = App\Models\Note::factory()->count(4)->for($this->team)->create();
+    $trashedRecords = App\Models\Note::factory()->trashed()->count(6)->for($this->team)->create();
 
     livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -74,7 +73,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = App\Models\Note::factory(20)->for($this->user->personalTeam())->create();
+    $records = App\Models\Note::factory(20)->for($this->team)->create();
 
     livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -83,7 +82,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = App\Models\Note::factory(5)->for($this->user->personalTeam())->create();
+    $records = App\Models\Note::factory(5)->for($this->team)->create();
 
     livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -95,6 +94,48 @@ it('can bulk delete records', function (): void {
         ->assertCanNotSeeTableRecords($records);
 
     $this->assertSoftDeleted($records);
+});
+
+it('can create a note', function (): void {
+    livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
+        ->callAction('create', data: [
+            'title' => 'New Note',
+        ])
+        ->assertHasNoActionErrors();
+
+    $this->assertDatabaseHas(App\Models\Note::class, [
+        'title' => 'New Note',
+        'team_id' => $this->team->id,
+    ]);
+});
+
+it('can edit a note', function (): void {
+    $record = App\Models\Note::factory()->for($this->team)->create();
+
+    livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
+        ->callAction(TestAction::make('edit')->table($record), data: [
+            'title' => 'Updated Note',
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->title)->toBe('Updated Note');
+});
+
+it('can delete a note', function (): void {
+    $record = App\Models\Note::factory()->for($this->team)->create();
+
+    livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
+        ->callAction(TestAction::make('delete')->table($record));
+
+    $this->assertSoftDeleted($record);
+});
+
+it('validates title is required on create', function (): void {
+    livewire(App\Filament\Resources\NoteResource\Pages\ManageNotes::class)
+        ->callAction('create', data: [
+            'title' => null,
+        ])
+        ->assertHasActionErrors(['title' => 'required']);
 });
 
 it('has `:dataset` filter', function (string $filter): void {

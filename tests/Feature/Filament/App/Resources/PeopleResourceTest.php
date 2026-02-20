@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->personalTeam());
+    $this->team = $this->user->currentTeam;
+    Filament::setTenant($this->team);
 });
 
 it('can render the index page', function (): void {
@@ -17,7 +19,7 @@ it('can render the index page', function (): void {
 });
 
 it('can render the view page', function (): void {
-    $record = App\Models\People::factory()->for($this->user->personalTeam())->create();
+    $record = App\Models\People::factory()->for($this->team)->create();
 
     livewire(App\Filament\Resources\PeopleResource\Pages\ViewPeople::class, ['record' => $record->getKey()])
         ->assertOk();
@@ -44,7 +46,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['name', 'company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = App\Models\People::factory(3)->for($this->user->personalTeam())->create();
+    $records = App\Models\People::factory(3)->for($this->team)->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Illuminate\Database\Eloquent\Model $record) => data_get($record, $column)->value
@@ -58,7 +60,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = App\Models\People::factory(3)->for($this->user->personalTeam())->create();
+    $records = App\Models\People::factory(3)->for($this->team)->create();
     $search = data_get($records->first(), $column);
 
     livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
@@ -68,8 +70,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['name', 'company.name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = App\Models\People::factory()->count(4)->for($this->user->personalTeam())->create();
-    $trashedRecords = App\Models\People::factory()->trashed()->count(6)->for($this->user->personalTeam())->create();
+    $records = App\Models\People::factory()->count(4)->for($this->team)->create();
+    $trashedRecords = App\Models\People::factory()->trashed()->count(6)->for($this->team)->create();
 
     livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
         ->assertCanSeeTableRecords($records)
@@ -78,7 +80,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = App\Models\People::factory(20)->for($this->user->personalTeam())->create();
+    $records = App\Models\People::factory(20)->for($this->team)->create();
 
     livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -87,7 +89,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = App\Models\People::factory(5)->for($this->user->personalTeam())->create();
+    $records = App\Models\People::factory(5)->for($this->team)->create();
 
     livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
         ->assertCanSeeTableRecords($records)
@@ -99,6 +101,48 @@ it('can bulk delete records', function (): void {
         ->assertCanNotSeeTableRecords($records);
 
     $this->assertSoftDeleted($records);
+});
+
+it('can create a person', function (): void {
+    livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
+        ->callAction('create', data: [
+            'name' => 'Jane Doe',
+        ])
+        ->assertHasNoActionErrors();
+
+    $this->assertDatabaseHas(App\Models\People::class, [
+        'name' => 'Jane Doe',
+        'team_id' => $this->team->id,
+    ]);
+});
+
+it('can edit a person', function (): void {
+    $record = App\Models\People::factory()->for($this->team)->create();
+
+    livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
+        ->callAction(TestAction::make('edit')->table($record), data: [
+            'name' => 'Updated Person',
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->name)->toBe('Updated Person');
+});
+
+it('can delete a person', function (): void {
+    $record = App\Models\People::factory()->for($this->team)->create();
+
+    livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
+        ->callAction(TestAction::make('delete')->table($record));
+
+    $this->assertSoftDeleted($record);
+});
+
+it('validates name is required on create', function (): void {
+    livewire(App\Filament\Resources\PeopleResource\Pages\ListPeople::class)
+        ->callAction('create', data: [
+            'name' => null,
+        ])
+        ->assertHasActionErrors(['name' => 'required']);
 });
 
 it('has `:dataset` filter', function (string $filter): void {

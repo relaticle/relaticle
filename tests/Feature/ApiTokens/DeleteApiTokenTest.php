@@ -9,11 +9,7 @@ use Laravel\Jetstream\Http\Livewire\ApiTokenManager;
 use Livewire\Livewire;
 
 test('api tokens can be deleted', function () {
-    if (Features::hasTeamFeatures()) {
-        $this->actingAs($user = User::factory()->withPersonalTeam()->create());
-    } else {
-        $this->actingAs($user = User::factory()->create());
-    }
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     $token = $user->tokens()->create([
         'name' => 'Test Token',

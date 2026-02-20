@@ -23,14 +23,14 @@ use Illuminate\Support\Facades\Schema;
 describe('ULID Migration', function (): void {
 
     it('uses ULID for user primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
 
         expect($user->id)->toBeString()
             ->and(strlen($user->id))->toBe(26);
     });
 
     it('uses ULID for team primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $team = $user->currentTeam;
 
         expect($team->id)->toBeString()
@@ -38,7 +38,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for company primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $company = Company::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -49,7 +49,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for people primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $person = People::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -60,7 +60,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for opportunity primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $opportunity = Opportunity::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -71,7 +71,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for task primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $task = Task::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -82,7 +82,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for note primary key', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $note = Note::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -93,7 +93,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains user-team relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $team = $user->currentTeam;
 
         expect($team->user_id)->toBe($user->id)
@@ -101,7 +101,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains team-user pivot relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $team = $user->currentTeam;
 
         // Attach user to team via pivot table
@@ -118,7 +118,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains company foreign key relationships', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $team = $user->currentTeam;
         $company = Company::factory()->create([
             'team_id' => $team->id,
@@ -135,7 +135,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains people-company relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $company = Company::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -153,7 +153,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains opportunity relationships', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $company = Company::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -177,7 +177,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains task-user pivot relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $task = Task::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -190,7 +190,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains taskables polymorphic relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $company = Company::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,
@@ -209,7 +209,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains noteables polymorphic relationship', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withTeam()->create();
         $company = Company::factory()->create([
             'team_id' => $user->currentTeam->id,
             'creator_id' => $user->id,

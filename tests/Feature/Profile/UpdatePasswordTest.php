@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 test('password component renders correctly', function () {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
     Livewire::test(UpdatePasswordComponent::class)
@@ -17,7 +17,7 @@ test('password component renders correctly', function () {
 });
 
 test('password can be updated', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -33,7 +33,7 @@ test('password can be updated', function () {
 });
 
 test('current password must be correct', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -48,7 +48,7 @@ test('current password must be correct', function () {
 });
 
 test('new passwords must match', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([

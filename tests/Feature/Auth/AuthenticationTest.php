@@ -12,7 +12,7 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
     livewire(Login::class)

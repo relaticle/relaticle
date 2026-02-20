@@ -15,11 +15,14 @@ use RuntimeException;
 
 final readonly class RecordSummaryService
 {
-    private const string MODEL = 'claude-3-5-haiku-latest';
-
     public function __construct(
         private RecordContextBuilder $contextBuilder
     ) {}
+
+    private function model(): string
+    {
+        return config('services.anthropic.summary_model');
+    }
 
     /**
      * Get or generate an AI summary for a record.
@@ -43,7 +46,7 @@ final readonly class RecordSummaryService
         $prompt = $this->formatPrompt($context);
 
         $response = Prism::text()
-            ->using(Provider::Anthropic, self::MODEL)
+            ->using(Provider::Anthropic, $this->model())
             ->withSystemPrompt($this->getSystemPrompt())
             ->withPrompt($prompt)
             ->generate();
@@ -66,7 +69,7 @@ final readonly class RecordSummaryService
             'summarizable_type' => $record->getMorphClass(),
             'summarizable_id' => $record->getKey(),
             'summary' => $summary,
-            'model_used' => self::MODEL,
+            'model_used' => $this->model(),
             'prompt_tokens' => $usage->promptTokens,
             'completion_tokens' => $usage->completionTokens,
         ]);

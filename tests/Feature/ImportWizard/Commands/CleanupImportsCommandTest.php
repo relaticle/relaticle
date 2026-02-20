@@ -16,8 +16,8 @@ mutates(\Relaticle\ImportWizard\Commands\CleanupImportsCommand::class);
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withTeam()->create();
+    $this->team = $this->user->currentTeam;
     $this->imports = [];
 
     File::cleanDirectory(storage_path('app/imports'));

@@ -12,7 +12,7 @@ use Livewire\Livewire;
 test('team members can be invited to team', function () {
     Mail::fake();
 
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])
         ->set('addTeamMemberForm', [
@@ -30,7 +30,7 @@ test('team members can be invited to team', function () {
 test('team member invitations can be cancelled', function () {
     Mail::fake();
 
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     // Add the team member...
     $component = Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])

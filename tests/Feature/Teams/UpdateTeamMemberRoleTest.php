@@ -7,7 +7,7 @@ use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
 
 test('team member roles can be updated', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     $user->currentTeam->users()->attach(
         $otherUser = User::factory()->create(), ['role' => 'admin']
@@ -24,7 +24,7 @@ test('team member roles can be updated', function () {
 });
 
 test('only team owner can update team member roles', function () {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withTeam()->create();
 
     $user->currentTeam->users()->attach(
         $otherUser = User::factory()->create(), ['role' => 'admin']

@@ -26,9 +26,9 @@ mutates(PreviewStep::class, MatchResolver::class);
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->personalTeam();
+    $this->team = $this->user->currentTeam;
 
     Filament::setTenant($this->team);
 });

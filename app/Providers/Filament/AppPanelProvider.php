@@ -197,18 +197,16 @@ final class AppPanelProvider extends PanelProvider
             ]);
         }
 
-        if (Features::hasTeamFeatures()) {
-            $panel
-                ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
-                ->tenantRegistration(CreateTeam::class)
-                ->tenantProfile(EditTeam::class)
-                ->tenantMenuItems([
-                    Action::make('import_history')
-                        ->label('Import History')
-                        ->icon(Heroicon::OutlinedClock)
-                        ->url(fn (): string => ImportHistory::getUrl()),
-                ]);
-        }
+        $panel
+            ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
+            ->tenantRegistration(CreateTeam::class)
+            ->tenantProfile(EditTeam::class)
+            ->tenantMenuItems([
+                Action::make('import_history')
+                    ->label('Import History')
+                    ->icon(Heroicon::OutlinedClock)
+                    ->url(fn (): string => ImportHistory::getUrl()),
+            ]);
 
         return $panel;
     }

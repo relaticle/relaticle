@@ -8,7 +8,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 test('team name and slug can be updated', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'New Name', 'slug' => 'new-name'])
@@ -22,7 +22,7 @@ test('team name and slug can be updated', function () {
 });
 
 test('slug is required', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'Test Team', 'slug' => ''])
@@ -31,7 +31,7 @@ test('slug is required', function () {
 });
 
 test('slug must be at least 3 characters', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'Test Team', 'slug' => 'ab'])
@@ -40,7 +40,7 @@ test('slug must be at least 3 characters', function () {
 });
 
 test('slug must match valid format', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'Test Team', 'slug' => 'Invalid Slug!'])
@@ -49,7 +49,7 @@ test('slug must match valid format', function () {
 });
 
 test('slug must be unique across teams', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Team::factory()->create(['slug' => 'taken-slug']);
 
@@ -60,7 +60,7 @@ test('slug must be unique across teams', function () {
 });
 
 test('team can keep its own slug on update', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     $currentSlug = $user->currentTeam->slug;
 
@@ -72,7 +72,7 @@ test('team can keep its own slug on update', function () {
 });
 
 test('slug change triggers redirect', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'New Name', 'slug' => 'completely-new-slug'])
@@ -82,7 +82,7 @@ test('slug change triggers redirect', function () {
 });
 
 test('same slug does not trigger redirect', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withTeam()->create());
 
     $currentSlug = $user->currentTeam->slug;
 

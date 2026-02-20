@@ -10,7 +10,7 @@ use Relaticle\ImportWizard\Support\EntityLinkResolver;
 mutates(EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->team = $this->user->currentTeam;
 });
 

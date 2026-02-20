@@ -23,10 +23,13 @@ beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
+
+    $this->teamOwner = User::factory()->withTeam()->create();
+    $this->team = $this->teamOwner->currentTeam;
 });
 
 it('can render the users list page', function () {
-    $users = User::factory(3)->withPersonalTeam()->create();
+    $users = User::factory(3)->withTeam()->create();
 
     livewire(ListUsers::class)
         ->assertOk()
@@ -42,7 +45,9 @@ it('can render the teams list page', function () {
 });
 
 it('can render the companies list page', function () {
-    $companies = Company::factory(3)->create();
+    $companies = Company::withoutEvents(fn () => Company::factory(3)
+        ->for($this->team)
+        ->create(['creator_id' => $this->teamOwner->id]));
 
     livewire(ListCompanies::class)
         ->assertOk()
@@ -50,7 +55,9 @@ it('can render the companies list page', function () {
 });
 
 it('can render the people list page', function () {
-    $people = People::factory(3)->create();
+    $people = People::withoutEvents(fn () => People::factory(3)
+        ->for($this->team)
+        ->create());
 
     livewire(ListPeople::class)
         ->assertOk()
@@ -58,7 +65,9 @@ it('can render the people list page', function () {
 });
 
 it('can render the tasks list page', function () {
-    $tasks = Task::factory(3)->create();
+    $tasks = Task::withoutEvents(fn () => Task::factory(3)
+        ->for($this->team)
+        ->create(['creator_id' => $this->teamOwner->id]));
 
     livewire(ListTasks::class)
         ->assertOk()
@@ -66,7 +75,9 @@ it('can render the tasks list page', function () {
 });
 
 it('can render the notes list page', function () {
-    $notes = Note::factory(3)->create();
+    $notes = Note::withoutEvents(fn () => Note::factory(3)
+        ->for($this->team)
+        ->create());
 
     livewire(ListNotes::class)
         ->assertOk()
@@ -74,7 +85,9 @@ it('can render the notes list page', function () {
 });
 
 it('can render the opportunities list page', function () {
-    $opportunities = Opportunity::factory(3)->create();
+    $opportunities = Opportunity::withoutEvents(fn () => Opportunity::factory(3)
+        ->for($this->team)
+        ->create());
 
     livewire(ListOpportunities::class)
         ->assertOk()

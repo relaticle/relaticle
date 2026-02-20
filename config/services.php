@@ -56,4 +56,8 @@ return [
     'discord' => [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
+
+    'anthropic' => [
+        'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
+    ],
 ];

@@ -19,18 +19,17 @@ use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\Testing\TextResponseFake;
 use Prism\Prism\ValueObjects\Usage;
-use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->personalTeam());
+    Filament::setTenant($this->user->currentTeam);
 });
 
 describe('RecordContextBuilder', function () {
     it('builds context for a company', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create(['name' => 'Test Company']);
 
         $builder = app(RecordContextBuilder::class);
@@ -47,7 +46,7 @@ describe('RecordContextBuilder', function () {
 
     it('builds context for a person', function () {
         $person = People::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create(['name' => 'John Doe']);
 
         $builder = app(RecordContextBuilder::class);
@@ -63,11 +62,11 @@ describe('RecordContextBuilder', function () {
 
     it('builds context for an opportunity', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $opportunity = Opportunity::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->for($company)
             ->create(['name' => 'Test Deal']);
 
@@ -84,11 +83,11 @@ describe('RecordContextBuilder', function () {
 
     it('includes related notes in context', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $notes = Note::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->count(3)
             ->create();
 
@@ -107,11 +106,11 @@ describe('RecordContextBuilder', function () {
 
     it('includes related tasks in context', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $tasks = Task::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->count(2)
             ->create();
 
@@ -130,11 +129,11 @@ describe('RecordContextBuilder', function () {
 
     it('limits related records and shows pagination info', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $notes = Note::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->count(15)
             ->create();
 
@@ -152,23 +151,16 @@ describe('RecordContextBuilder', function () {
 
     it('handles multi-value custom fields as strings in basic info', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
-        $domainsField = CustomField::forceCreate([
-            'name' => 'Domains',
-            'code' => CompanyField::DOMAINS->value,
-            'type' => 'link',
-            'entity_type' => 'company',
-            'tenant_id' => $this->user->personalTeam()->getKey(),
-            'sort_order' => 1,
-            'active' => true,
-            'system_defined' => true,
-            'settings' => new CustomFieldSettingsData(allow_multiple: true),
-        ]);
+        $domainsField = CustomField::query()
+            ->where('code', CompanyField::DOMAINS->value)
+            ->forEntity(Company::class)
+            ->firstOrFail();
 
         CustomFieldValue::forceCreate([
-            'tenant_id' => $this->user->personalTeam()->getKey(),
+            'tenant_id' => $this->user->currentTeam->getKey(),
             'entity_type' => 'company',
             'entity_id' => $company->getKey(),
             'custom_field_id' => $domainsField->getKey(),
@@ -199,7 +191,7 @@ describe('RecordSummaryService', function () {
         ]);
 
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $service = app(RecordSummaryService::class);
@@ -208,28 +200,28 @@ describe('RecordSummaryService', function () {
         expect($summary)
             ->toBeInstanceOf(AiSummary::class)
             ->summary->toBe('Test Company is a promising lead with recent engagement.')
-            ->model_used->toBe('claude-3-5-haiku-latest')
+            ->model_used->toBe('claude-haiku-4-5')
             ->prompt_tokens->toBe(100)
             ->completion_tokens->toBe(50);
 
         $this->assertDatabaseHas('ai_summaries', [
             'summarizable_type' => $company->getMorphClass(),
             'summarizable_id' => $company->getKey(),
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
         ]);
     });
 
     it('returns cached summary when available', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $cached = AiSummary::create([
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
             'summarizable_type' => $company->getMorphClass(),
             'summarizable_id' => $company->getKey(),
             'summary' => 'Cached summary text',
-            'model_used' => 'claude-3-5-haiku-latest',
+            'model_used' => 'claude-haiku-4-5',
             'prompt_tokens' => 50,
             'completion_tokens' => 25,
         ]);
@@ -243,15 +235,15 @@ describe('RecordSummaryService', function () {
 
     it('regenerates summary when requested', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         AiSummary::create([
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
             'summarizable_type' => $company->getMorphClass(),
             'summarizable_id' => $company->getKey(),
             'summary' => 'Old cached summary',
-            'model_used' => 'claude-3-5-haiku-latest',
+            'model_used' => 'claude-haiku-4-5',
             'prompt_tokens' => 50,
             'completion_tokens' => 25,
         ]);
@@ -283,7 +275,7 @@ describe('RecordSummaryService', function () {
         ]);
 
         $person = People::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create(['name' => 'John Doe']);
 
         $service = app(RecordSummaryService::class);
@@ -301,11 +293,11 @@ describe('RecordSummaryService', function () {
         ]);
 
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $opportunity = Opportunity::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->for($company)
             ->create();
 
@@ -319,7 +311,7 @@ describe('RecordSummaryService', function () {
 describe('HasAiSummary trait', function () {
     it('provides aiSummary relationship on Company', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         expect($company->aiSummary())->toBeInstanceOf(\Illuminate\Database\Eloquent\Relations\MorphOne::class);
@@ -327,15 +319,15 @@ describe('HasAiSummary trait', function () {
 
     it('can invalidate summary directly via trait method', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         AiSummary::create([
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
             'summarizable_type' => $company->getMorphClass(),
             'summarizable_id' => $company->getKey(),
             'summary' => 'Test summary',
-            'model_used' => 'claude-3-5-haiku-latest',
+            'model_used' => 'claude-haiku-4-5',
             'prompt_tokens' => 50,
             'completion_tokens' => 25,
         ]);
@@ -355,15 +347,15 @@ describe('HasAiSummary trait', function () {
 
     it('can invalidate summary for person', function () {
         $person = People::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         AiSummary::create([
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
             'summarizable_type' => $person->getMorphClass(),
             'summarizable_id' => $person->getKey(),
             'summary' => 'Test summary',
-            'model_used' => 'claude-3-5-haiku-latest',
+            'model_used' => 'claude-haiku-4-5',
             'prompt_tokens' => 50,
             'completion_tokens' => 25,
         ]);
@@ -378,20 +370,20 @@ describe('HasAiSummary trait', function () {
 
     it('can invalidate summary for opportunity', function () {
         $company = Company::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->create();
 
         $opportunity = Opportunity::factory()
-            ->for($this->user->personalTeam())
+            ->for($this->user->currentTeam)
             ->for($company)
             ->create();
 
         AiSummary::create([
-            'team_id' => $this->user->personalTeam()->getKey(),
+            'team_id' => $this->user->currentTeam->getKey(),
             'summarizable_type' => $opportunity->getMorphClass(),
             'summarizable_id' => $opportunity->getKey(),
             'summary' => 'Test summary',
-            'model_used' => 'claude-3-5-haiku-latest',
+            'model_used' => 'claude-haiku-4-5',
             'prompt_tokens' => 50,
             'completion_tokens' => 25,
         ]);
