@@ -49,11 +49,13 @@ final readonly class CreateTeamCustomFields
 
         $this->migrator->setTenantId($team->id);
 
-        foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
-            foreach ($enumClass::cases() as $enum) {
-                $this->createCustomField($modelClass, $enum);
+        DB::transaction(function (): void {
+            foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
+                foreach ($enumClass::cases() as $enum) {
+                    $this->createCustomField($modelClass, $enum);
+                }
             }
-        }
+        });
 
         if ($team->isPersonalTeam()) {
             $team->loadMissing('owner');
