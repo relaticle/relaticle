@@ -465,3 +465,52 @@ describe('filtering and sorting', function (): void {
             ->assertStatus(400);
     });
 });
+
+describe('pagination', function (): void {
+    it('paginates with per_page parameter', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory(5)->for($this->team)->create();
+
+        $this->getJson('/api/v1/companies?per_page=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    });
+
+    it('returns second page of results', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory(5)->for($this->team)->create();
+
+        $page1 = $this->getJson('/api/v1/companies?per_page=3&page=1');
+        $page2 = $this->getJson('/api/v1/companies?per_page=3&page=2');
+
+        $page1->assertOk()->assertJsonCount(3, 'data');
+        $page2->assertOk();
+
+        $page1Ids = collect($page1->json('data'))->pluck('id');
+        $page2Ids = collect($page2->json('data'))->pluck('id');
+        expect($page1Ids->intersect($page2Ids))->toBeEmpty();
+    });
+
+    it('caps per_page at maximum allowed value', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory(5)->for($this->team)->create();
+
+        $response = $this->getJson('/api/v1/companies?per_page=500');
+        $response->assertOk();
+
+        expect($response->json('data'))->toBeArray();
+    });
+
+    it('returns empty data array for page beyond results', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory(2)->for($this->team)->create();
+
+        $this->getJson('/api/v1/companies?page=999')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    });
+});
