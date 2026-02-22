@@ -67,6 +67,11 @@
                         'description' => 'Easily migrate your data with CSV imports and exports. Transfer contacts, companies, and opportunities without losing any information.',
                         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />'
                     ],
+                    [
+                        'title' => 'API & AI Integration',
+                        'description' => 'Connect your CRM to any tool with the REST API, or let AI assistants manage your data directly through the MCP server. Automate workflows and build custom integrations.',
+                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />'
+                    ],
                 ];
             @endphp
 

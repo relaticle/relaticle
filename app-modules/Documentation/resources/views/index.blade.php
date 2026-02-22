@@ -26,6 +26,7 @@
                     'import' => 'heroicon-o-arrow-up-tray',
                     'developer' => 'heroicon-o-code-bracket',
                     'api' => 'heroicon-o-variable',
+                    'mcp' => 'heroicon-o-cpu-chip',
                 ];
             @endphp
 

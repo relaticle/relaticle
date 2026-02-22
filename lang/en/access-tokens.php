@@ -51,5 +51,13 @@ return [
         'description' => 'Create a token above to get started.',
     ],
 
+    'integrations' => [
+        'heading' => 'What to do next',
+        'api_link' => 'REST API',
+        'api_description' => 'Manage CRM data programmatically.',
+        'mcp_link' => 'MCP Server',
+        'mcp_description' => 'Connect AI assistants like Claude.',
+    ],
+
     'user_menu' => 'Access Tokens',
 ];
