@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\ValidatesCustomFields;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -49,6 +50,7 @@ final class UpdateTaskTool extends Tool
 
         /** @var Task $task */
         $task = Task::query()->findOrFail($validated['id']);
+        Gate::authorize('update', $task);
         unset($validated['id']);
 
         $task = $action->execute($user, $task, $validated);

@@ -8,6 +8,7 @@ use App\Actions\Company\DeleteCompany;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -36,6 +37,7 @@ final class DeleteCompanyTool extends Tool
 
         /** @var Company $company */
         $company = Company::query()->findOrFail($validated['id']);
+        Gate::authorize('delete', $company);
 
         $action->execute($user, $company);
 

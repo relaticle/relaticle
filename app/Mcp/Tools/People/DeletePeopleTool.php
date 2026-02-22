@@ -8,6 +8,7 @@ use App\Actions\People\DeletePeople;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -36,6 +37,7 @@ final class DeletePeopleTool extends Tool
 
         /** @var People $person */
         $person = People::query()->findOrFail($validated['id']);
+        Gate::authorize('delete', $person);
 
         $action->execute($user, $person);
 

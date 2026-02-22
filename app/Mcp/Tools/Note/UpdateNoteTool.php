@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\ValidatesCustomFields;
 use App\Models\Note;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -49,6 +50,7 @@ final class UpdateNoteTool extends Tool
 
         /** @var Note $note */
         $note = Note::query()->findOrFail($validated['id']);
+        Gate::authorize('update', $note);
         unset($validated['id']);
 
         $note = $action->execute($user, $note, $validated);

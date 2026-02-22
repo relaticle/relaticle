@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\ValidatesCustomFields;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -55,6 +56,7 @@ final class UpdateOpportunityTool extends Tool
 
         /** @var Opportunity $opportunity */
         $opportunity = Opportunity::query()->findOrFail($validated['id']);
+        Gate::authorize('update', $opportunity);
         unset($validated['id']);
 
         $opportunity = $action->execute($user, $opportunity, $validated);

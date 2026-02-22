@@ -8,6 +8,7 @@ use App\Actions\Opportunity\DeleteOpportunity;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -36,6 +37,7 @@ final class DeleteOpportunityTool extends Tool
 
         /** @var Opportunity $opportunity */
         $opportunity = Opportunity::query()->findOrFail($validated['id']);
+        Gate::authorize('delete', $opportunity);
 
         $action->execute($user, $opportunity);
 

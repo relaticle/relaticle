@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\ValidatesCustomFields;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -53,6 +54,7 @@ final class UpdatePeopleTool extends Tool
 
         /** @var People $person */
         $person = People::query()->findOrFail($validated['id']);
+        Gate::authorize('update', $person);
         unset($validated['id']);
 
         $person = $action->execute($user, $person, $validated);

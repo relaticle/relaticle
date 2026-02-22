@@ -8,6 +8,7 @@ use App\Actions\Task\DeleteTask;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -36,6 +37,7 @@ final class DeleteTaskTool extends Tool
 
         /** @var Task $task */
         $task = Task::query()->findOrFail($validated['id']);
+        Gate::authorize('delete', $task);
 
         $action->execute($user, $task);
 

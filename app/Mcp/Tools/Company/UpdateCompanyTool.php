@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\ValidatesCustomFields;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -49,6 +50,7 @@ final class UpdateCompanyTool extends Tool
 
         /** @var Company $company */
         $company = Company::query()->findOrFail($validated['id']);
+        Gate::authorize('update', $company);
         unset($validated['id']);
 
         $company = $action->execute($user, $company, $validated);
