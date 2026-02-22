@@ -211,3 +211,18 @@ it('can read the CRM overview prompt', function (): void {
     $response->assertOk()
         ->assertSee('CRM Overview');
 });
+
+it('throws when updating non-existent company', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateCompanyTool::class, [
+            'id' => 'non-existent-id',
+            'name' => 'Ghost',
+        ]);
+})->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+it('throws when deleting non-existent company', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(DeleteCompanyTool::class, [
+            'id' => 'non-existent-id',
+        ]);
+})->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);

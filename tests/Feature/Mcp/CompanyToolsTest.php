@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
@@ -97,5 +98,32 @@ describe('pagination', function () {
             ]);
 
         $page2->assertOk();
+    });
+});
+
+describe('validation', function () {
+    it('rejects empty name on create', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateCompanyTool::class, [])
+            ->assertHasErrors(['name']);
+    });
+
+    it('rejects name exceeding 255 characters', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateCompanyTool::class, [
+                'name' => str_repeat('a', 256),
+            ])
+            ->assertHasErrors(['name']);
+    });
+
+    it('sets creation source to MCP', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateCompanyTool::class, [
+                'name' => 'Source Test Corp',
+            ])
+            ->assertOk();
+
+        $company = Company::query()->where('name', 'Source Test Corp')->first();
+        expect($company->creation_source)->toBe(\App\Enums\CreationSource::MCP);
     });
 });
