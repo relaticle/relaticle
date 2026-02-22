@@ -466,6 +466,43 @@ describe('filtering and sorting', function (): void {
     });
 });
 
+describe('soft deletes', function (): void {
+    it('excludes soft-deleted companies from list', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->for($this->team)->create(['name' => 'Deleted Corp']);
+        $company->delete();
+
+        $active = Company::factory()->for($this->team)->create(['name' => 'Active Corp']);
+
+        $response = $this->getJson('/api/v1/companies');
+
+        $ids = collect($response->json('data'))->pluck('id');
+        expect($ids)->toContain($active->id);
+        expect($ids)->not->toContain($company->id);
+    });
+
+    it('cannot show a soft-deleted company', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->for($this->team)->create();
+        $company->delete();
+
+        $this->getJson("/api/v1/companies/{$company->id}")
+            ->assertNotFound();
+    });
+
+    it('cannot update a soft-deleted company', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->for($this->team)->create();
+        $company->delete();
+
+        $this->putJson("/api/v1/companies/{$company->id}", ['name' => 'Revived'])
+            ->assertNotFound();
+    });
+});
+
 describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
@@ -512,5 +549,52 @@ describe('pagination', function (): void {
         $this->getJson('/api/v1/companies?page=999')
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    });
+});
+
+describe('mass assignment protection', function (): void {
+    it('ignores team_id in create request', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $otherTeam = Team::factory()->create();
+
+        $this->postJson('/api/v1/companies', [
+            'name' => 'Test Corp',
+            'team_id' => $otherTeam->id,
+        ])
+            ->assertCreated();
+
+        $company = Company::query()->where('name', 'Test Corp')->first();
+        expect($company->team_id)->toBe($this->team->id);
+    });
+
+    it('ignores creator_id in create request', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $otherUser = User::factory()->create();
+
+        $this->postJson('/api/v1/companies', [
+            'name' => 'Test Corp',
+            'creator_id' => $otherUser->id,
+        ])
+            ->assertCreated();
+
+        $company = Company::query()->where('name', 'Test Corp')->first();
+        expect($company->creator_id)->toBe($this->user->id);
+    });
+
+    it('ignores team_id in update request', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->for($this->team)->create();
+        $otherTeam = Team::factory()->create();
+
+        $this->putJson("/api/v1/companies/{$company->id}", [
+            'name' => 'Updated',
+            'team_id' => $otherTeam->id,
+        ])
+            ->assertOk();
+
+        expect($company->refresh()->team_id)->toBe($this->team->id);
     });
 });

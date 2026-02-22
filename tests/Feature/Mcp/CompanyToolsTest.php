@@ -63,6 +63,19 @@ describe('team scoping', function () {
                 'id' => $otherCompany->id,
             ]);
     })->throws(ModelNotFoundException::class);
+
+    it('excludes soft-deleted companies from list', function (): void {
+        $deleted = Company::factory()->for($this->team)->create(['name' => 'Deleted Corp']);
+        $deleted->delete();
+
+        $active = Company::factory()->for($this->team)->create(['name' => 'Active Corp']);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class)
+            ->assertOk()
+            ->assertSee('Active Corp')
+            ->assertDontSee('Deleted Corp');
+    });
 });
 
 describe('pagination', function () {
