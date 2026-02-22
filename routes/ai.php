@@ -7,4 +7,4 @@ use App\Mcp\Servers\RelaticleServer;
 use Laravel\Mcp\Facades\Mcp;
 
 Mcp::web('/mcp', RelaticleServer::class)
-    ->middleware(['auth:sanctum', SetApiTeamContext::class]);
+    ->middleware(['auth:sanctum', 'throttle:api', SetApiTeamContext::class]);

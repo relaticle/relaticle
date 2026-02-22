@@ -18,7 +18,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::prefix('v1')
-    ->middleware(['auth:sanctum', ForceJsonResponse::class, SetApiTeamContext::class])
+    ->middleware(['auth:sanctum', 'throttle:api', ForceJsonResponse::class, SetApiTeamContext::class])
     ->group(function (): void {
         Route::apiResource('companies', CompaniesController::class);
         Route::apiResource('people', PeopleController::class);
