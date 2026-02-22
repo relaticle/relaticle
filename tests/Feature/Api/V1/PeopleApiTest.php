@@ -272,3 +272,24 @@ describe('filtering', function (): void {
         expect($names)->not->toContain('Bob Smith');
     });
 });
+
+describe('input validation', function (): void {
+    it('rejects name exceeding 255 characters', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/people', ['name' => str_repeat('a', 256)])
+            ->assertUnprocessable()
+            ->assertInvalid(['name']);
+    });
+
+    it('rejects invalid company_id format', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/people', [
+            'name' => 'Test Person',
+            'company_id' => 'not-a-valid-id',
+        ])
+            ->assertUnprocessable()
+            ->assertInvalid(['company_id']);
+    });
+});

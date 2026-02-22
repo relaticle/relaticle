@@ -598,3 +598,36 @@ describe('mass assignment protection', function (): void {
         expect($company->refresh()->team_id)->toBe($this->team->id);
     });
 });
+
+describe('input validation', function (): void {
+    it('rejects name exceeding 255 characters', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/companies', ['name' => str_repeat('a', 256)])
+            ->assertUnprocessable()
+            ->assertInvalid(['name']);
+    });
+
+    it('rejects non-string name', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/companies', ['name' => 12345])
+            ->assertUnprocessable()
+            ->assertInvalid(['name']);
+    });
+
+    it('rejects array as name', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/companies', ['name' => ['nested' => 'value']])
+            ->assertUnprocessable()
+            ->assertInvalid(['name']);
+    });
+
+    it('accepts name at exactly 255 characters', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/companies', ['name' => str_repeat('a', 255)])
+            ->assertCreated();
+    });
+});
