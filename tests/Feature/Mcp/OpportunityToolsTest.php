@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Opportunity\CreateOpportunityTool;
 use App\Mcp\Tools\Opportunity\DeleteOpportunityTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\Opportunity\UpdateOpportunityTool;
+use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\Scopes\TeamScope;
 use App\Models\Team;
@@ -89,4 +91,18 @@ describe('team scoping', function () {
                 'id' => $otherOpportunity->id,
             ]);
     })->throws(ModelNotFoundException::class);
+
+    it('rejects company_id from another team when creating opportunity', function (): void {
+        $otherTeam = Team::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
+            'team_id' => $otherTeam->id,
+        ]));
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateOpportunityTool::class, [
+                'name' => 'Test Deal',
+                'company_id' => $otherCompany->id,
+            ])
+            ->assertHasErrors();
+    });
 });

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Models\Company;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -165,6 +167,38 @@ describe('cross-tenant isolation', function (): void {
 
         $this->deleteJson("/api/v1/opportunities/{$otherOpportunity->id}")
             ->assertNotFound();
+    });
+
+    it('rejects company_id from another team on create', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $otherTeam = Team::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
+            'team_id' => $otherTeam->id,
+        ]));
+
+        $this->postJson('/api/v1/opportunities', [
+            'name' => 'Test Deal',
+            'company_id' => $otherCompany->id,
+        ])
+            ->assertUnprocessable()
+            ->assertInvalid(['company_id']);
+    });
+
+    it('rejects contact_id from another team on create', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $otherTeam = Team::factory()->create();
+        $otherPerson = People::withoutEvents(fn () => People::factory()->create([
+            'team_id' => $otherTeam->id,
+        ]));
+
+        $this->postJson('/api/v1/opportunities', [
+            'name' => 'Test Deal',
+            'contact_id' => $otherPerson->id,
+        ])
+            ->assertUnprocessable()
+            ->assertInvalid(['contact_id']);
     });
 });
 

@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\ListPeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\Scopes\TeamScope;
 use App\Models\Team;
@@ -84,4 +86,18 @@ describe('team scoping', function () {
                 'id' => $otherPerson->id,
             ]);
     })->throws(ModelNotFoundException::class);
+
+    it('rejects company_id from another team when creating person', function (): void {
+        $otherTeam = Team::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
+            'team_id' => $otherTeam->id,
+        ]));
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreatePeopleTool::class, [
+                'name' => 'Test Person',
+                'company_id' => $otherCompany->id,
+            ])
+            ->assertHasErrors();
+    });
 });
