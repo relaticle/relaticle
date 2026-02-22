@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
@@ -61,4 +62,25 @@ it('returns 403 when user has no team', function (): void {
 
     $this->getJson('/api/v1/companies')
         ->assertForbidden();
+});
+
+describe('/api/user endpoint', function (): void {
+    it('returns current authenticated user', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/user')
+            ->assertOk()
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->where('id', $this->user->id)
+                ->where('name', $this->user->name)
+                ->where('email', $this->user->email)
+                ->missing('password')
+                ->etc()
+            );
+    });
+
+    it('requires authentication', function (): void {
+        $this->getJson('/api/user')
+            ->assertUnauthorized();
+    });
 });
