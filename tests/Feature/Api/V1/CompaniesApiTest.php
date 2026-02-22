@@ -402,3 +402,66 @@ describe('custom fields', function (): void {
             ->toHaveKey('orphan_field', 'test value');
     });
 });
+
+describe('filtering and sorting', function (): void {
+    it('can filter companies by name', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+        Company::factory()->for($this->team)->create(['name' => 'Beta Inc']);
+
+        $response = $this->getJson('/api/v1/companies?filter[name]=Acme');
+
+        $response->assertOk();
+
+        $names = collect($response->json('data'))->pluck('attributes.name');
+        expect($names)->toContain('Acme Corp');
+        expect($names)->not->toContain('Beta Inc');
+    });
+
+    it('can sort companies by name ascending', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory()->for($this->team)->create(['name' => 'Zulu Corp']);
+        Company::factory()->for($this->team)->create(['name' => 'Alpha Inc']);
+
+        $response = $this->getJson('/api/v1/companies?sort=name');
+
+        $response->assertOk();
+
+        $names = collect($response->json('data'))->pluck('attributes.name')->values();
+        $alphaIndex = $names->search('Alpha Inc');
+        $zuluIndex = $names->search('Zulu Corp');
+        expect($alphaIndex)->toBeLessThan($zuluIndex);
+    });
+
+    it('can sort companies by name descending', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory()->for($this->team)->create(['name' => 'Alpha Inc']);
+        Company::factory()->for($this->team)->create(['name' => 'Zulu Corp']);
+
+        $response = $this->getJson('/api/v1/companies?sort=-name');
+
+        $response->assertOk();
+
+        $names = collect($response->json('data'))->pluck('attributes.name')->values();
+        $zuluIndex = $names->search('Zulu Corp');
+        $alphaIndex = $names->search('Alpha Inc');
+        expect($zuluIndex)->toBeLessThan($alphaIndex);
+    });
+
+    it('rejects disallowed filter fields', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/v1/companies?filter[team_id]=fake')
+            ->assertStatus(400);
+    });
+
+    it('rejects disallowed sort fields', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/v1/companies?sort=team_id')
+            ->assertStatus(400);
+    });
+});

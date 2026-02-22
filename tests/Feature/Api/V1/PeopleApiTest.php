@@ -222,3 +222,20 @@ describe('includes', function (): void {
             ->assertStatus(400);
     });
 });
+
+describe('filtering', function (): void {
+    it('can filter people by name', function (): void {
+        Sanctum::actingAs($this->user);
+
+        People::factory()->for($this->team)->create(['name' => 'Alice Johnson']);
+        People::factory()->for($this->team)->create(['name' => 'Bob Smith']);
+
+        $response = $this->getJson('/api/v1/people?filter[name]=Alice');
+
+        $response->assertOk();
+
+        $names = collect($response->json('data'))->pluck('attributes.name');
+        expect($names)->toContain('Alice Johnson');
+        expect($names)->not->toContain('Bob Smith');
+    });
+});
