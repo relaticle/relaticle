@@ -45,10 +45,10 @@
         <div class="relative max-w-xl mx-auto text-center">
             {{-- Main content --}}
             <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-black dark:text-white mb-4 tracking-tight leading-tight">
-                Your CRM, Your Way
+                Your CRM, Your Rules
             </h2>
             <p class="text-base md:text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-sm mx-auto leading-relaxed">
-                Self-hosted. Open source. Full control, zero compromises.
+                Self-hosted. Agent-native. Full control over your data and your AI.
             </p>
 
             {{-- Primary CTA with perfect design system styling --}}

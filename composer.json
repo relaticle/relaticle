@@ -1,7 +1,7 @@
 {
     "name": "laravel/laravel",
     "type": "project",
-    "description": "The Next-Generation Open-Source CRM Platform",
+    "description": "The Open-Source CRM Built for AI Agents",
     "keywords": [
         "crm",
         "laravel",

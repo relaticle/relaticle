@@ -22,6 +22,10 @@
                             <x-icon-filament class="h-3.5 w-3.5 dark:fill-white"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">Filament</span>
                         </div>
+                        <span class="text-gray-400">·</span>
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">MCP</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -29,16 +33,15 @@
             <!-- Hero Text - Enhanced Typography -->
             <div class="text-center space-y-6 max-w-3xl mx-auto">
                 <h1 class="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
-                    The Next-Generation<br class="hidden sm:block"/> <span class="relative inline-block">
-                        <span class="relative z-10">Open-Source CRM</span>
+                    The Open-Source CRM<br class="hidden sm:block"/> <span class="relative inline-block">
+                        <span class="relative z-10">Built for AI Agents</span>
                         <span
                             class="absolute bottom-2 sm:left-0 right-1/4 w-1/2 sm:w-full h-3 bg-primary/10 dark:bg-primary/20 sm:dark:bg-primary/30 -rotate-1 z-0"></span>
                     </span>
                 </h1>
 
                 <p class="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                    Transforming client relationship management with a modern, intuitive approach. Built for businesses
-                    that value simplicity and efficiency.
+                    MCP-native. Self-hosted. 20 tools for any AI to operate your CRM. Full control over your data and your AI.
                 </p>
             </div>
 
@@ -108,16 +111,16 @@
                     <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Free to use and customize</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Modern Stack</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">PHP 8.4, Laravel 12</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">Agent-Native</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">MCP server with 20 tools</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Secure</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enterprise-grade security</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">Self-Hosted</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Own your data and your AI</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Scalable</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Grows with your business</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">22 Field Types</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Customize without code</div>
                 </div>
             </div>
         </div>

@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center"> Next-Generation Open-Source CRM</h1>
+<h1 align="center"> The Open-Source CRM Built for AI Agents</h1>
 
 <p align="center">
   <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
@@ -31,21 +31,22 @@
 
 # About Relaticle
 
-**Perfect for:** Laravel developers, agencies, and SMBs who need a modern CRM they can customize and self-host.
+**Perfect for:** Teams and AI agents that need a modern, self-hosted CRM with first-class API and MCP support.
 
-Relaticle is a powerful, adaptable CRM platform built for teams who've outgrown spreadsheets but find Salesforce overkill. Unlike SaaS CRMs that lock your data in their cloud, Relaticle gives you complete control with self-hosting and unlimited customization through our no-code custom fields system.
+Relaticle is an agent-native CRM platform built for teams who want full control over their data -- and full access for their AI. Ships with a production-grade MCP server (20 tools), REST API, and 22 custom field types. Self-hosted, open source, no vendor lock-in.
 
 **Core Strengths:**
-- **Fully Customizable** - Create and manage custom fields without coding
-- **Multi-Team Support** - Securely manage multiple business units with isolated workspaces
-- **Modern Technology** - Built on Laravel 12, PHP 8.4, and Filament 4
-- **Privacy-Focused** - Self-host with complete data ownership
+- **Agent-Native** - MCP server with 20 tools, REST API, schema resources for AI discovery
+- **Fully Customizable** - 22 custom field types, no-code, no migrations required
+- **Multi-Team Support** - Isolated workspaces with 5-layer authorization
+- **Self-Hosted** - Complete data ownership, bring your own AI provider
 - **Open Source** - Transparent development with AGPL-3.0 license
 
 **vs Other CRMs:**
-- **vs HubSpot/Salesforce:** Self-hosted, no monthly fees, own your data
-- **vs SuiteCRM:** Modern Laravel stack, no-code customization, beautiful UI
-- **vs Custom Build:** Production-ready, maintained, community-supported
+- **vs HubSpot:** Self-hosted, 20 MCP tools (vs their 9), no per-seat pricing
+- **vs Salesforce:** Open source, no enterprise bloat, you control the AI
+- **vs Attio:** Self-hosted, open source, same agent-native vision
+- **vs SuiteCRM:** Modern stack, agent-native, beautiful UI
 
 Visit our [website](https://relaticle.com) to learn more about Relaticle's capabilities.
 
