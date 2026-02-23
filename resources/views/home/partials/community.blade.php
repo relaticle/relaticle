@@ -11,11 +11,10 @@
                 Community
             </span>
             <h2 class="font-display mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
-                Collaborate and Grow Together
+                Built in the Open
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                As an open-source platform, Relaticle thrives on community collaboration. Join our growing community to
-                get help, share ideas, and contribute.
+                Relaticle is AGPL-3.0 open source. Star the repo, join Discord, and help shape the future of agent-native CRM.
             </p>
         </div>
 
@@ -96,22 +95,22 @@
                 </div>
             </div>
 
-            <!-- Community highlights - Simplified -->
+            <!-- Community highlights -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Open</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Source License</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">AGPL-3.0</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Open Source</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Active</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Development</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">900+</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Automated Tests</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Community</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Driven</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">20</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">MCP Tools</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
