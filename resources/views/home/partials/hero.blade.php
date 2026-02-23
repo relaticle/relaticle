@@ -50,12 +50,12 @@
                 <a href="{{ route('register') }}"
                    class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-600 text-white px-7 py-3.5 rounded-md text-base font-medium transition-all duration-200 shadow-sm hover:shadow">
                     <span>Start for free</span>
-                    <x-heroicon-c-arrow-right class="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"/>
+                    <x-ri-arrow-right-line class="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"/>
                 </a>
 
                 <a href="https://github.com/relaticle/relaticle" target="_blank"
                    class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-md text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200 bg-white/50 dark:bg-black/50">
-                    <x-icon-github class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"/>
+                    <x-ri-github-fill class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"/>
                     <span class="font-medium">GitHub</span>
                 </a>
             </div>
@@ -77,11 +77,7 @@
                         <!-- Browser Address Bar -->
                         <div
                             class="ml-4 flex-1 bg-white/90 dark:bg-gray-700/80 rounded-md px-3 py-1 text-xs text-gray-600 dark:text-gray-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-500 mr-1.5" fill="none"
-                                 viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                            </svg>
+                            <x-ri-shield-check-line class="h-3 w-3 text-green-500 mr-1.5" />
                             <span>app.relaticle.com</span>
                         </div>
                     </div>

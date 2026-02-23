@@ -26,7 +26,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                            <x-icon-github class="w-6 h-6 text-primary dark:text-primary-400"/>
+                            <x-ri-github-line class="w-6 h-6 text-primary dark:text-primary-400"/>
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">GitHub</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Star our repo, report issues, and
@@ -36,11 +36,7 @@
                             <a href="https://github.com/relaticle/relaticle" target="_blank"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 View Repository
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
@@ -51,7 +47,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                          <x-icon-discord class="w-6 h-6 text-primary dark:text-primary-400" />
+                          <x-ri-discord-line class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Discord Community</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Chat with developers, get help, and
@@ -60,11 +56,7 @@
                             <a href="{{ route('discord') }}" target="_blank"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 Join Discord
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
@@ -75,7 +67,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                            <x-heroicon-o-document class="w-6 h-6 text-primary dark:text-primary-400" />
+                            <x-ri-file-text-line class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Documentation</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Learn how to use Relaticle and help
@@ -84,11 +76,7 @@
                             <a href="{{ route('documentation.index') }}"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 Read the Docs
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
