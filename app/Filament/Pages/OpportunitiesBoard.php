@@ -56,6 +56,7 @@ final class OpportunitiesBoard extends BoardPage
                     })
                     ->select('opportunities.*', 'cfv.'.$valueColumn)
                     ->with(['company', 'contact'])
+                    ->withCustomFieldValues()
             )
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)
