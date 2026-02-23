@@ -56,7 +56,7 @@
                 <a href="{{ route('register') }}"
                    class="group relative inline-flex items-center justify-center gap-2.5 bg-primary hover:bg-primary-700 text-white px-8 py-3.5 rounded-lg text-base font-medium transition-all duration-300 shadow-sm hover:shadow-md transform active:translate-y-0">
                     <span>Start for free</span>
-                    <x-heroicon-c-arrow-right
+                    <x-ri-arrow-right-line
                         class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"/>
 
                 </a>
@@ -64,10 +64,10 @@
 
             {{-- Trust indicators - super minimal --}}
             <div class="flex items-center justify-center gap-1 text-[13px] text-gray-600 dark:text-gray-400">
-                <x-heroicon-o-check-circle class="h-3.5 w-3.5 text-green-500 dark:text-green-400 flex-shrink-0"/>
+                <x-ri-checkbox-circle-line class="h-3.5 w-3.5 text-green-500 dark:text-green-400 flex-shrink-0"/>
                 <span>No credit card</span>
                 <span class="mx-1.5 text-gray-400 dark:text-gray-600">•</span>
-                <x-heroicon-o-check-circle class="h-3.5 w-3.5 text-green-500 dark:text-green-400 flex-shrink-0"/>
+                <x-ri-checkbox-circle-line class="h-3.5 w-3.5 text-green-500 dark:text-green-400 flex-shrink-0"/>
                 <span>Deploy in 5 minutes</span>
             </div>
         </div>

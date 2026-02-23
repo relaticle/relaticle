@@ -67,7 +67,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                            <x-ri-file-text-line class="w-6 h-6 text-primary dark:text-primary-400" />
+                            <x-ri-book-open-line class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Documentation</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Learn how to use Relaticle and help

@@ -37,32 +37,24 @@
                     <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener"
                        class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
                        aria-label="GitHub Repository">
-                        <x-icon-github class="w-4 h-4"/>
+                        <x-ri-github-fill class="w-4 h-4"/>
                         @if(isset($githubStars) && $githubStars > 0)
                             <span>{{ $formattedGithubStars }}</span>
                         @endif
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
+                        <x-ri-external-link-line class="h-3 w-3 text-gray-400"/>
                     </a>
                     <a href="{{ route('discord') }}" target="_blank"
                        class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
                        aria-label="Join Discord Community">
-                        <x-icon-discord class="w-4 h-4"/>
+                        <x-ri-discord-line class="w-4 h-4"/>
                         Discord
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
+                        <x-ri-external-link-line class="h-3 w-3 text-gray-400"/>
                     </a>
                 </nav>
             </div>
 
-            <!-- Right Section: Auth and Settings (Right Column) -->
+            <!-- Right Section: Auth (Right Column) -->
             <div class="flex flex-1 items-center justify-end space-x-5">
-                <!-- Dark Mode Toggle -->
-                <button id="theme-toggle"
-                        class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-transform duration-300 active:scale-90"
-                        aria-label="Toggle dark mode">
-                    <x-heroicon-o-sun class="h-5 w-5 hidden dark:block"/>
-                    <x-heroicon-o-moon class="h-5 w-5 block dark:hidden"/>
-                </button>
-
                 <!-- Auth Links -->
                 <div class="hidden lg:flex items-center space-x-6">
                     <a href="{{ route('login') }}"
@@ -84,7 +76,7 @@
                             class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-all active:scale-95"
                             aria-label="Toggle mobile menu"
                             aria-expanded="false">
-                        <x-heroicon-o-bars-3 class="h-6 w-6"/>
+                        <x-ri-menu-line class="h-6 w-6"/>
                     </button>
                 </div>
             </div>
@@ -100,39 +92,66 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Dark mode toggle functionality - simplified
-        const themeToggleButton = document.getElementById('theme-toggle');
-
-        // Function to toggle dark mode
-        function toggleDarkMode() {
-            const htmlElement = document.documentElement;
-            if (htmlElement.classList.contains('dark')) {
-                htmlElement.classList.remove('dark');
-                localStorage.theme = 'light';
+        // Theme management: system | light | dark
+        function applyTheme(mode) {
+            if (mode === 'system') {
+                localStorage.removeItem('theme');
+                document.documentElement.classList.toggle(
+                    'dark',
+                    window.matchMedia('(prefers-color-scheme: dark)').matches
+                );
             } else {
-                htmlElement.classList.add('dark');
-                localStorage.theme = 'dark';
+                localStorage.theme = mode;
+                document.documentElement.classList.toggle('dark', mode === 'dark');
             }
+            updateThemeButtons();
         }
 
-        // Initialize theme on page load
-        document.documentElement.classList.toggle(
-            "dark",
-            localStorage.theme === "dark" ||
-            (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
-        );
-
-        // Add event listener to theme toggle button
-        if (themeToggleButton) {
-            themeToggleButton.addEventListener('click', toggleDarkMode);
+        function getActiveTheme() {
+            if (!('theme' in localStorage)) {
+                return 'system';
+            }
+            return localStorage.theme;
         }
+
+        function updateThemeButtons() {
+            var active = getActiveTheme();
+            document.querySelectorAll('.theme-btn').forEach(function(btn) {
+                var isActive = btn.dataset.theme === active;
+                btn.classList.toggle('bg-white', isActive);
+                btn.classList.toggle('dark:bg-gray-700', isActive);
+                btn.classList.toggle('shadow-sm', isActive);
+                btn.classList.toggle('text-gray-900', isActive);
+                btn.classList.toggle('dark:text-white', isActive);
+                btn.classList.toggle('text-gray-400', !isActive);
+                btn.classList.toggle('dark:text-gray-500', !isActive);
+                btn.classList.toggle('hover:text-gray-600', !isActive);
+                btn.classList.toggle('dark:hover:text-gray-300', !isActive);
+            });
+        }
+
+        // Initialize
+        applyTheme(getActiveTheme());
+
+        // Listen for system preference changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            if (getActiveTheme() === 'system') {
+                applyTheme('system');
+            }
+        });
+
+        // Bind all theme buttons (footer + mobile)
+        document.querySelectorAll('.theme-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                applyTheme(btn.dataset.theme);
+            });
+        });
 
         // Mobile menu functionality
         const mobileMenuButton = document.getElementById('mobile-menu-button');
         const mobileMenu = document.getElementById('mobile-menu');
         const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
         const mobileMenuClose = document.getElementById('mobile-menu-close');
-        const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
         const mobileMenuLinks = document.querySelectorAll('.mobile-menu-link');
 
         function openMobileMenu() {
@@ -180,10 +199,6 @@
 
         if (mobileMenuBackdrop) {
             mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
-        }
-
-        if (mobileThemeToggle) {
-            mobileThemeToggle.addEventListener('click', toggleDarkMode);
         }
 
         // Close menu when clicking links
