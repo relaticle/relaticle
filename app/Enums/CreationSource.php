@@ -31,12 +31,20 @@ enum CreationSource: string implements HasColor, HasLabel
      */
     case IMPORT = 'import';
 
+    /**
+     * Created through the MCP (Model Context Protocol) interface.
+     * This applies to records generated via MCP tool calls,
+     * such as AI assistants interacting with the application.
+     */
+    case MCP = 'mcp';
+
     public function getColor(): string
     {
         return match ($this) {
             self::WEB => 'info',
             self::SYSTEM => 'warning',
             self::IMPORT => 'success',
+            self::MCP => 'gray',
         };
     }
 
@@ -46,6 +54,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::WEB => 'Web Interface',
             self::SYSTEM => 'System Process',
             self::IMPORT => 'Data Import',
+            self::MCP => 'MCP',
         };
     }
 }
