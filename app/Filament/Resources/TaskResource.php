@@ -239,6 +239,7 @@ final class TaskResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with(['team'])
+            ->withCustomFieldValues()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
