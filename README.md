@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center"> Next-Generation Open-Source CRM</h1>
+<h1 align="center">Next-Generation Open-Source CRM</h1>
 
 <p align="center">
   <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
