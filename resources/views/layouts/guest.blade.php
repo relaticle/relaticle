@@ -32,6 +32,14 @@
     <meta name="apple-mobile-web-app-title" content="Relaticle" />
     <link rel="manifest" href="/site.webmanifest" />
 
+    <!-- Dark mode FOUC prevention (must run synchronously before paint) -->
+    <script>
+        document.documentElement.classList.toggle(
+            'dark',
+            localStorage.getItem('theme') === 'dark' || ((!localStorage.getItem('theme') || localStorage.getItem('theme') === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        );
+    </script>
+
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 

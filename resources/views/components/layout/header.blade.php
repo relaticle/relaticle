@@ -1,15 +1,3 @@
-<!-- Minimalist Header -->
-{{--@push('header')--}}
-<script>
-    // On page load or when changing themes, best to add inline in `head` to avoid FOUC
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-</script>
-{{--@endpush--}}
-
 <header
     class="bg-white dark:bg-black py-4 fixed w-full top-0 z-50 transition-all duration-300 border-b border-gray-100 dark:border-gray-900 backdrop-blur-sm bg-white/95 dark:bg-black/95">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,16 +43,8 @@
 
             <!-- Right Section: Auth and Settings (Right Column) -->
             <div class="flex flex-1 items-center justify-end space-x-5">
-                <!-- Dark Mode Toggle -->
-                <button id="theme-toggle"
-                        class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-transform duration-300 active:scale-90"
-                        aria-label="Toggle dark mode">
-                    <x-heroicon-o-sun class="h-5 w-5 hidden dark:block"/>
-                    <x-heroicon-o-moon class="h-5 w-5 block dark:hidden"/>
-                </button>
-
                 <!-- Auth Links -->
-                <div class="hidden lg:flex items-center space-x-6">
+                <div class="hidden md:flex items-center space-x-6">
                     <a href="{{ route('login') }}"
                        class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 {{ Route::is('login') ? 'text-primary dark:text-primary-400' : '' }}"
                        aria-label="Sign in to your account">Sign In</a>
@@ -100,39 +80,11 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Dark mode toggle functionality - simplified
-        const themeToggleButton = document.getElementById('theme-toggle');
-
-        // Function to toggle dark mode
-        function toggleDarkMode() {
-            const htmlElement = document.documentElement;
-            if (htmlElement.classList.contains('dark')) {
-                htmlElement.classList.remove('dark');
-                localStorage.theme = 'light';
-            } else {
-                htmlElement.classList.add('dark');
-                localStorage.theme = 'dark';
-            }
-        }
-
-        // Initialize theme on page load
-        document.documentElement.classList.toggle(
-            "dark",
-            localStorage.theme === "dark" ||
-            (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
-        );
-
-        // Add event listener to theme toggle button
-        if (themeToggleButton) {
-            themeToggleButton.addEventListener('click', toggleDarkMode);
-        }
-
         // Mobile menu functionality
         const mobileMenuButton = document.getElementById('mobile-menu-button');
         const mobileMenu = document.getElementById('mobile-menu');
         const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
         const mobileMenuClose = document.getElementById('mobile-menu-close');
-        const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
         const mobileMenuLinks = document.querySelectorAll('.mobile-menu-link');
 
         function openMobileMenu() {
@@ -180,10 +132,6 @@
 
         if (mobileMenuBackdrop) {
             mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
-        }
-
-        if (mobileThemeToggle) {
-            mobileThemeToggle.addEventListener('click', toggleDarkMode);
         }
 
         // Close menu when clicking links
