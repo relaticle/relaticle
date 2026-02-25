@@ -10,7 +10,11 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\ImportWizard\Enums\ImportEntityType;
+use Relaticle\ImportWizard\Enums\ImportStatus;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use Relaticle\SystemAdmin\Filament\Resources\ImportResource\Pages\ListImports;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\ListNotes;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\ListPeople;
@@ -92,6 +96,25 @@ it('can render the opportunities list page', function () {
     livewire(ListOpportunities::class)
         ->assertOk()
         ->assertCanSeeTableRecords($opportunities);
+});
+
+it('can render the imports list page', function () {
+    $imports = collect(range(1, 3))->map(fn () => Import::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->teamOwner->id,
+        'entity_type' => ImportEntityType::Company,
+        'file_name' => 'test.csv',
+        'status' => ImportStatus::Completed,
+        'total_rows' => 10,
+        'created_rows' => 8,
+        'failed_rows' => 2,
+        'headers' => ['name', 'email'],
+        'column_mappings' => [],
+    ]));
+
+    livewire(ListImports::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords($imports);
 });
 
 it('has trashed filter on soft-deletable resources', function (string $listPageClass) {
