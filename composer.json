@@ -50,7 +50,6 @@
         "symfony/yaml": "^7.2"
     },
     "require-dev": {
-        "cweagans/composer-patches": "*",
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "itsgoingd/clockwork": "^5.3",
@@ -144,8 +143,7 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true,
-            "cweagans/composer-patches": true
+            "php-http/discovery": true
         }
     },
     "minimum-stability": "beta",

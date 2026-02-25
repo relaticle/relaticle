@@ -1,3 +1,4 @@
+.DS_Store
 /.phpunit.cache
 /node_modules
 /public/build
