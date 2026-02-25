@@ -146,7 +146,6 @@ Relaticle includes a custom fields system for extending entities without migrati
 
 ```
 docker pull ghcr.io/relaticle/relaticle:latest
-cp docker-compose.prod.yml docker-compose.yml
 cp .env.example .env
 # Edit .env with production settings
 docker compose up -d
