@@ -29,7 +29,7 @@
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^4.0",
         "prism-php/prism": "^0.98.5",
-        "relaticle/custom-fields": "@dev",
+        "relaticle/custom-fields": "^3.0",
         "relaticle/flowforge": "@dev",
         "sentry/sentry-laravel": "^4.13",
         "spatie/cpu-load-health-check": "^1.0",
@@ -53,7 +53,6 @@
         "symfony/yaml": "^7.2"
     },
     "require-dev": {
-        "cweagans/composer-patches": "*",
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "itsgoingd/clockwork": "^5.3",
@@ -149,8 +148,7 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true,
-            "cweagans/composer-patches": true
+            "php-http/discovery": true
         }
     },
     "minimum-stability": "beta",

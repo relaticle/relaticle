@@ -84,13 +84,21 @@
 
                     <!-- Browser Content Area -->
                     <div class="relative">
-                        <img id="app-companies-preview-image"
-                             src="{{ asset('images/app-companies-preview.jpg') }}"
-                             alt="Relaticle CRM Dashboard"
-                             class="w-full h-auto"
-                             width="1200"
-                             height="675"
-                             loading="lazy">
+                        <picture id="app-companies-preview-picture">
+                            <source id="preview-source-avif"
+                                    srcset="{{ asset('images/app-companies-preview.avif') }}"
+                                    type="image/avif">
+                            <source id="preview-source-webp"
+                                    srcset="{{ asset('images/app-companies-preview.webp') }}"
+                                    type="image/webp">
+                            <img id="app-companies-preview-image"
+                                 src="{{ asset('images/app-companies-preview.png') }}"
+                                 alt="Relaticle CRM Dashboard"
+                                 class="w-full h-auto"
+                                 width="2880"
+                                 height="1800"
+                                 loading="lazy">
+                        </picture>
 
                         <!-- Subtle highlight overlay -->
                         <div
@@ -125,14 +133,25 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const appPreviewImage = document.getElementById('app-companies-preview-image');
-        const lightImage = "{{ asset('images/app-companies-preview.jpg') }}";
-        const darkImage = "{{ asset('images/app-companies-preview-dark.jpg') }}";
+        const sourceAvif = document.getElementById('preview-source-avif');
+        const sourceWebp = document.getElementById('preview-source-webp');
+        const fallbackImg = document.getElementById('app-companies-preview-image');
 
-        // Initial setup based on current theme
+        const sources = {
+            light: {
+                avif: "{{ asset('images/app-companies-preview.avif') }}",
+                webp: "{{ asset('images/app-companies-preview.webp') }}",
+                png: "{{ asset('images/app-companies-preview.png') }}",
+            },
+            dark: {
+                avif: "{{ asset('images/app-companies-preview-dark.avif') }}",
+                webp: "{{ asset('images/app-companies-preview-dark.webp') }}",
+                png: "{{ asset('images/app-companies-preview-dark.png') }}",
+            },
+        };
+
         updateImageSource();
 
-        // Create a MutationObserver to detect changes to the html element's class list
         const observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
                 if (mutation.attributeName === 'class') {
@@ -141,16 +160,13 @@
             });
         });
 
-        // Start observing the html element for class changes
         observer.observe(document.documentElement, {attributes: true});
 
-        // Function to update the image source based on dark mode
         function updateImageSource() {
-            if (document.documentElement.classList.contains('dark')) {
-                appPreviewImage.src = darkImage;
-            } else {
-                appPreviewImage.src = lightImage;
-            }
+            const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            sourceAvif.srcset = sources[theme].avif;
+            sourceWebp.srcset = sources[theme].webp;
+            fallbackImg.src = sources[theme].png;
         }
     });
 </script>
