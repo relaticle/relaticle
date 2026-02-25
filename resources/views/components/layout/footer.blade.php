@@ -89,13 +89,12 @@
             </div>
         </div>
 
-        <!-- Copyright section - Simplified -->
-        <div class="mt-8 flex flex-col md:flex-row md:justify-between items-center">
+        <!-- Copyright section -->
+        <div class="mt-8 flex flex-col md:flex-row md:justify-between items-center gap-4">
             <p class="text-gray-500 dark:text-gray-400 text-xs">&copy; {{ date('Y') }} Relaticle. All rights
                 reserved.</p>
-            <div class="mt-4 md:mt-0 text-xs text-gray-500 dark:text-gray-400">
-                Made with <span class="text-red-500 mx-1">♥</span> for open-source
-            </div>
+
+            <x-theme-switcher />
         </div>
     </div>
 </footer>
