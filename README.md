@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center"> Next-Generation Open-Source CRM</h1>
+<h1 align="center">Next-Generation Open-Source CRM</h1>
 
 <p align="center">
   <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="https://relaticle.com/images/github-preview-light.png" alt="Relaticle Dashboard - Manage contacts, companies, and opportunities in a modern interface" />
+  <img src="https://relaticle.com/images/github-preview-light.png?v=3" alt="Relaticle Dashboard - Manage contacts, companies, and opportunities in a modern interface" />
   <br>
   <sub>Clean, modern interface built with Filament 5 and Livewire 4</sub>
 </p>
@@ -78,7 +78,7 @@ composer lint
 
 # Docker Deployment
 
-For production deployment using Docker, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
+For production deployment using Docker, see [`compose.yml`](compose.yml).
 
 # Documentation
 

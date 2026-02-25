@@ -11,11 +11,10 @@
                 Community
             </span>
             <h2 class="font-display mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
-                Collaborate and Grow Together
+                Built in the Open
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                As an open-source platform, Relaticle thrives on community collaboration. Join our growing community to
-                get help, share ideas, and contribute.
+                Relaticle is AGPL-3.0 open source. Star the repo, join Discord, and help shape the future of agent-native CRM.
             </p>
         </div>
 
@@ -27,7 +26,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                            <x-icon-github class="w-6 h-6 text-primary dark:text-primary-400"/>
+                            <x-ri-github-line class="w-6 h-6 text-primary dark:text-primary-400"/>
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">GitHub</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Star our repo, report issues, and
@@ -37,11 +36,7 @@
                             <a href="https://github.com/relaticle/relaticle" target="_blank"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 View Repository
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
@@ -52,7 +47,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                          <x-icon-discord class="w-6 h-6 text-primary dark:text-primary-400" />
+                          <x-ri-discord-line class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Discord Community</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Chat with developers, get help, and
@@ -61,11 +56,7 @@
                             <a href="{{ route('discord') }}" target="_blank"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 Join Discord
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
@@ -76,7 +67,7 @@
                     <div class="flex flex-col h-full">
                         <div
                             class="bg-primary/10 dark:bg-primary/20 p-3 rounded-lg inline-flex w-12 h-12 items-center justify-center mb-5">
-                            <x-heroicon-o-document class="w-6 h-6 text-primary dark:text-primary-400" />
+                            <x-ri-book-open-line class="w-6 h-6 text-primary dark:text-primary-400" />
                         </div>
                         <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-3">Documentation</h3>
                         <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Learn how to use Relaticle and help
@@ -85,33 +76,29 @@
                             <a href="{{ route('documentation.index') }}"
                                class="inline-flex items-center text-primary dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium text-sm transition-colors">
                                 Read the Docs
-                                <svg xmlns="http://www.w3.org/2000/svg" class="ml-1.5 h-4 w-4" fill="none"
-                                     viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                </svg>
+                                <x-ri-arrow-right-line class="ml-1.5 h-4 w-4" />
                             </a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Community highlights - Simplified -->
+            <!-- Community highlights -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Open</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Source License</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">AGPL-3.0</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Open Source</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Active</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Development</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">900+</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Automated Tests</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">
-                    <div class="text-lg font-semibold text-primary dark:text-primary-400">Community</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Driven</div>
+                    <div class="text-lg font-semibold text-primary dark:text-primary-400">20</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">MCP Tools</div>
                 </div>
                 <div
                     class="py-3 px-4 text-center border border-gray-100 dark:border-gray-800 rounded-lg bg-white dark:bg-black">

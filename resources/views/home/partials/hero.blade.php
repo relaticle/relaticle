@@ -22,6 +22,10 @@
                             <x-icon-filament class="h-3.5 w-3.5 dark:fill-white"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">Filament</span>
                         </div>
+                        <span class="text-gray-400">·</span>
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">MCP</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -29,16 +33,15 @@
             <!-- Hero Text - Enhanced Typography -->
             <div class="text-center space-y-6 max-w-3xl mx-auto">
                 <h1 class="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
-                    The Next-Generation<br class="hidden sm:block"/> <span class="relative inline-block">
-                        <span class="relative z-10">Open-Source CRM</span>
+                    The Open-Source CRM<br class="hidden sm:block"/> <span class="relative inline-block">
+                        <span class="relative z-10">Built for AI Agents</span>
                         <span
                             class="absolute bottom-2 sm:left-0 right-1/4 w-1/2 sm:w-full h-3 bg-primary/10 dark:bg-primary/20 sm:dark:bg-primary/30 -rotate-1 z-0"></span>
                     </span>
                 </h1>
 
                 <p class="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                    Transforming client relationship management with a modern, intuitive approach. Built for businesses
-                    that value simplicity and efficiency.
+                    MCP-native. Self-hosted. 20 tools for any AI to operate your CRM. Full control over your data and your AI.
                 </p>
             </div>
 
@@ -47,12 +50,12 @@
                 <a href="{{ route('register') }}"
                    class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-600 text-white px-7 py-3.5 rounded-md text-base font-medium transition-all duration-200 shadow-sm hover:shadow">
                     <span>Start for free</span>
-                    <x-heroicon-c-arrow-right class="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"/>
+                    <x-ri-arrow-right-line class="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"/>
                 </a>
 
                 <a href="https://github.com/relaticle/relaticle" target="_blank"
                    class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-md text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200 bg-white/50 dark:bg-black/50">
-                    <x-icon-github class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"/>
+                    <x-ri-github-fill class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"/>
                     <span class="font-medium">GitHub</span>
                 </a>
             </div>
@@ -74,24 +77,28 @@
                         <!-- Browser Address Bar -->
                         <div
                             class="ml-4 flex-1 bg-white/90 dark:bg-gray-700/80 rounded-md px-3 py-1 text-xs text-gray-600 dark:text-gray-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-500 mr-1.5" fill="none"
-                                 viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                            </svg>
+                            <x-ri-shield-check-line class="h-3 w-3 text-green-500 mr-1.5" />
                             <span>app.relaticle.com</span>
                         </div>
                     </div>
 
                     <!-- Browser Content Area -->
                     <div class="relative">
-                        <img id="app-companies-preview-image"
-                             src="{{ asset('images/app-companies-preview.jpg') }}"
-                             alt="Relaticle CRM Dashboard"
-                             class="w-full h-auto"
-                             width="1200"
-                             height="675"
-                             loading="lazy">
+                        <picture id="app-companies-preview-picture">
+                            <source id="preview-source-avif"
+                                    srcset="{{ asset('images/app-companies-preview.avif') }}"
+                                    type="image/avif">
+                            <source id="preview-source-webp"
+                                    srcset="{{ asset('images/app-companies-preview.webp') }}"
+                                    type="image/webp">
+                            <img id="app-companies-preview-image"
+                                 src="{{ asset('images/app-companies-preview.png') }}"
+                                 alt="Relaticle CRM Dashboard"
+                                 class="w-full h-auto"
+                                 width="2880"
+                                 height="1800"
+                                 loading="lazy">
+                        </picture>
 
                         <!-- Subtle highlight overlay -->
                         <div
@@ -108,16 +115,16 @@
                     <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Free to use and customize</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Modern Stack</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">PHP 8.4, Laravel 12</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">Agent-Native</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">MCP server with 20 tools</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Secure</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enterprise-grade security</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">Self-Hosted</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Own your data and your AI</div>
                 </div>
                 <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Scalable</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Grows with your business</div>
+                    <div class="text-lg font-semibold text-black dark:text-white">22 Field Types</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Customize without code</div>
                 </div>
             </div>
         </div>
@@ -126,14 +133,25 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const appPreviewImage = document.getElementById('app-companies-preview-image');
-        const lightImage = "{{ asset('images/app-companies-preview.jpg') }}";
-        const darkImage = "{{ asset('images/app-companies-preview-dark.jpg') }}";
+        const sourceAvif = document.getElementById('preview-source-avif');
+        const sourceWebp = document.getElementById('preview-source-webp');
+        const fallbackImg = document.getElementById('app-companies-preview-image');
 
-        // Initial setup based on current theme
+        const sources = {
+            light: {
+                avif: "{{ asset('images/app-companies-preview.avif') }}",
+                webp: "{{ asset('images/app-companies-preview.webp') }}",
+                png: "{{ asset('images/app-companies-preview.png') }}",
+            },
+            dark: {
+                avif: "{{ asset('images/app-companies-preview-dark.avif') }}",
+                webp: "{{ asset('images/app-companies-preview-dark.webp') }}",
+                png: "{{ asset('images/app-companies-preview-dark.png') }}",
+            },
+        };
+
         updateImageSource();
 
-        // Create a MutationObserver to detect changes to the html element's class list
         const observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
                 if (mutation.attributeName === 'class') {
@@ -142,16 +160,13 @@
             });
         });
 
-        // Start observing the html element for class changes
         observer.observe(document.documentElement, {attributes: true});
 
-        // Function to update the image source based on dark mode
         function updateImageSource() {
-            if (document.documentElement.classList.contains('dark')) {
-                appPreviewImage.src = darkImage;
-            } else {
-                appPreviewImage.src = lightImage;
-            }
+            const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            sourceAvif.srcset = sources[theme].avif;
+            sourceWebp.srcset = sources[theme].webp;
+            fallbackImg.src = sources[theme].png;
         }
     });
 </script>

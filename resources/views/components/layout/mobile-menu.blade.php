@@ -17,9 +17,7 @@
             <button id="mobile-menu-close"
                     class="group p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all duration-200 rounded-xl hover:bg-gray-100/60 dark:hover:bg-gray-800/60 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/20"
                     aria-label="Close menu">
-                <svg class="h-5 w-5 transition-transform duration-200 group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <x-ri-close-line class="h-5 w-5 transition-transform duration-200 group-hover:rotate-90" />
             </button>
         </div>
 
@@ -30,17 +28,13 @@
                 <a href="{{ url('/#features') }}"
                    class="mobile-menu-link group flex items-center px-5 py-4 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white rounded-2xl hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
                     <span class="font-medium text-base">Features</span>
-                    <svg class="ml-auto h-4 w-4 opacity-0 group-hover:opacity-70 transition-all duration-300 transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <x-ri-arrow-right-s-line class="ml-auto h-4 w-4 opacity-0 group-hover:opacity-70 transition-all duration-300 transform group-hover:translate-x-1" />
                 </a>
 
                 <a href="{{ route('documentation.index') }}"
                    class="mobile-menu-link group flex items-center px-5 py-4 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white rounded-2xl hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] {{ Route::is('documentation.*') ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-300' : '' }}">
                     <span class="font-medium text-base">Documentation</span>
-                    <svg class="ml-auto h-4 w-4 opacity-0 group-hover:opacity-70 transition-all duration-300 transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <x-ri-arrow-right-s-line class="ml-auto h-4 w-4 opacity-0 group-hover:opacity-70 transition-all duration-300 transform group-hover:translate-x-1" />
                 </a>
 
                 <a href="https://github.com/Relaticle/relaticle"
@@ -53,18 +47,14 @@
                             <span class="ml-2.5 text-xs bg-gray-200/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-400 px-2.5 py-1 rounded-full font-medium">{{ $formattedGithubStars }}</span>
                         @endif
                     </div>
-                    <svg class="ml-auto h-4 w-4 opacity-50 group-hover:opacity-70 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <x-ri-external-link-line class="ml-auto h-4 w-4 opacity-50 group-hover:opacity-70 transition-all duration-300" />
                 </a>
 
                 <a href="{{ route('discord') }}"
                    target="_blank"
                    class="mobile-menu-link group flex items-center px-5 py-4 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white rounded-2xl hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
                     <span class="font-medium text-base">Discord</span>
-                    <svg class="ml-auto h-4 w-4 opacity-50 group-hover:opacity-70 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <x-ri-external-link-line class="ml-auto h-4 w-4 opacity-50 group-hover:opacity-70 transition-all duration-300" />
                 </a>
             </nav>
 
@@ -86,23 +76,25 @@
             </div>
         </div>
 
-        <!-- Refined Footer -->
+        <!-- Theme Switcher -->
         <div class="p-6 border-t border-gray-100/80 dark:border-gray-800/80 flex-shrink-0">
-            <button id="mobile-theme-toggle"
-                    class="group w-full flex items-center justify-between px-5 py-4 text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-white rounded-2xl hover:bg-gray-50/60 dark:hover:bg-gray-900/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    aria-label="Toggle dark mode">
-                <div class="flex items-center space-x-3">
-                    <svg class="h-5 w-5 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" class="block dark:hidden" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" class="hidden dark:block" />
-                    </svg>
-                    <span class="font-medium text-base">Theme</span>
+            <div class="flex items-center justify-between px-5 py-4">
+                <span class="font-medium text-base text-gray-700 dark:text-gray-200">Theme</span>
+                <div id="mobile-theme-switcher" class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-0.5">
+                    <button data-theme="system" aria-label="System theme"
+                            class="theme-btn p-2 rounded-full transition-all duration-200 cursor-pointer">
+                        <x-ri-computer-line class="h-4 w-4" />
+                    </button>
+                    <button data-theme="light" aria-label="Light theme"
+                            class="theme-btn p-2 rounded-full transition-all duration-200 cursor-pointer">
+                        <x-ri-sun-line class="h-4 w-4" />
+                    </button>
+                    <button data-theme="dark" aria-label="Dark theme"
+                            class="theme-btn p-2 rounded-full transition-all duration-200 cursor-pointer">
+                        <x-ri-moon-line class="h-4 w-4" />
+                    </button>
                 </div>
-                <div class="relative">
-                    <div class="w-12 h-6 bg-gray-200 dark:bg-gray-700 rounded-full transition-colors duration-300 shadow-inner"></div>
-                    <div class="absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full shadow-md transform dark:translate-x-6 transition-transform duration-300 group-hover:shadow-lg"></div>
-                </div>
-            </button>
+            </div>
         </div>
     </div>
 </div>
