@@ -125,7 +125,6 @@ final class TopTeamsTableWidget extends BaseWidget
         [$lastActivitySql, $lastActivityBindings] = $this->buildLastActivityExpression(CreationSource::SYSTEM->value);
 
         return Team::query()
-            ->where('personal_team', false)
             ->select(['teams.*'])
             ->selectRaw("({$recordsCountSql}) as records_count", $recordsBindings)
             ->selectRaw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count')

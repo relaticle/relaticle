@@ -16,13 +16,9 @@ describe('SystemAdmin Security', function () {
         $admin = SystemAdministrator::factory()->create();
         $user = User::factory()->create();
 
-        // System admin cannot access app panel
-        expect($admin->canAccessPanel(Filament::getPanel('app')))->toBeFalse();
+        expect($admin->canAccessPanel(Filament::getPanel('app')))->toBeFalse()
+            ->and($user->canAccessPanel(Filament::getPanel('sysadmin')))->toBeFalse();
 
-        // Regular user cannot access sysadmin panel
-        expect($user->canAccessPanel(Filament::getPanel('sysadmin')))->toBeFalse();
-
-        // Guards are isolated
         $this->actingAs($admin, 'sysadmin');
         $this->assertAuthenticatedAs($admin, 'sysadmin');
         $this->assertGuest('web');
@@ -46,16 +42,38 @@ describe('SystemAdmin Security', function () {
             ->and(auth('sysadmin')->user()->can('delete', $superAdmin))->toBeFalse();
     });
 
-    it('requires email verification for panel access', function () {
+    it('redirects unauthenticated visitors to sysadmin login', function (string $route) {
+        $this->get($route)->assertRedirect('/sysadmin/login');
+    })->with([
+        'dashboard' => '/sysadmin',
+        'companies' => '/sysadmin/companies',
+        'imports' => '/sysadmin/imports',
+        'users' => '/sysadmin/users',
+        'teams' => '/sysadmin/teams',
+        'system-administrators' => '/sysadmin/system-administrators',
+    ]);
+
+    it('blocks regular app users from accessing sysadmin panel', function (string $route) {
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'web')
+            ->get($route)
+            ->assertRedirect('/sysadmin/login');
+    })->with([
+        'dashboard' => '/sysadmin',
+        'companies' => '/sysadmin/companies',
+        'users' => '/sysadmin/users',
+    ]);
+
+    it('blocks unverified sysadmin from accessing panel routes', function () {
         $unverifiedAdmin = SystemAdministrator::factory()->unverified()->create();
 
-        expect($unverifiedAdmin->canAccessPanel(Filament::getPanel('sysadmin')))->toBeFalse();
+        $this->actingAs($unverifiedAdmin, 'sysadmin')
+            ->get('/sysadmin')
+            ->assertForbidden();
     });
 
-    it('protects routes with authentication', function () {
-        $this->get('/sysadmin/system-administrators')
-            ->assertRedirect('/sysadmin/login');
-
+    it('allows verified sysadmin to access panel routes', function () {
         $admin = SystemAdministrator::factory()->create();
 
         $this->actingAs($admin, 'sysadmin')
@@ -63,13 +81,4 @@ describe('SystemAdmin Security', function () {
             ->assertOk();
     });
 
-    it('validates data integrity', function () {
-        $admin = SystemAdministrator::factory()->create([
-            'role' => SystemAdministratorRole::SuperAdministrator,
-        ]);
-
-        expect($admin->role)->toBeInstanceOf(SystemAdministratorRole::class)
-            ->and($admin->role)->toBe(SystemAdministratorRole::SuperAdministrator)
-            ->and($admin->hasVerifiedEmail())->toBeTrue();
-    });
 });
