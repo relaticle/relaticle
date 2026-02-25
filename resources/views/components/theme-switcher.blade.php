@@ -10,15 +10,14 @@
 @endphp
 
 <div x-data="{
-        theme: localStorage.theme || 'system',
+        theme: localStorage.getItem('theme') || 'system',
         apply(mode) {
             this.theme = mode;
+            localStorage.setItem('theme', mode);
 
             if (mode === 'system') {
-                localStorage.removeItem('theme');
                 document.documentElement.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
             } else {
-                localStorage.theme = mode;
                 document.documentElement.classList.toggle('dark', mode === 'dark');
             }
 
