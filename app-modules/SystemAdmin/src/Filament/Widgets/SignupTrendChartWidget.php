@@ -118,7 +118,7 @@ final class SignupTrendChartWidget extends ChartWidget
             ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
             ->groupByRaw($bucketExpression)
             ->pluck('cnt', 'bucket')
-            ->map(fn ($value): int => (int) $value);
+            ->map(fn (mixed $value): int => (int) $value);
     }
 
     private function getGroupFormat(int $days): string
