@@ -1,15 +1,3 @@
-<!-- Minimalist Header -->
-{{--@push('header')--}}
-<script>
-    // On page load or when changing themes, best to add inline in `head` to avoid FOUC
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-</script>
-{{--@endpush--}}
-
 <header
     class="bg-white dark:bg-black py-4 fixed w-full top-0 z-50 transition-all duration-300 border-b border-gray-100 dark:border-gray-900 backdrop-blur-sm bg-white/95 dark:bg-black/95">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -92,61 +80,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Theme management: system | light | dark
-        function applyTheme(mode) {
-            if (mode === 'system') {
-                localStorage.removeItem('theme');
-                document.documentElement.classList.toggle(
-                    'dark',
-                    window.matchMedia('(prefers-color-scheme: dark)').matches
-                );
-            } else {
-                localStorage.theme = mode;
-                document.documentElement.classList.toggle('dark', mode === 'dark');
-            }
-            updateThemeButtons();
-        }
-
-        function getActiveTheme() {
-            if (!('theme' in localStorage)) {
-                return 'system';
-            }
-            return localStorage.theme;
-        }
-
-        function updateThemeButtons() {
-            var active = getActiveTheme();
-            document.querySelectorAll('.theme-btn').forEach(function(btn) {
-                var isActive = btn.dataset.theme === active;
-                btn.classList.toggle('bg-white', isActive);
-                btn.classList.toggle('dark:bg-gray-700', isActive);
-                btn.classList.toggle('shadow-sm', isActive);
-                btn.classList.toggle('text-gray-900', isActive);
-                btn.classList.toggle('dark:text-white', isActive);
-                btn.classList.toggle('text-gray-400', !isActive);
-                btn.classList.toggle('dark:text-gray-500', !isActive);
-                btn.classList.toggle('hover:text-gray-600', !isActive);
-                btn.classList.toggle('dark:hover:text-gray-300', !isActive);
-            });
-        }
-
-        // Initialize
-        applyTheme(getActiveTheme());
-
-        // Listen for system preference changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-            if (getActiveTheme() === 'system') {
-                applyTheme('system');
-            }
-        });
-
-        // Bind all theme buttons (footer + mobile)
-        document.querySelectorAll('.theme-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                applyTheme(btn.dataset.theme);
-            });
-        });
-
         // Mobile menu functionality
         const mobileMenuButton = document.getElementById('mobile-menu-button');
         const mobileMenu = document.getElementById('mobile-menu');

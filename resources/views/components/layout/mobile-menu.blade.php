@@ -90,20 +90,7 @@
         <div class="p-6 border-t border-gray-100/80 dark:border-gray-800/80 flex-shrink-0">
             <div class="flex items-center justify-between px-5 py-3">
                 <span class="font-medium text-base text-gray-700 dark:text-gray-200">Theme</span>
-                <div class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-0.5">
-                    <button data-theme="system" aria-label="System theme"
-                            class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
-                        <x-heroicon-o-computer-desktop class="h-4 w-4" />
-                    </button>
-                    <button data-theme="light" aria-label="Light theme"
-                            class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
-                        <x-heroicon-o-sun class="h-4 w-4" />
-                    </button>
-                    <button data-theme="dark" aria-label="Dark theme"
-                            class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
-                        <x-heroicon-o-moon class="h-4 w-4" />
-                    </button>
-                </div>
+                <x-theme-switcher size="md" />
             </div>
         </div>
     </div>
