@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="https://relaticle.com/images/github-preview-light.png" alt="Relaticle Dashboard - Manage contacts, companies, and opportunities in a modern interface" />
+  <img src="https://relaticle.com/images/github-preview-light.png?v=3" alt="Relaticle Dashboard - Manage contacts, companies, and opportunities in a modern interface" />
   <br>
   <sub>Clean, modern interface built with Filament 5 and Livewire 4</sub>
 </p>
