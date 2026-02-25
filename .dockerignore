@@ -37,7 +37,7 @@
 # Development tools
 .editorconfig
 .styleci.yml
-docker-compose.yml
+compose.dev.yml
 Makefile
 
 # Documentation
