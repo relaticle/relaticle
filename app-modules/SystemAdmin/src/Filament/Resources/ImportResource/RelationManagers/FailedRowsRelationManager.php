@@ -31,7 +31,7 @@ final class FailedRowsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('data')
                     ->label('Row Data')
-                    ->formatStateUsing(fn (array $state): string => json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))
+                    ->formatStateUsing(fn (array $state): string => json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR))
                     ->wrap()
                     ->limit(100),
                 TextColumn::make('validation_error')

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Policies;
 
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
+
 final class FailedImportRowPolicy
 {
     public function viewAny(): bool
@@ -16,22 +18,22 @@ final class FailedImportRowPolicy
         return true;
     }
 
-    public function create(): bool
+    public function create(SystemAdministrator $admin): bool
     {
         return false;
     }
 
-    public function update(): bool
+    public function update(SystemAdministrator $admin): bool
     {
         return false;
     }
 
-    public function delete(): bool
+    public function delete(SystemAdministrator $admin): bool
     {
         return false;
     }
 
-    public function deleteAny(): bool
+    public function deleteAny(SystemAdministrator $admin): bool
     {
         return false;
     }
