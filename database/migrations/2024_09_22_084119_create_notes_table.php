@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('notes', function (Blueprint $table): void {
@@ -20,17 +17,12 @@ return new class extends Migration
             $table->foreignUlid('creator_id')->nullable()->constrained('users')->onDelete('set null');
 
             $table->string('title');
+            $table->string('creation_source', 50);
 
             $table->timestamps();
             $table->softDeletes();
-        });
-    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('notes');
+            $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_notes_team_activity');
+        });
     }
 };

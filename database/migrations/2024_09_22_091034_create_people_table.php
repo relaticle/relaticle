@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('people', function (Blueprint $table): void {
@@ -21,17 +18,12 @@ return new class extends Migration
             $table->foreignUlid('company_id')->nullable()->constrained()->onDelete('set null');
 
             $table->string('name');
+            $table->string('creation_source', 50);
 
             $table->timestamps();
             $table->softDeletes();
-        });
-    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('people');
+            $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_people_team_activity');
+        });
     }
 };

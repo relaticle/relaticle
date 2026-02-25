@@ -9,6 +9,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 final class SignupTrendChartWidget extends ChartWidget
@@ -56,17 +57,22 @@ final class SignupTrendChartWidget extends ChartWidget
         $intervals = $this->buildIntervals($start, $end, $days);
         $labels = $intervals->pluck('label')->toArray();
 
+        $groupFormat = $this->getGroupFormat($days);
+
+        $userCountsByBucket = $this->getCountsByBucket(User::query(), $start, $end, $groupFormat);
+        $teamCountsByBucket = $this->getCountsByBucket(
+            Team::query()->where('personal_team', false),
+            $start,
+            $end,
+            $groupFormat,
+        );
+
         $userCounts = $intervals->map(
-            fn (array $interval): int => User::query()
-                ->whereBetween('created_at', [$interval['start'], $interval['end']])
-                ->count()
+            fn (array $interval): int => $userCountsByBucket->get($interval['bucket'], 0)
         )->all();
 
         $teamCounts = $intervals->map(
-            fn (array $interval): int => Team::query()
-                ->where('personal_team', false)
-                ->whereBetween('created_at', [$interval['start'], $interval['end']])
-                ->count()
+            fn (array $interval): int => $teamCountsByBucket->get($interval['bucket'], 0)
         )->all();
 
         return [
@@ -97,7 +103,39 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<string, int>
+     */
+    private function getCountsByBucket(
+        Builder $query,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+        string $groupFormat,
+    ): Collection {
+        $bucketExpression = "to_char(created_at, '{$groupFormat}')";
+
+        return $query
+            ->selectRaw("{$bucketExpression} as bucket, COUNT(*) as cnt")
+            ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
+            ->groupByRaw($bucketExpression)
+            ->pluck('cnt', 'bucket')
+            ->map(fn (mixed $value): int => (int) $value);
+    }
+
+    private function getGroupFormat(int $days): string
+    {
+        if ($days <= 30) {
+            return 'YYYY-MM-DD';
+        }
+
+        if ($days <= 90) {
+            return 'IYYY-IW';
+        }
+
+        return 'YYYY-MM';
+    }
+
+    /**
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
      */
     private function buildIntervals(CarbonImmutable $start, CarbonImmutable $end, int $days): Collection
     {
@@ -113,19 +151,24 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
      */
     private function buildDailyIntervals(CarbonImmutable $start, int $days): Collection
     {
-        return collect(range(0, $days - 1))->map(fn (int $i): array => [
-            'label' => $start->addDays($i)->format('M j'),
-            'start' => $start->addDays($i)->startOfDay(),
-            'end' => $start->addDays($i)->endOfDay(),
-        ]);
+        return collect(range(0, $days - 1))->map(function (int $i) use ($start): array {
+            $day = $start->addDays($i);
+
+            return [
+                'label' => $day->format('M j'),
+                'start' => $day->startOfDay(),
+                'end' => $day->endOfDay(),
+                'bucket' => $day->format('Y-m-d'),
+            ];
+        });
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
      */
     private function buildWeeklyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
     {
@@ -138,6 +181,7 @@ final class SignupTrendChartWidget extends ChartWidget
                 'label' => $current->format('M j'),
                 'start' => $current,
                 'end' => $weekEnd,
+                'bucket' => $current->format('o-W'),
             ]);
             $current = $current->addWeek();
         }
@@ -146,7 +190,7 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
      */
     private function buildMonthlyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
     {
@@ -159,6 +203,7 @@ final class SignupTrendChartWidget extends ChartWidget
                 'label' => $current->format('M Y'),
                 'start' => $current,
                 'end' => $monthEnd,
+                'bucket' => $current->format('Y-m'),
             ]);
             $current = $current->addMonth();
         }

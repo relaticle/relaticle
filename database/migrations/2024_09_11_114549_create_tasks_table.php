@@ -17,16 +17,14 @@ return new class extends Migration
             $table->foreignUlid('creator_id')->nullable()->constrained('users')->onDelete('set null');
 
             $table->string('title');
+            $table->string('creation_source', 50);
 
             $table->unsignedBigInteger('order_column')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
-        });
-    }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('tasks');
+            $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_tasks_team_activity');
+        });
     }
 };

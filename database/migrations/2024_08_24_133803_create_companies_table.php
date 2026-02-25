@@ -16,18 +16,15 @@ return new class extends Migration
             $table->foreignUlid('team_id')->constrained('teams')->cascadeOnDelete();
             $table->foreignUlid('creator_id')->nullable()->constrained('users')->onDelete('set null');
 
-            // Account Owner For Companies: Your team member responsible for managing the company account
             $table->foreignUlid('account_owner_id')->nullable()->constrained('users')->onDelete('set null');
 
             $table->string('name');
+            $table->string('creation_source', 50);
 
             $table->timestamps();
             $table->softDeletes();
-        });
-    }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('companies');
+            $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_companies_team_activity');
+        });
     }
 };

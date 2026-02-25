@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('opportunities', function (Blueprint $table): void {
@@ -22,19 +19,14 @@ return new class extends Migration
             $table->foreignUlid('contact_id')->nullable()->constrained('people')->onDelete('set null');
 
             $table->string('name');
+            $table->string('creation_source', 50);
 
             $table->unsignedBigInteger('order_column')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
-        });
-    }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('opportunities');
+            $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_opportunities_team_activity');
+        });
     }
 };
