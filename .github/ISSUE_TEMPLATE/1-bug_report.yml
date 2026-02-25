@@ -48,7 +48,7 @@ body:
       description: How are you running Relaticle?
       options:
         - Laravel Herd (local)
-        - Docker (docker-compose.prod.yml)
+        - Docker (compose.yml)
         - Manual installation
         - Other
 
