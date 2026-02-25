@@ -89,12 +89,25 @@
             </div>
         </div>
 
-        <!-- Copyright section - Simplified -->
-        <div class="mt-8 flex flex-col md:flex-row md:justify-between items-center">
+        <!-- Copyright section -->
+        <div class="mt-8 flex flex-col md:flex-row md:justify-between items-center gap-4">
             <p class="text-gray-500 dark:text-gray-400 text-xs">&copy; {{ date('Y') }} Relaticle. All rights
                 reserved.</p>
-            <div class="mt-4 md:mt-0 text-xs text-gray-500 dark:text-gray-400">
-                Made with <span class="text-red-500 mx-1">♥</span> for open-source
+
+            <!-- Theme Switcher: System | Light | Dark -->
+            <div class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-0.5">
+                <button data-theme="system" aria-label="System theme"
+                        class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
+                    <x-heroicon-o-computer-desktop class="h-3.5 w-3.5" />
+                </button>
+                <button data-theme="light" aria-label="Light theme"
+                        class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
+                    <x-heroicon-o-sun class="h-3.5 w-3.5" />
+                </button>
+                <button data-theme="dark" aria-label="Dark theme"
+                        class="theme-btn p-1.5 rounded-full transition-all duration-200 cursor-pointer">
+                    <x-heroicon-o-moon class="h-3.5 w-3.5" />
+                </button>
             </div>
         </div>
     </div>
