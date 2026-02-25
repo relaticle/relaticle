@@ -12,7 +12,7 @@ use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
@@ -57,11 +57,7 @@ final class TopTeamsTableWidget extends BaseWidget
                 TextColumn::make('records_count')
                     ->label('Records')
                     ->numeric()
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        [$sql, $bindings] = $this->getRecordsCountExpression();
-
-                        return $query->orderByRaw("({$sql}) {$direction}", $bindings);
-                    })
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('records_count', $direction))
                     ->alignCenter()
                     ->badge()
                     ->color('info'),
@@ -123,6 +119,8 @@ final class TopTeamsTableWidget extends BaseWidget
     {
         [$recordsCountSql, $recordsBindings] = $this->getRecordsCountExpression();
         [$lastActivitySql, $lastActivityBindings] = $this->buildLastActivityExpression(CreationSource::SYSTEM->value);
+        [$startStr, $endStr] = $this->getDateRange();
+        $systemSource = CreationSource::SYSTEM->value;
 
         return Team::query()
             ->select(['teams.*'])
@@ -130,7 +128,18 @@ final class TopTeamsTableWidget extends BaseWidget
             ->selectRaw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count')
             ->selectRaw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count')
             ->selectRaw("{$lastActivitySql} as last_activity", $lastActivityBindings)
-            ->whereRaw("({$recordsCountSql}) > 0", $recordsBindings);
+            ->where(function (Builder $query) use ($startStr, $endStr, $systemSource): void {
+                foreach (self::ENTITY_TABLES as $table) {
+                    $query->orWhereExists(function (QueryBuilder $sub) use ($table, $startStr, $endStr, $systemSource): void {
+                        $sub->selectRaw('1')
+                            ->from($table)
+                            ->whereColumn("{$table}.team_id", 'teams.id')
+                            ->whereNull("{$table}.deleted_at")
+                            ->where("{$table}.creation_source", '!=', $systemSource)
+                            ->whereBetween("{$table}.created_at", [$startStr, $endStr]);
+                    });
+                }
+            });
     }
 
     /**
@@ -154,17 +163,12 @@ final class TopTeamsTableWidget extends BaseWidget
      */
     private function buildLastActivityExpression(string $systemSource): array
     {
-        $epoch = DB::getDriverName() === 'sqlite'
-            ? "'1970-01-01 00:00:00'"
-            : "TIMESTAMP '1970-01-01'";
-
         $coalesces = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != ?), {$epoch})"
+            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != ?), TIMESTAMP '1970-01-01')"
         );
 
         $bindings = array_fill(0, count(self::ENTITY_TABLES), $systemSource);
-        $aggregateFn = DB::getDriverName() === 'sqlite' ? 'MAX' : 'GREATEST';
 
-        return ["{$aggregateFn}({$coalesces->implode(', ')})", $bindings];
+        return ["GREATEST({$coalesces->implode(', ')})", $bindings];
     }
 }

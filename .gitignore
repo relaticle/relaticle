@@ -24,6 +24,7 @@ AGENTS.md
 boost.json
 .mcp.json
 /.ai
+/.github/skills
 /.fleet
 /.idea
 /.vscode

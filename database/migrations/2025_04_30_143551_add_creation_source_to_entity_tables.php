@@ -10,11 +10,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * The tables that need the creation_source column.
-     *
-     * @var array<string>
-     */
+    /** @var array<int, string> */
     private array $tables = [
         'companies',
         'people',
@@ -23,34 +19,20 @@ return new class extends Migration
         'notes',
     ];
 
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         foreach ($this->tables as $table) {
-            Schema::table($table, function (Blueprint $table): void {
-                $table->after('creator_id', function (Blueprint $table): void {
-                    $table->string('creation_source', 50);
-                });
+            if (Schema::hasColumn($table, 'creation_source')) {
+                continue;
+            }
+
+            Schema::table($table, function (Blueprint $blueprint): void {
+                $blueprint->string('creation_source', 50);
             });
         }
 
-        // Set default value for existing records
         foreach ($this->tables as $table) {
-            DB::table($table)->update(['creation_source' => CreationSource::WEB->value]);
-        }
-    }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        foreach ($this->tables as $table) {
-            Schema::table($table, function (Blueprint $table): void {
-                $table->dropColumn('creation_source');
-            });
+            DB::table($table)->whereNull('creation_source')->update(['creation_source' => CreationSource::WEB->value]);
         }
     }
 };

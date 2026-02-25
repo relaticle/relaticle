@@ -111,6 +111,8 @@ New features or modified behavior should include corresponding Pest tests. There
 - Queued jobs with `ShouldQueue` for expensive operations
 - `casts()` method, not `$casts` property
 - Middleware in `bootstrap/app.php`, not a Kernel class
+- **PostgreSQL exclusively** — no SQLite/MySQL compatibility layers, driver checks, or conditional SQL
+- Migrations: only `up()` methods — no `down()` methods
 
 ## Filament 5
 
