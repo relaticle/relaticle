@@ -57,9 +57,7 @@ final class TopTeamsTableWidget extends BaseWidget
                 TextColumn::make('records_count')
                     ->label('Records')
                     ->numeric()
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->orderBy('records_count', $direction);
-                    })
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('records_count', $direction))
                     ->alignCenter()
                     ->badge()
                     ->color('info'),
