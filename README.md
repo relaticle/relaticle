@@ -78,7 +78,7 @@ composer lint
 
 # Docker Deployment
 
-For production deployment using Docker, see [`docker-compose.prod.yml`](docker-compose.prod.yml).
+For production deployment using Docker, see [`compose.yml`](compose.yml).
 
 # Documentation
 
