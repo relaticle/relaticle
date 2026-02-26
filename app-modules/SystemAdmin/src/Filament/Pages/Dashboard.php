@@ -23,6 +23,8 @@ final class Dashboard extends BaseDashboard
 
     protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
 
+    protected static ?string $navigationLabel = 'Growth';
+
     protected ?string $heading = 'Relaticle Admin';
 
     protected ?string $subheading = 'Platform growth and adoption metrics.';
@@ -39,8 +41,6 @@ final class Dashboard extends BaseDashboard
             TopTeamsTableWidget::class,
         ];
     }
-
-    protected static ?string $navigationLabel = 'Growth';
 
     public function getColumns(): array
     {

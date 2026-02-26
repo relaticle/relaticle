@@ -39,8 +39,8 @@ final class ActivationRateWidget extends StatsOverviewWidget
         $previousRate = $previousSignups > 0 ? round($previousActivated / $previousSignups * 100, 1) : 0.0;
 
         return [
-            $this->buildSignupsStat($currentSignups, $previousSignups, $currentStart, $currentEnd),
-            $this->buildActivatedStat($currentActivated, $previousActivated, $currentStart, $currentEnd),
+            $this->buildCountStat('Sign-ups', 'this period', $currentSignups, $previousSignups, $this->buildSignupsSparkline($currentStart, $currentEnd)),
+            $this->buildCountStat('Activated Users', 'created a record', $currentActivated, $previousActivated, $this->buildActivatedSparkline($currentStart, $currentEnd)),
             $this->buildActivationRateStat($currentRate, $previousRate),
         ];
     }
@@ -90,43 +90,33 @@ final class ActivationRateWidget extends StatsOverviewWidget
         return (int) ($result->total ?? 0);
     }
 
-    private function buildSignupsStat(
+    /** @param array<int, int>|null $chart */
+    private function buildCountStat(
+        string $label,
+        string $description,
         int $current,
         int $previous,
-        CarbonImmutable $start,
-        CarbonImmutable $end,
+        ?array $chart = null,
     ): Stat {
         $change = $this->calculateChange($current, $previous);
 
-        return Stat::make('Sign-ups', number_format($current))
-            ->description("this period{$this->formatChange($change)}")
+        $stat = Stat::make($label, number_format($current))
+            ->description("{$description}{$this->formatChange($change)}")
             ->descriptionIcon($change >= 0 ? 'heroicon-o-arrow-trending-up' : 'heroicon-o-arrow-trending-down')
-            ->color($change >= 0 ? 'success' : 'danger')
-            ->chart($this->buildSignupsSparkline($start, $end));
-    }
+            ->color($change >= 0 ? 'success' : 'danger');
 
-    private function buildActivatedStat(
-        int $current,
-        int $previous,
-        CarbonImmutable $start,
-        CarbonImmutable $end,
-    ): Stat {
-        $change = $this->calculateChange($current, $previous);
+        if ($chart !== null) {
+            $stat->chart($chart);
+        }
 
-        return Stat::make('Activated Users', number_format($current))
-            ->description("created a record{$this->formatChange($change)}")
-            ->descriptionIcon($change >= 0 ? 'heroicon-o-arrow-trending-up' : 'heroicon-o-arrow-trending-down')
-            ->color($change >= 0 ? 'success' : 'danger')
-            ->chart($this->buildActivatedSparkline($start, $end));
+        return $stat;
     }
 
     private function buildActivationRateStat(
         float $currentRate,
         float $previousRate,
     ): Stat {
-        $rateChange = $previousRate > 0
-            ? round($currentRate - $previousRate, 1)
-            : ($currentRate > 0 ? $currentRate : 0.0);
+        $rateChange = round($currentRate - $previousRate, 1);
 
         $changeText = $rateChange !== 0.0
             ? ' ('.($rateChange > 0 ? '+' : '')."{$rateChange}pp)"

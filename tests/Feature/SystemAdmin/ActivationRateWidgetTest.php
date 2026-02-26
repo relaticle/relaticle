@@ -25,12 +25,10 @@ it('can render the activation rate widget', function () {
 });
 
 it('counts activated users who created records manually', function () {
-    // 3 users who sign up this period
     $users = User::factory(3)->withTeam()->create([
         'created_at' => now()->subDays(5),
     ]);
 
-    // 1 user creates a company (activated)
     Company::withoutEvents(fn () => Company::factory()
         ->for($this->team)
         ->create([
@@ -39,7 +37,6 @@ it('counts activated users who created records manually', function () {
             'created_at' => now()->subDays(4),
         ]));
 
-    // 1 user creates a note (activated)
     Note::withoutEvents(fn () => Note::factory()
         ->for($this->team)
         ->create([
@@ -47,15 +44,10 @@ it('counts activated users who created records manually', function () {
             'created_at' => now()->subDays(3),
         ]));
 
-    // 1 user does nothing (not activated)
-    // $users[2] has no records
-
     $widget = livewire(ActivationRateWidget::class);
     $instance = $widget->instance();
-    $method = new ReflectionMethod($instance, 'getStats');
-    $stats = $method->invoke($instance);
+    $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
 
-    // Should show at least 2 activated users in the stats
     expect($stats)->toHaveCount(3);
 });
 
@@ -64,7 +56,6 @@ it('excludes system-created records from activation count', function () {
         'created_at' => now()->subDays(5),
     ]);
 
-    // System-created record should NOT count as activation
     Company::withoutEvents(fn () => Company::factory()
         ->for($this->team)
         ->create([
@@ -75,8 +66,7 @@ it('excludes system-created records from activation count', function () {
 
     $widget = livewire(ActivationRateWidget::class);
     $instance = $widget->instance();
-    $method = new ReflectionMethod($instance, 'getStats');
-    $stats = $method->invoke($instance);
+    $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
 
     expect($stats)->toHaveCount(3);
 });

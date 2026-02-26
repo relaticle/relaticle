@@ -64,18 +64,14 @@ final class UserRetentionChartWidget extends ChartWidget
                 continue;
             }
 
-            $newCount = DB::table('users')
+            $counts = DB::table('users')
+                ->selectRaw('COUNT(*) FILTER (WHERE created_at >= ? AND created_at <= ?) AS new_count', [$interval['start'], $interval['end']])
+                ->selectRaw('COUNT(*) FILTER (WHERE created_at < ?) AS returning_count', [$interval['start']])
                 ->whereIn('id', $activeCreators)
-                ->whereBetween('created_at', [$interval['start'], $interval['end']])
-                ->count();
+                ->first();
 
-            $returningCount = DB::table('users')
-                ->whereIn('id', $activeCreators)
-                ->where('created_at', '<', $interval['start'])
-                ->count();
-
-            $newActive[] = $newCount;
-            $returning[] = $returningCount;
+            $newActive[] = (int) $counts->new_count;
+            $returning[] = (int) $counts->returning_count;
         }
 
         return [
