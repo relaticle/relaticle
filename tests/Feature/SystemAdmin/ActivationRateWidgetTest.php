@@ -49,6 +49,10 @@ it('counts activated users who created records manually', function () {
     $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
 
     expect($stats)->toHaveCount(3);
+
+    $activatedStat = $stats[1];
+
+    expect($activatedStat->getValue())->toBe('2');
 });
 
 it('excludes system-created records from activation count', function () {
@@ -69,4 +73,8 @@ it('excludes system-created records from activation count', function () {
     $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
 
     expect($stats)->toHaveCount(3);
+
+    $activatedStat = $stats[1];
+
+    expect($activatedStat->getValue())->toBe('0');
 });
