@@ -21,6 +21,8 @@ final class Dashboard extends BaseDashboard
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
+
     protected ?string $heading = 'Relaticle Admin';
 
     protected ?string $subheading = 'Platform growth and adoption metrics.';
@@ -38,7 +40,7 @@ final class Dashboard extends BaseDashboard
         ];
     }
 
-    protected static ?string $navigationLabel = 'Dashboard';
+    protected static ?string $navigationLabel = 'Growth';
 
     public function getColumns(): array
     {

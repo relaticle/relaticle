@@ -20,6 +20,8 @@ final class EngagementDashboard extends BaseDashboard
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
+
     protected ?string $heading = 'User Engagement';
 
     protected ?string $subheading = 'Activation and retention metrics.';
