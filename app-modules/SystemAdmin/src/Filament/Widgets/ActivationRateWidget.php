@@ -209,10 +209,6 @@ final class ActivationRateWidget extends StatsOverviewWidget
 
     private function bucketExpression(): string
     {
-        if (DB::getDriverName() === 'sqlite') {
-            return 'CAST((julianday("created_at") - julianday(?)) * 86400 / ? AS INTEGER)';
-        }
-
         return 'FLOOR(EXTRACT(EPOCH FROM ("created_at" - ?::timestamp)) / ?)';
     }
 
