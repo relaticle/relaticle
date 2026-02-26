@@ -4,26 +4,29 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Pages;
 
-use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard\Actions\FilterAction;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersAction;
 use Filament\Widgets\WidgetConfiguration;
-use Relaticle\SystemAdmin\Filament\Widgets\PlatformGrowthStatsWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\RecordDistributionChartWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\SignupTrendChartWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\TopTeamsTableWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 
-final class Dashboard extends BaseDashboard
+final class EngagementDashboard extends BaseDashboard
 {
     use HasFiltersAction;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
+    protected static string $routePath = 'engagement';
 
-    protected ?string $heading = 'Relaticle Admin';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected ?string $subheading = 'Platform growth and adoption metrics.';
+    protected ?string $heading = 'User Engagement';
+
+    protected ?string $subheading = 'Activation and retention metrics.';
+
+    protected static ?string $navigationLabel = 'Engagement';
+
+    protected static ?int $navigationSort = 1;
 
     /**
      * @return array<class-string | WidgetConfiguration>
@@ -31,14 +34,10 @@ final class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            PlatformGrowthStatsWidget::class,
-            SignupTrendChartWidget::class,
-            RecordDistributionChartWidget::class,
-            TopTeamsTableWidget::class,
+            ActivationRateWidget::class,
+            UserRetentionChartWidget::class,
         ];
     }
-
-    protected static ?string $navigationLabel = 'Dashboard';
 
     public function getColumns(): array
     {
@@ -64,12 +63,6 @@ final class Dashboard extends BaseDashboard
                         ->default('30'),
                 ])
                 ->slideOver(false),
-            Action::make('view-site')
-                ->label('View Website')
-                ->url(config('app.url'))
-                ->icon('heroicon-o-globe-alt')
-                ->color('gray')
-                ->openUrlInNewTab(),
         ];
     }
 }
