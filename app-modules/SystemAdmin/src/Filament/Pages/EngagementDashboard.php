@@ -4,30 +4,31 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Pages;
 
-use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard\Actions\FilterAction;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersAction;
 use Filament\Widgets\WidgetConfiguration;
-use Relaticle\SystemAdmin\Filament\Widgets\PlatformGrowthStatsWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\RecordDistributionChartWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\SignupTrendChartWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\TopTeamsTableWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 
-final class Dashboard extends BaseDashboard
+final class EngagementDashboard extends BaseDashboard
 {
     use HasFiltersAction;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
+    protected static string $routePath = 'engagement';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
 
-    protected static ?string $navigationLabel = 'Growth';
+    protected ?string $heading = 'User Engagement';
 
-    protected ?string $heading = 'Relaticle Admin';
+    protected ?string $subheading = 'Activation and retention metrics.';
 
-    protected ?string $subheading = 'Platform growth and adoption metrics.';
+    protected static ?string $navigationLabel = 'Engagement';
+
+    protected static ?int $navigationSort = 1;
 
     /**
      * @return array<class-string | WidgetConfiguration>
@@ -35,10 +36,8 @@ final class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            PlatformGrowthStatsWidget::class,
-            SignupTrendChartWidget::class,
-            RecordDistributionChartWidget::class,
-            TopTeamsTableWidget::class,
+            ActivationRateWidget::class,
+            UserRetentionChartWidget::class,
         ];
     }
 
@@ -66,12 +65,6 @@ final class Dashboard extends BaseDashboard
                         ->default('30'),
                 ])
                 ->slideOver(false),
-            Action::make('view-site')
-                ->label('View Website')
-                ->url(config('app.url'))
-                ->icon('heroicon-o-globe-alt')
-                ->color('gray')
-                ->openUrlInNewTab(),
         ];
     }
 }
