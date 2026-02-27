@@ -53,8 +53,8 @@ final class ActivationRateWidget extends StatsOverviewWidget
         $days = (int) ($this->pageFilters['period'] ?? 30);
         $currentEnd = CarbonImmutable::now();
         $currentStart = $currentEnd->subDays($days);
-        $previousEnd = $currentStart;
-        $previousStart = $previousEnd->subDays($days);
+        $previousEnd = $currentStart->subSecond();
+        $previousStart = $currentStart->subDays($days);
 
         return [$currentStart, $currentEnd, $previousStart, $previousEnd];
     }
@@ -197,10 +197,10 @@ final class ActivationRateWidget extends StatsOverviewWidget
         $buckets = array_fill(0, $points, 0);
 
         foreach ($rows as $row) {
-            $idx = (int) $row->bucket;
+            $idx = min((int) $row->bucket, $points - 1);
 
-            if ($idx >= 0 && $idx < $points) {
-                $buckets[$idx] = (int) $row->cnt;
+            if ($idx >= 0) {
+                $buckets[$idx] += (int) $row->cnt;
             }
         }
 
