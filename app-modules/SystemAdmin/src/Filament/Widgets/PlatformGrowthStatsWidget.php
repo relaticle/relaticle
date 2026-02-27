@@ -52,8 +52,8 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
         $days = (int) ($this->pageFilters['period'] ?? 30);
         $currentEnd = CarbonImmutable::now();
         $currentStart = $currentEnd->subDays($days);
-        $previousEnd = $currentStart;
-        $previousStart = $previousEnd->subDays($days);
+        $previousEnd = $currentStart->subSecond();
+        $previousStart = $currentStart->subDays($days);
 
         return [$currentStart, $currentEnd, $previousStart, $previousEnd];
     }
@@ -190,10 +190,10 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
         $buckets = array_fill(0, $points, 0);
 
         foreach ($rows as $row) {
-            $idx = (int) $row->bucket;
+            $idx = min((int) $row->bucket, $points - 1);
 
-            if ($idx >= 0 && $idx < $points) {
-                $buckets[$idx] = (int) $row->cnt;
+            if ($idx >= 0) {
+                $buckets[$idx] += (int) $row->cnt;
             }
         }
 
@@ -233,28 +233,18 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
         $buckets = array_fill(0, $points, 0);
 
         foreach ($rows as $row) {
-            $idx = (int) $row->bucket;
+            $idx = min((int) $row->bucket, $points - 1);
 
-            if ($idx >= 0 && $idx < $points) {
-                $buckets[$idx] = (int) $row->cnt;
+            if ($idx >= 0) {
+                $buckets[$idx] += (int) $row->cnt;
             }
         }
 
         return $buckets;
     }
 
-    /**
-     * Build a database-agnostic bucket expression for time-series grouping.
-     *
-     * Uses EXTRACT(EPOCH) on PostgreSQL and julianday() on SQLite.
-     * Expects two positional bindings: start timestamp and segment seconds.
-     */
     private function bucketExpression(): string
     {
-        if (DB::getDriverName() === 'sqlite') {
-            return 'CAST((julianday("created_at") - julianday(?)) * 86400 / ? AS INTEGER)';
-        }
-
         return 'FLOOR(EXTRACT(EPOCH FROM ("created_at" - ?::timestamp)) / ?)';
     }
 
