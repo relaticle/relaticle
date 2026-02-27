@@ -53,6 +53,8 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: base_path('app-modules/SystemAdmin/src/Filament/Widgets'), for: 'Relaticle\\SystemAdmin\\Filament\\Widgets')
             ->navigationGroups([
                 NavigationGroup::make()
+                    ->label('Dashboards'),
+                NavigationGroup::make()
                     ->label('User Management'),
                 NavigationGroup::make()
                     ->label('CRM'),
