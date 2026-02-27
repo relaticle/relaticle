@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Enums\CreationSource;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
 
 final class UserRetentionChartWidget extends ChartWidget
 {
+    use HasPeriodComparison;
     use InteractsWithPageFilters;
 
     protected static ?int $sort = 6;
@@ -22,8 +23,6 @@ final class UserRetentionChartWidget extends ChartWidget
     protected ?string $maxHeight = '300px';
 
     protected int|string|array $columnSpan = 'full';
-
-    private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
     public function getHeading(): string
     {
@@ -55,9 +54,9 @@ final class UserRetentionChartWidget extends ChartWidget
         foreach ($intervals as $interval) {
             $labels[] = $interval['label'];
 
-            $activeCreators = $this->getActiveCreators($interval['start'], $interval['end']);
+            $activeCreatorIds = $this->getActiveCreatorIds($interval['start'], $interval['end']);
 
-            if ($activeCreators->isEmpty()) {
+            if ($activeCreatorIds->isEmpty()) {
                 $newActive[] = 0;
                 $returning[] = 0;
 
@@ -67,7 +66,7 @@ final class UserRetentionChartWidget extends ChartWidget
             $counts = DB::table('users')
                 ->selectRaw('COUNT(*) FILTER (WHERE created_at >= ? AND created_at <= ?) AS new_count', [$interval['start'], $interval['end']])
                 ->selectRaw('COUNT(*) FILTER (WHERE created_at < ?) AS returning_count', [$interval['start']])
-                ->whereIn('id', $activeCreators)
+                ->whereIn('id', $activeCreatorIds)
                 ->first();
 
             $newActive[] = (int) $counts->new_count;
@@ -106,26 +105,6 @@ final class UserRetentionChartWidget extends ChartWidget
                 'legend' => ['position' => 'bottom'],
             ],
         ];
-    }
-
-    /**
-     * @return Collection<int, string>
-     */
-    private function getActiveCreators(CarbonImmutable $start, CarbonImmutable $end): Collection
-    {
-        $unionParts = [];
-        $bindings = [];
-
-        foreach (self::ENTITY_TABLES as $table) {
-            $unionParts[] = "SELECT DISTINCT \"creator_id\" FROM \"{$table}\" WHERE \"creator_id\" IS NOT NULL AND \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
-            $bindings[] = CreationSource::SYSTEM->value;
-            $bindings[] = $start->toDateTimeString();
-            $bindings[] = $end->toDateTimeString();
-        }
-
-        $sql = 'SELECT DISTINCT creator_id FROM ('.implode(' UNION ', $unionParts).') AS all_creators';
-
-        return collect(DB::select($sql, $bindings))->pluck('creator_id');
     }
 
     /**

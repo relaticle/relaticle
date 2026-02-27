@@ -10,11 +10,12 @@ use Carbon\CarbonImmutable;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
 
 final class ActivationRateWidget extends StatsOverviewWidget
 {
+    use HasPeriodComparison;
     use InteractsWithPageFilters;
 
     protected static ?int $sort = 5;
@@ -22,8 +23,6 @@ final class ActivationRateWidget extends StatsOverviewWidget
     protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = null;
-
-    private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
     protected function getStats(): array
     {
@@ -45,20 +44,6 @@ final class ActivationRateWidget extends StatsOverviewWidget
         ];
     }
 
-    /**
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: CarbonImmutable, 3: CarbonImmutable}
-     */
-    private function getPeriodDates(): array
-    {
-        $days = (int) ($this->pageFilters['period'] ?? 30);
-        $currentEnd = CarbonImmutable::now();
-        $currentStart = $currentEnd->subDays($days);
-        $previousEnd = $currentStart->subSecond();
-        $previousStart = $currentStart->subDays($days);
-
-        return [$currentStart, $currentEnd, $previousStart, $previousEnd];
-    }
-
     private function countSignups(CarbonImmutable $start, CarbonImmutable $end): int
     {
         return User::query()
@@ -68,26 +53,16 @@ final class ActivationRateWidget extends StatsOverviewWidget
 
     private function countActivatedUsers(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        $unionParts = [];
-        $bindings = [];
+        $activeCreatorIds = $this->getActiveCreatorIds($start, $end);
 
-        foreach (self::ENTITY_TABLES as $table) {
-            $unionParts[] = "SELECT DISTINCT \"creator_id\" FROM \"{$table}\" WHERE \"creator_id\" IS NOT NULL AND \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
-            $bindings[] = CreationSource::SYSTEM->value;
-            $bindings[] = $start->toDateTimeString();
-            $bindings[] = $end->toDateTimeString();
+        if ($activeCreatorIds->isEmpty()) {
+            return 0;
         }
 
-        $unionSql = implode(' UNION ', $unionParts);
-        $sql = "SELECT COUNT(DISTINCT creator_id) as total FROM ({$unionSql}) AS active_creators
-                WHERE creator_id IN (SELECT id FROM users WHERE created_at BETWEEN ? AND ?)";
-
-        $bindings[] = $start->toDateTimeString();
-        $bindings[] = $end->toDateTimeString();
-
-        $result = DB::selectOne($sql, $bindings);
-
-        return (int) ($result->total ?? 0);
+        return User::query()
+            ->whereIn('id', $activeCreatorIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
     }
 
     /** @param array<int, int>|null $chart */
@@ -112,10 +87,8 @@ final class ActivationRateWidget extends StatsOverviewWidget
         return $stat;
     }
 
-    private function buildActivationRateStat(
-        float $currentRate,
-        float $previousRate,
-    ): Stat {
+    private function buildActivationRateStat(float $currentRate, float $previousRate): Stat
+    {
         $rateChange = round($currentRate - $previousRate, 1);
 
         $changeText = $rateChange !== 0.0
@@ -187,48 +160,5 @@ final class ActivationRateWidget extends StatsOverviewWidget
         $rows = DB::select($sql, [$start->toDateTimeString(), $segmentSeconds, ...$bindings]);
 
         return $this->fillBuckets(collect($rows), $points);
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    private function fillBuckets(Collection $rows, int $points): array
-    {
-        $buckets = array_fill(0, $points, 0);
-
-        foreach ($rows as $row) {
-            $idx = min((int) $row->bucket, $points - 1);
-
-            if ($idx >= 0) {
-                $buckets[$idx] += (int) $row->cnt;
-            }
-        }
-
-        return $buckets;
-    }
-
-    private function bucketExpression(): string
-    {
-        return 'FLOOR(EXTRACT(EPOCH FROM ("created_at" - ?::timestamp)) / ?)';
-    }
-
-    private function calculateChange(int $current, int $previous): float
-    {
-        if ($previous === 0) {
-            return $current > 0 ? 100.0 : 0.0;
-        }
-
-        return round((($current - $previous) / $previous) * 100, 1);
-    }
-
-    private function formatChange(float $change): string
-    {
-        if ($change === 0.0) {
-            return '';
-        }
-
-        $sign = $change > 0 ? '+' : '';
-
-        return " ({$sign}{$change}%)";
     }
 }
