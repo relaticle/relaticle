@@ -24,13 +24,17 @@ final readonly class CreateTeam implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'min:3', 'max:255', 'regex:'.Team::SLUG_REGEX, 'unique:teams,slug'],
         ])->validateWithBag('createTeam');
+
+        $isFirstTeam = $user->ownedTeams()->count() === 0;
 
         event(new \Laravel\Jetstream\Events\AddingTeam($user));
 
         $user->switchTeam($team = $user->ownedTeams()->create([
             'name' => $input['name'],
-            'personal_team' => false,
+            'slug' => $input['slug'] ?? null,
+            'personal_team' => $isFirstTeam,
         ]));
 
         /** @var Team $team */
