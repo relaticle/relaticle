@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Filament\Pages\CreateTeam;
+use App\Filament\Resources\CompanyResource;
 use App\Models\Team;
 use App\Models\User;
 
-mutates(CreateTeam::class);
+mutates(CreateTeam::class, CreateTeamAction::class);
 
 it('renders the create team page for teamless users', function (): void {
     $user = User::factory()->create();
@@ -131,4 +133,18 @@ it('marks subsequent teams as non-personal', function (): void {
     $secondTeam = $user->fresh()->ownedTeams()->where('name', 'Second Team')->first();
 
     expect($secondTeam->personal_team)->toBeFalse();
+});
+
+it('redirects to companies index after team creation', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Redirect Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(CompanyResource::getUrl('index', ['tenant' => $user->fresh()->currentTeam]));
 });

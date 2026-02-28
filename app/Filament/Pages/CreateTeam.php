@@ -7,6 +7,7 @@ namespace App\Filament\Pages;
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Filament\Resources\CompanyResource;
 use App\Models\Team;
+use App\Models\User;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Tenancy\RegisterTenant;
@@ -74,18 +75,6 @@ final class CreateTeam extends RegisterTenant
             ]);
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    #[Override]
-    protected function mutateFormDataBeforeRegister(array $data): array
-    {
-        unset($data['slug_auto_generated']);
-
-        return $data;
-    }
-
     #[Override]
     protected function getRedirectUrl(): string
     {
@@ -95,7 +84,7 @@ final class CreateTeam extends RegisterTenant
     #[Override]
     protected function handleRegistration(array $data): Model
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = auth('web')->user();
 
         return resolve(CreateTeamAction::class)->create($user, $data);

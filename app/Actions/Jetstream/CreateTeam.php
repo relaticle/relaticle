@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Jetstream\Contracts\CreatesTeams;
+use Laravel\Jetstream\Events\AddingTeam;
 use Laravel\Jetstream\Jetstream;
 
 final readonly class CreateTeam implements CreatesTeams
@@ -24,16 +25,16 @@ final readonly class CreateTeam implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'min:3', 'max:255', 'regex:'.Team::SLUG_REGEX, 'unique:teams,slug'],
+            'slug' => ['required', 'string', 'min:3', 'max:255', 'regex:'.Team::SLUG_REGEX, 'unique:teams,slug'],
         ])->validateWithBag('createTeam');
 
         $isFirstTeam = $user->ownedTeams()->count() === 0;
 
-        event(new \Laravel\Jetstream\Events\AddingTeam($user));
+        event(new AddingTeam($user));
 
         $user->switchTeam($team = $user->ownedTeams()->create([
             'name' => $input['name'],
-            'slug' => $input['slug'] ?? null,
+            'slug' => $input['slug'],
             'personal_team' => $isFirstTeam,
         ]));
 
