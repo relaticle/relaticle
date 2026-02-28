@@ -28,7 +28,7 @@ final readonly class CreateTeam implements CreatesTeams
             'slug' => ['required', 'string', 'min:3', 'max:255', 'regex:'.Team::SLUG_REGEX, 'unique:teams,slug'],
         ])->validateWithBag('createTeam');
 
-        $isFirstTeam = $user->ownedTeams()->count() === 0;
+        $isFirstTeam = ! $user->ownedTeams()->exists();
 
         event(new AddingTeam($user));
 
