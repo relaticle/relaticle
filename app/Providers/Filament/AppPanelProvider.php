@@ -89,7 +89,9 @@ final class AppPanelProvider extends PanelProvider
         $panel
             ->homeUrl(fn (): string => CompanyResource::getUrl())
             ->brandName('Relaticle')
-            ->brandLogo(fn (): View|Factory => Auth::check() ? view('filament.app.logo-empty') : view('filament.app.logo'))
+            ->brandLogo(fn (): View|Factory => Auth::check() && Auth::user()->hasVerifiedEmail()
+                ? view('filament.app.logo-empty')
+                : view('filament.app.logo'))
             ->brandLogoHeight('2.6rem')
             ->login(Login::class)
             ->registration(Register::class)
