@@ -48,6 +48,8 @@ final class CreateTeam extends RegisterTenant
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
+                    ->placeholder('Acme Corp')
+                    ->autofocus()
                     ->live(onBlur: true)
                     ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                         if ($get('slug_auto_generated') === true || blank($get('slug'))) {
