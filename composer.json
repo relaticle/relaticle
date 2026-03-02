@@ -41,6 +41,7 @@
         "spatie/laravel-markdown": "^2.7",
         "spatie/laravel-medialibrary": "^11.12",
         "spatie/laravel-prefixed-ids": "^1.4",
+        "spatie/laravel-query-builder": "^6.4",
         "spatie/laravel-settings": "^3.3",
         "spatie/laravel-sitemap": "^7.3",
         "spatie/security-advisories-health-check": "^1.3",
@@ -53,6 +54,7 @@
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "itsgoingd/clockwork": "^5.3",
+        "knuckleswtf/scribe": "^5.7",
         "larastan/larastan": "^3.0",
         "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.2",
@@ -63,7 +65,8 @@
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
-        "rector/rector": "^2.0"
+        "rector/rector": "^2.0",
+        "scalar/laravel": "^0.2.0"
     },
     "autoload": {
         "psr-4": {
@@ -111,7 +114,7 @@
         "test:refactor": "rector --dry-run",
         "test:types": "phpstan analyse",
         "test:arch": "pest --filter=arch",
-        "test:type-coverage": "pest --type-coverage --min=99.9",
+        "test:type-coverage": "pest --type-coverage --min=100",
         "test:coverage": "pest --coverage --min=80",
         "test:pest": "pest --parallel",
         "test:pest:shard": "pest --parallel --shard=${SHARD}",

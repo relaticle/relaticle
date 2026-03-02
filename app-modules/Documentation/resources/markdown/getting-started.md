@@ -135,4 +135,4 @@ See the **Import Guide** for detailed instructions and CSV templates.
 
 - **Import data** → See the Import Guide
 - **Customize fields** → Settings > Custom Fields
-- **Integrate via API** → API Reference (coming soon)
+- **Integrate via API** → [API Reference](/docs/api)

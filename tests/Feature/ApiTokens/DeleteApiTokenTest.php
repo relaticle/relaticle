@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Livewire\App\ApiTokens\ManageApiTokens;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
-use Laravel\Jetstream\Http\Livewire\ApiTokenManager;
-use Livewire\Livewire;
 
 test('api tokens can be deleted', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
@@ -17,9 +16,8 @@ test('api tokens can be deleted', function () {
         'abilities' => ['create', 'read'],
     ]);
 
-    Livewire::test(ApiTokenManager::class)
-        ->set(['apiTokenIdBeingDeleted' => $token->id])
-        ->call('deleteApiToken');
+    livewire(ManageApiTokens::class)
+        ->callTableAction('delete', $token);
 
     expect($user->fresh()->tokens)->toHaveCount(0);
 })->skip(function () {

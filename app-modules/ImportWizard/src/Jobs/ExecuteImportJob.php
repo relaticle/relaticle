@@ -306,7 +306,7 @@ final class ExecuteImportJob implements ShouldQueue
         /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->with(['options' => fn ($q) => $q->withoutGlobalScopes()])
+            ->with(['options' => fn (\Illuminate\Database\Eloquent\Relations\HasMany $q) => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $importer->entityName())
             ->where('type', '!=', 'record')
@@ -690,7 +690,7 @@ final class ExecuteImportJob implements ShouldQueue
     private function allowedAttributeKeys(BaseImporter $importer): array
     {
         $keys = collect($importer->allFields())
-            ->reject(fn ($field): bool => $field->key === 'id')
+            ->reject(fn (\Relaticle\ImportWizard\Data\ImportField $field): bool => $field->key === 'id')
             ->pluck('key')
             ->merge(['team_id', 'creator_id', 'creation_source'])
             ->merge(

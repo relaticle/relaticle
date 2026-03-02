@@ -1,13 +1,12 @@
 <x-filament::section aside>
     <x-slot name="heading">
-        {{ __('filament-jetstream::default.manage_api_tokens.section.title') }}
+        {{ __('access-tokens.sections.manage.title') }}
     </x-slot>
     <x-slot name="description">
-        {{ __('filament-jetstream::default.manage_api_tokens.section.description') }}
+        {{ __('access-tokens.sections.manage.description') }}
     </x-slot>
 
     {{ $this->table }}
 
-    <x-filament-actions::modals/>
-
+    <x-filament-actions::modals />
 </x-filament::section>

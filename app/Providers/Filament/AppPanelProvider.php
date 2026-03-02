@@ -191,7 +191,7 @@ final class AppPanelProvider extends PanelProvider
         if (Features::hasApiFeatures()) {
             $panel->userMenuItems([
                 Action::make('api_tokens')
-                    ->label('API Tokens')
+                    ->label(__('access-tokens.user_menu'))
                     ->icon('heroicon-o-key')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(ApiTokens::getUrl())

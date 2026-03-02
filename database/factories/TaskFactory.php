@@ -6,7 +6,6 @@ namespace Database\Factories;
 
 use App\Models\Task;
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 
@@ -24,7 +23,6 @@ final class TaskFactory extends Factory
             'created_at' => \Illuminate\Support\Facades\Date::now(),
             'updated_at' => \Illuminate\Support\Facades\Date::now(),
             'team_id' => Team::factory(),
-            'creator_id' => User::factory(),
         ];
     }
 

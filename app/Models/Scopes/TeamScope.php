@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Scopes;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -20,6 +21,9 @@ final class TeamScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $builder->whereBelongsTo(auth('web')->user()->currentTeam);
+        /** @var User $user */
+        $user = auth()->user();
+
+        $builder->whereBelongsTo($user->currentTeam);
     }
 }

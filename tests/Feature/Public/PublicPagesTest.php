@@ -44,20 +44,20 @@ describe('Legal pages', function () {
 
 describe('Documentation pages', function () {
     it('displays the documentation index', function () {
-        $response = $this->get('/documentation');
+        $response = $this->get('/docs');
 
         $response->assertStatus(200);
         $response->assertSee('Documentation');
     });
 
     it('returns 404 for non-existent documentation page', function () {
-        $response = $this->get('/documentation/non-existent-page');
+        $response = $this->get('/docs/non-existent-page');
 
         $response->assertStatus(404);
     });
 
     it('can search documentation', function () {
-        $response = $this->get('/documentation/search?query=test');
+        $response = $this->get('/docs/search?query=test');
 
         $response->assertStatus(200);
     });

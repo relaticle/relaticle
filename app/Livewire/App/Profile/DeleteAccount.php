@@ -78,7 +78,7 @@ final class DeleteAccount extends BaseLivewireComponent
                 $user->deleteProfilePhoto();
             }
 
-            // Delete API tokens if they exist
+            // Delete access tokens if they exist
             if (method_exists($user, 'tokens')) {
                 $user->tokens->each->delete();
             }

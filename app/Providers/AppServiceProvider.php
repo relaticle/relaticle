@@ -13,18 +13,24 @@ use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\GitHubService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
+use Knuckles\Scribe\Scribe;
+use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -44,11 +50,15 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         $this->configurePolicies();
         $this->configureModels();
         $this->configureFilament();
         $this->configureGitHubStars();
         $this->configureLivewire();
+        $this->configureRateLimiting();
+        $this->configureScribe();
     }
 
     private function configurePolicies(): void
@@ -110,6 +120,24 @@ final class AppServiceProvider extends ServiceProvider
     private function configureLivewire(): void
     {
         // Custom Livewire components can be registered here
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+    }
+
+    private function configureScribe(): void
+    {
+        if (! class_exists(Scribe::class) || $this->app->environment('production')) {
+            return;
+        }
+
+        Scribe::beforeResponseCall(function (\Symfony\Component\HttpFoundation\Request $request): void {
+            $user = User::factory()->withPersonalTeam()->create();
+            $user->switchTeam($user->personalTeam());
+            Sanctum::actingAs($user, ['*']);
+        });
     }
 
     /**

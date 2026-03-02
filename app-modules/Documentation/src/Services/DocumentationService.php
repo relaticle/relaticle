@@ -65,6 +65,10 @@ final class DocumentationService
         $results = collect();
 
         foreach ($documentTypes as $docType => $document) {
+            if (! isset($document['file'])) {
+                continue;
+            }
+
             $path = $this->getMarkdownPath($document['file']);
 
             if (! file_exists($path)) {

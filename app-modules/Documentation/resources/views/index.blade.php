@@ -26,6 +26,7 @@
                     'import' => 'heroicon-o-arrow-up-tray',
                     'developer' => 'heroicon-o-code-bracket',
                     'api' => 'heroicon-o-variable',
+                    'mcp' => 'heroicon-o-cpu-chip',
                 ];
             @endphp
 
@@ -33,7 +34,7 @@
                 <x-documentation::card
                     :title="$document['title']"
                     :description="$document['description'] ?? ''"
-                    :link="route('documentation.show', ['type' => $type])"
+                    :link="isset($document['url']) ? $document['url'] : route('documentation.show', ['type' => $type])"
                     :icon="$documentIcons[$type] ?? null"
                 />
             @endforeach

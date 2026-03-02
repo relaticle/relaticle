@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Livewire\App\ApiTokens\ManageApiTokens;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
-use Laravel\Jetstream\Http\Livewire\ApiTokenManager;
-use Livewire\Livewire;
 
 test('api token permissions can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
@@ -17,20 +16,40 @@ test('api token permissions can be updated', function () {
         'abilities' => ['create', 'read'],
     ]);
 
-    Livewire::test(ApiTokenManager::class)
-        ->set(['managingPermissionsFor' => $token])
-        ->set(['updateApiTokenForm' => [
-            'permissions' => [
-                'delete',
-                'missing-permission',
-            ],
-        ]])
-        ->call('updateApiToken');
+    livewire(ManageApiTokens::class)
+        ->callTableAction('permissions', $token, data: [
+            'permissions' => ['delete', 'update'],
+        ]);
 
-    expect($user->fresh()->tokens->first())
-        ->can('delete')->toBeTrue()
-        ->can('read')->toBeFalse()
-        ->can('missing-permission')->toBeFalse();
-})->skip(function () {
-    return ! Features::hasApiFeatures();
-}, 'API support is not enabled.');
+    $freshToken = $user->fresh()->tokens->first();
+
+    expect($freshToken->abilities)->toBe(['delete', 'update']);
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('table shows team name column', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $user->tokens()->create([
+        'name' => 'Test Token',
+        'token' => Str::random(40),
+        'abilities' => ['read'],
+        'team_id' => $user->currentTeam->id,
+    ]);
+
+    livewire(ManageApiTokens::class)
+        ->assertCanRenderTableColumn('team.name');
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('table shows expiration column', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $user->tokens()->create([
+        'name' => 'Expiring Token',
+        'token' => Str::random(40),
+        'abilities' => ['read'],
+        'expires_at' => now()->addDays(30),
+    ]);
+
+    livewire(ManageApiTokens::class)
+        ->assertCanRenderTableColumn('expires_at');
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
