@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\ValidTeamSlug;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Jetstream\Contracts\CreatesTeams;
@@ -25,7 +26,7 @@ final readonly class CreateTeam implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'min:3', 'max:255', 'regex:'.Team::SLUG_REGEX, 'unique:teams,slug'],
+            'slug' => ['required', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
         ])->validateWithBag('createTeam');
 
         $isFirstTeam = ! $user->ownedTeams()->exists();

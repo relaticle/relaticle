@@ -139,8 +139,8 @@ test('observer generates unique slug when duplicate name exists', function () {
     $second = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
     $third = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
 
-    expect($second->slug)->toBe('acme-corp-2')
-        ->and($third->slug)->toBe('acme-corp-3');
+    expect($second->slug)->toBe('acme-corp-1')
+        ->and($third->slug)->toBe('acme-corp-2');
 });
 
 test('observer handles special characters in slug', function () {
