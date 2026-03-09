@@ -116,9 +116,6 @@ final class NoteResource extends Resource
         ];
     }
 
-    /**
-     * @return Builder<Note>
-     */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

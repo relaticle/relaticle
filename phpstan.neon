@@ -11,6 +11,7 @@ parameters:
             identifier: argument.type
             message: '#(Closure\(App\\Models\\CustomField|Relaticle\\CustomFields\\Models\\CustomField)(Option|Value|Section)?#'
 
+
     stubFiles:
         - stubs/Mailcoach.stub
 
