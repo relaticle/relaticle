@@ -34,3 +34,4 @@ boost.json
 /.junie
 /.playwright-mcp
 /docs
+.context

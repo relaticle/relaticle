@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\View\View;
 
 final class UpdateProfileInformation extends BaseLivewireComponent
 {
@@ -81,7 +82,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         $this->sendNotification();
     }
 
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         return view('livewire.app.profile.update-profile-information');
     }

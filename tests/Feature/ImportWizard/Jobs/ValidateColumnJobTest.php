@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -212,7 +215,7 @@ it('skips validation when import does not exist', function (): void {
     try {
         $job->handle();
         expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+    } catch (ModelNotFoundException $e) {
         expect($e->getModel())->toBe(Import::class);
     }
 });
@@ -288,9 +291,9 @@ it('validates color picker hex format', function (): void {
 
 // --- Entity Link Format Validation Tests ---
 
-function ensureCustomFieldExists(object $context, string $code, string $type, string $entityType = 'people'): \App\Models\CustomField
+function ensureCustomFieldExists(object $context, string $code, string $type, string $entityType = 'people'): CustomField
 {
-    $existing = \App\Models\CustomField::query()
+    $existing = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $context->team->id)
         ->where('entity_type', $entityType)
@@ -301,7 +304,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
         return $existing;
     }
 
-    return \App\Models\CustomField::forceCreate([
+    return CustomField::forceCreate([
         'tenant_id' => $context->team->id,
         'code' => $code,
         'name' => ucfirst(str_replace('_', ' ', $code)),
@@ -311,7 +314,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
         'active' => true,
         'system_defined' => false,
         'validation_rules' => [],
-        'settings' => new \Relaticle\CustomFields\Data\CustomFieldSettingsData,
+        'settings' => new CustomFieldSettingsData,
     ]);
 }
 

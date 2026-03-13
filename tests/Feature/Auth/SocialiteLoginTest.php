@@ -122,7 +122,7 @@ test('callback from socialite provider links social account to existing user whe
 test('callback from socialite provider handles error gracefully', function () {
     // Mock the Socialite facade to throw an exception
     $provider = Mockery::mock(AbstractProvider::class);
-    $provider->shouldReceive('user')->andThrow(new \Exception('Socialite error'));
+    $provider->shouldReceive('user')->andThrow(new Exception('Socialite error'));
 
     Socialite::shouldReceive('driver')
         ->with(SocialiteProvider::GOOGLE->value)

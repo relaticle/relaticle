@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Enums;
 
 use Carbon\Carbon;
 use Filament\Support\Contracts\HasLabel;
+use Illuminate\Support\Facades\Date;
 
 /**
  * Supported date/datetime formats for CSV import parsing.
@@ -103,7 +104,7 @@ enum DateFormat: string implements HasLabel
 
         foreach ($this->getParseFormats($withTime) as $format) {
             try {
-                $date = \Illuminate\Support\Facades\Date::createFromFormat($format, $value);
+                $date = Date::createFromFormat($format, $value);
 
                 if ($date instanceof Carbon) {
                     return $date;

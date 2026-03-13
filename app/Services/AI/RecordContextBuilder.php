@@ -10,6 +10,7 @@ use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\PeopleField;
 use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -253,10 +254,10 @@ final readonly class RecordContextBuilder
             return null;
         }
 
-        /** @var Collection<int, \App\Models\CustomFieldValue> $customFieldValues */
+        /** @var Collection<int, CustomFieldValue> $customFieldValues */
         $customFieldValues = $model->customFieldValues; // @phpstan-ignore property.notFound
 
-        $customFieldValue = $customFieldValues->first(fn (\App\Models\CustomFieldValue $cfv): bool => $cfv->customField->code === $code);
+        $customFieldValue = $customFieldValues->first(fn (CustomFieldValue $cfv): bool => $cfv->customField->code === $code);
 
         if ($customFieldValue === null) {
             return null;

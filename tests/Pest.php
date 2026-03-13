@@ -14,8 +14,11 @@ declare(strict_types=1);
 */
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
+use Tests\TestCase;
 
-pest()->extend(Tests\TestCase::class)
+pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature', 'Unit');
 
@@ -40,9 +43,9 @@ expect()->extend('toBeOne', function () {
  * @param  class-string  $component
  * @param  array<string, mixed>  $params
  */
-function livewire(string $component, array $params = []): \Livewire\Features\SupportTesting\Testable
+function livewire(string $component, array $params = []): Testable
 {
-    return \Livewire\Livewire::test($component, $params);
+    return Livewire::test($component, $params);
 }
 
 /*

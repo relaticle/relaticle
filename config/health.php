@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Spatie\Health\ResultStores\InMemoryHealthResultStore;
 
 return [
     /*
@@ -9,7 +10,7 @@ return [
      * can use multiple stores at the same time.
      */
     'result_stores' => [
-        Spatie\Health\ResultStores\InMemoryHealthResultStore::class,
+        InMemoryHealthResultStore::class,
     ],
 
     /*

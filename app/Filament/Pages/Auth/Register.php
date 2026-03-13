@@ -11,7 +11,7 @@ use Filament\Support\Enums\Size;
 
 final class Register extends BaseRegister
 {
-    protected function getEmailFormComponent(): \Filament\Forms\Components\TextInput
+    protected function getEmailFormComponent(): TextInput
     {
         return TextInput::make('email')
             ->label(__('filament-panels::auth/pages/register.form.email.label'))

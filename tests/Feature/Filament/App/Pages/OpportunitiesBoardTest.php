@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\Flowforge\Board;
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -22,7 +23,7 @@ beforeEach(function () {
         ->first();
 });
 
-function getOpportunityBoard(): \Relaticle\Flowforge\Board
+function getOpportunityBoard(): Board
 {
     $component = livewire(OpportunitiesBoard::class);
 

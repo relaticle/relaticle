@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Livewire\App\Profile\UpdateProfileInformation as UpdateProfileInformationComponent;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -94,7 +95,7 @@ describe('photo upload', function () {
             ->email_verified_at->toBeNull()
             ->profile_photo_path->toBe($photoPath);
 
-        Notification::assertSentTo($this->user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+        Notification::assertSentTo($this->user, VerifyEmail::class);
     });
 
     test('can delete profile photo', function () {

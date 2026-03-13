@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Agent;
 
@@ -80,7 +81,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
     /**
      * Get the current sessions.
      *
-     * @return Collection<int, object{agent: \Laravel\Jetstream\Agent, ip_address: mixed, is_current_device: bool, last_active: string}>
+     * @return Collection<int, object{agent: Agent, ip_address: mixed, is_current_device: bool, last_active: string}>
      */
     public function browserSessions(): Collection
     {
@@ -101,7 +102,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
                     'agent' => $agent,
                     'ip_address' => $session->ip_address,
                     'is_current_device' => $session->id === request()->session()->getId(),
-                    'last_active' => \Illuminate\Support\Facades\Date::createFromTimestamp($session->last_activity)->diffForHumans(),
+                    'last_active' => Date::createFromTimestamp($session->last_activity)->diffForHumans(),
                 ];
             });
     }

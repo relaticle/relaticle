@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\File;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 function createTempEnvFile(): string
 {
@@ -65,7 +67,7 @@ it('creates system administrator when requested', function (): void {
     $tempEnv = createTempEnvFile();
 
     // Clear any existing system administrators
-    \Relaticle\SystemAdmin\Models\SystemAdministrator::query()->delete();
+    SystemAdministrator::query()->delete();
 
     $this->artisan('relaticle:install', [
         '--force' => true,
@@ -86,7 +88,7 @@ it('creates system administrator when requested', function (): void {
         ->assertSuccessful();
 
     // Verify the system administrator was created
-    expect(\Relaticle\SystemAdmin\Models\SystemAdministrator::where('email', 'test@example.com')->exists())->toBeTrue();
+    expect(SystemAdministrator::where('email', 'test@example.com')->exists())->toBeTrue();
 
     File::delete($tempEnv);
 });
@@ -95,12 +97,12 @@ it('skips system admin creation if one already exists', function (): void {
     $tempEnv = createTempEnvFile();
 
     // Ensure a system administrator exists
-    \Relaticle\SystemAdmin\Models\SystemAdministrator::firstOrCreate(
+    SystemAdministrator::firstOrCreate(
         ['email' => 'existing@example.com'],
         [
             'name' => 'Existing Admin',
             'password' => bcrypt('password'),
-            'role' => \Relaticle\SystemAdmin\Enums\SystemAdministratorRole::SuperAdministrator,
+            'role' => SystemAdministratorRole::SuperAdministrator,
             'email_verified_at' => now(),
         ]
     );

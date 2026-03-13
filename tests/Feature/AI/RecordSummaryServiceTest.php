@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\AI\RecordContextBuilder;
 use App\Services\AI\RecordSummaryService;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\Testing\TextResponseFake;
@@ -314,7 +315,7 @@ describe('HasAiSummary trait', function () {
             ->for($this->user->currentTeam)
             ->create();
 
-        expect($company->aiSummary())->toBeInstanceOf(\Illuminate\Database\Eloquent\Relations\MorphOne::class);
+        expect($company->aiSummary())->toBeInstanceOf(MorphOne::class);
     });
 
     it('can invalidate summary directly via trait method', function () {

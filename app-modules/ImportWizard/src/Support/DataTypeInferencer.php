@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Support;
 
 use Illuminate\Support\Facades\Validator;
+use Relaticle\CustomFields\Contracts\FieldTypeDefinitionInterface;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\FieldTypeSystem\FieldManager;
 use Relaticle\CustomFields\Models\CustomField;
@@ -94,7 +95,7 @@ final class DataTypeInferencer
         $fieldManager = resolve(FieldManager::class);
 
         foreach ($fieldManager->getFieldTypes() as $fieldTypeClass) {
-            /** @var \Relaticle\CustomFields\Contracts\FieldTypeDefinitionInterface $instance */
+            /** @var FieldTypeDefinitionInterface $instance */
             $instance = new $fieldTypeClass;
             $schema = $instance->configure();
             $data = $schema->data();

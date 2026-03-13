@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Membership as JetstreamMembership;
 
 final class Membership extends JetstreamMembership
 {
-    /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
-    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+    /** @use HasFactory<Factory<self>> */
+    use HasFactory;
 
     /**
      * Indicates if the IDs are auto-incrementing.

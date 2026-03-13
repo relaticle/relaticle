@@ -6,12 +6,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Laravel\Jetstream\Events\TeamCreated;
+use Relaticle\ImportWizard\Commands\CleanupImportsCommand;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
-mutates(\Relaticle\ImportWizard\Commands\CleanupImportsCommand::class);
+mutates(CleanupImportsCommand::class);
 
 beforeEach(function (): void {
     Event::fake()->except([TeamCreated::class]);

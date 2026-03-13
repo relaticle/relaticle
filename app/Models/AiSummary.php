@@ -6,16 +6,18 @@ namespace App\Models;
 
 use App\Models\Concerns\HasTeam;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 final class AiSummary extends Model
 {
+    /** @use HasFactory<Factory<self>> */
+    use HasFactory;
+
     use HasTeam;
     use HasUlids;
-
-    /** @use \Illuminate\Database\Eloquent\Factories\HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<self>> */
-    use \Illuminate\Database\Eloquent\Factories\HasFactory;
 
     /**
      * @var list<string>

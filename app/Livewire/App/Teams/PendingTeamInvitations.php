@@ -9,6 +9,7 @@ use App\Models\Team;
 use Filament\Actions\Action;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
@@ -69,7 +70,7 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
         $this->sendNotification(__('teams.notifications.team_invitation_cancelled.success'));
     }
 
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         return view('livewire.app.teams.pending-team-invitations');
     }

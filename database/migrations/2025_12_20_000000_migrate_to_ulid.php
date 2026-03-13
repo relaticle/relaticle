@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
+use App\Models\Export;
+use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Task;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -464,7 +473,7 @@ return new class extends Migration
             ->whereIn('custom_field_id', $emailFieldIds)
             ->whereNotNull('string_value')
             ->where('string_value', '!=', '')
-            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
+            ->where(function (Builder $query): void {
                 $query->whereNull('json_value')
                     ->orWhere('json_value', '=', '[]')
                     ->orWhere('json_value', '=', 'null');
@@ -505,7 +514,7 @@ return new class extends Migration
         // Find all domains custom fields (code 'domains' or legacy 'domain_name')
         $domainFieldIds = DB::table($fieldTable)
             ->where('entity_type', 'company')
-            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
+            ->where(function (Builder $query): void {
                 $query->where('code', 'domains')
                     ->orWhere('code', 'domain_name');
             })
@@ -520,7 +529,7 @@ return new class extends Migration
             ->whereIn('custom_field_id', $domainFieldIds)
             ->whereNotNull('string_value')
             ->where('string_value', '!=', '')
-            ->where(function (\Illuminate\Contracts\Database\Query\Builder $query): void {
+            ->where(function (Builder $query): void {
                 $query->whereNull('json_value')
                     ->orWhere('json_value', '=', '[]')
                     ->orWhere('json_value', '=', 'null');
@@ -577,7 +586,7 @@ return new class extends Migration
             foreach ($foreignKeys as $fk) {
                 try {
                     DB::statement("ALTER TABLE \"{$fk->table_name}\" DROP CONSTRAINT IF EXISTS \"{$fk->constraint_name}\"");
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
             }
 
@@ -594,7 +603,7 @@ return new class extends Migration
             foreach ($indexesToDrop as $indexName) {
                 try {
                     DB::statement("DROP INDEX IF EXISTS \"{$indexName}\"");
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
             }
         } else {
@@ -608,7 +617,7 @@ return new class extends Migration
             foreach ($foreignKeys as $fk) {
                 try {
                     DB::statement("ALTER TABLE `{$fk->TABLE_NAME}` DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
             }
 
@@ -625,7 +634,7 @@ return new class extends Migration
             foreach ($indexesToDrop as $table => $indexName) {
                 try {
                     DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$indexName}`");
-                } catch (\Throwable) {
+                } catch (Throwable) {
                 }
             }
         }
@@ -1011,15 +1020,15 @@ return new class extends Migration
         if ($nullCount > 0) {
             // Populate using full class name mapping
             $fullClassMap = [
-                \App\Models\User::class => 'users',
-                \App\Models\Team::class => 'teams',
-                \App\Models\Company::class => 'companies',
-                \App\Models\People::class => 'people',
-                \App\Models\Opportunity::class => 'opportunities',
-                \App\Models\Task::class => 'tasks',
-                \App\Models\Note::class => 'notes',
+                User::class => 'users',
+                Team::class => 'teams',
+                Company::class => 'companies',
+                People::class => 'people',
+                Opportunity::class => 'opportunities',
+                Task::class => 'tasks',
+                Note::class => 'notes',
                 'App\\Models\\Import' => 'imports',
-                \App\Models\Export::class => 'exports',
+                Export::class => 'exports',
                 'App\\Models\\SystemAdministrator' => 'system_administrators',
             ];
 
@@ -1105,7 +1114,7 @@ return new class extends Migration
             Schema::table($tableName, function (Blueprint $table) use ($tableName, $morphTypeColumn, $morphIdColumn): void {
                 $table->dropIndex("{$tableName}_{$morphTypeColumn}_{$morphIdColumn}_index");
             });
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Index might not exist
         }
 

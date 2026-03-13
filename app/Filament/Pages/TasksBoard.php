@@ -18,9 +18,11 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -187,7 +189,7 @@ final class TasksBoard extends BoardPage
         $board = $this->getBoard();
         $query = $board->getQuery();
 
-        throw_unless($query instanceof \Illuminate\Database\Eloquent\Builder, InvalidArgumentException::class, 'Board query not available');
+        throw_unless($query instanceof Builder, InvalidArgumentException::class, 'Board query not available');
 
         /** @var Task|null $card */
         $card = (clone $query)->with(['assignees'])->find($cardId);
@@ -242,7 +244,7 @@ final class TasksBoard extends BoardPage
             return '';
         }
 
-        $date = \Illuminate\Support\Facades\Date::parse($state);
+        $date = Date::parse($state);
 
         return match (true) {
             $date->isPast() => $date->format('M j, Y').' (Overdue)',

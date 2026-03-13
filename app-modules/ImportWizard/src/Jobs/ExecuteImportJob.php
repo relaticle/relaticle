@@ -114,7 +114,7 @@ final class ExecuteImportJob implements ShouldQueue
         $customFieldFormatMap = $this->buildCustomFieldFormatMap($fieldMappings);
 
         $matchField = $this->resolveMatchField($importer, $fieldMappings);
-        $matchSourceColumn = $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField
+        $matchSourceColumn = $matchField instanceof MatchableField
             ? $this->findMatchSourceColumn($matchField, $fieldMappings)
             : null;
 
@@ -221,7 +221,7 @@ final class ExecuteImportJob implements ShouldQueue
         $effectiveMatchedId = $row->matched_id;
 
         if ($effectiveAction === RowMatchAction::Create
-            && $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField
+            && $matchField instanceof MatchableField
             && $matchSourceColumn !== null
         ) {
             $cachedRecordId = $this->lookupMatchableValueCache($row, $matchField, $matchSourceColumn);
@@ -271,7 +271,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $record->forceFill($prepared);
                 $record->save();
 
-                if ($isCreate && $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField && $matchSourceColumn !== null) {
+                if ($isCreate && $matchField instanceof MatchableField && $matchSourceColumn !== null) {
                     $this->registerInMatchableValueCache($row, $matchField, $matchSourceColumn, (string) $record->getKey());
                 }
 
@@ -729,7 +729,7 @@ final class ExecuteImportJob implements ShouldQueue
         $mappedFieldKeys = $fieldMappings->pluck('target')->all();
         $matchField = $importer->getMatchFieldForMappedColumns($mappedFieldKeys);
 
-        if (! $matchField instanceof \Relaticle\ImportWizard\Data\MatchableField || $matchField->isCreate()) {
+        if (! $matchField instanceof MatchableField || $matchField->isCreate()) {
             return null;
         }
 

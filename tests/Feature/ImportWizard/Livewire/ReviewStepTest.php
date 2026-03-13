@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
@@ -80,7 +81,7 @@ afterEach(function (): void {
     $this->import->delete();
 });
 
-function mountReviewStep(object $context): \Livewire\Features\SupportTesting\Testable
+function mountReviewStep(object $context): Testable
 {
     Bus::fake();
 
@@ -295,7 +296,7 @@ it('allows continueToPreview while only match resolution is running', function (
     $component->call('continueToPreview')
         ->assertDispatched('completed');
 
-    $cachedBatchId = \Illuminate\Support\Facades\Cache::get("import-{$this->store->id()}-match-resolution-batch");
+    $cachedBatchId = Cache::get("import-{$this->store->id()}-match-resolution-batch");
 
     expect($cachedBatchId)->toBe('fake-batch-id');
 });

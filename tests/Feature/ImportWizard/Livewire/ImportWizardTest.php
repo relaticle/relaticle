@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
@@ -37,7 +38,7 @@ afterEach(function (): void {
     }
 });
 
-function mountImportWizard(object $context, ?string $returnUrl = null): \Livewire\Features\SupportTesting\Testable
+function mountImportWizard(object $context, ?string $returnUrl = null): Testable
 {
     return Livewire::test(ImportWizard::class, [
         'entityType' => ImportEntityType::People,

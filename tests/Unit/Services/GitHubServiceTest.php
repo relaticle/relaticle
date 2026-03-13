@@ -74,7 +74,7 @@ it('returns 0 when API call fails', function () {
 it('returns 0 when API throws exception', function () {
     // Mock HTTP exception
     Http::fake(function () {
-        throw new \Exception('Network error');
+        throw new Exception('Network error');
     });
 
     // Call the service

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Models\Import;
@@ -13,7 +14,7 @@ final class DownloadFailedRowsController
 {
     public function __invoke(Request $request, Import $import): StreamedResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         abort_unless(

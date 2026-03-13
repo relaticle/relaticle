@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Support;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 
@@ -155,9 +156,9 @@ final class EntityLinkResolver
     {
         return User::query()
             ->whereIn($field, $uniqueValues)
-            ->where(function (\Illuminate\Database\Eloquent\Builder $query): void {
-                $query->whereHas('teams', fn (\Illuminate\Database\Eloquent\Builder $q) => $q->where('teams.id', $this->teamId))
-                    ->orWhereHas('ownedTeams', fn (\Illuminate\Database\Eloquent\Builder $q) => $q->where('teams.id', $this->teamId));
+            ->where(function (Builder $query): void {
+                $query->whereHas('teams', fn (Builder $q) => $q->where('teams.id', $this->teamId))
+                    ->orWhereHas('ownedTeams', fn (Builder $q) => $q->where('teams.id', $this->teamId));
             })
             ->pluck('id', $field)
             ->all();

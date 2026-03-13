@@ -10,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
+use App\Models\Export;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -36,7 +37,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
-        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, \App\Models\Export::class);
+        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
     }
 
     /**

@@ -17,6 +17,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Jetstream\Jetstream;
 
@@ -100,7 +101,7 @@ final class AddTeamMember extends BaseLivewireComponent
         $this->redirect(Filament::getTenantProfileUrl());
     }
 
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         return view('livewire.app.teams.add-team-member');
     }

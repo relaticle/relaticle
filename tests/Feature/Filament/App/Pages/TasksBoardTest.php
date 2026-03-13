@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\Flowforge\Board;
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -22,7 +23,7 @@ beforeEach(function () {
         ->first();
 });
 
-function getTaskBoard(): \Relaticle\Flowforge\Board
+function getTaskBoard(): Board
 {
     $component = livewire(TasksBoard::class);
 

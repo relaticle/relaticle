@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Models\Import;
@@ -219,7 +220,7 @@ final class ValidateColumnJob implements ShouldQueue
 
     private function hydrateColumnField(Import $import): void
     {
-        if ($this->column->importField instanceof \Relaticle\ImportWizard\Data\ImportField) {
+        if ($this->column->importField instanceof ImportField) {
             return;
         }
 

@@ -65,7 +65,7 @@ final readonly class MatchResolver
     {
         $sourceColumn = $this->findSourceColumn($matchField, $mappings);
 
-        if (! $sourceColumn instanceof \Relaticle\ImportWizard\Data\ColumnData) {
+        if (! $sourceColumn instanceof ColumnData) {
             return;
         }
 

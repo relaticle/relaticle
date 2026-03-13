@@ -13,6 +13,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
@@ -66,7 +67,7 @@ final class DeleteAccount extends BaseLivewireComponent
             if (config('jetstream.features.teams', false)) {
                 $user->teams()->detach();
 
-                /** @var \Illuminate\Database\Eloquent\Collection<int, Team> $ownedTeams */
+                /** @var Collection<int, Team> $ownedTeams */
                 $ownedTeams = $user->ownedTeams;
                 $ownedTeams->each(function (Team $team): void {
                     resolve(DeleteTeam::class)->delete($team);

@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -39,7 +40,7 @@ afterEach(function (): void {
     }
 });
 
-function mountUploadStep(object $context, ?string $storeId = null): \Livewire\Features\SupportTesting\Testable
+function mountUploadStep(object $context, ?string $storeId = null): Testable
 {
     return Livewire::test(UploadStep::class, [
         'entityType' => ImportEntityType::People,

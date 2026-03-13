@@ -37,17 +37,17 @@ final class HighQualityDriver implements Fetcher
         }
 
         $favicon = $this->tryAppleTouchIcon($url);
-        if ($favicon instanceof \AshAllenDesign\FaviconFetcher\Favicon && $this->faviconIsAccessible($favicon)) {
+        if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
             return $favicon;
         }
 
         $favicon = $this->tryHighResFavicon($url);
-        if ($favicon instanceof \AshAllenDesign\FaviconFetcher\Favicon && $this->faviconIsAccessible($favicon)) {
+        if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
             return $favicon;
         }
 
         $favicon = $this->tryGoogleHighRes($url);
-        if ($favicon instanceof \AshAllenDesign\FaviconFetcher\Favicon && $this->faviconIsAccessible($favicon)) {
+        if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
             return $favicon;
         }
 

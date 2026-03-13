@@ -20,6 +20,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use Laravel\Jetstream\Events\TeamMemberUpdated;
 use Laravel\Jetstream\Jetstream;
 
 final class TeamMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
@@ -124,7 +125,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
         $team->users()->updateExistingPivot($teamMember->user_id, ['role' => $data['role']]);
 
-        event(new \Laravel\Jetstream\Events\TeamMemberUpdated($team->fresh(), $teamMember));
+        event(new TeamMemberUpdated($team->fresh(), $teamMember));
 
         $this->sendNotification();
 

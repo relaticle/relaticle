@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use App\Models\User;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 return [
 
@@ -69,12 +71,12 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         'system_administrators' => [
             'driver' => 'eloquent',
-            'model' => Relaticle\SystemAdmin\Models\SystemAdministrator::class,
+            'model' => SystemAdministrator::class,
         ],
 
         // 'users' => [

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Rules;
 
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
 use Relaticle\ImportWizard\Enums\DateFormat;
 
 /**
@@ -26,7 +28,7 @@ final readonly class ImportDateRule implements ValidationRule
      *
      * ValueValidator guarantees non-empty string; keep type check only.
      *
-     * @param  Closure(string, ?string=): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -34,7 +36,7 @@ final readonly class ImportDateRule implements ValidationRule
             return;
         }
 
-        if (! $this->format->parse($value) instanceof \Carbon\Carbon) {
+        if (! $this->format->parse($value) instanceof Carbon) {
             $fail(__('import-wizard-new::validation.invalid_date', [
                 'format' => $this->format->getLabel(),
             ]));

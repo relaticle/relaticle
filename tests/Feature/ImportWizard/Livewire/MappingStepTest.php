@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -70,7 +71,7 @@ function createStoreWithHeaders(object $context, array $headers, array $rows = [
     $context->import->update(['total_rows' => count($rows)]);
 }
 
-function mountMappingStep(object $context): \Livewire\Features\SupportTesting\Testable
+function mountMappingStep(object $context): Testable
 {
     return Livewire::test(MappingStep::class, [
         'storeId' => $context->store->id(),

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -10,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         // Get all phone_number custom field IDs that are currently text type
-        /** @var \Illuminate\Support\Collection<int, int|string> */
+        /** @var Collection<int, int|string> */
         $phoneFieldIds = DB::table('custom_fields')
             ->where('code', 'phone_number')
             ->where('type', 'text')

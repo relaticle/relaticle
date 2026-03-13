@@ -4,17 +4,26 @@ declare(strict_types=1);
 
 use App\Enums\CreationSource;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
+use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
+use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Models\Import;
@@ -142,7 +151,7 @@ it('sets custom field values on created records', function (): void {
     $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -150,7 +159,7 @@ it('sets custom field values on created records', function (): void {
         ->first();
 
     if ($emailField) {
-        $cfValue = \App\Models\CustomFieldValue::query()
+        $cfValue = CustomFieldValue::query()
             ->where('custom_field_id', $emailField->id)
             ->where('entity_id', $person->id)
             ->first();
@@ -160,7 +169,7 @@ it('sets custom field values on created records', function (): void {
 });
 
 it('resolves multiple custom field values via batch JSON query', function (): void {
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -180,7 +189,7 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
             'team_id' => $this->team->id,
         ]);
 
-        \App\Models\CustomFieldValue::create([
+        CustomFieldValue::create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
@@ -410,7 +419,7 @@ it('sets store status to Failed on exception', function (): void {
 
     try {
         runImportJob($this);
-    } catch (\Throwable) {
+    } catch (Throwable) {
     }
 
     $import = $this->import->fresh();
@@ -532,11 +541,11 @@ it('skips auto-creation for entity links with only MatchOnly matchers', function
         ColumnData::toEntityLink(source: 'Opportunity', matcherKey: 'id', entityLinkKey: 'opportunities'),
     ], ImportEntityType::Task);
 
-    $initialOpportunityCount = \App\Models\Opportunity::where('team_id', $this->team->id)->count();
+    $initialOpportunityCount = Opportunity::where('team_id', $this->team->id)->count();
 
     runImportJob($this);
 
-    expect(\App\Models\Opportunity::where('team_id', $this->team->id)->count())->toBe($initialOpportunityCount);
+    expect(Opportunity::where('team_id', $this->team->id)->count())->toBe($initialOpportunityCount);
 });
 
 it('calls store() for MorphToMany entity links after record save', function (): void {
@@ -650,7 +659,7 @@ it('handles nonexistent import gracefully', function (): void {
     try {
         $job->handle();
         expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+    } catch (ModelNotFoundException $e) {
         expect($e->getModel())->toBe(Import::class);
     }
 });
@@ -939,7 +948,7 @@ it('marks import as Failed when job exhausts retries via failed() handler', func
         teamId: (string) $this->team->id,
     );
 
-    $job->failed(new \RuntimeException('Queue worker gave up'));
+    $job->failed(new RuntimeException('Queue worker gave up'));
 
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Failed);
@@ -985,9 +994,9 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
 
 // --- Custom Field Import Tests ---
 
-function createTestCustomField(object $context, string $code, string $type, string $entityType = 'people', array $options = []): \App\Models\CustomField
+function createTestCustomField(object $context, string $code, string $type, string $entityType = 'people', array $options = []): CustomField
 {
-    $cf = \App\Models\CustomField::forceCreate([
+    $cf = CustomField::forceCreate([
         'tenant_id' => $context->team->id,
         'code' => $code,
         'name' => ucfirst(str_replace('_', ' ', $code)),
@@ -997,7 +1006,7 @@ function createTestCustomField(object $context, string $code, string $type, stri
         'active' => true,
         'system_defined' => false,
         'validation_rules' => [],
-        'settings' => new \Relaticle\CustomFields\Data\CustomFieldSettingsData,
+        'settings' => new CustomFieldSettingsData,
     ]);
 
     foreach ($options as $i => $optionName) {
@@ -1012,9 +1021,9 @@ function createTestCustomField(object $context, string $code, string $type, stri
     return $cf->fresh();
 }
 
-function getTestCustomFieldValue(object $context, string $entityId, string $customFieldId): ?\App\Models\CustomFieldValue
+function getTestCustomFieldValue(object $context, string $entityId, string $customFieldId): ?CustomFieldValue
 {
-    return \App\Models\CustomFieldValue::query()
+    return CustomFieldValue::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $context->team->id)
         ->where('entity_id', $entityId)
@@ -1088,7 +1097,7 @@ it('imports currency custom field with comma decimal format', function (): void 
         (new ColumnData(
             source: 'Revenue',
             target: "custom_fields_{$cf->code}",
-            numberFormat: \Relaticle\ImportWizard\Enums\NumberFormat::COMMA,
+            numberFormat: NumberFormat::COMMA,
         )),
     ]);
 
@@ -1128,7 +1137,7 @@ it('imports date custom field with European format', function (): void {
         (new ColumnData(
             source: 'Start',
             target: "custom_fields_{$cf->code}",
-            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::EUROPEAN,
+            dateFormat: DateFormat::EUROPEAN,
         )),
     ]);
 
@@ -1150,7 +1159,7 @@ it('imports date custom field with American format', function (): void {
         (new ColumnData(
             source: 'Start',
             target: "custom_fields_{$cf->code}",
-            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::AMERICAN,
+            dateFormat: DateFormat::AMERICAN,
         )),
     ]);
 
@@ -1190,7 +1199,7 @@ it('imports datetime custom field with European format including time', function
         (new ColumnData(
             source: 'Meeting',
             target: "custom_fields_{$cf->code}",
-            dateFormat: \Relaticle\ImportWizard\Enums\DateFormat::EUROPEAN,
+            dateFormat: DateFormat::EUROPEAN,
         )),
     ]);
 
@@ -1311,7 +1320,7 @@ it('updates existing custom field value on record update', function (): void {
         'team_id' => $this->team->id,
     ]);
 
-    \App\Models\CustomFieldValue::forceCreate([
+    CustomFieldValue::forceCreate([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
@@ -1769,7 +1778,7 @@ it('imports opportunity with company and contact entity links', function (): voi
 
     runImportJob($this);
 
-    $opportunity = \App\Models\Opportunity::where('team_id', $this->team->id)->where('name', 'Big Deal')->first();
+    $opportunity = Opportunity::where('team_id', $this->team->id)->where('name', 'Big Deal')->first();
     expect($opportunity)->not->toBeNull()
         ->and((string) $opportunity->company_id)->toBe((string) $company->id)
         ->and((string) $opportunity->contact_id)->toBe((string) $contact->id);
@@ -1797,7 +1806,7 @@ it('imports note with polymorphic entity links to company and person', function 
 
     runImportJob($this);
 
-    $note = \App\Models\Note::where('team_id', $this->team->id)->where('title', 'Meeting Notes')->first();
+    $note = Note::where('team_id', $this->team->id)->where('title', 'Meeting Notes')->first();
     expect($note)->not->toBeNull();
 
     expect($note->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all())
@@ -1816,7 +1825,7 @@ it('imports note with title field only', function (): void {
 
     runImportJob($this);
 
-    $note = \App\Models\Note::where('team_id', $this->team->id)->where('title', 'Quick note')->first();
+    $note = Note::where('team_id', $this->team->id)->where('title', 'Quick note')->first();
     expect($note)->not->toBeNull()
         ->and($note->creation_source)->toBe(CreationSource::IMPORT);
 });
@@ -1972,7 +1981,7 @@ it('merges multi-choice custom field values during update', function (): void {
         'team_id' => $this->team->id,
     ]);
 
-    \App\Models\CustomFieldValue::create([
+    CustomFieldValue::create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
@@ -2003,7 +2012,7 @@ it('merges multi-choice custom field values during update', function (): void {
 });
 
 it('merges multi-choice custom field values during dedup', function (): void {
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -2044,7 +2053,7 @@ it('does not duplicate existing multi-choice values during merge', function (): 
         'team_id' => $this->team->id,
     ]);
 
-    \App\Models\CustomFieldValue::create([
+    CustomFieldValue::create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
@@ -2094,7 +2103,7 @@ it('populates matching custom field when auto-creating person via email MatchOrC
     $person = People::where('team_id', $this->team->id)->where('name', 'john@example.com')->first();
     expect($person)->not->toBeNull();
 
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -2105,7 +2114,7 @@ it('populates matching custom field when auto-creating person via email MatchOrC
 
     $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $emailField->id);
     expect($cfv)->not->toBeNull()
-        ->and($cfv->json_value)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+        ->and($cfv->json_value)->toBeInstanceOf(Collection::class)
         ->and($cfv->json_value->all())->toBe(['john@example.com']);
 });
 
@@ -2129,7 +2138,7 @@ it('populates matching custom field when auto-creating company via domain MatchO
     $company = Company::where('team_id', $this->team->id)->where('name', 'example.com')->first();
     expect($company)->not->toBeNull();
 
-    $domainField = \App\Models\CustomField::query()
+    $domainField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'company')
@@ -2140,7 +2149,7 @@ it('populates matching custom field when auto-creating company via domain MatchO
 
     $cfv = getTestCustomFieldValue($this, (string) $company->id, (string) $domainField->id);
     expect($cfv)->not->toBeNull()
-        ->and($cfv->json_value)->toBeInstanceOf(\Illuminate\Support\Collection::class)
+        ->and($cfv->json_value)->toBeInstanceOf(Collection::class)
         ->and($cfv->json_value->all())->toBe(['example.com']);
 });
 
@@ -2194,7 +2203,7 @@ it('deduplicates auto-created records while still populating matching custom fie
     $people = People::where('team_id', $this->team->id)->where('name', 'jane@example.com')->get();
     expect($people)->toHaveCount(1);
 
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -2207,7 +2216,7 @@ it('deduplicates auto-created records while still populating matching custom fie
 });
 
 it('does not auto-create record for custom field entity link', function (): void {
-    $recordCf = \App\Models\CustomField::query()
+    $recordCf = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')

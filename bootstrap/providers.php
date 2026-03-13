@@ -1,17 +1,28 @@
 <?php
 
 declare(strict_types=1);
+use App\Providers\AppServiceProvider;
+use App\Providers\FaviconServiceProvider;
+use App\Providers\Filament\AppPanelProvider;
+use App\Providers\FortifyServiceProvider;
+use App\Providers\HealthServiceProvider;
+use App\Providers\HorizonServiceProvider;
+use App\Providers\JetstreamServiceProvider;
+use App\Providers\MacroServiceProvider;
+use Relaticle\Documentation\DocumentationServiceProvider;
+use Relaticle\ImportWizard\ImportWizardNewServiceProvider;
+use Relaticle\SystemAdmin\SystemAdminPanelProvider;
 
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\FaviconServiceProvider::class,
-    App\Providers\Filament\AppPanelProvider::class,
-    App\Providers\FortifyServiceProvider::class,
-    App\Providers\HealthServiceProvider::class,
-    App\Providers\HorizonServiceProvider::class,
-    App\Providers\JetstreamServiceProvider::class,
-    App\Providers\MacroServiceProvider::class,
-    Relaticle\Documentation\DocumentationServiceProvider::class,
-    Relaticle\ImportWizard\ImportWizardNewServiceProvider::class,
-    Relaticle\SystemAdmin\SystemAdminPanelProvider::class,
+    AppServiceProvider::class,
+    FaviconServiceProvider::class,
+    AppPanelProvider::class,
+    FortifyServiceProvider::class,
+    HealthServiceProvider::class,
+    HorizonServiceProvider::class,
+    JetstreamServiceProvider::class,
+    MacroServiceProvider::class,
+    DocumentationServiceProvider::class,
+    ImportWizardNewServiceProvider::class,
+    SystemAdminPanelProvider::class,
 ];

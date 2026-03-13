@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
@@ -71,7 +75,7 @@ function createPreviewReadyStore(
     return $store;
 }
 
-function mountPreviewStep(object $context): \Livewire\Features\SupportTesting\Testable
+function mountPreviewStep(object $context): Testable
 {
     return Livewire::test(PreviewStep::class, [
         'storeId' => $context->store->id(),
@@ -132,7 +136,7 @@ it('resolves rows as Update when email matches existing record', function (): vo
         'team_id' => $this->team->id,
     ]);
 
-    $emailField = \App\Models\CustomField::query()
+    $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)
         ->where('entity_type', 'people')
@@ -140,7 +144,7 @@ it('resolves rows as Update when email matches existing record', function (): vo
         ->first();
 
     if ($emailField) {
-        \App\Models\CustomFieldValue::create([
+        CustomFieldValue::create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
@@ -449,7 +453,7 @@ it('previewRows returns paginated rows', function (): void {
     $component = mountPreviewStep($this);
 
     $previewRows = $component->get('previewRows');
-    expect($previewRows)->toBeInstanceOf(\Illuminate\Contracts\Pagination\LengthAwarePaginator::class)
+    expect($previewRows)->toBeInstanceOf(LengthAwarePaginator::class)
         ->and($previewRows->total())->toBe(3)
         ->and($previewRows->items())->toHaveCount(3);
 });

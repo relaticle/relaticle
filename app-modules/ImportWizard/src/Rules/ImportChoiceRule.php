@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
 
 /**
  * Validates that a value matches one of the available choice options.
@@ -29,7 +30,7 @@ final readonly class ImportChoiceRule implements ValidationRule
      *
      * ValueValidator guarantees non-empty string; keep type check only.
      *
-     * @param  Closure(string, ?string=): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {

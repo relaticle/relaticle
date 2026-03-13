@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Importers\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
+use Relaticle\ImportWizard\Data\MatchableField;
 
 /**
  * Contract for entity importers.
@@ -45,14 +47,14 @@ interface ImporterContract
     /**
      * Get entity links (relationships and Record custom fields) for this entity.
      *
-     * @return array<string, \Relaticle\ImportWizard\Data\EntityLink>
+     * @return array<string, EntityLink>
      */
     public function entityLinks(): array;
 
     /**
      * Get fields that can be used to match imported rows to existing records.
      *
-     * @return array<\Relaticle\ImportWizard\Data\MatchableField>
+     * @return array<MatchableField>
      */
     public function matchableFields(): array;
 
@@ -61,7 +63,7 @@ interface ImporterContract
      *
      * @param  array<string>  $mappedFields  List of mapped field keys
      */
-    public function getMatchFieldForMappedColumns(array $mappedFields): ?\Relaticle\ImportWizard\Data\MatchableField;
+    public function getMatchFieldForMappedColumns(array $mappedFields): ?MatchableField;
 
     /**
      * Prepare data for saving to the database.

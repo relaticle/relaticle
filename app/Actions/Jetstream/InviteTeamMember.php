@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
+use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
@@ -30,7 +31,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         $this->validate($team, $email, $role);
 
-        event(new \Laravel\Jetstream\Events\InvitingTeamMember($team, $email, $role));
+        event(new InvitingTeamMember($team, $email, $role));
 
         $invitation = $team->teamInvitations()->create([
             'email' => $email,

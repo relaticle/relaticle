@@ -13,6 +13,7 @@ use Illuminate\Queue\Middleware\ThrottlesExceptionsWithRedis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
+use Spatie\MailcoachSdk\Resources\Subscriber;
 
 final class UpdateSubscriberJob implements ShouldQueue
 {
@@ -25,7 +26,7 @@ final class UpdateSubscriberJob implements ShouldQueue
         $email = $this->data->email;
         $subscriber = Mailcoach::findByEmail(config('mailcoach-sdk.subscribers_list_id'), $this->data->email);
 
-        if ($subscriber instanceof \Spatie\MailcoachSdk\Resources\Subscriber) {
+        if ($subscriber instanceof Subscriber) {
             $data = $this->data->toArray();
             $data['tags'] = collect($subscriber->tags)->merge($this->data->tags)->unique()->toArray();
 
@@ -46,7 +47,7 @@ final class UpdateSubscriberJob implements ShouldQueue
     /**
      * Get the middleware the job should pass through.
      *
-     * @return array<\Illuminate\Queue\Middleware\ThrottlesExceptionsWithRedis>
+     * @return array<ThrottlesExceptionsWithRedis>
      */
     public function middleware(): array
     {

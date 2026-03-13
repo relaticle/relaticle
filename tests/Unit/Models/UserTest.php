@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -35,7 +36,7 @@ test('user can access tenants', function () {
     $team = Team::factory()->create(['user_id' => $user->id]);
     $user->ownedTeams()->save($team);
 
-    $tenants = $user->getTenants(app(\Filament\Panel::class)->id('app'));
+    $tenants = $user->getTenants(app(Panel::class)->id('app'));
 
     expect($tenants->count())->toBe(1)
         ->and($tenants->first()->id)->toBe($team->id);

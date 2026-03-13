@@ -7,9 +7,11 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
+use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\EntityLinkSource;
+use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 
 mutates(EntityLinkValidator::class);
@@ -180,8 +182,8 @@ it('getResolvedId returns null for non-existing record', function (): void {
 });
 
 it('validateFromColumn returns null for field mapping column', function (): void {
-    $column = \Relaticle\ImportWizard\Data\ColumnData::toField(source: 'Name', target: 'name');
-    $importer = Mockery::mock(\Relaticle\ImportWizard\Importers\BaseImporter::class);
+    $column = ColumnData::toField(source: 'Name', target: 'name');
+    $importer = Mockery::mock(BaseImporter::class);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -189,7 +191,7 @@ it('validateFromColumn returns null for field mapping column', function (): void
 });
 
 it('validateFromColumn validates entity link column', function (): void {
-    $column = \Relaticle\ImportWizard\Data\ColumnData::toEntityLink(
+    $column = ColumnData::toEntityLink(
         source: 'Company',
         matcherKey: 'id',
         entityLinkKey: 'company',
@@ -202,7 +204,7 @@ it('validateFromColumn validates entity link column', function (): void {
         matchableFields: [MatchableField::id()],
     );
 
-    $importer = Mockery::mock(\Relaticle\ImportWizard\Importers\BaseImporter::class);
+    $importer = Mockery::mock(BaseImporter::class);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -213,8 +215,8 @@ it('validateFromColumn validates entity link column', function (): void {
 });
 
 it('batchValidateFromColumn returns null for field mapping column', function (): void {
-    $column = \Relaticle\ImportWizard\Data\ColumnData::toField(source: 'Name', target: 'name');
-    $importer = Mockery::mock(\Relaticle\ImportWizard\Importers\BaseImporter::class);
+    $column = ColumnData::toField(source: 'Name', target: 'name');
+    $importer = Mockery::mock(BaseImporter::class);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -226,7 +228,7 @@ it('batchValidateFromColumn returns null for field mapping column', function ():
 it('batchValidateFromColumn validates entity link column', function (): void {
     $company = Company::factory()->create(['team_id' => $this->team->id]);
 
-    $column = \Relaticle\ImportWizard\Data\ColumnData::toEntityLink(
+    $column = ColumnData::toEntityLink(
         source: 'Company',
         matcherKey: 'id',
         entityLinkKey: 'company',
@@ -239,7 +241,7 @@ it('batchValidateFromColumn validates entity link column', function (): void {
         matchableFields: [MatchableField::id()],
     );
 
-    $importer = Mockery::mock(\Relaticle\ImportWizard\Importers\BaseImporter::class);
+    $importer = Mockery::mock(BaseImporter::class);
     $validator = new EntityLinkValidator((string) $this->team->id);
 
     $results = $validator->batchValidateFromColumn($column, $importer, [(string) $company->id, '99999']);

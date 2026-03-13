@@ -8,6 +8,7 @@ use App\Models\AiSummary;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Prism\Prism\Enums\Provider;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\ValueObjects\Usage;
@@ -114,10 +115,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addBasicInfo(\Illuminate\Support\Collection $parts, array $context): void
+    private function addBasicInfo(Collection $parts, array $context): void
     {
         if (blank($context['basic_info'])) {
             return;
@@ -139,10 +140,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addRelationships(\Illuminate\Support\Collection $parts, array $context): void
+    private function addRelationships(Collection $parts, array $context): void
     {
         if (blank($context['relationships'] ?? [])) {
             return;
@@ -155,10 +156,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addOpportunities(\Illuminate\Support\Collection $parts, array $context): void
+    private function addOpportunities(Collection $parts, array $context): void
     {
         $opportunities = Arr::get($context, 'opportunities.items', []);
         if (blank($opportunities)) {
@@ -181,10 +182,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addNotes(\Illuminate\Support\Collection $parts, array $context): void
+    private function addNotes(Collection $parts, array $context): void
     {
         $notes = Arr::get($context, 'notes.items', []);
         if (blank($notes)) {
@@ -208,10 +209,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addTasks(\Illuminate\Support\Collection $parts, array $context): void
+    private function addTasks(Collection $parts, array $context): void
     {
         $tasks = Arr::get($context, 'tasks.items', []);
         if (blank($tasks)) {
@@ -252,10 +253,10 @@ PROMPT;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $parts
+     * @param  Collection<int, string>  $parts
      * @param  array<string, mixed>  $context
      */
-    private function addTimestamps(\Illuminate\Support\Collection $parts, array $context): void
+    private function addTimestamps(Collection $parts, array $context): void
     {
         $parts->push(
             '',
