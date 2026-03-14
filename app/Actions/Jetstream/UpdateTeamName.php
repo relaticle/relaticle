@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\ValidTeamSlug;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Jetstream\Contracts\UpdatesTeamNames;
@@ -23,7 +24,7 @@ final readonly class UpdateTeamName implements UpdatesTeamNames
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'min:3', 'regex:'.Team::SLUG_REGEX, "unique:teams,slug,{$team->id}"],
+            'slug' => ['required', 'string', 'max:255', new ValidTeamSlug(ignoreValue: $team->slug), "unique:teams,slug,{$team->id}"],
         ])->validateWithBag('updateTeamName');
 
         $team->update([

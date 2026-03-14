@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -99,6 +100,7 @@ test('team events are dispatched', function () {
 
     $team = Team::factory()->create([
         'name' => 'Test Team',
+        'slug' => 'test-team',
     ]);
 
     $team->update([
@@ -112,7 +114,7 @@ test('team events are dispatched', function () {
     Event::assertDispatched(TeamDeleted::class);
 });
 
-test('observer generates slug from name on creation', function () {
+test('slug is generated from name on creation', function () {
     Event::fake()->except(
         fn (string $event) => str_starts_with($event, 'eloquent.')
     );
@@ -128,7 +130,7 @@ test('observer generates slug from name on creation', function () {
     expect($team->slug)->toBe('acme-corp');
 });
 
-test('observer generates unique slug when duplicate name exists', function () {
+test('unique slug is generated when duplicate name exists', function () {
     Event::fake()->except(
         fn (string $event) => str_starts_with($event, 'eloquent.')
     );
@@ -139,11 +141,11 @@ test('observer generates unique slug when duplicate name exists', function () {
     $second = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
     $third = Team::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_team' => false]);
 
-    expect($second->slug)->toBe('acme-corp-2')
-        ->and($third->slug)->toBe('acme-corp-3');
+    expect($second->slug)->toBe('acme-corp-1')
+        ->and($third->slug)->toBe('acme-corp-2');
 });
 
-test('observer handles special characters in slug', function () {
+test('special characters are handled in slug generation', function () {
     Event::fake()->except(
         fn (string $event) => str_starts_with($event, 'eloquent.')
     );
@@ -159,7 +161,7 @@ test('observer handles special characters in slug', function () {
     expect($team->slug)->toBe('hello-world-friends');
 });
 
-test('observer does not overwrite explicitly provided slug', function () {
+test('explicitly provided slug is not overwritten', function () {
     Event::fake()->except(
         fn (string $event) => str_starts_with($event, 'eloquent.')
     );
@@ -176,7 +178,7 @@ test('observer does not overwrite explicitly provided slug', function () {
     expect($team->slug)->toBe('custom-slug');
 });
 
-test('observer generates random slug when name has no alphanumeric characters', function () {
+test('random slug is generated when name has no alphanumeric characters', function () {
     Event::fake()->except(
         fn (string $event) => str_starts_with($event, 'eloquent.')
     );
@@ -202,4 +204,42 @@ test('slug is stable when name is updated', function () {
     $team->update(['name' => 'Updated Name']);
 
     expect($team->fresh()->slug)->toBe('original-name');
+});
+
+test('auto-generated slug from reserved name gets suffixed', function () {
+    Event::fake()->except(
+        fn (string $event) => str_starts_with($event, 'eloquent.')
+    );
+
+    $user = User::factory()->create();
+
+    $team = Team::query()->create([
+        'name' => 'Admin',
+        'user_id' => $user->id,
+        'personal_team' => true,
+    ]);
+
+    expect($team->slug)->not->toBe('admin')
+        ->and($team->slug)->toStartWith('admin-');
+});
+
+test('reserved slugs cover all top-level route segments', function () {
+    $routes = Route::getRoutes();
+
+    $excludedPrefixes = ['livewire', 'sanctum', 'filament', 'app', '__clockwork', 'clockwork', 'laravel-login-link-login'];
+
+    $firstSegments = collect($routes->getRoutes())
+        ->map(fn ($route) => explode('/', trim($route->uri(), '/'))[0] ?? '')
+        ->filter(fn (string $segment) => $segment !== '' && ! str_starts_with($segment, '{'))
+        ->reject(fn (string $segment) => in_array($segment, $excludedPrefixes, true) || str_starts_with($segment, 'livewire-'))
+        ->unique()
+        ->values();
+
+    $missing = $firstSegments->reject(
+        fn (string $segment) => in_array($segment, Team::RESERVED_SLUGS, true)
+    );
+
+    expect($missing->toArray())->toBeEmpty(
+        'These route segments are missing from Team::RESERVED_SLUGS: '.$missing->implode(', ')
+    );
 });

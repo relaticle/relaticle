@@ -8,6 +8,7 @@ use App\Actions\Jetstream\UpdateTeamName as UpdateTeamNameAction;
 use App\Filament\Pages\EditTeam;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
+use App\Rules\ValidTeamSlug;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -61,7 +62,7 @@ final class UpdateTeamName extends BaseLivewireComponent
                             ->string()
                             ->maxLength(255)
                             ->required()
-                            ->rules(['min:3', 'regex:'.Team::SLUG_REGEX])
+                            ->rules([new ValidTeamSlug(ignoreValue: $this->team->slug)])
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (): void {
                                 $this->slugManuallyEdited = true;

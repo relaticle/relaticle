@@ -7,15 +7,15 @@
 <script>
 window.addEventListener('load', function() {
     function normalizeUrl(pathname) {
-        // Remove tenant ID: /1/people → /people
-        pathname = pathname.replace(/^\/\d+/, '');
+        // Remove tenant slug: /my-team/people → /people
+        pathname = pathname.replace(/^\/[^\/]+/, '');
 
-        // Normalize patterns:
-        // /people/5 → /people/view
-        // /people/5/edit → /people/edit
+        // Normalize record IDs (numeric or ULID) out of paths:
+        // /people/01abc123 → /people/view
+        // /people/01abc123/edit → /people/edit
         pathname = pathname
-            .replace(/^(\/\w+)\/\d+$/,'$1/view')           // detail view
-            .replace(/^(\/\w+)\/\d+\/edit$/,'$1/edit');    // edit form
+            .replace(/^(\/[\w-]+)\/[^\/]+\/(\w+)$/, '$1/$2')          // /resource/id/action → /resource/action
+            .replace(/^(\/[\w-]+)\/(?=[^\/]*\d)[^\/]+$/, '$1/view');  // /resource/id → /resource/view (id must contain a digit)
 
         return pathname || '/dashboard';
     }

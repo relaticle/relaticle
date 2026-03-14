@@ -115,6 +115,7 @@ arch('SystemAdmin module must not depend on main app namespace')
     ->ignoring([
         'App\Models',
         'App\Enums',
+        'App\Rules',
     ]);
 
 arch('must not use custom-fields package models directly')

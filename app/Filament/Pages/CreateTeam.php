@@ -8,6 +8,7 @@ use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Filament\Resources\CompanyResource;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\ValidTeamSlug;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Tenancy\RegisterTenant;
@@ -60,9 +61,8 @@ final class CreateTeam extends RegisterTenant
 
                 TextInput::make('slug')
                     ->required()
-                    ->minLength(3)
                     ->maxLength(255)
-                    ->regex(Team::SLUG_REGEX)
+                    ->rules([new ValidTeamSlug])
                     ->unique(Team::class, 'slug')
                     ->prefix("{$appHost}/")
                     ->helperText('Only lowercase letters, numbers, and hyphens are allowed.')

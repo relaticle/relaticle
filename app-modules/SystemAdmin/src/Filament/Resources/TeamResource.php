@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Models\Team;
+use App\Rules\ValidTeamSlug;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -71,7 +72,7 @@ final class TeamResource extends Resource
                     ->maxLength(255),
                 TextInput::make('slug')
                     ->required()
-                    ->rules(['regex:'.Team::SLUG_REGEX])
+                    ->rules([fn (?Team $record): ValidTeamSlug => new ValidTeamSlug(ignoreValue: $record?->slug)])
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
                 Toggle::make('personal_team')
