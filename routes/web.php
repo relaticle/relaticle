@@ -10,6 +10,7 @@ use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Jetstream\Http\Controllers\TeamInvitationController;
+use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,10 +38,11 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
 
-Route::get('/', HomeController::class);
-
-Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
-Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
+Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
+    Route::get('/', HomeController::class);
+    Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
+    Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
+});
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 

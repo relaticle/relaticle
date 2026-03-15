@@ -1,177 +1,124 @@
 <header
-    class="bg-white dark:bg-black py-4 fixed w-full top-0 z-50 transition-all duration-300 border-b border-gray-100 dark:border-gray-900 backdrop-blur-sm bg-white/95 dark:bg-black/95">
+    id="main-header"
+    class="fixed w-full top-0 z-50 bg-transparent dark:bg-black/95 dark:backdrop-blur-md"
+    style="border-bottom: 1px solid transparent; transition: background 0.4s ease, border-bottom 0.4s ease, backdrop-filter 0.4s ease;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Three-column layout: Logo | Nav (centered) | Actions -->
-        <div class="flex items-center justify-between">
-            <!-- Logo (Left Column) -->
-            <div class="flex flex-1 items-center min-w-0">
-                <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
-                    <x-brand.logo-lockup
-                        size="md"
-                        class="text-black dark:text-white"
-                    />
+        <div class="flex items-center justify-between h-16 md:h-20" id="header-container">
+
+            <div class="flex flex-1 items-center">
+                <a href="{{ url('/') }}" class="transition-opacity" aria-label="Relaticle Home">
+                    <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                 </a>
             </div>
 
-            <!-- Desktop Navigation (Center Column) -->
-            <div class="hidden md:flex flex-1 items-center justify-center">
-                <nav class="flex items-center space-x-8">
+            <div id="nav-pill"
+                 class="hidden md:flex items-center rounded-full px-1.5 py-1"
+                 style="gap: 2px; background: transparent; border: 1px solid transparent; box-shadow: none; transition: background 0.4s ease, border 0.4s ease, box-shadow 0.4s ease, gap 0.4s ease;">
+                <nav class="flex items-center" id="nav-links" style="gap: 0px; transition: gap 0.4s ease;">
                     <a href="{{ url('/#features') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Product features">Features</a>
-                    <a href="{{ route('documentation.index') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Documentation">Documentation</a>
-                    <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="GitHub Repository">
-                        <x-icon-github class="w-4 h-4"/>
-                        @if(isset($githubStars) && $githubStars > 0)
-                            <span>{{ $formattedGithubStars }}</span>
-                        @endif
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
+                       class="px-4 py-1.5 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-400 text-[13px] font-medium transition-colors rounded-full">
+                        Features
                     </a>
+                    <a href="{{ route('documentation.index') }}"
+                       class="px-4 py-1.5 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-400 text-[13px] font-medium transition-colors rounded-full">
+                        Documentation
+                    </a>
+
+                    <a href="https://github.com/Relaticle/relaticle" target="_blank"
+                       class="px-4 py-1.5 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-400 text-[13px] font-medium transition-colors rounded-full flex items-center gap-2">
+                        <x-ri-github-fill class="w-4 h-4"/>
+                        @if(isset($githubStars) && $githubStars > 0)
+                            <span class="opacity-80">{{ $formattedGithubStars }}</span>
+                        @else
+                            <span>GitHub</span>
+                        @endif
+                    </a>
+
                     <a href="{{ route('discord') }}" target="_blank"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Join Discord Community">
-                        <x-icon-discord class="w-4 h-4"/>
-                        Discord
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
+                       class="px-4 py-1.5 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary-400 text-[13px] font-medium transition-colors rounded-full flex items-center gap-1.5">
+                        <x-ri-discord-line class="w-4 h-4"/>
+                        <span>Discord</span>
                     </a>
                 </nav>
             </div>
 
-            <!-- Right Section: Auth and Settings (Right Column) -->
-            <div class="flex flex-1 items-center justify-end space-x-5">
-                <!-- Auth Links -->
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="{{ route('login') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 {{ Route::is('login') ? 'text-primary dark:text-primary-400' : '' }}"
-                       aria-label="Sign in to your account">Sign In</a>
+            <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
 
-                    <a href="{{ route('register') }}"
-                       class="group bg-primary hover:bg-primary-600 text-white px-5 py-2.5 text-sm rounded-md transition-all duration-300 font-medium relative overflow-hidden shadow-sm hover:shadow hover:scale-[1.02] active:scale-[0.98]"
-                       aria-label="Create a new account">
-                        <span class="relative z-10">Start for free</span>
-                        <span
-                            class="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                    </a>
-                </div>
+                <a href="{{ route('login') }}"
+                   class="hidden sm:flex h-9 items-center rounded-lg border border-gray-200
+              bg-white px-5 text-sm font-medium
+              transition-all duration-100
+              hover:bg-gray-50/50
+              dark:border-white/10 dark:bg-black dark:text-white dark:hover:bg-neutral-900">
+                    Sign In
+                </a>
 
-                <!-- Mobile Menu Button -->
-                <div class="md:hidden">
-                    <button id="mobile-menu-button"
-                            class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-all active:scale-95"
-                            aria-label="Toggle mobile menu"
-                            aria-expanded="false">
-                        <x-heroicon-o-bars-3 class="h-6 w-6"/>
-                    </button>
-                </div>
+                <a href="{{ route('register') }}"
+                   class="flex h-8 sm:h-9 items-center rounded-lg border border-primary
+              bg-primary px-3.5 sm:px-5 text-xs sm:text-sm font-medium text-white
+              transition-all duration-100
+              hover:bg-primary/95 hover:shadow-sm hover:ring-2 hover:ring-primary/10">
+                    Start for free
+                </a>
+
             </div>
         </div>
     </div>
-
-    <!-- Mobile Menu Component -->
-    <x-layout.mobile-menu/>
 </header>
 
-<!-- Add a spacer to prevent content from hiding behind fixed header -->
-<div class="h-[64px]"></div>
+<div class="h-16 md:h-20"></div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Mobile menu functionality
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
-        const mobileMenuClose = document.getElementById('mobile-menu-close');
-        const mobileMenuLinks = document.querySelectorAll('.mobile-menu-link');
+        const header = document.getElementById('main-header');
+        const container = document.getElementById('header-container');
+        const navPill = document.getElementById('nav-pill');
+        const navLinks = document.getElementById('nav-links');
+        const isDark = () => document.documentElement.classList.contains('dark');
 
-        function openMobileMenu() {
-            // Show elements
-            mobileMenu.classList.remove('hidden');
-            mobileMenuBackdrop.classList.remove('hidden');
+        let scrolled = false;
 
-            // Prevent body scroll
-            document.body.classList.add('overflow-hidden');
+        function updateHeader() {
+            const isScrolled = window.scrollY > 20;
 
-            // Trigger animations
-            setTimeout(() => {
-                mobileMenu.classList.remove('translate-x-full');
-                mobileMenuBackdrop.classList.remove('opacity-0');
-            }, 10);
+            if (isScrolled === scrolled) return;
+            scrolled = isScrolled;
 
-            mobileMenuButton.setAttribute('aria-expanded', 'true');
-        }
+            if (isScrolled) {
+                // Scrolled state — bordered pill, frosted header
+                header.style.background = isDark() ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)';
+                header.style.backdropFilter = 'blur(16px)';
+                header.style.webkitBackdropFilter = 'blur(16px)';
+                header.style.borderBottom = isDark() ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.04)';
 
-        function closeMobileMenu() {
-            // Hide with animations
-            mobileMenu.classList.add('translate-x-full');
-            mobileMenuBackdrop.classList.add('opacity-0');
-
-            // Re-enable body scroll
-            document.body.classList.remove('overflow-hidden');
-
-            // Hide elements after animation
-            setTimeout(() => {
-                mobileMenu.classList.add('hidden');
-                mobileMenuBackdrop.classList.add('hidden');
-            }, 300);
-
-            mobileMenuButton.setAttribute('aria-expanded', 'false');
-        }
-
-        // Event listeners
-        if (mobileMenuButton) {
-            mobileMenuButton.addEventListener('click', openMobileMenu);
-        }
-
-        if (mobileMenuClose) {
-            mobileMenuClose.addEventListener('click', closeMobileMenu);
-        }
-
-        if (mobileMenuBackdrop) {
-            mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
-        }
-
-        // Close menu when clicking links
-        mobileMenuLinks.forEach(link => {
-            link.addEventListener('click', closeMobileMenu);
-        });
-
-        // Close menu on escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && mobileMenuButton.getAttribute('aria-expanded') === 'true') {
-                closeMobileMenu();
-            }
-        });
-
-        // Dynamic header scrolling effect
-        const header = document.querySelector('header');
-        window.addEventListener('scroll', function () {
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-            if (scrollTop > 20) {
-                header.classList.add('py-2', 'shadow-sm');
-                header.classList.remove('py-4');
+                navPill.style.background = isDark() ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+                navPill.style.border = isDark() ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)';
+                navPill.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+                navPill.style.gap = '4px';
+                navLinks.style.gap = '4px';
             } else {
-                header.classList.add('py-4');
-                header.classList.remove('py-2', 'shadow-sm');
-            }
-        });
+                // Default state — transparent in light, solid in dark
+                header.style.background = isDark() ? 'rgba(0,0,0,0.95)' : 'transparent';
+                header.style.backdropFilter = isDark() ? 'blur(16px)' : 'none';
+                header.style.webkitBackdropFilter = isDark() ? 'blur(16px)' : 'none';
+                header.style.borderBottom = isDark() ? '1px solid rgba(255,255,255,0.05)' : '1px solid transparent';
 
-        // Check for user preference for reduced motion
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (prefersReducedMotion) {
-            document.documentElement.classList.add('reduce-motion');
+                navPill.style.background = 'transparent';
+                navPill.style.border = '1px solid transparent';
+                navPill.style.boxShadow = 'none';
+                navPill.style.gap = '2px';
+                navLinks.style.gap = '0px';
+            }
         }
+
+        // Watch for dark mode changes
+        const darkObserver = new MutationObserver(() => {
+            scrolled = !scrolled; // force re-apply
+            updateHeader();
+        });
+        darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        window.addEventListener('scroll', updateHeader, { passive: true });
+        updateHeader();
     });
 </script>
-
-<style>
-    /* Adding styles for users who prefer reduced motion */
-    .reduce-motion * {
-        transition-duration: 0.05s !important;
-        animation-duration: 0.05s !important;
-    }
-</style>

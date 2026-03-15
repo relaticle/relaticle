@@ -48,6 +48,15 @@ test('slug must match valid format', function () {
         ->assertHasFormErrors(['slug']);
 });
 
+test('reserved slug is rejected on team update', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
+        ->fillForm(['name' => 'Admin', 'slug' => 'admin'])
+        ->call('updateTeamName', $user->currentTeam)
+        ->assertHasFormErrors(['slug']);
+});
+
 test('slug must be unique across teams', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 

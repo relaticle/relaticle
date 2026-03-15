@@ -1,5 +1,6 @@
 .DS_Store
 /.phpunit.cache
+.scribe
 /node_modules
 /public/build
 /public/hot
@@ -35,3 +36,5 @@ boost.json
 /.playwright-mcp
 /docs
 .context
+polyscope.json
+/bin/setup-preview.sh

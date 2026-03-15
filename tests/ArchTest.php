@@ -137,6 +137,7 @@ arch('SystemAdmin module must not depend on main app namespace')
     ->ignoring([
         'App\Models',
         'App\Enums',
+        'App\Rules',
     ]);
 
 arch('API controllers must not use Eloquent query methods directly')

@@ -11,9 +11,9 @@
 
 <x-guest-layout 
     :title="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : config('app.name') . ' - ' . __('Documentation')"
-    :description="!empty($documentTitle) ? $documentTitle . ' - Relaticle Documentation' : 'Comprehensive documentation for Relaticle - The Next-Generation Open-Source CRM Platform. Learn how to install, configure, and use Relaticle effectively.'"
+    :description="!empty($documentTitle) ? $documentTitle . ' - Relaticle Documentation' : 'Documentation for Relaticle - the open-source CRM built for AI agents. Self-hosted with 20 MCP tools, REST API, and 22 custom field types.'"
     :ogTitle="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : config('app.name') . ' - Documentation'"
-    :ogDescription="!empty($documentTitle) ? 'Learn about ' . $documentTitle . ' in the Relaticle documentation.' : 'Explore the Relaticle documentation. Learn how to get started, configuration options, and advanced features of our open-source CRM platform.'">
+    :ogDescription="!empty($documentTitle) ? 'Learn about ' . $documentTitle . ' in the Relaticle documentation.' : 'Explore the Relaticle documentation. Installation, MCP server setup, REST API integration, custom fields, and more.'">
     @pushonce('header')
         @vite(['app-modules/Documentation/resources/js/documentation.js', 'app-modules/Documentation/resources/css/documentation.css'])
     @endpushonce
@@ -32,4 +32,28 @@
         </div>
     </div>
 
+    @php
+        $breadcrumbItems = [
+            \Spatie\SchemaOrg\Schema::listItem()
+                ->position(1)
+                ->name('Home')
+                ->item(url('/')),
+            \Spatie\SchemaOrg\Schema::listItem()
+                ->position(2)
+                ->name('Documentation')
+                ->item(route('documentation.index')),
+        ];
+
+        if (! empty($documentTitle)) {
+            $breadcrumbItems[] = \Spatie\SchemaOrg\Schema::listItem()
+                ->position(3)
+                ->name($documentTitle)
+                ->item(url()->current());
+        }
+
+        $breadcrumbs = \Spatie\SchemaOrg\Schema::breadcrumbList()
+            ->itemListElement($breadcrumbItems);
+    @endphp
+
+    {!! $breadcrumbs->toScript() !!}
 </x-guest-layout>

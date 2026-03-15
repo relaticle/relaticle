@@ -19,17 +19,17 @@
                        class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="GitHub">
                         <span class="sr-only">GitHub</span>
-                        <x-icon-github class="h-5 w-5" />
+                        <x-ri-github-fill class="h-5 w-5" />
                     </a>
                     <a href="https://x.com/relaticle" target="_blank" class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="X">
                         <span class="sr-only">X</span>
-                        <x-icon-x-twitter class="h-5 w-5" />
+                        <x-ri-twitter-x-fill class="h-5 w-5" />
                     </a>
                     <a href="https://www.linkedin.com/company/relaticle"  target="_blank" class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="LinkedIn">
                         <span class="sr-only">LinkedIn</span>
-                        <x-icon-linkedin class="h-5 w-5" />
+                        <x-ri-linkedin-box-fill class="h-5 w-5" />
                     </a>
                 </div>
             </div>

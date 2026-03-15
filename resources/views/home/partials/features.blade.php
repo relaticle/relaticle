@@ -1,111 +1,336 @@
-<!-- Modern Minimalist Features Section -->
-<section id="features" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
-    <!-- Subtle gradient background element -->
-    <div class="absolute -bottom-64 left-0 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
+@php
+    $cardBase = 'group feat-card rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm';
+    $cardTitle = 'font-display text-lg font-medium text-gray-900 dark:text-white mb-2';
+    $cardDesc = 'text-[13px] leading-relaxed text-gray-500 dark:text-gray-400';
+@endphp
 
-    <div class="container max-w-6xl mx-auto px-6 lg:px-8 relative">
-        <!-- Section Header -->
-        <div class="max-w-3xl mx-auto text-center mb-16 md:mb-20">
-            <span class="inline-block px-3 py-1 bg-white dark:bg-gray-900 rounded-full text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
-                Features
-            </span>
-            <h2 class="font-display mt-4 text-3xl sm:text-4xl font-bold text-black dark:text-white">
-                Everything you need to manage relationships
+<section id="features" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
+    <div class="max-w-6xl mx-auto px-6 lg:px-8 relative">
+
+        <div class="max-w-2xl mx-auto text-center mb-16 md:mb-20">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.03] backdrop-blur-sm mb-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Features</span>
+            </div>
+            <h2 class="font-display text-3xl sm:text-4xl md:text-[2.75rem] font-bold text-gray-950 dark:text-white tracking-[-0.02em] leading-[1.15]">
+                Built for humans. Accessible to AI.
             </h2>
-            <p class="mt-5 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                A comprehensive suite of tools designed to streamline your client management workflow
+            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
+                20 MCP tools, a REST API, and 22 custom field types. Your team and your AI agents work from the same source of truth.
             </p>
         </div>
 
-        <!-- Features Grid - Cleaner & More Minimal -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            @php
-                $features = [
-                    [
-                        'title' => 'Task Management',
-                        'description' => 'Stay on top of your team\'s productivity with easy task creation, assignment, and tracking. Receive real-time notifications to keep everyone updated.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />'
-                    ],
-                    [
-                        'title' => 'People Management',
-                        'description' => 'Effortlessly manage individual contacts with detailed profiles, advanced search options, and complete interaction histories to personalize your outreach.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />'
-                    ],
-                    [
-                        'title' => 'AI-Powered Insights',
-                        'description' => 'Generate instant, intelligent summaries of your contacts and deals with one click. AI analyzes notes, tasks, and interactions to surface what matters most.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />'
-                    ],
-                    [
-                        'title' => 'Company Management',
-                        'description' => 'Maintain detailed company profiles and link them to individual contacts, track opportunities, and manage tasks for seamless business operations.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />'
-                    ],
-                    [
-                        'title' => 'Sales Opportunities',
-                        'description' => 'Visualize and manage your sales pipeline with custom stages, lifecycle tracking, and detailed outcome analysis to drive your sales process forward.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />'
-                    ],
-                    [
-                        'title' => 'Notes & Organization',
-                        'description' => 'Capture and categorize notes linked to people, companies, and tasks. Share updates with your team and quickly retrieve important information.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />'
-                    ],
-                    [
-                        'title' => 'Customizable Data Model',
-                        'description' => 'Tailor the CRM to your business needs with user and system-defined custom fields, dynamic forms, and validation rules for data integrity.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />'
-                    ],
-                    [
-                        'title' => 'Team Collaboration',
-                        'description' => 'Work together seamlessly with multi-workspace support, role-based permissions, and real-time notifications to keep your entire team aligned.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />'
-                    ],
-                    [
-                        'title' => 'Import & Export',
-                        'description' => 'Easily migrate your data with CSV imports and exports. Transfer contacts, companies, and opportunities without losing any information.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />'
-                    ],
-                    [
-                        'title' => 'API & AI Integration',
-                        'description' => 'Connect your CRM to any tool with the REST API, or let AI assistants manage your data directly through the MCP server. Automate workflows and build custom integrations.',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />'
-                    ],
-                ];
-            @endphp
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
 
-            @foreach ($features as $feature)
-                <div class="group relative bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl p-6 transition-all duration-300 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm">
-                    <div class="mb-5">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800 text-primary dark:text-primary-400 group-hover:bg-primary/10 dark:group-hover:bg-primary/20 transition-colors duration-300">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                {!! $feature['icon'] !!}
-                            </svg>
+            {{-- Agent-Native Infrastructure — 2col 2row --}}
+            <div class="{{ $cardBase }} p-8 md:col-span-2 lg:col-span-2 lg:row-span-2 overflow-hidden">
+                <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
+                    <x-ri-git-merge-line class="w-4 h-4 text-primary dark:text-primary-400"/>
+                    Agent-Native Infrastructure
+                </h3>
+                <p class="{{ $cardDesc }} max-w-md">
+                    Connect any AI agent through the MCP server with 20 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                </p>
+
+                <div class="mt-6 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden">
+                    <style>
+                        #flow-desktop .fn, #flow-mobile .fn { opacity: 0; }
+                    </style>
+
+                    <div id="flow-mobile" class="flex flex-col items-center gap-2 sm:hidden">
+                        <div class="flex items-center gap-2 flex-wrap justify-center">
+                            @foreach([['ri-claude-fill', 'text-[#D4763C]', 'Claude'], ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT'], ['ri-gemini-fill', 'text-blue-500', 'Gemini']] as [$icon, $color, $name])
+                                <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5">
+                                    <x-dynamic-component :component="$icon" class="w-4 h-4 {{ $color }}"/>
+                                    <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $name }}</span>
+                                </div>
+                            @endforeach
+                            <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
+                                <x-ri-add-line class="w-4 h-4 text-gray-400 dark:text-gray-500"/>
+                                <span class="text-xs font-medium text-gray-400 dark:text-gray-500">Custom</span>
+                            </div>
+                        </div>
+                        <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
+                        <div class="fn w-full bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
+                            <div class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
+                            <div class="flex gap-4 text-[11px]">
+                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">20</span> tools</span>
+                                <span class="text-gray-500 dark:text-gray-400">REST API <span class="font-mono font-medium text-gray-800 dark:text-gray-200">v1</span></span>
+                                <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-600 dark:text-emerald-400">auto</span></span>
+                            </div>
+                        </div>
+                        <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
+                        <div class="fn flex gap-2 flex-wrap justify-center text-[11px] text-gray-600 dark:text-gray-300">
+                            @foreach(['Contacts', 'Companies', 'Deals', 'Tasks', 'Notes'] as $e)
+                                <span class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1">{{ $e }}</span>
+                            @endforeach
                         </div>
                     </div>
-                    <h3 class="font-display text-lg font-medium text-black dark:text-white mb-2 group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
-                        {{ $feature['title'] }}
+
+                    <div id="flow-desktop" class="hidden sm:block relative">
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 613 188" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#d1d5db"/><stop offset="50%" stop-color="oklch(0.6 0.19 275 / 0.5)"/><stop offset="100%" stop-color="#d1d5db"/>
+                                </linearGradient>
+                            </defs>
+                            @foreach([42,81,119,158] as $i => $y)
+                                <path class="curve-path" pathLength="1" d="M 120 {{ $y }} C 183 {{ $y }}, 183 {{ 65 + $i * 12 }}, 246 {{ 65 + $i * 12 }}" stroke="url(#cg)" stroke-width="1.2" fill="none" opacity="{{ $i === 3 ? '0.4' : '0.6' }}"/>
+                            @endforeach
+                            @foreach([[65,40],[70,73],[82,105],[90,138],[100,170]] as [$sy,$ey])
+                                <path class="curve-path" pathLength="1" d="M 386 {{ $sy }} C 450 {{ $sy }}, 450 {{ $ey }}, 513 {{ $ey }}" stroke="url(#cg)" stroke-width="1.2" fill="none" opacity="0.6"/>
+                            @endforeach
+                        </svg>
+
+                        <div class="relative z-10 grid gap-0" style="grid-template-columns: 120px 1fr minmax(140px, auto) 1fr 100px;">
+                            <div class="space-y-2 py-1">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">Agents</div>
+                                @foreach([['ri-claude-fill', 'text-[#D4763C]', 'Claude', false], ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', false], ['ri-gemini-fill', 'text-blue-500', 'Gemini', false], ['ri-add-line', 'text-gray-400 dark:text-gray-500', 'Custom', true]] as [$icon, $color, $name, $dashed])
+                                    <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border {{ $dashed ? 'border-dashed border-gray-300' : 'border-gray-200' }} dark:border-gray-600 rounded-lg px-2.5 py-1.5 {{ $dashed ? '' : 'shadow-sm' }}">
+                                        <x-dynamic-component :component="$icon" class="w-3.5 h-3.5 {{ $color }}"/>
+                                        <span class="text-[11px] font-medium {{ $dashed ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300' }}">{{ $name }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div></div>
+                            <div class="fn py-1">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">MCP Server</div>
+                                <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
+                                    <div class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-2">Connected</div>
+                                    <div class="space-y-1.5">
+                                        @foreach([['Tools', '20', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-600 dark:text-emerald-400']] as [$label, $val, $valClass])
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
+                                                <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                            <div></div>
+                            <div class="fn py-1">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">Your CRM</div>
+                                <div class="space-y-1.5">
+                                    @foreach(['Contacts', 'Companies', 'Deals', 'Tasks', 'Notes'] as $entity)
+                                        <div class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2.5 py-1">
+                                            <div class="w-1.5 h-1.5 rounded-full bg-primary/60"></div>
+                                            {{ $entity }}
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var ease = [0.22, 1, 0.36, 1];
+                            animate(".curve-path", { pathLength: 0 }, { duration: 0 });
+                            inView("#flow-desktop", function() {
+                                animate("#flow-desktop .fn", { opacity: [0, 1], y: [12, 0] }, { delay: stagger(0.05), duration: 0.4, ease: ease });
+                                animate(".curve-path", { pathLength: [0, 1] }, { duration: 0.8, delay: stagger(0.06, { start: 0.3 }), ease: ease });
+                            }, { amount: 0.3 });
+                            inView("#flow-mobile", function() {
+                                animate("#flow-mobile .fn", { opacity: [0, 1], y: [12, 0] }, { delay: stagger(0.06), duration: 0.4, ease: ease });
+                            }, { amount: 0.3 });
+                        });
+                    </script>
+                </div>
+            </div>
+
+            {{-- AI-Powered Insights --}}
+            <div id="card-ai" class="{{ $cardBase }} p-6 overflow-hidden">
+                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                    <x-ri-lightbulb-flash-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                    AI-Powered Insights
+                </h3>
+                <p class="{{ $cardDesc }}">
+                    One-click summaries of contacts and deals. AI analyzes notes, tasks, and interactions so you always know what happened and what to do next.
+                </p>
+                {{-- Animated insight lines --}}
+                <div class="mt-4 space-y-2">
+                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/20 dark:bg-primary/30 w-0"></div></div>
+                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
+                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/10 dark:bg-primary/20 w-0"></div></div>
+                </div>
+            </div>
+
+            {{-- Customizable Data Model --}}
+            <div id="card-data" class="{{ $cardBase }} p-6 overflow-hidden">
+                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                    <x-ri-stack-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                    Customizable Data Model
+                </h3>
+                <p class="{{ $cardDesc }}">
+                    22 field types including entity relationships, conditional visibility, and per-field encryption.
+                </p>
+                <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-3 space-y-2">
+                    @foreach([['Text', 'Company name...', false], ['Select', 'Industry', true]] as [$label, $placeholder, $hasArrow])
+                        <div class="field-row flex items-center gap-2">
+                            <div class="w-14 text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ $label }}</div>
+                            <div class="flex-1 h-6 rounded bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 flex items-center {{ $hasArrow ? 'justify-between' : '' }} text-[10px] text-gray-400">
+                                <span>{{ $placeholder }}</span>
+                                @if($hasArrow)<x-ri-arrow-down-s-line class="w-3 h-3"/>@endif
+                            </div>
+                        </div>
+                    @endforeach
+                    <div class="field-row flex items-center gap-2">
+                        <div class="w-14 text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Toggle</div>
+                        <div class="w-8 h-4 rounded-full bg-primary relative">
+                            <div class="absolute right-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Company Management --}}
+            <div class="relative {{ $cardBase }} p-6 overflow-hidden">
+                <div class="absolute w-32 h-32 bg-primary/10 dark:bg-primary/15 rounded-full blur-2xl" style="top: -2rem; left: -2rem;"></div>
+                <div class="relative">
+                    <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                        <x-ri-building-2-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                        Company Management
                     </h3>
-                    <p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                        {{ $feature['description'] }}
-                    </p>
+                    <p class="{{ $cardDesc }}">Track companies with detailed profiles, linked contacts, and opportunity history. See the full picture at a glance.</p>
+                </div>
+            </div>
+
+            {{-- People Management --}}
+            <div class="{{ $cardBase }} p-6">
+                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                    <x-ri-user-star-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                    People Management
+                </h3>
+                <p class="{{ $cardDesc }}">Rich contact profiles with interaction history, notes, and linked companies. Find anyone with advanced search and filters.</p>
+            </div>
+
+            {{-- Sales Opportunities --}}
+            <div id="card-sales" class="{{ $cardBase }} p-6 overflow-hidden">
+                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                    <x-ri-funds-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                    Sales Opportunities
+                </h3>
+                <p class="{{ $cardDesc }}">
+                    Manage your pipeline with custom stages, lifecycle tracking, and win/loss analysis.
+                </p>
+                <div class="mt-4 flex gap-1 h-2 rounded-full overflow-hidden">
+                    <div class="pipe-seg flex-[3] bg-primary/70 rounded-l-full origin-left"></div>
+                    <div class="pipe-seg flex-[2] bg-primary/45 origin-left"></div>
+                    <div class="pipe-seg flex-[2] bg-primary/25 origin-left"></div>
+                    <div class="pipe-seg flex-[1] bg-gray-200 dark:bg-gray-700 rounded-r-full origin-left"></div>
+                </div>
+                <div class="mt-1.5 flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
+                    @foreach(['Lead', 'Qualified', 'Proposal', 'Won'] as $stage)
+                        <span>{{ $stage }}</span>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Task Management — 2col --}}
+            <div id="card-tasks" class="{{ $cardBase }} p-8 md:col-span-2 lg:col-span-2 overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:gap-8">
+                    <div class="sm:flex-1">
+                        <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
+                            <x-ri-layout-masonry-line class="w-4 h-4 text-primary dark:text-primary-400"/>
+                            Task Management
+                        </h3>
+                        <p class="{{ $cardDesc }}">
+                            Create, assign, and track tasks linked to contacts, companies, and deals. Your AI agent can create follow-ups automatically.
+                        </p>
+                    </div>
+                    <div class="mt-5 sm:mt-0 sm:flex-1 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
+                        @foreach([
+                            [true, 'Send proposal to', '@Acme', 'bg-primary/10 text-primary-700 dark:text-primary-300'],
+                            [false, 'Follow up with', '@Sarah', 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'],
+                            [false, 'Review Q4 pipeline', 'Due today', 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'],
+                        ] as [$done, $text, $badge, $badgeClass])
+                            <div class="task-row flex items-center gap-3">
+                                <div class="w-4 h-4 rounded-full border-2 {{ $done ? 'border-green-500 bg-green-500/20' : 'border-gray-300 dark:border-gray-600' }} flex items-center justify-center shrink-0">
+                                    @if($done)<x-ri-check-line class="w-2.5 h-2.5 text-green-600 dark:text-green-400"/>@endif
+                                </div>
+                                <span class="text-sm {{ $done ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300' }}">{{ $text }}</span>
+                                <span class="text-[10px] {{ $badgeClass }} px-2 py-0.5 rounded-full shrink-0">{{ $badge }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            {{-- Simple feature cards row 2 --}}
+            @foreach([
+                ['ri-team-line', 'Team Collaboration', 'Multi-workspace support with role-based permissions and 5-layer authorization. Every team member sees exactly what they should.'],
+                ['ri-download-cloud-2-line', 'Import & Export', 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime — your data is yours.'],
+                ['ri-quill-pen-line', 'Notes & Activity Log', 'Capture notes linked to any record. Your AI agent can log meeting notes automatically. Search and retrieve context instantly.'],
+            ] as [$icon, $title, $desc])
+                <div class="{{ $cardBase }} p-6">
+                    <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
+                        <x-dynamic-component :component="$icon" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                        {{ $title }}
+                    </h3>
+                    <p class="{{ $cardDesc }}">{{ $desc }}</p>
                 </div>
             @endforeach
+
+            {{-- CTA Card --}}
+            <div class="relative {{ $cardBase }} p-6 flex flex-col justify-between md:col-span-2 lg:col-span-1 overflow-hidden">
+                <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-primary/10 dark:bg-primary/15 rounded-full blur-2xl"></div>
+                <div class="relative">
+                    <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white mb-2">Ready to start?</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">Give your AI agents a CRM they can actually use.</p>
+                </div>
+                <div class="relative mt-5">
+                    <a href="{{ route('register') }}" class="group/cta inline-flex items-center gap-2 bg-primary hover:bg-primary-600 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-all duration-300">
+                        <span>Start for free</span>
+                        <x-ri-arrow-right-line class="h-3.5 w-3.5 transition-transform duration-300 group-hover/cta:translate-x-1"/>
+                    </a>
+                    <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500">
+                        <span>No credit card</span><span>&middot;</span><span>1,100+ tests</span><span>&middot;</span><span>AGPL-3.0</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <!-- Call-to-action - Simplified -->
-        <div class="mt-20 text-center">
-            <div class="inline-block pt-10 px-4 md:px-8 border-t border-gray-200 dark:border-gray-800 max-w-2xl mx-auto">
-                <h3 class="font-display text-xl font-semibold text-black dark:text-white mb-4">Ready to transform your customer relationships?</h3>
-                <p class="text-gray-600 dark:text-gray-300 mb-6 text-base">Experience the power of Relaticle CRM today with a free account.</p>
-                <a href="{{ route('register') }}" class="group inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-600 text-white px-8 py-3.5 rounded-md font-medium text-base transition-all duration-300">
-                    <span>Start for free</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var e = [0.22, 1, 0.36, 1];
+
+                // Cards entrance — staggered fade up
+                document.querySelectorAll('.feat-card').forEach(function(c) { c.style.opacity = '0'; });
+                inView('#features .grid', function() {
+                    animate('.feat-card', { opacity: [0, 1], y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
+                }, { amount: 0.1 });
+
+                // AI Insights — scanning lines fill to random widths
+                inView('#card-ai', function() {
+                    animate('.ai-fill', { width: ['0%', '85%'] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.8, ease: e });
+                    setTimeout(function() {
+                        animate('.ai-fill', { width: ['85%', '60%'] }, { delay: stagger(0.08), duration: 0.5, ease: e });
+                        setTimeout(function() {
+                            animate('.ai-fill', { width: ['60%', '92%'] }, { delay: stagger(0.1), duration: 0.6, ease: e });
+                        }, 600);
+                    }, 1000);
+                    // Sparkle icon pulse
+                    animate('#ai-sparkle', { scale: [1, 1.3, 1], rotate: [0, 15, 0] }, { duration: 0.6, delay: 0.2, ease: e });
+                }, { amount: 0.4 });
+
+                // Data Model — form fields slide in from left
+                document.querySelectorAll('#card-data .field-row').forEach(function(r) { r.style.opacity = '0'; });
+                inView('#card-data', function() {
+                    animate('#card-data .field-row', { opacity: [0, 1], x: [-16, 0] }, { delay: stagger(0.1, { start: 0.3 }), duration: 0.4, ease: e });
+                }, { amount: 0.4 });
+
+                // Sales Pipeline — segments scale in from left
+                document.querySelectorAll('.pipe-seg').forEach(function(s) { s.style.transform = 'scaleX(0)'; });
+                inView('#card-sales', function() {
+                    animate('.pipe-seg', { scaleX: [0, 1] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.6, ease: e });
+                }, { amount: 0.4 });
+
+                // Tasks — rows slide in staggered from right
+                document.querySelectorAll('.task-row').forEach(function(r) { r.style.opacity = '0'; });
+                inView('#card-tasks', function() {
+                    animate('.task-row', { opacity: [0, 1], x: [20, 0] }, { delay: stagger(0.15, { start: 0.2 }), duration: 0.45, ease: e });
+                }, { amount: 0.3 });
+            });
+        </script>
     </div>
 </section>

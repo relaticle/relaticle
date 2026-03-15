@@ -23,6 +23,15 @@ test('teams can be created', function () {
     expect($user->fresh()->ownedTeams()->where('name', 'Test Team')->exists())->toBeTrue();
 });
 
+test('reserved slug is rejected on team creation', function () {
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
+
+    Livewire::test(CreateTeamForm::class)
+        ->set(['state' => ['name' => 'Admin Team', 'slug' => 'admin']])
+        ->call('createTeam')
+        ->assertHasErrors('slug');
+});
+
 test('non-personal teams do not get demo data seeded', function (): void {
     Event::fake()->except([
         'eloquent.creating: App\\Models\\Team',
