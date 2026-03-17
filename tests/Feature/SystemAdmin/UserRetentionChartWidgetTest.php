@@ -26,6 +26,8 @@ it('can render the user retention chart widget', function () {
 });
 
 it('classifies new active vs returning users correctly', function () {
+    $this->travelTo(now()->next('Wednesday')->midDay());
+
     $newUser = User::factory()->withTeam()->create([
         'created_at' => now()->subDays(2),
     ]);
@@ -35,7 +37,7 @@ it('classifies new active vs returning users correctly', function () {
         ->create([
             'creator_id' => $newUser->id,
             'creation_source' => CreationSource::WEB,
-            'created_at' => now()->subDays(1),
+            'created_at' => now()->subDay(),
         ]));
 
     $returningUser = User::factory()->withTeam()->create([
@@ -47,7 +49,7 @@ it('classifies new active vs returning users correctly', function () {
         ->create([
             'creator_id' => $returningUser->id,
             'creation_source' => CreationSource::WEB,
-            'created_at' => now()->subDays(1),
+            'created_at' => now()->subDay(),
         ]));
 
     $component = livewire(UserRetentionChartWidget::class)->assertOk();
