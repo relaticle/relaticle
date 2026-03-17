@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Models\Company;
@@ -9,6 +10,8 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+
+mutates(CompanyResource::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -161,3 +164,37 @@ it('has `:dataset` filter', function (string $filter): void {
     livewire(ListCompanies::class)
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
+
+it('sets creator_id and team_id via observer when creating a company', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('create', data: [
+            'name' => 'Observer Test Corp',
+        ])
+        ->assertHasNoActionErrors();
+
+    $company = Company::query()->where('name', 'Observer Test Corp')->first();
+
+    expect($company->creator_id)->toBe($this->user->id)
+        ->and($company->team_id)->toBe($this->team->id);
+});
+
+it('authorizes team member to view and update own team company', function (): void {
+    $record = Company::factory()->for($this->team)->create();
+
+    expect($this->user->can('view', $record))->toBeTrue()
+        ->and($this->user->can('update', $record))->toBeTrue()
+        ->and($this->user->can('delete', $record))->toBeTrue();
+});
+
+it('denies non-team-member from viewing another team company', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    $this->actingAs($otherUser);
+    $record = Company::factory()->for($otherTeam)->create();
+    $this->actingAs($this->user);
+
+    expect($this->user->can('view', $record))->toBeFalse()
+        ->and($this->user->can('update', $record))->toBeFalse()
+        ->and($this->user->can('delete', $record))->toBeFalse();
+});

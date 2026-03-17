@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
+mutates(UpdatePasswordComponent::class);
+
 test('password component renders correctly', function () {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);

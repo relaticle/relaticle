@@ -7,6 +7,8 @@ use App\Models\Team;
 use App\Models\User;
 use Livewire\Livewire;
 
+mutates(UpdateTeamName::class);
+
 test('team name and slug can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 

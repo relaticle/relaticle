@@ -6,6 +6,8 @@ use App\Models\User;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('users can leave teams', function () {
     $user = User::factory()->withTeam()->create();
 

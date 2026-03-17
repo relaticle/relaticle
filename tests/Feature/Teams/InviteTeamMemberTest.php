@@ -9,6 +9,8 @@ use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Laravel\Jetstream\Mail\TeamInvitation;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('team members can be invited to team', function () {
     Mail::fake();
 

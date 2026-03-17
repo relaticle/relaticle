@@ -23,6 +23,8 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
+mutates(User::class, Team::class, Company::class, People::class, Task::class, Note::class, Opportunity::class);
+
 beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');

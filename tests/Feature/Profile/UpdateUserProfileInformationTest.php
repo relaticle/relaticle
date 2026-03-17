@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
+mutates(UpdateUserProfileInformation::class, UpdateProfileInformationComponent::class);
+
 beforeEach(function () {
     $this->action = new UpdateUserProfileInformation;
     $this->user = User::factory()->create([

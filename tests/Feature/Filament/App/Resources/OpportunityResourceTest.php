@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Models\Opportunity;
@@ -9,6 +10,8 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+
+mutates(OpportunityResource::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -153,3 +156,37 @@ it('has `:dataset` filter', function (string $filter): void {
     livewire(ListOpportunities::class)
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
+
+it('sets creator_id and team_id via observer when creating an opportunity', function (): void {
+    livewire(ListOpportunities::class)
+        ->callAction('create', data: [
+            'name' => 'Observer Test Deal',
+        ])
+        ->assertHasNoActionErrors();
+
+    $opportunity = Opportunity::query()->where('name', 'Observer Test Deal')->first();
+
+    expect($opportunity->creator_id)->toBe($this->user->id)
+        ->and($opportunity->team_id)->toBe($this->team->id);
+});
+
+it('authorizes team member to view and update own team opportunity', function (): void {
+    $record = Opportunity::factory()->for($this->team)->create();
+
+    expect($this->user->can('view', $record))->toBeTrue()
+        ->and($this->user->can('update', $record))->toBeTrue()
+        ->and($this->user->can('delete', $record))->toBeTrue();
+});
+
+it('denies non-team-member from viewing another team opportunity', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    $this->actingAs($otherUser);
+    $record = Opportunity::factory()->for($otherTeam)->create();
+    $this->actingAs($this->user);
+
+    expect($this->user->can('view', $record))->toBeFalse()
+        ->and($this->user->can('update', $record))->toBeFalse()
+        ->and($this->user->can('delete', $record))->toBeFalse();
+});

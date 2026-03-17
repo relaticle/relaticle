@@ -7,10 +7,13 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Http\Livewire\CreateTeamForm;
 use Livewire\Livewire;
+
+mutates(Team::class);
 
 test('teams can be created', function () {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());

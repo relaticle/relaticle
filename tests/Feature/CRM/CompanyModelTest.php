@@ -17,6 +17,8 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 uses(RefreshDatabase::class);
 
+mutates(Company::class);
+
 test('company belongs to team', function () {
     $team = Team::factory()->create();
     $company = Company::factory()->create([

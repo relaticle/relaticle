@@ -20,6 +20,8 @@ use Livewire\Livewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 
+mutates(OpportunityExporter::class);
+
 beforeEach(function () {
     Event::fake()->except([
         TeamCreated::class,

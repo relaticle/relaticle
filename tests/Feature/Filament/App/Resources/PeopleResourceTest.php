@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\People;
@@ -9,6 +10,8 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+
+mutates(PeopleResource::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -153,3 +156,37 @@ it('has `:dataset` filter', function (string $filter): void {
     livewire(ListPeople::class)
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
+
+it('sets creator_id and team_id via observer when creating a person', function (): void {
+    livewire(ListPeople::class)
+        ->callAction('create', data: [
+            'name' => 'Observer Test Person',
+        ])
+        ->assertHasNoActionErrors();
+
+    $person = People::query()->where('name', 'Observer Test Person')->first();
+
+    expect($person->creator_id)->toBe($this->user->id)
+        ->and($person->team_id)->toBe($this->team->id);
+});
+
+it('authorizes team member to view and update own team person', function (): void {
+    $record = People::factory()->for($this->team)->create();
+
+    expect($this->user->can('view', $record))->toBeTrue()
+        ->and($this->user->can('update', $record))->toBeTrue()
+        ->and($this->user->can('delete', $record))->toBeTrue();
+});
+
+it('denies non-team-member from viewing another team person', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    $this->actingAs($otherUser);
+    $record = People::factory()->for($otherTeam)->create();
+    $this->actingAs($this->user);
+
+    expect($this->user->can('view', $record))->toBeFalse()
+        ->and($this->user->can('update', $record))->toBeFalse()
+        ->and($this->user->can('delete', $record))->toBeFalse();
+});

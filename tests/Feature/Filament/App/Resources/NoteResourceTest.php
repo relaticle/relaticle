@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Models\Note;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+
+mutates(NoteResource::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -145,3 +148,37 @@ it('has `:dataset` filter', function (string $filter): void {
     livewire(ManageNotes::class)
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
+
+it('sets creator_id and team_id via observer when creating a note', function (): void {
+    livewire(ManageNotes::class)
+        ->callAction('create', data: [
+            'title' => 'Observer Test Note',
+        ])
+        ->assertHasNoActionErrors();
+
+    $note = Note::query()->where('title', 'Observer Test Note')->first();
+
+    expect($note->creator_id)->toBe($this->user->id)
+        ->and($note->team_id)->toBe($this->team->id);
+});
+
+it('authorizes team member to view and update own team note', function (): void {
+    $record = Note::factory()->for($this->team)->create();
+
+    expect($this->user->can('view', $record))->toBeTrue()
+        ->and($this->user->can('update', $record))->toBeTrue()
+        ->and($this->user->can('delete', $record))->toBeTrue();
+});
+
+it('denies non-team-member from viewing another team note', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    $this->actingAs($otherUser);
+    $record = Note::factory()->for($otherTeam)->create();
+    $this->actingAs($this->user);
+
+    expect($this->user->can('view', $record))->toBeFalse()
+        ->and($this->user->can('update', $record))->toBeFalse()
+        ->and($this->user->can('delete', $record))->toBeFalse();
+});

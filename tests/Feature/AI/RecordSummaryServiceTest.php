@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\CustomFields\CompanyField;
 use App\Models\AiSummary;
 use App\Models\Company;
+use App\Models\Concerns\HasAiSummary;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\Note;
@@ -20,6 +21,8 @@ use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\Testing\TextResponseFake;
 use Prism\Prism\ValueObjects\Usage;
+
+mutates(RecordContextBuilder::class, RecordSummaryService::class, HasAiSummary::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();

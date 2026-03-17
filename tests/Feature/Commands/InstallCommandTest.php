@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\InstallCommand;
 use Illuminate\Support\Facades\File;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+
+mutates(InstallCommand::class);
 
 function createTempEnvFile(): string
 {

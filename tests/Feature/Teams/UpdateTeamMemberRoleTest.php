@@ -6,6 +6,8 @@ use App\Models\User;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('team member roles can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 

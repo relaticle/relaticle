@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Providers\MacroServiceProvider;
 use Filament\Facades\Filament;
+
+mutates(MacroServiceProvider::class);
 
 describe('app panel configuration - path mode (default)', function () {
     it('registers panel with path prefix and no domain constraint', function () {

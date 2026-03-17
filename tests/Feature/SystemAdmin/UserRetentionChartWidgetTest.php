@@ -9,6 +9,8 @@ use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
+mutates(UserRetentionChartWidget::class);
+
 beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
@@ -48,11 +50,10 @@ it('classifies new active vs returning users correctly', function () {
             'created_at' => now()->subDays(1),
         ]));
 
-    $component = livewire(UserRetentionChartWidget::class)
-        ->assertOk();
+    $component = livewire(UserRetentionChartWidget::class)->assertOk();
 
-    $instance = $component->instance();
-    $chartData = (new ReflectionMethod($instance, 'getData'))->invoke($instance);
+    $chartData = invade($component->instance())->getData();
+
     $datasetsByLabel = collect($chartData['datasets'])->keyBy('label');
 
     $newActiveData = $datasetsByLabel['New Active']['data'] ?? [];

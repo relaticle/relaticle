@@ -10,6 +10,8 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\Flowforge\Board;
 
+mutates(OpportunitiesBoard::class);
+
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);

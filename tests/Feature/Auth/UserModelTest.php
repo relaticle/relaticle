@@ -11,6 +11,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+mutates(User::class);
+
 test('user has many social accounts', function () {
     $user = User::factory()->create();
     $socialAccount = UserSocialAccount::factory()->create([

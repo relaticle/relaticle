@@ -5,14 +5,17 @@
          colors="true"
 >
     <testsuites>
+        <testsuite name="Arch">
+            <directory>tests/Arch</directory>
+        </testsuite>
+        <testsuite name="Smoke">
+            <directory>tests/Smoke</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
-        <testsuite name="Arch">
-            <file>tests/ArchTest.php</file>
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
         </testsuite>
     </testsuites>
     <source>
@@ -23,8 +26,6 @@
             <directory>routes</directory>
         </include>
         <exclude>
-            <directory>app/Console/Kernel.php</directory>
-            <directory>app/Exceptions/Handler.php</directory>
             <directory>app/Http/Middleware</directory>
             <file>app/Providers/AppServiceProvider.php</file>
         </exclude>

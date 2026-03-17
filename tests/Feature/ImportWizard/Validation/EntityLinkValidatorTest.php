@@ -11,7 +11,7 @@ use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\EntityLinkSource;
-use Relaticle\ImportWizard\Importers\BaseImporter;
+use Relaticle\ImportWizard\Importers\CompanyImporter;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 
 mutates(EntityLinkValidator::class);
@@ -183,7 +183,7 @@ it('getResolvedId returns null for non-existing record', function (): void {
 
 it('validateFromColumn returns null for field mapping column', function (): void {
     $column = ColumnData::toField(source: 'Name', target: 'name');
-    $importer = Mockery::mock(BaseImporter::class);
+    $importer = new CompanyImporter((string) $this->team->id);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -204,7 +204,7 @@ it('validateFromColumn validates entity link column', function (): void {
         matchableFields: [MatchableField::id()],
     );
 
-    $importer = Mockery::mock(BaseImporter::class);
+    $importer = new CompanyImporter((string) $this->team->id);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -216,7 +216,7 @@ it('validateFromColumn validates entity link column', function (): void {
 
 it('batchValidateFromColumn returns null for field mapping column', function (): void {
     $column = ColumnData::toField(source: 'Name', target: 'name');
-    $importer = Mockery::mock(BaseImporter::class);
+    $importer = new CompanyImporter((string) $this->team->id);
 
     $validator = new EntityLinkValidator((string) $this->team->id);
 
@@ -241,7 +241,7 @@ it('batchValidateFromColumn validates entity link column', function (): void {
         matchableFields: [MatchableField::id()],
     );
 
-    $importer = Mockery::mock(BaseImporter::class);
+    $importer = new CompanyImporter((string) $this->team->id);
     $validator = new EntityLinkValidator((string) $this->team->id);
 
     $results = $validator->batchValidateFromColumn($column, $importer, [(string) $company->id, '99999']);

@@ -6,6 +6,8 @@ use App\Services\GitHubService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
+mutates(GitHubService::class);
+
 beforeEach(function () {
     // Create a new instance of the service for each test
     $this->service = new GitHubService;

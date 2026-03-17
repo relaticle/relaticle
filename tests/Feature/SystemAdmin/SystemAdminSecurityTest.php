@@ -7,6 +7,8 @@ use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
+mutates(SystemAdministrator::class);
+
 describe('SystemAdmin Security', function () {
     beforeEach(function () {
         Filament::setCurrentPanel('sysadmin');

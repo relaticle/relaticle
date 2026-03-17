@@ -62,9 +62,11 @@
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
         "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-browser": "^4.3",
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
-        "rector/rector": "^2.0"
+        "rector/rector": "^2.0",
+        "spatie/pest-plugin-route-testing": "^1.1"
     },
     "autoload": {
         "psr-4": {
@@ -111,13 +113,12 @@
         "test:lint": "pint --test",
         "test:refactor": "rector --dry-run",
         "test:types": "phpstan analyse",
-        "test:arch": "pest --filter=arch",
-        "test:type-coverage": "pest --type-coverage --min=99.9",
-        "test:coverage": "pest --coverage --min=80",
-        "test:pest": "pest --parallel",
-        "test:pest:shard": "pest --parallel --shard=${SHARD}",
-        "test:pest:ci": "pest --parallel --configuration phpunit.ci.xml",
-        "test:pest:ci:shard": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD}",
+        "test:arch": "pest tests/Arch/",
+        "test:type-coverage": "pest --type-coverage --min=100",
+        "test:pest": "pest --parallel --exclude-testsuite=Browser",
+        "test:pest:shard": "pest --parallel --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:pest:ci": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:browser": "pest tests/Browser/",
         "test": [
             "@test:lint",
             "@test:refactor",

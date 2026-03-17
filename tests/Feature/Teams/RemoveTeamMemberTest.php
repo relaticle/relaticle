@@ -6,6 +6,8 @@ use App\Models\User;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('team members can be removed from teams', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
 
+mutates(Register::class);
+
 it('registers a new user without creating a team', function (): void {
     livewire(Register::class)
         ->fillForm([

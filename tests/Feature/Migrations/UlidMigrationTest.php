@@ -11,6 +11,8 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 
+mutates(User::class, Team::class, Company::class, People::class, Opportunity::class, Task::class, Note::class);
+
 /**
  * Tests for the ULID migration.
  *

@@ -13,6 +13,7 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -27,6 +28,7 @@ use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\DateFormat;
@@ -306,7 +308,7 @@ final class ExecuteImportJob implements ShouldQueue
         /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->with(['options' => fn ($q) => $q->withoutGlobalScopes()])
+            ->with(['options' => fn (HasMany $q) => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $importer->entityName())
             ->where('type', '!=', 'record')
@@ -690,7 +692,7 @@ final class ExecuteImportJob implements ShouldQueue
     private function allowedAttributeKeys(BaseImporter $importer): array
     {
         $keys = collect($importer->allFields())
-            ->reject(fn ($field): bool => $field->key === 'id')
+            ->reject(fn (ImportField $field): bool => $field->key === 'id')
             ->pluck('key')
             ->merge(['team_id', 'creator_id', 'creation_source'])
             ->merge(

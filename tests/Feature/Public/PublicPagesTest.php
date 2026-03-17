@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PrivacyPolicyController;
+use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Support\Facades\Http;
+
+mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class);
 
 describe('Home page', function () {
     it('returns a successful response', function () {

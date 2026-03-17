@@ -7,6 +7,8 @@ use Laravel\Jetstream\Features;
 use Laravel\Jetstream\Http\Livewire\ApiTokenManager;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('api tokens can be created', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 

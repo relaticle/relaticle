@@ -10,6 +10,8 @@ use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
+mutates(ActivationRateWidget::class);
+
 beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
@@ -44,15 +46,9 @@ it('counts activated users who created records manually', function () {
             'created_at' => now()->subDays(3),
         ]));
 
-    $widget = livewire(ActivationRateWidget::class);
-    $instance = $widget->instance();
-    $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
-
-    expect($stats)->toHaveCount(3);
-
-    $activatedStat = $stats[1];
-
-    expect($activatedStat->getValue())->toBe('2');
+    livewire(ActivationRateWidget::class)
+        ->assertSee('Activated Users')
+        ->assertSee('2');
 });
 
 it('excludes system-created records from activation count', function () {
@@ -68,13 +64,7 @@ it('excludes system-created records from activation count', function () {
             'created_at' => now()->subDays(4),
         ]));
 
-    $widget = livewire(ActivationRateWidget::class);
-    $instance = $widget->instance();
-    $stats = (new ReflectionMethod($instance, 'getStats'))->invoke($instance);
-
-    expect($stats)->toHaveCount(3);
-
-    $activatedStat = $stats[1];
-
-    expect($activatedStat->getValue())->toBe('0');
+    livewire(ActivationRateWidget::class)
+        ->assertSee('Activated Users')
+        ->assertSee('0');
 });

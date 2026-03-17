@@ -5,14 +5,17 @@
          colors="true"
 >
     <testsuites>
+        <testsuite name="Arch">
+            <directory>tests/Arch</directory>
+        </testsuite>
+        <testsuite name="Smoke">
+            <directory>tests/Smoke</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
-        <testsuite name="Arch">
-            <file>tests/ArchTest.php</file>
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
         </testsuite>
     </testsuites>
     <source>
@@ -23,8 +26,6 @@
             <directory>routes</directory>
         </include>
         <exclude>
-            <directory>app/Console/Kernel.php</directory>
-            <directory>app/Exceptions/Handler.php</directory>
             <directory>app/Http/Middleware</directory>
             <file>app/Providers/AppServiceProvider.php</file>
         </exclude>
@@ -45,5 +46,10 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="BROADCAST_CONNECTION" value="log"/>
+        <env name="PUSHER_APP_KEY" value="test-key"/>
+        <env name="PUSHER_APP_SECRET" value="test-secret"/>
+        <env name="PUSHER_APP_ID" value="test-id"/>
+        <env name="PUSHER_APP_CLUSTER" value="mt1"/>
     </php>
 </phpunit>

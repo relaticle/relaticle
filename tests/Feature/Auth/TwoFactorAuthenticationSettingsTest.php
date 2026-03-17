@@ -7,6 +7,8 @@ use Laravel\Fortify\Features;
 use Laravel\Jetstream\Http\Livewire\TwoFactorAuthenticationForm;
 use Livewire\Livewire;
 
+mutates(User::class);
+
 test('two factor authentication can be enabled', function () {
     $this->actingAs($user = User::factory()->create()->fresh());
 

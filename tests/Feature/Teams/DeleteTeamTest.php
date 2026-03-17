@@ -7,6 +7,8 @@ use App\Models\User;
 use Laravel\Jetstream\Http\Livewire\DeleteTeamForm;
 use Livewire\Livewire;
 
+mutates(Team::class);
+
 test('teams can be deleted', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
