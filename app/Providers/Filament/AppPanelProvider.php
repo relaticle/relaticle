@@ -99,6 +99,7 @@ final class AppPanelProvider extends PanelProvider
             ->authPasswordBroker('users')
             ->passwordReset()
             ->emailVerification()
+            ->emailChangeVerification()
             ->strictAuthorization()
             ->databaseNotifications()
             ->colors([

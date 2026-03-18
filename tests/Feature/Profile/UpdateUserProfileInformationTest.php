@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Livewire\App\Profile\UpdateProfileInformation as UpdateProfileInformationComponent;
 use App\Models\User;
+use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
+use Filament\Auth\Notifications\VerifyEmailChange;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -39,14 +41,17 @@ describe('profile component functionality', function () {
             ]);
     });
 
-    test('can update profile through livewire component', function () {
-        $user = User::factory()->withTeam()->create();
+    test('can update name without changing email', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'stable@example.com',
+            'email_verified_at' => now(),
+        ]);
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
             ->fillForm([
                 'name' => 'Updated Name',
-                'email' => 'updated@example.com',
+                'email' => 'stable@example.com',
             ])
             ->call('updateProfile')
             ->assertHasNoFormErrors()
@@ -54,7 +59,99 @@ describe('profile component functionality', function () {
 
         expect($user->fresh())
             ->name->toBe('Updated Name')
-            ->email->toBe('updated@example.com');
+            ->email->toBe('stable@example.com')
+            ->email_verified_at->not->toBeNull();
+    });
+});
+
+describe('email change verification', function () {
+    beforeEach(function () {
+        Notification::fake();
+
+        $this->verifiedUser = User::factory()->withTeam()->create([
+            'email' => 'original@example.com',
+            'email_verified_at' => now(),
+        ]);
+        $this->actingAs($this->verifiedUser);
+    });
+
+    test('email change does not update email immediately', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $this->verifiedUser->name,
+                'email' => 'new@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors()
+            ->assertNotified();
+
+        expect($this->verifiedUser->fresh())
+            ->email->toBe('original@example.com')
+            ->email_verified_at->not->toBeNull();
+    });
+
+    test('email change sends verification to new email', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $this->verifiedUser->name,
+                'email' => 'new@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        Notification::assertSentOnDemand(VerifyEmailChange::class);
+    });
+
+    test('email change sends notice to old email with block link', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $this->verifiedUser->name,
+                'email' => 'new@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        Notification::assertSentTo($this->verifiedUser, NoticeOfEmailChangeRequest::class);
+    });
+
+    test('same email does not trigger verification', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => 'New Name',
+                'email' => 'original@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        Notification::assertNotSentTo($this->verifiedUser, NoticeOfEmailChangeRequest::class);
+        Notification::assertSentOnDemandTimes(VerifyEmailChange::class, 0);
+    });
+
+    test('email change resets form email to current value', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $this->verifiedUser->name,
+                'email' => 'new@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertFormSet([
+                'email' => 'original@example.com',
+            ]);
+    });
+
+    test('name change is saved even when email change is deferred', function () {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => 'Updated Name',
+                'email' => 'new@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors()
+            ->assertNotified();
+
+        expect($this->verifiedUser->fresh())
+            ->name->toBe('Updated Name')
+            ->email->toBe('original@example.com');
     });
 });
 
@@ -127,7 +224,9 @@ describe('photo upload', function () {
 
     test('can update profile through livewire component with photo', function () {
         Storage::fake('public');
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withTeam()->create([
+            'email' => 'photo-test@example.com',
+        ]);
         $this->actingAs($user);
 
         $photo = UploadedFile::fake()->image('avatar.jpg', 200, 200);
@@ -135,7 +234,7 @@ describe('photo upload', function () {
         Livewire::test(UpdateProfileInformationComponent::class)
             ->fillForm([
                 'name' => 'Updated Name',
-                'email' => 'updated@example.com',
+                'email' => 'photo-test@example.com',
                 'profile_photo_path' => $photo,
             ])
             ->call('updateProfile')
@@ -144,7 +243,7 @@ describe('photo upload', function () {
 
         expect($user->fresh())
             ->name->toBe('Updated Name')
-            ->email->toBe('updated@example.com')
+            ->email->toBe('photo-test@example.com')
             ->profile_photo_path->not->toBeNull();
     });
 });
