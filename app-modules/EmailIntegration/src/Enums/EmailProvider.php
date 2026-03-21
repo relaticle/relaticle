@@ -11,13 +11,13 @@ use Filament\Support\Contracts\HasLabel;
 enum EmailProvider: string implements HasColor, HasIcon, HasLabel
 {
     case GMAIL = 'gmail';
-    case MICROSOFT = 'microsoft';
+    case AZURE = 'azure';
 
     public function getLabel(): string
     {
         return match ($this) {
             self::GMAIL => 'Gmail',
-            self::MICROSOFT => 'Outlook / Microsoft 365',
+            self::AZURE => 'Outlook / Microsoft 365',
         };
     }
 
@@ -25,14 +25,14 @@ enum EmailProvider: string implements HasColor, HasIcon, HasLabel
     {
         return match ($this) {
             self::GMAIL => 'danger',
-            self::MICROSOFT => 'info',
+            self::AZURE => 'info',
         };
     }
 
     public function getIcon(): string
     {
         return match ($this) {
-            self::GMAIL, self::MICROSOFT => 'heroicon-o-envelope',
+            self::GMAIL, self::AZURE => 'heroicon-o-envelope',
         };
     }
 }

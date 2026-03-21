@@ -63,20 +63,28 @@ return [
 
     // Email config
     'gmail' => [
-        'client_id'     => env('GMAIL_CLIENT_ID'),
+        'client_id' => env('GMAIL_CLIENT_ID'),
         'client_secret' => env('GMAIL_CLIENT_SECRET'),
-        'redirect'      => env('GMAIL_REDIRECT_URI'),
+        'redirect' => env('GMAIL_REDIRECT_URI'),
     ],
 
     'microsoft' => [
-        'client_id'     => env('MICROSOFT_CLIENT_ID'),
+        'client_id' => env('MICROSOFT_CLIENT_ID'),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
-        'redirect'      => env('MICROSOFT_REDIRECT_URI'),
+        'redirect' => env('MICROSOFT_REDIRECT_URI'),
+    ],
+
+    'azure' => [
+        'client_id' => env('AZURE_CLIENT_ID'),
+        'client_secret' => env('AZURE_CLIENT_SECRET'),
+        'redirect' => env('AZURE_REDIRECT_URI'),
+        'tenant' => env('AZURE_TENANT_ID'),
+        'proxy' => env('PROXY'),  // optionally
     ],
 
     'email_sync' => [
-        'initial_days'   => env('EMAIL_SYNC_INITIAL_DAYS', 90),
-        'interval'       => env('EMAIL_SYNC_INTERVAL_MINUTES', 5),
-        'batch_size'     => env('EMAIL_SYNC_BATCH_SIZE', 50),
+        'initial_days' => env('EMAIL_SYNC_INITIAL_DAYS', 90),
+        'interval' => env('EMAIL_SYNC_INTERVAL_MINUTES', 5),
+        'batch_size' => env('EMAIL_SYNC_BATCH_SIZE', 50),
     ],
 ];
