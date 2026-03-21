@@ -60,4 +60,23 @@ return [
     'anthropic' => [
         'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
     ],
+
+    // Email config
+    'gmail' => [
+        'client_id'     => env('GMAIL_CLIENT_ID'),
+        'client_secret' => env('GMAIL_CLIENT_SECRET'),
+        'redirect'      => env('GMAIL_REDIRECT_URI'),
+    ],
+
+    'microsoft' => [
+        'client_id'     => env('MICROSOFT_CLIENT_ID'),
+        'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
+        'redirect'      => env('MICROSOFT_REDIRECT_URI'),
+    ],
+
+    'email_sync' => [
+        'initial_days'   => env('EMAIL_SYNC_INITIAL_DAYS', 90),
+        'interval'       => env('EMAIL_SYNC_INTERVAL_MINUTES', 5),
+        'batch_size'     => env('EMAIL_SYNC_BATCH_SIZE', 50),
+    ],
 ];

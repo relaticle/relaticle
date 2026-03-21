@@ -22,6 +22,7 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -50,6 +51,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureFilament();
         $this->configureGitHubStars();
         $this->configureLivewire();
+        $this->configureMacros();
     }
 
     private function configurePolicies(): void
@@ -170,6 +172,13 @@ final class AppServiceProvider extends ServiceProvider
                 'githubStars' => $starsCount,
                 'formattedGithubStars' => $formattedStarsCount,
             ]);
+        });
+    }
+
+    private function configureMacros(): void
+    {
+        Blueprint::macro('teams', function (): void {
+            $this->foreignUlid('team_id')->constrained()->cascadeOnDelete();
         });
     }
 }

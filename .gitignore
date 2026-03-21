@@ -37,3 +37,4 @@ boost.json
 .context
 polyscope.json
 /bin/setup-preview.sh
+/docs
