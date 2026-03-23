@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Laravel\Jetstream\TeamInvitation as JetstreamTeamInvitation;
 
 final class TeamInvitation extends JetstreamTeamInvitation
@@ -25,6 +26,7 @@ final class TeamInvitation extends JetstreamTeamInvitation
     protected $fillable = [
         'email',
         'role',
+        'expires_at',
     ];
 
     /**
@@ -33,5 +35,27 @@ final class TeamInvitation extends JetstreamTeamInvitation
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function isExpired(): bool
+    {
+        if ($this->expires_at === null) {
+            return true;
+        }
+
+        /** @var Carbon $expiresAt */
+        $expiresAt = $this->expires_at;
+
+        return $expiresAt->isPast();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+        ];
     }
 }

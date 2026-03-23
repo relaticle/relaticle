@@ -13,12 +13,14 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
 
 final class AddTeamMember extends BaseLivewireComponent
@@ -89,12 +91,21 @@ final class AddTeamMember extends BaseLivewireComponent
 
         $data = $this->form->getState();
 
-        resolve(InviteTeamMember::class)->invite(
-            $this->authUser(),
-            $team,
-            $data['email'],
-            $data['role'] ?? null
-        );
+        try {
+            resolve(InviteTeamMember::class)->invite(
+                $this->authUser(),
+                $team,
+                $data['email'],
+                $data['role'] ?? null
+            );
+        } catch (ValidationException $e) {
+            Notification::make()
+                ->title($e->validator->errors()->first())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
 

@@ -48,6 +48,8 @@ return [
         'remove_team_member' => 'Remove',
         'leave_team' => 'Leave',
         'resend_team_invitation' => 'Resend',
+        'extend_team_invitation' => 'Extend',
+        'copy_invite_link' => 'Copy Link',
         'cancel_team_invitation' => 'Cancel',
         'delete_team' => 'Delete Team',
     ],
@@ -61,6 +63,12 @@ return [
         ],
         'team_invitation_cancelled' => [
             'success' => 'Team invitation cancelled.',
+        ],
+        'team_invitation_extended' => [
+            'success' => 'Team invitation extended.',
+        ],
+        'invite_link_copied' => [
+            'success' => 'Invite link copied to clipboard.',
         ],
         'team_member_removed' => [
             'success' => 'You have removed this team member.',

@@ -2,51 +2,69 @@
 
 declare(strict_types=1);
 
+use App\Livewire\App\Teams\AddTeamMember;
+use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Jetstream\Features;
-use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
-use Laravel\Jetstream\Mail\TeamInvitation;
-use Livewire\Livewire;
 
 mutates(User::class);
 
-test('team members can be invited to team', function () {
+beforeEach(function () {
     Mail::fake();
 
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->user = User::factory()->withTeam()->create();
+    $this->actingAs($this->user);
+    $this->team = $this->user->currentTeam;
+    Filament::setTenant($this->team);
+});
 
-    Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])
-        ->set('addTeamMemberForm', [
+test('team members can be invited to team', function () {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
             'email' => 'test@example.com',
             'role' => 'admin',
-        ])->call('addTeamMember');
+        ])
+        ->call('addTeamMember', $this->team);
 
-    Mail::assertSent(TeamInvitation::class);
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
 
-    expect($user->currentTeam->fresh()->teamInvitations)->toHaveCount(1);
-})->skip(function () {
-    return ! Features::sendsTeamInvitations();
-}, 'Team invitations not enabled.');
+    $invitation = $this->team->fresh()->teamInvitations->first();
+    expect($invitation->email)->toBe('test@example.com')
+        ->and($invitation->role)->toBe('admin')
+        ->and($invitation->expires_at)->not->toBeNull()
+        ->and($invitation->expires_at->isFuture())->toBeTrue();
+});
+
+test('invitation expires_at is set based on config', function () {
+    config(['jetstream.invitation_expiry_days' => 14]);
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'test@example.com',
+            'role' => 'editor',
+        ])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->first();
+    expect((int) round($invitation->expires_at->diffInDays(now(), absolute: true)))->toBe(14);
+});
 
 test('team member invitations can be cancelled', function () {
-    Mail::fake();
-
-    $this->actingAs($user = User::factory()->withTeam()->create());
-
-    // Add the team member...
-    $component = Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])
-        ->set('addTeamMemberForm', [
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
             'email' => 'test@example.com',
             'role' => 'admin',
-        ])->call('addTeamMember');
+        ])
+        ->call('addTeamMember', $this->team);
 
-    $invitationId = $user->currentTeam->fresh()->teamInvitations->first()->id;
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
 
-    // Cancel the team invitation...
-    $component->call('cancelTeamInvitation', $invitationId);
+    $invitation = $this->team->fresh()->teamInvitations->first();
 
-    expect($user->currentTeam->fresh()->teamInvitations)->toHaveCount(0);
-})->skip(function () {
-    return ! Features::sendsTeamInvitations();
-}, 'Team invitations not enabled.');
+    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+        ->callAction(TestAction::make('cancelTeamInvitation')->table($invitation));
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
