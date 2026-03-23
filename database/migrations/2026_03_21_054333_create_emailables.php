@@ -17,8 +17,6 @@ return new class extends Migration
             $table->string('link_source', 20)->default('auto'); // auto | manual
 
             $table->timestamps();
-
-            $table->index(['emailable_type', 'emailable_id']);
             $table->index('email_id');
         });
     }

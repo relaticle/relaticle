@@ -14,9 +14,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 
+/**
+ * @property string $id
+ * @property string $team_id
+ * @property string $user_id
+ * @property EmailProvider $provider
+ * @property string $provider_account_id
+ * @property string $email_address
+ * @property string|null $display_name
+ * @property string $access_token
+ * @property string|null $refresh_token
+ * @property Carbon|null $token_expires_at
+ */
 final class ConnectedAccount extends Model
 {
     /**
