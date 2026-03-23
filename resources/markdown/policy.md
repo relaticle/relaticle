@@ -1,36 +1,104 @@
-### Guaranteed legal and secure processing of personal data.
+# Privacy Policy
 
-Each client can be sure his personal data will be dealt with honestly and legally. We only use that data for the legitimate reasons outlined above, and we can guarantee that it will always be kept safe from accidental or intentional misuse.
+**Effective date:** March 20, 2026
 
-We will never store your personal data for longer than what is necessary. Your data will get archived after a certain time period or when you stop using our services.
+This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.
 
-We've taken strong technical and organizational measures to keep your personal data secure. They are appropriate to the type of data involved and proportionate to the risk level we're exposed to.
+---
 
-Protecting sensitive data is crucial, so only authorized users can access it. We help with setting up necessary safeguards and monitoring user activity to keep data safe. It is impossible to eliminate all risks. One way we can reduce the likelihood or impact of a breach is by protecting important data and information we have with strong passwords and other protections in place. In any case, if a problem does occur, we will notify you immediately and take precautions to minimize any theft or damage.
-<hr class="w-3/4" />
+## 1. What We Collect
 
-## Right to object
-Each client can object to the processing of their personal data. This right to object only exists if there are sufficient legitimate and compelling reasons relating to their particular situation. The customer may at any time, free of charge and without further ado, object to the proposed processing of their personal data, if this data was collected for direct marketing purposes.
+### Cloud Users (app.relaticle.com)
 
-Each client has the right to object to the processing of their personal data. They have this right if they provide legitimate, compelling reasons regarding their individual situation. You can object to any data processing for marketing purposes at any time without giving reasons.
+- **Account information:** Name, email address, and password (hashed)
+- **Profile data:** Avatar, team name, and role
+- **CRM data:** Companies, people, opportunities, tasks, notes, and custom fields you create
+- **Usage data:** Login timestamps, feature usage, and error reports
+- **Technical data:** IP address, browser type, and device information
 
-You also have the right to obtain the deletion and/or prohibition of the use of all your personal data that has been collected and which is incomplete or irrelevant in terms of the purpose of processing. This also applies to any personal data the registration, disclosure, and storage of which is prohibited, or to personal data stored beyond the permitted period. This right can be exercised at any time free of charge and without any additional justification.
+### Self-Hosted Users
 
-Customers must exercise their right by sending a signed written request to Relaticle by registered mail. We will take appropriate action upon request within fifteen (15) business days.
+We do not collect any data from self-hosted installations. Your data stays entirely on your servers.
 
-## Right to access
-Each client who has confirmed his or her identity has the right to access all information related to the processing of his or her personal data by Relaticle, as defined in the Privacy Act. This Privacy Policy is the first indication of the purposes of processing and the categories of information being processed, as well as the categories of recipients to whom the data is provided.
+### Website Visitors (relaticle.com)
 
-The Client must exercise his or her right by means of a signed written request to Relaticle by registered mail. Relaticle will take appropriate action upon request within fifteen (15) business days.
+- **Contact form submissions:** Name, email, and message content
+- **Analytics:** Anonymous page views and referrer data
 
-## Right to correct
-We attach great importance to collecting accurate data. Thus, inaccurate or incomplete personal data can always be corrected or even deleted.
+## 2. How We Use Your Data
 
-Since we cannot constantly be aware of any errors, incompleteness or falsity of your personal data, you, as a customer, must report inaccuracies or omissions and make the necessary adjustments with respect to your registration data.
+We use your data to:
 
-If your personal actions seem insufficient, contact us by sending a signed, written and registered request to Relaticle. We perform the necessary actions within 15 working days, making additions, correcting or deleting personal data. Deletion is mainly related to visibility, so it is possible that deleted data will remain temporarily stored.
+- Provide and maintain the CRM service
+- Authenticate your account and enforce team-level access controls
+- Send transactional emails (password resets, team invitations)
+- Improve the service based on aggregated, anonymized usage patterns
+- Respond to support inquiries
 
-## Right to forget
-Like your right to be corrected, you also have the right to be forgotten. You can ask us to delete all information related to your account and actions from our system.
+We do **not**:
 
-Only the data that we need to save for legal or tax purposes will be saved.
+- Sell your data to third parties
+- Use your CRM data for advertising
+- Share your data with third parties except as described below
+- Train AI models on your data
+
+## 3. Third-Party Services
+
+The Cloud service uses the following third-party providers:
+
+- **Hosting infrastructure:** For application and database hosting
+- **Email delivery:** For transactional emails (password resets, invitations)
+- **Error monitoring:** For detecting and fixing bugs (anonymized error reports)
+
+We do not share your CRM data with any third party.
+
+## 4. Data Security
+
+We protect your data with:
+
+- Encrypted connections (TLS/HTTPS) for all data in transit
+- Encrypted database storage for sensitive fields
+- Team-based access isolation (multi-tenancy)
+- API token authentication with scoped permissions
+- Regular security updates and dependency audits
+
+## 5. Data Retention
+
+- **Active accounts:** Data is retained as long as your account is active
+- **Deleted accounts:** Data is deleted within 30 days of account deletion
+- **Contact form submissions:** Retained for up to 12 months
+- **Server logs:** Retained for up to 90 days
+
+## 6. Your Rights
+
+You have the right to:
+
+- **Access** your personal data at any time through the application
+- **Export** your data via the application or REST API
+- **Correct** inaccurate personal data through your profile settings
+- **Delete** your account and associated data
+- **Object** to data processing for specific purposes
+
+To exercise these rights, contact us at [Contact Us](/contact). We will respond within 15 business days.
+
+## 7. Cookies
+
+The Cloud service uses essential cookies for:
+
+- Session management (keeping you logged in)
+- CSRF protection (security)
+- Theme preferences (light/dark mode)
+
+We do not use tracking cookies or third-party advertising cookies.
+
+## 8. Children
+
+Our services are not directed to children under 16. We do not knowingly collect personal data from children.
+
+## 9. Changes to This Policy
+
+We may update this Privacy Policy from time to time. We will notify registered users of material changes via email or in-app notification.
+
+## 10. Contact
+
+Questions about this Privacy Policy? Reach us at [Contact Us](/contact).

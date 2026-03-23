@@ -14,8 +14,8 @@ final readonly class NoteObserver
         if (auth()->check()) {
             /** @var User $user */
             $user = auth()->user();
-            $note->creator_id = $user->getKey();
-            $note->team_id = $user->currentTeam->getKey();
+            $note->creator_id ??= $user->getKey();
+            $note->team_id ??= $user->currentTeam->getKey();
         }
     }
 

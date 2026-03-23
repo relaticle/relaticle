@@ -26,7 +26,7 @@ it('can render the user retention chart widget', function () {
 });
 
 it('classifies new active vs returning users correctly', function () {
-    $this->travelTo(now()->next('Wednesday')->midDay());
+    $this->travelTo(now()->startOfWeek()->addDays(3));
 
     $newUser = User::factory()->withTeam()->create([
         'created_at' => now()->subDays(2),

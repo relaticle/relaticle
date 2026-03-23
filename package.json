@@ -10,16 +10,17 @@
         "playwright": "^1.54.1",
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/typography": "^0.5.19",
-        "autoprefixer": "^10.4.24",
+        "autoprefixer": "^10.4.27",
         "chokidar": "^5.0.0",
         "laravel-vite-plugin": "^2.1",
-        "postcss": "^8.5.6",
+        "postcss": "^8.5.8",
         "postcss-nesting": "^14.0.0",
-        "tailwindcss": "^4.1.18",
+        "tailwindcss": "^4.2.1",
         "vite": "^7.3"
     },
     "dependencies": {
-        "@tailwindcss/vite": "^4.1.18",
-        "shiki": "^3.22.0"
+        "@tailwindcss/vite": "^4.2.1",
+        "motion": "^12.34.3",
+        "shiki": "^4.0.2"
     }
 }

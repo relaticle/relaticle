@@ -28,6 +28,21 @@
                  class="prose prose-sm sm:prose-base lg:prose-lg dark:prose-invert max-w-none mx-auto">
                 {!! $content !!}
             </div>
+
+            @php
+                $editFile = config("documentation.documents.{$currentType}.file");
+            @endphp
+            @if($editFile)
+                <div class="mt-10 pt-6 border-t border-gray-200 dark:border-gray-800">
+                    <a href="https://github.com/Relaticle/relaticle/edit/main/app-modules/Documentation/resources/markdown/{{ $editFile }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                        <x-ri-github-fill class="w-4 h-4"/>
+                        Edit this page on GitHub
+                    </a>
+                </div>
+            @endif
         </div>
 
         <!-- Right Sidebar: Table of Contents -->

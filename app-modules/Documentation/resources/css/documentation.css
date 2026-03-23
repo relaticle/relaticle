@@ -2,15 +2,40 @@
 
 @import "~/css/theme.css";
 
+mark {
+    background: oklch(0.42 0.24 287.23 / 0.1);
+    color: inherit;
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+:is(.dark) mark {
+    background: oklch(0.42 0.24 287.23 / 0.2);
+}
+
 #documentation-content {
     h1,
     h2,
     h3 {
-        @apply font-display;
+        @apply font-display relative;
+    }
+
+    h2,
+    h3 {
+        @apply cursor-pointer w-fit;
     }
 
     .heading-permalink {
-        @apply mr-2 text-gray-700/10 dark:text-gray-600 hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary-400)] transition-colors;
+        @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
+    }
+
+    h2:hover .heading-permalink,
+    h3:hover .heading-permalink {
+        @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
+    }
+
+    h1 .heading-permalink {
+        @apply hidden;
     }
 
     /* Code block wrapper for sticky copy button */

@@ -1,12 +1,12 @@
 <div>
-    <!-- Generate API Token -->
+    <!-- Generate Access Token -->
     <x-form-section submit="createApiToken">
         <x-slot name="title">
-            {{ __('Create API Token') }}
+            {{ __('access-tokens.sections.create.title') }}
         </x-slot>
 
         <x-slot name="description">
-            {{ __('API tokens allow third-party services to authenticate with our application on your behalf.') }}
+            {{ __('access-tokens.sections.create.description') }}
         </x-slot>
 
         <x-slot name="form">
@@ -48,18 +48,18 @@
     @if ($this->user->tokens->isNotEmpty())
         <x-section-border />
 
-        <!-- Manage API Tokens -->
+        <!-- Manage Access Tokens -->
         <div class="mt-10 sm:mt-0">
             <x-action-section>
                 <x-slot name="title">
-                    {{ __('Manage API Tokens') }}
+                    {{ __('access-tokens.sections.manage.title') }}
                 </x-slot>
 
                 <x-slot name="description">
-                    {{ __('You may delete any of your existing tokens if they are no longer needed.') }}
+                    {{ __('access-tokens.sections.manage.description') }}
                 </x-slot>
 
-                <!-- API Token List -->
+                <!-- Access Token List -->
                 <x-slot name="content">
                     <div class="space-y-6">
                         @foreach ($this->user->tokens->sortBy('name') as $token)
@@ -96,12 +96,12 @@
     <!-- Token Value Modal -->
     <x-dialog-modal wire:model.live="displayingToken">
         <x-slot name="title">
-            {{ __('API Token') }}
+            {{ __('access-tokens.modals.show_token.title') }}
         </x-slot>
 
         <x-slot name="content">
             <div>
-                {{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}
+                {{ __('access-tokens.modals.show_token.description') }}
             </div>
 
             <x-input x-ref="plaintextToken" type="text" readonly :value="$plainTextToken"
@@ -118,10 +118,10 @@
         </x-slot>
     </x-dialog-modal>
 
-    <!-- API Token Permissions Modal -->
+    <!-- Access Token Permissions Modal -->
     <x-dialog-modal wire:model.live="managingApiTokenPermissions">
         <x-slot name="title">
-            {{ __('API Token Permissions') }}
+            {{ __('access-tokens.modals.permissions.title') }}
         </x-slot>
 
         <x-slot name="content">
@@ -149,11 +149,11 @@
     <!-- Delete Token Confirmation Modal -->
     <x-confirmation-modal wire:model.live="confirmingApiTokenDeletion">
         <x-slot name="title">
-            {{ __('Delete API Token') }}
+            {{ __('access-tokens.modals.delete.title') }}
         </x-slot>
 
         <x-slot name="content">
-            {{ __('Are you sure you would like to delete this API token?') }}
+            {{ __('access-tokens.modals.delete.description') }}
         </x-slot>
 
         <x-slot name="footer">

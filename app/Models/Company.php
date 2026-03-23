@@ -28,9 +28,6 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property string $name
- * @property string $address
- * @property string $country
- * @property string $phone
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
  * @property-read string $created_by
@@ -56,9 +53,6 @@ final class Company extends Model implements HasCustomFields, HasMedia
      */
     protected $fillable = [
         'name',
-        'address',
-        'country',
-        'phone',
         'creation_source',
     ];
 

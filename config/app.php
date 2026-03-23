@@ -86,6 +86,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | MCP Server Configuration
+    |--------------------------------------------------------------------------
+    |
+    | The domain where the MCP server is publicly accessible.
+    | If set, URL helpers will generate URLs using this domain.
+    | Otherwise, the MCP endpoint is available at {APP_URL}/mcp.
+    |
+    */
+
+    'mcp_domain' => env('MCP_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Configuration
+    |--------------------------------------------------------------------------
+    |
+    | The domain where the REST API is publicly accessible.
+    | If set, URL helpers will generate URLs using this domain.
+    | Otherwise, the API is available at {APP_URL}/api.
+    |
+    */
+
+    'api_domain' => env('API_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

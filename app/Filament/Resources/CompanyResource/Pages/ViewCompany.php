@@ -20,6 +20,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewCompany extends ViewRecord
@@ -37,9 +38,9 @@ final class ViewCompany extends ViewRecord
                         ->label('Copy page URL')
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Company $record): void {
-                            $url = CompanyResource::getUrl('view', [$record]);
+                            $jsUrl = Js::from(CompanyResource::getUrl('view', [$record]));
                             $this->js("
-                            navigator.clipboard.writeText('{$url}').then(() => {
+                            navigator.clipboard.writeText({$jsUrl}).then(() => {
                                 new FilamentNotification()
                                     .title('URL copied to clipboard')
                                     .success()
@@ -51,9 +52,9 @@ final class ViewCompany extends ViewRecord
                         ->label('Copy record ID')
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Company $record): void {
-                            $id = $record->getKey();
+                            $jsId = Js::from((string) $record->getKey());
                             $this->js("
-                            navigator.clipboard.writeText('{$id}').then(() => {
+                            navigator.clipboard.writeText({$jsId}).then(() => {
                                 new FilamentNotification()
                                     .title('Record ID copied to clipboard')
                                     .success()

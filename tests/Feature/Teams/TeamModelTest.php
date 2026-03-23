@@ -228,7 +228,7 @@ test('auto-generated slug from reserved name gets suffixed', function () {
 test('reserved slugs cover all top-level route segments', function () {
     $routes = Route::getRoutes();
 
-    $excludedPrefixes = ['livewire', 'sanctum', 'filament', 'app', '__clockwork', 'clockwork', 'laravel-login-link-login'];
+    $excludedPrefixes = ['livewire', 'sanctum', 'filament', 'app', '__clockwork', 'clockwork', 'laravel-login-link-login', '_boost'];
 
     $firstSegments = collect($routes->getRoutes())
         ->map(fn ($route) => explode('/', trim($route->uri(), '/'))[0] ?? '')

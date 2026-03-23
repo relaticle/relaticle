@@ -127,16 +127,20 @@ final class TasksBoard extends BoardPage
                     ->slideOver(false)
                     ->model(Task::class)
                     ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
-                    ->using(function (array $data, array $arguments): Task {
+                    ->using(function (array $data, CreateAction $action): Task {
                         /** @var Team $currentTeam */
                         $currentTeam = Auth::guard('web')->user()->currentTeam;
 
                         /** @var Task $task */
                         $task = $currentTeam->tasks()->create($data);
 
-                        $statusField = $this->statusCustomField();
-                        $task->saveCustomFieldValue($statusField, $arguments['column']);
-                        $task->order_column = (float) $this->getBoardPositionInColumn((string) $arguments['column']);
+                        $columnId = $action->getArguments()['column'] ?? null;
+
+                        if (filled($columnId)) {
+                            $task->saveCustomFieldValue($this->statusCustomField(), $columnId);
+                            $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
+                            $task->saveQuietly();
+                        }
 
                         return $task;
                     }),
@@ -169,7 +173,8 @@ final class TasksBoard extends BoardPage
                     ->relationship('assignees', 'name')
                     ->multiple(),
             ])
-            ->filtersFormWidth(Width::Medium);
+            ->filtersFormWidth(Width::Medium)
+            ->headerToolbar();
     }
 
     /**

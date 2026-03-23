@@ -54,10 +54,20 @@ return [
             'file' => 'developer-guide.md',
             'description' => 'Installation, architecture, and contributing.',
         ],
+        'self-hosting' => [
+            'title' => 'Self-Hosting Guide',
+            'file' => 'self-hosting-guide.md',
+            'description' => 'Deploy Relaticle with Docker or manually.',
+        ],
+        'mcp' => [
+            'title' => 'MCP Server',
+            'file' => 'mcp-guide.md',
+            'description' => 'Connect AI assistants like Claude to your CRM.',
+        ],
         'api' => [
             'title' => 'API Reference',
-            'file' => 'api-guide.md',
-            'description' => 'REST API documentation (coming soon).',
+            'url' => '/docs/api',
+            'description' => 'REST API documentation for managing CRM entities.',
         ],
     ],
 

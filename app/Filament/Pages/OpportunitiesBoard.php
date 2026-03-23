@@ -14,19 +14,26 @@ use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
+use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
 use UnitEnum;
 
@@ -47,6 +54,15 @@ final class OpportunitiesBoard extends BoardPage
         $stageField = $this->stageCustomField();
         $valueColumn = $stageField->getValueColumn();
 
+        $customFields = CustomFields::infolist()
+            ->forModel(Opportunity::class)
+            ->only([OpportunityCustomField::AMOUNT, OpportunityCustomField::CLOSE_DATE])
+            ->hiddenLabels()
+            ->visibleWhenFilled()
+            ->withoutSections()
+            ->values()
+            ->keyBy(fn (mixed $field): string => $field->getName());
+
         return $board
             ->query(
                 Opportunity::query()
@@ -62,19 +78,41 @@ final class OpportunitiesBoard extends BoardPage
             ->positionIdentifier('order_column')
             ->searchable(['name'])
             ->columns($this->getColumns())
-            ->cardSchema(fn (Schema $schema): Schema => $schema->components([
-                CustomFields::infolist()
-                    ->forSchema($schema)
-                    ->only(['description'])
-                    ->hiddenLabels()
-                    ->visibleWhenFilled()
-                    ->withoutSections()
-                    ->values()
-                    ->first()
-                    ?->columnSpanFull()
-                    ->visible(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString()),
-            ]))
+            ->cardSchema(function (Schema $schema) use ($customFields): Schema {
+                $amountField = $customFields->get('custom_fields.'.OpportunityCustomField::AMOUNT->value)
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->badge()
+                    ->color('success')
+                    ->icon(Heroicon::OutlinedCurrencyDollar)
+                    ->grow(false)
+                    ->hiddenLabel();
+
+                $closeDateField = $customFields->get('custom_fields.'.OpportunityCustomField::CLOSE_DATE->value)
+                    ?->visible(fn (?string $state): bool => filled($state))
+                    ->badge()
+                    ->color('gray')
+                    ->icon(Heroicon::OutlinedCalendar)
+                    ->grow(false)
+                    ->hiddenLabel()
+                    ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state));
+
+                return $schema
+                    ->components([
+                        CardFlex::make([
+                            TextEntry::make('company.name')
+                                ->hiddenLabel()
+                                ->visible(fn (?string $state): bool => filled($state))
+                                ->icon(Heroicon::OutlinedBuildingOffice)
+                                ->color('gray')
+                                ->size(TextSize::ExtraSmall)
+                                ->grow(),
+                        ]),
+                        CardFlex::make([
+                            $amountField,
+                            $closeDateField,
+                        ])->align('center'),
+                    ]);
+            })
             ->columnActions([
                 CreateAction::make()
                     ->label('Add Opportunity')
@@ -83,17 +121,41 @@ final class OpportunitiesBoard extends BoardPage
                     ->modalWidth(Width::Large)
                     ->slideOver(false)
                     ->model(Opportunity::class)
-                    ->schema(OpportunityForm::get(...))
-                    ->using(function (array $data, array $arguments): Opportunity {
+                    ->schema(fn (Schema $schema): Schema => $schema
+                        ->components([
+                            TextInput::make('name')
+                                ->required()
+                                ->placeholder('Enter opportunity title')
+                                ->columnSpanFull(),
+                            Select::make('company_id')
+                                ->relationship('company', 'name')
+                                ->searchable()
+                                ->preload(),
+                            Select::make('contact_id')
+                                ->relationship('contact', 'name')
+                                ->searchable()
+                                ->preload(),
+                            CustomFields::form()
+                                ->except([OpportunityCustomField::STAGE])
+                                ->build()
+                                ->columnSpanFull()
+                                ->columns(1),
+                        ])
+                        ->columns(2))
+                    ->using(function (array $data, CreateAction $action): Opportunity {
                         /** @var Team $currentTeam */
                         $currentTeam = Auth::guard('web')->user()->currentTeam;
 
                         /** @var Opportunity $opportunity */
                         $opportunity = $currentTeam->opportunities()->create($data);
 
-                        $stageField = $this->stageCustomField();
-                        $opportunity->saveCustomFieldValue($stageField, $arguments['column']);
-                        $opportunity->order_column = (float) $this->getBoardPositionInColumn((string) $arguments['column']);
+                        $columnId = $action->getArguments()['column'] ?? null;
+
+                        if (filled($columnId)) {
+                            $opportunity->saveCustomFieldValue($this->stageCustomField(), $columnId);
+                            $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
+                            $opportunity->saveQuietly();
+                        }
 
                         return $opportunity;
                     }),
@@ -132,7 +194,8 @@ final class OpportunitiesBoard extends BoardPage
                     ->relationship('contact', 'name')
                     ->multiple(),
             ])
-            ->filtersFormWidth(Width::Medium);
+            ->filtersFormWidth(Width::Medium)
+            ->headerToolbar();
     }
 
     /**
@@ -190,6 +253,22 @@ final class OpportunitiesBoard extends BoardPage
             ->color($stage['color'])
             ->label($stage['name'])
         )->toArray();
+    }
+
+    private function formatCloseDateBadge(?string $state): string
+    {
+        if (blank($state)) {
+            return '';
+        }
+
+        $date = Date::parse($state);
+
+        return match (true) {
+            $date->isPast() => $date->format('M j').' (Overdue)',
+            $date->isToday() => 'Closes Today',
+            $date->isTomorrow() => 'Closes Tomorrow',
+            default => $date->format('M j'),
+        };
     }
 
     private function stageCustomField(): ?CustomField

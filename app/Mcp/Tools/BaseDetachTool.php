@@ -1,0 +1,89 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Models\User;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
+
+abstract class BaseDetachTool extends Tool
+{
+    use ChecksTokenAbility;
+
+    /** @return class-string<Model> */
+    abstract protected function modelClass(): string;
+
+    abstract protected function entityLabel(): string;
+
+    /** @return class-string<JsonResource> */
+    abstract protected function resourceClass(): string;
+
+    /** @return array<string, mixed> */
+    abstract protected function relationshipSchema(JsonSchema $schema): array;
+
+    /** @return array<string, array<int, mixed>> */
+    abstract protected function relationshipRules(User $user): array;
+
+    /** @param array<string, mixed> $data */
+    abstract protected function detachRelationships(Model $model, array $data): void;
+
+    /** @return array<int, string> */
+    protected function relationshipsToLoad(): array
+    {
+        return [];
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        $label = strtolower($this->entityLabel());
+
+        return array_merge(
+            ['id' => $schema->string()->description("The {$label} ID.")->required()],
+            $this->relationshipSchema($schema),
+        );
+    }
+
+    public function handle(Request $request): Response
+    {
+        $this->ensureTokenCan('update');
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        $rules = array_merge(
+            ['id' => ['required', 'string']],
+            $this->relationshipRules($user),
+        );
+
+        $validated = $request->validate($rules);
+
+        $relationshipData = collect($validated)->except('id')->filter(fn (mixed $v): bool => is_array($v));
+        abort_if($relationshipData->isEmpty(), 422, 'At least one relationship array must be provided.');
+
+        $modelClass = $this->modelClass();
+
+        /** @var Model $model */
+        $model = $modelClass::query()->findOrFail($validated['id']);
+
+        abort_unless($user->can('update', $model), 403);
+
+        $this->detachRelationships($model, $validated);
+
+        $model->loadMissing('customFieldValues.customField');
+        $model->loadMissing($this->relationshipsToLoad());
+
+        /** @var class-string<JsonResource> $resourceClass */
+        $resourceClass = $this->resourceClass();
+
+        return Response::text(
+            new $resourceClass($model)->toJson(JSON_PRETTY_PRINT)
+        );
+    }
+}

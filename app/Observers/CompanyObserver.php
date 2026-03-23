@@ -16,8 +16,8 @@ final readonly class CompanyObserver
         if (auth()->check()) {
             /** @var User $user */
             $user = auth()->user();
-            $company->creator_id = $user->getKey();
-            $company->team_id = $user->currentTeam->getKey();
+            $company->creator_id ??= $user->getKey();
+            $company->team_id ??= $user->currentTeam->getKey();
         }
     }
 

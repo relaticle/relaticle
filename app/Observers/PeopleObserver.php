@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Models\People;
+use App\Models\User;
 
 final readonly class PeopleObserver
 {
     public function creating(People $people): void
     {
-        if (auth('web')->check()) {
-            $people->creator_id = (string) auth('web')->id();
-            $people->team_id = auth('web')->user()->currentTeam->getKey();
+        if (auth()->check()) {
+            /** @var User $user */
+            $user = auth()->user();
+            $people->creator_id ??= $user->getKey();
+            $people->team_id ??= $user->currentTeam->getKey();
         }
     }
 

@@ -21,3 +21,108 @@
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Hero gradient text animation — slow, subtle shimmer */
+@keyframes gradient-shift {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+}
+
+/* Badge spinning border */
+@keyframes badge-spin {
+    from { --badge-angle: 0deg; }
+    to   { --badge-angle: 360deg; }
+}
+
+@property --badge-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+}
+
+.hero-badge-wrapper {
+    overflow: hidden;
+}
+
+.hero-badge-border {
+    position: absolute;
+    inset: -1px;
+    border-radius: 9999px;
+    background: conic-gradient(
+        from var(--badge-angle),
+        transparent 0%,
+        transparent 30%,
+        var(--color-primary-300) 42%,
+        var(--color-primary) 50%,
+        var(--color-primary-300) 58%,
+        transparent 70%,
+        transparent 100%
+    );
+    animation: badge-spin 4s linear infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    padding: 1px;
+}
+
+:is(.dark) .hero-badge-border {
+    background: conic-gradient(
+        from var(--badge-angle),
+        transparent 0%,
+        transparent 30%,
+        var(--color-primary-400) 42%,
+        var(--color-primary-300) 50%,
+        var(--color-primary-400) 58%,
+        transparent 70%,
+        transparent 100%
+    );
+}
+
+/* Hero underline shimmer sweep */
+@keyframes shimmer-sweep {
+    0%   { background-position: 200% center; }
+    40%  { background-position: -50% center; }
+    100% { background-position: -50% center; }
+}
+
+/* Hero entrance animation — staggered fade + slide up */
+@keyframes hero-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hero-enter {
+    opacity: 0;
+    animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero-enter-1 { animation-delay: 0ms; }
+.hero-enter-2 { animation-delay: 120ms; }
+.hero-enter-3 { animation-delay: 240ms; }
+.hero-enter-4 { animation-delay: 360ms; }
+.hero-enter-5 { animation-delay: 500ms; }
+.hero-enter-6 { animation-delay: 650ms; }
+
+/* Tab active indicator slide */
+.hero-tab-indicator {
+    transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .hero-enter {
+        opacity: 1;
+        animation: none;
+    }
+    .hero-tab-indicator {
+        transition: none;
+    }
+}

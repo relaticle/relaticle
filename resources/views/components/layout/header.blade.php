@@ -1,177 +1,61 @@
-<header
-    class="bg-white dark:bg-black py-4 fixed w-full top-0 z-50 transition-all duration-300 border-b border-gray-100 dark:border-gray-900 backdrop-blur-sm bg-white/95 dark:bg-black/95">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Three-column layout: Logo | Nav (centered) | Actions -->
-        <div class="flex items-center justify-between">
-            <!-- Logo (Left Column) -->
-            <div class="flex flex-1 items-center min-w-0">
-                <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
-                    <x-brand.logo-lockup
-                        size="md"
-                        class="text-black dark:text-white"
-                    />
-                </a>
-            </div>
+<div x-data="{ mobileMenu: false }" @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
+    <header
+        id="main-header"
+        class="fixed w-full top-0 z-50 bg-white/80 dark:bg-black/90 backdrop-blur-md border-b border-gray-200/60 dark:border-white/[0.06]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
 
-            <!-- Desktop Navigation (Center Column) -->
-            <div class="hidden md:flex flex-1 items-center justify-center">
-                <nav class="flex items-center space-x-8">
-                    <a href="{{ url('/#features') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Product features">Features</a>
-                    <a href="{{ route('documentation.index') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Documentation">Documentation</a>
-                    <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="GitHub Repository">
-                        <x-icon-github class="w-4 h-4"/>
-                        @if(isset($githubStars) && $githubStars > 0)
-                            <span>{{ $formattedGithubStars }}</span>
-                        @endif
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
-                    </a>
-                    <a href="{{ route('discord') }}" target="_blank"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:w-0 after:bg-primary dark:after:bg-primary after:transition-all hover:after:w-full"
-                       aria-label="Join Discord Community">
-                        <x-icon-discord class="w-4 h-4"/>
-                        Discord
-                        <x-heroicon-o-arrow-up-right class="h-3 w-3 text-gray-400"/>
-                    </a>
-                </nav>
-            </div>
-
-            <!-- Right Section: Auth and Settings (Right Column) -->
-            <div class="flex flex-1 items-center justify-end space-x-5">
-                <!-- Auth Links -->
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="{{ route('login') }}"
-                       class="text-gray-700 dark:text-white hover:text-primary dark:hover:text-primary-400 text-sm font-medium transition-all duration-200 {{ Route::is('login') ? 'text-primary dark:text-primary-400' : '' }}"
-                       aria-label="Sign in to your account">Sign In</a>
-
-                    <a href="{{ route('register') }}"
-                       class="group bg-primary hover:bg-primary-600 text-white px-5 py-2.5 text-sm rounded-md transition-all duration-300 font-medium relative overflow-hidden shadow-sm hover:shadow hover:scale-[1.02] active:scale-[0.98]"
-                       aria-label="Create a new account">
-                        <span class="relative z-10">Start for free</span>
-                        <span
-                            class="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                <div class="flex flex-1 items-center">
+                    <a href="{{ url('/') }}" class="transition-opacity" aria-label="Relaticle Home">
+                        <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                     </a>
                 </div>
 
-                <!-- Mobile Menu Button -->
-                <div class="md:hidden">
-                    <button id="mobile-menu-button"
-                            class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary/30 rounded-full transition-all active:scale-95"
-                            aria-label="Toggle mobile menu"
-                            aria-expanded="false">
-                        <x-heroicon-o-bars-3 class="h-6 w-6"/>
+                <nav class="hidden md:flex items-center gap-1">
+                    <a href="{{ url('/#features') }}"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
+                        Features
+                    </a>
+                    <a href="{{ route('pricing') }}"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
+                        Pricing
+                    </a>
+                    <a href="{{ route('documentation.index') }}"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
+                        Documentation
+                    </a>
+                    <a href="{{ route('discord') }}" target="_blank"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors flex items-center gap-1.5">
+                        <x-ri-discord-fill class="w-4 h-4"/>
+                        <span>Discord</span>
+                        <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
+                    </a>
+                </nav>
+
+                <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+                    <div class="hidden md:flex items-center gap-2">
+                        <x-marketing.button variant="secondary" size="sm" href="{{ route('login') }}">
+                            Sign In
+                        </x-marketing.button>
+
+                        <x-marketing.button size="sm" href="{{ route('register') }}">
+                            Start for free
+                        </x-marketing.button>
+                    </div>
+
+                    <button @click="mobileMenu = !mobileMenu"
+                            class="md:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                            :aria-expanded="mobileMenu"
+                            :aria-label="mobileMenu ? 'Close menu' : 'Open menu'">
+                        <svg class="w-5 h-5 transition-transform duration-200" :class="mobileMenu && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path x-show="!mobileMenu" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                            <path x-show="mobileMenu" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
                     </button>
                 </div>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Mobile Menu Component -->
     <x-layout.mobile-menu/>
-</header>
-
-<!-- Add a spacer to prevent content from hiding behind fixed header -->
-<div class="h-[64px]"></div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Mobile menu functionality
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
-        const mobileMenuClose = document.getElementById('mobile-menu-close');
-        const mobileMenuLinks = document.querySelectorAll('.mobile-menu-link');
-
-        function openMobileMenu() {
-            // Show elements
-            mobileMenu.classList.remove('hidden');
-            mobileMenuBackdrop.classList.remove('hidden');
-
-            // Prevent body scroll
-            document.body.classList.add('overflow-hidden');
-
-            // Trigger animations
-            setTimeout(() => {
-                mobileMenu.classList.remove('translate-x-full');
-                mobileMenuBackdrop.classList.remove('opacity-0');
-            }, 10);
-
-            mobileMenuButton.setAttribute('aria-expanded', 'true');
-        }
-
-        function closeMobileMenu() {
-            // Hide with animations
-            mobileMenu.classList.add('translate-x-full');
-            mobileMenuBackdrop.classList.add('opacity-0');
-
-            // Re-enable body scroll
-            document.body.classList.remove('overflow-hidden');
-
-            // Hide elements after animation
-            setTimeout(() => {
-                mobileMenu.classList.add('hidden');
-                mobileMenuBackdrop.classList.add('hidden');
-            }, 300);
-
-            mobileMenuButton.setAttribute('aria-expanded', 'false');
-        }
-
-        // Event listeners
-        if (mobileMenuButton) {
-            mobileMenuButton.addEventListener('click', openMobileMenu);
-        }
-
-        if (mobileMenuClose) {
-            mobileMenuClose.addEventListener('click', closeMobileMenu);
-        }
-
-        if (mobileMenuBackdrop) {
-            mobileMenuBackdrop.addEventListener('click', closeMobileMenu);
-        }
-
-        // Close menu when clicking links
-        mobileMenuLinks.forEach(link => {
-            link.addEventListener('click', closeMobileMenu);
-        });
-
-        // Close menu on escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && mobileMenuButton.getAttribute('aria-expanded') === 'true') {
-                closeMobileMenu();
-            }
-        });
-
-        // Dynamic header scrolling effect
-        const header = document.querySelector('header');
-        window.addEventListener('scroll', function () {
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-            if (scrollTop > 20) {
-                header.classList.add('py-2', 'shadow-sm');
-                header.classList.remove('py-4');
-            } else {
-                header.classList.add('py-4');
-                header.classList.remove('py-2', 'shadow-sm');
-            }
-        });
-
-        // Check for user preference for reduced motion
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (prefersReducedMotion) {
-            document.documentElement.classList.add('reduce-motion');
-        }
-    });
-</script>
-
-<style>
-    /* Adding styles for users who prefer reduced motion */
-    .reduce-motion * {
-        transition-duration: 0.05s !important;
-        animation-duration: 0.05s !important;
-    }
-</style>
+</div>

@@ -1,4 +1,4 @@
-@props(['title', 'description' => 'Relaticle - The Next-Generation Open-Source CRM Platform for modern businesses', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
+@props(['title', 'description' => 'Relaticle - The open-source CRM built for AI agents. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -24,13 +24,16 @@
     <meta name="twitter:description" content="{{ $ogDescription ?? $description }}" />
     <meta name="twitter:image" content="{{ $ogImage ?? url('/images/og-image.jpg') }}" />
 
-    <title>{{ $title ?? config('app.name', 'Relaticle - The Next-Generation Open-Source CRM Platform') }}</title>
+    <title>{{ $title ?? config('app.name', 'Relaticle - The Open-Source CRM Built for AI Agents') }}</title>
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Relaticle" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" as="image" href="{{ asset('images/app-companies-preview.webp') }}" type="image/webp" />
 
     <!-- Dark mode FOUC prevention (must run synchronously before paint) -->
     <script>

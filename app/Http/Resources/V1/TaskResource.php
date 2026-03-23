@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\V1;
+
+use App\Http\Resources\V1\Concerns\FormatsCustomFields;
+use App\Models\Task;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\JsonApi\JsonApiResource;
+
+/**
+ * @mixin Task
+ */
+final class TaskResource extends JsonApiResource
+{
+    use FormatsCustomFields;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toAttributes(Request $request): array
+    {
+        return [
+            'title' => $this->title,
+            'creation_source' => $this->creation_source,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'custom_fields' => $this->formatCustomFields($this->resource),
+            'assignees_count' => $this->whenHas('assignees_count'),
+            'companies_count' => $this->whenHas('companies_count'),
+            'people_count' => $this->whenHas('people_count'),
+            'opportunities_count' => $this->whenHas('opportunities_count'),
+        ];
+    }
+
+    /**
+     * @return array<string, class-string<JsonApiResource>>
+     */
+    public function toRelationships(Request $request): array
+    {
+        return [
+            'creator' => UserResource::class,
+            'assignees' => UserResource::class,
+            'companies' => CompanyResource::class,
+            'people' => PeopleResource::class,
+            'opportunities' => OpportunityResource::class,
+        ];
+    }
+}
