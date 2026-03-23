@@ -475,8 +475,8 @@ return new class extends Migration
             ->where('string_value', '!=', '')
             ->where(function (Builder $query): void {
                 $query->whereNull('json_value')
-                    ->orWhere('json_value', '=', '[]')
-                    ->orWhere('json_value', '=', 'null');
+                    ->orWhereRaw('"json_value"::text = ?', ['[]'])
+                    ->orWhereRaw('"json_value"::text = ?', ['null']);
             })
             ->select(['id', 'string_value'])
             ->get();
@@ -531,8 +531,8 @@ return new class extends Migration
             ->where('string_value', '!=', '')
             ->where(function (Builder $query): void {
                 $query->whereNull('json_value')
-                    ->orWhere('json_value', '=', '[]')
-                    ->orWhere('json_value', '=', 'null');
+                    ->orWhereRaw('"json_value"::text = ?', ['[]'])
+                    ->orWhereRaw('"json_value"::text = ?', ['null']);
             })
             ->select(['id', 'string_value'])
             ->get();
