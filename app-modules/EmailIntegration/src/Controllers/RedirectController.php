@@ -13,7 +13,7 @@ final readonly class RedirectController
     {
         return match ($provider) {
             'gmail' => Socialite::driver('google')
-                ->stateless()
+                ->stateless() // TODO: Remove stateless() once we can handle the state parameter properly
                 ->scopes([
                     'https://www.googleapis.com/auth/gmail.readonly',
                     'https://www.googleapis.com/auth/gmail.send',

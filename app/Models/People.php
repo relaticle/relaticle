@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 
 /**
  * @property Carbon|null $deleted_at
@@ -32,6 +33,7 @@ final class People extends Model implements HasCustomFields
 {
     use HasAiSummary;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<PeopleFactory> */
     use HasFactory;

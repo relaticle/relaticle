@@ -16,5 +16,10 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
             });
 
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../config/email-integration.php.php' => config_path('email-integration.php'),
+            ], 'email-integration-config');
+        }
     }
 }

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
@@ -32,6 +33,7 @@ final class Opportunity extends Model implements HasCustomFields
 {
     use HasAiSummary;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<OpportunityFactory> */
     use HasFactory;

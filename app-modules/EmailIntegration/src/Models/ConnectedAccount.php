@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Models;
 use App\Models\Concerns\HasTeam;
 use App\Models\User;
 use Database\Factories\ConnectedAccountFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
 
 /**
  * @property string $id
@@ -30,6 +32,7 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
  * @property string|null $refresh_token
  * @property Carbon|null $token_expires_at
  */
+#[ObservedBy(ConnectedAccountObserver::class)]
 final class ConnectedAccount extends Model
 {
     /**

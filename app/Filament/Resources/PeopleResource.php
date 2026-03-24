@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
 use App\Models\Company;
@@ -164,6 +165,7 @@ final class PeopleResource extends Resource
         return [
             TasksRelationManager::class,
             NotesRelationManager::class,
+            EmailsRelationManager::class,
         ];
     }
 

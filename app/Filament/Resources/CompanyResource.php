@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -125,6 +126,13 @@ final class CompanyResource extends Resource
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            EmailsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -40,6 +41,7 @@ final class Company extends Model implements HasCustomFields, HasMedia
 {
     use HasAiSummary;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<CompanyFactory> */
     use HasFactory;

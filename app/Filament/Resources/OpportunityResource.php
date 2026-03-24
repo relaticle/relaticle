@@ -9,6 +9,7 @@ use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
 use App\Models\Opportunity;
@@ -108,6 +109,7 @@ final class OpportunityResource extends Resource
         return [
             TasksRelationManager::class,
             NotesRelationManager::class,
+            EmailsRelationManager::class,
         ];
     }
 

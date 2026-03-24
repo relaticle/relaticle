@@ -10,6 +10,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Database\Factories\EmailFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,11 +19,36 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Observers\EmailObserver;
 
+/**
+ * /**
+ * * @property string $id
+ * * @property string $team_id
+ * * @property string $user_id
+ * * @property string $connected_account_id
+ * * @property string|null $rfc_message_id
+ * * @property string|null $provider_message_id
+ * * @property string|null $thread_id
+ * * @property string|null $in_reply_to
+ * * @property string $subject
+ * * @property string|null $snippet
+ * * @property Carbon|null $sent_at
+ * * @property EmailDirection $direction
+ * * @property string|null $folder
+ * * @property EmailStatus $status
+ * * @property EmailPrivacyTier $privacy_tier
+ * * @property bool $has_attachments
+ * * @property bool $is_internal
+ * * @property Carbon|null $read_at
+ * * @property EmailCreationSource $creation_source
+ */
+#[ObservedBy(EmailObserver::class)]
 final class Email extends Model
 {
     /**

@@ -6,6 +6,9 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
@@ -27,6 +30,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:generate-sitemap')->daily();
         $schedule->command('import:cleanup')->hourly();
         $schedule->command('queue:prune-batches --hours=24')->daily();
+
+        $schedule->call(function (): void {
+            ConnectedAccount::where('status', EmailAccountStatus::ACTIVE)
+                ->whereNotNull('sync_cursor')
+                ->each(fn (ConnectedAccount $account) => IncrementalEmailSyncJob::dispatch($account));
+        })
+            ->everyFiveMinutes()
+            ->name('email:incremental-sync')
+            ->withoutOverlapping();
 
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();
