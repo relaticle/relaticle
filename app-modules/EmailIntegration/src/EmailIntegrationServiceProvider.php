@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
@@ -16,6 +20,14 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->call(function (): void {
+                ConnectedAccount::where('status', EmailAccountStatus::ACTIVE)
+                    ->cursor()
+                    ->each(fn (ConnectedAccount $account) => IncrementalEmailSyncJob::dispatch($account));
+            })->everyFiveMinutes()->name('email-incremental-sync');
+        });
+
         Route::middleware('web')
             ->group(function (): void {
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');

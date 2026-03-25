@@ -32,7 +32,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         $account = $this->connectedAccount;
-        $daysBack = config('services.email_sync.initial_days', 90);
+        $daysBack = (int) config('email-integration.sync.initial_days', 90);
 
         if ($account->provider === EmailProvider::GMAIL) {
             $service = new GmailService($account);
@@ -47,23 +47,6 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
                 ->map(fn ($chunk) => $chunk->map(fn ($id) => new StoreEmailJob($account, $id, 'gmail'))->all()
                 )
                 ->flatten()
-                ->all();
-
-            Bus::batch($jobs)
-                ->name("Initial sync: {$account->email_address}")
-                ->allowFailures()
-                ->dispatch();
-        }
-
-        if ($account->provider === EmailProvider::AZURE) {
-            // MS Graph: use $delta endpoint — it returns all messages + a deltaToken cursor
-            $service = new MicrosoftService($account);
-            $data = $service->fetchDelta('initial');
-
-            $account->update(['sync_cursor' => $data['new_cursor']]);
-
-            $jobs = collect($data['messages'])
-                ->map(fn ($raw) => new StoreEmailJob($account, $raw['id'], 'azure'))
                 ->all();
 
             Bus::batch($jobs)
