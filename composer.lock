@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3fde65b2b1fc6e66c789f2038be618bc",
+    "content-hash": "a9507ecfe16f0e5da34e3f2919d4b5fa",
     "packages": [
         {
             "name": "ashallendesign/favicon-fetcher",
@@ -14953,6 +14953,32 @@
             "time": "2025-08-14T07:29:31+00:00"
         },
         {
+            "name": "filament/blueprint",
+            "version": "dev-feat/email-calendar-integration",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament/blueprint",
+                "reference": "83d1fa975d38c33c2146afc006b7fe6c192281c6"
+            },
+            "require": {
+                "filament/support": "^4.0|^5.0",
+                "laravel/boost": "^1.8|^2.0"
+            },
+            "type": "library",
+            "license": [
+                "proprietary"
+            ],
+            "description": "Guidelines for AI agents to produce detailed Filament implementation plans.",
+            "homepage": "https://github.com/filamentphp/filament",
+            "support": {
+                "issues": "https://github.com/filamentphp/filament/issues",
+                "source": "https://github.com/filamentphp/filament"
+            },
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "filp/whoops",
             "version": "2.18.4",
             "source": {
@@ -18634,11 +18660,12 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "beta",
+    "minimum-stability": "dev",
     "stability-flags": {
+        "filament/blueprint": 20,
         "relaticle/flowforge": 20
     },
-    "prefer-stable": true,
+    "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.4"

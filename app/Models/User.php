@@ -25,6 +25,7 @@ use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 
 /**
  * @property string $name
@@ -59,6 +60,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         'name',
         'email',
         'password',
+        'default_email_sharing_tier',
     ];
 
     /**
@@ -92,6 +94,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
         ];
     }
 

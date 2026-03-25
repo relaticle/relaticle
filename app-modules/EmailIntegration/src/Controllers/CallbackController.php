@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Controllers;
 
-use App\Filament\Pages\EmailAccounts;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class CallbackController
@@ -29,7 +30,7 @@ final readonly class CallbackController
 
         DB::transaction(function () use ($provider, $socialUser, $user): void {
 
-            ConnectedAccount::updateOrCreate(
+            ConnectedAccount::query()->updateOrCreate(
                 [
                     'user_id' => $user->getKey(),
                     'provider' => $provider,
@@ -44,11 +45,12 @@ final readonly class CallbackController
                     'token_expires_at' => now()->addSeconds($socialUser->expiresIn ?? 3600),
                     'status' => 'active',
                     'last_error' => null,
+                    'contact_creation_mode' => ContactCreationMode::All,
                 ]
             );
         });
 
-        return redirect(EmailAccounts::getUrl([
+        return redirect(EmailAccountsPage::getUrl([
             'tenant' => $user->currentTeam->slug,
         ]))->with('success', 'Email account connected successfully.');
     }

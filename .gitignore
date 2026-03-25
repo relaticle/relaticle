@@ -38,3 +38,4 @@ boost.json
 polyscope.json
 /bin/setup-preview.sh
 /docs
+/packages

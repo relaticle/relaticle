@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Livewire\App\Email\UserEmailPrivacySettings;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Livewire\App\Profile\UpdatePassword;
@@ -32,6 +33,7 @@ final class EditProfile extends Page
         return $schema->components([
             Livewire::make(UpdateProfileInformation::class),
             Livewire::make(UpdatePassword::class),
+            Livewire::make(UserEmailPrivacySettings::class),
             Livewire::make(LogoutOtherBrowserSessions::class),
             Livewire::make(DeleteAccount::class),
         ]);

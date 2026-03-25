@@ -18,6 +18,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
@@ -83,8 +84,36 @@ final class ViewOpportunity extends ViewRecord
                         ->grow(false),
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
-            ])
-                ->columnSpanFull(),
+            ])->columnSpanFull(),
+
+            Section::make('Communication Intelligence')
+                ->icon(Heroicon::ChartBar)
+                ->schema([
+                    TextEntry::make('last_interaction_at')
+                        ->label('Last Interaction')
+                        ->dateTime()
+                        ->placeholder('Never'),
+
+                    TextEntry::make('last_email_at')
+                        ->label('Last Email')
+                        ->dateTime()
+                        ->placeholder('Never'),
+
+                    TextEntry::make('days_since_last_email')
+                        ->label('Days Since Last Email')
+                        ->getStateUsing(fn (Opportunity $record): string => $record->last_email_at
+                            ? now()->diffInDays($record->last_email_at).' days ago'
+                            : 'No emails yet'
+                        ),
+
+                    TextEntry::make('email_count')
+                        ->label('Total Emails')
+                        ->default(0),
+                ])
+                ->columns(2)
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(fn (Opportunity $record): bool => ($record->email_count ?? 0) === 0),
         ]);
     }
 }

@@ -31,8 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('import:cleanup')->hourly();
         $schedule->command('queue:prune-batches --hours=24')->daily();
 
+        // TODO::Separate it in different command class
         $schedule->call(function (): void {
-            ConnectedAccount::where('status', EmailAccountStatus::ACTIVE)
+            ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
                 ->whereNotNull('sync_cursor')
                 ->each(fn (ConnectedAccount $account) => IncrementalEmailSyncJob::dispatch($account));
         })

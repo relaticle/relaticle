@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use App\Jobs\ClassifyEmailJob;
+use App\Models\User;
+use Exception;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -12,10 +15,13 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Services\EmailLinkingService;
 use Relaticle\EmailIntegration\Services\GmailService;
+use Throwable;
 
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 {
@@ -28,9 +34,12 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly string $messageId,
-        public readonly string $provider,
+        public readonly EmailProvider $provider,
     ) {}
 
+    /**
+     * @throws Throwable
+     */
     public function handle(): void
     {
         if ($this->batch()?->cancelled()) {
@@ -38,21 +47,19 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
         }
 
         // Skip if already stored (dedup by account + rfc_message_id)
-        $exists = Email::where('connected_account_id', $this->connectedAccount->getKey())
-            ->where('rfc_message_id', $this->messageId)
-            ->exists();
 
-        if ($exists) {
+        if ($this->isAlreadyStored()) {
             return;
         }
 
         $raw = match ($this->provider) {
-            'gmail' => (new GmailService($this->connectedAccount))->fetchMessage($this->messageId),
+            EmailProvider::GMAIL => new GmailService($this->connectedAccount)->fetchMessage($this->messageId),
+            EmailProvider::AZURE => throw new Exception('To be implemented'),
             // TODO: add other providers here
         };
 
         DB::transaction(function () use ($raw): void {
-            $email = Email::create([
+            $email = Email::query()->create([
                 'team_id' => $this->connectedAccount->team_id,
                 'user_id' => $this->connectedAccount->user_id,
                 'connected_account_id' => $this->connectedAccount->getKey(),
@@ -69,21 +76,49 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             ]);
 
             // Store body in separate table
-            $email->body()->create([
-                'body_text' => $raw['body_text'],
-                'body_html' => $raw['body_html'],
-            ]);
+            $this->storeEmailBody($email, $raw['body_text'], $raw['body_html']);
 
-            foreach ($raw['participants'] as $p) {
-                EmailParticipant::create([
+            foreach ($raw['participants'] as $participant) {
+                EmailParticipant::query()->create([
                     'email_id' => $email->getKey(),
-                    'email_address' => $p['email_address'],
-                    'name' => $p['name'] ?? null,
-                    'role' => $p['role'],
+                    'email_address' => $participant['email_address'],
+                    'name' => $participant['name'] ?? null,
+                    'role' => $participant['role'],
                 ]);
             }
 
-            // EmailObserver::created() fires here and calls EmailLinkingService
+            // Detect internal emails — true when all participants are workspace members
+            $teamUserEmails = User::query()->where('current_team_id', $email->team_id)
+                ->pluck('email')
+                ->map(fn ($e) => strtolower($e));
+
+            $participants = $email->participants()->pluck('email_address')
+                ->map(fn ($e) => strtolower($e));
+
+            $isInternal = $participants->isNotEmpty() && $participants->every(
+                fn ($address) => $teamUserEmails->contains($address)
+            );
+
+            $email->updateQuietly(['is_internal' => $isInternal]);
+
+            // Trigger linking and classification now that participants and is_internal are set.
+            app(EmailLinkingService::class)->linkEmail($email);
+            //            ClassifyEmailJob::dispatch($email->getKey())->delay(now()->addSeconds(5));
         });
+    }
+
+    private function isAlreadyStored(): bool
+    {
+        return Email::query()->where('connected_account_id', $this->connectedAccount->getKey())
+            ->where('rfc_message_id', $this->messageId)
+            ->exists();
+    }
+
+    private function storeEmailBody(Email $email, ?string $bodyText, string $bodyHtml): void
+    {
+        $email->body()->create([
+            'body_text' => $bodyText,
+            'body_html' => $bodyHtml,
+        ]);
     }
 }

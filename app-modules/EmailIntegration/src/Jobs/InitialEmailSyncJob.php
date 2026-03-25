@@ -32,10 +32,12 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         $account = $this->connectedAccount;
+
         $daysBack = (int) config('email-integration.sync.initial_days', 90);
 
         if ($account->provider === EmailProvider::GMAIL) {
             $service = new GmailService($account);
+
             $data = $service->fetchInitialMessages($daysBack);
 
             // Persist historyId cursor — used by incremental sync from now on
@@ -44,8 +46,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             // Chunk message IDs and dispatch one StoreEmailJob per message
             $jobs = collect($data['message_ids'])
                 ->chunk(config('services.email_sync.batch_size', 50))
-                ->map(fn ($chunk) => $chunk->map(fn ($id) => new StoreEmailJob($account, $id, 'gmail'))->all()
-                )
+                ->map(fn ($chunk) => $chunk->map(fn ($id) => new StoreEmailJob($account, $id, EmailProvider::GMAIL))->all())
                 ->flatten()
                 ->all();
 

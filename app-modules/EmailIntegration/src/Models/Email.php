@@ -27,26 +27,25 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
 
 /**
- * /**
- * * @property string $id
- * * @property string $team_id
- * * @property string $user_id
- * * @property string $connected_account_id
- * * @property string|null $rfc_message_id
- * * @property string|null $provider_message_id
- * * @property string|null $thread_id
- * * @property string|null $in_reply_to
- * * @property string $subject
- * * @property string|null $snippet
- * * @property Carbon|null $sent_at
- * * @property EmailDirection $direction
- * * @property string|null $folder
- * * @property EmailStatus $status
- * * @property EmailPrivacyTier $privacy_tier
- * * @property bool $has_attachments
- * * @property bool $is_internal
- * * @property Carbon|null $read_at
- * * @property EmailCreationSource $creation_source
+ * @property string $id
+ * @property string $team_id
+ * @property string $user_id
+ * @property string $connected_account_id
+ * @property string|null $rfc_message_id
+ * @property string|null $provider_message_id
+ * @property string|null $thread_id
+ * @property string|null $in_reply_to
+ * @property string $subject
+ * @property string|null $snippet
+ * @property Carbon|null $sent_at
+ * @property EmailDirection $direction
+ * @property string|null $folder
+ * @property EmailStatus $status
+ * @property EmailPrivacyTier $privacy_tier
+ * @property bool $has_attachments
+ * @property bool $is_internal
+ * @property Carbon|null $read_at
+ * @property EmailCreationSource $creation_source
  */
 #[ObservedBy(EmailObserver::class)]
 final class Email extends Model

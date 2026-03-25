@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -30,9 +31,10 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+
         $account = $this->connectedAccount;
 
-        if (! $account->isActive() || ! $account->sync_cursor) {
+        if ($account->status !== EmailAccountStatus::ACTIVE || ! $account->sync_cursor) {
             return;
         }
 
@@ -40,8 +42,10 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             $service = new GmailService($account);
             $data = $service->fetchDelta($account->sync_cursor);
 
+            Log::info("Fetched delta for account {$account->id}: ".json_encode($data));
+
             foreach ($data['message_ids'] as $messageId) {
-                StoreEmailJob::dispatch($account, $messageId, 'gmail');
+                StoreEmailJob::dispatch($account, $messageId, EmailProvider::GMAIL);
             }
 
             $account->update([
@@ -55,8 +59,13 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        $isAuthError = str_contains($exception->getMessage(), 'invalid_grant')
+            || str_contains($exception->getMessage(), '401');
+
+        //        Log::info($exception->getMessage());
+
         $this->connectedAccount->update([
-            'status' => EmailAccountStatus::ERROR,
+            'status' => $isAuthError ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
             'last_error' => $exception->getMessage(),
         ]);
     }

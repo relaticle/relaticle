@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
@@ -57,6 +58,8 @@ final class ConnectedAccount extends Model
         'last_error',
         'sync_inbox',
         'sync_sent',
+        'contact_creation_mode',
+        'auto_create_companies',
         'daily_send_limit',
         'hourly_send_limit',
     ];
@@ -68,6 +71,8 @@ final class ConnectedAccount extends Model
         'last_synced_at' => 'datetime',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
+        'contact_creation_mode' => ContactCreationMode::class,
+        'auto_create_companies' => 'boolean',
         'capabilities' => 'array',
         'access_token' => 'encrypted',
         'refresh_token' => 'encrypted',
@@ -126,7 +131,7 @@ final class ConnectedAccount extends Model
 
     public function isActive(): bool
     {
-        return $this->status === EmailAccountStatus::ACTIVE && ! $this->isTokenExpired();
+        return $this->status === EmailAccountStatus::ACTIVE;
     }
 
     /**

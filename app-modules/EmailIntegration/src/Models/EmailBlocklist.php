@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 
 final class EmailBlocklist extends Model
 {
@@ -25,6 +26,13 @@ final class EmailBlocklist extends Model
         'type',
         'value',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'type' => EmailBlocklistType::class,
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>

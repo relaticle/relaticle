@@ -10,6 +10,8 @@ use Illuminate\Support\ServiceProvider;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Observers\EmailObserver;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
@@ -20,6 +22,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
+
+        Email::observe(EmailObserver::class);
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->call(function (): void {
                 ConnectedAccount::where('status', EmailAccountStatus::ACTIVE)

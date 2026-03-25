@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
+use Filament\Support\Icons\Heroicon;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -86,6 +87,41 @@ final class ViewPeople extends ViewRecord
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
             ])->columnSpanFull(),
+
+            Section::make('Communication Intelligence')
+                ->icon(Heroicon::ChartBar)
+                ->schema([
+                    TextEntry::make('last_interaction_at')
+                        ->label('Last Interaction')
+                        ->dateTime()
+                        ->placeholder('Never'),
+
+                    TextEntry::make('last_email_at')
+                        ->label('Last Email')
+                        ->dateTime()
+                        ->placeholder('Never'),
+
+                    TextEntry::make('days_since_last_email')
+                        ->label('Days Since Last Email')
+                        ->getStateUsing(fn (People $record): string => $record->last_email_at
+                            ? now()->diffInDays($record->last_email_at).' days ago'
+                            : 'No emails yet'
+                        ),
+
+                    TextEntry::make('email_count')
+                        ->label('Total Emails')
+                        ->default(0),
+
+                    TextEntry::make('inbound_email_count')
+                        ->label('Received'),
+
+                    TextEntry::make('outbound_email_count')
+                        ->label('Sent'),
+                ])
+                ->columns(3)
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(fn (People $record): bool => ($record->email_count ?? 0) === 0),
         ]);
     }
 }

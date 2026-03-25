@@ -19,7 +19,7 @@
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
         "doctrine/dbal": "^4.4",
-        "filament/filament": "^5.0",
+        "filament/filament": "^5.4",
         "google/apiclient": "^2.19",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.29",
@@ -55,6 +55,7 @@
     "require-dev": {
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
+        "filament/blueprint": "dev-feat/email-calendar-integration",
         "itsgoingd/clockwork": "^5.3",
         "larastan/larastan": "^3.0",
         "laravel/boost": "^2.0",
@@ -151,6 +152,6 @@
             "php-http/discovery": true
         }
     },
-    "minimum-stability": "beta",
-    "prefer-stable": true
+    "minimum-stability": "dev",
+    "prefer-stable": false
 }

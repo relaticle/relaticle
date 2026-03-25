@@ -52,6 +52,11 @@ final class Opportunity extends Model implements HasCustomFields
      */
     protected $fillable = [
         'creation_source',
+        'last_email_at',
+        'last_interaction_at',
+        'email_count',
+        'inbound_email_count',
+        'outbound_email_count',
     ];
 
     /**
@@ -70,6 +75,8 @@ final class Opportunity extends Model implements HasCustomFields
     {
         return [
             'creation_source' => CreationSource::class,
+            'last_email_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
         ];
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models;
 
+use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasTeam;
 use Database\Factories\EmailThreadFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -17,7 +18,7 @@ final class EmailThread extends Model
     /**
      * @use HasFactory<EmailThreadFactory>
      */
-    use HasFactory, HasTeam, HasUlids;
+    use HasAiSummary, HasFactory, HasTeam, HasUlids;
 
     protected $fillable = [
         'team_id',

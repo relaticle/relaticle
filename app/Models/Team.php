@@ -15,6 +15,7 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -97,6 +98,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         'name',
         'slug',
         'personal_team',
+        'default_email_sharing_tier',
     ];
 
     /**
@@ -119,6 +121,7 @@ final class Team extends JetstreamTeam implements HasAvatar
     {
         return [
             'personal_team' => 'boolean',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
         ];
     }
 

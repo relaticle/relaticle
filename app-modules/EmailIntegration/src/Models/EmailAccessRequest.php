@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 
 final class EmailAccessRequest extends Model
 {
@@ -28,6 +29,13 @@ final class EmailAccessRequest extends Model
         'tier_requested',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'status' => EmailAccessRequestStatus::class,
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>
