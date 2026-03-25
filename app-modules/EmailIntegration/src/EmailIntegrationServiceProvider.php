@@ -9,6 +9,11 @@ use Illuminate\Support\ServiceProvider;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->mergeConfigFrom(__DIR__.'/../config/email-integration.php', 'email-integration');
+    }
+
     public function boot(): void
     {
         Route::middleware('web')
@@ -18,7 +23,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../config/email-integration.php.php' => config_path('email-integration.php'),
+                __DIR__.'/../config/email-integration.php' => config_path('email-integration.php'),
             ], 'email-integration-config');
         }
     }

@@ -37,7 +37,7 @@ final class EmailAccounts extends Page
             ->label('Connect Gmail')
             ->icon('heroicon-o-plus')
             ->size(Size::Small)
-            ->url(fn () => route('auth.socialite.redirect', ['provider' => 'gmail']), true);
+            ->url(fn () => route('email-accounts.redirect', ['provider' => 'gmail']), true);
     }
 
     public function disconnectAction(): Action

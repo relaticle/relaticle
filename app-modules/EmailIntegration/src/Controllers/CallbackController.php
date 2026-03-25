@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Controllers;
 
+use App\Filament\Pages\EmailAccounts;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
@@ -16,12 +18,16 @@ final readonly class CallbackController
      */
     public function __invoke(string $provider): RedirectResponse
     {
+        /**
+         * @var User $user
+         */
+        $user = auth()->user();
+
         $socialUser = Socialite::driver($this->resolveDriver($provider))
             ->stateless() // TODO: Remove stateless() once we can handle the state parameter properly
             ->user();
 
-        DB::transaction(function () use ($provider, $socialUser): void {
-            $user = auth()->user();
+        DB::transaction(function () use ($provider, $socialUser, $user): void {
 
             ConnectedAccount::updateOrCreate(
                 [
@@ -42,8 +48,9 @@ final readonly class CallbackController
             );
         });
 
-        return redirect()->route('filament.app.pages.email-accounts')
-            ->with('success', 'Email account connected successfully.');
+        return redirect(EmailAccounts::getUrl([
+            'tenant' => $user->currentTeam->slug,
+        ]))->with('success', 'Email account connected successfully.');
     }
 
     private function resolveDriver(string $provider): string
