@@ -55,6 +55,10 @@ Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::cla
     ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
     ->name('team-invitations.accept');
 
+// Legacy documentation redirects
+Route::get('/documentation/{slug?}', fn (string $slug = '') => redirect("/docs/{$slug}", 301))
+    ->where('slug', '.*');
+
 // Community redirects
 Route::get('/discord', function () {
     return redirect()->away(config('services.discord.invite_url'));
