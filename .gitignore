@@ -1,5 +1,7 @@
 .DS_Store
+.superpowers
 /.phpunit.cache
+.scribe
 /node_modules
 /public/build
 /public/hot
@@ -19,11 +21,13 @@ Homestead.yaml
 auth.json
 npm-debug.log
 yarn-error.log
-CLAUDE.md
 AGENTS.md
 boost.json
 .mcp.json
-/.ai
+/.ai/*
+!/.ai/guidelines/
+/.ai/guidelines/*
+!/.ai/guidelines/relaticle/
 /.github/skills
 /.fleet
 /.idea
@@ -34,6 +38,12 @@ boost.json
 /.junie
 /.playwright-mcp
 /docs
+api.json
+.scribe/
+/public/vendor/scribe
+/resources/views/scribe
+/storage/app/scribe
+/tests/Feature/Scribe
 .context
 polyscope.json
 /bin/setup-preview.sh

@@ -8,14 +8,6 @@ use App\Models\People;
 
 final readonly class PeopleObserver
 {
-    public function creating(People $people): void
-    {
-        if (auth('web')->check()) {
-            $people->creator_id = (string) auth('web')->id();
-            $people->team_id = auth('web')->user()->currentTeam->getKey();
-        }
-    }
-
     /**
      * Handle the People "saved" event.
      * Invalidate AI summary when person data changes.

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +30,7 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 #[ObservedBy(NoteObserver::class)]
 final class Note extends Model implements HasCustomFields
 {
+    use BelongsToTeamCreator;
     use HasCreator;
 
     /** @use HasFactory<NoteFactory> */
@@ -88,5 +92,33 @@ final class Note extends Model implements HasCustomFields
     public function opportunities(): MorphToMany
     {
         return $this->morphedByMany(Opportunity::class, 'noteable');
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forNotableType(Builder $query, string $type): void
+    {
+        $relationMap = [
+            'company' => 'companies',
+            'people' => 'people',
+            'opportunity' => 'opportunities',
+        ];
+
+        $relation = $relationMap[$type] ?? null;
+
+        if ($relation) {
+            $query->whereHas($relation);
+        }
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forNotableId(Builder $query, string $id): void
+    {
+        $query->where(function (Builder $q) use ($id): void {
+            $q->whereHas('companies', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id))
+                ->orWhereHas('people', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id))
+                ->orWhereHas('opportunities', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id));
+        });
     }
 }

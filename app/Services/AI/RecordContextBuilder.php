@@ -50,7 +50,7 @@ final readonly class RecordContextBuilder
 
         $company->load([
             'accountOwner',
-            'customFieldValues.customField',
+            'customFieldValues.customField.options',
             'notes' => $this->recentWithCustomFields('notes'),
             'tasks' => $this->recentWithCustomFields('tasks'),
             'opportunities' => $this->recentWithCustomFields('opportunities'),
@@ -81,7 +81,7 @@ final readonly class RecordContextBuilder
 
         $person->load([
             'company',
-            'customFieldValues.customField',
+            'customFieldValues.customField.options',
             'notes' => $this->recentWithCustomFields('notes'),
             'tasks' => $this->recentWithCustomFields('tasks'),
         ]);
@@ -108,7 +108,7 @@ final readonly class RecordContextBuilder
         $opportunity->load([
             'company',
             'contact',
-            'customFieldValues.customField',
+            'customFieldValues.customField.options',
             'notes' => $this->recentWithCustomFields('notes'),
             'tasks' => $this->recentWithCustomFields('tasks'),
         ]);
@@ -129,7 +129,7 @@ final readonly class RecordContextBuilder
     private function recentWithCustomFields(string $table): Closure
     {
         return fn (Relation $query): Relation => $query
-            ->with('customFieldValues.customField')
+            ->with('customFieldValues.customField.options')
             ->latest("{$table}.created_at")
             ->limit(self::RELATIONSHIP_LIMIT);
     }

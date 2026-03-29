@@ -36,6 +36,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $remember_token
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property-read Team|null $currentTeam
  */
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
 {

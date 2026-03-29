@@ -41,8 +41,8 @@ final class Team extends JetstreamTeam implements HasAvatar
         // Authentication & authorization
         'login', 'logout', 'register', 'signin', 'signout', 'signup',
         'auth', 'oauth', 'sso', 'callback',
-        'forgot-password', 'reset-password', 'verify-email', 'confirm-password',
-        'two-factor-challenge',
+        'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
+        'confirm-password', 'two-factor-challenge',
 
         // Administration
         'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',
@@ -66,7 +66,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         'discord',
 
         // API & developer
-        'api', 'graphql', 'webhooks', 'developer', 'developers', 'connect', 'user',
+        'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
 
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
@@ -76,7 +76,8 @@ final class Team extends JetstreamTeam implements HasAvatar
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
 
         // Infrastructure & framework
-        'filament', 'livewire', 'storage', 'imports', 'horizon',
+        'filament', 'livewire', 'storage', 'imports', 'horizon', 'scalar', 'engagement',
+        'system-administrators',
         'up', 'health', 'status', 'metrics',
         'static', 'assets', 'cdn', 'public', 'uploads',
         'www', 'ftp', 'ssh', 'dns', 'ns1', 'ns2',

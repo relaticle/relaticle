@@ -7,9 +7,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use Filament\Panel;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 mutates(User::class);
 

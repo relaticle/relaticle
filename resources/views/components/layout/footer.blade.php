@@ -1,5 +1,5 @@
 <!-- Minimalist Footer -->
-<footer class="py-12 md:py-16 border-t border-gray-100 dark:border-gray-900 bg-white dark:bg-black">
+<footer class="py-12 md:py-16 border-t border-gray-100 dark:border-gray-900 bg-white dark:bg-gray-950">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div
             class="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8 pb-10 border-b border-gray-100 dark:border-gray-900">
@@ -9,8 +9,7 @@
                     <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                 </a>
                 <p class="text-gray-500 dark:text-gray-400 text-sm leading-relaxed max-w-md">
-                    The Next-Generation Open-Source CRM Platform designed to streamline your customer relationships.
-                    Built with modern technologies for businesses of all sizes.
+                    The open-source CRM built for AI agents. Self-hosted. No per-seat pricing. Yours to own.
                 </p>
 
                 <!-- Social links - Simplified -->
@@ -19,17 +18,17 @@
                        class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="GitHub">
                         <span class="sr-only">GitHub</span>
-                        <x-icon-github class="h-5 w-5" />
+                        <x-ri-github-fill class="h-5 w-5" />
                     </a>
                     <a href="https://x.com/relaticle" target="_blank" class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="X">
                         <span class="sr-only">X</span>
-                        <x-icon-x-twitter class="h-5 w-5" />
+                        <x-ri-twitter-x-fill class="h-5 w-5" />
                     </a>
                     <a href="https://www.linkedin.com/company/relaticle"  target="_blank" class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="LinkedIn">
                         <span class="sr-only">LinkedIn</span>
-                        <x-icon-linkedin class="h-5 w-5" />
+                        <x-ri-linkedin-box-fill class="h-5 w-5" />
                     </a>
                 </div>
             </div>
@@ -44,6 +43,12 @@
                         <a href="{{ url('/') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
                             Home
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('pricing') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            Pricing
                         </a>
                     </li>
                     <li>
@@ -80,7 +85,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="mailto:manuk.minasyan1@gmail.com"
+                        <a href="{{ route('contact') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
                             Contact Us
                         </a>

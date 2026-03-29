@@ -1,173 +1,306 @@
-<!-- Modern Minimalist Hero Section -->
-<section class="relative py-16 md:py-24 bg-white dark:bg-black overflow-hidden">
-    <!-- Subtle background elements -->
-    <div class="absolute inset-0 bg-grid-pattern opacity-[0.01] dark:opacity-[0.02]"></div>
-    <div class="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
+<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-20 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
 
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div class="space-y-14 md:space-y-16">
-            <!-- Tech Badge - Simplified -->
+    {{-- Background system — layered depth --}}
+    <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div class="flex flex-col items-center gap-8 md:gap-10">
+
+            {{-- ── Badge (GitHub) ── --}}
             <div class="flex justify-center">
-                <div
-                    class="inline-flex items-center px-3 py-1.5 border border-gray-100 dark:border-gray-800 rounded-full text-xs shadow-sm">
-                    <span class="text-gray-500 dark:text-gray-400 mr-2">Built with</span>
-                    <div class="flex items-center gap-1">
-                        <div class="flex items-center gap-1">
-                            <x-icon-laravel class="h-3.5 w-3.5 "/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">Laravel</span>
-                        </div>
-                        <span class="text-gray-400">·</span>
-                        <div class="flex items-center gap-1">
-                            <x-icon-filament class="h-3.5 w-3.5 dark:fill-white"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">Filament</span>
-                        </div>
-                    </div>
-                </div>
+                <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
+                   class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
+                    <x-ri-github-fill class="h-3.5 w-3.5"/>
+                    <span class="text-gray-900 dark:text-white font-semibold">{{ $formattedGithubStars ?? '1.2K' }}+ stars</span>
+                    <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
+                    <span>Open Source</span>
+                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+                </a>
             </div>
 
-            <!-- Hero Text - Enhanced Typography -->
-            <div class="text-center space-y-6 max-w-3xl mx-auto">
-                <h1 class="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
-                    The Next-Generation<br class="hidden sm:block"/> <span class="relative inline-block">
-                        <span class="relative z-10">Open-Source CRM</span>
-                        <span
-                            class="absolute bottom-2 sm:left-0 right-1/4 w-1/2 sm:w-full h-3 bg-primary/10 dark:bg-primary/20 sm:dark:bg-primary/30 -rotate-1 z-0"></span>
-                    </span>
+            {{-- ── Heading ── --}}
+            <div class="text-center max-w-3xl">
+                <h1 class="font-display leading-[1.08] tracking-[-0.035em] text-balance">
+                    <span class="block text-2xl sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem] font-normal text-gray-500 dark:text-gray-400">The Open-Source CRM</span>
+                    <span class="block text-[2.25rem] sm:text-5xl md:text-[3.5rem] lg:text-[3.75rem] font-extrabold text-gray-950 dark:text-white mt-1.5 sm:mt-2">Built for AI Agents</span>
                 </h1>
 
-                <p class="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                    Transforming client relationship management with a modern, intuitive approach. Built for businesses
-                    that value simplicity and efficiency.
+                <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
+                    Connect any AI agent with 30 MCP tools.<br class="hidden sm:block"/>
+                    Self-hosted. No per-seat pricing. Yours to own.
                 </p>
             </div>
 
-            <!-- CTA Section - Refined -->
-            <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                <a href="{{ route('register') }}"
-                   class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-600 text-white px-7 py-3.5 rounded-md text-base font-medium transition-all duration-200 shadow-sm hover:shadow">
-                    <span>Start for free</span>
-                    <x-heroicon-c-arrow-right class="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"/>
-                </a>
+            {{-- ── CTA Buttons ── --}}
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
+                <x-marketing.button href="{{ route('register') }}" class="group">
+                    Start for free
+                </x-marketing.button>
 
-                <a href="https://github.com/relaticle/relaticle" target="_blank"
-                   class="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-md text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200 bg-white/50 dark:bg-black/50">
-                    <x-icon-github class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"/>
-                    <span class="font-medium">GitHub</span>
-                </a>
+                <x-marketing.button variant="secondary" href="{{ route('contact') }}">
+                    Get in touch
+                </x-marketing.button>
             </div>
 
-            <!-- App Preview - Cleaner Mockup -->
-            <div class="mt-16 md:mt-20 max-w-5xl mx-auto">
-                <div
-                    class="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800 shadow-lg dark:shadow-gray-950/20 hover:shadow-xl transition-shadow duration-300">
-                    <!-- Browser Header -->
-                    <div
-                        class="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-100 dark:border-gray-700 px-4 py-2 flex items-center">
-                        <!-- Window Controls -->
-                        <div class="flex space-x-1.5">
-                            <div class="w-3 h-3 rounded-full bg-gray-300/80 dark:bg-gray-600/80"></div>
-                            <div class="w-3 h-3 rounded-full bg-gray-300/80 dark:bg-gray-600/80"></div>
-                            <div class="w-3 h-3 rounded-full bg-gray-300/80 dark:bg-gray-600/80"></div>
+            {{-- ── App Preview with tabs ── --}}
+            <div class="relative w-full max-w-5xl mt-8 md:mt-12">
+
+                {{-- Multi-color glow behind mockup --}}
+                <div class="absolute -inset-6 md:-inset-12 -z-10 pointer-events-none" aria-hidden="true">
+                    <div class="absolute top-[0%] left-[15%] w-[70%] h-[60%] rounded-full bg-primary/[0.04] dark:bg-primary/[0.08] blur-[120px]"></div>
+                </div>
+
+                {{-- ── Decorative framing lines ── --}}
+                <div class="hidden md:block absolute left-1/2 -translate-x-1/2 -top-10 w-px h-10 bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+                <div class="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+                <div class="hidden md:block absolute top-0 -left-12 w-px bg-gradient-to-b from-gray-200 via-gray-200/60 to-transparent dark:from-white/[0.08] dark:via-white/[0.05] dark:to-transparent pointer-events-none" style="height:70%" aria-hidden="true"></div>
+                <div class="hidden md:block absolute top-0 -right-12 w-px bg-gradient-to-b from-gray-200 via-gray-200/60 to-transparent dark:from-white/[0.08] dark:via-white/[0.05] dark:to-transparent pointer-events-none" style="height:70%" aria-hidden="true"></div>
+
+                {{-- Feature Tabs --}}
+                <div id="hero-tabs" class="relative z-10 flex items-stretch">
+                    <div class="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[100vw] h-px pointer-events-none bg-[repeating-linear-gradient(to_right,theme(colors.gray.200)_0,theme(colors.gray.200)_10px,transparent_10px,transparent_18px)] dark:bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.08)_0,rgba(255,255,255,0.08)_10px,transparent_10px,transparent_18px)]" aria-hidden="true"></div>
+                    <div x-ref="indicator" class="absolute bottom-0 h-px bg-primary/80 rounded-full pointer-events-none transition-[left,width] duration-200" aria-hidden="true"></div>
+                    <button type="button" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                        Pipeline
+                    </button>
+                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
+                    <button type="button" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                        AI Agent
+                    </button>
+                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
+                    <button type="button" x-ref="tab-companies" x-on:click="switchTab('companies')" :class="tabClasses('companies')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                        Companies
+                    </button>
+                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
+                    <button type="button" x-ref="tab-custom-fields" x-on:click="switchTab('custom-fields')" :class="tabClasses('custom-fields')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                        <span class="sm:hidden">Fields</span><span class="hidden sm:inline">Custom Fields</span>
+                    </button>
+                </div>
+
+                {{-- Mockup with layered glow border --}}
+                <div class="relative z-10 mt-5 [perspective:2000px]">
+                    <div class="hidden md:block absolute -top-[110px] left-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+                    <div class="hidden md:block absolute -top-[110px] right-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+                    <div class="absolute -inset-3 rounded-3xl bg-gradient-to-b from-black/[0.03] via-black/[0.015] to-transparent dark:from-white/[0.04] dark:via-white/[0.02] dark:to-transparent blur-xl pointer-events-none" aria-hidden="true"></div>
+                    <div class="absolute -inset-[3px] rounded-[18px] bg-gradient-to-b from-gray-300/40 via-gray-200/20 to-gray-100/5 dark:from-white/[0.07] dark:via-white/[0.03] dark:to-transparent blur-[3px] pointer-events-none" aria-hidden="true"></div>
+                    <div class="absolute -inset-px rounded-2xl bg-gradient-to-b from-gray-300/50 via-gray-200/30 to-gray-200/10 dark:from-white/[0.12] dark:via-white/[0.06] dark:to-white/[0.02] pointer-events-none" aria-hidden="true"></div>
+
+                    <div class="relative rounded-2xl overflow-hidden bg-white dark:bg-neutral-950 transform-gpu hover:[transform:rotateX(1deg)] transition-transform duration-700 ease-out">
+
+                        {{-- Browser chrome --}}
+                        <div class="bg-gray-50 dark:bg-neutral-900 border-b border-gray-200/60 dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between">
+                            <div class="flex gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
+                            </div>
+                            <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                app.relaticle.com
+                            </div>
                         </div>
 
-                        <!-- Browser Address Bar -->
-                        <div
-                            class="ml-4 flex-1 bg-white/90 dark:bg-gray-700/80 rounded-md px-3 py-1 text-xs text-gray-600 dark:text-gray-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-500 mr-1.5" fill="none"
-                                 viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                            </svg>
-                            <span>app.relaticle.com</span>
+                        {{-- Tab panels — grid stacking for Safari-smooth crossfade --}}
+                        <div class="relative grid overflow-hidden">
+                            {{-- Pipeline tab --}}
+                            <div x-ref="panel-pipeline" class="col-start-1 row-start-1">
+                                <picture>
+                                    <source data-light-srcset="{{ asset('images/app-pipeline-preview.webp') }}" data-dark-srcset="{{ asset('images/app-pipeline-preview-dark.webp') }}" srcset="{{ asset('images/app-pipeline-preview.webp') }}" type="image/webp">
+                                    <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
+                                         data-dark-src="{{ asset('images/app-pipeline-preview-dark.png') }}"
+                                         src="{{ asset('images/app-pipeline-preview.png') }}"
+                                         alt="Relaticle CRM — Pipeline"
+                                         class="hero-preview-image w-full h-auto"
+                                         width="1440"
+                                         height="900"
+                                         loading="lazy">
+                                </picture>
+                            </div>
+
+                            {{-- AI Agent tab --}}
+                            <div x-ref="panel-ai-agent" class="col-start-1 row-start-1 invisible">
+                                @include('home.partials.hero-agent-preview')
+                            </div>
+
+                            <div x-ref="panel-companies" class="col-start-1 row-start-1 invisible">
+                                <picture>
+                                    <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
+                                    <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
+                                         data-dark-src="{{ asset('images/app-companies-preview-dark.png') }}"
+                                         src="{{ asset('images/app-companies-preview.png') }}"
+                                         alt="Relaticle CRM — Companies"
+                                         class="hero-preview-image w-full h-auto"
+                                         width="1440"
+                                         height="900"
+                                         loading="lazy">
+                                </picture>
+                            </div>
+
+                            <div x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible">
+                                <picture>
+                                    <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
+                                    <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
+                                         data-dark-src="{{ asset('images/app-custom-fields-preview-dark.png') }}"
+                                         src="{{ asset('images/app-custom-fields-preview.png') }}"
+                                         alt="Relaticle CRM — Custom Fields"
+                                         class="hero-preview-image w-full h-auto"
+                                         width="1440"
+                                         height="900"
+                                         loading="lazy">
+                                </picture>
+                            </div>
+                            {{-- Bottom fade overlay --}}
+                            <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
                         </div>
                     </div>
-
-                    <!-- Browser Content Area -->
-                    <div class="relative">
-                        <picture id="app-companies-preview-picture">
-                            <source id="preview-source-avif"
-                                    srcset="{{ asset('images/app-companies-preview.avif') }}"
-                                    type="image/avif">
-                            <source id="preview-source-webp"
-                                    srcset="{{ asset('images/app-companies-preview.webp') }}"
-                                    type="image/webp">
-                            <img id="app-companies-preview-image"
-                                 src="{{ asset('images/app-companies-preview.png') }}"
-                                 alt="Relaticle CRM Dashboard"
-                                 class="w-full h-auto"
-                                 width="2880"
-                                 height="1800"
-                                 loading="lazy">
-                        </picture>
-
-                        <!-- Subtle highlight overlay -->
-                        <div
-                            class="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-transparent opacity-60 pointer-events-none"></div>
-                    </div>
                 </div>
             </div>
 
-            <!-- Key Highlights - Simplified -->
-            <div
-                class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-14 border-t border-gray-100 dark:border-gray-800 pt-10 px-2">
-                <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Open Source</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Free to use and customize</div>
-                </div>
-                <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Modern Stack</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">PHP 8.4, Laravel 12</div>
-                </div>
-                <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Secure</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enterprise-grade security</div>
-                </div>
-                <div class="p-3 text-center">
-                    <div class="text-lg font-semibold text-black dark:text-white">Scalable</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Grows with your business</div>
-                </div>
-            </div>
+
         </div>
     </div>
 </section>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const sourceAvif = document.getElementById('preview-source-avif');
-        const sourceWebp = document.getElementById('preview-source-webp');
-        const fallbackImg = document.getElementById('app-companies-preview-image');
+    function heroTabs() {
+        return {
+            activeTab: 'pipeline',
+            tabOrder: ['pipeline', 'ai-agent', 'companies', 'custom-fields'],
+            reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            ease: [0.16, 1, 0.3, 1],
+            duration: 0.35,
+            slideDistance: 40,
 
-        const sources = {
-            light: {
-                avif: "{{ asset('images/app-companies-preview.avif') }}",
-                webp: "{{ asset('images/app-companies-preview.webp') }}",
-                png: "{{ asset('images/app-companies-preview.png') }}",
+            init() {
+                this.positionIndicator();
+                this.updateImages();
+                this.observeDarkMode();
             },
-            dark: {
-                avif: "{{ asset('images/app-companies-preview-dark.avif') }}",
-                webp: "{{ asset('images/app-companies-preview-dark.webp') }}",
-                png: "{{ asset('images/app-companies-preview-dark.png') }}",
+
+            positionIndicator() {
+                var tab = this.$refs['tab-' + this.activeTab];
+                var indicator = this.$refs.indicator;
+                if (!tab || !indicator) return;
+                indicator.style.left = tab.offsetLeft + 'px';
+                indicator.style.width = tab.offsetWidth + 'px';
             },
-        };
 
-        updateImageSource();
+            showPanel(panel) {
+                panel.classList.remove('invisible');
+                panel.style.zIndex = '1';
+            },
 
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (mutation) {
-                if (mutation.attributeName === 'class') {
-                    updateImageSource();
+            hidePanel(panel) {
+                panel.classList.add('invisible');
+                panel.style.opacity = '';
+                panel.style.transform = '';
+                panel.style.willChange = '';
+                panel.style.zIndex = '';
+            },
+
+            cancelPanelAnimations() {
+                var self = this;
+                this.tabOrder.forEach(function(name) {
+                    var panel = self.$refs['panel-' + name];
+                    if (!panel) return;
+                    if (panel.getAnimations) {
+                        panel.getAnimations().forEach(function(a) { a.cancel(); });
+                    }
+                    panel.style.opacity = '';
+                    panel.style.transform = '';
+                    panel.style.willChange = '';
+                    panel.style.zIndex = '';
+                });
+            },
+
+            switchTab(target) {
+                if (target === this.activeTab) return;
+
+                var previousTab = this.activeTab;
+                var direction = this.tabOrder.indexOf(target) > this.tabOrder.indexOf(previousTab) ? 1 : -1;
+                var self = this;
+
+                this.activeTab = target;
+                this.positionIndicator();
+
+                if (target === 'ai-agent') {
+                    this.$dispatch('hero-chat-reset');
                 }
-            });
-        });
 
-        observer.observe(document.documentElement, {attributes: true});
+                this.cancelPanelAnimations();
 
-        function updateImageSource() {
-            const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-            sourceAvif.srcset = sources[theme].avif;
-            sourceWebp.srcset = sources[theme].webp;
-            fallbackImg.src = sources[theme].png;
-        }
-    });
+                this.tabOrder.forEach(function(name) {
+                    var panel = self.$refs['panel-' + name];
+                    if (!panel) return;
+                    if (name !== target && name !== previousTab) {
+                        self.hidePanel(panel);
+                    }
+                });
+
+                var currentPanel = this.$refs['panel-' + previousTab];
+                var nextPanel = this.$refs['panel-' + target];
+                if (!currentPanel || !nextPanel) return;
+
+                this.showPanel(nextPanel);
+
+                if (this.reducedMotion) {
+                    this.hidePanel(currentPanel);
+                    if (target === 'ai-agent') {
+                        this.$dispatch('hero-chat-animate');
+                    }
+                    return;
+                }
+
+                currentPanel.style.willChange = 'transform, opacity';
+                nextPanel.style.willChange = 'transform, opacity';
+
+                var outX = -direction * this.slideDistance;
+                var inX = direction * this.slideDistance;
+
+                animate(currentPanel, {
+                    opacity: [1, 0],
+                    transform: ['translateX(0px)', 'translateX(' + outX + 'px)']
+                }, { duration: this.duration, ease: this.ease });
+
+                animate(nextPanel, {
+                    opacity: [0, 1],
+                    transform: ['translateX(' + inX + 'px)', 'translateX(0px)']
+                }, { duration: this.duration, ease: this.ease }).then(function() {
+                    if (self.activeTab !== target) return;
+                    self.hidePanel(currentPanel);
+                    nextPanel.style.willChange = '';
+                    if (target === 'ai-agent') {
+                        self.$dispatch('hero-chat-animate');
+                    }
+                });
+            },
+
+            tabClasses(tab) {
+                return this.activeTab === tab
+                    ? 'text-gray-800 dark:text-white'
+                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300';
+            },
+
+            updateImages() {
+                var isDark = document.documentElement.classList.contains('dark');
+                this.$root.querySelectorAll('.hero-preview-image').forEach(function(img) {
+                    img.src = isDark ? img.dataset.darkSrc : img.dataset.lightSrc;
+                });
+                this.$root.querySelectorAll('picture source[data-light-srcset]').forEach(function(source) {
+                    source.srcset = isDark ? source.dataset.darkSrcset : source.dataset.lightSrcset;
+                });
+            },
+
+            observeDarkMode() {
+                var self = this;
+                new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'class') {
+                            self.updateImages();
+                        }
+                    });
+                }).observe(document.documentElement, { attributes: true });
+            }
+        };
+    }
 </script>

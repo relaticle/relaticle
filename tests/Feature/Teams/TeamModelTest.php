@@ -9,14 +9,11 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
-
-uses(RefreshDatabase::class);
 
 mutates(Team::class);
 
@@ -228,7 +225,7 @@ test('auto-generated slug from reserved name gets suffixed', function () {
 test('reserved slugs cover all top-level route segments', function () {
     $routes = Route::getRoutes();
 
-    $excludedPrefixes = ['livewire', 'sanctum', 'filament', 'app', '__clockwork', 'clockwork', 'laravel-login-link-login'];
+    $excludedPrefixes = ['livewire', 'sanctum', 'filament', 'app', '__clockwork', 'clockwork', 'laravel-login-link-login', '_boost'];
 
     $firstSegments = collect($routes->getRoutes())
         ->map(fn ($route) => explode('/', trim($route->uri(), '/'))[0] ?? '')

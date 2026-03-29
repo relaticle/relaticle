@@ -142,32 +142,7 @@ Relaticle includes a custom fields system for extending entities without migrati
 
 ## Deployment
 
-### Docker (Recommended)
-
-```
-docker pull ghcr.io/relaticle/relaticle:latest
-cp .env.example .env
-# Edit .env with production settings
-docker compose up -d
-```
-
-By default, the CRM panel is available at `{APP_URL}/app` (path mode). For subdomain routing, set `APP_PANEL_DOMAIN` in your `.env` (e.g., `APP_PANEL_DOMAIN=app.example.com`).
-
-Included services:
-- **app** - Web server (nginx + php-fpm) on port 8080
-- **horizon** - Queue processing
-- **scheduler** - Cron jobs
-- **postgres** - Database
-- **redis** - Cache and sessions
-
-### Manual Deployment
-
-1. Pull latest code
-2. `composer install --no-dev --optimize-autoloader`
-3. `npm ci && npm run build`
-4. `php artisan migrate --force`
-5. `php artisan optimize`
-6. `php artisan queue:restart`
+For production deployment instructions, including Docker setup, environment configuration, reverse proxy, and platform-specific guides (Dokploy, Coolify), see the **Self-Hosting Guide**.
 
 ---
 

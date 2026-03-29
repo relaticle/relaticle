@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +36,7 @@ use Spatie\EloquentSortable\SortableTrait;
 #[ObservedBy(TaskObserver::class)]
 final class Task extends Model implements HasCustomFields
 {
+    use BelongsToTeamCreator;
     use HasCreator;
 
     /** @use HasFactory<TaskFactory> */
@@ -108,5 +112,26 @@ final class Task extends Model implements HasCustomFields
     public function people(): MorphToMany
     {
         return $this->morphedByMany(People::class, 'taskable');
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forCompany(Builder $query, string $companyId): void
+    {
+        $query->whereHas('companies', fn (Builder $q) => $q->where('companies.id', $companyId));
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forPerson(Builder $query, string $personId): void
+    {
+        $query->whereHas('people', fn (Builder $q) => $q->where('people.id', $personId));
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forOpportunity(Builder $query, string $opportunityId): void
+    {
+        $query->whereHas('opportunities', fn (Builder $q) => $q->where('opportunities.id', $opportunityId));
     }
 }

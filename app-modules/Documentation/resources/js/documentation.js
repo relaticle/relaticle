@@ -99,6 +99,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Make h2/h3 heading text clickable -- navigate to their anchor
+    document.querySelectorAll('#documentation-content h2, #documentation-content h3').forEach(function(heading) {
+        heading.addEventListener('click', function(e) {
+            if (e.target.closest('a')) return;
+            if (e.target !== heading && !heading.contains(e.target)) return;
+            var permalink = heading.querySelector('.heading-permalink');
+            if (permalink) {
+                var href = permalink.getAttribute('href');
+                if (href) {
+                    var targetId = href.substring(1);
+                    var targetEl = document.getElementById(targetId);
+                    if (targetEl) {
+                        var pos = targetEl.getBoundingClientRect().top + window.scrollY - 80;
+                        window.scrollTo({ top: pos, behavior: 'smooth' });
+                        history.pushState(null, null, href);
+                    }
+                }
+            }
+        });
+    });
+
     // Add smooth scrolling
     document.addEventListener('click', function(e) {
         const link = e.target.closest('a[href^="#"]');
