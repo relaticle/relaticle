@@ -118,11 +118,11 @@
                             </div>
 
                             {{-- AI Agent tab --}}
-                            <div x-ref="panel-ai-agent" class="col-start-1 row-start-1 invisible">
+                            <div x-ref="panel-ai-agent" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 @include('home.partials.hero-agent-preview')
                             </div>
 
-                            <div x-ref="panel-companies" class="col-start-1 row-start-1 invisible">
+                            <div x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 <picture>
                                     <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
@@ -136,7 +136,7 @@
                                 </picture>
                             </div>
 
-                            <div x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible">
+                            <div x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 <picture>
                                     <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
@@ -186,12 +186,14 @@
             },
 
             showPanel(panel) {
-                panel.classList.remove('invisible');
+                panel.classList.remove('invisible', 'absolute', 'inset-0');
+                panel.style.position = 'relative';
                 panel.style.zIndex = '1';
             },
 
             hidePanel(panel) {
-                panel.classList.add('invisible');
+                panel.classList.add('invisible', 'absolute', 'inset-0');
+                panel.style.position = '';
                 panel.style.opacity = '';
                 panel.style.transform = '';
                 panel.style.willChange = '';
