@@ -15,7 +15,7 @@ final class ContactRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc,dns', 'max:255'],
             'company' => ['nullable', 'string', 'max:255'],
-            'message' => ['required', 'string', 'max:5000'],
+            'message' => ['required', 'string', 'min:20', 'max:5000'],
         ];
     }
 }
