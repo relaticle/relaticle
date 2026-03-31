@@ -57,6 +57,11 @@ return [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
 
+    'turnstile' => [
+        'key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'anthropic' => [
         'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
     ],

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fab1eb5db08052491ca3cbf0b6a5c5a8",
+    "content-hash": "3d312f070a43df846f90bc9a44cec0d6",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -7899,6 +7899,80 @@
                 }
             ],
             "time": "2026-03-18T14:51:08+00:00"
+        },
+        {
+            "name": "ryangjchandler/laravel-cloudflare-turnstile",
+            "version": "v3.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ryangjchandler/laravel-cloudflare-turnstile.git",
+                "reference": "7da8024659990dc0e0d99e1509263e3d98a9012c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ryangjchandler/laravel-cloudflare-turnstile/zipball/7da8024659990dc0e0d99e1509263e3d98a9012c",
+                "reference": "7da8024659990dc0e0d99e1509263e3d98a9012c",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "spatie/laravel-package-tools": "^1.13.0"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.1",
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^8.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.7|^4.4",
+                "pestphp/pest-plugin-laravel": "^3.1|^4.1",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0|^2.0",
+                "phpstan/phpstan-phpunit": "^1.0|^2.0",
+                "phpunit/phpunit": "^10.0|^11.5.3|^12.5.12",
+                "spatie/laravel-ray": "^1.26",
+                "spatie/pest-plugin-snapshots": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "LaravelCloudflareTurnstile": "RyanChandler\\LaravelCloudflareTurnstile\\Facades\\LaravelCloudflareTurnstile"
+                    },
+                    "providers": [
+                        "RyanChandler\\LaravelCloudflareTurnstile\\LaravelCloudflareTurnstileServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "RyanChandler\\LaravelCloudflareTurnstile\\": "src",
+                    "RyanChandler\\LaravelCloudflareTurnstile\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ryan Chandler",
+                    "email": "support@ryangjchandler.co.uk",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A simple package to help integrate Cloudflare Turnstile.",
+            "homepage": "https://github.com/ryangjchandler/laravel-cloudflare-turnstile",
+            "keywords": [
+                "laravel",
+                "laravel-cloudflare-turnstile",
+                "ryangjchandler"
+            ],
+            "support": {
+                "issues": "https://github.com/ryangjchandler/laravel-cloudflare-turnstile/issues",
+                "source": "https://github.com/ryangjchandler/laravel-cloudflare-turnstile/tree/v3.0.3"
+            },
+            "time": "2026-03-19T10:40:28+00:00"
         },
         {
             "name": "scalar/laravel",
