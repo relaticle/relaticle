@@ -54,6 +54,26 @@ describe('API routing - subdomain mode', function () {
     });
 });
 
+describe('Scribe config matches API route prefixes', function () {
+    it('uses api/v1 prefix when no API_DOMAIN is set', function (): void {
+        config(['app.api_domain' => null]);
+
+        $prefixes = require base_path('config/scribe.php');
+        $prefix = $prefixes['routes'][0]['match']['prefixes'][0];
+
+        expect($prefix)->toBe('api/v1/*');
+    });
+
+    it('uses v1 prefix when API_DOMAIN is set', function (): void {
+        config(['app.api_domain' => 'api.example.com']);
+
+        $prefixes = require base_path('config/scribe.php');
+        $prefix = $prefixes['routes'][0]['match']['prefixes'][0];
+
+        expect($prefix)->toBe('v1/*');
+    });
+});
+
 describe('MCP routing - default path mode', function () {
     it('serves MCP at /mcp path', function (): void {
         $this->get('/mcp')->assertStatus(405);
