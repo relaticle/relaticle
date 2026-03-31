@@ -8,7 +8,7 @@ return [
     | Cache Settings
     |--------------------------------------------------------------------------
     |
-    | These options control the caching behavior of the documentation module.
+    | These options control the caching behavior of the documentation package.
     |
     */
     'cache' => [
@@ -83,6 +83,6 @@ return [
         'allow_html' => false,
         'code_highlighting' => true,
         'table_of_contents' => true,
-        'base_path' => base_path('app-modules/Documentation/resources/markdown'),
+        'base_path' => base_path('packages/Documentation/resources/markdown'),
     ],
 ];

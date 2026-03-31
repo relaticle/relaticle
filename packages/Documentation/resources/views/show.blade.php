@@ -34,7 +34,7 @@
             @endphp
             @if($editFile)
                 <div class="mt-10 pt-6 border-t border-gray-200 dark:border-gray-800">
-                    <a href="https://github.com/Relaticle/relaticle/edit/main/app-modules/Documentation/resources/markdown/{{ $editFile }}"
+                    <a href="https://github.com/Relaticle/relaticle/edit/main/packages/Documentation/resources/markdown/{{ $editFile }}"
                        target="_blank"
                        rel="noopener noreferrer"
                        class="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">

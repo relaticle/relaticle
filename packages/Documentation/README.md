@@ -1,6 +1,6 @@
-# Documentation Module
+# Documentation Package
 
-A dedicated documentation module for the Relaticle application with a modern, customized frontend architecture.
+A dedicated documentation package for the Relaticle application with a modern, customized frontend architecture.
 
 ## Features
 
@@ -16,16 +16,16 @@ A dedicated documentation module for the Relaticle application with a modern, cu
 
 ## Installation
 
-The Documentation module is included in the Relaticle application by default. If you need to install it manually:
+The Documentation package is included in the Relaticle application by default. If you need to install it manually:
 
 ```bash
-# Publish the module's resources
+# Publish the package's resources
 php artisan vendor:publish --tag=documentation-views
 php artisan vendor:publish --tag=documentation-markdown
 php artisan vendor:publish --tag=documentation-config
 
 # Install dependencies
-cd app-modules/Documentation
+cd packages/Documentation
 npm install
 
 # Build assets
@@ -34,22 +34,22 @@ npm run build
 
 ## Development
 
-To work on the Documentation module's frontend:
+To work on the Documentation package's frontend:
 
 ```bash
 # Start the Vite development server
-cd app-modules/Documentation
+cd packages/Documentation
 npm run dev
 ```
 
 ## Asset Architecture
 
-The Documentation module uses a dedicated asset pipeline with separate CSS and JS files:
+The Documentation package uses a dedicated asset pipeline with separate CSS and JS files:
 
 - `resources/css/documentation.css`: Main CSS file with Tailwind directives
 - `resources/js/documentation.js`: Main JS file with Alpine.js components
-- `tailwind.config.js`: TailwindCSS configuration for the Documentation module
-- `vite.config.js`: Vite configuration for the Documentation module
+- `tailwind.config.js`: TailwindCSS configuration for the Documentation package
+- `vite.config.js`: Vite configuration for the Documentation package
 
 ## Components
 
@@ -87,20 +87,20 @@ Available callout types:
 ## Customization
 
 ### Styling
-The Documentation module uses TailwindCSS 3 with a custom configuration. You can customize the styles by editing:
+The Documentation package uses TailwindCSS 3 with a custom configuration. You can customize the styles by editing:
 
 - `tailwind.config.js`: Colors, typography, and other Tailwind settings
 - `resources/css/documentation.css`: Custom components and utilities
 
 ### Templates
-The Documentation module's templates are located in:
+The Documentation package's templates are located in:
 
 - `resources/views/components/`: Blade components
 - `resources/views/`: Blade templates
 
 ## Accessibility
 
-The Documentation module is designed with accessibility in mind:
+The Documentation package is designed with accessibility in mind:
 
 - Proper ARIA attributes on interactive elements
 - Keyboard navigation for all features
@@ -110,7 +110,7 @@ The Documentation module is designed with accessibility in mind:
 
 ## Browser Support
 
-The Documentation module supports all modern browsers:
+The Documentation package supports all modern browsers:
 
 - Chrome (latest)
 - Firefox (latest)
@@ -119,4 +119,4 @@ The Documentation module supports all modern browsers:
 
 ## License
 
-The Documentation module is open-source software licensed under the [MIT license](https://opensource.org/licenses/MIT). 
+The Documentation package is open-source software licensed under the [MIT license](https://opensource.org/licenses/MIT).

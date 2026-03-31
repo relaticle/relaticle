@@ -81,10 +81,10 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
-            "Relaticle\\SystemAdmin\\": "app-modules/SystemAdmin/src",
-            "Relaticle\\Documentation\\": "app-modules/Documentation/src",
-            "Relaticle\\OnboardSeed\\": "app-modules/OnboardSeed/src",
-            "Relaticle\\ImportWizard\\": "app-modules/ImportWizard/src",
+            "Relaticle\\SystemAdmin\\": "packages/SystemAdmin/src",
+            "Relaticle\\Documentation\\": "packages/Documentation/src",
+            "Relaticle\\OnboardSeed\\": "packages/OnboardSeed/src",
+            "Relaticle\\ImportWizard\\": "packages/ImportWizard/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }

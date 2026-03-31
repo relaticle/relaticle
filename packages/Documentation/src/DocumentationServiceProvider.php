@@ -33,7 +33,7 @@ final class DocumentationServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the module routes.
+     * Register the package routes.
      */
     private function registerRoutes(): void
     {
@@ -44,7 +44,7 @@ final class DocumentationServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the module views.
+     * Register the package views.
      */
     private function registerViews(): void
     {

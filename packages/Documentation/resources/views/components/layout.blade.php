@@ -15,7 +15,7 @@
     :ogTitle="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : config('app.name') . ' - Documentation'"
     :ogDescription="!empty($documentTitle) ? 'Learn about ' . $documentTitle . ' in the Relaticle documentation.' : 'Explore the Relaticle documentation. Installation, MCP server setup, REST API integration, custom fields, and more.'">
     @pushonce('header')
-        @vite(['app-modules/Documentation/resources/js/documentation.js', 'app-modules/Documentation/resources/css/documentation.css'])
+        @vite(['packages/Documentation/resources/js/documentation.js', 'packages/Documentation/resources/css/documentation.css'])
     @endpushonce
 
     <div class="pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-black relative">

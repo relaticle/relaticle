@@ -19,7 +19,7 @@ return RectorConfig::configure()
     ->withComposerBased(laravel: true)
     ->withPaths([
         __DIR__.'/app',
-        __DIR__.'/app-modules',
+        __DIR__.'/packages',
         __DIR__.'/bootstrap/app.php',
         __DIR__.'/config',
         __DIR__.'/database',
@@ -45,7 +45,7 @@ return RectorConfig::configure()
         ],
         AddHasFactoryToModelsRector::class => [
             __DIR__.'/app/Models/PersonalAccessToken.php',
-            __DIR__.'/app-modules/ImportWizard/src/Models/*',
+            __DIR__.'/packages/ImportWizard/src/Models/*',
         ],
     ])
     ->withSets([

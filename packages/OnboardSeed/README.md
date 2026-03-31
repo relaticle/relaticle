@@ -46,7 +46,7 @@ custom_fields: # All custom field values under this key
 
 ### Relationship Types in YAML
 
-The module supports defining different types of relationships directly in YAML fixtures:
+The package supports defining different types of relationships directly in YAML fixtures:
 
 1. **Belongs-To Relationships** - References to parent entities:
    ```yaml

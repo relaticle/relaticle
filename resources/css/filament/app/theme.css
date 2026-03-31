@@ -6,8 +6,8 @@
 @source '../../../../resources/views';
 
 /* ImportWizard */
-@source '../../../../app-modules/ImportWizard/resources';
-@source '../../../../app-modules/ImportWizardNew/resources';
+@source '../../../../packages/ImportWizard/resources';
+@source '../../../../packages/ImportWizardNew/resources';
 
 /* Custom Fields */
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';
