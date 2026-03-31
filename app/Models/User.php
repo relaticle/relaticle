@@ -104,6 +104,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->hasMany(UserSocialAccount::class);
     }
 
+    public function hasPassword(): bool
+    {
+        return $this->password !== null;
+    }
+
     /**
      * @return BelongsToMany<Task, $this>
      */

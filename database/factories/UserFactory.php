@@ -94,6 +94,13 @@ final class UserFactory extends Factory
         });
     }
 
+    public function socialOnly(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'password' => null,
+        ]);
+    }
+
     public function configure(): Factory
     {
         return $this->sequence(fn (Sequence $sequence): array => [

@@ -29,19 +29,22 @@ final class UpdatePassword extends BaseLivewireComponent
 
     public function form(Schema $schema): Schema
     {
+        $hasPassword = $this->authUser()->hasPassword();
+
         return $schema
             ->schema([
-                Section::make(__('profile.sections.update_password.title'))
+                Section::make($hasPassword ? __('profile.sections.update_password.title') : __('profile.sections.set_password.title'))
                     ->aside()
-                    ->description(__('profile.sections.update_password.description'))
+                    ->description($hasPassword ? __('profile.sections.update_password.description') : __('profile.sections.set_password.description'))
                     ->schema([
                         TextInput::make('currentPassword')
                             ->label(__('profile.form.current_password.label'))
                             ->password()
                             ->revealable(filament()->arePasswordsRevealable())
-                            ->required()
+                            ->required($hasPassword)
                             ->autocomplete('current-password')
-                            ->currentPassword(),
+                            ->currentPassword($hasPassword)
+                            ->visible($hasPassword),
                         TextInput::make('password')
                             ->label(__('profile.form.new_password.label'))
                             ->password()
