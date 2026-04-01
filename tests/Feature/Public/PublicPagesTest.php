@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Support\Facades\Http;
+use ManukMinasyan\FilamentBlog\Models\Category;
+use ManukMinasyan\FilamentBlog\Models\Post;
 
-mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class);
+mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class);
 
 beforeEach(function () {
     Http::fake([
@@ -315,6 +318,67 @@ describe('Hero AI tab — demo CTA', function () {
                 unlink($videoPath);
             }
         }
+    });
+});
+
+describe('Blog pages', function () {
+    it('displays the blog index', function () {
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('Engineering Blog');
+    });
+
+    it('displays published posts on the index', function () {
+        $post = Post::factory()->create();
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee($post->title);
+    });
+
+    it('does not display draft posts on the index', function () {
+        $post = Post::factory()->draft()->create();
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertDontSee($post->title);
+    });
+
+    it('displays a single blog post', function () {
+        $post = Post::factory()->create();
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($post->title);
+    });
+
+    it('returns 404 for non-existent blog post', function () {
+        $this->get('/blog/non-existent-post')
+            ->assertStatus(404);
+    });
+
+    it('displays posts filtered by category', function () {
+        $category = Category::factory()->create();
+        $post = Post::factory()->create(['category_id' => $category->id]);
+
+        $this->get("/blog/category/{$category->slug}")
+            ->assertStatus(200)
+            ->assertSee($post->title)
+            ->assertSee($category->name);
+    });
+
+    it('returns RSS feed', function () {
+        Post::factory()->create();
+
+        $this->get('/blog/feed')
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'application/rss+xml');
+    });
+
+    it('includes blog link in navigation', function () {
+        $this->get('/')
+            ->assertStatus(200)
+            ->assertSee(route('blog.index'));
     });
 });
 

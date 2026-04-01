@@ -6,6 +6,7 @@ use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
@@ -52,6 +53,14 @@ Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
     Route::get('/pricing', fn () => view('pricing'))->name('pricing');
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');
     Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
+});
+
+Route::middleware(ProvideMarkdownResponse::class)->prefix('blog')->name('blog.')->group(function (): void {
+    Route::get('/', [BlogController::class, 'index'])->name('index');
+    Route::get('/feed', [BlogController::class, 'feed'])->name('feed');
+    Route::get('/category/{slug}', [BlogController::class, 'category'])->name('category');
+    Route::get('/preview/{post}', [BlogController::class, 'preview'])->name('preview')->middleware('signed');
+    Route::get('/{slug}', [BlogController::class, 'show'])->name('show');
 });
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');

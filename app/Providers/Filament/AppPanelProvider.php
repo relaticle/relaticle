@@ -58,6 +58,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
+use ManukMinasyan\FilamentBlog\FilamentBlogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
@@ -198,6 +199,7 @@ final class AppPanelProvider extends PanelProvider
                 CustomFieldsPlugin::make()
                     ->authorize(fn () => Gate::check('update', Filament::getTenant())),
                 ResizedColumnPlugin::make(),
+                FilamentBlogPlugin::make(),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,

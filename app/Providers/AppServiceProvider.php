@@ -56,6 +56,8 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use ManukMinasyan\FilamentBlog\Models\Category;
+use ManukMinasyan\FilamentBlog\Models\Post;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
@@ -309,6 +311,8 @@ final class AppServiceProvider extends ServiceProvider
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
+            'blog_post' => Post::class,
+            'blog_category' => Category::class,
         ]);
 
         // Use custom models for custom-fields package

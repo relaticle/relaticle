@@ -23,6 +23,7 @@
             @foreach([
                 ['url' => url('/#features'), 'label' => 'Features'],
                 ['url' => route('pricing'), 'label' => 'Pricing'],
+                ['url' => route('blog.index'), 'label' => 'Blog'],
                 ['url' => route('contact'), 'label' => 'Contact'],
             ] as $link)
                 <a href="{{ $link['url'] }}" @click="mobileMenu = false"
