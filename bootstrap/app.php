@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
+use App\Http\Middleware\ValidateSignature;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -44,6 +45,10 @@ return Application::configure(basePath: dirname(__DIR__))
             before: SubstituteBindings::class,
             prepend: SetApiTeamContext::class,
         );
+
+        $middleware->alias([
+            'signed' => ValidateSignature::class,
+        ]);
 
         $middleware->redirectGuestsTo(function (Request $request): string {
             if ($request->routeIs('team-invitations.accept')) {

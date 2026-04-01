@@ -11,6 +11,11 @@ parameters:
             identifier: argument.type
             message: '#(Closure\(App\\Models\\CustomField|Relaticle\\CustomFields\\Models\\CustomField)(Option|Value|Section)?#'
 
+        # Base ValidateSignature has untyped variadic ...$args that PHPStan infers as array|null
+        -
+            identifier: argument.type
+            path: app/Http/Middleware/ValidateSignature.php
+
 
     stubFiles:
         - stubs/Mailcoach.stub
