@@ -151,7 +151,7 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configureScribe(): void
     {
-        if (! class_exists(Scribe::class) || $this->app->environment('production')) {
+        if (! class_exists(Scribe::class)) {
             return;
         }
 
