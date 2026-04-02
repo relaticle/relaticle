@@ -17,14 +17,17 @@
         <div x-data="{ open: null }" class="divide-y divide-gray-200/80 dark:divide-white/[0.06]">
             @foreach($faqs as $index => [$question, $answer])
                 <div class="faq-item py-5">
-                    <button @click="open = open === {{ $index }} ? null : {{ $index }}"
+                    <button id="faq-question-{{ $index }}"
+                            @click="open = open === {{ $index }} ? null : {{ $index }}"
+                            :aria-expanded="(open === {{ $index }}).toString()"
+                            aria-controls="faq-answer-{{ $index }}"
                             class="flex w-full items-center justify-between text-left gap-4 cursor-pointer hover:text-primary dark:hover:text-primary-400 transition-colors duration-150">
                         <span class="text-base font-semibold text-gray-900 dark:text-white">
                             {{ $question }}
                         </span>
                         <x-ri-arrow-down-s-line class="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200" ::class="open === {{ $index }} ? 'rotate-180' : ''"/>
                     </button>
-                    <div x-show="open === {{ $index }}" x-collapse class="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    <div id="faq-answer-{{ $index }}" role="region" aria-labelledby="faq-question-{{ $index }}" x-show="open === {{ $index }}" x-collapse x-cloak class="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                         {{ $answer }}
                     </div>
                 </div>
@@ -35,9 +38,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var e = [0.22, 1, 0.36, 1];
-            document.querySelectorAll('.faq-item').forEach(function(item) { item.style.opacity = '0'; });
             inView('#faq .divide-y', function() {
-                animate('.faq-item', { opacity: [0, 1], y: [20, 0] }, { delay: stagger(0.08), duration: 0.5, ease: e });
+                animate('.faq-item', { y: [20, 0] }, { delay: stagger(0.08), duration: 0.5, ease: e });
             }, { amount: 0.15 });
         });
     </script>

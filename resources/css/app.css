@@ -6,3 +6,7 @@
 
 @import "./fonts.css";
 @import "./theme.css";
+
+[x-cloak] {
+    display: none !important;
+}

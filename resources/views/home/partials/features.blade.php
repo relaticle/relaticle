@@ -33,7 +33,6 @@
 
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
                     <style>
-                        #flow-desktop .fn, #flow-mobile .fn { opacity: 0; }
                         @media (min-width: 1024px) { #flow-mobile { display: none !important; } }
                         @media (max-width: 1023px) { #flow-desktop { display: none !important; } }
                     </style>
@@ -99,7 +98,7 @@
                                 <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
                                     <div class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-2">Connected</div>
                                     <div class="space-y-1.5">
-                                        @foreach([['Tools', '20', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-600 dark:text-emerald-400']] as [$label, $val, $valClass])
+                                        @foreach([['Tools', '30', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-600 dark:text-emerald-400']] as [$label, $val, $valClass])
                                             <div class="flex items-center justify-between text-[11px]">
                                                 <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
                                                 <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>
@@ -128,11 +127,11 @@
                             var ease = [0.22, 1, 0.36, 1];
                             animate(".curve-path", { pathLength: 0 }, { duration: 0 });
                             inView("#flow-desktop", function() {
-                                animate("#flow-desktop .fn", { opacity: [0, 1], y: [12, 0] }, { delay: stagger(0.05), duration: 0.4, ease: ease });
+                                animate("#flow-desktop .fn", { y: [12, 0] }, { delay: stagger(0.05), duration: 0.4, ease: ease });
                                 animate(".curve-path", { pathLength: [0, 1] }, { duration: 0.8, delay: stagger(0.06, { start: 0.3 }), ease: ease });
                             }, { amount: 0.3 });
                             inView("#flow-mobile", function() {
-                                animate("#flow-mobile .fn", { opacity: [0, 1], y: [12, 0] }, { delay: stagger(0.06), duration: 0.4, ease: ease });
+                                animate("#flow-mobile .fn", { y: [12, 0] }, { delay: stagger(0.06), duration: 0.4, ease: ease });
                             }, { amount: 0.3 });
                         });
                     </script>
@@ -169,7 +168,7 @@
                     @foreach([['Text', 'Company name...', false], ['Select', 'Industry', true]] as [$label, $placeholder, $hasArrow])
                         <div class="field-row flex items-center gap-2">
                             <div class="w-14 text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ $label }}</div>
-                            <div class="flex-1 h-6 rounded bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 flex items-center {{ $hasArrow ? 'justify-between' : '' }} text-[10px] text-gray-400">
+                            <div class="flex-1 h-6 rounded bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 flex items-center {{ $hasArrow ? 'justify-between' : '' }} text-[10px] text-gray-500 dark:text-gray-400">
                                 <span>{{ $placeholder }}</span>
                                 @if($hasArrow)<x-ri-arrow-down-s-line class="w-3 h-3"/>@endif
                             </div>
@@ -220,7 +219,7 @@
                     <div class="pipe-seg flex-[2] bg-primary/25 origin-left"></div>
                     <div class="pipe-seg flex-[1] bg-gray-200 dark:bg-gray-700 rounded-r-full origin-left"></div>
                 </div>
-                <div class="mt-1.5 flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
+                <div class="mt-1.5 flex justify-between text-[10px] text-gray-500 dark:text-gray-500">
                     @foreach(['Lead', 'Qualified', 'Proposal', 'Won'] as $stage)
                         <span>{{ $stage }}</span>
                     @endforeach
@@ -249,7 +248,7 @@
                                 <div class="w-4 h-4 rounded-full border-2 {{ $done ? 'border-green-500 bg-green-500/20' : 'border-gray-300 dark:border-gray-600' }} flex items-center justify-center shrink-0">
                                     @if($done)<x-ri-check-line class="w-2.5 h-2.5 text-green-600 dark:text-green-400"/>@endif
                                 </div>
-                                <span class="text-sm {{ $done ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300' }}">{{ $text }}</span>
+                                <span class="text-sm {{ $done ? 'text-gray-500 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300' }}">{{ $text }}</span>
                                 <span class="text-[10px] {{ $badgeClass }} px-2 py-0.5 rounded-full shrink-0">{{ $badge }}</span>
                             </div>
                         @endforeach
@@ -291,7 +290,7 @@
                     <x-marketing.button size="sm" href="{{ route('register') }}">
                         Start for free
                     </x-marketing.button>
-                    <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500">
+                    <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-500">
                         <span>No credit card</span><span>&middot;</span><span>1,100+ tests</span><span>&middot;</span><span>AGPL-3.0</span>
                     </div>
                 </div>
@@ -303,10 +302,9 @@
             document.addEventListener('DOMContentLoaded', function() {
                 var e = [0.22, 1, 0.36, 1];
 
-                // Cards entrance — staggered fade up
-                document.querySelectorAll('.feat-card').forEach(function(c) { c.style.opacity = '0'; });
+                // Cards entrance — staggered fade up (visible by default for Lighthouse/no-JS)
                 inView('#features .grid', function() {
-                    animate('.feat-card', { opacity: [0, 1], y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
+                    animate('.feat-card', { y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
                 }, { amount: 0.1 });
 
                 // AI Insights — scanning lines fill to random widths
@@ -323,21 +321,18 @@
                 }, { amount: 0.4 });
 
                 // Data Model — form fields slide in from left
-                document.querySelectorAll('#card-data .field-row').forEach(function(r) { r.style.opacity = '0'; });
                 inView('#card-data', function() {
-                    animate('#card-data .field-row', { opacity: [0, 1], x: [-16, 0] }, { delay: stagger(0.1, { start: 0.3 }), duration: 0.4, ease: e });
+                    animate('#card-data .field-row', { x: [-16, 0] }, { delay: stagger(0.1, { start: 0.3 }), duration: 0.4, ease: e });
                 }, { amount: 0.4 });
 
                 // Sales Pipeline — segments scale in from left
-                document.querySelectorAll('.pipe-seg').forEach(function(s) { s.style.transform = 'scaleX(0)'; });
                 inView('#card-sales', function() {
                     animate('.pipe-seg', { scaleX: [0, 1] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.6, ease: e });
                 }, { amount: 0.4 });
 
                 // Tasks — rows slide in staggered from right
-                document.querySelectorAll('.task-row').forEach(function(r) { r.style.opacity = '0'; });
                 inView('#card-tasks', function() {
-                    animate('.task-row', { opacity: [0, 1], x: [20, 0] }, { delay: stagger(0.15, { start: 0.2 }), duration: 0.45, ease: e });
+                    animate('.task-row', { x: [20, 0] }, { delay: stagger(0.15, { start: 0.2 }), duration: 0.45, ease: e });
                 }, { amount: 0.3 });
             });
         </script>

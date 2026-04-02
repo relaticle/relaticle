@@ -8,6 +8,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <meta name="description" content="{{ $description }}">
+    <link rel="canonical" href="{{ url()->current() }}" />
 
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
@@ -33,7 +34,13 @@
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="preload" as="image" href="{{ asset('images/app-companies-preview.webp') }}" type="image/webp" />
+
+    {{-- Preload critical fonts (discovered late if left to CSS) --}}
+    <link rel="preload" as="font" href="/fonts/inter/InterVariable.woff2" type="font/woff2" crossorigin />
+    <link rel="preload" as="font" href="/fonts/satoshi/Satoshi-Variable.woff2" type="font/woff2" crossorigin />
+
+    {{-- Preload LCP hero image (default pipeline tab) --}}
+    <link rel="preload" as="image" href="{{ asset('images/app-pipeline-preview.webp') }}" type="image/webp" />
 
     <!-- Dark mode FOUC prevention (must run synchronously before paint) -->
     <script>
@@ -50,9 +57,6 @@
 
     @stack('header')
 
-    <!-- Styles -->
-    @livewireStyles
-
     @if(app()->isProduction() && !empty(config('services.fathom.site_id')))
         <!-- Fathom - beautiful, simple website analytics -->
         <script src="https://cdn.usefathom.com/script.js" data-site="{{ config('services.fathom.site_id') }}" defer></script>
@@ -61,13 +65,17 @@
 </head>
 <body class="font-sans antialiased text-gray-800">
 
+<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-gray-900 focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-primary dark:focus:bg-gray-900 dark:focus:text-white">
+    Skip to main content
+</a>
+
 <x-layout.header/>
 
-<!-- Main Content -->
-{{ $slot }}
+<main id="main-content" tabindex="-1">
+    {{ $slot }}
+</main>
 
 <x-layout.footer/>
 
-@livewireScripts
 </body>
 </html>

@@ -57,23 +57,23 @@
                 <div class="hidden md:block absolute top-0 -right-12 w-px bg-gradient-to-b from-gray-200 via-gray-200/60 to-transparent dark:from-white/[0.08] dark:via-white/[0.05] dark:to-transparent pointer-events-none" style="height:70%" aria-hidden="true"></div>
 
                 {{-- Feature Tabs --}}
-                <div id="hero-tabs" class="relative z-10 flex items-stretch">
+                <div id="hero-tabs" role="tablist" class="relative z-10 flex items-stretch">
                     <div class="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
                     <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[100vw] h-px pointer-events-none bg-[repeating-linear-gradient(to_right,theme(colors.gray.200)_0,theme(colors.gray.200)_10px,transparent_10px,transparent_18px)] dark:bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.08)_0,rgba(255,255,255,0.08)_10px,transparent_10px,transparent_18px)]" aria-hidden="true"></div>
                     <div x-ref="indicator" class="absolute bottom-0 h-px bg-primary/80 rounded-full pointer-events-none transition-[left,width] duration-200" aria-hidden="true"></div>
-                    <button type="button" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                    <button type="button" id="tab-pipeline" role="tab" :aria-selected="(activeTab === 'pipeline').toString()" :tabindex="activeTab === 'pipeline' ? 0 : -1" aria-controls="panel-pipeline" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
                         Pipeline
                     </button>
                     <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                    <button type="button" id="tab-ai-agent" role="tab" :aria-selected="(activeTab === 'ai-agent').toString()" :tabindex="activeTab === 'ai-agent' ? 0 : -1" aria-controls="panel-ai-agent" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
                         AI Agent
                     </button>
                     <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" x-ref="tab-companies" x-on:click="switchTab('companies')" :class="tabClasses('companies')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                    <button type="button" id="tab-companies" role="tab" :aria-selected="(activeTab === 'companies').toString()" :tabindex="activeTab === 'companies' ? 0 : -1" aria-controls="panel-companies" x-ref="tab-companies" x-on:click="switchTab('companies')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('companies')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
                         Companies
                     </button>
                     <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" x-ref="tab-custom-fields" x-on:click="switchTab('custom-fields')" :class="tabClasses('custom-fields')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
+                    <button type="button" id="tab-custom-fields" role="tab" :aria-selected="(activeTab === 'custom-fields').toString()" :tabindex="activeTab === 'custom-fields' ? 0 : -1" aria-controls="panel-custom-fields" x-ref="tab-custom-fields" x-on:click="switchTab('custom-fields')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('custom-fields')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
                         <span class="sm:hidden">Fields</span><span class="hidden sm:inline">Custom Fields</span>
                     </button>
                 </div>
@@ -95,15 +95,15 @@
                                 <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
                                 <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
                             </div>
-                            <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-400 dark:text-gray-500">
+                            <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-500">
                                 app.relaticle.com
                             </div>
                         </div>
 
                         {{-- Tab panels — grid stacking for Safari-smooth crossfade --}}
                         <div class="relative grid overflow-hidden">
-                            {{-- Pipeline tab --}}
-                            <div x-ref="panel-pipeline" class="col-start-1 row-start-1">
+                            {{-- Pipeline tab (default — LCP element, must load eagerly) --}}
+                            <div id="panel-pipeline" role="tabpanel" aria-labelledby="tab-pipeline" x-ref="panel-pipeline" class="col-start-1 row-start-1">
                                 <picture>
                                     <source data-light-srcset="{{ asset('images/app-pipeline-preview.webp') }}" data-dark-srcset="{{ asset('images/app-pipeline-preview-dark.webp') }}" srcset="{{ asset('images/app-pipeline-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
@@ -113,16 +113,16 @@
                                          class="hero-preview-image w-full h-auto"
                                          width="1440"
                                          height="900"
-                                         loading="lazy">
+                                         fetchpriority="high">
                                 </picture>
                             </div>
 
                             {{-- AI Agent tab --}}
-                            <div x-ref="panel-ai-agent" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
+                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 @include('home.partials.hero-agent-preview')
                             </div>
 
-                            <div x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
+                            <div id="panel-companies" role="tabpanel" aria-labelledby="tab-companies" x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 <picture>
                                     <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
@@ -136,7 +136,7 @@
                                 </picture>
                             </div>
 
-                            <div x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
+                            <div id="panel-custom-fields" role="tabpanel" aria-labelledby="tab-custom-fields" x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
                                 <picture>
                                     <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
@@ -275,6 +275,28 @@
                         self.$dispatch('hero-chat-animate');
                     }
                 });
+            },
+
+            handleTabKeydown(event) {
+                var key = event.key;
+                var index = this.tabOrder.indexOf(this.activeTab);
+                var next = -1;
+
+                if (key === 'ArrowRight') {
+                    next = (index + 1) % this.tabOrder.length;
+                } else if (key === 'ArrowLeft') {
+                    next = (index - 1 + this.tabOrder.length) % this.tabOrder.length;
+                } else if (key === 'Home') {
+                    next = 0;
+                } else if (key === 'End') {
+                    next = this.tabOrder.length - 1;
+                }
+
+                if (next >= 0) {
+                    event.preventDefault();
+                    this.switchTab(this.tabOrder[next]);
+                    this.$refs['tab-' + this.tabOrder[next]].focus();
+                }
             },
 
             tabClasses(tab) {
