@@ -27,6 +27,7 @@
             $allDocs = collect($documentTypes);
         @endphp
 
+        <h2 class="sr-only">Available Guides</h2>
         <div class="border-t border-gray-200/60 dark:border-white/[0.04] divide-y divide-gray-200/60 dark:divide-white/[0.04]">
             <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200/60 dark:divide-white/[0.04]">
                 @foreach($allDocs as $type => $document)

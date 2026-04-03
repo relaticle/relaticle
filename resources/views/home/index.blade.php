@@ -15,6 +15,19 @@
     :ogTitle="config('app.name') . ' - Open-Source Agent-Native CRM'"
     ogDescription="Self-hosted CRM with 30 MCP tools for AI agents. Full CRUD, custom fields, schema discovery. Own your data, bring your AI."
     :ogImage="url('/images/open-graph.jpg')">
+    @push('preload')
+        <link rel="preload"
+              as="image"
+              href="{{ asset('images/app-pipeline-preview-832w.webp') }}"
+              imagesrcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
+              imagesizes="(max-width: 640px) 380px, (max-width: 1024px) 640px, 832px"
+              type="image/webp" />
+    @endpush
+
+    @push('header')
+        @vite('resources/js/motion.js')
+    @endpush
+
     @include('home.partials.hero')
     @include('home.partials.features')
     @include('home.partials.community')

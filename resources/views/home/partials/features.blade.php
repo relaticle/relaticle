@@ -47,16 +47,16 @@
                             @endforeach
                             <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
                                 <x-ri-add-line class="w-4 h-4 text-gray-400 dark:text-gray-500"/>
-                                <span class="text-xs font-medium text-gray-400 dark:text-gray-500">Custom</span>
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-500">Custom</span>
                             </div>
                         </div>
                         <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
                         <div class="fn w-full bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
-                            <div class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
+                            <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
                             <div class="flex gap-4 text-[11px]">
                                 <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">30</span> tools</span>
                                 <span class="text-gray-500 dark:text-gray-400">REST API <span class="font-mono font-medium text-gray-800 dark:text-gray-200">v1</span></span>
-                                <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-600 dark:text-emerald-400">auto</span></span>
+                                <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-700 dark:text-emerald-400">auto</span></span>
                             </div>
                         </div>
                         <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
@@ -88,7 +88,7 @@
                                 @foreach([['ri-claude-fill', 'text-[#D4763C]', 'Claude', false], ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', false], ['ri-gemini-fill', 'text-blue-500', 'Gemini', false], ['ri-add-line', 'text-gray-400 dark:text-gray-500', 'Custom', true]] as [$icon, $color, $name, $dashed])
                                     <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border {{ $dashed ? 'border-dashed border-gray-300' : 'border-gray-200' }} dark:border-gray-600 rounded-lg px-2.5 py-1.5 {{ $dashed ? '' : 'shadow-sm' }}">
                                         <x-dynamic-component :component="$icon" class="w-3.5 h-3.5 {{ $color }}"/>
-                                        <span class="text-[11px] font-medium {{ $dashed ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300' }}">{{ $name }}</span>
+                                        <span class="text-[11px] font-medium {{ $dashed ? 'text-gray-500 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300' }}">{{ $name }}</span>
                                     </div>
                                 @endforeach
                             </div>
@@ -96,9 +96,9 @@
                             <div class="fn py-1">
                                 <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">MCP Server</div>
                                 <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
-                                    <div class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-2">Connected</div>
+                                    <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">Connected</div>
                                     <div class="space-y-1.5">
-                                        @foreach([['Tools', '30', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-600 dark:text-emerald-400']] as [$label, $val, $valClass])
+                                        @foreach([['Tools', '30', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
                                             <div class="flex items-center justify-between text-[11px]">
                                                 <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
                                                 <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>

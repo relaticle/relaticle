@@ -39,8 +39,7 @@
     <link rel="preload" as="font" href="/fonts/inter/InterVariable.woff2" type="font/woff2" crossorigin />
     <link rel="preload" as="font" href="/fonts/satoshi/Satoshi-Variable.woff2" type="font/woff2" crossorigin />
 
-    {{-- Preload LCP hero image (default pipeline tab) --}}
-    <link rel="preload" as="image" href="{{ asset('images/app-pipeline-preview.webp') }}" type="image/webp" />
+    @stack('preload')
 
     <!-- Dark mode FOUC prevention (must run synchronously before paint) -->
     <script>

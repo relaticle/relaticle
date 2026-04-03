@@ -105,7 +105,11 @@
                             {{-- Pipeline tab (default — LCP element, must load eagerly) --}}
                             <div id="panel-pipeline" role="tabpanel" aria-labelledby="tab-pipeline" x-ref="panel-pipeline" class="col-start-1 row-start-1">
                                 <picture>
-                                    <source data-light-srcset="{{ asset('images/app-pipeline-preview.webp') }}" data-dark-srcset="{{ asset('images/app-pipeline-preview-dark.webp') }}" srcset="{{ asset('images/app-pipeline-preview.webp') }}" type="image/webp">
+                                    <source data-light-srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
+                                            data-dark-srcset="{{ asset('images/app-pipeline-preview-dark-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-dark-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-dark-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview-dark.webp') }} 1440w"
+                                            srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
+                                            sizes="(max-width: 640px) 380px, (max-width: 1024px) 640px, 832px"
+                                            type="image/webp">
                                     <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-pipeline-preview-dark.png') }}"
                                          src="{{ asset('images/app-pipeline-preview.png') }}"
