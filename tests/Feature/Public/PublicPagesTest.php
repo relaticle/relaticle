@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Blog\BlogCategoryController;
+use App\Http\Controllers\Blog\BlogFeedController;
+use App\Http\Controllers\Blog\BlogPreviewController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
@@ -10,7 +13,7 @@ use Illuminate\Support\Facades\Http;
 use ManukMinasyan\FilamentBlog\Models\Category;
 use ManukMinasyan\FilamentBlog\Models\Post;
 
-mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class);
+mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class, BlogCategoryController::class, BlogFeedController::class, BlogPreviewController::class);
 
 beforeEach(function () {
     Http::fake([
