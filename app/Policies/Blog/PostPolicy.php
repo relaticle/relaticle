@@ -6,7 +6,6 @@ namespace App\Policies\Blog;
 
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
-use ManukMinasyan\FilamentBlog\Models\Post;
 
 final readonly class PostPolicy
 {
@@ -17,7 +16,7 @@ final readonly class PostPolicy
         return $user->hasVerifiedEmail();
     }
 
-    public function view(User $user, Post $post): bool
+    public function view(User $user): bool
     {
         return $user->hasVerifiedEmail();
     }
@@ -27,12 +26,12 @@ final readonly class PostPolicy
         return $user->hasVerifiedEmail();
     }
 
-    public function update(User $user, Post $post): bool
+    public function update(User $user): bool
     {
         return $user->hasVerifiedEmail();
     }
 
-    public function delete(User $user, Post $post): bool
+    public function delete(User $user): bool
     {
         return $user->hasVerifiedEmail();
     }
@@ -42,7 +41,7 @@ final readonly class PostPolicy
         return $user->hasVerifiedEmail();
     }
 
-    public function restore(User $user, Post $post): bool
+    public function restore(User $user): bool
     {
         return $user->hasVerifiedEmail();
     }
@@ -52,7 +51,7 @@ final readonly class PostPolicy
         return $user->hasVerifiedEmail();
     }
 
-    public function forceDelete(User $user, Post $post): bool
+    public function forceDelete(User $user): bool
     {
         return $user->hasVerifiedEmail();
     }

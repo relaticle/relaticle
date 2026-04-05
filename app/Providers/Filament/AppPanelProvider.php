@@ -58,6 +58,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
+use ManukMinasyan\FilamentBlog\Filament\Resources\CategoryResource;
+use ManukMinasyan\FilamentBlog\Filament\Resources\PostResource;
 use ManukMinasyan\FilamentBlog\FilamentBlogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
@@ -77,6 +79,9 @@ final class AppPanelProvider extends PanelProvider
             TenantSet::class,
             SwitchTeam::class,
         );
+
+        CategoryResource::scopeToTenant(false);
+        PostResource::scopeToTenant(false);
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
