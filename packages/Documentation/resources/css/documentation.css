@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+
+@import "~/css/theme.css";
+
+mark {
+    background: oklch(0.42 0.24 287.23 / 0.1);
+    color: inherit;
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+:is(.dark) mark {
+    background: oklch(0.42 0.24 287.23 / 0.2);
+}
+
+#documentation-content {
+    h1,
+    h2,
+    h3 {
+        @apply font-display relative;
+    }
+
+    h2,
+    h3 {
+        @apply cursor-pointer w-fit;
+    }
+
+    .heading-permalink {
+        @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
+    }
+
+    h2:hover .heading-permalink,
+    h3:hover .heading-permalink {
+        @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
+    }
+
+    h1 .heading-permalink {
+        @apply hidden;
+    }
+
+    /* Code block wrapper for sticky copy button */
+    .code-block-wrapper {
+        @apply relative rounded-lg bg-gray-900 dark:bg-gray-950;
+        margin: 1rem 0;
+    }
+
+    .code-block-wrapper pre {
+        @apply rounded-lg bg-transparent text-gray-100 text-sm leading-relaxed overflow-x-auto m-0;
+        padding: 1rem 1.25rem;
+    }
+
+    /* Standalone pre without wrapper */
+    pre:not(.code-block-wrapper pre) {
+        @apply rounded-lg bg-gray-900 dark:bg-gray-950 text-gray-100 text-sm leading-relaxed overflow-x-auto;
+        padding: 1rem 1.25rem;
+        margin: 1rem 0;
+    }
+
+    pre code {
+        @apply bg-transparent p-0 text-sm font-mono;
+        white-space: pre;
+        word-spacing: normal;
+        word-break: normal;
+        tab-size: 4;
+    }
+
+    /* Inline code */
+    :not(pre) > code {
+        @apply bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-1.5 py-0.5 rounded text-sm font-mono;
+    }
+
+    /* Copy button - positioned on wrapper, stays fixed during scroll */
+    .copy-button {
+        @apply absolute top-2 right-2 p-1.5 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-400 hover:text-gray-200 transition-all opacity-0 cursor-pointer border-0 flex items-center justify-center w-8 h-8 z-10;
+    }
+
+    .code-block-wrapper:hover .copy-button,
+    pre:hover > .copy-button {
+        @apply opacity-100;
+    }
+
+    .copy-button.copied {
+        @apply text-green-400;
+    }
+
+    .copy-button svg {
+        @apply w-4 h-4 shrink-0;
+    }
+}

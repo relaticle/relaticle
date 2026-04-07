@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Auth\Notifications\ResetPassword as ResetPasswordNotification;
 use Filament\Auth\Pages\PasswordReset\RequestPasswordReset;
 use Filament\Auth\Pages\PasswordReset\ResetPassword;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -97,6 +98,36 @@ test('password reset requires confirmation to match', function () {
         ->assertHasFormErrors(['password']);
 
     expect(Hash::check('password', $user->fresh()->password))->toBeTrue();
+});
+
+test('signed password reset URL is accessible', function () {
+    $user = User::factory()->withTeam()->create();
+    $token = Password::broker('users')->createToken($user);
+
+    $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
+
+    $this->get($url)->assertSuccessful();
+});
+
+test('password reset URL with decoded percent-encoding is accessible', function () {
+    $user = User::factory()->withTeam()->create();
+    $token = Password::broker('users')->createToken($user);
+
+    $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
+
+    $this->get(urldecode($url))->assertSuccessful();
+});
+
+test('password reset URL with tampered email is rejected', function () {
+    $user = User::factory()->withTeam()->create();
+    $token = Password::broker('users')->createToken($user);
+
+    $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
+
+    // Tamper with the email parameter
+    $tamperedUrl = preg_replace('/email=[^&]+/', 'email=hacker@example.com', $url);
+
+    $this->get($tamperedUrl)->assertForbidden();
 });
 
 test('authenticated user is redirected from forgot password page', function () {

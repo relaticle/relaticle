@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
@@ -29,9 +30,6 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property string $name
- * @property string $address
- * @property string $country
- * @property string $phone
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
  * @property-read string $created_by
@@ -39,6 +37,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 #[ObservedBy(CompanyObserver::class)]
 final class Company extends Model implements HasCustomFields, HasMedia
 {
+    use BelongsToTeamCreator;
     use HasAiSummary;
     use HasCreator;
     use HasEmails;
@@ -58,9 +57,6 @@ final class Company extends Model implements HasCustomFields, HasMedia
      */
     protected $fillable = [
         'name',
-        'address',
-        'country',
-        'phone',
         'creation_source',
     ];
 

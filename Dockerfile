@@ -31,7 +31,7 @@ RUN npm ci --ignore-scripts
 COPY vite.config.js ./
 COPY resources ./resources
 COPY public ./public
-COPY app-modules ./app-modules
+COPY packages ./packages
 
 # Copy vendor for Filament theme CSS
 COPY --from=composer /app/vendor ./vendor

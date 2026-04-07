@@ -37,6 +37,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $remember_token
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property-read Team|null $currentTeam
  */
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
 {
@@ -104,6 +105,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(UserSocialAccount::class);
+    }
+
+    public function hasPassword(): bool
+    {
+        return $this->password !== null;
     }
 
     /**

@@ -15,7 +15,7 @@ return [
         resource_path('views'),
         base_path('.env'),
         base_path('composer.lock'),
-        base_path('app-modules'),
+        base_path('packages'),
     ],
 
     /*

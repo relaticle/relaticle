@@ -21,7 +21,7 @@
     <source>
         <include>
             <directory>app</directory>
-            <directory>app-modules</directory>
+            <directory>packages</directory>
             <directory>config</directory>
             <directory>routes</directory>
         </include>

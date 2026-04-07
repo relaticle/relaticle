@@ -33,9 +33,12 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         event(new InvitingTeamMember($team, $email, $role));
 
+        $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
+
         $invitation = $team->teamInvitations()->create([
             'email' => $email,
             'role' => $role,
+            'expires_at' => now()->addDays($expiryDays),
         ]);
 
         /** @var TeamInvitationModel $invitation */

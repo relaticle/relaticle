@@ -36,6 +36,10 @@ return [
             'title' => 'Update Password',
             'description' => 'Ensure your account is using a long, random password to stay secure.',
         ],
+        'set_password' => [
+            'title' => 'Set Password',
+            'description' => 'Add a password to your account so you can also sign in with your email and password.',
+        ],
         'browser_sessions' => [
             'title' => 'Browser Sessions',
             'description' => 'Manage and log out your active sessions on other browsers and devices.',
@@ -71,10 +75,12 @@ return [
     'modals' => [
         'delete_account' => [
             'notice' => 'Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.',
+            'notice_no_password' => 'Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted.',
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
             'description' => 'Enter your password to confirm you would like to log out of your other browser sessions across all of your devices.',
+            'description_no_password' => 'Are you sure you would like to log out of your other browser sessions across all of your devices?',
         ],
     ],
 

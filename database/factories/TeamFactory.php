@@ -31,7 +31,7 @@ final class TeamFactory extends Factory
 
     public function configure(): static
     {
-        return $this->afterMaking(function (Team $team): void {
+        $factory = $this->afterMaking(function (Team $team): void {
             if (blank($team->slug)) {
                 $team->slug = Str::slug($team->name).'-'.Str::lower(Str::random(5));
             }
@@ -39,5 +39,11 @@ final class TeamFactory extends Factory
             'created_at' => now()->subMinutes($sequence->index),
             'updated_at' => now()->subMinutes($sequence->index),
         ]);
+
+        if (config('scribe.generating')) {
+            return $factory->state(['user_id' => (string) Str::ulid()]);
+        }
+
+        return $factory;
     }
 }

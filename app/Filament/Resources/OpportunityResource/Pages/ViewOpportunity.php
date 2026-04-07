@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
@@ -36,9 +37,9 @@ final class ViewOpportunity extends ViewRecord
                         ->label('Copy page URL')
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Opportunity $record): void {
-                            $url = OpportunityResource::getUrl('view', [$record]);
+                            $jsUrl = Js::from(OpportunityResource::getUrl('view', [$record]));
                             $this->js("
-                            navigator.clipboard.writeText('{$url}').then(() => {
+                            navigator.clipboard.writeText({$jsUrl}).then(() => {
                                 new FilamentNotification()
                                     .title('URL copied to clipboard')
                                     .success()
@@ -50,9 +51,9 @@ final class ViewOpportunity extends ViewRecord
                         ->label('Copy record ID')
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Opportunity $record): void {
-                            $id = $record->getKey();
+                            $jsId = Js::from((string) $record->getKey());
                             $this->js("
-                            navigator.clipboard.writeText('{$id}').then(() => {
+                            navigator.clipboard.writeText({$jsId}).then(() => {
                                 new FilamentNotification()
                                     .title('Record ID copied to clipboard')
                                     .success()
