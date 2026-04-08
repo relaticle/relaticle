@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('protected_recipients', function (Blueprint $table) {
+        Schema::create('protected_recipients', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('team_id')->constrained()->cascadeOnDelete();
             $table->string('type', 20);                      // email | domain

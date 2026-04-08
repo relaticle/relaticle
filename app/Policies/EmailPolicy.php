@@ -9,11 +9,11 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
-final class EmailPolicy
+final readonly class EmailPolicy
 {
-    public function __construct(private readonly PrivacyService $privacyService) {}
+    public function __construct(private PrivacyService $privacyService) {}
 
-    public function viewAny(User $user): bool
+    public function viewAny(): bool
     {
         return true;
     }
@@ -21,7 +21,7 @@ final class EmailPolicy
     /** Can the viewer see this email exists at all? */
     public function view(User $user, Email $email): bool
     {
-        return $this->privacyService->effectiveTier($email, $user) !== null;
+        return $this->privacyService->effectiveTier($email, $user) instanceof EmailPrivacyTier;
     }
 
     /** Can the viewer see the subject line? */
@@ -29,7 +29,7 @@ final class EmailPolicy
     {
         $tier = $this->privacyService->effectiveTier($email, $user);
 
-        return $tier !== null && $tier !== EmailPrivacyTier::METADATA_ONLY;
+        return $tier instanceof EmailPrivacyTier && $tier !== EmailPrivacyTier::METADATA_ONLY;
     }
 
     /** Can the viewer see the body and attachments? */
@@ -55,6 +55,6 @@ final class EmailPolicy
 
         $tier = $this->privacyService->effectiveTier($email, $user);
 
-        return $tier !== null && $tier !== EmailPrivacyTier::FULL;
+        return $tier instanceof EmailPrivacyTier && $tier !== EmailPrivacyTier::FULL;
     }
 }

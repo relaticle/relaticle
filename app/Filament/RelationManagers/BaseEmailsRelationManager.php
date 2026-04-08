@@ -53,12 +53,10 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->modalHeading('Share my emails on this record')
                     ->modalDescription('Update visibility and teammate access for all emails you own on this record.')
                     ->modalSubmitActionLabel('Save')
-                    ->visible(function (): bool {
-                        return $this->getOwnerRecord()
-                            ->emails()
-                            ->where('user_id', $this->authUser()->getKey())
-                            ->exists();
-                    })
+                    ->visible(fn (): bool => $this->getOwnerRecord()
+                        ->emails()
+                        ->where('user_id', $this->authUser()->getKey())
+                        ->exists())
                     ->schema([
                         Select::make('privacy_tier')
                             ->label('Who can see these emails?')
@@ -78,7 +76,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                     ->options(function (): array {
                                         $user = $this->authUser();
 
-                                        return User::where('current_team_id', $user->current_team_id)
+                                        return User::query()->where('current_team_id', $user->current_team_id)
                                             ->where('id', '!=', $user->getKey())
                                             ->pluck('name', 'id')
                                             ->all();
@@ -103,7 +101,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                             $sharingService->shareAllOnRecord(
                                 $record,
                                 $owner,
-                                User::findOrFail($share['shared_with']),
+                                User::query()->findOrFail($share['shared_with']),
                                 EmailPrivacyTier::from($share['tier']),
                             );
                         }
@@ -159,8 +157,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 TextColumn::make('privacy_tier')
                     ->label('Visibility')
                     ->badge()
-                    ->formatStateUsing(fn (EmailPrivacyTier $state) => $state->getLabel())
-                    ->color(fn (EmailPrivacyTier $state) => match ($state) {
+                    ->formatStateUsing(fn (EmailPrivacyTier $state): string => $state->getLabel())
+                    ->color(fn (EmailPrivacyTier $state): string => match ($state) {
                         EmailPrivacyTier::PRIVATE => 'gray',
                         EmailPrivacyTier::METADATA_ONLY => 'gray',
                         EmailPrivacyTier::SUBJECT => 'warning',
@@ -210,7 +208,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                         ->options(function (): array {
                                             $user = $this->authUser();
 
-                                            return User::where('current_team_id', $user->current_team_id)
+                                            return User::query()->where('current_team_id', $user->current_team_id)
                                                 ->where('id', '!=', $user->getKey())
                                                 ->pluck('name', 'id')
                                                 ->all();
@@ -245,7 +243,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 $sharingService->shareEmail(
                                     $record,
                                     $sharer,
-                                    User::findOrFail($share['shared_with']),
+                                    User::query()->findOrFail($share['shared_with']),
                                     EmailPrivacyTier::from($share['tier']),
                                 );
                             }
@@ -272,7 +270,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ->action(function (Email $record, array $data): void {
                             $requester = $this->authUser();
 
-                            $existing = EmailAccessRequest::where('email_id', $record->getKey())
+                            $existing = EmailAccessRequest::query()->where('email_id', $record->getKey())
                                 ->where('requester_id', $requester->getKey())
                                 ->where('status', 'pending')
                                 ->exists();
@@ -286,7 +284,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 return;
                             }
 
-                            $request = EmailAccessRequest::create([
+                            $request = EmailAccessRequest::query()->create([
                                 'email_id' => $record->getKey(),
                                 'requester_id' => $requester->getKey(),
                                 'owner_id' => $record->user_id,
@@ -334,7 +332,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     TextEntry::make('privacy_tier')
                         ->label('Visibility')
                         ->badge()
-                        ->formatStateUsing(fn (EmailPrivacyTier $state) => $state->getLabel()),
+                        ->formatStateUsing(fn (EmailPrivacyTier $state): string => $state->getLabel()),
 
                     TextEntry::make('has_attachments')
                         ->label('Has Attachments')
@@ -351,7 +349,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                             TextEntry::make('role')
                                 ->label('Role')
                                 ->badge()
-                                ->formatStateUsing(fn ($state) => strtoupper($state->value)),
+                                ->formatStateUsing(fn ($state) => strtoupper((string) $state->value)),
                             TextEntry::make('name')
                                 ->label('Name')
                                 ->default('—'),
@@ -444,7 +442,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     private function buildThreadSummaryView(Email $email): View
     {
-        $thread = EmailThread::where('thread_id', $email->thread_id)
+        $thread = EmailThread::query()->where('thread_id', $email->thread_id)
             ->where('connected_account_id', $email->connected_account_id)
             ->first();
 

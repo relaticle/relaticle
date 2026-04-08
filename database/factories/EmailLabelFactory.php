@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 
+/**
+ * @extends Factory<EmailLabel>
+ */
 final class EmailLabelFactory extends Factory
 {
     protected $model = EmailLabel::class;
@@ -15,7 +18,7 @@ final class EmailLabelFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Carbon::now(),
+            'created_at' => Date::now(),
         ];
     }
 }

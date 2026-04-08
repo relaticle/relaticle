@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('emailables', function (Blueprint $table) {
+        Schema::create('emailables', function (Blueprint $table): void {
             $table->id();                                    // bigInteger PK (matches noteables/taskables)
             $table->foreignUlid('email_id')->constrained('emails')->cascadeOnDelete();
             $table->ulidMorphs('emailable');                 // emailable_type, emailable_id (ULID)

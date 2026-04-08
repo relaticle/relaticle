@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('email_access_requests', function (Blueprint $table) {
+        Schema::create('email_access_requests', function (Blueprint $table): void {
             $table->ulid('id')->primary();
 
             $table->foreignUlid('requester_id')->constrained('users')->cascadeOnDelete();

@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('opportunities', function (Blueprint $table) {
+        Schema::table('opportunities', function (Blueprint $table): void {
             $table->timestamp('last_email_at')->nullable();
             $table->timestamp('last_interaction_at')->nullable();
             $table->integer('email_count')->default(0);
@@ -27,7 +27,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('opportunities', function (Blueprint $table) {
+        Schema::table('opportunities', function (Blueprint $table): void {
             $table->dropColumn('last_email_at');
             $table->dropColumn('last_interaction_at');
             $table->dropColumn('email_count');

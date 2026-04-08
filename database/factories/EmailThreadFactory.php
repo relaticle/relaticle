@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Models\EmailThread;
 
+/**
+ * @extends Factory<EmailThread>
+ */
 final class EmailThreadFactory extends Factory
 {
     protected $model = EmailThread::class;
@@ -15,8 +18,8 @@ final class EmailThreadFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
+            'created_at' => Date::now(),
+            'updated_at' => Date::now(),
         ];
     }
 }

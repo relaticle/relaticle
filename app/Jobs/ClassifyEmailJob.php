@@ -45,7 +45,7 @@ final class ClassifyEmailJob implements ShouldQueue
 
         $category = $this->classify($email);
 
-        EmailLabel::create([
+        EmailLabel::query()->create([
             'email_id' => $email->getKey(),
             'label' => $category,
             'source' => 'ai',

@@ -35,3 +35,4 @@ parameters:
         - config
         - packages/ImportWizard/config
         - packages/Documentation/config
+        - packages/EmailIntegration/config

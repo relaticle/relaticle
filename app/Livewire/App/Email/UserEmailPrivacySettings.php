@@ -24,7 +24,7 @@ final class UserEmailPrivacySettings extends Component
 
         $this->default_email_sharing_tier = $user->default_email_sharing_tier?->value;
 
-        $this->blocklist = EmailBlocklist::where('user_id', $user->getKey())
+        $this->blocklist = EmailBlocklist::query()->where('user_id', $user->getKey())
             ->where('team_id', $user->currentTeam->getKey())
             ->get(['id', 'type', 'value'])
             ->toArray();
@@ -50,16 +50,16 @@ final class UserEmailPrivacySettings extends Component
             'default_email_sharing_tier' => $this->default_email_sharing_tier ?: null,
         ]);
 
-        EmailBlocklist::where('user_id', $user->getKey())
+        EmailBlocklist::query()->where('user_id', $user->getKey())
             ->where('team_id', $teamId)
             ->delete();
 
         foreach ($this->blocklist as $entry) {
-            if (empty(trim($entry['value']))) {
+            if (in_array(trim($entry['value']), ['', '0'], true)) {
                 continue;
             }
 
-            EmailBlocklist::create([
+            EmailBlocklist::query()->create([
                 'user_id' => $user->getKey(),
                 'team_id' => $teamId,
                 'type' => $entry['type'],
@@ -77,7 +77,7 @@ final class UserEmailPrivacySettings extends Component
     public function getTierOptions(): array
     {
         return collect(EmailPrivacyTier::cases())
-            ->mapWithKeys(fn (EmailPrivacyTier $tier) => [$tier->value => $tier->getLabel()])
+            ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => $tier->getLabel()])
             ->prepend('Use workspace default', '')
             ->all();
     }
@@ -86,7 +86,7 @@ final class UserEmailPrivacySettings extends Component
     public function getTypeOptions(): array
     {
         return collect(EmailBlocklistType::cases())
-            ->mapWithKeys(fn (EmailBlocklistType $type) => [$type->value => $type->getLabel()])
+            ->mapWithKeys(fn (EmailBlocklistType $type): array => [$type->value => $type->getLabel()])
             ->all();
     }
 

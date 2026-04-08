@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('connected_accounts', function (Blueprint $table) {
+        Schema::create('connected_accounts', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->teams();
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();

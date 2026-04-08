@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('email_labels', function (Blueprint $table) {
+        Schema::create('email_labels', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('email_id')->constrained('emails')->cascadeOnDelete();
             $table->string('label');

@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('email_signatures', function (Blueprint $table) {
+        Schema::create('email_signatures', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('connected_account_id')
                 ->constrained('connected_accounts')

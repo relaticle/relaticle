@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('teams', function (Blueprint $table) {
+        Schema::table('teams', function (Blueprint $table): void {
             $table->string('default_email_sharing_tier', 30)
                 ->default('metadata_only')
                 ->after('personal_team');
@@ -19,7 +19,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('teams', function (Blueprint $table) {
+        Schema::table('teams', function (Blueprint $table): void {
             $table->dropColumn('default_email_sharing_tier');
         });
     }
