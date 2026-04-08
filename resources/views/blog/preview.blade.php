@@ -1,5 +1,5 @@
 <x-guest-layout title="Preview - {{ $post->title }}">
-    @push('head')
+    @push('header')
         <meta name="robots" content="noindex, nofollow">
     @endpush
 

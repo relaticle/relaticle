@@ -23,8 +23,10 @@ final readonly class BlogPreviewController
             ->limit(3)
             ->get();
 
-        $editUrl = auth()->user()
-            ? PostResource::getUrl('edit', ['record' => $post])
+        $user = auth()->user();
+
+        $editUrl = $user?->currentTeam
+            ? PostResource::getUrl('edit', ['record' => $post, 'tenant' => $user->currentTeam])
             : null;
 
         return view('blog.preview', ['post' => $post, 'relatedPosts' => $relatedPosts, 'editUrl' => $editUrl]);
