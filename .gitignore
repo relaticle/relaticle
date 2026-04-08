@@ -47,5 +47,5 @@ api.json
 .context
 polyscope.json
 /bin/setup-preview.sh
-/packages
+/packages/filament
 .gstack/
