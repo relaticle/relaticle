@@ -63,111 +63,6 @@ Do not add new PHPStan errors to the baseline without approval. All parameters a
 - In Filament, the package's own `SetTenantContextMiddleware` handles tenant context — no action-level code needed there either
 - `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()` — this is defensive and correct, don't change it to rely on ambient state
 
-=== .ai/v4 rules ===
-
-## Filament 4
-
-### Important Version 4 Changes
-
-- File visibility is now `private` by default.
-- The `deferFilters` method from Filament v3 is now the default behavior in Filament v4, so users must click a button before the filters are applied to the table. To disable this behavior, you can use the `deferFilters(false)` method.
-- The `Grid`, `Section`, and `Fieldset` layout components no longer span all columns by default.
-- The `all` pagination page method is not available for tables by default.
-- All action classes extend `Filament\Actions\Action`. No action classes exist in `Filament\Tables\Actions`.
-- The `Form` & `Infolist` layout components have been moved to `Filament\Schemas\Components`, for example `Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.
-- A new `Repeater` component for Forms has been added.
-- Icons now use the `Filament\Support\Icons\Heroicon` Enum by default. Other options are available and documented.
-
-### Organize Component Classes Structure
-
-- Schema components: `Schemas/Components/`
-- Table columns: `Tables/Columns/`
-- Table filters: `Tables/Filters/`
-- Actions: `Actions/`
-
-### Form Components in v4
-
-- Use `Filament\Forms\Components` for form fields like TextInput, Select, Textarea, etc.
-- Use `Filament\Schemas\Components` for layout components like Grid, Section, Fieldset, Tabs, Wizard.
-
-### Actions in v4
-
-```php
-use Filament\Actions\Action;
-
-Action::make('send')
-    ->label('Send Email')
-    ->icon(Heroicon::OutlinedPaperAirplane)
-    ->requiresConfirmation()
-    ->action(fn (Model $record) => $record->sendEmail());
-```
-
-### Table Actions in v4
-
-```php
-use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-
-public static function table(Table $table): Table
-{
-    return $table
-        ->actions([
-            EditAction::make(),
-            DeleteAction::make(),
-            Action::make('approve')
-                ->action(fn (Model $record) => $record->approve()),
-        ]);
-}
-```
-
-### Icons in v4
-
-```php
-use Filament\Support\Icons\Heroicon;
-
-// Instead of string icons
-->icon(Heroicon::OutlinedHome)
-->icon(Heroicon::SolidUser)
-```
-
-### Testing Filament 4 Resources
-
-```php
-use function Pest\Livewire\livewire;
-
-it('can list records', function () {
-    $records = Model::factory()->count(5)->create();
-
-    livewire(ListModels::class)
-        ->assertCanSeeTableRecords($records);
-});
-
-it('can create a record', function () {
-    livewire(CreateModel::class)
-        ->fillForm([
-            'name' => 'Test Name',
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    expect(Model::query()->where('name', 'Test Name')->exists())->toBeTrue();
-});
-
-it('can edit a record', function () {
-    $record = Model::factory()->create();
-
-    livewire(EditModel::class, ['record' => $record->getRouteKey()])
-        ->fillForm([
-            'name' => 'Updated Name',
-        ])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    expect($record->refresh()->name)->toBe('Updated Name');
-});
-```
-
 === foundation rules ===
 
 # Laravel Boost Guidelines
@@ -196,6 +91,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - pestphp/pest (PEST) - v4
 - phpunit/phpunit (PHPUNIT) - v12
 - rector/rector (RECTOR) - v2
+- alpinejs (ALPINEJS) - v3
 - tailwindcss (TAILWINDCSS) - v4
 
 ## Skills Activation
@@ -209,10 +105,6 @@ This project has domain-specific skills available. You MUST activate the relevan
 - `livewire-development` — Use for any task or question involving Livewire. Activate if user mentions Livewire, wire: directives, or Livewire-specific concepts like wire:model, wire:click, wire:sort, or islands, invoke this skill. Covers building new components, debugging reactivity issues, real-time form validation, drag-and-drop, loading states, migrating from Livewire 3 to 4, converting component formats (SFC/MFC/class-based), and performance optimization. Do not use for non-Livewire reactive UI (React, Vue, Alpine-only, Inertia.js) or standard Laravel forms without Livewire.
 - `pest-testing` — Use this skill for Pest PHP testing in Laravel projects only. Trigger whenever any test is being written, edited, fixed, or refactored — including fixing tests that broke after a code change, adding assertions, converting PHPUnit to Pest, adding datasets, and TDD workflows. Always activate when the user asks how to write something in Pest, mentions test files or directories (tests/Feature, tests/Unit, tests/Browser), or needs browser testing, smoke testing multiple pages for JS errors, or architecture tests. Covers: it()/expect() syntax, datasets, mocking, browser testing (visit/click/fill), smoke testing, arch(), Livewire component tests, RefreshDatabase, and all Pest 4 features. Do not use for factories, seeders, migrations, controllers, models, or non-test PHP code.
 - `tailwindcss-development` — Always invoke when the user's message includes 'tailwind' in any form. Also invoke for: building responsive grid layouts (multi-column card grids, product grids), flex/grid page structures (dashboards with sidebars, fixed topbars, mobile-toggle navs), styling UI components (cards, tables, navbars, pricing sections, forms, inputs, badges), adding dark mode variants, fixing spacing or typography, and Tailwind v3/v4 work. The core use case: writing or fixing Tailwind utility classes in HTML templates (Blade, JSX, Vue). Skip for backend PHP logic, database queries, API routes, JavaScript with no HTML/CSS component, CSS file audits, build tool configuration, and vanilla CSS.
-- `custom-fields-development` — Adds dynamic custom fields to Eloquent models without migrations using Filament integration. Use when adding the UsesCustomFields trait to models, integrating custom fields in Filament forms/tables/infolists, configuring field types, working with field validation, or managing feature flags for conditional visibility, encryption, and multi-tenancy.
-- `flowforge-development` — Builds Kanban board interfaces for Eloquent models with drag-and-drop functionality. Use when creating board pages, configuring columns and cards, implementing drag-and-drop positioning, working with Filament board pages or standalone Livewire boards, or troubleshooting position-related issues.
-- `laravel-query-builder` — Build filtered, sorted, and included API endpoints using spatie/laravel-query-builder. Activates when working with QueryBuilder, AllowedFilter, AllowedSort, AllowedInclude, or when the user mentions query parameters, API filtering, sorting, includes, or spatie/laravel-query-builder.
-- `spatie-laravel-php-standards` — Apply Spatie's Laravel and PHP coding standards for any task that creates, edits, reviews, refactors, or formats Laravel/PHP code or Blade templates; use for controllers, Eloquent models, routes, config, validation, migrations, tests, and related files to align with Laravel conventions and PSR-12.
 
 ## Conventions
 
@@ -291,13 +183,6 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
 - Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
 - Use array shape type definitions in PHPDoc blocks.
-
-=== herd rules ===
-
-# Laravel Herd
-
-- The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
-- Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
 
 === tests rules ===
 
@@ -533,12 +418,5 @@ livewire(ListUsers::class)
 
 - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed.
 - **Never assume full-width layout.** `Grid`, `Section`, and `Fieldset` do not span all columns by default. Explicitly set column spans when needed.
-
-=== spatie/boost-spatie-guidelines rules ===
-
-# Project Coding Guidelines
-
-- This codebase follows Spatie's Laravel & PHP guidelines.
-- Always activate the `spatie-laravel-php-standards` skill whenever writing, editing, reviewing, or formatting Laravel or PHP code.
 
 </laravel-boost-guidelines>

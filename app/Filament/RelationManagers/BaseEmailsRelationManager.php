@@ -10,13 +10,11 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\TextSize;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
@@ -172,7 +170,10 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->color('info'),
             ])
             ->recordActions([
-                ViewAction::make()->slideOver(),
+                ViewAction::make()
+                    ->modalHeading('Email details')
+                    ->modalWidth(Width::SevenExtraLarge)
+                    ->slideOver(),
 
                 ActionGroup::make([
                     Action::make('summarizeThread')
@@ -305,133 +306,14 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function infolist(Schema $schema): Schema
     {
-        return $schema->schema([
-
-            // ── Internal email notice (owner only) ─────────────────────────
-            Section::make('Internal Email')
-                ->schema([
-                    TextEntry::make('is_internal')
-                        ->label('')
-                        ->formatStateUsing(fn (): string => 'This email is between workspace members only and is automatically hidden from teammates\' views.')
-                        ->columnSpanFull(),
-                ])
-                ->visible(fn (Email $record): bool => $record->is_internal && $record->user_id === $this->authUser()->getKey()),
-
-            // ── Metadata (always visible) ───────────────────────────────────
-            Section::make('Email Details')
-                ->schema([
-                    TextEntry::make('sent_at')
-                        ->label('Date')
-                        ->dateTime(),
-
-                    TextEntry::make('direction')
-                        ->label('Direction')
-                        ->badge()
-                        ->formatStateUsing(fn ($state) => $state->getLabel()),
-
-                    TextEntry::make('privacy_tier')
-                        ->label('Visibility')
-                        ->badge()
-                        ->formatStateUsing(fn (EmailPrivacyTier $state): string => $state->getLabel()),
-
-                    TextEntry::make('has_attachments')
-                        ->label('Has Attachments')
-                        ->formatStateUsing(fn (bool $state): string => $state ? 'Yes' : 'No'),
-                ])
-                ->columns(2),
-
-            // ── Participants (always visible) ───────────────────────────────
-            Section::make('Participants')
-                ->schema([
-                    RepeatableEntry::make('participants')
-                        ->label('')
-                        ->schema([
-                            TextEntry::make('role')
-                                ->label('Role')
-                                ->badge()
-                                ->formatStateUsing(fn ($state) => strtoupper((string) $state->value)),
-                            TextEntry::make('name')
-                                ->label('Name')
-                                ->default('—'),
-                            TextEntry::make('email_address')
-                                ->label('Email'),
-                        ])
-                        ->columns(3),
-                ]),
-
-            // ── Labels ──────────────────────────────────────────────────────
-            Section::make('Labels')
-                ->schema([
-                    TextEntry::make('labels_display')
-                        ->label('')
-                        ->badge()
-                        ->getStateUsing(fn (Email $record): array => $record->labels->pluck('label')->all())
-                        ->color(fn (string $state): string => match ($state) {
-                            'Scheduling' => 'info',
-                            'Marketing' => 'warning',
-                            'Invoice' => 'danger',
-                            'Support' => 'success',
-                            'Sales' => 'primary',
-                            default => 'gray',
-                        })
-                        ->separator(','),
-                ])
-                ->visible(fn (Email $record): bool => $record->labels->isNotEmpty()),
-
-            // ── Subject (visible at SUBJECT tier or above) ──────────────────
-            Section::make('Subject')
-                ->schema([
-                    TextEntry::make('subject')
-                        ->label('')
-                        ->size(TextSize::Large),
-                ])
-                ->visible(fn (Email $record): bool => $this->authUser()->can('viewSubject', $record)),
-
-            // ── Attachments (visible at FULL tier only) ──────────────────────
-            Section::make('Attachments')
-                ->schema([
-                    RepeatableEntry::make('attachments')
-                        ->label('')
-                        ->schema([
-                            TextEntry::make('filename')
-                                ->label('File'),
-                            TextEntry::make('mime_type')
-                                ->label('Type'),
-                            TextEntry::make('size')
-                                ->label('Size')
-                                ->formatStateUsing(fn (int $state): string => number_format($state / 1024, 1).' KB'),
-                        ])
-                        ->columns(3),
-                ])
-                ->visible(fn (Email $record): bool => $record->has_attachments && $this->authUser()->can('viewBody', $record)),
-
-            // ── Body (visible at FULL tier only) ─────────────────────────────
-            Section::make('Message Body')
-                ->schema([
-                    TextEntry::make('body.body_html')
-                        ->label('')
-                        ->html()
-                        ->getStateUsing(fn (Email $record): string => $record->body?->body_html
-                            ?? nl2br(e($record->body?->body_text ?? '')))
-                        ->columnSpanFull(),
-                ])
-                ->visible(fn (Email $record): bool => $this->authUser()->can('viewBody', $record)),
-
-            // ── Privacy gate notice ─────────────────────────────────────────
-            Section::make('Access Restricted')
-                ->schema([
-                    TextEntry::make('privacy_tier')
-                        ->label('')
-                        ->formatStateUsing(fn (EmailPrivacyTier $state): string => match ($state) {
-                            EmailPrivacyTier::METADATA_ONLY => 'You can see participant and date information for this email. The subject and body are hidden. Request access to see more.',
-                            EmailPrivacyTier::SUBJECT => 'You can see the subject line. The full email body is hidden. Request access to see more.',
-                            default => 'This email is private.',
-                        })
-                        ->columnSpanFull(),
-                ])
-                ->visible(fn (Email $record): bool => ! $this->authUser()->can('viewBody', $record)),
-
-        ])->columns(1);
+        return $schema
+            ->schema([
+                ViewEntry::make('email')
+                    ->hiddenLabel()
+                    ->view('filament.emails.email-view')
+                    ->columnSpanFull(),
+            ])
+            ->columns(1);
     }
 
     private function authUser(): User
