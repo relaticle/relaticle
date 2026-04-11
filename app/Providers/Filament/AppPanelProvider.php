@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Features\SocialAuth;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -45,6 +46,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
+use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
@@ -175,15 +177,21 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
                 fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                fn (): View|Factory => view('filament.auth.social_login_buttons')
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                fn (): View|Factory => view('filament.auth.social_login_buttons')
-            )
+            );
+
+        if (Feature::active(SocialAuth::class)) {
+            $panel
+                ->renderHook(
+                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                    fn (): View|Factory => view('filament.auth.social_login_buttons')
+                )
+                ->renderHook(
+                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
+                    fn (): View|Factory => view('filament.auth.social_login_buttons')
+                );
+        }
+
+        $panel
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')

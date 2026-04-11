@@ -12,11 +12,17 @@
         </div>
 
         <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-3 mb-10">
-            @foreach([
-                ['url' => 'https://github.com/relaticle/relaticle', 'icon' => 'ri-github-fill', 'iconClass' => '', 'title' => 'GitHub', 'desc' => 'Star our repo, report issues, and contribute code. Completely open source and free to use.', 'cta' => 'View Repository', 'external' => true],
-                ['url' => route('discord'), 'icon' => 'ri-discord-fill', 'iconClass' => 'text-[#5865F2]', 'title' => 'Discord', 'desc' => 'Chat with developers, get help, and share ideas. Join our growing community of builders.', 'cta' => 'Join Discord', 'external' => true],
-                ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Documentation', 'desc' => 'Learn how to use Relaticle. Comprehensive guides for users and developers alike.', 'cta' => 'Read the Docs', 'external' => false],
-            ] as $card)
+            @php
+                $cards = [
+                    ['url' => 'https://github.com/relaticle/relaticle', 'icon' => 'ri-github-fill', 'iconClass' => '', 'title' => 'GitHub', 'desc' => 'Star our repo, report issues, and contribute code. Completely open source and free to use.', 'cta' => 'View Repository', 'external' => true],
+                    ['url' => route('discord'), 'icon' => 'ri-discord-fill', 'iconClass' => 'text-[#5865F2]', 'title' => 'Discord', 'desc' => 'Chat with developers, get help, and share ideas. Join our growing community of builders.', 'cta' => 'Join Discord', 'external' => true],
+                ];
+
+                if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
+                    $cards[] = ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Documentation', 'desc' => 'Learn how to use Relaticle. Comprehensive guides for users and developers alike.', 'cta' => 'Read the Docs', 'external' => false];
+                }
+            @endphp
+            @foreach($cards as $card)
                 <a href="{{ $card['url'] }}" @if($card['external']) target="_blank" rel="noopener noreferrer" @endif
                    class="group rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6 transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm flex flex-col">
                     <div class="flex items-center justify-between mb-3">

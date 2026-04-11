@@ -9,6 +9,7 @@ use App\Enums\CustomFields\NoteField as NoteCustomField;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\PeopleField as PeopleCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -17,6 +18,7 @@ use App\Models\Task;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
+use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
 use Relaticle\CustomFields\Data\CustomFieldData;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
@@ -57,7 +59,7 @@ final readonly class CreateTeamCustomFields
             }
         });
 
-        if ($team->isPersonalTeam()) {
+        if ($team->isPersonalTeam() && Feature::active(OnboardSeed::class)) {
             $team->loadMissing('owner');
 
             /** @var Authenticatable $owner */
