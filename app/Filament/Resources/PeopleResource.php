@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Filament\Actions\MassSendBulkAction;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\ActivityTimelineRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
@@ -151,6 +154,7 @@ final class PeopleResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    MassSendBulkAction::make(),
                     ExportBulkAction::make()
                         ->exporter(PeopleExporter::class),
                     DeleteBulkAction::make(),
@@ -163,6 +167,7 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityTimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             EmailsRelationManager::class,
@@ -174,6 +179,7 @@ final class PeopleResource extends Resource
         return [
             'index' => ListPeople::route('/'),
             'view' => ViewPeople::route('/{record}'),
+            'emails' => PeopleEmailsPage::route('/{record}/emails'),
         ];
     }
 

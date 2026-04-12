@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
@@ -39,13 +40,14 @@ use Relaticle\EmailIntegration\Observers\EmailObserver;
  * @property string|null $snippet
  * @property Carbon|null $sent_at
  * @property EmailDirection $direction
- * @property string|null $folder
+ * @property EmailFolder|null $folder
  * @property EmailStatus $status
  * @property EmailPrivacyTier $privacy_tier
  * @property bool $has_attachments
  * @property bool $is_internal
  * @property Carbon|null $read_at
  * @property EmailCreationSource $creation_source
+ * @property string|null $batch_id
  */
 #[ObservedBy(EmailObserver::class)]
 final class Email extends Model
@@ -74,6 +76,7 @@ final class Email extends Model
         'is_internal',
         'read_at',
         'creation_source',
+        'batch_id',
     ];
 
     protected $attributes = [
@@ -88,6 +91,7 @@ final class Email extends Model
         'sent_at' => 'datetime',
         'read_at' => 'datetime',
         'direction' => EmailDirection::class,
+        'folder' => EmailFolder::class,
         'status' => EmailStatus::class,
         'privacy_tier' => EmailPrivacyTier::class,
         'creation_source' => EmailCreationSource::class,
@@ -183,5 +187,13 @@ final class Email extends Model
     public function opportunities(): MorphToMany
     {
         return $this->morphedByMany(Opportunity::class, 'emailable');
+    }
+
+    /**
+     * @return BelongsTo<EmailBatch, $this>
+     */
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(EmailBatch::class, 'batch_id');
     }
 }

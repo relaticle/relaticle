@@ -19,6 +19,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Policies\EmailPolicy;
+use App\Policies\EmailTemplatePolicy;
 use App\Services\GitHubService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -39,6 +40,7 @@ use Relaticle\CustomFields\CustomFields;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -73,6 +75,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configurePolicies(): void
     {
         Gate::policy(Email::class, EmailPolicy::class);
+        Gate::policy(EmailTemplate::class, EmailTemplatePolicy::class);
 
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {

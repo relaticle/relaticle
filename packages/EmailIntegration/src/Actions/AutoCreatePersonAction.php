@@ -25,7 +25,7 @@ final readonly class AutoCreatePersonAction
         ?string $companyId = null,
     ): People {
         $person = People::query()
-            ->create([
+            ->updateOrCreate([
                 'name' => $name ?: $emailAddress,
                 'team_id' => $teamId,
                 'company_id' => $companyId,

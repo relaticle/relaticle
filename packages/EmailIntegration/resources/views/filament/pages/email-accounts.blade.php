@@ -2,7 +2,7 @@
     <div class="space-y-6">
         <x-filament::section heading="Connected Email Accounts">
             @forelse($this->connectedAccounts as $account)
-                <div class="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg dark:border-gray-700">
                     <div class="flex items-center gap-3">
                         <x-filament::icon icon="heroicon-o-envelope" class="w-5 h-5 text-gray-400" />
                         <div>
@@ -34,6 +34,7 @@
         <x-filament::section heading="Connect an Account">
             <div class="flex gap-3">
                 {{ $this->connectGmailAction }}
+                {{ $this->checkAttachmentAction }}
 {{--                {{ $this->connectAzureAction }}--}}
             </div>
         </x-filament::section>

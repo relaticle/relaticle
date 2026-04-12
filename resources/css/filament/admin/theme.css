@@ -2,6 +2,8 @@
 @import '../../fonts.css';
 @import '../../theme.css';
 
+@source not '../../../../vendor/laravel/horizon';
+
 @source '../../../../app/Filament';
 @source '../../../../resources/views/filament';
 @source '../../../../vendor/relaticle/custom-fields';

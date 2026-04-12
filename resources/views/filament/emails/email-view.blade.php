@@ -148,30 +148,33 @@
 
             {{-- Icon-only action group --}}
             @if ($canViewBody)
-                <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-gray-700">
+                <div
+                    x-data
+                    class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-gray-700"
+                >
                     <button
                         type="button"
-                        disabled
-                        title="Reply (coming soon)"
-                        class="flex cursor-not-allowed items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
+                        title="Reply"
+                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'reply' })"
+                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                     >
                         <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                     </button>
                     <button
                         type="button"
-                        disabled
-                        title="Forward (coming soon)"
-                        class="flex cursor-not-allowed items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
+                        title="Reply All"
+                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'reply_all' })"
+                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                     >
-                        <x-heroicon-o-arrow-right class="h-4 w-4" />
+                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4 scale-x-[-1]" />
                     </button>
                     <button
                         type="button"
-                        disabled
-                        title="Assign (coming soon)"
-                        class="flex cursor-not-allowed items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
+                        title="Forward"
+                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'forward' })"
+                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                     >
-                        <x-heroicon-o-user-plus class="h-4 w-4" />
+                        <x-heroicon-o-arrow-right class="h-4 w-4" />
                     </button>
                 </div>
             @endif
@@ -184,9 +187,15 @@
         <div class="flex flex-col items-center bg-gray-50 dark:bg-gray-900/30 px-6 py-6">
             <div class="w-full max-w-3xl rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-8 py-6 shadow-xs">
                 @if ($record->body?->body_html)
-                    <div class="prose prose-sm dark:prose-invert max-w-none prose-a:text-primary-600 dark:prose-a:text-primary-400 prose-img:rounded-lg">
-                        {!! $record->body->body_html !!}
-                    </div>
+                    @php
+                        $safeHtml = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $record->body->body_html);
+                    @endphp
+                    <iframe
+                        srcdoc="{{ $safeHtml }}"
+                        sandbox="allow-same-origin allow-popups"
+                        class="w-full rounded-lg border-0"
+                        style="min-height: 100vh"
+                    ></iframe>
                 @elseif ($record->body?->body_text)
                     <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
                 @else
@@ -248,19 +257,46 @@
 
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($record->attachments as $attachment)
-                    <div class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800">
+                    @php
+                        $downloadUrl = filled($attachment->provider_attachment_id)
+                            ? route('email-attachments.download', $attachment->getKey())
+                            : null;
+                    @endphp
+
+                    @if ($downloadUrl)
+                        <a
+                            href="{{ $downloadUrl }}"
+                            download
+                            class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 group"
+                        >
+                    @else
+                        <div class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3">
+                    @endif
+
                         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-gray-900 shadow-xs ring-1 ring-gray-200 dark:ring-gray-700">
-                            <x-heroicon-o-paper-clip class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            @if ($downloadUrl)
+                                <x-heroicon-o-arrow-down-tray class="h-4 w-4 text-primary-500 dark:text-primary-400 group-hover:text-primary-600 dark:group-hover:text-primary-300" />
+                            @else
+                                <x-heroicon-o-paper-clip class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            @endif
                         </div>
                         <div class="min-w-0">
-                            <p class="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
+                            <p class="truncate text-xs font-medium {{ $downloadUrl ? 'text-primary-700 dark:text-primary-300' : 'text-gray-800 dark:text-gray-200' }}">
                                 {{ $attachment->filename ?? 'Unnamed file' }}
                             </p>
                             <p class="text-xs text-gray-400 dark:text-gray-500">
                                 {{ $formatBytes($attachment->size ?? 0) }}
+                                @if (! $downloadUrl)
+                                    · <span class="italic">processing…</span>
+                                @endif
                             </p>
                         </div>
-                    </div>
+
+                    @if ($downloadUrl)
+                        </a>
+                    @else
+                        </div>
+                    @endif
                 @endforeach
             </div>
 

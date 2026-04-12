@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\RelationManagers;
 
+use App\Filament\Concerns\HasEmailComposeActions;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -19,6 +20,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -31,9 +33,16 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 abstract class BaseEmailsRelationManager extends RelationManager
 {
+    use HasEmailComposeActions;
+
     protected static string $relationship = 'emails';
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+
+    protected function getCrmRecord(): Model
+    {
+        return $this->getOwnerRecord();
+    }
 
     public function table(Table $table): Table
     {
@@ -44,6 +53,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->recordTitleAttribute('subject')
             ->defaultSort('sent_at', 'desc')
             ->headerActions([
+                $this->composeEmailAction(),
+
                 Action::make('shareAllOnRecord')
                     ->label('Share my emails')
                     ->icon('heroicon-o-share')
@@ -74,7 +85,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                     ->options(function (): array {
                                         $user = $this->authUser();
 
-                                        return User::query()->where('current_team_id', $user->current_team_id)
+                                        return User::query()
+                                            ->where('current_team_id', $user->current_team_id)
                                             ->where('id', '!=', $user->getKey())
                                             ->pluck('name', 'id')
                                             ->all();
@@ -209,11 +221,13 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                         ->options(function (): array {
                                             $user = $this->authUser();
 
-                                            return User::query()->where('current_team_id', $user->current_team_id)
+                                            return User::query()
+                                                ->where('current_team_id', $user->current_team_id)
                                                 ->where('id', '!=', $user->getKey())
                                                 ->pluck('name', 'id')
                                                 ->all();
                                         })
+                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                         ->required()
                                         ->distinct(),
 
@@ -236,7 +250,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ->action(function (Email $record, array $data, EmailSharingService $sharingService): void {
                             $sharer = $this->authUser();
 
-                            $sharingService->setEmailTier($record, EmailPrivacyTier::from($data['privacy_tier']));
+                            $sharingService->setEmailTier($record, $data['privacy_tier']);
 
                             $record->shares()->where('shared_by', $sharer->getKey())->delete();
 
@@ -248,7 +262,6 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                     EmailPrivacyTier::from($share['tier']),
                                 );
                             }
-
                             Notification::make()
                                 ->success()
                                 ->title('Sharing settings saved.')

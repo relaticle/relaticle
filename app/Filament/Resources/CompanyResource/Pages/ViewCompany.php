@@ -7,7 +7,6 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 use App\Filament\Actions\GenerateRecordSummaryAction;
 use App\Filament\Components\Infolists\AvatarName;
 use App\Filament\Resources\CompanyResource;
-use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
@@ -33,6 +32,11 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            Action::make('viewEmails')
+                ->label('Emails')
+                ->icon('heroicon-o-envelope')
+                ->color('gray')
+                ->url(fn (): string => CompanyResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
             ActionGroup::make([
                 ActionGroup::make([
@@ -156,7 +160,6 @@ final class ViewCompany extends ViewRecord
             PeopleRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
-            EmailsRelationManager::class,
         ];
     }
 }

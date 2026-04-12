@@ -6,6 +6,8 @@
 
 @import "./fonts.css";
 @import "./theme.css";
+/** add packages views **/
+@source '../../packages/EmailIntegration/resources/views/*.blade.php';
 
 [x-cloak] {
     display: none !important;

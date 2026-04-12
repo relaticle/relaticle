@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Filament\Exports\CompanyExporter;
+use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
@@ -131,7 +132,7 @@ final class CompanyResource extends Resource
     public static function getRelations(): array
     {
         return [
-            EmailsRelationManager::class,
+            // EmailsRelationManager::class,
         ];
     }
 
@@ -140,6 +141,7 @@ final class CompanyResource extends Resource
         return [
             'index' => ListCompanies::route('/'),
             'view' => ViewCompany::route('/{record}'),
+            'emails' => CompanyEmailsPage::route('/{record}/emails'),
         ];
     }
 

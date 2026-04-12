@@ -28,7 +28,7 @@ final readonly class VisibleEmailScope implements Scope
                 ->orWhere(function (Builder $q) use ($viewerId): void {
                     $q->where('is_internal', false)
                         ->where('privacy_tier', '!=', EmailPrivacyTier::PRIVATE->value)
-                        ->orWhereHas('shares', fn (\Illuminate\Contracts\Database\Query\Builder $s) => $s->where('shared_with', $viewerId));
+                        ->orWhereHas('shares', fn (Builder $shareQuery) => $shareQuery->where('shared_with', $viewerId));
                 });
         });
     }

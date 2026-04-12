@@ -12,6 +12,7 @@ final readonly class ConnectedAccountObserver
 {
     public function creating(ConnectedAccount $connectedAccount): void
     {
+        // TODO::remove this logic from observer
         if (auth()->check()) {
             /** @var User $user */
             $user = auth()->user();

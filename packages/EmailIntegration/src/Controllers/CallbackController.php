@@ -45,6 +45,7 @@ final readonly class CallbackController
                     'token_expires_at' => now()->addSeconds($socialUser->expiresIn ?? 3600),
                     'status' => 'active',
                     'last_error' => null,
+                    'auto_create_companies' => true,
                     'contact_creation_mode' => ContactCreationMode::All,
                 ]
             );

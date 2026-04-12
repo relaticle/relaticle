@@ -10,12 +10,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string|null $storage_path
+ * @property string|null $provider_attachment_id Gmail attachment ID (can exceed 255 chars, stored as text)
+ */
 final class EmailAttachment extends Model
 {
     /**
      * @use HasFactory<EmailAttachmentFactory>
      */
     use HasFactory, HasUlids;
+
+    public $timestamps = false;
 
     protected $fillable = [
         'email_id',
@@ -24,6 +30,7 @@ final class EmailAttachment extends Model
         'size',
         'storage_path',
         'content_id',
+        'provider_attachment_id',
     ];
 
     protected $casts = [

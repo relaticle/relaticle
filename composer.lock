@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9ece3a38bd9845632b8c5d46cca08a0c",
+    "content-hash": "35413da3d945ba537d78ab5f891d671c",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -16188,6 +16188,32 @@
             "time": "2025-08-14T07:29:31+00:00"
         },
         {
+            "name": "filament/blueprint",
+            "version": "dev-feat/email-calendar-integration",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament/blueprint",
+                "reference": "83d1fa975d38c33c2146afc006b7fe6c192281c6"
+            },
+            "require": {
+                "filament/support": "^4.0|^5.0",
+                "laravel/boost": "^1.8|^2.0"
+            },
+            "type": "library",
+            "license": [
+                "proprietary"
+            ],
+            "description": "Guidelines for AI agents to produce detailed Filament implementation plans.",
+            "homepage": "https://github.com/filamentphp/filament",
+            "support": {
+                "issues": "https://github.com/filamentphp/filament/issues",
+                "source": "https://github.com/filamentphp/filament"
+            },
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "hamcrest/hamcrest-php",
             "version": "v2.1.1",
             "source": {
@@ -19687,8 +19713,10 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "beta",
-    "stability-flags": {},
+    "minimum-stability": "dev",
+    "stability-flags": {
+        "filament/blueprint": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

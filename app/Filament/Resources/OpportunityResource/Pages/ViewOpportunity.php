@@ -30,6 +30,11 @@ final class ViewOpportunity extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            Action::make('viewEmails')
+                ->label('Emails')
+                ->icon('heroicon-o-envelope')
+                ->color('gray')
+                ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
             ActionGroup::make([
                 ActionGroup::make([

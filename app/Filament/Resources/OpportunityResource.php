@@ -8,7 +8,9 @@ use App\Enums\CreationSource;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\ActivityTimelineRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
@@ -107,9 +109,10 @@ final class OpportunityResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityTimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
-            EmailsRelationManager::class,
+            // EmailsRelationManager::class,
         ];
     }
 
@@ -119,6 +122,7 @@ final class OpportunityResource extends Resource
         return [
             'index' => ListOpportunities::route('/'),
             'view' => ViewOpportunity::route('/{record}'),
+            'emails' => OpportunityEmailsPage::route('/{record}/emails'),
         ];
     }
 
