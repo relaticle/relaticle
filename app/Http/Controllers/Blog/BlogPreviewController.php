@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Blog;
 
+use App\Models\User;
 use Illuminate\View\View;
 use ManukMinasyan\FilamentBlog\Filament\Resources\PostResource;
 use ManukMinasyan\FilamentBlog\Models\Post;
@@ -25,7 +26,7 @@ final readonly class BlogPreviewController
 
         $user = auth()->user();
 
-        $editUrl = $user?->currentTeam
+        $editUrl = $user instanceof User && $user->currentTeam
             ? PostResource::getUrl('edit', ['record' => $post, 'tenant' => $user->currentTeam])
             : null;
 
