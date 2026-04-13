@@ -14,14 +14,14 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Playwright\Playwright;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
-    ->use(RefreshDatabase::class)
+    ->use(LazilyRefreshDatabase::class)
     ->in('Feature', 'Smoke', 'Browser');
 
 if (class_exists(Playwright::class)) {

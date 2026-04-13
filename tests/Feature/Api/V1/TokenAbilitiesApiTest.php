@@ -25,7 +25,7 @@ describe('read-only token', function (): void {
     });
 
     it('can show a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->getJson("/api/v1/companies/{$company->id}")
@@ -39,7 +39,7 @@ describe('read-only token', function (): void {
     });
 
     it('cannot update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->putJson("/api/v1/companies/{$company->id}", ['name' => 'Blocked'])
@@ -47,7 +47,7 @@ describe('read-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->deleteJson("/api/v1/companies/{$company->id}")
@@ -73,7 +73,7 @@ describe('create-only token', function (): void {
     });
 
     it('cannot update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->putJson("/api/v1/companies/{$company->id}", ['name' => 'Blocked'])
@@ -81,7 +81,7 @@ describe('create-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->deleteJson("/api/v1/companies/{$company->id}")
@@ -107,7 +107,7 @@ describe('update-only token', function (): void {
     });
 
     it('can update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->putJson("/api/v1/companies/{$company->id}", ['name' => 'Updated'])
@@ -115,7 +115,7 @@ describe('update-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->deleteJson("/api/v1/companies/{$company->id}")
@@ -141,7 +141,7 @@ describe('delete-only token', function (): void {
     });
 
     it('can delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->deleteJson("/api/v1/companies/{$company->id}")
@@ -167,7 +167,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->putJson("/api/v1/companies/{$company->id}", ['name' => 'Updated'])
@@ -175,7 +175,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($this->token)
             ->deleteJson("/api/v1/companies/{$company->id}")
@@ -195,7 +195,7 @@ describe('multi-ability token', function (): void {
             ->postJson('/api/v1/companies', ['name' => 'Multi Corp'])
             ->assertCreated();
 
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         $this->withToken($token)
             ->putJson("/api/v1/companies/{$company->id}", ['name' => 'Blocked'])

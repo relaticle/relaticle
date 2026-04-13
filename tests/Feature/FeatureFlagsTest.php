@@ -8,6 +8,10 @@ use App\Features\SocialAuth;
 use App\Filament\Pages\CreateTeam;
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Foundation\Bootstrap\LoadConfiguration;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\CachedState;
+use Illuminate\Support\Facades\Http;
 use Laravel\Pennant\Feature;
 
 mutates(OnboardSeed::class, SocialAuth::class, Documentation::class);
@@ -60,16 +64,28 @@ describe('SocialAuth', function (): void {
 
     it('does not register social auth routes when feature is inactive', function (): void {
         putenv('RELATICLE_FEATURE_SOCIAL_AUTH=false');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
         $this->get('/auth/redirect/google')
             ->assertNotFound();
 
         putenv('RELATICLE_FEATURE_SOCIAL_AUTH');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
     });
 });
 
 describe('Documentation', function (): void {
+    beforeEach(function () {
+        Http::fake([
+            'api.github.com/*' => Http::response(['stargazers_count' => 0], 200),
+        ]);
+    });
+
     it('serves documentation pages when feature is active', function (): void {
         $this->get('/docs')
             ->assertOk();
@@ -77,11 +93,17 @@ describe('Documentation', function (): void {
 
     it('does not register documentation routes when feature is inactive', function (): void {
         putenv('RELATICLE_FEATURE_DOCUMENTATION=false');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
         $this->get('/docs')
             ->assertNotFound();
 
         putenv('RELATICLE_FEATURE_DOCUMENTATION');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
     });
 });

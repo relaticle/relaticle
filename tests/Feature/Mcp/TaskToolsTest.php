@@ -25,7 +25,7 @@ afterEach(function () {
 });
 
 it('can create a task with assignees and company', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, [
@@ -43,7 +43,7 @@ it('can create a task with assignees and company', function (): void {
 });
 
 it('can update task assignees', function (): void {
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
     $member = User::factory()->create();
     $this->team->users()->attach($member);
 
@@ -59,7 +59,7 @@ it('can update task assignees', function (): void {
 });
 
 it('can get a task by ID', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Follow Up Call']);
+    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Follow Up Call']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetTaskTool::class, ['id' => $task->id])
@@ -68,7 +68,7 @@ it('can get a task by ID', function (): void {
 });
 
 it('can update a task via MCP tool', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Old Task']);
+    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Old Task']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateTaskTool::class, [
@@ -82,7 +82,7 @@ it('can update a task via MCP tool', function (): void {
 });
 
 it('can delete a task via MCP tool', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Delete Me']);
+    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Delete Me']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteTaskTool::class, [
@@ -95,7 +95,7 @@ it('can delete a task via MCP tool', function (): void {
 });
 
 it('can attach assignees to a task', function (): void {
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachTaskToEntitiesTool::class, [
@@ -108,10 +108,10 @@ it('can attach assignees to a task', function (): void {
 });
 
 it('can filter tasks by company_id', function (): void {
-    $company = Company::factory()->for($this->team)->create();
-    $linkedTask = Task::factory()->for($this->team)->create(['title' => 'Linked Task']);
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $linkedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Linked Task']);
     $linkedTask->companies()->attach($company);
-    $unlinkedTask = Task::factory()->for($this->team)->create(['title' => 'Unlinked Task']);
+    $unlinkedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unlinked Task']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListTasksTool::class, [
@@ -132,7 +132,7 @@ describe('team scoping', function () {
             'team_id' => Team::factory()->create()->id,
             'title' => 'Other Team Task',
         ]));
-        $ownTask = Task::factory()->for($this->team)->create(['title' => 'Own Team Task']);
+        $ownTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Own Team Task']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListTasksTool::class)

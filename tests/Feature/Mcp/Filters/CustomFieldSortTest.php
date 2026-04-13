@@ -23,8 +23,8 @@ afterEach(function (): void {
 });
 
 it('sorts opportunities by custom field value ascending', function (): void {
-    $opp1 = Opportunity::factory()->for($this->team)->create(['name' => 'A']);
-    $opp2 = Opportunity::factory()->for($this->team)->create(['name' => 'B']);
+    $opp1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'A']);
+    $opp2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'B']);
 
     $amountField = CustomField::query()
         ->withoutGlobalScopes()
@@ -57,8 +57,8 @@ it('sorts opportunities by custom field value ascending', function (): void {
 });
 
 it('sorts opportunities by custom field value descending', function (): void {
-    $opp1 = Opportunity::factory()->for($this->team)->create(['name' => 'A']);
-    $opp2 = Opportunity::factory()->for($this->team)->create(['name' => 'B']);
+    $opp1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'A']);
+    $opp2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'B']);
 
     $amountField = CustomField::query()
         ->withoutGlobalScopes()

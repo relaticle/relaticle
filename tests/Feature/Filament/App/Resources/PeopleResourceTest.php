@@ -26,7 +26,7 @@ it('can render the index page', function (): void {
 });
 
 it('can render the view page', function (): void {
-    $record = People::factory()->for($this->team)->create();
+    $record = People::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ViewPeople::class, ['record' => $record->getKey()])
         ->assertOk();
@@ -53,7 +53,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['name', 'company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = People::factory(3)->for($this->team)->create();
+    $records = People::factory(3)->recycle([$this->user, $this->team])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -67,7 +67,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = People::factory(3)->for($this->team)->create();
+    $records = People::factory(3)->recycle([$this->user, $this->team])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ListPeople::class)
@@ -77,8 +77,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['name', 'company.name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = People::factory()->count(4)->for($this->team)->create();
-    $trashedRecords = People::factory()->trashed()->count(6)->for($this->team)->create();
+    $records = People::factory()->count(4)->recycle([$this->user, $this->team])->create();
+    $trashedRecords = People::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
 
     livewire(ListPeople::class)
         ->assertCanSeeTableRecords($records)
@@ -87,7 +87,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = People::factory(20)->for($this->team)->create();
+    $records = People::factory(20)->recycle([$this->user, $this->team])->create();
 
     livewire(ListPeople::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -96,7 +96,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = People::factory(5)->for($this->team)->create();
+    $records = People::factory(5)->recycle([$this->user, $this->team])->create();
 
     livewire(ListPeople::class)
         ->assertCanSeeTableRecords($records)
@@ -124,7 +124,7 @@ it('can create a person', function (): void {
 });
 
 it('can edit a person', function (): void {
-    $record = People::factory()->for($this->team)->create();
+    $record = People::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ListPeople::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -136,7 +136,7 @@ it('can edit a person', function (): void {
 });
 
 it('can delete a person', function (): void {
-    $record = People::factory()->for($this->team)->create();
+    $record = People::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ListPeople::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -171,7 +171,7 @@ it('sets creator_id and team_id via observer when creating a person', function (
 });
 
 it('authorizes team member to view and update own team person', function (): void {
-    $record = People::factory()->for($this->team)->create();
+    $record = People::factory()->recycle([$this->user, $this->team])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()

@@ -85,7 +85,7 @@ describe('rate limiting', function (): void {
 
 describe('real-token middleware chain', function (): void {
     it('authenticates and scopes via real bearer token through full middleware stack', function (): void {
-        $companies = Company::factory()->for($this->team)->count(2)->create();
+        $companies = Company::factory()->recycle([$this->user, $this->team])->count(2)->create();
 
         $raw = Str::random(40);
         $token = $this->user->tokens()->create([

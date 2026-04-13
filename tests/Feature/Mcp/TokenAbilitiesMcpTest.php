@@ -34,7 +34,7 @@ describe('read-only token', function (): void {
     })->throws(MissingAbilityException::class);
 
     it('cannot update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -44,7 +44,7 @@ describe('read-only token', function (): void {
     })->throws(MissingAbilityException::class);
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
@@ -71,7 +71,7 @@ describe('create-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
@@ -99,7 +99,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can update a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -110,7 +110,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can delete a company', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [

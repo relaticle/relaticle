@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Assert;
 
@@ -21,6 +22,10 @@ TestResponse::macro('assertNotServerError', function (): TestResponse {
 
 routeTesting('smoke: all GET routes return non-500 response')
     ->setUp(function (): void {
+        Http::fake([
+            'api.github.com/*' => Http::response(['stargazers_count' => 0], 200),
+        ]);
+
         $user = User::factory()->withTeam()->create();
 
         $this->actingAs($user);
