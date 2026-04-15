@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
+use App\Filament\Pages\EmailAccessRequestsPage;
 use App\Filament\Pages\EmailInboxPage;
 use App\Models\Team;
 use App\Models\User;
@@ -34,9 +35,6 @@ final class EmailAccessRequestedNotification extends Notification
     {
         $email = $this->request->email;
         $team = $email !== null ? Team::find($email->team_id) : null;
-        $inboxUrl = $team !== null
-            ? EmailInboxPage::getUrl(parameters: ['email' => $email->getKey()], tenant: $team)
-            : null;
 
         $subject = $email !== null ? ($email->subject ?? '(subject hidden)') : '(subject hidden)';
         $requesterName = $this->request->requester->name;
@@ -47,12 +45,28 @@ final class EmailAccessRequestedNotification extends Notification
             ->warning()
             ->icon('heroicon-o-key');
 
-        if ($inboxUrl !== null) {
-            $notification->actions([
-                Action::make('view')
-                    ->label('View in inbox')
-                    ->url($inboxUrl),
-            ]);
+        if ($team !== null) {
+            $actions = [
+                Action::make('review')
+                    ->label('Review request')
+                    ->url(EmailAccessRequestsPage::getUrl(
+                        parameters: ['request' => $this->request->getKey()],
+                        tenant: $team,
+                    ))
+                    ->button(),
+            ];
+
+            if ($email !== null) {
+                $actions[] = Action::make('view')
+                    ->label('View email')
+                    ->url(EmailInboxPage::getUrl(
+                        parameters: ['email' => $email->getKey()],
+                        tenant: $team,
+                    ))
+                    ->color('gray');
+            }
+
+            $notification->actions($actions);
         }
 
         return $notification->getDatabaseMessage();

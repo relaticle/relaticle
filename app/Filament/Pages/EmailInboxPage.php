@@ -26,6 +26,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
@@ -68,13 +69,14 @@ final class EmailInboxPage extends Page
 
     public EmailFolder $folder = EmailFolder::Inbox;
 
+    #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
     public string $search = '';
 
-    public function mount(?string $email = null): void
+    public function mount(): void
     {
-        $this->selectedEmailId = $email;
+        // selectedEmailId is initialised from the ?email= query param via #[Url]
     }
 
     /**
