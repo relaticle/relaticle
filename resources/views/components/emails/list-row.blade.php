@@ -4,6 +4,7 @@
     use Relaticle\EmailIntegration\Enums\EmailDirection;
 
     $isSelected  = $selectedEmailId === $email->id;
+    $isUnread    = $email->read_at === null && $email->direction === EmailDirection::INBOUND;
     $from        = $email->from->first();
     $senderName  = $from?->name ?: $from?->email_address ?: '?';
     $authUser    = auth()->user();
@@ -24,14 +25,19 @@
     ])>
 
         {{-- Sender + meta row --}}
-        <div class="flex items-baseline justify-between gap-2 mb-0.5">
-            <span @class([
-                'truncate text-sm',
-                'font-semibold text-gray-900 dark:text-white' => $isSelected,
-                'font-normal text-gray-700 dark:text-gray-300' => ! $isSelected,
-            ])>
-                {{ $senderName }}
-            </span>
+        <div class="flex items-center justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+                @if ($isUnread && ! $isSelected)
+                    <span class="shrink-0 h-1.5 w-1.5 rounded-full bg-primary-500"></span>
+                @endif
+                <span @class([
+                    'truncate text-sm',
+                    'font-semibold text-gray-900 dark:text-white' => $isSelected || $isUnread,
+                    'font-normal text-gray-700 dark:text-gray-300' => ! $isSelected && ! $isUnread,
+                ])>
+                    {{ $senderName }}
+                </span>
+            </div>
             <div class="flex shrink-0 items-center gap-1.5">
                 @if ($folder->value === 'all')
                     @if ($email->direction === EmailDirection::OUTBOUND)
@@ -54,7 +60,8 @@
         <p @class([
             'truncate text-xs',
             'font-medium text-gray-800 dark:text-gray-100' => $isSelected,
-            'font-normal text-gray-600 dark:text-gray-400' => ! $isSelected,
+            'font-medium text-gray-800 dark:text-gray-200' => $isUnread && ! $isSelected,
+            'font-normal text-gray-600 dark:text-gray-400' => ! $isSelected && ! $isUnread,
         ])>
             {{ $canViewSubject ? ($email->subject ?: '(no subject)') : '(subject hidden)' }}
         </p>
