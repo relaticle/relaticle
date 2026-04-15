@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -332,6 +334,72 @@ abstract class BaseRecordEmailsPage extends Page
                 Notification::make()
                     ->success()
                     ->title('Access request sent.')
+                    ->send();
+            });
+    }
+
+    protected function approveAccessRequestAction(): Action
+    {
+        return Action::make('approveAccessRequest')
+            ->requiresConfirmation()
+            ->modalHeading('Approve access request')
+            ->modalDescription(fn (array $arguments): string => sprintf(
+                'Grant %s access to this email?',
+                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+            ))
+            ->modalSubmitActionLabel('Approve')
+            ->color('success')
+            ->action(function (array $arguments): void {
+                $accessRequest = EmailAccessRequest::query()
+                    ->with(['email', 'owner', 'requester'])
+                    ->whereKey($arguments['requestId'] ?? null)
+                    ->where('owner_id', $this->authUser()->getKey())
+                    ->first();
+
+                if ($accessRequest === null) {
+                    return;
+                }
+
+                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest);
+
+                unset($this->selectedEmail);
+
+                Notification::make()
+                    ->success()
+                    ->title('Access request approved.')
+                    ->send();
+            });
+    }
+
+    protected function denyAccessRequestAction(): Action
+    {
+        return Action::make('denyAccessRequest')
+            ->requiresConfirmation()
+            ->modalHeading('Deny access request')
+            ->modalDescription(fn (array $arguments): string => sprintf(
+                'Deny %s\'s request for access to this email?',
+                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+            ))
+            ->modalSubmitActionLabel('Deny')
+            ->color('danger')
+            ->action(function (array $arguments): void {
+                $accessRequest = EmailAccessRequest::query()
+                    ->with(['requester'])
+                    ->whereKey($arguments['requestId'] ?? null)
+                    ->where('owner_id', $this->authUser()->getKey())
+                    ->first();
+
+                if ($accessRequest === null) {
+                    return;
+                }
+
+                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest);
+
+                unset($this->selectedEmail);
+
+                Notification::make()
+                    ->success()
+                    ->title('Access request denied.')
                     ->send();
             });
     }

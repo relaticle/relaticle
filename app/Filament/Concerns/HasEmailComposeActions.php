@@ -382,7 +382,7 @@ trait HasEmailComposeActions
                         .'</span>'
                         .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
                         .'</div>'
-                        .'<div x-show="open" x-collapse class="mt-2 overflow-y-auto max-h-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
+                        .'<div x-show="open" x-collapse class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
                         .($get('quoted_body_html') ?? '')
                         .'</div>'
                         .'</div>'

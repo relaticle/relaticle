@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 
+/**
+ * @property EmailAccessRequestStatus $status
+ */
 final class EmailAccessRequest extends Model
 {
     /**

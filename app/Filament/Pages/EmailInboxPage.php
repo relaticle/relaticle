@@ -27,6 +27,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
+use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -70,9 +72,9 @@ final class EmailInboxPage extends Page
 
     public string $search = '';
 
-    public function mount(): void
+    public function mount(?string $email = null): void
     {
-        $this->selectedEmailId = null;
+        $this->selectedEmailId = $email;
     }
 
     /**
@@ -478,6 +480,72 @@ final class EmailInboxPage extends Page
             });
     }
 
+    protected function approveAccessRequestAction(): Action
+    {
+        return Action::make('approveAccessRequest')
+            ->requiresConfirmation()
+            ->modalHeading('Approve access request')
+            ->modalDescription(fn (array $arguments): string => sprintf(
+                'Grant %s access to this email?',
+                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+            ))
+            ->modalSubmitActionLabel('Approve')
+            ->color('success')
+            ->action(function (array $arguments): void {
+                $accessRequest = EmailAccessRequest::query()
+                    ->with(['email', 'owner', 'requester'])
+                    ->whereKey($arguments['requestId'] ?? null)
+                    ->where('owner_id', $this->authUser()->getKey())
+                    ->first();
+
+                if ($accessRequest === null) {
+                    return;
+                }
+
+                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest);
+
+                unset($this->selectedEmail);
+
+                Notification::make()
+                    ->success()
+                    ->title('Access request approved.')
+                    ->send();
+            });
+    }
+
+    protected function denyAccessRequestAction(): Action
+    {
+        return Action::make('denyAccessRequest')
+            ->requiresConfirmation()
+            ->modalHeading('Deny access request')
+            ->modalDescription(fn (array $arguments): string => sprintf(
+                'Deny %s\'s request for access to this email?',
+                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+            ))
+            ->modalSubmitActionLabel('Deny')
+            ->color('danger')
+            ->action(function (array $arguments): void {
+                $accessRequest = EmailAccessRequest::query()
+                    ->with(['requester'])
+                    ->whereKey($arguments['requestId'] ?? null)
+                    ->where('owner_id', $this->authUser()->getKey())
+                    ->first();
+
+                if ($accessRequest === null) {
+                    return;
+                }
+
+                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest);
+
+                unset($this->selectedEmail);
+
+                Notification::make()
+                    ->success()
+                    ->title('Access request denied.')
+                    ->send();
+            });
+    }
+
     /**
      * @return array<int, mixed>
      */
@@ -526,7 +594,7 @@ final class EmailInboxPage extends Page
                             }
 
                             $rendered = resolve(EmailTemplateRenderService::class)
-                                ->render($template, null);
+                                ->render($template);
 
                             $set('subject', $rendered['subject']);
                             $set('body_html', $rendered['body_html']);
@@ -678,7 +746,7 @@ final class EmailInboxPage extends Page
                         .'</span>'
                         .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
                         .'</div>'
-                        .'<div x-show="open" x-collapse class="mt-2 overflow-y-auto max-h-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
+                        .'<div x-show="open" x-collapse class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
                         .($get('quoted_body_html') ?? '')
                         .'</div>'
                         .'</div>'
