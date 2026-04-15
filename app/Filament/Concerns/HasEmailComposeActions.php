@@ -272,45 +272,46 @@ trait HasEmailComposeActions
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
-            Section::make('Signature & attachments')
+            Section::make('Signature')
                 ->collapsed()
                 ->schema([
-                    Grid::make(2)
-                        ->schema([
-                            Select::make('signature_id')
-                                ->label('Signature')
-                                ->placeholder('No signature')
-                                ->options(fn (Get $get): array => EmailSignature::query()
-                                    ->where('connected_account_id', $get('connected_account_id'))
-                                    ->pluck('name', 'id')
-                                    ->all()
-                                )
-                                ->live()
-                                ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                                    if ($state === null) {
-                                        return;
-                                    }
+                    Select::make('signature_id')
+                        ->hiddenLabel()
+                        ->placeholder('No signature')
+                        ->options(fn (Get $get): array => EmailSignature::query()
+                            ->where('connected_account_id', $get('connected_account_id'))
+                            ->pluck('name', 'id')
+                            ->all()
+                        )
+                        ->live()
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
+                            if ($state === null) {
+                                return;
+                            }
 
-                                    /** @var EmailSignature|null $sig */
-                                    $sig = EmailSignature::query()->whereKey($state)->first();
+                            /** @var EmailSignature|null $sig */
+                            $sig = EmailSignature::query()->whereKey($state)->first();
 
-                                    if ($sig === null) {
-                                        return;
-                                    }
+                            if ($sig === null) {
+                                return;
+                            }
 
-                                    $body = $get('body_html') ?? '';
-                                    $set('body_html', $body.'<br><hr><br>'.$sig->content_html);
-                                }),
+                            $body = $get('body_html') ?? '';
+                            $set('body_html', $body.'<br><hr><br>'.$sig->content_html);
+                        }),
+                ]),
 
-                            FileUpload::make('attachments')
-                                ->label('Attachments')
-                                ->multiple()
-                                ->visibility('private')
-                                ->disk('local')
-                                ->directory('email-attachments')
-                                ->maxSize(10240)
-                                ->nullable(),
-                        ]),
+            Section::make('Attachments')
+                ->collapsed()
+                ->schema([
+                    FileUpload::make('attachments')
+                        ->hiddenLabel()
+                        ->multiple()
+                        ->visibility('private')
+                        ->disk('local')
+                        ->directory('email-attachments')
+                        ->maxSize(10240)
+                        ->nullable(),
                 ]),
         ];
     }
