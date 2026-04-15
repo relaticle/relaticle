@@ -7,6 +7,8 @@ namespace App\Filament\Concerns;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -19,6 +21,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -52,6 +55,7 @@ trait HasEmailComposeActions
             ->icon('heroicon-o-pencil-square')
             ->modalWidth(Width::SevenExtraLarge)
             ->keyBindings(['command+e', 'ctrl+e'])
+            ->tooltip('⌘ + e')
             ->visible(fn (): bool => $this->hasActiveConnectedAccount())
             ->fillForm(function (): array {
                 $account = ConnectedAccount::query()
@@ -102,6 +106,11 @@ trait HasEmailComposeActions
                 'forward' => 'Forward',
                 default => 'Reply',
             })
+            ->tooltip(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
+                'reply_all' => 'Reply All',
+                'forward' => 'Forward',
+                default => 'Reply',
+            })
             ->modalWidth(Width::SevenExtraLarge)
             ->fillForm(function (array $arguments): array {
                 /** @var Email|null $email */
@@ -132,21 +141,29 @@ trait HasEmailComposeActions
                 };
 
                 $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
-                $quotedBody = $mode === 'forward'
-                    ? '<br><p>---------- Forwarded message ----------</p>'.($email->body?->body_html ?? '')
-                    : '<br><blockquote>'.($email->body?->body_html ?? '').'</blockquote>';
 
                 return [
                     'connected_account_id' => $account?->getKey(),
                     'to' => $toParticipants,
                     'subject' => $subjectPrefix.($email->subject ?? ''),
-                    'body_html' => $quotedBody,
+                    'body_html' => '',
+                    'quoted_body_html' => $email->body?->body_html ?? '',
+                    'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
                 ];
             })
             ->schema($this->replyFormSchema())
             ->action(function (array $data, array $arguments): void {
                 $mode = $arguments['mode'] ?? 'reply';
+
+                if (filled($data['quoted_body_html'] ?? '')) {
+                    $quotedSection = $mode === 'forward'
+                        ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$data['quoted_body_html']
+                        : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$data['quoted_body_html'].'</blockquote>';
+
+                    $data['body_html'] = ($data['body_html'] ?? '').$quotedSection;
+                }
+
                 $source = match ($mode) {
                     'reply_all' => EmailCreationSource::REPLY_ALL,
                     'forward' => EmailCreationSource::FORWARD,
@@ -336,13 +353,41 @@ trait HasEmailComposeActions
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Body')
+                ->label('Message')
                 ->required()
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
+
+            Hidden::make('quoted_body_html'),
+            Hidden::make('mode'),
+            Hidden::make('in_reply_to_email_id'),
+
+            Placeholder::make('quoted_body_preview')
+                ->hiddenLabel()
+                ->content(function (Get $get): HtmlString {
+                    $isForward = $get('mode') === 'forward';
+                    $label = $isForward ? 'Forwarded message' : 'Original message';
+
+                    return new HtmlString(
+                        '<div x-data="{ open: false }" class="mt-1">'
+                        .'<div class="flex items-center gap-3 cursor-pointer select-none" @click="open = !open">'
+                        .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
+                        .'<span class="flex items-center gap-1 shrink-0 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">'
+                        .'<svg x-bind:class="open && \'rotate-90\'" class="h-3 w-3 transition-transform duration-150" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>'
+                        .$label
+                        .'</span>'
+                        .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
+                        .'</div>'
+                        .'<div x-show="open" x-collapse class="mt-2 overflow-y-auto max-h-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
+                        .($get('quoted_body_html') ?? '')
+                        .'</div>'
+                        .'</div>'
+                    );
+                })
+                ->visible(fn (Get $get): bool => filled($get('quoted_body_html'))),
         ];
     }
 
