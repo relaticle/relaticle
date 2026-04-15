@@ -1,6 +1,11 @@
-name: Tests
+name: Deploy
 
-on: [pull_request]
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
 
 jobs:
   lint-and-static-analysis:
@@ -221,3 +226,13 @@ jobs:
 
       - name: Browser Tests
         run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Forge
+    if: github.event.release.prerelease == false
+    needs: [lint-and-static-analysis, tests, browser-tests]
+
+    steps:
+      - name: Trigger Forge Deploy
+        run: curl --fail --silent --show-error --location "${{ secrets.FORGE_DEPLOY_WEBHOOK }}"

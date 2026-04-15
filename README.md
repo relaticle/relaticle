@@ -7,7 +7,7 @@
 <h1 align="center">The Open-Source CRM Built for AI Agents</h1>
 
 <p align="center">
-  <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
+  <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/deploy.yml?style=for-the-badge&label=tests" alt="Tests"></a>
   <a href="https://relaticle.com/docs/mcp"><img src="https://img.shields.io/badge/MCP_Tools-30-8A2BE2?style=for-the-badge" alt="30 MCP Tools"></a>
   <a href="https://laravel.com/docs/12.x"><img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel" alt="Laravel 12"></a>
   <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.4-777BB4?style=for-the-badge&logo=php" alt="PHP 8.4"></a>
