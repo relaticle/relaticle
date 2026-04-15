@@ -77,7 +77,7 @@
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
         "rector/rector": "^2.0",
-        "spatie/boost-spatie-guidelines": "^1.1",
+        "spatie/guidelines-skills": "dev-main",
         "spatie/pest-plugin-route-testing": "^1.1"
     },
     "autoload": {

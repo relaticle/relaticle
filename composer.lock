@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b242fceef183fbd3be4dbddec3d9ed25",
+    "content-hash": "1c86c5e64cb30e2d65114a04f883cac7",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -16278,16 +16278,16 @@
         },
         {
             "name": "laravel/boost",
-            "version": "v2.4.0",
+            "version": "v2.4.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/boost.git",
-                "reference": "a09bebcff238ed92fd123e460b27bd58bed22520"
+                "reference": "841d52905728cfac9f93c778a1758e740ce9a367"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/boost/zipball/a09bebcff238ed92fd123e460b27bd58bed22520",
-                "reference": "a09bebcff238ed92fd123e460b27bd58bed22520",
+                "url": "https://api.github.com/repos/laravel/boost/zipball/841d52905728cfac9f93c778a1758e740ce9a367",
+                "reference": "841d52905728cfac9f93c778a1758e740ce9a367",
                 "shasum": ""
             },
             "require": {
@@ -16340,7 +16340,7 @@
                 "issues": "https://github.com/laravel/boost/issues",
                 "source": "https://github.com/laravel/boost"
             },
-            "time": "2026-03-23T16:01:08+00:00"
+            "time": "2026-04-10T15:59:10+00:00"
         },
         {
             "name": "laravel/pail",
@@ -19268,34 +19268,35 @@
             "time": "2026-03-11T22:59:30+00:00"
         },
         {
-            "name": "spatie/boost-spatie-guidelines",
-            "version": "1.1.0",
+            "name": "spatie/guidelines-skills",
+            "version": "dev-main",
             "source": {
                 "type": "git",
-                "url": "https://github.com/spatie/boost-spatie-guidelines.git",
-                "reference": "1d15ddcd4077f7f7230fa9550fad16b6d78d0493"
+                "url": "https://github.com/spatie/guidelines-skills.git",
+                "reference": "0fb11f5cd3607db70a7c7503b8f437c8adeeeba5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/boost-spatie-guidelines/zipball/1d15ddcd4077f7f7230fa9550fad16b6d78d0493",
-                "reference": "1d15ddcd4077f7f7230fa9550fad16b6d78d0493",
+                "url": "https://api.github.com/repos/spatie/guidelines-skills/zipball/0fb11f5cd3607db70a7c7503b8f437c8adeeeba5",
+                "reference": "0fb11f5cd3607db70a7c7503b8f437c8adeeeba5",
                 "shasum": ""
             },
             "require": {
                 "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
                 "php": "^8.2"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
                     "providers": [
-                        "Spatie\\BoostSpatieGuidelines\\BoostSpatieGuidelinesServiceProvider"
+                        "Spatie\\Guidelines\\GuidelinesServiceProvider"
                     ]
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Spatie\\BoostSpatieGuidelines\\": "src"
+                    "Spatie\\Guidelines\\": "src"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -19310,20 +19311,22 @@
                     "role": "Developer"
                 }
             ],
-            "description": "Spatie's Laravel & PHP coding guidelines for Laravel Boost",
-            "homepage": "https://github.com/spatie/boost-spatie-guidelines",
+            "description": "Spatie's coding guidelines as AI skills for Laravel Boost and skills.sh",
+            "homepage": "https://github.com/spatie/guidelines-skills",
             "keywords": [
+                "ai",
                 "boost",
                 "coding-standards",
                 "guidelines",
                 "laravel",
+                "skills",
                 "spatie"
             ],
             "support": {
-                "issues": "https://github.com/spatie/boost-spatie-guidelines/issues",
-                "source": "https://github.com/spatie/boost-spatie-guidelines/tree/1.1.0"
+                "issues": "https://github.com/spatie/guidelines-skills/issues",
+                "source": "https://github.com/spatie/guidelines-skills/tree/main"
             },
-            "time": "2026-03-06T08:25:49+00:00"
+            "time": "2026-03-16T14:11:29+00:00"
         },
         {
             "name": "spatie/pest-plugin-route-testing",
@@ -19626,7 +19629,9 @@
     ],
     "aliases": [],
     "minimum-stability": "beta",
-    "stability-flags": {},
+    "stability-flags": {
+        "spatie/guidelines-skills": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
