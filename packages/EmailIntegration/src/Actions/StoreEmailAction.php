@@ -15,19 +15,14 @@ use Throwable;
 
 final readonly class StoreEmailAction
 {
-    public function __construct(
-        private LinkEmailAction $linkEmail,
-    ) {}
-
     /**
-     * Persist a pre-fetched message to the database and link it to CRM records.
-     * The caller is responsible for deduplication before invoking this action.
+     * Persist a pre-fetched message to the database.
+     * The caller is responsible for deduplication and CRM linking (via LinkEmailJob).
      *
      * @throws Throwable
      */
     public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
-
         return DB::transaction(function () use ($connectedAccount, $data): Email {
             $email = Email::query()->create([
                 'team_id' => $connectedAccount->team_id,
@@ -43,6 +38,7 @@ final readonly class StoreEmailAction
                 'direction' => $data->direction,
                 'folder' => $data->folder,
                 'has_attachments' => $data->hasAttachments,
+                'read_at' => $data->isRead ? $data->sentAt : null,
             ]);
 
             $email->body()->create([
@@ -85,8 +81,6 @@ final readonly class StoreEmailAction
             );
 
             $email->updateQuietly(['is_internal' => $isInternal]);
-
-            $this->linkEmail->execute($email);
 
             return $email;
         });

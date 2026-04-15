@@ -17,9 +17,11 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -36,6 +38,7 @@ abstract class BaseRecordEmailsPage extends Page
 {
     use HasEmailComposeActions;
     use InteractsWithRecord;
+    use WithPagination;
 
     protected string $view = 'filament.pages.record-emails';
 
@@ -48,7 +51,8 @@ abstract class BaseRecordEmailsPage extends Page
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
-        $this->selectedEmailId = $this->emails()->first()?->id;
+        $firstItem = $this->emails()->items()[0] ?? null;
+        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
     }
 
     protected function getCrmRecord(): Model
@@ -75,10 +79,10 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     /**
-     * @return Collection<int, Email>
+     * @return LengthAwarePaginator<int, Email&object{pivot: Pivot}>
      */
     #[Computed]
-    public function emails(): Collection
+    public function emails(): LengthAwarePaginator
     {
         $user = $this->authUser();
 
@@ -103,7 +107,7 @@ abstract class BaseRecordEmailsPage extends Page
             });
         }
 
-        return $query->latest('sent_at')->get();
+        return $query->latest('sent_at')->paginate(20);
     }
 
     #[Computed]
@@ -125,16 +129,48 @@ abstract class BaseRecordEmailsPage extends Page
             ->first();
     }
 
+    #[Computed]
+    public function inboxUnreadCount(): int
+    {
+        /** @var Company|Opportunity|People $record */
+        $record = $this->getRecord();
+
+        return $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
+            ->where('direction', EmailDirection::INBOUND)
+            ->whereNull('read_at')
+            ->count();
+    }
+
     public function selectEmail(string $id): void
     {
         $this->selectedEmailId = $id;
+
+        // Optimistically mark the email as read so the unread count updates immediately
+        Email::query()
+            ->whereKey($id)
+            ->where('user_id', $this->authUser()->getKey())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        unset($this->inboxUnreadCount);
     }
 
     public function setFolder(string $folder): void
     {
         $this->folder = EmailFolder::from($folder);
         $this->search = '';
-        $this->selectedEmailId = $this->emails()->first()?->id;
+        $this->resetPage();
+        unset($this->emails);
+        $firstItem = $this->emails()->items()[0] ?? null;
+        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+        unset($this->emails);
     }
 
     protected function manageSharingAction(): Action

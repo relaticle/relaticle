@@ -1,4 +1,4 @@
-@props(['folder', 'active', 'icon', 'label'])
+@props(['folder', 'active', 'icon', 'label', 'badge' => null])
 
 <button
     wire:click="setFolder('{{ $folder }}')"
@@ -16,4 +16,9 @@
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
     </svg>
     {{ $label }}
+    @if ($badge !== null && $badge > 0)
+        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] rounded-full bg-primary-500 px-1 text-[10px] font-semibold leading-none text-white">
+            {{ $badge > 99 ? '99+' : $badge }}
+        </span>
+    @endif
 </button>

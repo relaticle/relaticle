@@ -62,6 +62,17 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             dispatch(new StoreEmailJob($account, $messageId));
         }
 
+        // Mark emails as read when UNREAD label was removed in Gmail
+        $readIds = $data['read_message_ids']->all();
+
+        if ($readIds !== []) {
+            Email::query()
+                ->where('connected_account_id', $account->getKey())
+                ->whereIn('provider_message_id', $readIds)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
+
         $account->update([
             'sync_cursor' => $data['new_history_id'],
             'last_synced_at' => now(),

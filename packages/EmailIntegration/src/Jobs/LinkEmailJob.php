@@ -92,7 +92,7 @@ final class LinkEmailJob implements ShouldBeUnique, ShouldQueue
                     }
                 });
 
-            $linkEmail->execute($participant, $email, $company, $person);
+            $linkEmail->execute($participant);
         }
     }
 

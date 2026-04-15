@@ -48,23 +48,44 @@ final readonly class GmailService
 
     /**
      * Fetch messages newer than the given historyId (incremental sync).
-     * Returns the new historyId cursor to persist.
+     * Returns new message IDs and IDs of messages where UNREAD was removed (marked as read).
+     *
+     * @return array{message_ids: Collection<int, string>, read_message_ids: Collection<int, string>, new_history_id: string}
      */
     public function fetchDelta(string $historyId): array
     {
         $history = $this->gmail->users_history->listUsersHistory('me', [
             'startHistoryId' => $historyId,
-            'historyTypes' => ['messageAdded'],
+            'historyTypes' => ['messageAdded', 'labelsRemoved'],
         ]);
 
-        $messageIds = collect($history->getHistory())
-            ->flatMap(fn ($item) => $item->getMessagesAdded())
-            ->map(fn ($msg) => $msg->getMessage()->getId())
-            ->unique()
-            ->values();
+        /** @var array<int, string> $messageIds */
+        $messageIds = [];
+        /** @var array<int, string> $readMessageIds */
+        $readMessageIds = [];
+
+        foreach ($history->getHistory() ?? [] as $item) {
+            foreach ($item->getMessagesAdded() ?? [] as $added) {
+                $id = $added->getMessage()->getId();
+                if (! in_array($id, $messageIds, strict: true)) {
+                    $messageIds[] = $id;
+                }
+            }
+
+            // Track messages where the UNREAD label was removed (user read the email)
+            foreach ($item->getLabelsRemoved() ?? [] as $change) {
+                if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
+                    $id = $change->getMessage()->getId();
+                    if (! in_array($id, $readMessageIds, strict: true)) {
+                        $readMessageIds[] = $id;
+                    }
+                }
+            }
+        }
 
         return [
-            'message_ids' => $messageIds,
+            'message_ids' => collect($messageIds),
+            'read_message_ids' => collect($readMessageIds),
             'new_history_id' => $history->getHistoryId() ?? $historyId,
         ];
     }
@@ -93,6 +114,7 @@ final readonly class GmailService
             direction: in_array('SENT', $labelIds) ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $this->resolveFolder($labelIds),
             hasAttachments: $this->hasAttachments($payload),
+            isRead: ! in_array('UNREAD', $labelIds),
             bodyText: $this->extractBody($payload, 'text/plain'),
             bodyHtml: $this->extractBody($payload, 'text/html'),
             participants: $this->extractParticipants($headers),

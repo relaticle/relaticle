@@ -25,6 +25,7 @@ final readonly class FetchedEmailData
         public EmailDirection $direction,
         public ?EmailFolder $folder,
         public bool $hasAttachments,
+        public bool $isRead,
         public ?string $bodyText,
         public ?string $bodyHtml,
         public array $participants,

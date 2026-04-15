@@ -6,7 +6,7 @@
 
             <div class="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
                 <x-emails.folder-tab folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   label="All" />
-                <x-emails.folder-tab folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          label="Inbox" />
+                <x-emails.folder-tab folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          label="Inbox" :badge="$this->inboxUnreadCount" />
                 <x-emails.folder-tab folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" label="Sent" />
             </div>
 
@@ -18,6 +18,30 @@
                 @empty
                     <x-emails.list-empty :search="$search" :folder="$folder" />
                 @endforelse
+            </div>
+
+            <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 px-3 py-2 flex items-center justify-between">
+                <button
+                    wire:click="previousPage"
+                    wire:loading.attr="disabled"
+                    @disabled($this->emails->onFirstPage())
+                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-40"
+                >
+                    <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                    Prev
+                </button>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                    {{ $this->emails->firstItem() ?? 0 }}–{{ $this->emails->lastItem() ?? 0 }} of {{ $this->emails->total() }}
+                </span>
+                <button
+                    wire:click="nextPage"
+                    wire:loading.attr="disabled"
+                    @disabled($this->emails->onLastPage())
+                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-40"
+                >
+                    Next
+                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                </button>
             </div>
 
         </div>
