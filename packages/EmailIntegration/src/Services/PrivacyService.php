@@ -77,12 +77,12 @@ final readonly class PrivacyService
         $protectedEmails = ProtectedRecipient::query()->where('team_id', $teamId)
             ->where('type', 'email')
             ->pluck('value')
-            ->map(fn ($v) => strtolower((string) $v));
+            ->map(fn (mixed $value): string => strtolower((string) $value));
 
         $protectedDomains = ProtectedRecipient::query()->where('team_id', $teamId)
             ->where('type', 'domain')
             ->pluck('value')
-            ->map(fn ($v) => strtolower((string) $v));
+            ->map(fn (mixed $value): string => strtolower((string) $value));
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);

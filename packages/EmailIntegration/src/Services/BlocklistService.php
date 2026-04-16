@@ -42,8 +42,8 @@ final readonly class BlocklistService
             ->where('team_id', $teamId)
             ->get();
 
-        $emails = $rows->where('type', 'email')->pluck('value')->map(fn ($v) => strtolower((string) $v));
-        $domains = $rows->where('type', 'domain')->pluck('value')->map(fn ($v) => strtolower((string) $v));
+        $emails = $rows->where('type', 'email')->pluck('value')->map(fn (mixed $value): string => strtolower((string) $value));
+        $domains = $rows->where('type', 'domain')->pluck('value')->map(fn (mixed $value): string => strtolower((string) $value));
 
         return [$emails, $domains];
     }
