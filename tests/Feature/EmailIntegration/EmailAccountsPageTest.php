@@ -61,7 +61,7 @@ it('deletes the authenticated user\'s account on disconnect', function (): void 
     livewire(EmailAccountsPage::class)
         ->callAction('disconnect', arguments: ['account_id' => $this->account->id]);
 
-    $this->assertSoftDeleted('connected_accounts', [
+    $this->assertSoftDeleted(ConnectedAccount::class, [
         'id' => $this->account->id,
     ]);
 });
@@ -76,7 +76,7 @@ it('does not delete another user\'s account on disconnect', function (): void {
     livewire(EmailAccountsPage::class)
         ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]);
 
-    $this->assertNotSoftDeleted('connected_accounts', [
+    $this->assertNotSoftDeleted(ConnectedAccount::class, [
         'id' => $otherAccount->id,
     ]);
 });
