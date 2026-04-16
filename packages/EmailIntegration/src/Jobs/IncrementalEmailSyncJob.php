@@ -42,7 +42,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $service = new GmailService($account);
+        $service = GmailService::forAccount($account);
         $data = $service->fetchDelta($account->sync_cursor);
 
         Log::info("Fetched delta for account {$account->id}: ".json_encode($data));

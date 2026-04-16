@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
-use Google\Client as GoogleClient;
 use Google\Service\Exception;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
@@ -18,32 +17,13 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class GmailService
 {
-    private Gmail $gmail;
+    public function __construct(private ConnectedAccount $account, private Gmail $gmail) {}
 
-    public function __construct(private ConnectedAccount $account)
+    public static function forAccount(ConnectedAccount $account): self
     {
-        $client = new GoogleClient;
+        $client = app(Factories\GoogleClientFactory::class)->make($account);
 
-        // TODO:: These must be bind via service container
-        $client->setClientId(config('services.gmail.client_id'));
-        $client->setClientSecret(config('services.gmail.client_secret'));
-
-        $client->setAccessToken([
-            'access_token' => $account->access_token,
-            'refresh_token' => $account->refresh_token,
-            'expires_in' => $account->token_expires_at?->diffInSeconds(now()),
-        ]);
-
-        if ($client->isAccessTokenExpired()) {
-            $newToken = $client->fetchAccessTokenWithRefreshToken($account->refresh_token);
-
-            $account->update([
-                'access_token' => $newToken['access_token'],
-                'token_expires_at' => now()->addSeconds($newToken['expires_in']),
-            ]);
-        }
-
-        $this->gmail = new Gmail($client);
+        return new self($account, new Gmail($client));
     }
 
     /**

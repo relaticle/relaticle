@@ -56,7 +56,7 @@ final class EmailAccountsPage extends Page
     {
         return Action::make('checkAttachment')
             ->action(function (): void {
-                new GmailService(ConnectedAccount::query()->firstWhere('user_id', auth()->id()))->fetchMessage('19d82a37752febd1');
+                GmailService::forAccount(ConnectedAccount::query()->firstWhere('user_id', auth()->id()))->fetchMessage('19d82a37752febd1');
             });
 
     }

@@ -9,9 +9,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(EmailsRelationManager::class);
@@ -22,17 +20,12 @@ beforeEach(function (): void {
     $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
 
-    $this->account = ConnectedAccount::create([
+    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
-        'provider' => EmailProvider::GMAIL,
-        'provider_account_id' => 'test-account-id',
         'email_address' => 'sender@example.com',
         'display_name' => 'Test Sender',
-        'access_token' => 'fake-token',
-        'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
-    ]);
+    ]));
 
     $this->person = People::create([
         'team_id' => $this->team->id,

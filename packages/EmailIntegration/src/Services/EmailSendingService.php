@@ -47,7 +47,7 @@ final readonly class EmailSendingService
      */
     private function dispatchToProvider(ConnectedAccount $account, array $data): array
     {
-        $service = new GmailService($account);
+        $service = GmailService::forAccount($account);
 
         /** @var Email|null $inReplyToEmail */
         $inReplyToEmail = isset($data['in_reply_to_email_id'])

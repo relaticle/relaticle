@@ -60,7 +60,7 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
         }
 
         $fetched = match ($this->connectedAccount->provider) {
-            EmailProvider::GMAIL => new GmailService($this->connectedAccount)->fetchMessage($this->messageId),
+            EmailProvider::GMAIL => GmailService::forAccount($this->connectedAccount)->fetchMessage($this->messageId),
             EmailProvider::AZURE => throw new Exception('Azure email provider is not yet implemented.'),
         };
 

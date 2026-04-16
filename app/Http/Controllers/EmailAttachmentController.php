@@ -41,7 +41,7 @@ final readonly class EmailAttachmentController
         set_time_limit(120);
 
         // Fetch the binary before streaming so any API/auth errors surface as proper HTTP responses
-        $binary = new GmailService($connectedAccount)
+        $binary = GmailService::forAccount($connectedAccount)
             ->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
 
         $filename = $attachment->filename ?? 'attachment';

@@ -6,9 +6,6 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -20,17 +17,12 @@ beforeEach(function (): void {
     $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
 
-    $this->account = ConnectedAccount::create([
+    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
-        'provider' => EmailProvider::GMAIL,
-        'provider_account_id' => 'test-account-id',
         'email_address' => 'sender@example.com',
         'display_name' => 'Test Sender',
-        'access_token' => 'fake-token',
-        'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
-    ]);
+    ]));
 });
 
 it('creates a signature record', function (): void {
