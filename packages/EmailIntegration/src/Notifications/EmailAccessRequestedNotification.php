@@ -34,7 +34,7 @@ final class EmailAccessRequestedNotification extends Notification
     public function toDatabase(User $notifiable): array
     {
         $email = $this->request->email;
-        $team = $email !== null ? Team::find($email->team_id) : null;
+        $team = $email !== null ? Team::query()->find($email->team_id) : null;
 
         $subject = $email !== null ? ($email->subject ?? '(subject hidden)') : '(subject hidden)';
         $requesterName = $this->request->requester->name;

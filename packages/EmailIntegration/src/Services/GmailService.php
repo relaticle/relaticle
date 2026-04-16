@@ -21,7 +21,7 @@ final readonly class GmailService
 
     public static function forAccount(ConnectedAccount $account): self
     {
-        $client = app(Factories\GoogleClientFactory::class)->make($account);
+        $client = resolve(Factories\GoogleClientFactory::class)->make($account);
 
         return new self($account, new Gmail($client));
     }
