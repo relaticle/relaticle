@@ -28,22 +28,18 @@ beforeEach(function (): void {
         'user_id' => $this->owner->id,
     ]));
 
-    $this->person = People::create([
+    $this->person = People::factory()->create([
         'team_id' => $this->team->id,
-        'name' => 'Jane Doe',
         'creator_id' => $this->owner->id,
     ]);
-});
 
-function linkEmailToPerson(Email $email, People $person): void
-{
-    $person->emails()->attach($email->getKey());
-}
+    $this->actingAs($this->owner);
+    Filament::setTenant($this->team);
+});
 
 describe('requestAccess table action', function (): void {
     it('creates an EmailAccessRequest and notifies the owner', function (): void {
         $this->actingAs($this->viewer);
-        Filament::setTenant($this->team);
 
         Notification::fake();
 
@@ -54,7 +50,7 @@ describe('requestAccess table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -78,7 +74,8 @@ describe('requestAccess table action', function (): void {
 
     it('shows a warning notification when a pending request already exists', function (): void {
         $this->actingAs($this->viewer);
-        Filament::setTenant($this->team);
+
+        Notification::fake();
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
@@ -87,14 +84,12 @@ describe('requestAccess table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
-        EmailAccessRequest::create([
+        EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
             'email_id' => $email->getKey(),
             'requester_id' => $this->viewer->id,
             'owner_id' => $this->owner->id,
-            'tier_requested' => EmailPrivacyTier::FULL->value,
-            'status' => 'pending',
         ]);
 
         livewire(EmailsRelationManager::class, [
@@ -114,9 +109,6 @@ describe('requestAccess table action', function (): void {
     });
 
     it('is hidden when the authenticated user is the email owner', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -124,7 +116,7 @@ describe('requestAccess table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -135,7 +127,6 @@ describe('requestAccess table action', function (): void {
 
     it('is hidden when the viewer already has full body access via a share', function (): void {
         $this->actingAs($this->viewer);
-        Filament::setTenant($this->team);
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
@@ -144,7 +135,7 @@ describe('requestAccess table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
             'email_id' => $email->getKey(),
@@ -162,9 +153,6 @@ describe('requestAccess table action', function (): void {
 
 describe('manageSharing table action', function (): void {
     it('updates the email privacy_tier', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -172,7 +160,7 @@ describe('manageSharing table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -188,9 +176,6 @@ describe('manageSharing table action', function (): void {
     });
 
     it('creates EmailShare rows for each specified teammate', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -198,7 +183,7 @@ describe('manageSharing table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -223,9 +208,6 @@ describe('manageSharing table action', function (): void {
     });
 
     it("clears the owner's previous shares when saved with an empty shares list", function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -233,7 +215,7 @@ describe('manageSharing table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         EmailShare::factory()->create([
             'email_id' => $email->getKey(),
@@ -260,7 +242,6 @@ describe('manageSharing table action', function (): void {
 
     it('is hidden for non-owners', function (): void {
         $this->actingAs($this->viewer);
-        Filament::setTenant($this->team);
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
@@ -269,7 +250,7 @@ describe('manageSharing table action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -281,9 +262,6 @@ describe('manageSharing table action', function (): void {
 
 describe('shareAllOnRecord header action', function (): void {
     it('updates privacy tier on all owner emails linked to the record', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $emailA = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -298,8 +276,8 @@ describe('shareAllOnRecord header action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($emailA, $this->person);
-        linkEmailToPerson($emailB, $this->person);
+        $this->person->emails()->attach($emailA->getKey());
+        $this->person->emails()->attach($emailB->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -316,9 +294,6 @@ describe('shareAllOnRecord header action', function (): void {
     });
 
     it('creates EmailShare rows for each email on the record per specified teammate', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -326,7 +301,7 @@ describe('shareAllOnRecord header action', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -351,9 +326,6 @@ describe('shareAllOnRecord header action', function (): void {
     });
 
     it('is hidden when the authenticated user has no emails linked to the record', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
@@ -365,7 +337,6 @@ describe('shareAllOnRecord header action', function (): void {
 describe('subject column privacy enforcement', function (): void {
     it('shows (subject hidden) when the viewer cannot view the subject', function (): void {
         $this->actingAs($this->viewer);
-        Filament::setTenant($this->team);
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
@@ -375,7 +346,7 @@ describe('subject column privacy enforcement', function (): void {
             'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
@@ -385,9 +356,6 @@ describe('subject column privacy enforcement', function (): void {
     });
 
     it('shows the real subject when the viewer can view the subject', function (): void {
-        $this->actingAs($this->owner);
-        Filament::setTenant($this->team);
-
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -396,7 +364,7 @@ describe('subject column privacy enforcement', function (): void {
             'privacy_tier' => EmailPrivacyTier::FULL,
         ]);
 
-        linkEmailToPerson($email, $this->person);
+        $this->person->emails()->attach($email->getKey());
 
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
