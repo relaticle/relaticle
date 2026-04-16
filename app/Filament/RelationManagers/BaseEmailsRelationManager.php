@@ -21,6 +21,7 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -155,7 +156,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 TextColumn::make('direction')
                     ->label('Direction')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state->getLabel()),
+                    ->formatStateUsing(fn (EmailDirection $state): string => $state->getLabel()),
 
                 TextColumn::make('sent_at')
                     ->label('Date')

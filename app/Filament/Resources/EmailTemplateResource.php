@@ -109,7 +109,7 @@ final class EmailTemplateResource extends Resource
                     DeleteBulkAction::make()
                         ->action(function (Collection $records): void {
                             $records
-                                ->filter(fn ($record): bool => $record instanceof EmailTemplate && $record->created_by === auth()->id())
+                                ->filter(fn (mixed $record): bool => $record instanceof EmailTemplate && $record->created_by === auth()->id())
                                 ->each->delete();
                         }),
                 ]),

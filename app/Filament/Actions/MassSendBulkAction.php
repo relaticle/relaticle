@@ -107,11 +107,11 @@ final class MassSendBulkAction extends BulkAction
                     ->distinct()
                     ->get()
                     ->groupBy('contact_id')
-                    ->map(fn ($participants) => $participants->first()->email_address);
+                    ->map(fn (Collection $participants): string => $participants->first()->email_address);
 
                 // Filter out people without a known email address
                 $validRecipients = $records->filter(
-                    fn ($person): bool => $person instanceof People && filled($personEmails->get($person->getKey()))
+                    fn (mixed $person): bool => $person instanceof People && filled($personEmails->get($person->getKey()))
                 );
 
                 if ($validRecipients->isEmpty()) {

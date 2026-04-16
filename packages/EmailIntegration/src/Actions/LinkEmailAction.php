@@ -130,7 +130,7 @@ final readonly class LinkEmailAction
             ->distinct()
             ->pluck('direction');
 
-        $values = $directions->map(fn ($d) => $d instanceof EmailDirection ? $d->value : $d);
+        $values = $directions->map(fn (mixed $direction): mixed => $direction instanceof EmailDirection ? $direction->value : $direction);
 
         return $values->contains(EmailDirection::INBOUND->value)
             && $values->contains(EmailDirection::OUTBOUND->value);

@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
@@ -67,7 +68,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $jobs = collect($newIds)
             ->chunk(config('services.email_sync.batch_size', 50))
-            ->flatMap(fn ($chunk): array => $chunk->map(fn (string $id): StoreEmailJob => new StoreEmailJob($account, $id))->all())
+            ->flatMap(fn (Collection $chunk): array => $chunk->map(fn (string $id): StoreEmailJob => new StoreEmailJob($account, $id))->all())
             ->all();
 
         Bus::batch($jobs)

@@ -77,7 +77,7 @@ final readonly class GmailService
     {
         $message = $this->gmail->users_messages->get('me', $messageId, ['format' => 'full']);
         $headers = collect($message->getPayload()->getHeaders())
-            ->keyBy(fn ($h) => strtolower((string) $h->getName()));
+            ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
 
         $payload = $message->getPayload();
 
@@ -121,7 +121,7 @@ final readonly class GmailService
             ]);
 
         $messageIds = collect($response->getMessages() ?? [])
-            ->map(fn ($message) => $message->getId());
+            ->map(fn (Message $message): string => $message->getId());
 
         $profile = $this->gmail
             ->users
@@ -311,7 +311,7 @@ final readonly class GmailService
 
         foreach ($payload->getParts() as $part) {
             $partHeaders = collect($part->getHeaders())
-                ->keyBy(fn ($h) => strtolower($h->getName()));
+                ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
 
             $disposition = $partHeaders->get('content-disposition')?->getValue() ?? '';
             $filename = $part->getFilename();
