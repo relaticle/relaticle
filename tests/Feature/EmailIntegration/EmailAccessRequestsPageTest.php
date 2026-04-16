@@ -40,10 +40,15 @@ describe('Tab switching', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $requesterAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $requester->id,
+        ]));
+
         $otherEmail = Email::factory()->private()->create([
             'team_id' => $this->team->id,
             'user_id' => $requester->id,
-            'connected_account_id' => $this->account->getKey(),
+            'connected_account_id' => $requesterAccount->getKey(),
         ]);
 
         $outgoingRequest = EmailAccessRequest::factory()->pending()->create([
@@ -71,10 +76,15 @@ describe('Tab switching', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $requesterAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $requester->id,
+        ]));
+
         $otherEmail = Email::factory()->private()->create([
             'team_id' => $this->team->id,
             'user_id' => $requester->id,
-            'connected_account_id' => $this->account->getKey(),
+            'connected_account_id' => $requesterAccount->getKey(),
         ]);
 
         $outgoingRequest = EmailAccessRequest::factory()->pending()->create([
@@ -246,6 +256,18 @@ describe('getNavigationBadge', function (): void {
         EmailAccessRequest::factory()->denied()->create([
             'owner_id' => $this->user->id,
             'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();
+    });
+
+    it('does not count outgoing pending requests in the badge', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
             'email_id' => $this->email->getKey(),
         ]);
 
