@@ -54,7 +54,6 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -84,13 +83,7 @@ beforeEach(function (): void {
 
 function linkEmailToPerson(Email $email, People $person): void
 {
-    DB::table('emailables')->insert([
-        'email_id' => $email->getKey(),
-        'emailable_type' => (new People)->getMorphClass(),
-        'emailable_id' => $person->getKey(),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $person->emails()->attach($email->getKey());
 }
 
 describe('requestAccess table action', function (): void {
