@@ -18,7 +18,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
-test('renders {name} and {company} for a People record', function (): void {
+it('renders {name} and {company} for a People record', function (): void {
     $company = Company::create([
         'team_id' => $this->team->id,
         'name' => 'Acme Corp',
@@ -46,7 +46,7 @@ test('renders {name} and {company} for a People record', function (): void {
         ->and($result['body_html'])->toBe('<p>Hi Jane Doe, you work at Acme Corp.</p>');
 });
 
-test('renders {name} for a Company record', function (): void {
+it('renders {name} for a Company record', function (): void {
     $company = Company::create([
         'team_id' => $this->team->id,
         'name' => 'Beta Ltd',
@@ -67,7 +67,7 @@ test('renders {name} for a Company record', function (): void {
         ->and($result['body_html'])->toBe('<p>Hello Beta Ltd team.</p>');
 });
 
-test('leaves placeholders unchanged when no record is passed', function (): void {
+it('leaves placeholders unchanged when no record is passed', function (): void {
     $template = EmailTemplate::create([
         'team_id' => $this->team->id,
         'created_by' => $this->user->id,
@@ -82,7 +82,7 @@ test('leaves placeholders unchanged when no record is passed', function (): void
         ->and($result['body_html'])->toBe('<p>Hi {name} from {company}.</p>');
 });
 
-test('renders empty string when People record has no company', function (): void {
+it('renders empty string when People record has no company', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,
         'name' => 'Solo Person',

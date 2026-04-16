@@ -83,7 +83,7 @@ beforeEach(function (): void {
     ]);
 });
 
-test('replyForwardEmail reply dispatches SendEmailJob with REPLY creation_source', function (): void {
+it('reply dispatches SendEmailJob with REPLY creation_source', function (): void {
     Queue::fake();
 
     livewire(EmailsRelationManager::class, [
@@ -112,7 +112,7 @@ test('replyForwardEmail reply dispatches SendEmailJob with REPLY creation_source
     );
 });
 
-test('replyForwardEmail forward dispatches SendEmailJob with FORWARD creation_source', function (): void {
+it('forward dispatches SendEmailJob with FORWARD creation_source', function (): void {
     Queue::fake();
 
     livewire(EmailsRelationManager::class, [
@@ -139,7 +139,7 @@ test('replyForwardEmail forward dispatches SendEmailJob with FORWARD creation_so
     );
 });
 
-test('replyForwardEmail reply_all dispatches SendEmailJob with REPLY_ALL creation_source', function (): void {
+it('reply_all dispatches SendEmailJob with REPLY_ALL creation_source', function (): void {
     Queue::fake();
 
     livewire(EmailsRelationManager::class, [

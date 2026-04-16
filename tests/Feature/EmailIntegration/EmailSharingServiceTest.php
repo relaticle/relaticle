@@ -39,7 +39,7 @@ function makeSharingEmail(array $overrides = []): Email
     ], $overrides));
 }
 
-test('shareEmail creates an EmailShare record', function (): void {
+it('creates an EmailShare record', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
     $email = makeSharingEmail();
 
@@ -52,7 +52,7 @@ test('shareEmail creates an EmailShare record', function (): void {
         ->and($share->tier)->toBe(EmailPrivacyTier::FULL->value);
 });
 
-test('shareEmail updates an existing share when called again for the same viewer', function (): void {
+it('updates an existing share when called again for the same viewer', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
     $email = makeSharingEmail();
 
@@ -67,7 +67,7 @@ test('shareEmail updates an existing share when called again for the same viewer
         ->and($shares->first()->tier)->toBe(EmailPrivacyTier::FULL->value);
 });
 
-test('revokeShare removes the share record', function (): void {
+it('removes the share record', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
     $email = makeSharingEmail();
 
@@ -80,7 +80,7 @@ test('revokeShare removes the share record', function (): void {
     ]);
 });
 
-test('revokeShare does nothing when no share exists', function (): void {
+it('does nothing when no share exists', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
     $email = makeSharingEmail();
 
@@ -90,7 +90,7 @@ test('revokeShare does nothing when no share exists', function (): void {
     expect(EmailShare::where('email_id', $email->getKey())->count())->toBe(0);
 });
 
-test('setEmailTier updates the email privacy_tier', function (): void {
+it('updates the email privacy_tier', function (): void {
     $email = makeSharingEmail(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
 
     $this->service->setEmailTier($email, EmailPrivacyTier::FULL);
@@ -98,7 +98,7 @@ test('setEmailTier updates the email privacy_tier', function (): void {
     expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-test('shareAllOnRecord shares all owner emails linked to a record', function (): void {
+it('shares all owner emails linked to a record', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $person = People::create([
@@ -124,7 +124,7 @@ test('shareAllOnRecord shares all owner emails linked to a record', function ():
     $this->assertDatabaseHas('email_shares', ['email_id' => $emailB->getKey(), 'shared_with' => $viewer->getKey(), 'tier' => EmailPrivacyTier::SUBJECT->value]);
 });
 
-test('shareAllOnRecord only shares emails owned by the specified owner', function (): void {
+it('only shares emails owned by the specified owner', function (): void {
     $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
@@ -156,7 +156,7 @@ test('shareAllOnRecord only shares emails owned by the specified owner', functio
     $this->assertDatabaseMissing('email_shares', ['email_id' => $otherEmail->getKey(), 'shared_with' => $viewer->getKey()]);
 });
 
-test('setTierForAllOnRecord bulk updates privacy_tier on all owner emails linked to a record', function (): void {
+it('bulk updates privacy_tier on all owner emails linked to a record', function (): void {
     $company = Company::create([
         'team_id' => $this->team->id,
         'name' => 'Acme Corp',
@@ -179,7 +179,7 @@ test('setTierForAllOnRecord bulk updates privacy_tier on all owner emails linked
         ->and($emailB->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-test('setTierForAllOnRecord returns 0 when no emails are linked to the record', function (): void {
+it('returns 0 when no emails are linked to the record', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,
         'name' => 'Nobody',

@@ -35,7 +35,7 @@ function makeBlocklistEmail(array $overrides = []): Email
     ], $overrides));
 }
 
-test('isBlockedForOwner returns false when email has no owner', function (): void {
+it('returns false when email has no owner', function (): void {
     $email = makeBlocklistEmail();
 
     // Simulate a missing owner by setting user relation to null in memory
@@ -44,7 +44,7 @@ test('isBlockedForOwner returns false when email has no owner', function (): voi
     expect($this->service->isBlockedForOwner($email))->toBeFalse();
 });
 
-test('isBlockedForOwner returns false when owner has no blocklist entries', function (): void {
+it('returns false when owner has no blocklist entries', function (): void {
     $email = makeBlocklistEmail();
 
     EmailParticipant::factory()->from()->create([
@@ -55,7 +55,7 @@ test('isBlockedForOwner returns false when owner has no blocklist entries', func
     expect($this->service->isBlockedForOwner($email))->toBeFalse();
 });
 
-test('isBlockedForOwner returns true when participant matches a blocked email address', function (): void {
+it('returns true when participant matches a blocked email address', function (): void {
     EmailBlocklist::factory()->email('spam@badactor.com')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,
@@ -71,7 +71,7 @@ test('isBlockedForOwner returns true when participant matches a blocked email ad
     expect($this->service->isBlockedForOwner($email))->toBeTrue();
 });
 
-test('isBlockedForOwner returns true when participant matches a blocked domain', function (): void {
+it('returns true when participant matches a blocked domain', function (): void {
     EmailBlocklist::factory()->domain('badactor.com')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,
@@ -87,7 +87,7 @@ test('isBlockedForOwner returns true when participant matches a blocked domain',
     expect($this->service->isBlockedForOwner($email))->toBeTrue();
 });
 
-test('isBlockedForOwner returns false when participant does not match any blocklist entry', function (): void {
+it('returns false when participant does not match any blocklist entry', function (): void {
     EmailBlocklist::factory()->email('spam@badactor.com')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,
@@ -103,7 +103,7 @@ test('isBlockedForOwner returns false when participant does not match any blockl
     expect($this->service->isBlockedForOwner($email))->toBeFalse();
 });
 
-test('isBlockedForOwner performs case-insensitive matching on email addresses', function (): void {
+it('performs case-insensitive matching on email addresses', function (): void {
     EmailBlocklist::factory()->email('spam@badactor.com')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,
@@ -119,7 +119,7 @@ test('isBlockedForOwner performs case-insensitive matching on email addresses', 
     expect($this->service->isBlockedForOwner($email))->toBeTrue();
 });
 
-test('isBlockedForOwner performs case-insensitive matching on domains', function (): void {
+it('performs case-insensitive matching on domains', function (): void {
     EmailBlocklist::factory()->domain('BADACTOR.COM')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,
@@ -135,7 +135,7 @@ test('isBlockedForOwner performs case-insensitive matching on domains', function
     expect($this->service->isBlockedForOwner($email))->toBeTrue();
 });
 
-test('isBlockedForOwner only checks the email owner\'s blocklist, not other users', function (): void {
+it('only checks the email owner\'s blocklist, not other users', function (): void {
     $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
 
     EmailBlocklist::factory()->email('spam@badactor.com')->create([
@@ -153,7 +153,7 @@ test('isBlockedForOwner only checks the email owner\'s blocklist, not other user
     expect($this->service->isBlockedForOwner($email))->toBeFalse();
 });
 
-test('isBlockedForOwner returns true when any one of multiple participants matches blocklist', function (): void {
+it('returns true when any one of multiple participants matches blocklist', function (): void {
     EmailBlocklist::factory()->email('blocked@example.com')->create([
         'user_id' => $this->owner->id,
         'team_id' => $this->team->id,

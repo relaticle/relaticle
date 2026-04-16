@@ -68,7 +68,7 @@ function attachEmailToPerson(People $person, string $emailAddress, string $teamI
     ]);
 }
 
-test('mass send creates an EmailBatch and dispatches one job per recipient', function (): void {
+it('creates an EmailBatch and dispatches one job per recipient', function (): void {
     Queue::fake();
 
     $people = collect(range(1, 3))->map(fn (int $i): People => People::create([
@@ -113,7 +113,7 @@ test('mass send creates an EmailBatch and dispatches one job per recipient', fun
     );
 });
 
-test('mass send skips people with no known email address', function (): void {
+it('skips people with no known email address', function (): void {
     Queue::fake();
 
     $withEmail = People::create([
@@ -151,7 +151,7 @@ test('mass send skips people with no known email address', function (): void {
     );
 });
 
-test('mass send shows warning notification when no valid recipients exist', function (): void {
+it('shows warning notification when no valid recipients exist', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,
         'name' => 'No Email',
@@ -173,7 +173,7 @@ test('mass send shows warning notification when no valid recipients exist', func
     expect(EmailBatch::count())->toBe(0);
 });
 
-test('mass send applies template variables per recipient', function (): void {
+it('applies template variables per recipient', function (): void {
     Queue::fake();
 
     $personA = People::create([

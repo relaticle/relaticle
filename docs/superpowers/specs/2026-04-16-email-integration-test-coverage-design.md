@@ -57,8 +57,6 @@ All files live in `tests/Feature/EmailIntegration/`.
 |---|---|
 | Viewer cannot `viewSubject` on an email | `subject` column shows `(subject hidden)` |
 | Viewer can `viewSubject` | Real subject is shown |
-| Email has no `thread_id` | `summarizeThread` row action is hidden |
-| Viewer cannot `viewSubject` | `summarizeThread` row action is hidden |
 
 ---
 
@@ -204,5 +202,5 @@ All test files follow the existing conventions in the project:
 ## What is intentionally out of scope
 
 - `CompanyEmailsRelationManager` / `OpportunityEmailsRelationManager` — they delegate entirely to `BaseEmailsRelationManager`; a smoke test adds no coverage value
-- `summarizeThread` AI content — the AI call itself is not tested (no deterministic output); only visibility conditions are tested
+- `summarizeThread` action — AI summary feature skipped entirely for now
 - OAuth redirect URLs (`connectGmail`, `connectAzure`) — these are URL-generating actions, not form actions; no Livewire state to assert

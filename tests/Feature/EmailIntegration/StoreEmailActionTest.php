@@ -49,7 +49,7 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
     );
 }
 
-test('StoreEmailAction persists the email record with correct fields', function (): void {
+it('persists the email record with correct fields', function (): void {
     $sentAt = now()->subHour();
     $data = makeFetchedEmailData([
         'providerMessageId' => 'gmail-abc123',
@@ -81,7 +81,7 @@ test('StoreEmailAction persists the email record with correct fields', function 
         ->and($email->read_at)->toBeNull();
 });
 
-test('StoreEmailAction sets read_at when isRead is true', function (): void {
+it('sets read_at when isRead is true', function (): void {
     $sentAt = now()->subHour();
     $data = makeFetchedEmailData(['sentAt' => $sentAt, 'isRead' => true]);
 
@@ -91,7 +91,7 @@ test('StoreEmailAction sets read_at when isRead is true', function (): void {
         ->and($email->read_at->toDateTimeString())->toBe($sentAt->toDateTimeString());
 });
 
-test('StoreEmailAction stores body_text and body_html in email_bodies', function (): void {
+it('stores body_text and body_html in email_bodies', function (): void {
     $data = makeFetchedEmailData([
         'bodyText' => 'Plain text content',
         'bodyHtml' => '<p>Rich <b>HTML</b> content</p>',
@@ -104,7 +104,7 @@ test('StoreEmailAction stores body_text and body_html in email_bodies', function
         ->and($email->body->body_html)->toBe('<p>Rich <b>HTML</b> content</p>');
 });
 
-test('StoreEmailAction creates email participants', function (): void {
+it('creates email participants', function (): void {
     $data = makeFetchedEmailData([
         'participants' => [
             ['email_address' => 'alice@acme.com', 'name' => 'Alice', 'role' => 'from'],
@@ -121,7 +121,7 @@ test('StoreEmailAction creates email participants', function (): void {
     expect($addresses)->toBe(['alice@acme.com', 'bob@acme.com', 'carol@acme.com']);
 });
 
-test('StoreEmailAction creates email attachments', function (): void {
+it('creates email attachments', function (): void {
     $data = makeFetchedEmailData([
         'hasAttachments' => true,
         'attachments' => [
@@ -147,7 +147,7 @@ test('StoreEmailAction creates email attachments', function (): void {
         ->and($attachment->provider_attachment_id)->toBe('att-001');
 });
 
-test('StoreEmailAction marks email as internal when all participants are team members', function (): void {
+it('marks email as internal when all participants are team members', function (): void {
     $teamMember = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $data = makeFetchedEmailData([
@@ -162,7 +162,7 @@ test('StoreEmailAction marks email as internal when all participants are team me
     expect($email->is_internal)->toBeTrue();
 });
 
-test('StoreEmailAction does not mark email as internal when at least one external participant exists', function (): void {
+it('does not mark email as internal when at least one external participant exists', function (): void {
     $data = makeFetchedEmailData([
         'participants' => [
             ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'from'],
@@ -175,7 +175,7 @@ test('StoreEmailAction does not mark email as internal when at least one externa
     expect($email->is_internal)->toBeFalse();
 });
 
-test('StoreEmailAction stores the email in the database', function (): void {
+it('stores the email in the database', function (): void {
     $data = makeFetchedEmailData(['providerMessageId' => 'stored-msg-001']);
 
     $email = app(StoreEmailAction::class)->execute($this->account, $data);
@@ -187,7 +187,7 @@ test('StoreEmailAction stores the email in the database', function (): void {
     ]);
 });
 
-test('StoreEmailAction stores body in email_bodies table', function (): void {
+it('stores body in email_bodies table', function (): void {
     $data = makeFetchedEmailData();
 
     $email = app(StoreEmailAction::class)->execute($this->account, $data);

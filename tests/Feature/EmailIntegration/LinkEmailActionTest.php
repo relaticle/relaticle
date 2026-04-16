@@ -39,7 +39,7 @@ function makeLinkEmail(array $overrides = []): Email
     ], $overrides));
 }
 
-test('LinkEmailAction links email to an existing company matched by domain', function (): void {
+it('links email to an existing company matched by domain', function (): void {
     $domainsField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())
@@ -73,7 +73,7 @@ test('LinkEmailAction links email to an existing company matched by domain', fun
     }
 });
 
-test('LinkEmailAction skips company matching for public email domains', function (): void {
+it('skips company matching for public email domains', function (): void {
     $email = makeLinkEmail();
 
     EmailParticipant::factory()->from()->create([
@@ -86,7 +86,7 @@ test('LinkEmailAction skips company matching for public email domains', function
     expect($email->companies()->count())->toBe(0);
 });
 
-test('LinkEmailAction skips company matching for team-specific public domains', function (): void {
+it('skips company matching for team-specific public domains', function (): void {
     PublicEmailDomain::factory()->create([
         'team_id' => $this->team->id,
         'domain' => 'internal-mailer.com',
@@ -104,7 +104,7 @@ test('LinkEmailAction skips company matching for team-specific public domains', 
     expect($email->companies()->count())->toBe(0);
 });
 
-test('LinkEmailAction links email to an existing person matched by email custom field', function (): void {
+it('links email to an existing person matched by email custom field', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())
@@ -136,7 +136,7 @@ test('LinkEmailAction links email to an existing person matched by email custom 
     expect($email->people()->where('people.id', $person->getKey())->exists())->toBeTrue();
 });
 
-test('LinkEmailAction updates participant contact_id when linked to a person', function (): void {
+it('updates participant contact_id when linked to a person', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())
@@ -168,7 +168,7 @@ test('LinkEmailAction updates participant contact_id when linked to a person', f
     expect($participant->fresh()->contact_id)->toBe($person->getKey());
 });
 
-test('LinkEmailAction does not auto-create companies when auto_create_companies is false', function (): void {
+it('does not auto-create companies when auto_create_companies is false', function (): void {
     $email = makeLinkEmail();
 
     EmailParticipant::factory()->from()->create([
@@ -183,7 +183,7 @@ test('LinkEmailAction does not auto-create companies when auto_create_companies 
     expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
-test('LinkEmailAction auto-creates a company when auto_create_companies is true', function (): void {
+it('auto-creates a company when auto_create_companies is true', function (): void {
     $this->account->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
@@ -198,7 +198,7 @@ test('LinkEmailAction auto-creates a company when auto_create_companies is true'
     expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->exists())->toBeTrue();
 });
 
-test('LinkEmailAction does not auto-create a person when contact_creation_mode is None', function (): void {
+it('does not auto-create a person when contact_creation_mode is None', function (): void {
     $countBefore = People::where('team_id', $this->team->id)->count();
 
     $email = makeLinkEmail();
@@ -213,7 +213,7 @@ test('LinkEmailAction does not auto-create a person when contact_creation_mode i
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
-test('LinkEmailAction auto-creates a person when contact_creation_mode is All', function (): void {
+it('auto-creates a person when contact_creation_mode is All', function (): void {
     $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $email = makeLinkEmail();
@@ -229,7 +229,7 @@ test('LinkEmailAction auto-creates a person when contact_creation_mode is All', 
     expect(People::where('team_id', $this->team->id)->where('name', 'New Contact')->exists())->toBeTrue();
 });
 
-test('LinkEmailAction does not auto-create a person when Bidirectional and only one direction exists', function (): void {
+it('does not auto-create a person when Bidirectional and only one direction exists', function (): void {
     $this->account->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
 
     // Only inbound email — no outbound yet
@@ -255,7 +255,7 @@ test('LinkEmailAction does not auto-create a person when Bidirectional and only 
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
-test('LinkEmailAction auto-creates a person when Bidirectional and both directions exist', function (): void {
+it('auto-creates a person when Bidirectional and both directions exist', function (): void {
     $this->account->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
 
     $address = 'bidirectional@bidirectional.com';
@@ -278,7 +278,7 @@ test('LinkEmailAction auto-creates a person when Bidirectional and both directio
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore + 1);
 });
 
-test('LinkEmailAction increments person email_count when linked', function (): void {
+it('increments person email_count when linked', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())
@@ -313,7 +313,7 @@ test('LinkEmailAction increments person email_count when linked', function (): v
         ->and($person->fresh()->outbound_email_count)->toBe(0);
 });
 
-test('LinkEmailAction also links email to opportunity via person relationship', function (): void {
+it('also links email to opportunity via person relationship', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())

@@ -38,153 +38,153 @@ beforeEach(function (): void {
     ]);
 });
 
-// ApproveEmailAccessRequestAction tests
+describe('ApproveEmailAccessRequestAction', function (): void {
+    it('shares the email with the requester at the requested tier', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-test('ApproveEmailAccessRequestAction shares the email with the requester at the requested tier', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+        Notification::fake();
 
-    Notification::fake();
+        app(ApproveEmailAccessRequestAction::class)->execute($request);
 
-    app(ApproveEmailAccessRequestAction::class)->execute($request);
+        $this->assertDatabaseHas('email_shares', [
+            'email_id' => $this->email->getKey(),
+            'shared_with' => $this->requester->id,
+            'tier' => EmailPrivacyTier::FULL->value,
+        ]);
+    });
 
-    $this->assertDatabaseHas('email_shares', [
-        'email_id' => $this->email->getKey(),
-        'shared_with' => $this->requester->id,
-        'tier' => EmailPrivacyTier::FULL->value,
-    ]);
+    it('updates request status to APPROVED', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::SUBJECT)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request);
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
+
+    it('sends a notification to the requester', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request);
+
+        Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
+    });
+
+    it('does nothing when request is already approved', function (): void {
+        $request = EmailAccessRequest::factory()->approved()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request);
+
+        Notification::assertNothingSent();
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+    });
+
+    it('does nothing when request is already denied', function (): void {
+        $request = EmailAccessRequest::factory()->denied()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request);
+
+        Notification::assertNothingSent();
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+    });
 });
 
-test('ApproveEmailAccessRequestAction updates request status to APPROVED', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::SUBJECT)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+describe('DenyEmailAccessRequestAction', function (): void {
+    it('updates request status to DENIED', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-    Notification::fake();
+        Notification::fake();
 
-    app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request);
 
-    expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
-});
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
+    });
 
-test('ApproveEmailAccessRequestAction sends a notification to the requester', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+    it('sends a notification to the requester', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-    Notification::fake();
+        Notification::fake();
 
-    app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request);
 
-    Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
-});
+        Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
+    });
 
-test('ApproveEmailAccessRequestAction does nothing when request is already approved', function (): void {
-    $request = EmailAccessRequest::factory()->approved()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+    it('does not create a share', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-    Notification::fake();
+        Notification::fake();
 
-    app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request);
 
-    Notification::assertNothingSent();
-    expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
-});
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+    });
 
-test('ApproveEmailAccessRequestAction does nothing when request is already denied', function (): void {
-    $request = EmailAccessRequest::factory()->denied()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+    it('does nothing when request is already approved', function (): void {
+        $request = EmailAccessRequest::factory()->approved()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-    Notification::fake();
+        Notification::fake();
 
-    app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request);
 
-    Notification::assertNothingSent();
-    expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
-});
+        Notification::assertNothingSent();
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
 
-// DenyEmailAccessRequestAction tests
+    it('does nothing when request is already denied', function (): void {
+        $request = EmailAccessRequest::factory()->denied()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
 
-test('DenyEmailAccessRequestAction updates request status to DENIED', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
+        Notification::fake();
 
-    Notification::fake();
+        app(DenyEmailAccessRequestAction::class)->execute($request);
 
-    app(DenyEmailAccessRequestAction::class)->execute($request);
-
-    expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
-});
-
-test('DenyEmailAccessRequestAction sends a notification to the requester', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
-
-    Notification::fake();
-
-    app(DenyEmailAccessRequestAction::class)->execute($request);
-
-    Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
-});
-
-test('DenyEmailAccessRequestAction does not create a share', function (): void {
-    $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
-
-    Notification::fake();
-
-    app(DenyEmailAccessRequestAction::class)->execute($request);
-
-    expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
-});
-
-test('DenyEmailAccessRequestAction does nothing when request is already approved', function (): void {
-    $request = EmailAccessRequest::factory()->approved()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
-
-    Notification::fake();
-
-    app(DenyEmailAccessRequestAction::class)->execute($request);
-
-    Notification::assertNothingSent();
-    expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
-});
-
-test('DenyEmailAccessRequestAction does nothing when request is already denied', function (): void {
-    $request = EmailAccessRequest::factory()->denied()->forTier(EmailPrivacyTier::FULL)->create([
-        'requester_id' => $this->requester->id,
-        'owner_id' => $this->owner->id,
-        'email_id' => $this->email->getKey(),
-    ]);
-
-    Notification::fake();
-
-    app(DenyEmailAccessRequestAction::class)->execute($request);
-
-    Notification::assertNothingSent();
+        Notification::assertNothingSent();
+    });
 });

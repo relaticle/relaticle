@@ -40,7 +40,7 @@ beforeEach(function (): void {
     ]);
 });
 
-test('SendEmailAction dispatches SendEmailJob to the emails queue', function (): void {
+it('dispatches SendEmailJob to the emails queue', function (): void {
     Queue::fake();
 
     $sendData = [
@@ -65,7 +65,7 @@ test('SendEmailAction dispatches SendEmailJob to the emails queue', function ():
     );
 });
 
-test('SendEmailAction passes linkToType and linkToId to the job', function (): void {
+it('passes linkToType and linkToId to the job', function (): void {
     Queue::fake();
 
     $person = People::create([
@@ -96,7 +96,7 @@ test('SendEmailAction passes linkToType and linkToId to the job', function (): v
     );
 });
 
-test('EmailSendingService throws when hourly send limit is exceeded', function (): void {
+it('throws when hourly send limit is exceeded', function (): void {
     $this->account->update(['hourly_send_limit' => 2]);
 
     foreach (range(1, 2) as $i) {
@@ -123,7 +123,7 @@ test('EmailSendingService throws when hourly send limit is exceeded', function (
     ]))->toThrow(RuntimeException::class, 'Hourly send limit');
 });
 
-test('EmailSendingService throws when daily send limit is exceeded', function (): void {
+it('throws when daily send limit is exceeded', function (): void {
     $this->account->update(['daily_send_limit' => 1]);
 
     Email::create([

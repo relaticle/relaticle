@@ -38,7 +38,7 @@ function makePrivacyEmail(array $overrides = []): Email
     ], $overrides));
 }
 
-test('effectiveTier returns FULL when viewer is the email owner', function (): void {
+it('effectiveTier returns FULL when viewer is the email owner', function (): void {
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::PRIVATE]);
 
     $tier = $this->service->effectiveTier($email, $this->owner);
@@ -46,7 +46,7 @@ test('effectiveTier returns FULL when viewer is the email owner', function (): v
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-test('effectiveTier returns null when a participant matches a protected email address', function (): void {
+it('effectiveTier returns null when a participant matches a protected email address', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     ProtectedRecipient::factory()->email('protected@sensitive.com')->create([
@@ -66,7 +66,7 @@ test('effectiveTier returns null when a participant matches a protected email ad
     expect($tier)->toBeNull();
 });
 
-test('effectiveTier returns null when a participant matches a protected domain', function (): void {
+it('effectiveTier returns null when a participant matches a protected domain', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     ProtectedRecipient::factory()->domain('sensitive.com')->create([
@@ -86,7 +86,7 @@ test('effectiveTier returns null when a participant matches a protected domain',
     expect($tier)->toBeNull();
 });
 
-test('effectiveTier returns null for internal emails', function (): void {
+it('effectiveTier returns null for internal emails', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail([
@@ -99,7 +99,7 @@ test('effectiveTier returns null for internal emails', function (): void {
     expect($tier)->toBeNull();
 });
 
-test('effectiveTier uses per-email share tier when a share exists for the viewer', function (): void {
+it('effectiveTier uses per-email share tier when a share exists for the viewer', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
@@ -115,7 +115,7 @@ test('effectiveTier uses per-email share tier when a share exists for the viewer
     expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-test('effectiveTier falls back to the email privacy_tier when no share exists', function (): void {
+it('effectiveTier falls back to the email privacy_tier when no share exists', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::SUBJECT]);
@@ -125,7 +125,7 @@ test('effectiveTier falls back to the email privacy_tier when no share exists', 
     expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-test('effectiveTier returns null when email privacy_tier is PRIVATE and viewer is not owner', function (): void {
+it('effectiveTier returns null when email privacy_tier is PRIVATE and viewer is not owner', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::PRIVATE]);
@@ -135,7 +135,7 @@ test('effectiveTier returns null when email privacy_tier is PRIVATE and viewer i
     expect($tier)->toBeNull();
 });
 
-test('effectiveTier returns METADATA_ONLY for a non-owner when email is metadata_only', function (): void {
+it('effectiveTier returns METADATA_ONLY for a non-owner when email is metadata_only', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
@@ -145,7 +145,7 @@ test('effectiveTier returns METADATA_ONLY for a non-owner when email is metadata
     expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
-test('effectiveTier returns FULL for a non-owner when email is FULL', function (): void {
+it('effectiveTier returns FULL for a non-owner when email is FULL', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
@@ -155,7 +155,7 @@ test('effectiveTier returns FULL for a non-owner when email is FULL', function (
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-test('defaultTierForUser returns user-level tier when the user has one set', function (): void {
+it('defaultTierForUser returns user-level tier when the user has one set', function (): void {
     $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $tier = $this->service->defaultTierForUser($this->owner);
@@ -163,7 +163,7 @@ test('defaultTierForUser returns user-level tier when the user has one set', fun
     expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-test('defaultTierForUser falls back to team default when user has no preference', function (): void {
+it('defaultTierForUser falls back to team default when user has no preference', function (): void {
     $this->owner->update(['default_email_sharing_tier' => null]);
     $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
 
@@ -172,7 +172,7 @@ test('defaultTierForUser falls back to team default when user has no preference'
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-test('effectiveTier owner access is not blocked by protected recipient', function (): void {
+it('effectiveTier owner access is not blocked by protected recipient', function (): void {
     ProtectedRecipient::factory()->email('protected@sensitive.com')->create([
         'team_id' => $this->team->id,
         'created_by' => $this->owner->id,

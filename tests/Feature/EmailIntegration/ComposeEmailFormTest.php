@@ -41,7 +41,7 @@ beforeEach(function (): void {
     ]);
 });
 
-test('composeEmail action dispatches SendEmailJob and shows notification', function (): void {
+it('dispatches SendEmailJob and shows notification', function (): void {
     Queue::fake();
 
     livewire(EmailsRelationManager::class, [
@@ -66,7 +66,7 @@ test('composeEmail action dispatches SendEmailJob and shows notification', funct
     );
 });
 
-test('composeEmail action requires a connected_account_id', function (): void {
+it('requires a connected_account_id', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -80,7 +80,7 @@ test('composeEmail action requires a connected_account_id', function (): void {
         ->assertHasActionErrors(['connected_account_id' => 'required']);
 });
 
-test('composeEmail action requires at least one recipient in the to field', function (): void {
+it('requires at least one recipient in the to field', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -94,7 +94,7 @@ test('composeEmail action requires at least one recipient in the to field', func
         ->assertHasActionErrors(['to' => 'required']);
 });
 
-test('composeEmail action is hidden when user has no active connected account', function (): void {
+it('is hidden when user has no active connected account', function (): void {
     $this->account->update(['status' => EmailAccountStatus::DISCONNECTED]);
 
     livewire(EmailsRelationManager::class, [

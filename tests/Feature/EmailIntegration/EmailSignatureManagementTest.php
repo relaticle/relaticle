@@ -33,7 +33,7 @@ beforeEach(function (): void {
     ]);
 });
 
-test('CreateSignatureAction creates a signature record', function (): void {
+it('creates a signature record', function (): void {
     $signature = app(CreateSignatureAction::class)->execute($this->account, [
         'name' => 'Work Signature',
         'content_html' => '<p>Best regards, Test</p>',
@@ -48,7 +48,7 @@ test('CreateSignatureAction creates a signature record', function (): void {
         ->and($signature->is_default)->toBeFalse();
 });
 
-test('CreateSignatureAction sets new signature as default and unsets the previous default', function (): void {
+it('sets new signature as default and unsets the previous default', function (): void {
     $existingDefault = EmailSignature::create([
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
@@ -67,7 +67,7 @@ test('CreateSignatureAction sets new signature as default and unsets the previou
         ->and($existingDefault->fresh()->is_default)->toBeFalse();
 });
 
-test('CreateSignatureAction allows multiple non-default signatures', function (): void {
+it('allows multiple non-default signatures', function (): void {
     app(CreateSignatureAction::class)->execute($this->account, [
         'name' => 'Sig One',
         'content_html' => '<p>One</p>',
@@ -84,7 +84,7 @@ test('CreateSignatureAction allows multiple non-default signatures', function ()
         ->and(EmailSignature::where('connected_account_id', $this->account->getKey())->where('is_default', true)->count())->toBe(0);
 });
 
-test('UpdateSignatureAction updates signature name', function (): void {
+it('updates signature name', function (): void {
     $signature = EmailSignature::create([
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
@@ -98,7 +98,7 @@ test('UpdateSignatureAction updates signature name', function (): void {
     expect($updated->name)->toBe('Updated Name');
 });
 
-test('UpdateSignatureAction setting is_default clears other defaults for the same account', function (): void {
+it('setting is_default clears other defaults for the same account', function (): void {
     $sigA = EmailSignature::create([
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
