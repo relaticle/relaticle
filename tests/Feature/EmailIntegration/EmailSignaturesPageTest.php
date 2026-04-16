@@ -85,12 +85,11 @@ it('requires content_html when creating a signature', function (): void {
 // ── editSignature ─────────────────────────────────────────────────────────────
 
 it('updates name and content and sends success notification', function (): void {
-    $signature = EmailSignature::create([
+    $signature = EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,
         'user_id' => $this->user->id,
         'name' => 'Original',
         'content_html' => '<p>Old</p>',
-        'is_default' => false,
     ]);
 
     livewire(EmailSignaturesPage::class)
@@ -107,20 +106,18 @@ it('updates name and content and sends success notification', function (): void 
 });
 
 it('clears previous default when is_default is toggled on', function (): void {
-    $previousDefault = EmailSignature::create([
+    $previousDefault = EmailSignature::factory()->default()->create([
         'connected_account_id' => $this->account->id,
         'user_id' => $this->user->id,
         'name' => 'Old Default',
         'content_html' => '<p>Old</p>',
-        'is_default' => true,
     ]);
 
-    $other = EmailSignature::create([
+    $other = EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,
         'user_id' => $this->user->id,
         'name' => 'Other',
         'content_html' => '<p>Other</p>',
-        'is_default' => false,
     ]);
 
     livewire(EmailSignaturesPage::class)
@@ -138,12 +135,11 @@ it('clears previous default when is_default is toggled on', function (): void {
 // ── deleteSignature ───────────────────────────────────────────────────────────
 
 it('deletes the signature and sends success notification', function (): void {
-    $signature = EmailSignature::create([
+    $signature = EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,
         'user_id' => $this->user->id,
         'name' => 'To Delete',
         'content_html' => '<p>Bye</p>',
-        'is_default' => false,
     ]);
 
     livewire(EmailSignaturesPage::class)
@@ -168,16 +164,16 @@ it('does not delete another user\'s signature', function (): void {
         'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
-    $otherSignature = EmailSignature::create([
+    $otherSignature = EmailSignature::factory()->create([
         'connected_account_id' => $otherAccount->id,
         'user_id' => $otherUser->id,
         'name' => 'Other Signature',
         'content_html' => '<p>Other</p>',
-        'is_default' => false,
     ]);
 
     livewire(EmailSignaturesPage::class)
-        ->callAction('deleteSignature', arguments: ['signature_id' => $otherSignature->id]);
+        ->callAction('deleteSignature', arguments: ['signature_id' => $otherSignature->id])
+        ->assertNotNotified('Signature deleted.');
 
     expect(EmailSignature::whereKey($otherSignature->id)->exists())->toBeTrue();
 });
@@ -185,12 +181,11 @@ it('does not delete another user\'s signature', function (): void {
 // ── mount / page scope ────────────────────────────────────────────────────────
 
 it('shows only the authenticated user\'s signatures on mount', function (): void {
-    $mySignature = EmailSignature::create([
+    $mySignature = EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,
         'user_id' => $this->user->id,
         'name' => 'My Signature',
         'content_html' => '<p>Mine</p>',
-        'is_default' => false,
     ]);
 
     $otherUser = User::factory()->withTeam()->create();
@@ -207,12 +202,11 @@ it('shows only the authenticated user\'s signatures on mount', function (): void
         'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
-    $otherSignature = EmailSignature::create([
+    $otherSignature = EmailSignature::factory()->create([
         'connected_account_id' => $otherAccount->id,
         'user_id' => $otherUser->id,
         'name' => 'Other Signature',
         'content_html' => '<p>Theirs</p>',
-        'is_default' => false,
     ]);
 
     $component = livewire(EmailSignaturesPage::class);
@@ -239,12 +233,11 @@ it('excludes another user\'s signatures even when in the same team', function ()
         'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
-    $teammateSignature = EmailSignature::create([
+    $teammateSignature = EmailSignature::factory()->create([
         'connected_account_id' => $otherAccount->id,
         'user_id' => $otherUser->id,
         'name' => 'Teammate Signature',
         'content_html' => '<p>Teammate</p>',
-        'is_default' => false,
     ]);
 
     $component = livewire(EmailSignaturesPage::class);

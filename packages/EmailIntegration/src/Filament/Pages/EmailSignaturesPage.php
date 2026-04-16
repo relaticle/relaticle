@@ -176,16 +176,18 @@ final class EmailSignaturesPage extends Page
             ->size(Size::Small)
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                EmailSignature::query()->where('id', $arguments['signature_id'])
+                $deleted = EmailSignature::query()->where('id', $arguments['signature_id'])
                     ->whereHas('connectedAccount', fn (Builder $q) => $q->where('user_id', auth()->id()))
                     ->delete();
 
                 $this->signatures = $this->loadSignatures();
 
-                Notification::make()
-                    ->title('Signature deleted.')
-                    ->success()
-                    ->send();
+                if ($deleted > 0) {
+                    Notification::make()
+                        ->title('Signature deleted.')
+                        ->success()
+                        ->send();
+                }
             });
     }
 }
