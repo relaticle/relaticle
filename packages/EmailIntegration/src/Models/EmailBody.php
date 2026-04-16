@@ -17,6 +17,11 @@ final class EmailBody extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailBodyFactory
+    {
+        return EmailBodyFactory::new();
+    }
+
     protected $fillable = [
         'email_id',
         'body_text',

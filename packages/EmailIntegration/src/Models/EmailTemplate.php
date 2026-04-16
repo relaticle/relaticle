@@ -20,6 +20,11 @@ final class EmailTemplate extends Model
      */
     use HasFactory, HasTeam, HasUlids, SoftDeletes;
 
+    protected static function newFactory(): EmailTemplateFactory
+    {
+        return EmailTemplateFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'created_by',

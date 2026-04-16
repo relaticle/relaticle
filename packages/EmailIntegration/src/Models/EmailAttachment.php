@@ -21,6 +21,11 @@ final class EmailAttachment extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailAttachmentFactory
+    {
+        return EmailAttachmentFactory::new();
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
 /**
@@ -18,8 +19,26 @@ final class ProtectedRecipientFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Date::now(),
-            'updated_at' => Date::now(),
+            'team_id' => Team::factory(),
+            'type' => 'email',
+            'value' => $this->faker->unique()->safeEmail(),
+            'created_by' => User::factory(),
         ];
+    }
+
+    public function email(string $address): static
+    {
+        return $this->state(fn (): array => [
+            'type' => 'email',
+            'value' => $address,
+        ]);
+    }
+
+    public function domain(string $domain): static
+    {
+        return $this->state(fn (): array => [
+            'type' => 'domain',
+            'value' => $domain,
+        ]);
     }
 }

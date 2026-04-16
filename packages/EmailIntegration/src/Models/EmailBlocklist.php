@@ -20,6 +20,11 @@ final class EmailBlocklist extends Model
      */
     use HasFactory, HasTeam, HasUlids;
 
+    protected static function newFactory(): EmailBlocklistFactory
+    {
+        return EmailBlocklistFactory::new();
+    }
+
     protected $fillable = [
         'user_id',
         'team_id',

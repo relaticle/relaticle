@@ -17,6 +17,11 @@ final class PublicEmailDomain extends Model
      */
     use HasFactory, HasTeam, HasUlids;
 
+    protected static function newFactory(): PublicEmailDomainFactory
+    {
+        return PublicEmailDomainFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'domain',

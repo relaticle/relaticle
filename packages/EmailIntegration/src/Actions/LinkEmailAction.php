@@ -40,7 +40,10 @@ final readonly class LinkEmailAction
 
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = Company::query()->where('team_id', $teamId)
-                    ->whereHas('customFieldValues', fn (Builder $q) => $q->where('string_value', 'like', "%{$domain}%"))
+                    ->whereHas('customFieldValues', fn (Builder $q) => $q
+                        ->whereHas('customField', fn (Builder $cfq) => $cfq->where('code', 'domains'))
+                        ->whereRaw('json_value::text like ?', ["%{$domain}%"])
+                    )
                     ->first();
 
                 // 2. Auto-create Company when no existing record found.

@@ -18,6 +18,11 @@ final class EmailSignature extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailSignatureFactory
+    {
+        return EmailSignatureFactory::new();
+    }
+
     protected $fillable = [
         'connected_account_id',
         'user_id',

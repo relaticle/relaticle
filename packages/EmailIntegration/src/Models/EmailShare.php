@@ -18,6 +18,11 @@ final class EmailShare extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailShareFactory
+    {
+        return EmailShareFactory::new();
+    }
+
     protected $fillable = [
         'email_id',
         'shared_by',

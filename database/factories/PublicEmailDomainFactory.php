@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-declare(strict_types=1);
-
 namespace Database\Factories;
 
+use App\Models\Team;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 
 /**
@@ -20,8 +18,8 @@ final class PublicEmailDomainFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Date::now(),
-            'updated_at' => Date::now(),
+            'team_id' => Team::factory(),
+            'domain' => $this->faker->unique()->domainName(),
         ];
     }
 }

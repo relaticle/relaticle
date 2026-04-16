@@ -43,6 +43,11 @@ final class ConnectedAccount extends Model
      */
     use HasFactory, HasTeam, HasUlids, SoftDeletes;
 
+    protected static function newFactory(): ConnectedAccountFactory
+    {
+        return ConnectedAccountFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'user_id',

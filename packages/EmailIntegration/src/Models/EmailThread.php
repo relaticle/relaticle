@@ -20,6 +20,11 @@ final class EmailThread extends Model
      */
     use HasAiSummary, HasFactory, HasTeam, HasUlids;
 
+    protected static function newFactory(): EmailThreadFactory
+    {
+        return EmailThreadFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'connected_account_id',

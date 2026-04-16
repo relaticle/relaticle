@@ -23,6 +23,11 @@ final class EmailAccessRequest extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailAccessRequestFactory
+    {
+        return EmailAccessRequestFactory::new();
+    }
+
     protected $fillable = [
         'requester_id',
         'owner_id',

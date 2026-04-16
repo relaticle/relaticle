@@ -57,6 +57,11 @@ final class Email extends Model
      */
     use HasFactory, HasTeam, HasUlids, SoftDeletes;
 
+    protected static function newFactory(): EmailFactory
+    {
+        return EmailFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'user_id',

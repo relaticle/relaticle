@@ -17,6 +17,11 @@ final class EmailLabel extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailLabelFactory
+    {
+        return EmailLabelFactory::new();
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

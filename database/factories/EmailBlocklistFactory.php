@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Date;
+use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 
 /**
@@ -18,8 +20,26 @@ final class EmailBlocklistFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Date::now(),
-            'updated_at' => Date::now(),
+            'user_id' => User::factory(),
+            'team_id' => Team::factory(),
+            'type' => EmailBlocklistType::EMAIL,
+            'value' => $this->faker->unique()->safeEmail(),
         ];
+    }
+
+    public function email(string $address): static
+    {
+        return $this->state(fn (): array => [
+            'type' => EmailBlocklistType::EMAIL,
+            'value' => $address,
+        ]);
+    }
+
+    public function domain(string $domain): static
+    {
+        return $this->state(fn (): array => [
+            'type' => EmailBlocklistType::DOMAIN,
+            'value' => $domain,
+        ]);
     }
 }

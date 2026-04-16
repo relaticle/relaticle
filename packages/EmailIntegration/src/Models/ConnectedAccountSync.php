@@ -17,6 +17,11 @@ final class ConnectedAccountSync extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): ConnectedAccountSyncFactory
+    {
+        return ConnectedAccountSyncFactory::new();
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

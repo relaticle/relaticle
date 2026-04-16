@@ -18,6 +18,11 @@ final class ProtectedRecipient extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): ProtectedRecipientFactory
+    {
+        return ProtectedRecipientFactory::new();
+    }
+
     protected $fillable = [
         'team_id',
         'type',

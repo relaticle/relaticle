@@ -20,6 +20,11 @@ final class EmailParticipant extends Model
      */
     use HasFactory, HasUlids;
 
+    protected static function newFactory(): EmailParticipantFactory
+    {
+        return EmailParticipantFactory::new();
+    }
+
     protected $fillable = [
         'email_id',
         'email_address',

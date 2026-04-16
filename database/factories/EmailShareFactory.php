@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Date;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailShare;
 
 /**
@@ -18,8 +20,17 @@ final class EmailShareFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Date::now(),
-            'updated_at' => Date::now(),
+            'email_id' => Email::factory(),
+            'shared_by' => User::factory(),
+            'shared_with' => User::factory(),
+            'tier' => EmailPrivacyTier::FULL->value,
         ];
+    }
+
+    public function tier(EmailPrivacyTier $tier): static
+    {
+        return $this->state(fn (): array => [
+            'tier' => $tier->value,
+        ]);
     }
 }

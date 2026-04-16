@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Date;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 
 /**
@@ -18,8 +18,9 @@ final class EmailBodyFactory extends Factory
     public function definition(): array
     {
         return [
-            'created_at' => Date::now(),
-            'updated_at' => Date::now(),
+            'email_id' => Email::factory(),
+            'body_text' => $this->faker->paragraph(),
+            'body_html' => '<p>'.$this->faker->paragraph().'</p>',
         ];
     }
 }
