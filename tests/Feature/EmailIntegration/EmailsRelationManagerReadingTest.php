@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\RelationManagers\BaseEmailsRelationManager;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
@@ -14,9 +15,8 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
-use Relaticle\EmailIntegration\Services\EmailSharingService;
 
-mutates(EmailsRelationManager::class);
+mutates(BaseEmailsRelationManager::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -200,15 +200,20 @@ describe('manageSharing table action', function (): void {
 
         linkEmailToPerson($email, $this->person);
 
-        // The Filament action passes the tier through EnumStateCast, so the service
-        // receives an EmailPrivacyTier enum directly. Call the service directly to
-        // verify the sharing behaviour that the action delegates to.
-        app(EmailSharingService::class)->shareEmail(
-            $email,
-            $this->owner,
-            $this->viewer,
-            EmailPrivacyTier::SUBJECT,
-        );
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('manageSharing', $email, data: [
+                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
+                'shares' => [
+                    [
+                        'shared_with' => $this->viewer->id,
+                        'tier' => EmailPrivacyTier::SUBJECT->value,
+                    ],
+                ],
+            ])
+            ->assertNotified('Sharing settings saved.');
 
         $this->assertDatabaseHas('email_shares', [
             'email_id' => $email->getKey(),
@@ -217,7 +222,7 @@ describe('manageSharing table action', function (): void {
         ]);
     });
 
-    it("replaces the owner's previous shares when saved again", function (): void {
+    it("clears the owner's previous shares when saved with an empty shares list", function (): void {
         $this->actingAs($this->owner);
         Filament::setTenant($this->team);
 
@@ -237,26 +242,19 @@ describe('manageSharing table action', function (): void {
             'tier' => EmailPrivacyTier::SUBJECT->value,
         ]);
 
-        $otherViewer = User::factory()->create(['current_team_id' => $this->team->id]);
-
-        // Delete old shares and create new ones as the action delegates to the service.
-        $email->shares()->where('shared_by', $this->owner->getKey())->delete();
-
-        app(EmailSharingService::class)->shareEmail(
-            $email,
-            $this->owner,
-            $otherViewer,
-            EmailPrivacyTier::FULL,
-        );
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('manageSharing', $email, data: [
+                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
+                'shares' => [],
+            ])
+            ->assertNotified('Sharing settings saved.');
 
         $this->assertDatabaseMissing('email_shares', [
             'email_id' => $email->getKey(),
             'shared_with' => $this->viewer->id,
-        ]);
-
-        $this->assertDatabaseHas('email_shares', [
-            'email_id' => $email->getKey(),
-            'shared_with' => $otherViewer->id,
         ]);
     });
 
@@ -303,16 +301,17 @@ describe('shareAllOnRecord header action', function (): void {
         linkEmailToPerson($emailA, $this->person);
         linkEmailToPerson($emailB, $this->person);
 
-        // The shareAllOnRecord action delegates to EmailSharingService::setTierForAllOnRecord.
-        // Verify that the service correctly updates the privacy tier on all linked emails.
-        $updated = app(EmailSharingService::class)->setTierForAllOnRecord(
-            $this->person,
-            $this->owner,
-            EmailPrivacyTier::FULL,
-        );
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('shareAllOnRecord', data: [
+                'privacy_tier' => EmailPrivacyTier::FULL->value,
+                'shares' => [],
+            ])
+            ->assertNotified('Sharing settings saved for all your emails on this record.');
 
-        expect($updated)->toBe(2)
-            ->and($emailA->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        expect($emailA->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
             ->and($emailB->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
     });
 
@@ -329,14 +328,20 @@ describe('shareAllOnRecord header action', function (): void {
 
         linkEmailToPerson($email, $this->person);
 
-        // The shareAllOnRecord action delegates to EmailSharingService::shareAllOnRecord.
-        // Verify that the service correctly creates shares for all linked emails.
-        app(EmailSharingService::class)->shareAllOnRecord(
-            $this->person,
-            $this->owner,
-            $this->viewer,
-            EmailPrivacyTier::SUBJECT,
-        );
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('shareAllOnRecord', data: [
+                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
+                'shares' => [
+                    [
+                        'shared_with' => $this->viewer->id,
+                        'tier' => EmailPrivacyTier::SUBJECT->value,
+                    ],
+                ],
+            ])
+            ->assertNotified('Sharing settings saved for all your emails on this record.');
 
         $this->assertDatabaseHas('email_shares', [
             'email_id' => $email->getKey(),

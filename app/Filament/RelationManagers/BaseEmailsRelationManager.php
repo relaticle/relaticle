@@ -103,16 +103,14 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->action(function (array $data, EmailSharingService $sharingService): void {
                         $owner = $this->authUser();
                         $record = $this->getOwnerRecord();
-                        $tier = EmailPrivacyTier::from($data['privacy_tier']);
-
-                        $sharingService->setTierForAllOnRecord($record, $owner, $tier);
+                        $sharingService->setTierForAllOnRecord($record, $owner, $data['privacy_tier']);
 
                         foreach ($data['shares'] ?? [] as $share) {
                             $sharingService->shareAllOnRecord(
                                 $record,
                                 $owner,
                                 User::query()->findOrFail($share['shared_with']),
-                                EmailPrivacyTier::from($share['tier']),
+                                $share['tier'],
                             );
                         }
 
@@ -259,7 +257,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                     $record,
                                     $sharer,
                                     User::query()->findOrFail($share['shared_with']),
-                                    EmailPrivacyTier::from($share['tier']),
+                                    $share['tier'],
                                 );
                             }
                             Notification::make()
