@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 
@@ -36,6 +37,9 @@ final readonly class BlocklistService
         return false;
     }
 
+    /**
+     * @return array{0: Collection<int|string, lowercase-string>, 1: Collection<int|string, lowercase-string>}
+     */
     private function loadBlocklist(User $user, string $teamId): array
     {
         $rows = EmailBlocklist::query()->where('user_id', $user->getKey())

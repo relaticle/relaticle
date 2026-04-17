@@ -63,8 +63,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->modalHeading('Share my emails on this record')
                     ->modalDescription('Update visibility and teammate access for all emails you own on this record.')
                     ->modalSubmitActionLabel('Save')
-                    ->visible(fn (): bool => $this->getOwnerRecord()
-                        ->emails()
+                    ->visible(fn (): bool => $this->getRelationship()
                         ->where('user_id', $this->authUser()->getKey())
                         ->exists())
                     ->schema([
@@ -110,7 +109,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                             $sharingService->shareAllOnRecord(
                                 $record,
                                 $owner,
-                                User::query()->findOrFail($share['shared_with']),
+                                User::query()->findOrFail((string) $share['shared_with']),
                                 $share['tier'],
                             );
                         }
@@ -257,7 +256,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 $sharingService->shareEmail(
                                     $record,
                                     $sharer,
-                                    User::query()->findOrFail($share['shared_with']),
+                                    User::query()->findOrFail((string) $share['shared_with']),
                                     $share['tier'],
                                 );
                             }

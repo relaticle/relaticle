@@ -76,8 +76,7 @@ final readonly class GmailService
     public function fetchMessage(string $messageId): FetchedEmailData
     {
         $message = $this->gmail->users_messages->get('me', $messageId, ['format' => 'full']);
-        $headers = collect($message->getPayload()->getHeaders())
-            ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
+        $headers = $this->indexHeaders($message->getPayload());
 
         $payload = $message->getPayload();
 
@@ -120,8 +119,7 @@ final readonly class GmailService
                 'maxResults' => 500,
             ]);
 
-        $messageIds = collect($response->getMessages() ?? [])
-            ->map(fn (Message $message): string => $message->getId());
+        $messageIds = $this->pluckMessageIds($response->getMessages());
 
         $profile = $this->gmail
             ->users
@@ -397,6 +395,10 @@ final readonly class GmailService
 
         $parts = preg_split('/,(?![^<>]*>)/', $raw);
 
+        if ($parts === false) {
+            return [];
+        }
+
         foreach ($parts as $part) {
             $part = trim($part);
             if ($part === '') {
@@ -420,5 +422,27 @@ final readonly class GmailService
         }
 
         return $addresses;
+    }
+
+    /**
+     * @return Collection<string, MessagePartHeader>
+     */
+    private function indexHeaders(MessagePart $payload): Collection
+    {
+        /** @var array<int, MessagePartHeader> $headers */
+        $headers = $payload->getHeaders();
+
+        return collect($headers)
+            ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
+    }
+
+    /**
+     * @param  array<int, Message>|null  $messages
+     * @return Collection<int, string>
+     */
+    private function pluckMessageIds(?array $messages): Collection
+    {
+        return collect($messages ?? [])
+            ->map(fn (Message $message): string => $message->getId());
     }
 }

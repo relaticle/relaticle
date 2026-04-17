@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\Concerns\HasTeam;
 use App\Models\User;
+use Database\Factories\EmailBatchFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,9 @@ use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 
 final class EmailBatch extends Model
 {
+    /** @use HasFactory<EmailBatchFactory> */
     use HasFactory;
+
     use HasTeam, HasUlids;
 
     protected $fillable = [

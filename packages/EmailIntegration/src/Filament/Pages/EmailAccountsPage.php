@@ -50,7 +50,7 @@ final class EmailAccountsPage extends Page
     private function getAccounts(): Collection
     {
         return ConnectedAccount::query()->where('user_id', auth()->id())
-            ->where('team_id', auth()->user()->currentTeam->getKey())
+            ->where('team_id', filament()->getTenant()?->getKey())
             ->get();
     }
 
@@ -91,7 +91,7 @@ final class EmailAccountsPage extends Page
             ->color('warning')
             ->size(Size::Small)
             ->url(fn (array $arguments): string => route('email-accounts.redirect', [
-                'provider' => ConnectedAccount::query()->find($arguments['account_id'])?->provider->value,
+                'provider' => ConnectedAccount::query()->find((string) $arguments['account_id'])?->provider->value,
             ]), true);
     }
 
@@ -103,16 +103,15 @@ final class EmailAccountsPage extends Page
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
-                /** @var ConnectedAccount|null $account */
-                $account = ConnectedAccount::query()->find($arguments['account_id']);
+                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
 
                 return [
-                    'sync_inbox' => $account?->sync_inbox ?? true,
-                    'sync_sent' => $account?->sync_sent ?? true,
-                    'contact_creation_mode' => $account?->contact_creation_mode?->value ?? ContactCreationMode::None->value,
-                    'auto_create_companies' => $account?->auto_create_companies ?? false,
-                    'hourly_send_limit' => $account?->hourly_send_limit,
-                    'daily_send_limit' => $account?->daily_send_limit,
+                    'sync_inbox' => $account->sync_inbox,
+                    'sync_sent' => $account->sync_sent,
+                    'contact_creation_mode' => $account->contact_creation_mode->value,
+                    'auto_create_companies' => $account->auto_create_companies,
+                    'hourly_send_limit' => $account->hourly_send_limit,
+                    'daily_send_limit' => $account->daily_send_limit,
                 ];
             })
             ->schema([
