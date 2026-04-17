@@ -63,7 +63,8 @@ abstract class BaseActivityTimelineRelationManager extends RelationManager
                     'type' => 'email',
                     'date' => $email->sent_at ?? $email->created_at,
                     'record' => $email,
-                ]);
+                ])
+                ->toBase();
         }
 
         $notes = collect();
@@ -78,7 +79,8 @@ abstract class BaseActivityTimelineRelationManager extends RelationManager
                     'type' => 'note',
                     'date' => $note->created_at,
                     'record' => $note,
-                ]);
+                ])
+                ->toBase();
         }
 
         return $emails->merge($notes)
