@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Relaticle\ActivityLog\Contracts\TimelineSource;
 use Relaticle\ActivityLog\Timeline\Sources\ActivityLogSource;
@@ -242,6 +244,50 @@ final class TimelineBuilder
         }
 
         return collect($grouped)->map(fn (array $g): TimelineEntry => $g['entry'])->values();
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, TimelineEntry>
+     */
+    public function paginate(?int $perPage = null, int $page = 1): LengthAwarePaginator
+    {
+        $perPage = $perPage ?? (int) config('activity-log.default_per_page', 20);
+        $buffer = (int) config('activity-log.pagination_buffer', 2);
+        $cap = $perPage * ($page + $buffer);
+
+        $window = $this->makeWindow(cap: $cap);
+        $entries = collect();
+
+        foreach ($this->sources as $source) {
+            foreach ($source->resolve($this->subject, $window) as $entry) {
+                if (! $this->passesFilters($entry)) {
+                    continue;
+                }
+                $entries->push($entry);
+            }
+        }
+
+        $entries = $this->applyDedup($entries);
+
+        $sorted = $this->sortDesc
+            ? $entries->sortByDesc(fn (TimelineEntry $e): int => $e->occurredAt->getTimestamp())->values()
+            : $entries->sortBy(fn (TimelineEntry $e): int => $e->occurredAt->getTimestamp())->values();
+
+        $total = $sorted->count();
+        $slice = $sorted->forPage($page, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            items: $slice,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $page,
+            options: ['path' => Paginator::resolveCurrentPath()],
+        );
+    }
+
+    public function count(): int
+    {
+        return $this->get()->count();
     }
 
     public function makeWindow(int $cap): Window
