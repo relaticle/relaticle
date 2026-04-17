@@ -38,6 +38,10 @@ final class TimelineBuilder
 
     private bool $sortDesc = true;
 
+    private bool $deduplicate = true;
+
+    private ?Closure $dedupKeyResolver = null;
+
     public function __construct(private readonly Model $subject) {}
 
     public static function make(Model $subject): self
@@ -165,6 +169,20 @@ final class TimelineBuilder
         return $this;
     }
 
+    public function deduplicate(bool $enabled = true): self
+    {
+        $this->deduplicate = $enabled;
+
+        return $this;
+    }
+
+    public function dedupKeyUsing(Closure $resolver): self
+    {
+        $this->dedupKeyResolver = $resolver;
+
+        return $this;
+    }
+
     /** @return Collection<int, TimelineEntry> */
     public function get(): Collection
     {
@@ -180,9 +198,50 @@ final class TimelineBuilder
             }
         }
 
+        $entries = $this->applyDedup($entries);
+
         return $this->sortDesc
             ? $entries->sortByDesc(fn (TimelineEntry $e): int => $e->occurredAt->getTimestamp())->values()
             : $entries->sortBy(fn (TimelineEntry $e): int => $e->occurredAt->getTimestamp())->values();
+    }
+
+    /**
+     * @param  Collection<int, TimelineEntry>  $entries
+     * @return Collection<int, TimelineEntry>
+     */
+    private function applyDedup(Collection $entries): Collection
+    {
+        if (! $this->deduplicate) {
+            return $entries;
+        }
+
+        $grouped = [];
+        $orderIndex = 0;
+
+        foreach ($entries as $entry) {
+            $key = $this->dedupKeyResolver !== null
+                ? ($this->dedupKeyResolver)($entry)
+                : $entry->dedupKey;
+
+            $current = $grouped[$key] ?? null;
+
+            if ($current === null) {
+                $grouped[$key] = ['entry' => $entry, 'order' => $orderIndex++];
+
+                continue;
+            }
+
+            $incumbent = $current['entry'];
+
+            if (
+                $entry->sourcePriority > $incumbent->sourcePriority
+                || ($entry->sourcePriority === $incumbent->sourcePriority && $current['order'] > $orderIndex)
+            ) {
+                $grouped[$key] = ['entry' => $entry, 'order' => $current['order']];
+            }
+        }
+
+        return collect($grouped)->map(fn (array $g): TimelineEntry => $g['entry'])->values();
     }
 
     public function makeWindow(int $cap): Window
