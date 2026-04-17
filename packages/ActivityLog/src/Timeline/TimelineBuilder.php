@@ -44,6 +44,8 @@ final class TimelineBuilder
 
     private ?Closure $dedupKeyResolver = null;
 
+    private ?int $cacheTtl = null;
+
     public function __construct(private readonly Model $subject) {}
 
     public static function make(Model $subject): self
@@ -185,6 +187,27 @@ final class TimelineBuilder
         return $this;
     }
 
+    public function cached(int $ttlSeconds): self
+    {
+        $this->cacheTtl = $ttlSeconds;
+
+        return $this;
+    }
+
+    private function filterHash(): string
+    {
+        return substr(md5(serialize([
+            'from' => $this->from?->toIso8601String(),
+            'to' => $this->to?->toIso8601String(),
+            'typeAllow' => $this->typeAllow,
+            'typeDeny' => $this->typeDeny,
+            'eventAllow' => $this->eventAllow,
+            'eventDeny' => $this->eventDeny,
+            'sortDesc' => $this->sortDesc,
+            'sources' => count($this->sources),
+        ])), 0, 12);
+    }
+
     /** @return Collection<int, TimelineEntry> */
     public function get(): Collection
     {
@@ -252,6 +275,26 @@ final class TimelineBuilder
     public function paginate(?int $perPage = null, int $page = 1): LengthAwarePaginator
     {
         $perPage = $perPage ?? (int) config('activity-log.default_per_page', 20);
+
+        if ($this->cacheTtl !== null && $this->cacheTtl > 0) {
+            $cache = app(TimelineCache::class);
+            $key = $cache->keyFor($this->subject, $this->filterHash(), $page, $perPage);
+
+            return $cache->store()->remember(
+                $key,
+                $this->cacheTtl,
+                fn (): LengthAwarePaginator => $this->runPaginate($perPage, $page),
+            );
+        }
+
+        return $this->runPaginate($perPage, $page);
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, TimelineEntry>
+     */
+    private function runPaginate(int $perPage, int $page): LengthAwarePaginator
+    {
         $buffer = (int) config('activity-log.pagination_buffer', 2);
         $cap = $perPage * ($page + $buffer);
 
