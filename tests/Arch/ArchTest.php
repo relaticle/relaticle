@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
 use App\Filament\Pages\Import\ImportPage;
+use App\Filament\RelationManagers\BaseActivityTimelineRelationManager;
+use App\Filament\RelationManagers\BaseEmailsRelationManager;
 use App\Livewire\BaseLivewireComponent;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
@@ -41,6 +43,8 @@ arch('avoid open for extension')
     ->classes()
     ->toBeFinal()
     ->ignoring([
+        BaseActivityTimelineRelationManager::class,
+        BaseEmailsRelationManager::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -61,6 +65,8 @@ arch('ensure no extends')
     ->not
     ->toBeAbstract()
     ->ignoring([
+        BaseActivityTimelineRelationManager::class,
+        BaseEmailsRelationManager::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
