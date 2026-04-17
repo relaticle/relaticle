@@ -57,11 +57,11 @@ final class ClassifyEmailJob implements ShouldQueue
     {
         $subject = $email->subject ?? '(no subject)';
         $snippet = $email->snippet ?? '';
-        $from = $email->participants->where('role', 'from')->first()?->email_address ?? '';
+        $from = $email->participants->where('role', 'from')->first()->email_address ?? '';
 
         $body = '';
         if ($email->privacy_tier === EmailPrivacyTier::FULL) {
-            $body = mb_substr($email->body?->body_text ?? '', 0, 800);
+            $body = mb_substr($email->body->body_text ?? '', 0, 800);
         }
 
         $prompt = <<<TEXT

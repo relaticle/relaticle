@@ -38,6 +38,7 @@ final readonly class EmailThreadSummaryService
             ->oldest('sent_at')
             ->get();
 
+        /** @var \Illuminate\Support\Collection<int, string> $lines */
         $lines = collect(["Email thread: \"{$thread->subject}\""]);
         $lines->push("{$thread->email_count} emails, {$thread->participant_count} participants");
         $lines->push('Date range: '.($thread->first_email_at?->toDateString() ?? '—').' — '.($thread->last_email_at?->toDateString() ?? '—'));
@@ -45,7 +46,7 @@ final readonly class EmailThreadSummaryService
 
         foreach ($emails as $index => $email) {
             $n = $index + 1;
-            $from = $email->from->first()?->name ?? $email->from->first()?->email_address ?? 'Unknown';
+            $from = $email->from->first()->name ?? $email->from->first()->email_address ?? 'Unknown';
             $date = $email->sent_at?->toDateTimeString() ?? '—';
             $dir = $email->direction->getLabel();
 
@@ -55,7 +56,7 @@ final readonly class EmailThreadSummaryService
             $isOwner = $email->user_id === $viewer->getKey();
 
             if ($isOwner || $email->privacy_tier === EmailPrivacyTier::FULL) {
-                $body = $email->body?->body_text ?? $email->snippet ?? '(no body)';
+                $body = $email->body->body_text ?? $email->snippet ?? '(no body)';
                 $lines->push('Body: '.mb_substr($body, 0, 500));
             } elseif ($email->privacy_tier === EmailPrivacyTier::SUBJECT) {
                 $lines->push("Subject: {$email->subject}  (body hidden)");

@@ -136,8 +136,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
                 TextColumn::make('from_address')
                     ->label('From')
-                    ->getStateUsing(fn (Email $record): string => $record->from->first()?->name
-                        ?? $record->from->first()?->email_address
+                    ->getStateUsing(fn (Email $record): string => $record->from->first()->name
+                        ?? $record->from->first()->email_address
                         ?? '—'),
 
                 TextColumn::make('ai_label')
@@ -151,7 +151,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         'Sales' => 'primary',
                         default => 'gray',
                     })
-                    ->getStateUsing(fn (Email $record): string => $record->labels->where('source', 'ai')->first()?->label ?? ''),
+                    ->getStateUsing(fn (Email $record): string => $record->labels->where('source', 'ai')->first()->label ?? ''),
 
                 TextColumn::make('direction')
                     ->label('Direction')
