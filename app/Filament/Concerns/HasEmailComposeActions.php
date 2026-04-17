@@ -148,7 +148,7 @@ trait HasEmailComposeActions
                     'to' => $toParticipants,
                     'subject' => $subjectPrefix.($email->subject ?? ''),
                     'body_html' => '',
-                    'quoted_body_html' => $email->body?->body_html ?? '',
+                    'quoted_body_html' => $email->body->body_html ?? '',
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
                 ];
