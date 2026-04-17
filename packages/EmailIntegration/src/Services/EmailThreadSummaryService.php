@@ -44,12 +44,12 @@ final readonly class EmailThreadSummaryService
         $lines->push('');
 
         foreach ($emails as $index => $email) {
-            $n = $index + 1;
+            $position = $index + 1;
             $from = $email->from->first()?->name ?? $email->from->first()?->email_address ?? 'Unknown';
             $date = $email->sent_at?->toDateTimeString() ?? '—';
-            $dir = $email->direction->getLabel();
+            $directionLabel = $email->direction->getLabel();
 
-            $lines->push("--- Email {$n} ({$dir}) ---");
+            $lines->push("--- Email {$position} ({$directionLabel}) ---");
             $lines->push("From: {$from}  |  Date: {$date}");
 
             $isOwner = $email->user_id === $viewer->getKey();

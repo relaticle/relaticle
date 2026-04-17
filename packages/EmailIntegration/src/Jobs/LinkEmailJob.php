@@ -157,11 +157,11 @@ final class LinkEmailJob implements ShouldBeUnique, ShouldQueue
     {
         $directions = Email::query()
             ->where('connected_account_id', $account->getKey())
-            ->whereHas('participants', fn (Builder $q) => $q->where('email_address', $emailAddress))
+            ->whereHas('participants', fn (Builder $participantQuery) => $participantQuery->where('email_address', $emailAddress))
             ->distinct()
             ->pluck('direction');
 
-        $values = $directions->map(fn (mixed $d): string => $d instanceof EmailDirection ? $d->value : (string) $d);
+        $values = $directions->map(fn (mixed $direction): string => $direction instanceof EmailDirection ? $direction->value : (string) $direction);
 
         return $values->contains(EmailDirection::INBOUND->value)
             && $values->contains(EmailDirection::OUTBOUND->value);

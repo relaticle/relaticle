@@ -19,6 +19,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['shared_with', 'email_id']);
+            $table->unique(['email_id', 'shared_with'], 'email_shares_email_user_unique');
         });
     }
 

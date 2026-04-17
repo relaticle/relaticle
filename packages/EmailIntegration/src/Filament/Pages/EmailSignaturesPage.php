@@ -56,7 +56,7 @@ final class EmailSignaturesPage extends Page
     private function loadSignatures(): Collection
     {
         return EmailSignature::query()
-            ->whereHas('connectedAccount', fn (Builder $q) => $q
+            ->whereHas('connectedAccount', fn (Builder $accountQuery) => $accountQuery
                 ->where('user_id', auth()->id())
                 ->where('team_id', filament()->getTenant()?->getKey())
             )
@@ -177,7 +177,7 @@ final class EmailSignaturesPage extends Page
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
                 $deleted = EmailSignature::query()->where('id', $arguments['signature_id'])
-                    ->whereHas('connectedAccount', fn (Builder $q) => $q->where('user_id', auth()->id()))
+                    ->whereHas('connectedAccount', fn (Builder $accountQuery) => $accountQuery->where('user_id', auth()->id()))
                     ->delete();
 
                 $this->signatures = $this->loadSignatures();

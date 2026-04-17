@@ -22,11 +22,11 @@ final readonly class VisibleEmailScope implements Scope
     {
         $viewerId = $this->viewer->getKey();
 
-        $builder->where(function (Builder $q) use ($viewerId): void {
+        $builder->where(function (Builder $visibilityQuery) use ($viewerId): void {
             // Owner always sees their own emails
-            $q->where('user_id', $viewerId)
-                ->orWhere(function (Builder $q) use ($viewerId): void {
-                    $q->where('is_internal', false)
+            $visibilityQuery->where('user_id', $viewerId)
+                ->orWhere(function (Builder $sharedQuery) use ($viewerId): void {
+                    $sharedQuery->where('is_internal', false)
                         ->where('privacy_tier', '!=', EmailPrivacyTier::PRIVATE->value)
                         ->orWhereHas('shares', fn (Builder $shareQuery) => $shareQuery->where('shared_with', $viewerId));
                 });

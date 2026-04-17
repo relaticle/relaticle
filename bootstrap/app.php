@@ -90,6 +90,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->name('email:incremental-sync')
             ->withoutOverlapping();
 
+        $schedule->command('email:dispatch-outbox')
+            ->everyMinute()
+            ->name('email:dispatch-outbox')
+            ->withoutOverlapping();
+
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();
             $schedule->command(DispatchQueueCheckJobsCommand::class)->everyMinute();

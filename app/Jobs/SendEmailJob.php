@@ -9,9 +9,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
-use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBatch;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
@@ -25,63 +23,67 @@ final class SendEmailJob implements ShouldQueue
 
     public int $backoff = 30;
 
-    /**
-     * @param  array<string, mixed>  $emailData  Validated data from SendEmailAction
-     * @param  string  $accountId  ConnectedAccount ULID
-     * @param  string|null  $batchId  EmailBatch ULID for mass sends
-     * @param  string|null  $linkToType  Fully-qualified model class e.g. App\Models\People
-     * @param  string|null  $linkToId  ULID of the record to link the sent email to
-     */
     public function __construct(
-        public readonly array $emailData,
-        public readonly string $accountId,
-        public readonly ?string $batchId = null,
-        public readonly ?string $linkToType = null,
-        public readonly ?string $linkToId = null,
+        public readonly string $emailId,
     ) {}
 
     public function handle(EmailSendingService $sendingService, LinkEmailAction $linkEmailAction): void
     {
-        $account = ConnectedAccount::query()->findOrFail($this->accountId);
+        /** @var Email|null $email */
+        $email = DB::transaction(function (): ?Email {
+            /** @var Email|null $lockedEmail */
+            $lockedEmail = Email::query()->lockForUpdate()->find($this->emailId);
 
-        /** @var array{subject: string, body_html: string, to: array<array{email: string, name: string|null}>, cc: array<array{email: string, name: string|null}>, bcc: array<array{email: string, name: string|null}>, creation_source: EmailCreationSource, in_reply_to_email_id: string|null, batch_id: string|null, privacy_tier: EmailPrivacyTier} $data */
-        $data = array_merge($this->emailData, ['batch_id' => $this->batchId]);
-        $email = $sendingService->send($account, $data);
-
-        // Direct-link to the CRM record the email was composed from
-        if ($this->linkToType !== null && $this->linkToId !== null) {
-            $alreadyLinked = DB::table('emailables')
-                ->where('email_id', $email->getKey())
-                ->where('emailable_type', $this->linkToType)
-                ->where('emailable_id', $this->linkToId)
-                ->exists();
-
-            if (! $alreadyLinked) {
-                DB::table('emailables')->insert([
-                    'email_id' => $email->getKey(),
-                    'emailable_type' => $this->linkToType,
-                    'emailable_id' => $this->linkToId,
-                    'link_source' => 'manual',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            if ($lockedEmail === null) {
+                return null;
             }
+
+            // Accept any non-terminal state. The dispatcher claims QUEUED → SENDING
+            // before enqueuing, so first attempts arrive here as SENDING; Laravel
+            // retries of the same job also arrive as SENDING.
+            if (! in_array($lockedEmail->status, [EmailStatus::QUEUED, EmailStatus::SENDING], true)) {
+                return null;
+            }
+
+            $lockedEmail->update([
+                'status' => EmailStatus::SENDING,
+                'attempts' => $lockedEmail->attempts + 1,
+            ]);
+
+            return $lockedEmail;
+        });
+
+        if ($email === null) {
+            return;
         }
 
-        // Run participant-based auto-linking (links to People/Company by email address)
-        $linkEmailAction->execute($email);
+        $sent = $sendingService->send($email);
 
-        if ($this->batchId !== null) {
-            EmailBatch::query()->where('id', $this->batchId)->increment('sent_count');
-            $this->updateBatchStatus($this->batchId);
+        $linkEmailAction->execute($sent);
+
+        if ($sent->batch_id !== null) {
+            EmailBatch::query()->where('id', $sent->batch_id)->increment('sent_count');
+            $this->updateBatchStatus((string) $sent->batch_id);
         }
     }
 
     public function failed(Throwable $exception): void
     {
-        if ($this->batchId !== null) {
-            EmailBatch::query()->where('id', $this->batchId)->increment('failed_count');
-            $this->updateBatchStatus($this->batchId);
+        /** @var Email|null $email */
+        $email = Email::query()->find($this->emailId);
+
+        if ($email === null) {
+            return;
+        }
+
+        $email->update([
+            'status' => EmailStatus::FAILED,
+            'last_error' => $exception->getMessage(),
+        ]);
+
+        if ($email->batch_id !== null) {
+            EmailBatch::query()->where('id', $email->batch_id)->increment('failed_count');
+            $this->updateBatchStatus((string) $email->batch_id);
         }
     }
 

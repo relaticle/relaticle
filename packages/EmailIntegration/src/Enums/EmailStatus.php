@@ -15,6 +15,7 @@ enum EmailStatus: string implements HasColor, HasLabel
     case SENDING = 'sending';
     case SENT = 'sent';
     case FAILED = 'failed';
+    case CANCELLED = 'cancelled';
 
     public function getLabel(): string
     {
@@ -25,6 +26,7 @@ enum EmailStatus: string implements HasColor, HasLabel
             self::SENDING => 'Sending',
             self::SENT => 'Sent',
             self::FAILED => 'Failed',
+            self::CANCELLED => 'Cancelled',
         };
     }
 
@@ -32,10 +34,11 @@ enum EmailStatus: string implements HasColor, HasLabel
     {
         return match ($this) {
             self::SYNCED => 'gray',
-            self::DRAFT => 'info',
-            self::QUEUED, self::SENDING => 'warning',
+            self::DRAFT, self::QUEUED => 'info',
+            self::SENDING => 'warning',
             self::SENT => 'success',
             self::FAILED => 'danger',
+            self::CANCELLED => 'gray',
         };
     }
 }

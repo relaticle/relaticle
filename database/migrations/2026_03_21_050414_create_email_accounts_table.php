@@ -34,6 +34,9 @@ return new class extends Migration
             $table->boolean('sync_inbox')->default(true);
             $table->boolean('sync_sent')->default(true);
 
+            $table->string('contact_creation_mode', 20)->default('none');
+            $table->boolean('auto_create_companies')->default(false);
+
             $table->unsignedInteger('daily_send_limit')->nullable();
             $table->unsignedInteger('hourly_send_limit')->nullable();
 

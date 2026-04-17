@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Jobs\SendEmailJob;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -24,7 +22,7 @@ beforeEach(function (): void {
     $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
 
-    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+    $this->account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
         'email_address' => 'sender@example.com',
@@ -32,9 +30,7 @@ beforeEach(function (): void {
     ]));
 });
 
-it('dispatches SendEmailJob to the emails queue', function (): void {
-    Queue::fake();
-
+it('persists a queued Email row for the outbox', function (): void {
     $sendData = [
         'connected_account_id' => $this->account->id,
         'subject' => 'Hello World',
@@ -48,18 +44,16 @@ it('dispatches SendEmailJob to the emails queue', function (): void {
         'batch_id' => null,
     ];
 
-    app(SendEmailAction::class)->execute($sendData);
+    $email = app(SendEmailAction::class)->execute($sendData);
 
-    Queue::assertPushedOn('emails', SendEmailJob::class);
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->accountId === $this->account->id && $job->batchId === null
-    );
+    expect($email->status)->toBe(EmailStatus::QUEUED)
+        ->and($email->direction)->toBe(EmailDirection::OUTBOUND)
+        ->and($email->connected_account_id)->toBe($this->account->id)
+        ->and($email->subject)->toBe('Hello World')
+        ->and($email->batch_id)->toBeNull();
 });
 
-it('passes linkToType and linkToId to the job', function (): void {
-    Queue::fake();
-
+it('links the queued email to a CRM record via emailables', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,
         'name' => 'Jane Doe',
@@ -79,63 +73,39 @@ it('passes linkToType and linkToId to the job', function (): void {
         'batch_id' => null,
     ];
 
-    app(SendEmailAction::class)->execute($sendData, People::class, $person->id);
+    $email = app(SendEmailAction::class)->execute($sendData, People::class, $person->id);
 
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->linkToType === People::class
-            && $job->linkToId === $person->id
-    );
+    $this->assertDatabaseHas('emailables', [
+        'email_id' => $email->getKey(),
+        'emailable_type' => People::class,
+        'emailable_id' => $person->id,
+        'link_source' => 'manual',
+    ]);
 });
 
-it('throws when hourly send limit is exceeded', function (): void {
-    $this->account->update(['hourly_send_limit' => 2]);
-
-    foreach (range(1, 2) as $i) {
-        Email::create([
-            'team_id' => $this->team->id,
-            'user_id' => $this->user->id,
-            'connected_account_id' => $this->account->id,
-            'subject' => "Email {$i}",
-            'sent_at' => now()->subMinutes(10),
-            'direction' => EmailDirection::OUTBOUND,
-            'status' => EmailStatus::SENT,
-            'privacy_tier' => EmailPrivacyTier::FULL,
-        ]);
-    }
-
-    expect(fn () => app(EmailSendingService::class)->send($this->account, [
-        'subject' => 'Over limit',
-        'body_html' => '<p>test</p>',
-        'to' => [['email' => 'x@example.com', 'name' => null]],
-        'cc' => [],
-        'bcc' => [],
-        'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
-    ]))->toThrow(RuntimeException::class, 'Hourly send limit');
-});
-
-it('throws when daily send limit is exceeded', function (): void {
-    $this->account->update(['daily_send_limit' => 1]);
+it('throws when the user has hit the max queued limit', function (): void {
+    config(['email-integration.outbox.max_queued_per_user' => 1]);
 
     Email::create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
         'connected_account_id' => $this->account->id,
-        'subject' => 'Earlier email',
-        'sent_at' => now()->subHours(2),
+        'subject' => 'Already queued',
         'direction' => EmailDirection::OUTBOUND,
-        'status' => EmailStatus::SENT,
+        'status' => EmailStatus::QUEUED,
         'privacy_tier' => EmailPrivacyTier::FULL,
     ]);
 
-    expect(fn () => app(EmailSendingService::class)->send($this->account, [
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
         'subject' => 'Over limit',
         'body_html' => '<p>test</p>',
         'to' => [['email' => 'x@example.com', 'name' => null]],
         'cc' => [],
         'bcc' => [],
+        'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
         'privacy_tier' => EmailPrivacyTier::FULL,
-    ]))->toThrow(RuntimeException::class, 'Daily send limit');
+        'batch_id' => null,
+    ]))->toThrow(RuntimeException::class, 'queued');
 });
