@@ -67,6 +67,8 @@ final readonly class StoreEmailAction
                 ]);
             }
 
+            resolve(LinkEmailAction::class)->execute($email);
+
             $teamUserEmails = User::query()
                 ->where('current_team_id', $email->team_id)
                 ->pluck('email')
@@ -81,6 +83,8 @@ final readonly class StoreEmailAction
             );
 
             $email->updateQuietly(['is_internal' => $isInternal]);
+
+            resolve(LinkEmailAction::class)->execute($email);
 
             return $email;
         });

@@ -18,11 +18,12 @@ final readonly class AutoCreateCompanyAction
      */
     public function execute(string $domain, string $teamId, Team $team): Company
     {
-        $company = Company::query()->updateOrCreate([
-            'name' => $this->domainToCompanyName($domain),
-            'team_id' => $teamId,
-            'creation_source' => CreationSource::SYSTEM,
-        ]);
+        $company = Company::query()
+            ->updateOrCreate([
+                'name' => $this->domainToCompanyName($domain),
+                'team_id' => $teamId,
+                'creation_source' => CreationSource::SYSTEM,
+            ]);
 
         $domainsField = $this->customFieldByCode($teamId);
 
