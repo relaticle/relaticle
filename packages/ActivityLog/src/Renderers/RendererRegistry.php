@@ -18,4 +18,9 @@ final class RendererRegistry
     {
         return $this->bindings[$eventOrType] ?? null;
     }
+
+    public function unregister(string $eventOrType): void
+    {
+        unset($this->bindings[$eventOrType]);
+    }
 }
