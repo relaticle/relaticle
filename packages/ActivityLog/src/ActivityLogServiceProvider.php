@@ -19,7 +19,7 @@ final class ActivityLogServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
-        $this->app->singleton(Renderers\RendererRegistry::class);
+        $this->app->singleton(Renderers\RendererRegistry::class, fn ($app) => new Renderers\RendererRegistry($app));
         $this->app->singleton(Timeline\TimelineCache::class);
     }
 }
