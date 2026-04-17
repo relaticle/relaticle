@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\ActivityLog;
+
+use Spatie\LaravelPackageTools\Package;
+use Spatie\LaravelPackageTools\PackageServiceProvider;
+
+final class ActivityLogServiceProvider extends PackageServiceProvider
+{
+    public function configurePackage(Package $package): void
+    {
+        $package
+            ->name('activity-log')
+            ->hasConfigFile('activity-log')
+            ->hasViews('activity-log');
+    }
+
+    public function packageRegistered(): void
+    {
+        $this->app->singleton(Renderers\RendererRegistry::class);
+        $this->app->singleton(Timeline\TimelineCache::class);
+    }
+}
