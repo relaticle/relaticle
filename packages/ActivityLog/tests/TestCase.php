@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ActivityLog\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Relaticle\ActivityLog\ActivityLogServiceProvider;
 use Spatie\Activitylog\ActivitylogServiceProvider as SpatieActivitylogServiceProvider;
@@ -23,6 +24,7 @@ abstract class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            LivewireServiceProvider::class,
             SpatieActivitylogServiceProvider::class,
             ActivityLogServiceProvider::class,
         ];
