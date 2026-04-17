@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\AiSummary;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Collection;
 use Prism\Prism\Enums\Provider;
 use Prism\Prism\Facades\Prism;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -38,7 +39,7 @@ final readonly class EmailThreadSummaryService
             ->oldest('sent_at')
             ->get();
 
-        /** @var \Illuminate\Support\Collection<int, string> $lines */
+        /** @var Collection<int, string> $lines */
         $lines = collect(["Email thread: \"{$thread->subject}\""]);
         $lines->push("{$thread->email_count} emails, {$thread->participant_count} participants");
         $lines->push('Date range: '.($thread->first_email_at?->toDateString() ?? '—').' — '.($thread->last_email_at?->toDateString() ?? '—'));
