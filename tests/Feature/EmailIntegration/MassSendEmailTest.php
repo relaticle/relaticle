@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 use App\Filament\Actions\MassSendBulkAction;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
-use App\Jobs\SendEmailJob;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -60,9 +58,7 @@ function attachEmailToPerson(People $person, string $emailAddress, string $teamI
     ]);
 }
 
-it('creates an EmailBatch and dispatches one job per recipient', function (): void {
-    Queue::fake();
-
+it('creates an EmailBatch and persists one Email row per recipient', function (): void {
     $people = collect(range(1, 3))->map(fn (int $i): People => People::create([
         'team_id' => $this->team->id,
         'name' => "Person {$i}",
@@ -97,17 +93,11 @@ it('creates an EmailBatch and dispatches one job per recipient', function (): vo
     expect($batch->total_recipients)->toBe(3)
         ->and($batch->status->value)->toBe('queued');
 
-    Queue::assertPushedOn('emails', SendEmailJob::class);
-    Queue::assertPushed(SendEmailJob::class, 3);
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->batchId === $batch->id
-    );
+    expect(Email::where('batch_id', $batch->id)->count())->toBe(3)
+        ->and(Email::where('batch_id', $batch->id)->where('status', EmailStatus::QUEUED)->count())->toBe(3);
 });
 
 it('skips people with no known email address', function (): void {
-    Queue::fake();
-
     $withEmail = People::create([
         'team_id' => $this->team->id,
         'name' => 'Has Email',
@@ -134,13 +124,16 @@ it('skips people with no known email address', function (): void {
         );
 
     $batch = EmailBatch::where('team_id', $this->team->id)->first();
-    expect($batch->total_recipients)->toBe(1);
+    expect($batch->total_recipients)->toBe(1)
+        ->and(Email::where('batch_id', $batch->id)->count())->toBe(1);
 
-    Queue::assertPushed(SendEmailJob::class, 1);
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->linkToId === $withEmail->id
-    );
+    $email = Email::where('batch_id', $batch->id)->firstOrFail();
+
+    $this->assertDatabaseHas('emailables', [
+        'email_id' => $email->getKey(),
+        'emailable_type' => People::class,
+        'emailable_id' => $withEmail->id,
+    ]);
 });
 
 it('shows warning notification when no valid recipients exist', function (): void {
@@ -166,8 +159,6 @@ it('shows warning notification when no valid recipients exist', function (): voi
 });
 
 it('applies template variables per recipient', function (): void {
-    Queue::fake();
-
     $personA = People::create([
         'team_id' => $this->team->id,
         'name' => 'Alice',
@@ -203,12 +194,8 @@ it('applies template variables per recipient', function (): void {
             ],
         );
 
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->emailData['subject'] === 'Hi Alice'
-    );
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->emailData['subject'] === 'Hi Bob'
-    );
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+
+    expect(Email::where('batch_id', $batch->id)->where('subject', 'Hi Alice')->exists())->toBeTrue()
+        ->and(Email::where('batch_id', $batch->id)->where('subject', 'Hi Bob')->exists())->toBeTrue();
 });

@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
-use App\Jobs\SendEmailJob;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -75,9 +73,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('reply dispatches SendEmailJob with REPLY creation_source', function (): void {
-    Queue::fake();
-
+it('reply persists a queued Email with REPLY creation_source', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -97,16 +93,17 @@ it('reply dispatches SendEmailJob with REPLY creation_source', function (): void
         )
         ->assertNotified('Email queued');
 
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->emailData['creation_source'] === EmailCreationSource::REPLY
-            && $job->emailData['in_reply_to_email_id'] === $this->inboundEmail->id
-    );
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->firstOrFail();
+
+    expect($reply->status)->toBe(EmailStatus::QUEUED)
+        ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id)
+        ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
 });
 
-it('forward dispatches SendEmailJob with FORWARD creation_source', function (): void {
-    Queue::fake();
-
+it('forward persists a queued Email with FORWARD creation_source', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -124,16 +121,16 @@ it('forward dispatches SendEmailJob with FORWARD creation_source', function (): 
             arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'forward'],
         );
 
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->emailData['creation_source'] === EmailCreationSource::FORWARD
-            && $job->emailData['in_reply_to_email_id'] === null
-    );
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail();
+
+    expect($forward->status)->toBe(EmailStatus::QUEUED)
+        ->and($forward->in_reply_to)->toBeNull();
 });
 
-it('reply_all dispatches SendEmailJob with REPLY_ALL creation_source', function (): void {
-    Queue::fake();
-
+it('reply_all persists a queued Email with REPLY_ALL creation_source', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -152,8 +149,8 @@ it('reply_all dispatches SendEmailJob with REPLY_ALL creation_source', function 
             arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply_all'],
         );
 
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->emailData['creation_source'] === EmailCreationSource::REPLY_ALL
-    );
+    expect(Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY_ALL)
+        ->exists())->toBeTrue();
 });

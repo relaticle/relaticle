@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
-use App\Jobs\SendEmailJob;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 
 mutates(EmailsRelationManager::class);
 
@@ -34,9 +35,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('dispatches SendEmailJob and shows notification', function (): void {
-    Queue::fake();
-
+it('persists a queued Email linked to the record and notifies', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
@@ -51,12 +50,18 @@ it('dispatches SendEmailJob and shows notification', function (): void {
         ])
         ->assertNotified('Email queued');
 
-    Queue::assertPushedOn('emails', SendEmailJob::class);
-    Queue::assertPushed(
-        SendEmailJob::class,
-        fn (SendEmailJob $job): bool => $job->linkToType === People::class
-            && $job->linkToId === $this->person->id
-    );
+    $email = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('subject', 'Hello from Relaticle')
+        ->firstOrFail();
+
+    expect($email->status)->toBe(EmailStatus::QUEUED);
+
+    $this->assertDatabaseHas('emailables', [
+        'email_id' => $email->getKey(),
+        'emailable_type' => People::class,
+        'emailable_id' => $this->person->id,
+    ]);
 });
 
 it('requires a connected_account_id', function (): void {

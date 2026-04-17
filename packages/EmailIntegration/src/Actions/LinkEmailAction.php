@@ -40,8 +40,8 @@ final readonly class LinkEmailAction
 
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = Company::query()->where('team_id', $teamId)
-                    ->whereHas('customFieldValues', fn (Builder $q) => $q
-                        ->whereHas('customField', fn (Builder $cfq) => $cfq->where('code', 'domains'))
+                    ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
+                        ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('code', 'domains'))
                         ->whereRaw('json_value::text like ?', ["%{$domain}%"])
                     )
                     ->first();
@@ -61,8 +61,8 @@ final readonly class LinkEmailAction
             // 3. Try to match existing People record by email address.
             // Email values are stored as JSON arrays in json_value (e.g. ["user@example.com"])
             $person = People::query()->where('team_id', $teamId)
-                ->whereHas('customFieldValues', fn (Builder $q) => $q
-                    ->whereHas('customField', fn (Builder $q) => $q->where('type', 'email'))
+                ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
+                    ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('type', 'email'))
                     ->whereJsonContains('json_value', $participant->email_address)
                 )
                 ->first();
@@ -126,7 +126,7 @@ final readonly class LinkEmailAction
     private function hasBidirectionalHistory(ConnectedAccount $account, string $emailAddress): bool
     {
         $directions = Email::query()->where('connected_account_id', $account->getKey())
-            ->whereHas('participants', fn (Builder $q) => $q->where('email_address', $emailAddress))
+            ->whereHas('participants', fn (Builder $participantQuery) => $participantQuery->where('email_address', $emailAddress))
             ->distinct()
             ->pluck('direction');
 

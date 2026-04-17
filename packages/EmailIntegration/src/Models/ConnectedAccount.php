@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
 
@@ -34,6 +35,8 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property Carbon|null $token_expires_at
  * @property ContactCreationMode $contact_creation_mode
  * @property bool $auto_create_companies
+ * @property int|null $hourly_send_limit
+ * @property int|null $daily_send_limit
  */
 #[ObservedBy(ConnectedAccountObserver::class)]
 final class ConnectedAccount extends Model
@@ -103,6 +106,15 @@ final class ConnectedAccount extends Model
     public function emails(): HasMany
     {
         return $this->hasMany(Email::class);
+    }
+
+    /**
+     * @return HasMany<Email, $this>
+     */
+    public function outgoingEmails(): HasMany
+    {
+        return $this->hasMany(Email::class, 'connected_account_id')
+            ->where('direction', EmailDirection::OUTBOUND);
     }
 
     /**

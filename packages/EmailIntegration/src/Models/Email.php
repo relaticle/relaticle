@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
@@ -48,6 +49,10 @@ use Relaticle\EmailIntegration\Observers\EmailObserver;
  * @property Carbon|null $read_at
  * @property EmailCreationSource $creation_source
  * @property string|null $batch_id
+ * @property Carbon|null $scheduled_for
+ * @property string|null $last_error
+ * @property int $attempts
+ * @property EmailPriority $priority
  */
 #[ObservedBy(EmailObserver::class)]
 final class Email extends Model
@@ -82,6 +87,10 @@ final class Email extends Model
         'read_at',
         'creation_source',
         'batch_id',
+        'scheduled_for',
+        'last_error',
+        'attempts',
+        'priority',
     ];
 
     protected $attributes = [
@@ -102,6 +111,9 @@ final class Email extends Model
         'creation_source' => EmailCreationSource::class,
         'has_attachments' => 'boolean',
         'is_internal' => 'boolean',
+        'scheduled_for' => 'datetime',
+        'attempts' => 'integer',
+        'priority' => EmailPriority::class,
     ];
 
     // Relations

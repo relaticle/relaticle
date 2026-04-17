@@ -8,6 +8,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -41,6 +42,10 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             });
 
         if ($this->app->runningInConsole()) {
+            $this->commands([
+                DispatchOutboxCommand::class,
+            ]);
+
             $this->publishes([
                 __DIR__.'/../config/email-integration.php' => config_path('email-integration.php'),
             ], 'email-integration-config');

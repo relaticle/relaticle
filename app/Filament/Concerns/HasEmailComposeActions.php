@@ -6,6 +6,7 @@ namespace App\Filament\Concerns;
 
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -21,9 +22,12 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\HtmlString;
+use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -31,6 +35,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use RuntimeException;
 
 trait HasEmailComposeActions
 {
@@ -83,17 +88,13 @@ trait HasEmailComposeActions
             ->action(function (array $data): void {
                 $record = $this->getCrmRecord();
 
-                resolve(SendEmailAction::class)->execute(
+                $email = resolve(SendEmailAction::class)->execute(
                     data: $this->buildSendData($data, EmailCreationSource::COMPOSE),
                     linkToType: $record::class,
                     linkToId: $record->getKey(),
                 );
 
-                Notification::make()
-                    ->title('Email queued')
-                    ->body('Your email is being sent.')
-                    ->success()
-                    ->send();
+                $this->sendQueuedNotification($email);
             });
     }
 
@@ -172,14 +173,40 @@ trait HasEmailComposeActions
 
                 $record = $this->getCrmRecord();
 
-                resolve(SendEmailAction::class)->execute(
+                $email = resolve(SendEmailAction::class)->execute(
                     data: $this->buildSendData($data, $source),
                     linkToType: $record::class,
                     linkToId: $record->getKey(),
                 );
 
-                Notification::make()->title('Email queued')->success()->send();
+                $this->sendQueuedNotification($email);
             });
+    }
+
+    private function sendQueuedNotification(Email $email): void
+    {
+        $notification = Notification::make()
+            ->title('Email queued')
+            ->body('Your email is being sent.')
+            ->success();
+
+        if ($email->scheduled_for !== null && $email->scheduled_for->isFuture()) {
+            $notification->actions([
+                Action::make('undo')
+                    ->label('Undo')
+                    ->link()
+                    ->action(function () use ($email): void {
+                        try {
+                            resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
+                            Notification::make()->title('Send cancelled')->success()->send();
+                        } catch (RuntimeException) {
+                            Notification::make()->title('Too late — email already sent')->danger()->send();
+                        }
+                    }),
+            ]);
+        }
+
+        $notification->send();
     }
 
     /**
@@ -270,6 +297,17 @@ trait HasEmailComposeActions
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
+                ]),
+
+            Section::make('Schedule')
+                ->collapsed()
+                ->schema([
+                    DateTimePicker::make('scheduled_for')
+                        ->label('Send at')
+                        ->helperText('Leave blank to send with a 30-second undo window.')
+                        ->seconds(false)
+                        ->minDate(now())
+                        ->nullable(),
                 ]),
 
             Section::make('Signature')
@@ -405,10 +443,17 @@ trait HasEmailComposeActions
      *     creation_source: EmailCreationSource,
      *     privacy_tier: EmailPrivacyTier,
      *     batch_id: null,
+     *     scheduled_for: \DateTimeInterface|null,
+     *     priority: EmailPriority,
      * }
      */
     private function buildSendData(array $data, EmailCreationSource $source): array
     {
+        $scheduledFor = null;
+        if (isset($data['scheduled_for']) && $data['scheduled_for'] !== '') {
+            $scheduledFor = Date::parse((string) $data['scheduled_for']);
+        }
+
         return [
             'connected_account_id' => $data['connected_account_id'],
             'subject' => $data['subject'],
@@ -420,6 +465,8 @@ trait HasEmailComposeActions
             'creation_source' => $source,
             'privacy_tier' => EmailPrivacyTier::FULL,
             'batch_id' => null,
+            'scheduled_for' => $scheduledFor,
+            'priority' => EmailPriority::PRIORITY,
         ];
     }
 

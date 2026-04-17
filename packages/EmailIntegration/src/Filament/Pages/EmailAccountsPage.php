@@ -6,12 +6,14 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -101,6 +103,7 @@ final class EmailAccountsPage extends Page
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
+                /** @var ConnectedAccount|null $account */
                 $account = ConnectedAccount::query()->find($arguments['account_id']);
 
                 return [
@@ -108,6 +111,8 @@ final class EmailAccountsPage extends Page
                     'sync_sent' => $account?->sync_sent ?? true,
                     'contact_creation_mode' => $account?->contact_creation_mode?->value ?? ContactCreationMode::None->value,
                     'auto_create_companies' => $account?->auto_create_companies ?? false,
+                    'hourly_send_limit' => $account?->hourly_send_limit,
+                    'daily_send_limit' => $account?->daily_send_limit,
                 ];
             })
             ->schema([
@@ -128,6 +133,21 @@ final class EmailAccountsPage extends Page
                 Toggle::make('auto_create_companies')
                     ->label('Auto-create companies')
                     ->helperText('Create Company records for unrecognised business domains (public domains like gmail.com are always excluded).'),
+                Grid::make(2)
+                    ->schema([
+                        TextInput::make('hourly_send_limit')
+                            ->label('Hourly send limit')
+                            ->numeric()
+                            ->minValue(1)
+                            ->placeholder(sprintf('Default: %d', Config::integer('email-integration.outbox.defaults.hourly_send_limit')))
+                            ->helperText('Leave blank to use the workspace default.'),
+                        TextInput::make('daily_send_limit')
+                            ->label('Daily send limit')
+                            ->numeric()
+                            ->minValue(1)
+                            ->placeholder(sprintf('Default: %d', Config::integer('email-integration.outbox.defaults.daily_send_limit')))
+                            ->helperText('Leave blank to use the workspace default.'),
+                    ]),
             ])
             ->action(function (array $arguments, array $data): void {
                 ConnectedAccount::query()->where('id', $arguments['account_id'])
@@ -137,6 +157,8 @@ final class EmailAccountsPage extends Page
                         'sync_sent' => $data['sync_sent'],
                         'contact_creation_mode' => $data['contact_creation_mode'],
                         'auto_create_companies' => $data['auto_create_companies'],
+                        'hourly_send_limit' => filled($data['hourly_send_limit'] ?? null) ? (int) $data['hourly_send_limit'] : null,
+                        'daily_send_limit' => filled($data['daily_send_limit'] ?? null) ? (int) $data['daily_send_limit'] : null,
                     ]);
             })
             ->modalHeading('Account Settings')

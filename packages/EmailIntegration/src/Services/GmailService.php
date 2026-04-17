@@ -215,20 +215,20 @@ final readonly class GmailService
         $headers = [];
         $headers[] = 'From: '.$this->formatAddress($fromName, $fromAddress);
         $headers[] = 'To: '.implode(', ', array_map(
-            fn (array $r): string => $this->formatAddress($r['name'] ?? '', $r['email']),
+            fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
             $data['to'] ?? []
         ));
 
         if (filled($data['cc'])) {
             $headers[] = 'Cc: '.implode(', ', array_map(
-                fn (array $r): string => $this->formatAddress($r['name'] ?? '', $r['email']),
+                fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['cc']
             ));
         }
 
         if (filled($data['bcc'])) {
             $headers[] = 'Bcc: '.implode(', ', array_map(
-                fn (array $r): string => $this->formatAddress($r['name'] ?? '', $r['email']),
+                fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['bcc']
             ));
         }

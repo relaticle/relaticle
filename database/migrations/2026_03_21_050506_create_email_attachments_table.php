@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('filename');
             $table->string('mime_type', 100);
             $table->unsignedBigInteger('size');              // bytes
-            $table->string('storage_path');
+            $table->string('storage_path')->nullable();
             $table->string('content_id')->nullable();        // for inline/CID images
             $table->timestamps();
         });

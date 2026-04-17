@@ -24,13 +24,17 @@ return new class extends Migration
 
             $table->string('subject')->nullable();
             $table->string('snippet', 255)->nullable();          // Preview text for list views
-            $table->timestamp('sent_at');
+            $table->timestamp('sent_at')->nullable();
+            $table->timestamp('scheduled_for')->nullable();
 
             $table->string('direction', 20);                     // inbound | outbound
             $table->string('folder', 30)->nullable();            // inbox | sent | drafts | archive
 
             // Status — add now (default synced) to avoid costly migration when Phase 2 ships
-            $table->string('status', 30)->default('synced');     // synced | draft | queued | sending | sent | failed
+            $table->string('status', 30)->default('synced');     // synced | draft | queued | sending | sent | failed | cancelled
+            $table->text('last_error')->nullable();
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->string('priority', 10)->default('bulk');
 
             // Privacy — owner-set default for team visibility (no shared_with_team boolean)
             $table->string('privacy_tier', 30)->default('metadata_only'); // private | metadata_only | subject | full
@@ -41,6 +45,7 @@ return new class extends Migration
             $table->timestamp('read_at')->nullable();
 
             $table->string('creation_source', 50)->default('sync'); // EmailCreationSource: sync | compose | forward | bcc_inbound
+            $table->foreignUlid('batch_id')->nullable()->constrained('email_batches')->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
@@ -55,6 +60,9 @@ return new class extends Migration
             $table->index('provider_message_id');
             $table->index(['user_id', 'privacy_tier']);
             $table->index(['team_id', 'deleted_at', 'creation_source', 'created_at'], 'idx_emails_team_activity');
+            $table->index('batch_id');
+            $table->index(['connected_account_id', 'status', 'scheduled_for'], 'idx_emails_dispatcher');
+            $table->index(['user_id', 'status'], 'idx_emails_user_status');
         });
     }
 
