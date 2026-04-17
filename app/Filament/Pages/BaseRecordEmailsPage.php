@@ -18,7 +18,7 @@ use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
@@ -81,7 +81,7 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     /**
-     * @return LengthAwarePaginator<int, Email&object{pivot: Pivot}>
+     * @return LengthAwarePaginator<int, Email&object{pivot: MorphPivot}>
      */
     #[Computed]
     public function emails(): LengthAwarePaginator

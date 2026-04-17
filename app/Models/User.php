@@ -37,6 +37,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $remember_token
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property-read Team|null $currentTeam
  */
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail

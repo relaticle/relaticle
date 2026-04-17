@@ -28,6 +28,12 @@ use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 /**
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
+ * @property Carbon|null $last_email_at
+ * @property Carbon|null $last_interaction_at
+ * @property int $email_count
+ * @property int $inbound_email_count
+ * @property int $outbound_email_count
+ * @property float|null $avg_response_time_hours
  */
 #[ObservedBy(PeopleObserver::class)]
 final class People extends Model implements HasCustomFields
@@ -72,6 +78,8 @@ final class People extends Model implements HasCustomFields
     {
         return [
             'creation_source' => CreationSource::class,
+            'last_email_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
         ];
     }
 

@@ -22,6 +22,7 @@ use Spatie\Sluggable\SlugOptions;
 /**
  * @property string $name
  * @property string $slug
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
  */
 final class Team extends JetstreamTeam implements HasAvatar
 {

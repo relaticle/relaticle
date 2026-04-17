@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models\Concerns;
 
+use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 use Relaticle\EmailIntegration\Models\Email;
 
 trait HasEmails
 {
     /**
-     * @return MorphToMany<Email, $this, Pivot>
+     * @return MorphToMany<Email, $this, MorphPivot>
      */
     public function emails(): MorphToMany
     {

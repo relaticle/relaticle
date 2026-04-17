@@ -8,9 +8,12 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use RuntimeException;
 
 final readonly class CallbackController
 {
@@ -24,9 +27,15 @@ final readonly class CallbackController
          */
         $user = auth()->user();
 
-        $socialUser = Socialite::driver($this->resolveDriver($provider))
+        $driver = Socialite::driver($this->resolveDriver($provider));
+
+        throw_unless($driver instanceof AbstractProvider, RuntimeException::class, "Socialite driver [{$provider}] is not an OAuth2 provider.");
+
+        $socialUser = $driver
             ->stateless() // TODO: Remove stateless() once we can handle the state parameter properly
             ->user();
+
+        throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
 
         DB::transaction(function () use ($provider, $socialUser, $user): void {
 
@@ -42,7 +51,7 @@ final readonly class CallbackController
                     'provider_account_id' => $socialUser->getId(),
                     'access_token' => $socialUser->token,
                     'refresh_token' => $socialUser->refreshToken,
-                    'token_expires_at' => now()->addSeconds($socialUser->expiresIn ?? 3600),
+                    'token_expires_at' => now()->addSeconds($socialUser->expiresIn),
                     'status' => 'active',
                     'last_error' => null,
                     'auto_create_companies' => true,
