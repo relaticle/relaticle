@@ -9,7 +9,7 @@ use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
 
 /** Cannot be final — Sanctum::actingAs() uses Mockery to mock this class in tests */
-final class PersonalAccessToken extends SanctumPersonalAccessToken
+class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     /** @var array<int, string> */
     protected $fillable = [
