@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\ActivityLog\Timeline\Sources;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 use Relaticle\ActivityLog\Timeline\Window;
-use Spatie\Activitylog\Contracts\Activity;
 use Spatie\Activitylog\Models\Activity as ActivityModel;
 
 final class RelatedActivityLogSource extends AbstractTimelineSource
@@ -46,26 +46,24 @@ final class RelatedActivityLogSource extends AbstractTimelineSource
         }
 
         $query = ActivityModel::query()
-            ->where(function ($q) use ($subjectPairs): void {
+            ->where(function (Builder $q) use ($subjectPairs): void {
                 foreach ($subjectPairs as [$type, $id]) {
-                    $q->orWhere(function ($inner) use ($type, $id): void {
+                    $q->orWhere(function (Builder $inner) use ($type, $id): void {
                         $inner->where('subject_type', $type)->where('subject_id', $id);
                     });
                 }
-            })
-            ->orderByDesc('created_at')
+            })->latest()
             ->limit($window->cap);
 
-        if ($window->from !== null) {
+        if ($window->from instanceof CarbonImmutable) {
             $query->where('created_at', '>=', $window->from);
         }
 
-        if ($window->to !== null) {
+        if ($window->to instanceof CarbonImmutable) {
             $query->where('created_at', '<=', $window->to);
         }
 
         foreach ($query->get() as $activity) {
-            /** @var Activity $activity */
             $relatedModel = $relatedCache[$activity->subject_type][(string) $activity->subject_id] ?? null;
 
             if ($relatedModel === null) {
@@ -76,7 +74,7 @@ final class RelatedActivityLogSource extends AbstractTimelineSource
         }
     }
 
-    private function makeEntry(Model $subject, Activity $activity, Model $relatedModel): TimelineEntry
+    private function makeEntry(Model $subject, ActivityModel $activity, Model $relatedModel): TimelineEntry
     {
         $occurredAt = CarbonImmutable::parse($activity->created_at);
         $event = (string) ($activity->event ?? $activity->description);

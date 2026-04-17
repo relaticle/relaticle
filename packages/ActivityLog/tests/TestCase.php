@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ActivityLog\Tests;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -21,7 +22,10 @@ abstract class TestCase extends Orchestra
         );
     }
 
-    protected function getPackageProviders($app): array
+    /**
+     * @return array<int, class-string>
+     */
+    protected function getPackageProviders(mixed $app): array
     {
         return [
             LivewireServiceProvider::class,
@@ -30,15 +34,15 @@ abstract class TestCase extends Orchestra
         ];
     }
 
-    protected function defineEnvironment($app): void
+    protected function defineEnvironment(mixed $app): void
     {
-        $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', [
+        $app->make(Repository::class)->set('database.default', 'testing');
+        $app->make(Repository::class)->set('database.connections.testing', [
             'driver' => 'sqlite',
             'database' => ':memory:',
             'prefix' => '',
         ]);
-        $app['config']->set('activitylog.database_connection', 'testing');
+        $app->make(Repository::class)->set('activitylog.database_connection', 'testing');
     }
 
     protected function defineDatabaseMigrations(): void

@@ -7,12 +7,15 @@ namespace Relaticle\ActivityLog\Tests\Fixtures\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Relaticle\ActivityLog\Tests\Fixtures\database\factories\EmailFactory;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 final class Email extends Model
 {
+    /** @use HasFactory<EmailFactory> */
     use HasFactory;
+
     use LogsActivity;
 
     protected $fillable = ['person_id', 'subject', 'sent_at', 'received_at'];
@@ -25,6 +28,9 @@ final class Email extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Person, $this>
+     */
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);

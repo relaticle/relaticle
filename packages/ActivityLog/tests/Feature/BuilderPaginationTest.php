@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Email;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
+use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 
 it('paginates results into a LengthAwarePaginator', function (): void {
@@ -18,7 +19,7 @@ it('paginates results into a LengthAwarePaginator', function (): void {
     }
 
     $paginator = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->paginate(perPage: 5, page: 1);
 
     expect($paginator)->toBeInstanceOf(LengthAwarePaginator::class)
@@ -37,11 +38,11 @@ it('returns correct entries for page 2', function (): void {
     }
 
     $page1 = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->paginate(perPage: 5, page: 1);
 
     $page2 = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->paginate(perPage: 5, page: 2);
 
     expect($page1->items())->not->toMatchArray($page2->items());
@@ -57,7 +58,7 @@ it('uses config default for perPage when null', function (): void {
     }
 
     $paginator = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->paginate();
 
     expect($paginator->perPage())->toBe(7);

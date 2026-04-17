@@ -69,11 +69,11 @@ final class RelatedModelSource extends AbstractTimelineSource
                 $query->with($this->with);
             }
 
-            if ($window->from !== null) {
+            if ($window->from instanceof CarbonImmutable) {
                 $query->where($column, '>=', $window->from);
             }
 
-            if ($window->to !== null) {
+            if ($window->to instanceof CarbonImmutable) {
                 $query->where($column, '<=', $window->to);
             }
 

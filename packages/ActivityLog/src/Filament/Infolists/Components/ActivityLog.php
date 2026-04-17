@@ -10,21 +10,21 @@ use Filament\Schemas\Components\Concerns\HasHeading;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
-class ActivityLog extends Entry
+final class ActivityLog extends Entry
 {
     use HasHeading;
 
     protected string $view = 'activity-log::infolist-component';
 
-    protected bool $groupByDate = false;
+    private bool $groupByDate = false;
 
-    protected bool $collapsible = false;
+    private bool $collapsible = false;
 
-    protected ?int $perPage = null;
+    private ?int $perPage = null;
 
-    protected ?Closure $using = null;
+    private ?Closure $using = null;
 
-    protected string $emptyState = 'No activity yet.';
+    private string $emptyState = 'No activity yet.';
 
     public function groupByDate(bool $enabled = true): static
     {
@@ -90,11 +90,9 @@ class ActivityLog extends Entry
     {
         $record = $this->getRecord();
 
-        if (! $record instanceof Model) {
-            throw new LogicException('ActivityLog infolist component requires a model record.');
-        }
+        throw_unless($record instanceof Model, LogicException::class, 'ActivityLog infolist component requires a model record.');
 
-        if (! method_exists($record, 'timeline') && $this->using === null) {
+        if (! method_exists($record, 'timeline') && ! $this->using instanceof Closure) {
             throw new LogicException(sprintf(
                 '%s must use HasTimeline trait or provide ->using().',
                 $record::class,

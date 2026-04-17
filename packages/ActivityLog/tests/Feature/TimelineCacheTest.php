@@ -13,7 +13,7 @@ it('caches paginated results for the TTL', function (): void {
     Email::factory()->for($person)->create(['sent_at' => CarbonImmutable::now()]);
 
     $first = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn (RelatedModelSource $s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->cached(ttlSeconds: 60)
         ->paginate(perPage: 5);
 
@@ -22,7 +22,7 @@ it('caches paginated results for the TTL', function (): void {
     Email::factory()->for($person)->create(['sent_at' => CarbonImmutable::now()]);
 
     $second = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn (RelatedModelSource $s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->cached(ttlSeconds: 60)
         ->paginate(perPage: 5);
 
@@ -34,7 +34,7 @@ it('forgetTimelineCache() invalidates the cache', function (): void {
     Email::factory()->for($person)->create(['sent_at' => CarbonImmutable::now()]);
 
     TimelineBuilder::make($person)
-        ->fromRelation('emails', fn (RelatedModelSource $s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->cached(ttlSeconds: 60)
         ->paginate(perPage: 5);
 
@@ -43,7 +43,7 @@ it('forgetTimelineCache() invalidates the cache', function (): void {
     $person->forgetTimelineCache();
 
     $after = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn (RelatedModelSource $s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->cached(ttlSeconds: 60)
         ->paginate(perPage: 5);
 

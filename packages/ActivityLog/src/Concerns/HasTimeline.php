@@ -29,6 +29,6 @@ trait HasTimeline
 
     public function forgetTimelineCache(): void
     {
-        app(TimelineCache::class)->forget($this);
+        resolve(TimelineCache::class)->forget($this);
     }
 }

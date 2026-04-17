@@ -36,6 +36,6 @@ it('throws when closure yields non-TimelineEntry', function (): void {
         yield 'not an entry';
     });
 
-    expect(fn () => iterator_to_array($source->resolve($person, new Window(cap: 10))))
+    expect(fn (): array => iterator_to_array($source->resolve($person, new Window(cap: 10))))
         ->toThrow(TypeError::class);
 });

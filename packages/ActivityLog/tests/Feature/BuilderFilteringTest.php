@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Email;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
+use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 
 it('merges sources and sorts by date desc by default', function (): void {
@@ -15,7 +16,7 @@ it('merges sources and sorts by date desc by default', function (): void {
 
     $entries = TimelineBuilder::make($person)
         ->fromActivityLog()
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->get();
 
     expect($entries->count())->toBeGreaterThanOrEqual(2);
@@ -29,7 +30,7 @@ it('applies between() filter', function (): void {
     Email::factory()->for($person)->create(['sent_at' => CarbonImmutable::parse('2026-04-20')]);
 
     $entries = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->between(CarbonImmutable::parse('2026-04-15'), CarbonImmutable::parse('2026-04-25'))
         ->get();
 
@@ -44,7 +45,7 @@ it('applies ofEvent and exceptEvent filters after merge', function (): void {
     ]);
 
     $entries = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent')->event('received_at', 'email_received'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent')->event('received_at', 'email_received'))
         ->ofEvent(['email_sent'])
         ->get();
 
@@ -57,7 +58,7 @@ it('sortByDateAsc() reverses order', function (): void {
     Email::factory()->for($person)->create(['sent_at' => CarbonImmutable::parse('2026-04-20')]);
 
     $entries = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent'))
         ->sortByDateAsc()
         ->get();
 

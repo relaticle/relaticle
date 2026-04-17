@@ -36,6 +36,6 @@ final class TimelineCache
     {
         unset($subject);
 
-        $this->store()->flush();
+        $this->store()->getStore()->flush();
     }
 }

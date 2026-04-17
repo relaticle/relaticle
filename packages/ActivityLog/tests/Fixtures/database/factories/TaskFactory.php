@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Task;
 
+/**
+ * @extends Factory<Task>
+ */
 final class TaskFactory extends Factory
 {
     protected $model = Task::class;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Email;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
+use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 use Spatie\Activitylog\Models\Activity;
@@ -20,7 +21,7 @@ it('dedups RelatedActivityLogSource and RelatedModelSource at same second, Relat
 
     $entries = TimelineBuilder::make($person)
         ->fromActivityLogOf(['emails'])
-        ->fromRelation('emails', fn ($s) => $s->event('created_at', 'email_created'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('created_at', 'email_created'))
         ->deduplicate()
         ->get();
 
@@ -40,7 +41,7 @@ it('priority override swaps the winner', function (): void {
 
     $entries = TimelineBuilder::make($person)
         ->fromActivityLogOf(['emails'], priority: 100)
-        ->fromRelation('emails', fn ($s) => $s->event('created_at', 'email_created'), priority: 20)
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('created_at', 'email_created'), priority: 20)
         ->deduplicate()
         ->get();
 
@@ -56,7 +57,7 @@ it('dedupKeyUsing() overrides the per-entry dedup key', function (): void {
     ]);
 
     $entries = TimelineBuilder::make($person)
-        ->fromRelation('emails', fn ($s) => $s->event('sent_at', 'email_sent')->event('received_at', 'email_received'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('sent_at', 'email_sent')->event('received_at', 'email_received'))
         ->dedupKeyUsing(fn (TimelineEntry $e): string => $e->relatedModel::class.':'.$e->relatedModel->id)
         ->deduplicate()
         ->get();
@@ -75,7 +76,7 @@ it('deduplicate(false) skips dedup entirely', function (): void {
 
     $entries = TimelineBuilder::make($person)
         ->fromActivityLogOf(['emails'])
-        ->fromRelation('emails', fn ($s) => $s->event('created_at', 'email_created'))
+        ->fromRelation('emails', fn (RelatedModelSource $s): RelatedModelSource => $s->event('created_at', 'email_created'))
         ->deduplicate(false)
         ->get();
 

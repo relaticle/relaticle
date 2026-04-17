@@ -21,7 +21,7 @@ final class ActivityLogPlugin implements Plugin
 
     public static function make(): static
     {
-        return app(self::class);
+        return resolve(self::class);
     }
 
     public function getId(): string
@@ -58,7 +58,7 @@ final class ActivityLogPlugin implements Plugin
 
     public function boot(Panel $panel): void
     {
-        $registry = app(RendererRegistry::class);
+        $registry = resolve(RendererRegistry::class);
 
         foreach ($this->renderers as $key => $renderer) {
             $registry->register($key, $renderer);

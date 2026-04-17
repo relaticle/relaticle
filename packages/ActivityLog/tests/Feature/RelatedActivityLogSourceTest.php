@@ -35,6 +35,6 @@ it('throws on unknown relation', function (): void {
     $person = Person::factory()->create();
     $source = new RelatedActivityLogSource(priority: 10, relations: ['unknown']);
 
-    expect(fn () => iterator_to_array($source->resolve($person, new Window(cap: 10))))
+    expect(fn (): array => iterator_to_array($source->resolve($person, new Window(cap: 10))))
         ->toThrow(InvalidArgumentException::class);
 });

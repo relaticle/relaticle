@@ -113,8 +113,8 @@ final class TimelineBuilder
 
     public function between(?CarbonInterface $from, ?CarbonInterface $to): self
     {
-        $this->from = $from !== null ? CarbonImmutable::instance($from) : null;
-        $this->to = $to !== null ? CarbonImmutable::instance($to) : null;
+        $this->from = $from instanceof CarbonInterface ? CarbonImmutable::instance($from) : null;
+        $this->to = $to instanceof CarbonInterface ? CarbonImmutable::instance($to) : null;
 
         return $this;
     }
@@ -244,7 +244,7 @@ final class TimelineBuilder
         $orderIndex = 0;
 
         foreach ($entries as $entry) {
-            $key = $this->dedupKeyResolver !== null
+            $key = $this->dedupKeyResolver instanceof Closure
                 ? ($this->dedupKeyResolver)($entry)
                 : $entry->dedupKey;
 
@@ -274,10 +274,10 @@ final class TimelineBuilder
      */
     public function paginate(?int $perPage = null, int $page = 1): LengthAwarePaginator
     {
-        $perPage = $perPage ?? (int) config('activity-log.default_per_page', 20);
+        $perPage ??= (int) config('activity-log.default_per_page', 20);
 
         if ($this->cacheTtl !== null && $this->cacheTtl > 0) {
-            $cache = app(TimelineCache::class);
+            $cache = resolve(TimelineCache::class);
             $key = $cache->keyFor($this->subject, $this->filterHash(), $page, $perPage);
 
             return $cache->store()->remember(

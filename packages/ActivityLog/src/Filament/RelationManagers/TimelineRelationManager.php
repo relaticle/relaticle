@@ -9,6 +9,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 final class TimelineRelationManager extends RelationManager
 {
@@ -18,9 +19,9 @@ final class TimelineRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = 'heroicon-o-clock';
 
-    protected bool $groupByDate = true;
+    private bool $groupByDate = true;
 
-    protected int $perPage = 20;
+    private int $perPage = 20;
 
     public function groupByDate(bool $enabled = true): static
     {
@@ -50,8 +51,8 @@ final class TimelineRelationManager extends RelationManager
     {
         return view('activity-log::relation-manager', [
             'owner' => $this->getOwnerRecord(),
-            'perPage' => $this->getPerPageCount(),
-            'groupByDate' => $this->isGrouped(),
+            'perPage' => $this->perPage,
+            'groupByDate' => $this->groupByDate,
         ]);
     }
 
@@ -60,6 +61,9 @@ final class TimelineRelationManager extends RelationManager
         return $schema;
     }
 
+    /**
+     * @return Builder<Model>|null
+     */
     public function getTableQuery(): ?Builder
     {
         return null;

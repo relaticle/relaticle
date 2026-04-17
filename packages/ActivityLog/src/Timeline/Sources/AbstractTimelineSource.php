@@ -29,6 +29,9 @@ abstract class AbstractTimelineSource implements TimelineSource
         );
     }
 
+    /**
+     * @return Relation<Model, Model, mixed>
+     */
     protected function assertRelation(Model $subject, string $relation): Relation
     {
         if (! method_exists($subject, $relation)) {

@@ -7,6 +7,9 @@ namespace Relaticle\ActivityLog\Tests\Fixtures\database\factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
 
+/**
+ * @extends Factory<Person>
+ */
 final class PersonFactory extends Factory
 {
     protected $model = Person::class;

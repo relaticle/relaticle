@@ -15,7 +15,7 @@ it('emits one entry per configured date column', function (): void {
         'received_at' => CarbonImmutable::parse('2026-04-17T10:00:00Z'),
     ]);
 
-    $source = (new RelatedModelSource(priority: 20, relation: 'emails'))
+    $source = new RelatedModelSource(priority: 20, relation: 'emails')
         ->event('sent_at', 'email_sent')
         ->event('received_at', 'email_received');
 
@@ -29,7 +29,7 @@ it('skips rows where the date column is null', function (): void {
     $person = Person::factory()->create();
     Email::factory()->for($person)->create(['sent_at' => null]);
 
-    $source = (new RelatedModelSource(priority: 20, relation: 'emails'))
+    $source = new RelatedModelSource(priority: 20, relation: 'emails')
         ->event('sent_at', 'email_sent');
 
     $entries = collect($source->resolve($person, new Window(cap: 10)));
@@ -48,7 +48,7 @@ it('honors when: closure filters', function (): void {
         'subject' => 'drop',
     ]);
 
-    $source = (new RelatedModelSource(priority: 20, relation: 'emails'))
+    $source = new RelatedModelSource(priority: 20, relation: 'emails')
         ->event('sent_at', 'email_sent', when: fn (Email $e): bool => $e->subject === 'keep');
 
     $entries = collect($source->resolve($person, new Window(cap: 10)));
@@ -63,7 +63,7 @@ it('produces dedup key scoped by related class and id', function (): void {
         'sent_at' => CarbonImmutable::parse('2026-04-17T09:00:00Z'),
     ]);
 
-    $source = (new RelatedModelSource(priority: 20, relation: 'emails'))
+    $source = new RelatedModelSource(priority: 20, relation: 'emails')
         ->event('sent_at', 'email_sent');
 
     $entry = collect($source->resolve($person, new Window(cap: 10)))->first();

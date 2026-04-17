@@ -6,6 +6,7 @@ namespace Relaticle\ActivityLog\Renderers;
 
 use Closure;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\View\Factory as ViewFactory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\HtmlString;
 use LogicException;
@@ -46,9 +47,9 @@ final class RendererRegistry
     private function normalize(string|Closure $binding): TimelineRenderer
     {
         if ($binding instanceof Closure) {
-            return new class($binding) implements TimelineRenderer
+            return new readonly class($binding) implements TimelineRenderer
             {
-                public function __construct(private readonly Closure $closure) {}
+                public function __construct(private Closure $closure) {}
 
                 public function render(TimelineEntry $entry): View|HtmlString
                 {
@@ -71,13 +72,13 @@ final class RendererRegistry
             return $instance;
         }
 
-        return new class($binding) implements TimelineRenderer
+        return new readonly class($binding, $this->container->make(ViewFactory::class)) implements TimelineRenderer
         {
-            public function __construct(private readonly string $view) {}
+            public function __construct(private string $view, private ViewFactory $factory) {}
 
             public function render(TimelineEntry $entry): View|HtmlString
             {
-                return view($this->view, ['entry' => $entry]);
+                return $this->factory->make($this->view, ['entry' => $entry]);
             }
         };
     }

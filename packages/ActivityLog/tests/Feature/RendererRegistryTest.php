@@ -11,7 +11,7 @@ use Relaticle\ActivityLog\Renderers\RendererRegistry;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 beforeEach(function (): void {
-    $this->registry = app(RendererRegistry::class);
+    $this->registry = resolve(RendererRegistry::class);
     $this->entry = new TimelineEntry(
         id: 'x', type: 'related_model', event: 'email_sent',
         occurredAt: CarbonImmutable::now(), dedupKey: 'k', sourcePriority: 20,
@@ -23,8 +23,8 @@ it('falls back to DefaultRenderer when nothing registered', function (): void {
 });
 
 it('resolves by event name before type', function (): void {
-    $this->registry->register('email_sent', fn () => new HtmlString('event'));
-    $this->registry->register('related_model', fn () => new HtmlString('type'));
+    $this->registry->register('email_sent', fn (): HtmlString => new HtmlString('event'));
+    $this->registry->register('related_model', fn (): HtmlString => new HtmlString('type'));
 
     $renderer = $this->registry->resolve($this->entry);
     $result = $renderer->render($this->entry);
@@ -33,7 +33,7 @@ it('resolves by event name before type', function (): void {
 });
 
 it('resolves by type when event has no binding', function (): void {
-    $this->registry->register('related_model', fn () => new HtmlString('type'));
+    $this->registry->register('related_model', fn (): HtmlString => new HtmlString('type'));
 
     $result = $this->registry->resolve($this->entry)->render($this->entry);
 
@@ -41,14 +41,14 @@ it('resolves by type when event has no binding', function (): void {
 });
 
 it('honors $entry->renderer to bypass registry', function (): void {
-    $this->registry->register('email_sent', fn () => new HtmlString('registered'));
+    $this->registry->register('email_sent', fn (): HtmlString => new HtmlString('registered'));
 
     $entry = new TimelineEntry(
         id: 'x', type: 'related_model', event: 'email_sent',
         occurredAt: CarbonImmutable::now(), dedupKey: 'k', sourcePriority: 20,
         renderer: 'email_sent',
     );
-    $this->registry->register('email_sent', fn () => new HtmlString('bypass'));
+    $this->registry->register('email_sent', fn (): HtmlString => new HtmlString('bypass'));
 
     expect((string) $this->registry->resolve($entry)->render($entry))->toBe('bypass');
 });

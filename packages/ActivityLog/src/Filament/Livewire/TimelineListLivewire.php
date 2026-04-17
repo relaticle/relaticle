@@ -10,7 +10,9 @@ use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use LogicException;
 use Relaticle\ActivityLog\Renderers\RendererRegistry;
+use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 final class TimelineListLivewire extends Component
@@ -47,7 +49,7 @@ final class TimelineListLivewire extends Component
     public function render(): View
     {
         $subject = $this->resolveSubject();
-        $builder = $subject->timeline();
+        $builder = $this->builderFor($subject);
 
         if ($this->typeFilter !== null) {
             $builder->ofType([$this->typeFilter]);
@@ -68,7 +70,7 @@ final class TimelineListLivewire extends Component
         return view('activity-log::timeline', [
             'paginator' => $paginator,
             'grouped' => $grouped,
-            'registry' => app(RendererRegistry::class),
+            'registry' => resolve(RendererRegistry::class),
             'emptyState' => $this->emptyState,
         ]);
     }
@@ -78,10 +80,20 @@ final class TimelineListLivewire extends Component
         /** @var class-string<Model> $class */
         $class = $this->subjectClass;
 
-        /** @var Model $model */
-        $model = $class::query()->findOrFail($this->subjectKey);
+        return $class::query()->findOrFail($this->subjectKey);
+    }
 
-        return $model;
+    private function builderFor(Model $subject): TimelineBuilder
+    {
+        if (! method_exists($subject, 'timeline')) {
+            throw new LogicException(sprintf('%s has no timeline() method.', $subject::class));
+        }
+
+        $result = $subject->timeline();
+
+        throw_unless($result instanceof TimelineBuilder, LogicException::class, sprintf('%s::timeline() must return %s.', $subject::class, TimelineBuilder::class));
+
+        return $result;
     }
 
     /**

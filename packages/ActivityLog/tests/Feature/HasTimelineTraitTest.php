@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Relaticle\ActivityLog\Concerns\HasTimeline;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
+use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 
 it('provides paginateTimeline() as a convenience wrapper', function (): void {
     $person = Person::factory()->create();
@@ -18,8 +20,9 @@ it('provides paginateTimeline() as a convenience wrapper', function (): void {
 it('throws if a class uses HasTimeline without implementing timeline()', function (): void {
     $model = new class extends Model
     {
+        use HasFactory;
         use HasTimeline;
     };
 
-    expect(fn () => $model->timeline())->toThrow(LogicException::class);
+    expect(fn (): TimelineBuilder => $model->timeline())->toThrow(LogicException::class);
 });

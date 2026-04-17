@@ -58,5 +58,5 @@ it('is immutable (readonly)', function (): void {
     );
 
     /** @phpstan-ignore-next-line */
-    expect(fn () => $entry->id = 'y')->toThrow(Error::class);
+    expect(fn (): string => $entry->id = 'y')->toThrow(Error::class);
 });

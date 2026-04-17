@@ -16,12 +16,12 @@ final class Timeline extends Facade
 {
     public static function registerRenderer(string $eventOrType, string|Closure $renderer): void
     {
-        app(RendererRegistry::class)->register($eventOrType, $renderer);
+        resolve(RendererRegistry::class)->register($eventOrType, $renderer);
     }
 
     public static function unregisterRenderer(string $eventOrType): void
     {
-        app(RendererRegistry::class)->unregister($eventOrType);
+        resolve(RendererRegistry::class)->unregister($eventOrType);
     }
 
     protected static function getFacadeAccessor(): string

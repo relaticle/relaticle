@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Email;
 use Relaticle\ActivityLog\Tests\Fixtures\Models\Person;
 
+/**
+ * @extends Factory<Email>
+ */
 final class EmailFactory extends Factory
 {
     protected $model = Email::class;

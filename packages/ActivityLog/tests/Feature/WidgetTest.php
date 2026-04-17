@@ -15,7 +15,7 @@ it('aggregates entries across subjects bounded by max_subjects', function (): vo
 
     $widget = new class extends ActivityLogWidget
     {
-        protected function model(): ?string
+        protected function model(): string
         {
             return Person::class;
         }
@@ -40,7 +40,7 @@ it('caps at perPage', function (): void {
 
     $widget = new class extends ActivityLogWidget
     {
-        protected function model(): ?string
+        protected function model(): string
         {
             return Person::class;
         }
