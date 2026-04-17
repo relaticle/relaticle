@@ -89,6 +89,9 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Misc
         'null', 'undefined', 'error', 'test', 'staging', 'preview',
+
+        // Email Integration
+       'email-accounts', 'email-attachments'
     ];
 
     /**
