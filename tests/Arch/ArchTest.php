@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
+use App\Filament\Pages\BaseRecordEmailsPage;
 use App\Filament\Pages\Import\ImportPage;
 use App\Filament\RelationManagers\BaseActivityTimelineRelationManager;
 use App\Filament\RelationManagers\BaseEmailsRelationManager;
@@ -16,6 +17,8 @@ use App\Mcp\Tools\BaseListTool;
 use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\PersonalAccessToken;
+use Relaticle\ImportWizard\Filament\Pages\ImportPage;
+use Relaticle\ImportWizard\Importers\BaseImporter;
 
 arch()->preset()->php();
 
@@ -45,6 +48,7 @@ arch('avoid open for extension')
     ->ignoring([
         BaseActivityTimelineRelationManager::class,
         BaseEmailsRelationManager::class,
+        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -67,6 +71,7 @@ arch('ensure no extends')
     ->ignoring([
         BaseActivityTimelineRelationManager::class,
         BaseEmailsRelationManager::class,
+        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -78,6 +83,7 @@ arch('ensure no extends')
         BaseAttachTool::class,
         BaseDetachTool::class,
         ImportPage::class,
+        BaseRecordEmailsPage::class,
     ]);
 
 arch('avoid mutation')
