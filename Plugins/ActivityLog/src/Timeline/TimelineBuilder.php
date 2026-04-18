@@ -196,16 +196,16 @@ final class TimelineBuilder
 
     private function filterHash(): string
     {
-        return substr(md5(serialize([
-            'from' => $this->from?->toIso8601String(),
-            'to' => $this->to?->toIso8601String(),
-            'typeAllow' => $this->typeAllow,
-            'typeDeny' => $this->typeDeny,
-            'eventAllow' => $this->eventAllow,
-            'eventDeny' => $this->eventDeny,
-            'sortDesc' => $this->sortDesc,
-            'sources' => count($this->sources),
-        ])), 0, 12);
+        return implode('|', [
+            'from:'.($this->from?->toIso8601String() ?? ''),
+            'to:'.($this->to?->toIso8601String() ?? ''),
+            'typeAllow:'.implode(',', $this->typeAllow ?? []),
+            'typeDeny:'.implode(',', $this->typeDeny ?? []),
+            'eventAllow:'.implode(',', $this->eventAllow ?? []),
+            'eventDeny:'.implode(',', $this->eventDeny ?? []),
+            'sortDesc:'.($this->sortDesc ? '1' : '0'),
+            'sources:'.count($this->sources),
+        ]);
     }
 
     /** @return Collection<int, TimelineEntry> */
