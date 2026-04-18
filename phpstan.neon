@@ -30,6 +30,10 @@ parameters:
 
     excludePaths:
         - packages/SystemAdmin
+        - packages/ActivityLog/vendor (?)
+        - packages/ActivityLog/tests/Feature
+        - packages/ActivityLog/tests/TestCase.php
+        - packages/ActivityLog/tests/Pest.php
 
     configDirectories:
         - config

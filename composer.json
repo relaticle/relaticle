@@ -77,6 +77,7 @@
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
         "rector/rector": "^2.0",
+        "relaticle/activity-log": "*@dev",
         "spatie/boost-spatie-guidelines": "^1.1",
         "spatie/pest-plugin-route-testing": "^1.1"
     },
@@ -163,5 +164,13 @@
     },
     "minimum-stability": "beta",
     "prefer-stable": true,
-    "repositories": []
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/ActivityLog",
+            "options": {
+                "symlink": true
+            }
+        }
+    ]
 }

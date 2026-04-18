@@ -1,0 +1,46 @@
+{
+    "name": "relaticle/activity-log",
+    "description": "Reusable Filament v5 plugin that renders a unified activity-log timeline for any Eloquent model.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "filament/filament": "^5.0",
+        "illuminate/contracts": "^12.0",
+        "illuminate/database": "^12.0",
+        "illuminate/support": "^12.0",
+        "spatie/laravel-activitylog": "^4.9",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "pestphp/pest-plugin-livewire": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Relaticle\\ActivityLog\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Relaticle\\ActivityLog\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Relaticle\\ActivityLog\\ActivityLogServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
