@@ -156,8 +156,8 @@ final class RelatedModelSource extends AbstractTimelineSource
                     subject: $subject,
                     causer: $this->resolveCauser($row),
                     relatedModel: $row,
-                    title: $this->titleResolver instanceof \Closure ? ($this->titleResolver)($row) : null,
-                    description: $this->descriptionResolver instanceof \Closure ? ($this->descriptionResolver)($row) : null,
+                    title: $this->titleResolver instanceof Closure ? ($this->titleResolver)($row) : null,
+                    description: $this->descriptionResolver instanceof Closure ? ($this->descriptionResolver)($row) : null,
                     icon: $eventConfig['icon'],
                     color: $eventConfig['color'],
                 );
