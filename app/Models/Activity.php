@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Scopes\TeamScope;
+use Database\Factories\ActivityFactory;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity as SpatieActivity;
 
@@ -16,6 +18,9 @@ use Spatie\Activitylog\Models\Activity as SpatieActivity;
 #[ScopedBy([TeamScope::class])]
 final class Activity extends SpatieActivity
 {
+    /** @use HasFactory<ActivityFactory> */
+    use HasFactory;
+
     public static function booted(): void
     {
         self::creating(function (self $activity): void {
