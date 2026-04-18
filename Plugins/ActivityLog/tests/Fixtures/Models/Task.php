@@ -7,18 +7,23 @@ namespace Relaticle\ActivityLog\Tests\Fixtures\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Relaticle\ActivityLog\Tests\Fixtures\database\factories\NoteFactory;
-use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Traits\LogsActivity;
+use Relaticle\ActivityLog\Tests\Fixtures\database\factories\TaskFactory;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
-final class Note extends Model
+final class Task extends Model
 {
-    /** @use HasFactory<NoteFactory> */
+    /** @use HasFactory<TaskFactory> */
     use HasFactory;
 
     use LogsActivity;
 
-    protected $fillable = ['person_id', 'body'];
+    protected $fillable = ['person_id', 'title', 'completed_at'];
+
+    protected function casts(): array
+    {
+        return ['completed_at' => 'datetime'];
+    }
 
     /**
      * @return BelongsTo<Person, $this>
@@ -30,6 +35,6 @@ final class Note extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnly(['body'])->logOnlyDirty();
+        return LogOptions::defaults()->logOnly(['title', 'completed_at'])->logOnlyDirty();
     }
 }

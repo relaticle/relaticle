@@ -11,6 +11,7 @@ use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\PeopleObserver;
 use App\Services\AvatarService;
 use Database\Factories\PeopleFactory;
@@ -51,6 +52,7 @@ final class People extends Model implements HasCustomFields
     use HasNotes;
     use HasTeam;
     use HasUlids;
+    use LogsCrmActivity;
     use SoftDeletes;
     use UsesCustomFields;
 

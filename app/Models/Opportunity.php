@@ -11,6 +11,7 @@ use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\OpportunityObserver;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -45,6 +46,7 @@ final class Opportunity extends Model implements HasCustomFields
     use HasNotes;
     use HasTeam;
     use HasUlids;
+    use LogsCrmActivity;
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;

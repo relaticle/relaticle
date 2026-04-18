@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
+use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -39,6 +40,7 @@ final class Note extends Model implements HasCustomFields
     use HasTeam;
     use HasUlids;
     use InvalidatesRelatedAiSummaries;
+    use LogsCrmActivity;
     use SoftDeletes;
     use UsesCustomFields;
 

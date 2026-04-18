@@ -15,7 +15,7 @@ use Relaticle\ActivityLog\Renderers\RendererRegistry;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
-final class TimelineListLivewire extends Component
+final class TimelineLivewire extends Component
 {
     use WithPagination;
 
@@ -117,21 +117,18 @@ final class TimelineListLivewire extends Component
     private function bucketFor(CarbonImmutable $at, CarbonImmutable $now): string
     {
         if ($at->isSameDay($now)) {
-            return 'today';
-        }
-        if ($at->isSameDay($now->subDay())) {
-            return 'yesterday';
+            return 'Today';
         }
         if ($at->isSameWeek($now)) {
-            return 'this_week';
-        }
-        if ($at->isSameWeek($now->subWeek())) {
-            return 'last_week';
+            return 'This week';
         }
         if ($at->isSameMonth($now)) {
-            return 'this_month';
+            return 'This month';
+        }
+        if ($at->isSameYear($now)) {
+            return $at->format('F');
         }
 
-        return 'older';
+        return $at->format('F Y');
     }
 }

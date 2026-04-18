@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
+use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -45,6 +46,7 @@ final class Task extends Model implements HasCustomFields
     use HasTeam;
     use HasUlids;
     use InvalidatesRelatedAiSummaries;
+    use LogsCrmActivity;
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;

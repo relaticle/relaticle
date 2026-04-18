@@ -167,7 +167,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "./packages/ActivityLog",
+            "url": "./Plugins/ActivityLog",
             "options": {
                 "symlink": true
             }

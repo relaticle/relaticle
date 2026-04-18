@@ -25,7 +25,10 @@ trait HasActivityTimeline
                 $source
                     ->event('sent_at', 'email_sent')
                     ->event('created_at', 'email_received', when: fn ($email): bool => $email->sent_at === null)
-                    ->with(['from', 'labels', 'participants']);
+                    ->with(['from', 'labels', 'participants'])
+                    ->title(fn ($email): string => $email->subject ?? 'Email')
+                    ->description(fn ($email): ?string => $email->from->first()?->email_address)
+                    ->causer(fn ($email) => $email->from->first());
 
                 if ($viewer instanceof User) {
                     $source->using(fn (Builder|Relation $query) => $query->withGlobalScope(
@@ -36,6 +39,13 @@ trait HasActivityTimeline
             })
             ->fromRelation('notes', fn (RelatedModelSource $source): RelatedModelSource => $source
                 ->event('created_at', 'note_created')
-                ->with(['creator']));
+                ->with(['creator'])
+                ->title(fn ($note): string => $note->title ?? 'Note')
+                ->causer('creator'))
+            ->fromRelation('tasks', fn (RelatedModelSource $source): RelatedModelSource => $source
+                ->event('created_at', 'task_created')
+                ->with(['creator'])
+                ->title(fn ($task): string => $task->title ?? 'Task')
+                ->causer('creator'));
     }
 }

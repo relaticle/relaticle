@@ -26,7 +26,7 @@ return RectorConfig::configure()
         __DIR__.'/public',
     ])
     ->withSkip([
-        __DIR__.'/packages/ActivityLog/vendor',
+        __DIR__.'/Plugins/ActivityLog/vendor',
         AddOverrideAttributeToOverriddenMethodsRector::class,
         RemoveUnusedPrivateMethodRector::class => [
             // Skip Filament importer lifecycle hooks - they're called dynamically via callHook()

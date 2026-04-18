@@ -40,6 +40,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 
@@ -167,6 +168,7 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             TimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
