@@ -25,8 +25,4 @@ return [
         'ttl_seconds' => 0,
         'key_prefix' => 'activity-log',
     ],
-
-    'widget' => [
-        'max_subjects' => 500,
-    ],
 ];

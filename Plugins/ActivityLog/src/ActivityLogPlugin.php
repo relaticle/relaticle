@@ -7,15 +7,10 @@ namespace Relaticle\ActivityLog;
 use Closure;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
-use Filament\Widgets\Widget;
-use Filament\Widgets\WidgetConfiguration;
 use Relaticle\ActivityLog\Renderers\RendererRegistry;
 
 final class ActivityLogPlugin implements Plugin
 {
-    /** @var array<class-string<Widget>|WidgetConfiguration> */
-    private array $widgets = [];
-
     /** @var array<string, string|Closure> */
     private array $renderers = [];
 
@@ -30,16 +25,6 @@ final class ActivityLogPlugin implements Plugin
     }
 
     /**
-     * @param  array<class-string<Widget>|WidgetConfiguration>  $widgets
-     */
-    public function widgets(array $widgets): static
-    {
-        $this->widgets = $widgets;
-
-        return $this;
-    }
-
-    /**
      * @param  array<string, string|Closure>  $renderers
      */
     public function renderers(array $renderers): static
@@ -49,12 +34,7 @@ final class ActivityLogPlugin implements Plugin
         return $this;
     }
 
-    public function register(Panel $panel): void
-    {
-        if ($this->widgets !== []) {
-            $panel->widgets($this->widgets);
-        }
-    }
+    public function register(Panel $panel): void {}
 
     public function boot(Panel $panel): void
     {
