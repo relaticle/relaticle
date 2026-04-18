@@ -20,6 +20,8 @@ final class RelatedModelSource extends AbstractTimelineSource
     /** @var array<int, string> */
     private array $with = [];
 
+    private ?Closure $queryModifier = null;
+
     public function __construct(int $priority, public readonly string $relation)
     {
         parent::__construct($priority);
@@ -53,28 +55,42 @@ final class RelatedModelSource extends AbstractTimelineSource
         return $this;
     }
 
+    public function using(Closure $modifier): self
+    {
+        $this->queryModifier = $modifier;
+
+        return $this;
+    }
+
     public function resolve(Model $subject, Window $window): iterable
     {
         $relation = $this->assertRelation($subject, $this->relation);
-        $relatedClass = $relation->getRelated()::class;
+        $related = $relation->getRelated();
+        $relatedClass = $related::class;
 
         foreach ($this->events as $eventConfig) {
             $column = $eventConfig['column'];
+            $qualifiedColumn = str_contains($column, '.') ? $column : $related->qualifyColumn($column);
+
             $query = $subject->{$this->relation}()
-                ->whereNotNull($column)
-                ->orderByDesc($column)
+                ->whereNotNull($qualifiedColumn)
+                ->orderByDesc($qualifiedColumn)
                 ->limit($window->cap);
 
             if ($this->with !== []) {
                 $query->with($this->with);
             }
 
+            if ($this->queryModifier instanceof Closure) {
+                ($this->queryModifier)($query);
+            }
+
             if ($window->from instanceof CarbonImmutable) {
-                $query->where($column, '>=', $window->from);
+                $query->where($qualifiedColumn, '>=', $window->from);
             }
 
             if ($window->to instanceof CarbonImmutable) {
-                $query->where($column, '<=', $window->to);
+                $query->where($qualifiedColumn, '<=', $window->to);
             }
 
             $rows = $query->get();

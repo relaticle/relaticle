@@ -9,7 +9,6 @@ use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
-use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -32,6 +31,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class CompanyResource extends Resource
@@ -132,7 +132,7 @@ final class CompanyResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // EmailsRelationManager::class,
+            TimelineRelationManager::class,
         ];
     }
 

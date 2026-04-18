@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
+use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
@@ -33,6 +34,7 @@ use Spatie\EloquentSortable\SortableTrait;
 final class Opportunity extends Model implements HasCustomFields
 {
     use BelongsToTeamCreator;
+    use HasActivityTimeline;
     use HasAiSummary;
     use HasCreator;
     use HasEmails;

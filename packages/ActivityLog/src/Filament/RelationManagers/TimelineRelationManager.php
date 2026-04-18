@@ -10,6 +10,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class TimelineRelationManager extends RelationManager
 {
@@ -67,5 +68,21 @@ final class TimelineRelationManager extends RelationManager
     public function getTableQuery(): ?Builder
     {
         return null;
+    }
+
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return HasOne<Model, Model>
+     */
+    public function getRelationship(): HasOne
+    {
+        $owner = $this->getOwnerRecord();
+        $keyName = $owner->getKeyName();
+
+        return new HasOne($owner->newQuery(), $owner, $keyName, $keyName);
     }
 }

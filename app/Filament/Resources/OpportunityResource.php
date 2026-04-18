@@ -10,7 +10,6 @@ use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
-use App\Filament\Resources\OpportunityResource\RelationManagers\ActivityTimelineRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
@@ -35,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
+use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 
 final class OpportunityResource extends Resource
 {
@@ -109,7 +109,7 @@ final class OpportunityResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ActivityTimelineRelationManager::class,
+            TimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             // EmailsRelationManager::class,

@@ -10,7 +10,6 @@ use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
-use App\Filament\Resources\PeopleResource\RelationManagers\ActivityTimelineRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
@@ -41,6 +40,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class PeopleResource extends Resource
@@ -167,7 +167,7 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ActivityTimelineRelationManager::class,
+            TimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             EmailsRelationManager::class,
