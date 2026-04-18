@@ -22,9 +22,36 @@ final class RelatedModelSource extends AbstractTimelineSource
 
     private ?Closure $queryModifier = null;
 
+    private ?Closure $titleResolver = null;
+
+    private ?Closure $descriptionResolver = null;
+
+    private Closure|string|null $causerResolver = null;
+
     public function __construct(int $priority, public readonly string $relation)
     {
         parent::__construct($priority);
+    }
+
+    public function title(Closure $resolver): self
+    {
+        $this->titleResolver = $resolver;
+
+        return $this;
+    }
+
+    public function description(Closure $resolver): self
+    {
+        $this->descriptionResolver = $resolver;
+
+        return $this;
+    }
+
+    public function causer(Closure|string $resolver): self
+    {
+        $this->causerResolver = $resolver;
+
+        return $this;
     }
 
     public function event(
@@ -60,6 +87,23 @@ final class RelatedModelSource extends AbstractTimelineSource
         $this->queryModifier = $modifier;
 
         return $this;
+    }
+
+    private function resolveCauser(Model $row): ?Model
+    {
+        if ($this->causerResolver === null) {
+            return null;
+        }
+
+        if (is_string($this->causerResolver)) {
+            $value = $row->{$this->causerResolver};
+
+            return $value instanceof Model ? $value : null;
+        }
+
+        $value = ($this->causerResolver)($row);
+
+        return $value instanceof Model ? $value : null;
     }
 
     public function resolve(Model $subject, Window $window): iterable
@@ -110,8 +154,10 @@ final class RelatedModelSource extends AbstractTimelineSource
                     dedupKey: $this->dedupKeyFor($relatedClass, (string) $row->getKey(), $occurredAt),
                     sourcePriority: $this->priority,
                     subject: $subject,
+                    causer: $this->resolveCauser($row),
                     relatedModel: $row,
-                    title: null,
+                    title: $this->titleResolver instanceof \Closure ? ($this->titleResolver)($row) : null,
+                    description: $this->descriptionResolver instanceof \Closure ? ($this->descriptionResolver)($row) : null,
                     icon: $eventConfig['icon'],
                     color: $eventConfig['color'],
                 );

@@ -11,8 +11,8 @@ use Relaticle\ActivityLog\Concerns\HasTimeline;
 use Relaticle\ActivityLog\Tests\Fixtures\database\factories\PersonFactory;
 use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
-use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 final class Person extends Model
 {

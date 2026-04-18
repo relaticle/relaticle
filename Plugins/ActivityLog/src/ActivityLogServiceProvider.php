@@ -29,6 +29,7 @@ final class ActivityLogServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        Livewire::component('activity-log-list', Filament\Livewire\TimelineListLivewire::class);
+        Livewire::component('timeline-livewire', Filament\Livewire\TimelineLivewire::class);
+        Livewire::component('activity-log-livewire', Filament\Livewire\ActivityLogLivewire::class);
     }
 }

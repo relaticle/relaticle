@@ -21,6 +21,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
+use Relaticle\ActivityLog\Filament\Actions\ActivityLogAction;
+use Relaticle\ActivityLog\Filament\Actions\TimelineAction;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -31,6 +33,8 @@ final class ViewPeople extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            TimelineAction::make(),
+            ActivityLogAction::make(),
             Action::make('viewEmails')
                 ->label('Emails')
                 ->icon('heroicon-o-envelope')
