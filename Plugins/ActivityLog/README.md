@@ -4,7 +4,7 @@
 
 A reusable Filament v5 plugin that renders a unified chronological timeline for any Eloquent model. It aggregates events from `spatie/laravel-activitylog` (both the model's own log and logs of its related models), timestamp columns on related models (e.g. `emails.sent_at`, `tasks.completed_at`), and any custom source you define.
 
-The plugin ships an infolist component, two relation managers, two header actions, and a facade for registering custom renderers.
+The plugin ships an infolist component, a relation manager, a header action, a Filament plugin for registering custom renderers, and a facade for registering renderers outside a panel.
 
 ---
 
@@ -45,9 +45,10 @@ The service provider (`Relaticle\ActivityLog\ActivityLogServiceProvider`) is aut
 
 - Config file (`config/activity-log.php`)
 - Blade views namespaced as `activity-log::*`
-- Translations
+- Translations (under the `activity-log::messages.*` namespace)
 - `RendererRegistry` and `TimelineCache` singletons
-- Two Livewire components: `timeline-livewire`, `activity-log-list`
+- A Livewire component registered as `activity-log`
+- The built-in `activity_log` renderer
 
 ### 2. Publish the config (optional)
 
@@ -118,7 +119,7 @@ use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog;
 public static function infolist(Schema $schema): Schema
 {
     return $schema->components([
-        ActivityLog::make('timeline')
+        ActivityLog::make('activity')
             ->heading('Activity')
             ->groupByDate()
             ->perPage(20)
@@ -247,94 +248,77 @@ Dedup behaviour: entries sharing a `dedupKey` collapse to the highest `sourcePri
 
 ## Filament UI integrations
 
-### Infolist components
+### Infolist component
 
-Two infolist entries are shipped. Both call `$record->timeline()` and require `HasTimeline`.
+One infolist entry is shipped. It calls `$record->timeline()` and requires `HasTimeline`.
 
 ```php
-use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog; // spatie-style flat activity log
-use Relaticle\ActivityLog\Filament\Infolists\Components\Timeline;    // unified date-grouped timeline
+use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog;
 
 ActivityLog::make('activity')
     ->heading('Activity')
-    ->groupByDate()                  // group by today / yesterday / this week / last week / this month / older
-    ->collapsible()                  // allow collapsing groups (only meaningful with groupByDate)
-    ->perPage(20)                    // overrides activity-log.default_per_page
+    ->groupByDate()                  // group by today / yesterday / this week / last week / this month / older (default: true)
+    ->perPage(20)                    // per-page for the Livewire component (default: 3)
     ->emptyState('No activity yet.') // custom empty-state message
-    ->infiniteScroll(false)          // false = "Load more" button (default for ActivityLog); true = wire:intersect
-    ->using(fn (Person $record) => $record->timeline()->exceptEvent(['draft_saved']))
-    ->columnSpanFull();
-
-Timeline::make('timeline')
-    ->heading('Timeline')
-    ->groupByDate()
-    ->perPage(3)                     // Timeline default
-    ->infiniteScroll(true)           // true = wire:intersect (default for Timeline); false = "Load more" button
+    ->infiniteScroll(true)           // true = wire:intersect (default); false = "Load more" button
     ->columnSpanFull();
 ```
-
-Pass `->using(Closure)` to mutate or replace the builder (e.g., for role-based filtering).
 
 ### Pagination UX: `infiniteScroll(bool)`
 
-Both entries expose an `infiniteScroll()` fluent flag that switches the bottom control:
+The `infiniteScroll()` fluent flag switches the bottom control:
 
-- `true` — renders a `wire:intersect` sentinel; the next page loads automatically as the user scrolls (Livewire 4).
+- `true` (default) — renders a `wire:intersect` sentinel; the next page loads automatically as the user scrolls (Livewire 4).
 - `false` — renders a `Load more` button the user clicks.
 
-Defaults: `ActivityLog` = `false`, `Timeline` = `true`.
+### Relation manager
 
-### Relation managers
-
-Two read-only relation managers render the timeline as a tab on the resource's view/edit page:
+A read-only relation manager renders the activity log as a tab on the resource's view/edit page:
 
 ```php
-use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager; // flat list, spatie-style
-use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;    // date-grouped, unified
+use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 
 public static function getRelations(): array
 {
-    return [TimelineRelationManager::class];
+    return [ActivityLogRelationManager::class];
 }
 ```
 
-Both override `canViewForRecord()` to always return `true`. They declare a dummy `HasOne` relationship so they don't write to the DB — the page just hosts a Livewire component.
+`canViewForRecord()` always returns `true`. It declares a dummy `HasOne` relationship so it doesn't write to the DB — the page just hosts the Livewire component.
 
-Each relation manager carries a `protected static bool $infiniteScroll` default (`false` for `ActivityLogRelationManager`, `true` for `TimelineRelationManager`) that is forwarded to the Livewire component. Flip it from a service provider if you want the opposite UX:
+The relation manager carries a `protected static bool $infiniteScroll = true` that is forwarded to the Livewire component. Flip it from a service provider if you want the opposite UX:
 
 ```php
-TimelineRelationManager::$infiniteScroll = false;
+ActivityLogRelationManager::$infiniteScroll = false;
 ```
 
-### Header actions
+### Header action
 
-Show the timeline in a slide-over modal from any resource table or page header:
+Show the activity log in a slide-over modal from any resource table or page header:
 
 ```php
-use Relaticle\ActivityLog\Filament\Actions\TimelineAction;
 use Relaticle\ActivityLog\Filament\Actions\ActivityLogAction;
 
 protected function getHeaderActions(): array
 {
     return [
-        TimelineAction::make(),     // unified timeline (emails/notes/tasks + spatie)
-        ActivityLogAction::make(),  // spatie-style flat activity list
+        ActivityLogAction::make(),
     ];
 }
 ```
 
-Both actions open a 2XL slide-over with the relevant Livewire component. Customize label/icon/modal width as with any Filament action.
+The action opens a 2XL slide-over with the Livewire component. Customize label/icon/modal width as with any Filament action.
 
 ---
 
 ## Custom renderers
 
-Out of the box, every entry renders via `DefaultRenderer` (emits title, description, causer, relative time, and a colored icon). For branded output per event type, register a custom renderer.
+Out of the box, entries from spatie's activity log render via the built-in `ActivityLogRenderer` (which understands `updated`/`created`/etc. events and renders field diffs), and everything else falls back to `DefaultRenderer` (title, description, causer, relative time, colored icon). For branded output per event type, register a custom renderer.
 
 ### Registering via the panel plugin
 
 ```php
-use Relaticle\ActivityLog\ActivityLogPlugin;
+use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 
 $panel->plugin(
     ActivityLogPlugin::make()->renderers([
