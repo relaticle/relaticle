@@ -1,8 +1,9 @@
 <div class="p-4">
-    @livewire('activity-log-list', [
-        'subjectClass' => get_class($owner),
-        'subjectKey' => $owner->getKey(),
-        'perPage' => $perPage,
-        'groupByDate' => $groupByDate,
-    ], key('activity-log-rm-'.get_class($owner).'-'.$owner->getKey()))
+    <livewire:activity-log-list
+        :subject-class="get_class($owner)"
+        :subject-key="$owner->getKey()"
+        :per-page="$perPage"
+        :group-by-date="$groupByDate"
+        :key="'activity-log-rm-'.get_class($owner).'-'.$owner->getKey()"
+    />
 </div>
