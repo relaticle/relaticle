@@ -76,18 +76,19 @@ If your panel uses a custom `theme.css`, add the plugin's views to its source li
 
 ### 1. Mark the model as timeline-capable
 
-Use the `HasTimeline` trait and define a `timeline(): TimelineBuilder` method:
+Implement the `HasTimeline` contract, use the `InteractsWithTimeline` trait for the helper methods, and define a `timeline(): TimelineBuilder` method:
 
 ```php
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\ActivityLog\Concerns\HasTimeline;
+use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-class Person extends Model
+class Person extends Model implements HasTimeline
 {
-    use HasTimeline;
+    use InteractsWithTimeline;
     use LogsActivity;
 
     public function timeline(): TimelineBuilder

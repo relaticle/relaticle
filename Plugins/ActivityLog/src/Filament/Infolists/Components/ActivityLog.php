@@ -9,6 +9,7 @@ use Filament\Infolists\Components\Entry;
 use Filament\Schemas\Components\Concerns\HasHeading;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 
 final class ActivityLog extends Entry
 {
@@ -106,10 +107,11 @@ final class ActivityLog extends Entry
 
         throw_unless($record instanceof Model, LogicException::class, 'ActivityLog infolist component requires a model record.');
 
-        if (! method_exists($record, 'timeline') && ! $this->using instanceof Closure) {
+        if (! $record instanceof HasTimeline && ! $this->using instanceof Closure) {
             throw new LogicException(sprintf(
-                '%s must use HasTimeline trait or provide ->using().',
+                '%s must implement %s or provide ->using().',
                 $record::class,
+                HasTimeline::class,
             ));
         }
 

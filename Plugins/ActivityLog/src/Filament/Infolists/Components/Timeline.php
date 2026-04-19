@@ -8,6 +8,7 @@ use Filament\Infolists\Components\Entry;
 use Filament\Schemas\Components\Concerns\HasHeading;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 
 final class Timeline extends Entry
 {
@@ -82,7 +83,7 @@ final class Timeline extends Entry
 
         throw_unless($record instanceof Model, LogicException::class, 'Timeline infolist component requires a model record.');
 
-        throw_unless(method_exists($record, 'timeline'), LogicException::class, sprintf('%s must implement a timeline() method.', $record::class));
+        throw_unless($record instanceof HasTimeline, LogicException::class, sprintf('%s must implement %s.', $record::class, HasTimeline::class));
 
         return $record;
     }

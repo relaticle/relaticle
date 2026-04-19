@@ -5,20 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\ActivityLog\Concerns;
 
 use Illuminate\Pagination\LengthAwarePaginator;
-use LogicException;
-use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineCache;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
-trait HasTimeline
+trait InteractsWithTimeline
 {
-    public function timeline(): TimelineBuilder
-    {
-        throw new LogicException(
-            static::class.' uses HasTimeline but does not implement timeline(): TimelineBuilder.'
-        );
-    }
-
     /**
      * @return LengthAwarePaginator<int, TimelineEntry>
      */

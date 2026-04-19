@@ -7,19 +7,20 @@ namespace Relaticle\ActivityLog\Tests\Fixtures\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Relaticle\ActivityLog\Concerns\HasTimeline;
+use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Tests\Fixtures\database\factories\PersonFactory;
 use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-final class Person extends Model
+final class Person extends Model implements HasTimeline
 {
     /** @use HasFactory<PersonFactory> */
     use HasFactory;
 
-    use HasTimeline;
+    use InteractsWithTimeline;
     use LogsActivity;
 
     protected $fillable = ['name'];

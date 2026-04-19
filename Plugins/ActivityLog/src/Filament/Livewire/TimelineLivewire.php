@@ -10,12 +10,14 @@ use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use LogicException;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Renderers\RendererRegistry;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 final class TimelineLivewire extends Component
 {
+    /** @var class-string<Model&HasTimeline>|string */
     public string $subjectClass = '';
 
     public int|string $subjectKey = 0;
@@ -97,15 +99,13 @@ final class TimelineLivewire extends Component
 
     private function builderFor(Model $subject): TimelineBuilder
     {
-        if (! method_exists($subject, 'timeline')) {
-            throw new LogicException(sprintf('%s has no timeline() method.', $subject::class));
-        }
+        throw_unless(
+            $subject instanceof HasTimeline,
+            LogicException::class,
+            sprintf('%s must implement %s.', $subject::class, HasTimeline::class),
+        );
 
-        $result = $subject->timeline();
-
-        throw_unless($result instanceof TimelineBuilder, LogicException::class, sprintf('%s::timeline() must return %s.', $subject::class, TimelineBuilder::class));
-
-        return $result;
+        return $subject->timeline();
     }
 
     /**

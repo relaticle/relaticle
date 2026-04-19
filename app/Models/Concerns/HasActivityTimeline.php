@@ -7,14 +7,14 @@ namespace App\Models\Concerns;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Relaticle\ActivityLog\Concerns\HasTimeline;
+use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 trait HasActivityTimeline
 {
-    use HasTimeline;
+    use InteractsWithTimeline;
 
     public function timeline(): TimelineBuilder
     {

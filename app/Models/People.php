@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
@@ -38,7 +39,7 @@ use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
  * @property float|null $avg_response_time_hours
  */
 #[ObservedBy(PeopleObserver::class)]
-final class People extends Model implements HasCustomFields
+final class People extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasActivityTimeline;
