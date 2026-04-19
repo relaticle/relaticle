@@ -45,7 +45,7 @@ The service provider (`Relaticle\ActivityLog\ActivityLogServiceProvider`) is aut
 - Blade views namespaced as `activity-log::*`
 - Translations
 - `RendererRegistry` and `TimelineCache` singletons
-- Two Livewire components: `timeline-livewire`, `activity-log-livewire`
+- Two Livewire components: `timeline-livewire`, `activity-log-list`
 
 ### 2. Publish the config (optional)
 
@@ -244,22 +244,42 @@ Dedup behaviour: entries sharing a `dedupKey` collapse to the highest `sourcePri
 
 ## Filament UI integrations
 
-### Infolist component — `ActivityLog::make()`
+### Infolist components
 
-Drop into any resource's view page infolist.
+Two infolist entries are shipped. Both call `$record->timeline()` and require `HasTimeline`.
 
 ```php
-ActivityLog::make('timeline')
+use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog; // spatie-style flat activity log
+use Relaticle\ActivityLog\Filament\Infolists\Components\Timeline;    // unified date-grouped timeline
+
+ActivityLog::make('activity')
     ->heading('Activity')
-    ->groupByDate()                 // group by today / yesterday / this week / last week / this month / older
+    ->groupByDate()                  // group by today / yesterday / this week / last week / this month / older
     ->collapsible()                  // allow collapsing groups (only meaningful with groupByDate)
     ->perPage(20)                    // overrides activity-log.default_per_page
     ->emptyState('No activity yet.') // custom empty-state message
-    ->using(fn (Person $record) => $record->timeline()->exceptEvent(['draft_saved'])) // override builder
+    ->infiniteScroll(false)          // false = "Load more" button (default for ActivityLog); true = wire:intersect
+    ->using(fn (Person $record) => $record->timeline()->exceptEvent(['draft_saved']))
+    ->columnSpanFull();
+
+Timeline::make('timeline')
+    ->heading('Timeline')
+    ->groupByDate()
+    ->perPage(3)                     // Timeline default
+    ->infiniteScroll(true)           // true = wire:intersect (default for Timeline); false = "Load more" button
     ->columnSpanFull();
 ```
 
-By default the component calls `$record->timeline()`, so the record must use `HasTimeline`. Pass `->using(Closure)` if you want to mutate or replace the builder (e.g., for role-based filtering).
+Pass `->using(Closure)` to mutate or replace the builder (e.g., for role-based filtering).
+
+### Pagination UX: `infiniteScroll(bool)`
+
+Both entries expose an `infiniteScroll()` fluent flag that switches the bottom control:
+
+- `true` — renders a `wire:intersect` sentinel; the next page loads automatically as the user scrolls (Livewire 4).
+- `false` — renders a `Load more` button the user clicks.
+
+Defaults: `ActivityLog` = `false`, `Timeline` = `true`.
 
 ### Relation managers
 
@@ -275,7 +295,13 @@ public static function getRelations(): array
 }
 ```
 
-Both override `canViewForRecord()` to always return `true`. Extend and override if you need role/policy gating. They declare a dummy `HasOne` relationship, so they don't write to the DB — the page just hosts a Livewire component.
+Both override `canViewForRecord()` to always return `true`. They declare a dummy `HasOne` relationship so they don't write to the DB — the page just hosts a Livewire component.
+
+Each relation manager carries a `protected static bool $infiniteScroll` default (`false` for `ActivityLogRelationManager`, `true` for `TimelineRelationManager`) that is forwarded to the Livewire component. Flip it from a service provider if you want the opposite UX:
+
+```php
+TimelineRelationManager::$infiniteScroll = false;
+```
 
 ### Header actions
 

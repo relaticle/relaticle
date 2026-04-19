@@ -4,29 +4,24 @@ declare(strict_types=1);
 
 namespace Relaticle\ActivityLog\Filament\Infolists\Components;
 
-use Closure;
 use Filament\Infolists\Components\Entry;
 use Filament\Schemas\Components\Concerns\HasHeading;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
-final class ActivityLog extends Entry
+final class Timeline extends Entry
 {
     use HasHeading;
 
-    protected string $view = 'activity-log::infolist-component';
+    protected string $view = 'activity-log::timeline-infolist-component';
 
-    private bool $groupByDate = false;
-
-    private bool $collapsible = false;
+    private bool $groupByDate = true;
 
     private ?int $perPage = null;
 
-    private ?Closure $using = null;
-
     private string $emptyState = 'No activity yet.';
 
-    private bool $infiniteScroll = false;
+    private bool $infiniteScroll = true;
 
     public function groupByDate(bool $enabled = true): static
     {
@@ -35,23 +30,9 @@ final class ActivityLog extends Entry
         return $this;
     }
 
-    public function collapsible(bool $enabled = true): static
-    {
-        $this->collapsible = $enabled;
-
-        return $this;
-    }
-
     public function perPage(int $perPage): static
     {
         $this->perPage = $perPage;
-
-        return $this;
-    }
-
-    public function using(Closure $resolver): static
-    {
-        $this->using = $resolver;
 
         return $this;
     }
@@ -85,14 +66,9 @@ final class ActivityLog extends Entry
         return $this->groupByDate;
     }
 
-    public function isCollapsible(): bool
-    {
-        return $this->collapsible;
-    }
-
     public function getPerPage(): int
     {
-        return $this->perPage ?? (int) config('activity-log.default_per_page', 20);
+        return $this->perPage ?? 3;
     }
 
     public function getEmptyStateMessage(): string
@@ -104,14 +80,9 @@ final class ActivityLog extends Entry
     {
         $record = $this->getRecord();
 
-        throw_unless($record instanceof Model, LogicException::class, 'ActivityLog infolist component requires a model record.');
+        throw_unless($record instanceof Model, LogicException::class, 'Timeline infolist component requires a model record.');
 
-        if (! method_exists($record, 'timeline') && ! $this->using instanceof Closure) {
-            throw new LogicException(sprintf(
-                '%s must use HasTimeline trait or provide ->using().',
-                $record::class,
-            ));
-        }
+        throw_unless(method_exists($record, 'timeline'), LogicException::class, sprintf('%s must implement a timeline() method.', $record::class));
 
         return $record;
     }

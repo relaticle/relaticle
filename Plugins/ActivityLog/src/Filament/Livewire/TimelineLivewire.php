@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 use LogicException;
 use Relaticle\ActivityLog\Renderers\RendererRegistry;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
@@ -17,15 +16,17 @@ use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 final class TimelineLivewire extends Component
 {
-    use WithPagination;
-
     public string $subjectClass = '';
 
     public int|string $subjectKey = 0;
 
     public int $perPage = 20;
 
+    public int $visibleCount = 0;
+
     public bool $groupByDate = false;
+
+    public bool $infiniteScroll = true;
 
     public string $emptyState = 'No activity yet.';
 
@@ -38,12 +39,24 @@ final class TimelineLivewire extends Component
     #[Url(as: 'to')]
     public ?string $toDate = null;
 
+    public function mount(): void
+    {
+        if ($this->visibleCount === 0) {
+            $this->visibleCount = $this->perPage;
+        }
+    }
+
     public function resetFilters(): void
     {
         $this->typeFilter = null;
         $this->fromDate = null;
         $this->toDate = null;
-        $this->resetPage();
+        $this->visibleCount = $this->perPage;
+    }
+
+    public function loadMore(): void
+    {
+        $this->visibleCount += $this->perPage;
     }
 
     public function render(): View
@@ -60,18 +73,17 @@ final class TimelineLivewire extends Component
             $this->toDate !== null ? CarbonImmutable::parse($this->toDate) : null,
         );
 
-        $paginator = $builder->paginate(
-            perPage: $this->perPage,
-            page: $this->getPage(),
-        );
-
-        $grouped = $this->groupByDate ? $this->groupEntries($paginator->items()) : null;
+        $all = $builder->get();
+        $entries = $all->take($this->visibleCount)->values();
+        $grouped = $this->groupByDate ? $this->groupEntries($entries->all()) : null;
 
         return view('activity-log::timeline', [
-            'paginator' => $paginator,
+            'entries' => $entries,
             'grouped' => $grouped,
             'registry' => resolve(RendererRegistry::class),
             'emptyState' => $this->emptyState,
+            'hasMore' => $entries->count() < $all->count(),
+            'infiniteScroll' => $this->infiniteScroll,
         ]);
     }
 

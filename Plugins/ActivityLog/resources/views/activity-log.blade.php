@@ -173,20 +173,34 @@
         </div>
 
         @if ($hasMore)
-            <div class="flex justify-center">
-                <x-filament::button
-                    color="gray"
-                    outlined
-                    size="sm"
-                    wire:click="loadMore"
-                    wire:loading.attr="disabled"
-                    wire:target="loadMore"
-                    icon="heroicon-m-arrow-down"
+            @if ($infiniteScroll)
+                <div
+                    wire:intersect="loadMore"
+                    wire:key="activity-log-load-more"
+                    class="flex items-center justify-center py-4 text-xs text-gray-500 dark:text-gray-400"
                 >
-                    <span wire:loading.remove wire:target="loadMore">Load earlier activity</span>
-                    <span wire:loading wire:target="loadMore">Loading&hellip;</span>
-                </x-filament::button>
-            </div>
+                    <span wire:loading.remove wire:target="loadMore">Scroll to load more&hellip;</span>
+                    <span wire:loading wire:target="loadMore" class="flex items-center gap-2">
+                        <x-filament::loading-indicator class="h-4 w-4" />
+                        Loading earlier activity&hellip;
+                    </span>
+                </div>
+            @else
+                <div class="flex justify-center">
+                    <x-filament::button
+                        color="gray"
+                        outlined
+                        size="sm"
+                        wire:click="loadMore"
+                        wire:loading.attr="disabled"
+                        wire:target="loadMore"
+                        icon="heroicon-m-arrow-down"
+                    >
+                        <span wire:loading.remove wire:target="loadMore">Load more</span>
+                        <span wire:loading wire:target="loadMore">Loading&hellip;</span>
+                    </x-filament::button>
+                </div>
+            @endif
         @endif
     @endif
 </div>

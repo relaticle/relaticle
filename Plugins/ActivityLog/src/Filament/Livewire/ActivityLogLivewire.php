@@ -20,6 +20,8 @@ final class ActivityLogLivewire extends Component
 
     public int $visibleCount = 0;
 
+    public bool $infiniteScroll = false;
+
     #[Url(as: 'filter')]
     public string $filter = 'all';
 
@@ -64,6 +66,7 @@ final class ActivityLogLivewire extends Component
             'filter' => $this->filter,
             'counts' => $this->eventCounts(),
             'hasMore' => $activities->count() < $totalCount,
+            'infiniteScroll' => $this->infiniteScroll,
         ]);
     }
 

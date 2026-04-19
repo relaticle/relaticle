@@ -21,6 +21,8 @@ final class TimelineRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = 'heroicon-o-clock';
 
+    protected static bool $infiniteScroll = true;
+
     public function content(Schema $schema): Schema
     {
         $owner = $this->getOwnerRecord();
@@ -30,6 +32,7 @@ final class TimelineRelationManager extends RelationManager
                 'subjectClass' => $owner::class,
                 'subjectKey' => $owner->getKey(),
                 'groupByDate' => true,
+                'infiniteScroll' => self::$infiniteScroll,
             ])->key('timeline-relation-manager-'.$owner->getKey()),
         ]);
     }

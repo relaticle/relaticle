@@ -21,6 +21,8 @@ final class ActivityLogRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = 'heroicon-o-clock';
 
+    protected static bool $infiniteScroll = false;
+
     public function content(Schema $schema): Schema
     {
         $owner = $this->getOwnerRecord();
@@ -29,6 +31,7 @@ final class ActivityLogRelationManager extends RelationManager
             Livewire::make(ActivityLogLivewire::class, [
                 'subjectClass' => $owner::class,
                 'subjectKey' => $owner->getKey(),
+                'infiniteScroll' => self::$infiniteScroll,
             ])->key('activity-log-'.$owner->getKey()),
         ]);
     }
