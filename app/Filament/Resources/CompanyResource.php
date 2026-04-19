@@ -32,7 +32,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
-use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class CompanyResource extends Resource
@@ -134,7 +133,6 @@ final class CompanyResource extends Resource
     {
         return [
             ActivityLogRelationManager::class,
-            TimelineRelationManager::class,
         ];
     }
 

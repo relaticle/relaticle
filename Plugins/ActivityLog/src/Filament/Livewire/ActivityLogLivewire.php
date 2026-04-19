@@ -4,29 +4,42 @@ declare(strict_types=1);
 
 namespace Relaticle\ActivityLog\Filament\Livewire;
 
-use Illuminate\Database\Eloquent\Builder;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use LogicException;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
+use Relaticle\ActivityLog\Renderers\RendererRegistry;
+use Relaticle\ActivityLog\Timeline\TimelineBuilder;
+use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 final class ActivityLogLivewire extends Component
 {
+    /** @var class-string<Model&HasTimeline>|string */
     public string $subjectClass = '';
 
     public int|string $subjectKey = 0;
 
-    public int $perPage = 5;
+    public int $perPage = 20;
 
     public int $visibleCount = 0;
 
-    public bool $infiniteScroll = false;
+    public bool $groupByDate = false;
 
-    #[Url(as: 'filter')]
-    public string $filter = 'all';
+    public bool $infiniteScroll = true;
 
-    /** @var array<int, string> */
-    public const array FILTERS = ['all', 'created', 'updated', 'deleted'];
+    public string $emptyState = '';
+
+    #[Url(as: 'type')]
+    public ?string $typeFilter = null;
+
+    #[Url(as: 'from')]
+    public ?string $fromDate = null;
+
+    #[Url(as: 'to')]
+    public ?string $toDate = null;
 
     public function mount(): void
     {
@@ -35,13 +48,11 @@ final class ActivityLogLivewire extends Component
         }
     }
 
-    public function setFilter(string $filter): void
+    public function resetFilters(): void
     {
-        if (! in_array($filter, self::FILTERS, true)) {
-            return;
-        }
-
-        $this->filter = $filter;
+        $this->typeFilter = null;
+        $this->fromDate = null;
+        $this->toDate = null;
         $this->visibleCount = $this->perPage;
     }
 
@@ -52,71 +63,30 @@ final class ActivityLogLivewire extends Component
 
     public function render(): View
     {
-        $query = $this->baseQuery();
-        $totalCount = (clone $query)->count();
+        $subject = $this->resolveSubject();
+        $builder = $this->builderFor($subject);
 
-        $activities = $query
-            ->with(['causer', 'subject'])
-            ->latest()
-            ->limit($this->visibleCount)
-            ->get();
+        if ($this->typeFilter !== null) {
+            $builder->ofType([$this->typeFilter]);
+        }
 
-        return view('activity-log::activity-log', [
-            'activities' => $activities,
-            'filter' => $this->filter,
-            'counts' => $this->eventCounts(),
-            'hasMore' => $activities->count() < $totalCount,
+        $builder->between(
+            $this->fromDate !== null ? CarbonImmutable::parse($this->fromDate) : null,
+            $this->toDate !== null ? CarbonImmutable::parse($this->toDate) : null,
+        );
+
+        $all = $builder->get();
+        $entries = $all->take($this->visibleCount)->values();
+        $grouped = $this->groupByDate ? $this->groupEntries($entries->all()) : null;
+
+        return view('activity-log::timeline', [
+            'entries' => $entries,
+            'grouped' => $grouped,
+            'registry' => resolve(RendererRegistry::class),
+            'emptyState' => $this->emptyState !== '' ? $this->emptyState : (string) __('activity-log::messages.empty_state'),
+            'hasMore' => $entries->count() < $all->count(),
             'infiniteScroll' => $this->infiniteScroll,
         ]);
-    }
-
-    /**
-     * @return Builder<Model>
-     */
-    private function baseQuery(): Builder
-    {
-        $subject = $this->resolveSubject();
-
-        $query = $this->activityQuery()
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey());
-
-        return match ($this->filter) {
-            'created' => $query->where('event', 'created'),
-            'updated' => $query->where('event', 'updated'),
-            'deleted' => $query->whereIn('event', ['deleted', 'restored']),
-            default => $query,
-        };
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function eventCounts(): array
-    {
-        $subject = $this->resolveSubject();
-
-        $base = $this->activityQuery()
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey());
-
-        return [
-            'all' => (clone $base)->count(),
-            'created' => (clone $base)->where('event', 'created')->count(),
-            'updated' => (clone $base)->where('event', 'updated')->count(),
-            'deleted' => (clone $base)->whereIn('event', ['deleted', 'restored'])->count(),
-        ];
-    }
-
-    /**
-     * @return Builder<Model>
-     */
-    private function activityQuery(): Builder
-    {
-        /** @var class-string<Model> $modelClass */
-        $modelClass = config('activitylog.activity_model');
-
-        return $modelClass::query();
     }
 
     private function resolveSubject(): Model
@@ -125,5 +95,56 @@ final class ActivityLogLivewire extends Component
         $class = $this->subjectClass;
 
         return $class::query()->findOrFail($this->subjectKey);
+    }
+
+    private function builderFor(Model $subject): TimelineBuilder
+    {
+        throw_unless(
+            $subject instanceof HasTimeline,
+            LogicException::class,
+            sprintf('%s must implement %s.', $subject::class, HasTimeline::class),
+        );
+
+        return $subject->timeline();
+    }
+
+    /**
+     * @param  array<int, TimelineEntry>  $entries
+     * @return array<string, array<int, TimelineEntry>>
+     */
+    private function groupEntries(array $entries): array
+    {
+        $now = CarbonImmutable::now();
+        $buckets = [];
+
+        foreach ($entries as $entry) {
+            $label = $this->bucketFor($entry->occurredAt, $now);
+            $buckets[$label] ??= [];
+            $buckets[$label][] = $entry;
+        }
+
+        return $buckets;
+    }
+
+    private function bucketFor(CarbonImmutable $at, CarbonImmutable $now): string
+    {
+        $entryWeekStart = $at->startOfWeek(CarbonImmutable::MONDAY);
+        $currentWeekStart = $now->startOfWeek(CarbonImmutable::MONDAY);
+
+        $diffWeeks = (int) round($currentWeekStart->diffInWeeks($entryWeekStart, absolute: false));
+
+        if ($diffWeeks === 0) {
+            return (string) __('activity-log::messages.groups.this_week');
+        }
+
+        if ($diffWeeks === -1) {
+            return (string) __('activity-log::messages.groups.last_week');
+        }
+
+        $format = $entryWeekStart->isSameYear($now) ? 'M j' : 'M j, Y';
+
+        return (string) __('activity-log::messages.groups.week_of', [
+            'date' => $entryWeekStart->format($format),
+        ]);
     }
 }

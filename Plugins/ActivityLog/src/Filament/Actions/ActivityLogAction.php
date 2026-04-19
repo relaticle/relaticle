@@ -23,19 +23,20 @@ final class ActivityLogAction extends Action
         parent::setUp();
 
         $this
-            ->label('Activity')
-            ->icon('heroicon-o-clock')
+            ->label(__('activity-log::messages.title'))
+            ->icon('heroicon-o-bars-3-bottom-left')
             ->color('gray')
-            ->modalHeading('Activity')
-            ->modalDescription('Recent changes made to this record.')
+            ->modalHeading(__('activity-log::messages.title'))
+            ->modalDescription(__('activity-log::messages.modal_description'))
             ->modalWidth(Width::TwoExtraLarge)
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close')
+            ->modalCancelActionLabel(__('activity-log::messages.close'))
             ->slideOver()
             ->schema(fn (Schema $schema, Model $record): Schema => $schema->components([
                 Livewire::make(ActivityLogLivewire::class, [
                     'subjectClass' => $record::class,
                     'subjectKey' => $record->getKey(),
+                    'groupByDate' => true,
                 ])->key('activity-log-action-'.$record->getKey()),
             ]));
     }

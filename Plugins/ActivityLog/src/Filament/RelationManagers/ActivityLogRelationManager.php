@@ -7,6 +7,7 @@ namespace Relaticle\ActivityLog\Filament\RelationManagers;
 use BackedEnum;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -17,22 +18,29 @@ final class ActivityLogRelationManager extends RelationManager
 {
     protected static string $relationship = 'activities';
 
-    protected static ?string $title = 'Activity';
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return (string) __('activity-log::messages.title');
+    }
 
     protected static string|BackedEnum|null $icon = 'heroicon-o-clock';
 
-    protected static bool $infiniteScroll = false;
+    protected static bool $infiniteScroll = true;
 
     public function content(Schema $schema): Schema
     {
         $owner = $this->getOwnerRecord();
 
         return $schema->components([
-            Livewire::make(ActivityLogLivewire::class, [
-                'subjectClass' => $owner::class,
-                'subjectKey' => $owner->getKey(),
-                'infiniteScroll' => self::$infiniteScroll,
-            ])->key('activity-log-'.$owner->getKey()),
+            Section::make()
+                ->schema([
+                    Livewire::make(ActivityLogLivewire::class, [
+                        'subjectClass' => $owner::class,
+                        'subjectKey' => $owner->getKey(),
+                        'groupByDate' => true,
+                        'infiniteScroll' => self::$infiniteScroll,
+                    ])->key('activity-log-relation-manager-'.$owner->getKey()),
+                ]),
         ]);
     }
 

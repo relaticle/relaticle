@@ -35,7 +35,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
-use Relaticle\ActivityLog\Filament\RelationManagers\TimelineRelationManager;
 
 final class OpportunityResource extends Resource
 {
@@ -111,7 +110,6 @@ final class OpportunityResource extends Resource
     {
         return [
             ActivityLogRelationManager::class,
-            TimelineRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             // EmailsRelationManager::class,

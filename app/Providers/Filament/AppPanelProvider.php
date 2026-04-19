@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\ActivityLog\AppEventPalette;
+use App\ActivityLog\AppEventRenderer;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -46,6 +48,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
+use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
@@ -175,6 +178,11 @@ final class AppPanelProvider extends PanelProvider
                 CustomFieldsPlugin::make()
                     ->authorize(fn () => Gate::check('update', Filament::getTenant())),
                 ResizedColumnPlugin::make(),
+                ActivityLogPlugin::make()
+                    ->renderers(array_fill_keys(
+                        array_column(AppEventPalette::cases(), 'value'),
+                        AppEventRenderer::class,
+                    )),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,

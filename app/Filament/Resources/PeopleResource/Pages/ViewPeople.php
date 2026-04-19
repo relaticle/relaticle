@@ -22,9 +22,7 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\Actions\ActivityLogAction;
-use Relaticle\ActivityLog\Filament\Actions\TimelineAction;
 use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog;
-use Relaticle\ActivityLog\Filament\Infolists\Components\Timeline;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -35,7 +33,6 @@ final class ViewPeople extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
-            TimelineAction::make(),
             ActivityLogAction::make(),
             Action::make('viewEmails')
                 ->label('Emails')
@@ -135,21 +132,11 @@ final class ViewPeople extends ViewRecord
                 ->collapsible()
                 ->collapsed(fn (People $record): bool => ($record->email_count ?? 0) === 0),
 
-            Section::make('Activity Timeline')
-                ->icon(Heroicon::Clock)
-                ->schema([
-                    ActivityLog::make('activities')
-                        ->groupByDate()
-                        ->perPage(10),
-                ])
-                ->columnSpanFull()
-                ->collapsible(),
-
-            Section::make('Unified Timeline')
+            Section::make('Activity log')
                 ->icon(Heroicon::Bars3BottomLeft)
-                ->description('Emails, notes, and tasks in one feed.')
+                ->description('All activity for this record, grouped by week.')
                 ->schema([
-                    Timeline::make('timeline')
+                    ActivityLog::make('activityLog')
                         ->groupByDate(),
                 ])
                 ->columnSpanFull()

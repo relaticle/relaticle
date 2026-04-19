@@ -52,7 +52,18 @@ final class ActivityLogSource extends AbstractTimelineSource
             causer: $activity->causer,
             relatedModel: null,
             title: $activity->description,
-            properties: $activity->properties?->toArray() ?? [],
+            properties: $this->extractProperties($activity),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractProperties(ActivityModel $activity): array
+    {
+        $changes = $activity->attribute_changes?->toArray() ?? [];
+        $properties = $activity->properties?->toArray() ?? [];
+
+        return [...$properties, ...$changes];
     }
 }

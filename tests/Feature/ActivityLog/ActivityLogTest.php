@@ -6,7 +6,6 @@ use App\Models\Activity;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 
 mutates(Activity::class);
 
@@ -95,37 +94,4 @@ it('scopes activities to the current team', function (): void {
     Filament::setTenant($otherTeam);
 
     expect(Activity::query()->count())->toBe(0);
-});
-
-it('renders the ActivityTimeline livewire component and filters by event', function (): void {
-    $company = Company::factory()->create([
-        'name' => 'First',
-        'team_id' => $this->team->getKey(),
-    ]);
-    $company->update(['name' => 'Second']);
-
-    livewire(ActivityLogLivewire::class, [
-        'subjectClass' => Company::class,
-        'subjectKey' => $company->getKey(),
-    ])
-        ->assertSet('filter', 'all')
-        ->call('setFilter', 'created')
-        ->assertSet('filter', 'created')
-        ->call('setFilter', 'updated')
-        ->assertSet('filter', 'updated');
-});
-
-it('increases visibleCount when loadMore is called', function (): void {
-    $company = Company::factory()->create([
-        'team_id' => $this->team->getKey(),
-    ]);
-
-    livewire(ActivityLogLivewire::class, [
-        'subjectClass' => Company::class,
-        'subjectKey' => $company->getKey(),
-        'perPage' => 10,
-    ])
-        ->assertSet('visibleCount', 10)
-        ->call('loadMore')
-        ->assertSet('visibleCount', 20);
 });
