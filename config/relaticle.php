@@ -19,6 +19,11 @@ return [
     |
     */
 
+    'deletion' => [
+        'grace_period_days' => 30,
+        'reminder_days_before' => 5,
+    ],
+
     'features' => [
         'onboard_seed' => (bool) env('RELATICLE_FEATURE_ONBOARD_SEED', true),
         'social_auth' => (bool) env('RELATICLE_FEATURE_SOCIAL_AUTH', true),

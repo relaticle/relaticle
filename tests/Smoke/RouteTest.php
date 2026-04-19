@@ -48,6 +48,7 @@ routeTesting('smoke: all GET routes return non-500 response')
         'discord',
         'user/confirm-password',
         'up',
+        'scheduled-deletion',
         'docs/api*',
         'api/*',
     ])

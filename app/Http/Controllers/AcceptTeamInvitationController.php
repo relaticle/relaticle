@@ -27,14 +27,19 @@ final readonly class AcceptTeamInvitationController
             return view('teams.invitation-expired');
         }
 
-        if ($request->user()->email !== $invitation->email) {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->email !== $invitation->email) {
             Log::warning('Invitation email mismatch', [
                 'invitation_id' => $invitation->id,
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
             ]);
 
             abort(403, __('This invitation was sent to a different email address.'));
         }
+
+        abort_if($user->isScheduledForDeletion(), 403, __('You cannot accept team invitations while your account is scheduled for deletion.'));
 
         /** @var User $owner */
         $owner = $invitation->team->owner;
@@ -48,8 +53,6 @@ final readonly class AcceptTeamInvitationController
 
         $invitation->delete();
 
-        /** @var User $user */
-        $user = $request->user();
         $user->switchTeam($invitation->team);
 
         return redirect(config('fortify.home'))

@@ -13,7 +13,9 @@ use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Resources\CompanyResource;
 use App\Http\Middleware\ApplyTenantScopes;
+use App\Http\Middleware\CheckScheduledDeletion;
 use App\Listeners\SwitchTeam;
+use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -44,6 +46,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
@@ -140,6 +143,11 @@ final class AppPanelProvider extends PanelProvider
                 AccessTokens::class,
             ])
             ->spa()
+            ->routes(function (): void {
+                Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
+                    ->middleware('auth')
+                    ->name('scheduled-deletion');
+            })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([
@@ -162,6 +170,7 @@ final class AppPanelProvider extends PanelProvider
             ->authPasswordBroker('users')
             ->authMiddleware([
                 Authenticate::class,
+                CheckScheduledDeletion::class,
             ])
             ->tenantMiddleware(
                 [

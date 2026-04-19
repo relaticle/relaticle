@@ -104,3 +104,22 @@ test('accepting invitation deletes the invitation record', function () {
 
     expect(TeamInvitation::count())->toBe(0);
 });
+
+test('user with scheduled deletion cannot accept invitation', function () {
+    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+
+    $team = Team::factory()->create();
+    $invitation = $team->teamInvitations()->create([
+        'email' => $user->email,
+        'role' => 'editor',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->actingAs($user)
+        ->get($acceptUrl)
+        ->assertForbidden();
+
+    expect($team->fresh()->hasUser($user))->toBeFalse();
+});
