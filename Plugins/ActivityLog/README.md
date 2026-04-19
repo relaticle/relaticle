@@ -1,6 +1,6 @@
 # relaticle/activity-log
 
-<img src="art/activity-log-cover.jpg" alt="Activity Log" width="800">
+<img src="art/activity-log-cover.jpg?v=1" alt="Activity Log" width="800">
 
 A reusable Filament v5 plugin that renders a unified chronological timeline for any Eloquent model. It aggregates events from `spatie/laravel-activitylog` (both the model's own log and logs of its related models), timestamp columns on related models (e.g. `emails.sent_at`, `tasks.completed_at`), and any custom source you define.
 
