@@ -21,6 +21,7 @@ trait HasActivityTimeline
         $viewer = auth()->user();
 
         return TimelineBuilder::make($this)
+            ->fromActivityLog()
             ->fromRelation('emails', function (RelatedModelSource $source) use ($viewer): void {
                 $source
                     ->event('sent_at', 'email_sent')

@@ -46,6 +46,7 @@ final class RelatedActivityLogSource extends AbstractTimelineSource
         }
 
         $query = ActivityModel::query()
+            ->with(['causer', 'subject'])
             ->where(function (Builder $q) use ($subjectPairs): void {
                 foreach ($subjectPairs as [$type, $id]) {
                     $q->orWhere(function (Builder $inner) use ($type, $id): void {
