@@ -18,7 +18,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
-it('enables calendar sync on an already-granted account', function (): void {
+it('redirects to oauth when enabling calendar sync', function (): void {
     Bus::fake([InitialCalendarSyncJob::class]);
 
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -28,10 +28,11 @@ it('enables calendar sync on an already-granted account', function (): void {
     ]));
 
     livewire(EmailAccountsPage::class)
-        ->callAction('syncCalendar', arguments: ['account_id' => $account->id]);
+        ->callAction('syncCalendar', arguments: ['account_id' => $account->id])
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
 
-    expect($account->fresh()?->hasCalendar())->toBeTrue();
-    Bus::assertDispatched(InitialCalendarSyncJob::class);
+    expect($account->fresh()?->hasCalendar())->toBeFalse();
+    Bus::assertNotDispatched(InitialCalendarSyncJob::class);
 });
 
 it('disables calendar sync when already enabled', function (): void {

@@ -24,10 +24,13 @@
                         @endif
                         @if ($account->provider->value === 'gmail')
                             {{ ($this->syncCalendarNowAction)(['account_id' => $account->id]) }}
-                            {{ ($this->syncCalendarAction)(['account_id' => $account->id]) }}
                         @endif
-                        {{ ($this->editSettingsAction)(['account_id' => $account->id]) }}
-                        {{ ($this->disconnectAction)(['account_id' => $account->id]) }}
+                        <x-filament-actions::group :actions="array_filter([
+                            $account->provider->value === 'gmail' ? ($this->syncCalendarAction)(['account_id' => $account->id]) : null,
+                            ($this->editSettingsAction)(['account_id' => $account->id]),
+                            ($this->disconnectAction)(['account_id' => $account->id]),
+                        ])" />
+                        <x-filament-actions::modals />
                     </div>
                 </div>
             @empty
