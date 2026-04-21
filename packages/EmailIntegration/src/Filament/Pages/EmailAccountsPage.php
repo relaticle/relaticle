@@ -175,8 +175,10 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments)?->provider === EmailProvider::GMAIL)
             ->requiresConfirmation(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
-            ->modalHeading('Disable calendar sync')
-            ->modalDescription('This will stop syncing calendar events for this account.')
+            ->modalHeading(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Enable calendar sync')
+            ->modalDescription(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
+                ? 'This will stop syncing calendar events for this account.'
+                : 'You will be redirected to Google to grant calendar access.')
             ->action(function (array $arguments) {
                 $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
 
