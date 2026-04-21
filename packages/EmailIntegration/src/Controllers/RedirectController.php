@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Controllers;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Laravel\Socialite\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use RuntimeException;
 
 final readonly class RedirectController
 {
-    public function __invoke(string $provider): RedirectResponse
+    public function __invoke(Request $request, string $provider): RedirectResponse
     {
+        $capability = $request->query('capability');
+        $includeCalendar = $capability === 'calendar';
+
         return match ($provider) {
             'gmail' => $this->driver('google')
-                ->stateless() // TODO: Remove stateless() once we can handle the state parameter properly
-                ->scopes([
-                    'https://www.googleapis.com/auth/gmail.readonly',
-                    'https://www.googleapis.com/auth/gmail.send',
-                ])
+                ->stateless()
+                ->scopes($this->gmailScopes($includeCalendar))
                 ->with(['access_type' => 'offline', 'prompt' => 'consent'])
                 ->redirect(),
 
@@ -33,6 +34,21 @@ final readonly class RedirectController
 
             default => back(),
         };
+    }
+
+    /** @return array<int, string> */
+    private function gmailScopes(bool $includeCalendar): array
+    {
+        $scopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        if ($includeCalendar) {
+            $scopes[] = 'https://www.googleapis.com/auth/calendar.readonly';
+        }
+
+        return $scopes;
     }
 
     private function driver(string $name): AbstractProvider

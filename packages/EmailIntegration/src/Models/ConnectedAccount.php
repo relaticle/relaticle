@@ -64,6 +64,8 @@ final class ConnectedAccount extends Model
         'capabilities',
         'sync_cursor',
         'last_synced_at',
+        'calendar_sync_cursor',
+        'last_calendar_synced_at',
         'status',
         'last_error',
         'sync_inbox',
@@ -79,6 +81,7 @@ final class ConnectedAccount extends Model
         'status' => EmailAccountStatus::class,
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
+        'last_calendar_synced_at' => 'datetime',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
         'contact_creation_mode' => ContactCreationMode::class,
@@ -161,5 +164,39 @@ final class ConnectedAccount extends Model
         return Attribute::make(
             get: fn (): string => "{$this->provider->getLabel()} - $this->email_address",
         );
+    }
+
+    // Calendar helpers
+
+    public function hasCalendar(): bool
+    {
+        return (bool) ($this->capabilities['calendar'] ?? false);
+    }
+
+    public function hasEmail(): bool
+    {
+        return (bool) ($this->capabilities['email'] ?? true);
+    }
+
+    public function enableCalendar(): void
+    {
+        $capabilities = $this->capabilities ?? [];
+        $capabilities['calendar'] = true;
+        $this->update(['capabilities' => $capabilities]);
+    }
+
+    public function disableCalendar(): void
+    {
+        $capabilities = $this->capabilities ?? [];
+        $capabilities['calendar'] = false;
+        $this->update(['capabilities' => $capabilities]);
+    }
+
+    /**
+     * @return HasMany<Meeting, $this>
+     */
+    public function meetings(): HasMany
+    {
+        return $this->hasMany(Meeting::class);
     }
 }

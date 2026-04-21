@@ -6,63 +6,63 @@ namespace Relaticle\EmailIntegration\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use RuntimeException;
 
 final readonly class CallbackController
 {
-    /**
-     * @throws \Throwable
-     */
-    public function __invoke(string $provider): RedirectResponse
+    public function __invoke(Request $request, string $provider): RedirectResponse
     {
-        /**
-         * @var User $user
-         */
+        /** @var User $user */
         $user = auth()->user();
 
         $driver = Socialite::driver($this->resolveDriver($provider));
 
-        throw_unless($driver instanceof AbstractProvider, RuntimeException::class, "Socialite driver [{$provider}] is not an OAuth2 provider.");
-
-        $socialUser = $driver
-            ->stateless() // TODO: Remove stateless() once we can handle the state parameter properly
-            ->user();
+        $socialUser = $driver->user();
 
         throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
 
-        DB::transaction(function () use ($provider, $socialUser, $user): void {
+        $grantedScopes = $socialUser->approvedScopes;
+        $hasCalendar = in_array('https://www.googleapis.com/auth/calendar.readonly', $grantedScopes, true);
 
-            ConnectedAccount::query()->updateOrCreate(
-                [
-                    'user_id' => $user->getKey(),
-                    'provider' => $provider,
-                    'email_address' => $socialUser->getEmail(),
-                    'team_id' => $user->currentTeam->getKey(),
+        $account = DB::transaction(fn (): ConnectedAccount => ConnectedAccount::query()->updateOrCreate(
+            [
+                'user_id' => $user->getKey(),
+                'provider' => $provider,
+                'email_address' => $socialUser->getEmail(),
+                'team_id' => $user->currentTeam->getKey(),
+            ],
+            [
+                'display_name' => $socialUser->getName(),
+                'provider_account_id' => $socialUser->getId(),
+                'access_token' => $socialUser->token,
+                'refresh_token' => $socialUser->refreshToken,
+                'token_expires_at' => now()->addSeconds($socialUser->expiresIn),
+                'status' => 'active',
+                'last_error' => null,
+                'auto_create_companies' => true,
+                'contact_creation_mode' => ContactCreationMode::All,
+                'capabilities' => [
+                    'email' => true,
+                    'calendar' => $hasCalendar,
                 ],
-                [
-                    'display_name' => $socialUser->getName(),
-                    'provider_account_id' => $socialUser->getId(),
-                    'access_token' => $socialUser->token,
-                    'refresh_token' => $socialUser->refreshToken,
-                    'token_expires_at' => now()->addSeconds($socialUser->expiresIn),
-                    'status' => 'active',
-                    'last_error' => null,
-                    'auto_create_companies' => true,
-                    'contact_creation_mode' => ContactCreationMode::All,
-                ]
-            );
-        });
+            ]
+        ));
+
+        if ($hasCalendar) {
+            dispatch(new InitialCalendarSyncJob($account));
+        }
 
         return redirect(EmailAccountsPage::getUrl([
             'tenant' => $user->currentTeam->slug,
-        ]))->with('success', 'Email account connected successfully.');
+        ]))->with('success', 'Account connected successfully.');
     }
 
     private function resolveDriver(string $provider): string

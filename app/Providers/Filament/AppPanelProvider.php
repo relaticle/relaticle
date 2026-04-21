@@ -6,6 +6,8 @@ namespace App\Providers\Filament;
 
 use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
+use App\ActivityLog\MeetingEventPalette;
+use App\ActivityLog\MeetingEventRenderer;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -182,6 +184,10 @@ final class AppPanelProvider extends PanelProvider
                     ->renderers(array_fill_keys(
                         array_column(AppEventPalette::cases(), 'value'),
                         AppEventRenderer::class,
+                    ))
+                    ->renderers(array_fill_keys(
+                        array_column(MeetingEventPalette::cases(), 'value'),
+                        MeetingEventRenderer::class,
                     )),
             ])
             ->renderHook(

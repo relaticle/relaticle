@@ -9,6 +9,7 @@ use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -133,6 +134,7 @@ final class CompanyResource extends Resource
     {
         return [
             ActivityLogRelationManager::class,
+            MeetingsRelationManager::class,
         ];
     }
 

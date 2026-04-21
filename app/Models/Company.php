@@ -28,6 +28,7 @@ use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
+use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -55,6 +56,7 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
     /** @use HasFactory<CompanyFactory> */
     use HasFactory;
 
+    use HasMeetings;
     use HasNotes;
     use HasTeam;
     use HasUlids;

@@ -18,5 +18,11 @@ return [
         'task_created' => [
             'label' => 'Task',
         ],
+        'meeting.created' => [
+            'label' => 'Meeting scheduled',
+        ],
+        'meeting.cancelled' => [
+            'label' => 'Meeting cancelled',
+        ],
     ],
 ];

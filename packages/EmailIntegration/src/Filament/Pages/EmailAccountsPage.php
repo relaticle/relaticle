@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
 
@@ -162,6 +164,53 @@ final class EmailAccountsPage extends Page
             })
             ->modalHeading('Account Settings')
             ->modalSubmitActionLabel('Save');
+    }
+
+    public function syncCalendarAction(): Action
+    {
+        return Action::make('syncCalendar')
+            ->label(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Sync calendar')
+            ->icon('heroicon-o-calendar')
+            ->color(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'warning' : 'success')
+            ->size(Size::Small)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments)?->provider === EmailProvider::GMAIL)
+            ->requiresConfirmation(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
+            ->modalHeading('Disable calendar sync')
+            ->modalDescription('This will stop syncing calendar events for this account.')
+            ->action(function (array $arguments) {
+                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+
+                if ($account->hasCalendar()) {
+                    $account->disableCalendar();
+                    $this->connectedAccounts = $this->getAccounts();
+
+                    return null;
+                }
+
+                // If the calendar key is absent the OAuth scope was never granted — redirect to request it.
+                if (! array_key_exists('calendar', $account->capabilities ?? [])) {
+                    return redirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
+                }
+
+                // The scope was previously granted (capabilities['calendar'] === false) — re-enable directly.
+                $account->enableCalendar();
+                dispatch(new InitialCalendarSyncJob($account));
+                $this->connectedAccounts = $this->getAccounts();
+
+                Notification::make()
+                    ->success()
+                    ->title('Calendar sync enabled.')
+                    ->send();
+
+                return null;
+            });
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function findAccount(array $arguments): ?ConnectedAccount
+    {
+        /** @var ConnectedAccount|null */
+        return ConnectedAccount::query()->find((string) $arguments['account_id']);
     }
 
     public function disconnectAction(): Action

@@ -10,16 +10,21 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
+use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Factories\GoogleCalendarServiceFactory;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/email-integration.php', 'email-integration');
+
+        $this->app->bind(CalendarServiceFactoryInterface::class, GoogleCalendarServiceFactory::class);
     }
 
     public function boot(): void
@@ -34,6 +39,14 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                     ->cursor()
                     ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalEmailSyncJob($account)));
             })->everyFiveMinutes()->name('email-incremental-sync');
+
+            $schedule->call(function (): void {
+                ConnectedAccount::query()
+                    ->where('status', EmailAccountStatus::ACTIVE)
+                    ->whereJsonContains('capabilities->calendar', true)
+                    ->cursor()
+                    ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalCalendarSyncJob($account)));
+            })->everyFiveMinutes()->name('calendar-incremental-sync');
         });
 
         Route::middleware('web')

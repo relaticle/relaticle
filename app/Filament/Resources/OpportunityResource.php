@@ -11,6 +11,7 @@ use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager;
+use App\Filament\Resources\OpportunityResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
 use App\Models\Opportunity;
@@ -113,6 +114,7 @@ final class OpportunityResource extends Resource
             TasksRelationManager::class,
             NotesRelationManager::class,
             // EmailsRelationManager::class,
+            MeetingsRelationManager::class,
         ];
     }
 

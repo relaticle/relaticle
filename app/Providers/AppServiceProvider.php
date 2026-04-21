@@ -20,6 +20,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Policies\EmailPolicy;
 use App\Policies\EmailTemplatePolicy;
+use App\Policies\MeetingPolicy;
 use App\Services\GitHubService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -42,6 +43,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class AppServiceProvider extends ServiceProvider
@@ -76,6 +78,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Email::class, EmailPolicy::class);
         Gate::policy(EmailTemplate::class, EmailTemplatePolicy::class);
+        Gate::policy(Meeting::class, MeetingPolicy::class);
 
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {
@@ -217,6 +220,7 @@ final class AppServiceProvider extends ServiceProvider
             'connected_account' => ConnectedAccount::class,
             'email_thread' => EmailThread::class,
             'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
         ]);
 
         // Use custom models for custom-fields package

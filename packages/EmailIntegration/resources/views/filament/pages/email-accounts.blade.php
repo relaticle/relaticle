@@ -22,6 +22,9 @@
                         @if ($account->status->value === 'reauth_required')
                             {{ ($this->reAuthAction)(['account_id' => $account->id]) }}
                         @endif
+                        @if ($account->provider->value === 'gmail')
+                            {{ ($this->syncCalendarAction)(['account_id' => $account->id]) }}
+                        @endif
                         {{ ($this->editSettingsAction)(['account_id' => $account->id]) }}
                         {{ ($this->disconnectAction)(['account_id' => $account->id]) }}
                     </div>

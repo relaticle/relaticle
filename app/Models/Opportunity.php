@@ -26,6 +26,7 @@ use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
+use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
@@ -44,6 +45,7 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
     /** @use HasFactory<OpportunityFactory> */
     use HasFactory;
 
+    use HasMeetings;
     use HasNotes;
     use HasTeam;
     use HasUlids;
