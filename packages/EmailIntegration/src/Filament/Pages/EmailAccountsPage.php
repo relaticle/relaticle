@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
-use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
 
@@ -188,22 +187,8 @@ final class EmailAccountsPage extends Page
                     return null;
                 }
 
-                // If the calendar key is absent the OAuth scope was never granted — redirect to request it.
-                if (! array_key_exists('calendar', $account->capabilities ?? [])) {
-                    return redirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
-                }
-
-                // The scope was previously granted (capabilities['calendar'] === false) — re-enable directly.
-                $account->enableCalendar();
-                dispatch(new InitialCalendarSyncJob($account));
-                $this->connectedAccounts = $this->getAccounts();
-
-                Notification::make()
-                    ->success()
-                    ->title('Calendar sync enabled.')
-                    ->send();
-
-                return null;
+                // Always re-run OAuth when enabling so Google grants the calendar scope on the token.
+                return redirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
             });
     }
 
