@@ -44,15 +44,6 @@ Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any A
 - **Modern Tech Stack** - Laravel 12, Filament 5, PHP 8.4, 1,100+ automated tests
 - **Privacy-First** - Self-hosted, AGPL-3.0, your data stays on your server
 
-**vs Other CRMs:**
-
-| | Self-Hosted | Open Source | MCP Tools | Custom Fields | Per-Seat Pricing |
-|---|---|---|---|---|---|
-| **Relaticle** | Yes | AGPL-3.0 | 30 | 22 types | No |
-| **HubSpot** | No | No | 9 | Limited | Yes |
-| **Salesforce** | No | No | 0 | Yes (complex) | Yes |
-| **Attio** | No | No | 0 | Yes | Yes |
-
 # Requirements
 
 - PHP 8.4+
