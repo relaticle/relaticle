@@ -19,7 +19,6 @@ final readonly class RedirectController
 
         return match ($provider) {
             'gmail' => $this->driver('google')
-                ->stateless()
                 ->scopes($this->gmailScopes($includeCalendar))
                 ->with(['access_type' => 'offline', 'prompt' => 'consent'])
                 ->redirect(),
