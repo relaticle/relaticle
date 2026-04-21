@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
@@ -203,6 +204,27 @@ final class EmailAccountsPage extends Page
                     ->send();
 
                 return null;
+            });
+    }
+
+    public function syncCalendarNowAction(): Action
+    {
+        return Action::make('syncCalendarNow')
+            ->label('Sync now')
+            ->icon('heroicon-o-arrow-path')
+            ->color('primary')
+            ->size(Size::Small)
+            ->visible(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
+            ->action(function (array $arguments): void {
+                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+
+                dispatch(new IncrementalCalendarSyncJob($account));
+
+                Notification::make()
+                    ->success()
+                    ->title('Calendar sync queued.')
+                    ->body('New events should appear within a minute.')
+                    ->send();
             });
     }
 

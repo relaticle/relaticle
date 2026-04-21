@@ -23,6 +23,7 @@
                             {{ ($this->reAuthAction)(['account_id' => $account->id]) }}
                         @endif
                         @if ($account->provider->value === 'gmail')
+                            {{ ($this->syncCalendarNowAction)(['account_id' => $account->id]) }}
                             {{ ($this->syncCalendarAction)(['account_id' => $account->id]) }}
                         @endif
                         {{ ($this->editSettingsAction)(['account_id' => $account->id]) }}
