@@ -1,228 +1,239 @@
-<x-filament-panels::page class="!pb-0">
-    <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
+<x-filament-panels::page>
 
-        {{-- ── Left panel: tabs + request list ───────────────────────── --}}
-        <div class="flex w-80 shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+    {{-- ── Tab switcher ─────────────────────────────────────────────── --}}
+    <x-filament::tabs label="Access request tabs" class="ei-tabs-segmented">
+        <x-filament::tabs.item
+            :active="$tab === 'incoming'"
+            :icon="\Filament\Support\Icons\Heroicon::OutlinedInboxArrowDown"
+            :badge="$this->pendingIncomingCount > 0 ? ($this->pendingIncomingCount > 99 ? '99+' : (string) $this->pendingIncomingCount) : null"
+            badge-color="primary"
+            wire:click="setTab('incoming')"
+        >
+            Incoming
+        </x-filament::tabs.item>
 
-            {{-- Tabs --}}
-            <div class="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
-                <button
-                    wire:click="setTab('incoming')"
-                    type="button"
-                    @class([
-                        'flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors focus:outline-none border-b-2',
-                        'border-primary-500 text-primary-600 dark:text-primary-400' => $tab === 'incoming',
-                        'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' => $tab !== 'incoming',
-                    ])
-                >
-                    <x-heroicon-o-inbox class="h-4 w-4" />
-                    Incoming
-                    @if ($this->pendingIncomingCount > 0)
-                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] rounded-full bg-warning-500 px-1 text-[10px] font-semibold leading-none text-white">
-                            {{ $this->pendingIncomingCount > 99 ? '99+' : $this->pendingIncomingCount }}
-                        </span>
-                    @endif
-                </button>
-                <button
-                    wire:click="setTab('sent')"
-                    type="button"
-                    @class([
-                        'flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors focus:outline-none border-b-2',
-                        'border-primary-500 text-primary-600 dark:text-primary-400' => $tab === 'sent',
-                        'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' => $tab !== 'sent',
-                    ])
-                >
-                    <x-heroicon-o-paper-airplane class="h-4 w-4" />
-                    Sent
-                </button>
-            </div>
+        <x-filament::tabs.item
+            :active="$tab === 'outgoing'"
+            :icon="\Filament\Support\Icons\Heroicon::OutlinedPaperAirplane"
+            wire:click="setTab('outgoing')"
+        >
+            Sent
+        </x-filament::tabs.item>
+    </x-filament::tabs>
 
-            {{-- Request list --}}
-            <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-                @forelse ($this->requests as $request)
-                    @php
-                        $isSelected = $selectedRequestId === $request->id;
-                        $isPending  = $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::PENDING;
-                        $person     = $tab === 'incoming' ? $request->requester : $request->owner;
-                        $subject    = $request->email?->subject ?? '(subject hidden)';
-                    @endphp
+    {{-- Status filter pills --}}
+    @php
+        $counts = $this->statusCounts;
+        $filters = [
+            ['key' => null,        'label' => 'All',      'count' => $counts['total']],
+            ['key' => 'pending',   'label' => 'Pending',  'count' => $counts['pending']],
+            ['key' => 'approved',  'label' => 'Approved', 'count' => $counts['approved']],
+            ['key' => 'denied',    'label' => 'Denied',   'count' => $counts['denied']],
+        ];
+    @endphp
+
+    @if ($counts['total'] > 0)
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex w-fit items-center rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+                @foreach ($filters as $filter)
+                    @php $isActive = $statusFilter === $filter['key']; @endphp
                     <button
-                        wire:click="selectRequest('{{ $request->id }}')"
+                        wire:click="setStatusFilter({{ $filter['key'] === null ? 'null' : "'".$filter['key']."'" }})"
                         type="button"
                         @class([
-                            'w-full text-left px-4 py-3 transition-colors focus:outline-none',
-                            'bg-primary-50 dark:bg-primary-900/20' => $isSelected,
-                            'hover:bg-gray-50 dark:hover:bg-gray-800/50' => ! $isSelected,
+                            'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition',
+                            'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' => $isActive,
+                            'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' => ! $isActive,
                         ])
                     >
-                        <div class="flex items-start justify-between gap-2">
-                            <span class="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                {{ $person?->name ?? 'Unknown' }}
-                            </span>
-                            <span @class([
-                                'shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-                                'bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-300' => $isPending,
-                                'bg-success-100 dark:bg-success-900/40 text-success-700 dark:text-success-300' => $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::APPROVED,
-                                'bg-danger-100 dark:bg-danger-900/40 text-danger-700 dark:text-danger-300' => $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::DENIED,
-                            ])>
-                                {{ $request->status->getLabel() }}
-                            </span>
-                        </div>
-                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400 truncate">{{ $subject }}</p>
-                        <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                            {{ \Relaticle\EmailIntegration\Enums\EmailPrivacyTier::from($request->tier_requested)->getLabel() }}
-                            · {{ $request->created_at->diffForHumans() }}
-                        </p>
+                        {{ $filter['label'] }}
+                        <span @class([
+                            'rounded-full px-1.5 text-[10px] font-semibold leading-4',
+                            'bg-primary-500 text-white' => $isActive,
+                            'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300' => ! $isActive,
+                        ])>
+                            {{ $filter['count'] }}
+                        </span>
                     </button>
-                @empty
-                    <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                            <x-heroicon-o-key class="h-6 w-6 text-gray-400 dark:text-gray-500" />
-                        </div>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">No requests</p>
-                        <p class="text-xs text-gray-400 dark:text-gray-500">
-                            {{ $tab === 'incoming' ? 'No one has requested access to your emails.' : "You haven't sent any access requests." }}
-                        </p>
-                    </div>
-                @endforelse
+                @endforeach
             </div>
 
+            <div class="relative w-full sm:w-64">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                    <x-heroicon-o-magnifying-glass class="h-4 w-4 text-gray-400 dark:text-gray-500" wire:loading.remove wire:target="search" />
+                    <svg wire:loading wire:target="search" class="h-4 w-4 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+                <input
+                    wire:model.live.debounce.300ms="search"
+                    type="text"
+                    placeholder="Search by name or subject…"
+                    class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1.5 pl-8 pr-8 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-500 dark:focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+                @if (filled($search))
+                    <button
+                        wire:click="$set('search', '')"
+                        type="button"
+                        class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                    </button>
+                @endif
+            </div>
         </div>
+    @endif
 
-        {{-- ── Right panel: request detail ────────────────────────────── --}}
-        <div class="relative flex flex-1 flex-col overflow-y-auto">
+    {{-- ── Request cards ─────────────────────────────────────────────── --}}
+    <div
+        class="space-y-3 transition-opacity"
+        wire:loading.class="opacity-50 pointer-events-none"
+        wire:target="setTab,setStatusFilter,search"
+    >
+    @forelse ($this->requests as $request)
+        @php
+            $isSelected = $selectedRequestId === $request->id;
+            $isPending  = $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::PENDING;
+            $isApproved = $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::APPROVED;
+            $isDenied   = $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::DENIED;
+            $person     = $tab === 'incoming' ? $request->requester : $request->owner;
+            $isOwner    = $request->owner_id === auth()->id();
+            $email      = $request->email;
+            $tier       = \Relaticle\EmailIntegration\Enums\EmailPrivacyTier::from($request->tier_requested);
+            $initial    = mb_strtoupper(mb_substr($person?->name ?? '?', 0, 1));
+        @endphp
 
-            @if ($this->selectedRequest !== null)
-                @php
-                    $req       = $this->selectedRequest;
-                    $email     = $req->email;
-                    $authUser  = auth()->user();
-                    $isOwner   = $req->owner_id === $authUser->getKey();
-                    $isPending = $req->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::PENDING;
-                    $tier      = \Relaticle\EmailIntegration\Enums\EmailPrivacyTier::from($req->tier_requested);
-                @endphp
+        <div @class([
+            'rounded-xl border bg-white dark:bg-gray-900 p-3 shadow-sm transition space-y-2.5',
+            'border-primary-400 dark:border-primary-500 ring-2 ring-primary-500/20' => $isSelected,
+            'border-gray-200 dark:border-gray-700' => ! $isSelected,
+        ])>
+            <div class="flex items-start gap-3">
 
-                {{-- Request header --}}
-                <div class="shrink-0 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="min-w-0">
-                            <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                @if ($tab === 'incoming')
-                                    <span class="text-gray-500 dark:text-gray-400 font-normal">From</span>
-                                    {{ $req->requester?->name ?? 'Unknown' }}
-                                @else
-                                    <span class="text-gray-500 dark:text-gray-400 font-normal">To</span>
-                                    {{ $req->owner?->name ?? 'Unknown' }}
-                                @endif
-                            </h2>
-                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                Requested {{ $tier->getLabel() }} access · {{ $req->created_at->diffForHumans() }}
-                            </p>
+                {{-- Avatar --}}
+                <div class="relative shrink-0">
+                    @if ($person?->profile_photo_path)
+                        <img
+                            src="{{ $person->profile_photo_url }}"
+                            alt="{{ $person->name }}"
+                            class="h-8 w-8 rounded-full object-cover"
+                        />
+                    @else
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white">
+                            {{ $initial }}
                         </div>
+                    @endif
+                    <span @class([
+                        'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900',
+                        'bg-warning-500' => $isPending,
+                        'bg-success-500' => $isApproved,
+                        'bg-danger-500' => $isDenied,
+                    ])></span>
+                </div>
 
-                        {{-- Status badge --}}
-                        <span @class([
-                            'shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
-                            'bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-300' => $isPending,
-                            'bg-success-100 dark:bg-success-900/40 text-success-700 dark:text-success-300' => $req->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::APPROVED,
-                            'bg-danger-100 dark:bg-danger-900/40 text-danger-700 dark:text-danger-300' => $req->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::DENIED,
-                        ])>
-                            {{ $req->status->getLabel() }}
+                {{-- Content --}}
+                <div class="min-w-0 flex-1 space-y-1">
+                    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                        <span class="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                            {{ $person?->name ?? 'Unknown user' }}
+                        </span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                            {{ $tab === 'incoming' ? 'requested access' : 'you requested access' }}
+                        </span>
+                        <span class="text-gray-300 dark:text-gray-600">·</span>
+                        <span class="text-[11px] text-gray-400 dark:text-gray-500">
+                            {{ $request->created_at->diffForHumans() }}
                         </span>
                     </div>
 
-                    {{-- Approve / Deny actions (owner + pending only) --}}
-                    @if ($isOwner && $isPending)
-                        <div class="mt-3 flex items-center gap-2">
-                            <button
-                                wire:click="mountAction('approveAccessRequest', { requestId: '{{ $req->id }}' })"
-                                type="button"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-success-700 transition-colors"
-                            >
-                                <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                Approve
-                            </button>
-                            <button
-                                wire:click="mountAction('denyAccessRequest', { requestId: '{{ $req->id }}' })"
-                                type="button"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                                Deny
-                            </button>
-                        </div>
-                    @endif
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300">
+                            <x-heroicon-m-lock-closed class="h-2.5 w-2.5" />
+                            {{ $tier->getLabel() }}
+                        </span>
+                        <span @class([
+                            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                            'bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-300' => $isPending,
+                            'bg-success-100 dark:bg-success-900/40 text-success-700 dark:text-success-300' => $isApproved,
+                            'bg-danger-100 dark:bg-danger-900/40 text-danger-700 dark:text-danger-300' => $isDenied,
+                        ])>
+                            {{ $request->status->getLabel() }}
+                        </span>
+                    </div>
                 </div>
 
-                {{-- Associated email preview --}}
-                @if ($email !== null)
-                    <div class="flex-1 px-6 py-5 space-y-4">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                            Associated Email
-                        </h3>
+                {{-- Actions --}}
+                <div class="flex shrink-0 items-center gap-1.5">
+                    @if ($email !== null)
+                        {{ ($this->openEmailAction)(['emailId' => $email->getKey()]) }}
+                    @endif
 
-                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
+                    @if ($isOwner && $isPending)
+                        {{ ($this->approveAccessRequestAction)(['requestId' => $request->id]) }}
+                        {{ ($this->denyAccessRequestAction)(['requestId' => $request->id]) }}
+                    @endif
+                </div>
+            </div>
 
-                            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {{-- Email reference --}}
+            @if ($email !== null)
+                <div class="rounded-md border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/40 px-2.5 py-1.5">
+                    <div class="flex items-start gap-1.5">
+                        <x-heroicon-o-envelope class="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
                                 {{ $email->subject ?? '(No subject)' }}
                             </p>
-
-                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                                @if ($email->from->isNotEmpty())
-                                    <span class="flex items-center gap-1">
-                                        <x-heroicon-o-user class="h-3.5 w-3.5 shrink-0" />
-                                        {{ $email->from->first()?->email_address }}
-                                    </span>
-                                @endif
-                                @if ($email->sent_at)
-                                    <span class="flex items-center gap-1">
-                                        <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" />
-                                        {{ $email->sent_at->format('M j, Y · g:i A') }}
-                                    </span>
-                                @endif
-                                <span class="flex items-center gap-1">
-                                    <x-heroicon-o-lock-closed class="h-3.5 w-3.5 shrink-0" />
-                                    {{ $email->privacy_tier->getLabel() }}
-                                </span>
-                            </div>
-
                             @if (filled($email->snippet))
-                                <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-4">
+                                <p class="line-clamp-1 text-[11px] text-gray-500 dark:text-gray-400">
                                     {{ $email->snippet }}
                                 </p>
                             @endif
-
-                            <div class="pt-1">
-                                <a
-                                    href="{{ \App\Filament\Pages\EmailInboxPage::getUrl(parameters: ['email' => $email->getKey()], tenant: filament()->getTenant()) }}"
-                                    class="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                                >
-                                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
-                                    View in inbox
-                                </a>
-                            </div>
-
                         </div>
                     </div>
-                @else
-                    <div class="flex flex-1 items-center justify-center px-8 py-12 text-center">
-                        <p class="text-sm text-gray-400 dark:text-gray-500">The associated email is no longer available.</p>
-                    </div>
-                @endif
-
-            @else
-                <div class="flex flex-col items-center justify-center gap-3 px-8 py-16 text-center h-full">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                        <x-heroicon-o-key class="h-8 w-8 text-gray-400 dark:text-gray-500" />
-                    </div>
-                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Select a request</p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">Choose a request from the list to review it</p>
                 </div>
+            @else
+                <p class="text-[11px] italic text-gray-400 dark:text-gray-500">
+                    The associated email is no longer available.
+                </p>
             @endif
-
         </div>
-
+    @empty
+        <div class="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-8 py-16 text-center">
+            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                <x-heroicon-o-key class="h-8 w-8 text-gray-400 dark:text-gray-500" />
+            </div>
+            @if ($statusFilter !== null)
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">No {{ $statusFilter }} requests</p>
+                <p class="max-w-sm text-xs text-gray-400 dark:text-gray-500">
+                    Try a different filter or clear the active one.
+                </p>
+                <button
+                    wire:click="setStatusFilter(null)"
+                    type="button"
+                    class="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
+                >
+                    Show all
+                </button>
+            @else
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {{ $tab === 'incoming' ? 'No incoming requests' : 'No sent requests' }}
+                </p>
+                <p class="max-w-sm text-xs text-gray-400 dark:text-gray-500">
+                    {{ $tab === 'incoming'
+                        ? 'When someone asks for access to one of your private emails, it will show up here.'
+                        : "You haven't asked for access to any emails yet." }}
+                </p>
+            @endif
+        </div>
+    @endforelse
     </div>
+
+    <x-filament::pagination
+        :paginator="$this->requests"
+        class="w-full [&_.fi-pagination-items]:col-start-3"
+    />
 
     <x-filament-actions::modals />
 </x-filament-panels::page>

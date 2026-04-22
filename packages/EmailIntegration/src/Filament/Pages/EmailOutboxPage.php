@@ -37,7 +37,7 @@ final class EmailOutboxPage extends Page implements HasTable
 
     protected static ?string $title = 'Outbox';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 2;
 
     protected static string|UnitEnum|null $navigationGroup = 'Emails';
 

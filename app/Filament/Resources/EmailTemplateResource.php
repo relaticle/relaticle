@@ -9,7 +9,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -22,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Override;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
 final class EmailTemplateResource extends Resource
 {
@@ -29,7 +29,7 @@ final class EmailTemplateResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 5;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
@@ -47,6 +47,8 @@ final class EmailTemplateResource extends Resource
             RichEditor::make('body_html')
                 ->label('Body')
                 ->required()
+                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                ->activePanel('mergeTags')
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -57,11 +59,6 @@ final class EmailTemplateResource extends Resource
             Toggle::make('is_shared')
                 ->label('Share with team')
                 ->helperText('When enabled, all team members can use this template.'),
-
-            Placeholder::make('variables_hint')
-                ->label('Available variables')
-                ->content('Use {name} for the full name, {first_name} for the first name only, {company} for the company name.')
-                ->columnSpanFull(),
         ]);
     }
 
@@ -100,6 +97,7 @@ final class EmailTemplateResource extends Resource
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
 
                 DeleteAction::make()
+                    ->label('Delete')
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
             ])
             ->toolbarActions([

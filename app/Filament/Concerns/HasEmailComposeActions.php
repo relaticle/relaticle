@@ -81,7 +81,7 @@ trait HasEmailComposeActions
                 return [
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
-                    'body_html' => $signature !== null ? '<br><hr><br>'.$signature->content_html : '',
+                    'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
                 ];
             })
             ->schema($this->composeFormSchema())
@@ -235,7 +235,7 @@ trait HasEmailComposeActions
                             $set('signature_id', $sig?->getKey());
 
                             if ($sig !== null) {
-                                $set('body_html', '<br><hr><br>'.$sig->content_html);
+                                $set('body_html', '<p></p><hr>'.$sig->content_html);
                             }
                         }),
 
@@ -293,6 +293,7 @@ trait HasEmailComposeActions
             RichEditor::make('body_html')
                 ->label('Body')
                 ->required()
+                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -335,7 +336,7 @@ trait HasEmailComposeActions
                             }
 
                             $body = $get('body_html') ?? '';
-                            $set('body_html', $body.'<br><hr><br>'.$sig->content_html);
+                            $set('body_html', ($body !== '' ? $body : '<p></p>').'<hr>'.$sig->content_html);
                         }),
                 ]),
 
@@ -394,6 +395,7 @@ trait HasEmailComposeActions
             RichEditor::make('body_html')
                 ->label('Message')
                 ->required()
+                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -454,10 +456,13 @@ trait HasEmailComposeActions
             $scheduledFor = Date::parse((string) $data['scheduled_for']);
         }
 
+        $renderer = resolve(EmailTemplateRenderService::class);
+        $record = $this->getCrmRecord();
+
         return [
             'connected_account_id' => $data['connected_account_id'],
-            'subject' => $data['subject'],
-            'body_html' => $data['body_html'],
+            'subject' => $renderer->renderContent((string) $data['subject'], $record),
+            'body_html' => $renderer->renderContent((string) $data['body_html'], $record),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),

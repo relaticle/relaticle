@@ -88,7 +88,7 @@ final class MassSendBulkAction extends BulkAction
                 RichEditor::make('body_html')
                     ->label('Body')
                     ->required()
-                    ->helperText('Use {name} for full name, {first_name} for first name, {company} for company name.')
+                    ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                     ->toolbarButtons([
                         'bold', 'italic', 'underline',
                         'link', 'bulletList', 'orderedList',
@@ -140,7 +140,10 @@ final class MassSendBulkAction extends BulkAction
                 foreach ($validRecipients as $person) {
                     $rendered = $template !== null
                         ? $renderService->render($template, $person)
-                        : ['subject' => $data['subject'], 'body_html' => $data['body_html']];
+                        : [
+                            'subject' => $renderService->renderContent((string) $data['subject'], $person),
+                            'body_html' => $renderService->renderContent((string) $data['body_html'], $person),
+                        ];
 
                     resolve(SendEmailAction::class)->execute(
                         data: [

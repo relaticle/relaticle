@@ -29,7 +29,7 @@ final class MeetingResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
@@ -111,10 +111,10 @@ final class MeetingResource extends Resource
             ->filters([
                 Filter::make('upcoming')
                     ->toggle()
-                    ->query(fn (Builder $q): Builder => $q->where('starts_at', '>=', now())),
+                    ->query(fn (Builder $query): Builder => $query->where('starts_at', '>=', now())),
                 Filter::make('past')
                     ->toggle()
-                    ->query(fn (Builder $q): Builder => $q->where('starts_at', '<', now())),
+                    ->query(fn (Builder $query): Builder => $query->where('starts_at', '<', now())),
                 SelectFilter::make('status')
                     ->options(CalendarEventStatus::class),
                 SelectFilter::make('response_status')

@@ -14,6 +14,7 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\EmailPrivacySettingsPage;
 use App\Filament\Resources\CompanyResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Listeners\SwitchTeam;
@@ -70,7 +71,7 @@ final class AppPanelProvider extends PanelProvider
         );
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
-        DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label('Delete record'));
+        DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label('Delete'));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
         Table::configureUsing(fn (Table $table): Table => $table);
     }
@@ -132,6 +133,12 @@ final class AppPanelProvider extends PanelProvider
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
+                Action::make('email_privacy')
+                    ->label('Email privacy')
+                    ->icon('heroicon-m-shield-check')
+                    ->url(fn (): string => $this->shouldRegisterMenuItem()
+                        ? url(EmailPrivacySettingsPage::getUrl())
+                        : url($panel->getPath())),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
@@ -144,6 +151,7 @@ final class AppPanelProvider extends PanelProvider
             ->pages([
                 EditProfile::class,
                 AccessTokens::class,
+                EmailPrivacySettingsPage::class,
             ])
             ->spa()
             ->sidebarWidth('67')

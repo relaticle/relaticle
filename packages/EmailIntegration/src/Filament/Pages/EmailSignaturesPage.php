@@ -27,7 +27,7 @@ final class EmailSignaturesPage extends Page
 
     protected static ?string $title = 'Signatures';
 
-    protected static ?int $navigationSort = 15;
+    protected static ?int $navigationSort = 6;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
