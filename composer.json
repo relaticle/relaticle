@@ -32,7 +32,7 @@
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^4.0",
         "prism-php/prism": "^0.98.5",
-        "relaticle/activity-log": "dev-main",
+        "relaticle/activity-log": "1.x-dev",
         "relaticle/custom-fields": "^3.0",
         "relaticle/flowforge": "^4.0",
         "ryangjchandler/laravel-cloudflare-turnstile": "^3.0",
@@ -163,14 +163,5 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./Plugins/ActivityLog",
-            "options": {
-                "symlink": true
-            }
-        }
-    ]
+    "prefer-stable": true
 }

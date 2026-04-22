@@ -22,7 +22,7 @@
 @source '../../../../vendor/relaticle/custom-fields/resources';
 
 /* ActivityLog plugin */
-@source '../../../../Plugins/ActivityLog/resources';
+@source '../../../../vendor/relaticle/activity-log/resources';
 
 /* ===================================
    Relaticle Brand Theme Customization
