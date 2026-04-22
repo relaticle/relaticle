@@ -269,6 +269,7 @@ abstract class BaseRecordEmailsPage extends Page
             ->label('Summarize Thread')
             ->icon('heroicon-o-sparkles')
             ->color('gray')
+            ->visible(false)
             ->modalHeading('AI Thread Summary')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')

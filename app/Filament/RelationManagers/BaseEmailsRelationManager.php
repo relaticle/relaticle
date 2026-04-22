@@ -190,7 +190,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ->label('Summarize Thread')
                         ->icon('heroicon-o-sparkles')
                         ->color('gray')
-                        ->visible(fn (Email $record): bool => filled($record->thread_id) && $this->authUser()->can('viewSubject', $record))
+                        ->visible(false)
                         ->modalHeading('AI Thread Summary')
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel('Close')
