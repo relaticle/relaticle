@@ -22,7 +22,6 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\Actions\ActivityLogAction;
-use Relaticle\ActivityLog\Filament\Infolists\Components\ActivityLog;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -131,16 +130,6 @@ final class ViewPeople extends ViewRecord
                 ->columnSpanFull()
                 ->collapsible()
                 ->collapsed(fn (People $record): bool => ($record->email_count ?? 0) === 0),
-
-            Section::make('Activity log')
-                ->icon(Heroicon::Bars3BottomLeft)
-                ->description('All activity for this record, grouped by week.')
-                ->schema([
-                    ActivityLog::make('activityLog')
-                        ->groupByDate(),
-                ])
-                ->columnSpanFull()
-                ->collapsible(),
         ]);
     }
 }
