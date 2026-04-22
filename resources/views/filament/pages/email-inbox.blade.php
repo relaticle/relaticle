@@ -47,17 +47,17 @@
         </div>
 
         {{-- ── Right panel: email detail ───────────────────────────────── --}}
-        <div class="relative flex flex-1 flex-col overflow-y-auto">
+        <div class="relative flex flex-1 flex-col min-h-0">
 
             {{-- Loading overlay while switching emails --}}
-            <div wire:loading wire:target="selectEmail" class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
-                <svg class="h-8 w-8 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <div wire:loading wire:target="selectEmail,setFolder" class="absolute inset-0 z-10 bg-white/70 dark:bg-gray-900/70">
+                <svg class="absolute top-1/2 left-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
             </div>
 
-            <div wire:loading.class="opacity-0" wire:target="selectEmail">
+            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-y-auto min-h-0">
                 @if ($this->selectedEmail !== null)
                     <x-emails.detail-action-bar :email="$this->selectedEmail" />
 

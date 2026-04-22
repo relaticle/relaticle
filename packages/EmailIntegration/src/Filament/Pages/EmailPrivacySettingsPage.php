@@ -30,8 +30,6 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     protected static ?int $navigationSort = 11;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
-
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
     public string $default_email_sharing_tier = 'metadata_only';

@@ -184,3 +184,80 @@ it('increments meeting_count metrics on matched records', function (): void {
     expect($person?->meeting_count)->toBe(1);
     expect(Carbon::parse($person?->last_meeting_at)->timestamp)->toBe($meeting->starts_at->timestamp);
 });
+
+it('does not double-count metrics when a meeting is re-linked on re-sync', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]));
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'y@acme.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    $person = People::query()->where('team_id', $team->id)->first();
+    expect($person?->meeting_count)->toBe(1);
+});
+
+it('never regresses last_meeting_at when an older meeting is linked after a newer one', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]));
+
+    $recent = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'starts_at' => Carbon::now()->addDays(3),
+        'ends_at' => Carbon::now()->addDays(3)->addHour(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $recent->getKey(),
+        'email_address' => 'z@acme.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($recent->fresh());
+
+    $older = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'starts_at' => Carbon::now()->subDays(30),
+        'ends_at' => Carbon::now()->subDays(30)->addHour(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $older->getKey(),
+        'email_address' => 'z@acme.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($older->fresh());
+
+    $person = People::query()->where('team_id', $team->id)->first();
+    expect($person?->meeting_count)->toBe(2);
+    expect(Carbon::parse($person?->last_meeting_at)->timestamp)->toBe($recent->starts_at->timestamp);
+});

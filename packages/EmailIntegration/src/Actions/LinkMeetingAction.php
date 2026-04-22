@@ -8,6 +8,10 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -48,10 +52,9 @@ final readonly class LinkMeetingAction
 
                 if ($company) {
                     $attendee->update(['company_id' => $company->getKey()]);
-                    $meeting->companies()->syncWithoutDetaching([
-                        $company->getKey() => ['link_source' => 'auto'],
-                    ]);
-                    $this->updateCompanyMetrics($company, $meeting);
+                    if ($this->autoAttach($meeting->companies(), $company->getKey())) {
+                        $this->updateCompanyMetrics($company, $meeting);
+                    }
                 }
             }
 
@@ -74,15 +77,12 @@ final readonly class LinkMeetingAction
 
             if ($person) {
                 $attendee->update(['contact_id' => $person->getKey()]);
-                $meeting->people()->syncWithoutDetaching([
-                    $person->getKey() => ['link_source' => 'auto'],
-                ]);
-                $this->updatePersonMetrics($person, $meeting);
+                if ($this->autoAttach($meeting->people(), $person->getKey())) {
+                    $this->updatePersonMetrics($person, $meeting);
+                }
 
                 if ($person->company_id) {
-                    $meeting->companies()->syncWithoutDetaching([
-                        $person->company_id => ['link_source' => 'auto'],
-                    ]);
+                    $this->autoAttach($meeting->companies(), $person->company_id);
                 }
 
                 $opportunities = Opportunity::query()->where('team_id', $teamId)
@@ -90,10 +90,9 @@ final readonly class LinkMeetingAction
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    $meeting->opportunities()->syncWithoutDetaching([
-                        $opportunity->getKey() => ['link_source' => 'auto'],
-                    ]);
-                    $this->updateOpportunityMetrics($opportunity, $meeting);
+                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey())) {
+                        $this->updateOpportunityMetrics($opportunity, $meeting);
+                    }
                 }
             }
         }
@@ -117,31 +116,63 @@ final readonly class LinkMeetingAction
             ->exists();
     }
 
+    /**
+     * Attaches a record to the meeting via the given morph relation if not already linked.
+     * Returns true only when a new pivot row was created, so callers can gate one-shot side
+     * effects (metric increments, activity logs) against re-sync of the same event.
+     *
+     * @template TRelated of Model
+     *
+     * @param  MorphToMany<TRelated, Meeting>  $relation
+     */
+    private function autoAttach(MorphToMany $relation, string $relatedId): bool
+    {
+        $result = $relation->syncWithoutDetaching([
+            $relatedId => ['link_source' => 'auto'],
+        ]);
+
+        return in_array($relatedId, $result['attached'], true);
+    }
+
     private function updatePersonMetrics(People $person, Meeting $meeting): void
     {
-        $person->updateQuietly([
-            'meeting_count' => DB::raw('meeting_count + 1'),
-            'last_meeting_at' => $meeting->starts_at,
-            'last_interaction_at' => $meeting->starts_at,
-        ]);
+        $this->advanceMetrics($person->getTable(), $person->getKey(), $meeting->starts_at);
     }
 
     private function updateCompanyMetrics(Company $company, Meeting $meeting): void
     {
-        $company->updateQuietly([
-            'meeting_count' => DB::raw('meeting_count + 1'),
-            'last_meeting_at' => $meeting->starts_at,
-            'last_interaction_at' => $meeting->starts_at,
-        ]);
+        $this->advanceMetrics($company->getTable(), $company->getKey(), $meeting->starts_at);
     }
 
     private function updateOpportunityMetrics(Opportunity $opportunity, Meeting $meeting): void
     {
-        $opportunity->updateQuietly([
-            'meeting_count' => DB::raw('meeting_count + 1'),
-            'last_meeting_at' => $meeting->starts_at,
-            'last_interaction_at' => $meeting->starts_at,
-        ]);
+        $this->advanceMetrics($opportunity->getTable(), $opportunity->getKey(), $meeting->starts_at);
+    }
+
+    /**
+     * Increments `meeting_count` and monotonically advances `last_meeting_at` / `last_interaction_at`.
+     * The timestamps are guarded at the SQL level so parallel workers processing events out of
+     * chronological order (e.g. the 90-day backfill) cannot regress a newer value to an older one.
+     */
+    private function advanceMetrics(string $table, string $id, Carbon $startsAt): void
+    {
+        DB::table($table)
+            ->where('id', $id)
+            ->update(['meeting_count' => DB::raw('meeting_count + 1')]);
+
+        $this->advanceTimestamp($table, $id, 'last_meeting_at', $startsAt);
+        $this->advanceTimestamp($table, $id, 'last_interaction_at', $startsAt);
+    }
+
+    private function advanceTimestamp(string $table, string $id, string $column, Carbon $startsAt): void
+    {
+        DB::table($table)
+            ->where('id', $id)
+            ->where(fn (QueryBuilder $q) => $q
+                ->whereNull($column)
+                ->orWhere($column, '<', $startsAt)
+            )
+            ->update([$column => $startsAt]);
     }
 
     /** @return Collection<int, lowercase-string> */

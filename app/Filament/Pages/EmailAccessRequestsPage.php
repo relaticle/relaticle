@@ -21,8 +21,6 @@ final class EmailAccessRequestsPage extends Page
 {
     protected string $view = 'filament.pages.email-access-requests';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
-
     protected static ?string $navigationLabel = 'Access Requests';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';

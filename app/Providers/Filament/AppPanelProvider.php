@@ -134,6 +134,7 @@ final class AppPanelProvider extends PanelProvider
                         : url($panel->getPath())),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
+            ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
@@ -153,6 +154,9 @@ final class AppPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('Tasks')
                     ->icon('heroicon-o-shopping-cart'),
+                NavigationGroup::make()
+                    ->label('Emails')
+                    ->icon('heroicon-o-envelope'),
             ])
             ->middleware([
                 EncryptCookies::class,

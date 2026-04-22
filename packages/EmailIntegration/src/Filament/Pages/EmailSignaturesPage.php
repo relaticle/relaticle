@@ -29,8 +29,6 @@ final class EmailSignaturesPage extends Page
 
     protected static ?int $navigationSort = 15;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-pencil';
-
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
     /**

@@ -13,6 +13,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -30,8 +31,6 @@ final class EmailAccountsPage extends Page
     protected static ?string $title = 'Accounts';
 
     protected static ?int $navigationSort = 10;
-
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Emails';
 
@@ -179,7 +178,7 @@ final class EmailAccountsPage extends Page
             ->modalDescription(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
                 ? 'This will stop syncing calendar events for this account.'
                 : 'You will be redirected to Google to grant calendar access.')
-            ->action(function (array $arguments) {
+            ->action(function (array $arguments): ?RedirectResponse {
                 $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
 
                 if ($account->hasCalendar()) {

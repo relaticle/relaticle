@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\DateTimePicker;
@@ -39,8 +38,6 @@ final class EmailOutboxPage extends Page implements HasTable
     protected static ?string $title = 'Outbox';
 
     protected static ?int $navigationSort = 5;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPaperAirplane;
 
     protected static string|UnitEnum|null $navigationGroup = 'Emails';
 

@@ -21,10 +21,19 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
     public static function forAccount(ConnectedAccount $account): self
     {
         $google = new GoogleClient;
+        $google->setClientId((string) config('services.gmail.client_id'));
+        $google->setClientSecret((string) config('services.gmail.client_secret'));
+
+        // `expires_in` must reflect seconds remaining from `created` (= now). If the stored token
+        // has already lapsed we pass 0 so `isAccessTokenExpired()` fires and refresh kicks in.
+        $secondsUntilExpiry = $account->token_expires_at !== null && $account->token_expires_at->isFuture()
+            ? (int) abs(now()->diffInSeconds($account->token_expires_at))
+            : 0;
+
         $google->setAccessToken([
             'access_token' => $account->access_token,
             'refresh_token' => $account->refresh_token,
-            'expires_in' => max(60, $account->token_expires_at?->diffInSeconds(now(), absolute: true) ?? 0),
+            'expires_in' => $secondsUntilExpiry,
             'created' => now()->timestamp,
         ]);
 

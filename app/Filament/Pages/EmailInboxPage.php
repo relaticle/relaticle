@@ -55,8 +55,6 @@ final class EmailInboxPage extends Page
 
     protected string $view = 'filament.pages.email-inbox';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
-
     protected static ?string $navigationLabel = 'Email';
 
     protected static ?string $title = 'Email';
@@ -76,7 +74,7 @@ final class EmailInboxPage extends Page
 
     public function mount(): void
     {
-        // selectedEmailId is initialised from the ?email= query param via #[Url]
+        $this->ensureEmailSelected();
     }
 
     /**
@@ -183,6 +181,22 @@ final class EmailInboxPage extends Page
         $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails);
+        $this->ensureEmailSelected();
+    }
+
+    private function ensureEmailSelected(): void
+    {
+        if ($this->selectedEmailId !== null) {
+            return;
+        }
+
+        $first = $this->emails()->first();
+
+        if ($first === null) {
+            return;
+        }
+
+        $this->selectEmail((string) $first->getKey());
     }
 
     public function deselectEmail(): void
