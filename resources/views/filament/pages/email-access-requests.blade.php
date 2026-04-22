@@ -101,7 +101,6 @@
             $isOwner    = $request->owner_id === auth()->id();
             $email      = $request->email;
             $tier       = \Relaticle\EmailIntegration\Enums\EmailPrivacyTier::from($request->tier_requested);
-            $initial    = mb_strtoupper(mb_substr($person?->name ?? '?', 0, 1));
         @endphp
 
         <div @class([
@@ -113,15 +112,21 @@
 
                 {{-- Avatar --}}
                 <div class="relative shrink-0">
-                    @if ($person?->profile_photo_path)
+                    @if ($person !== null)
+                        @php
+                            $photoPath = $person->profile_photo_path;
+                            $avatarUrl = filled($photoPath) && \Illuminate\Support\Facades\Storage::disk(config('jetstream.profile_photo_disk', 'public'))->exists($photoPath)
+                                ? \Illuminate\Support\Facades\Storage::disk(config('jetstream.profile_photo_disk', 'public'))->url($photoPath)
+                                : resolve(\App\Services\AvatarService::class)->generate($person->name);
+                        @endphp
                         <img
-                            src="{{ $person->profile_photo_url }}"
+                            src="{{ $avatarUrl }}"
                             alt="{{ $person->name }}"
                             class="h-8 w-8 rounded-full object-cover"
                         />
                     @else
-                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-xs font-semibold text-white">
-                            {{ $initial }}
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                            ?
                         </div>
                     @endif
                     <span @class([
