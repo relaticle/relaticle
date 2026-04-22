@@ -25,7 +25,7 @@ final class EmailAccessRequestsPage extends Page
 {
     use WithPagination;
 
-    private const int PER_PAGE = 2;
+    private const int PER_PAGE = 20;
 
     protected string $view = 'filament.pages.email-access-requests';
 
