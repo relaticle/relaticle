@@ -19,18 +19,6 @@
                                 Synced {{ $account->last_synced_at->diffForHumans() }}
                             </span>
                         @endif
-                        @if ($account->status->value === 'reauth_required')
-                            {{ ($this->reAuthAction)(['account_id' => $account->id]) }}
-                        @endif
-                        @if ($account->provider->value === 'gmail')
-                            {{ ($this->syncCalendarNowAction)(['account_id' => $account->id]) }}
-                        @endif
-                        <x-filament-actions::group :actions="array_filter([
-                            $account->provider->value === 'gmail' ? ($this->syncCalendarAction)(['account_id' => $account->id]) : null,
-                            ($this->editSettingsAction)(['account_id' => $account->id]),
-                            ($this->disconnectAction)(['account_id' => $account->id]),
-                        ])" />
-                        <x-filament-actions::modals />
                     </div>
                 </div>
             @empty
@@ -41,7 +29,6 @@
         <x-filament::section heading="Connect an Account">
             <div class="flex gap-3">
                 {{ $this->connectGmailAction }}
-                {{ $this->checkAttachmentAction }}
 {{--                {{ $this->connectAzureAction }}--}}
             </div>
         </x-filament::section>

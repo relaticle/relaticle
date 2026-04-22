@@ -221,6 +221,96 @@ describe('denyAccessRequest action', function (): void {
     });
 });
 
+describe('cancelAccessRequest action', function (): void {
+    it('deletes a pending outgoing request and clears selectedRequestId', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $otherEmail = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        livewire(EmailAccessRequestsPage::class)
+            ->call('setTab', 'outgoing')
+            ->call('selectRequest', (string) $request->id)
+            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id])
+            ->assertNotified('Access request cancelled.')
+            ->assertSet('selectedRequestId', null);
+
+        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeFalse();
+    });
+
+    it('does nothing when a non-requester passes a request id', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $otherEmail = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $requester->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        // Current user ($this->user) is neither owner nor requester — action should be a no-op
+        livewire(EmailAccessRequestsPage::class)
+            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id])
+            ->assertNotNotified();
+
+        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeTrue();
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
+    });
+
+    it('does not delete an approved request', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $otherEmail = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+        ]);
+
+        $request = EmailAccessRequest::factory()->approved()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        livewire(EmailAccessRequestsPage::class)
+            ->call('setTab', 'outgoing')
+            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id]);
+
+        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeTrue();
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
+});
+
 describe('getNavigationBadge', function (): void {
     it('returns the count of pending incoming requests as a string', function (): void {
         $requester = User::factory()->create(['current_team_id' => $this->team->id]);

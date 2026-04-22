@@ -19,7 +19,6 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Services\GmailService;
 
 final class EmailAccountsPage extends Page
 {
@@ -52,15 +51,6 @@ final class EmailAccountsPage extends Page
         return ConnectedAccount::query()->where('user_id', auth()->id())
             ->where('team_id', filament()->getTenant()?->getKey())
             ->get();
-    }
-
-    public function checkAttachmentAction(): Action
-    {
-        return Action::make('checkAttachment')
-            ->action(function (): void {
-                GmailService::forAccount(ConnectedAccount::query()->firstWhere('user_id', auth()->id()))->fetchMessage('19d82a37752febd1');
-            });
-
     }
 
     public function connectGmailAction(): Action

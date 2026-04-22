@@ -16,6 +16,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -270,6 +271,43 @@ final class EmailAccessRequestsPage extends Page
                 Notification::make()
                     ->success()
                     ->title('Access request denied.')
+                    ->send();
+            });
+    }
+
+    protected function cancelAccessRequestAction(): Action
+    {
+        return Action::make('cancelAccessRequest')
+            ->label('Cancel request')
+            ->icon('heroicon-m-x-mark')
+            ->color('danger')
+            ->size(Size::ExtraSmall)
+            ->outlined()
+            ->requiresConfirmation()
+            ->modalHeading('Cancel access request')
+            ->modalDescription(fn (array $arguments): string => sprintf(
+                'Withdraw your request for access to %s\'s email?',
+                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->owner->name ?? 'this user',
+            ))
+            ->modalSubmitActionLabel('Cancel request')
+            ->action(function (array $arguments): void {
+                $accessRequest = EmailAccessRequest::query()
+                    ->whereKey($arguments['requestId'] ?? null)
+                    ->where('requester_id', $this->authUser()->getKey())
+                    ->first();
+
+                if ($accessRequest === null) {
+                    return;
+                }
+
+                resolve(CancelEmailAccessRequestAction::class)->execute($accessRequest);
+
+                $this->selectedRequestId = null;
+                unset($this->selectedRequest, $this->requests, $this->statusCounts);
+
+                Notification::make()
+                    ->success()
+                    ->title('Access request cancelled.')
                     ->send();
             });
     }
