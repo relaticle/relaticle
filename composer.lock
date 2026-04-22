@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5b67624195575caa05702eee633677fa",
+    "content-hash": "2f9fbebfe57781972cd9dba2f995da3b",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -7894,11 +7894,17 @@
         },
         {
             "name": "relaticle/activity-log",
-            "version": "dev-main",
+            "version": "1.x-dev",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/relaticle/activity-log.git",
+                "reference": "f8839ef86308a2a31006dbbdeacece41b075cfa8"
+            },
             "dist": {
-                "type": "path",
-                "url": "./Plugins/ActivityLog",
-                "reference": "4bf6c31ef1f805aa6876179588a170e6c54f0349"
+                "type": "zip",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/f8839ef86308a2a31006dbbdeacece41b075cfa8",
+                "reference": "f8839ef86308a2a31006dbbdeacece41b075cfa8",
+                "shasum": ""
             },
             "require": {
                 "filament/filament": "^5.0",
@@ -7910,11 +7916,13 @@
                 "spatie/laravel-package-tools": "^1.16"
             },
             "require-dev": {
+                "laravel/pint": "^1.0",
                 "orchestra/testbench": "^10.0",
                 "pestphp/pest": "^4.0",
                 "pestphp/pest-plugin-laravel": "^4.0",
                 "pestphp/pest-plugin-livewire": "^4.0"
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -7928,19 +7936,16 @@
                     "Relaticle\\ActivityLog\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Relaticle\\ActivityLog\\Tests\\": "tests/"
-                }
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
-            "description": "Reusable Filament v5 plugin that renders a unified activity-log timeline for any Eloquent model.",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "description": "Reusable Filament plugin that renders a unified activity-log timeline for any Eloquent model",
+            "support": {
+                "issues": "https://github.com/relaticle/activity-log/issues",
+                "source": "https://github.com/relaticle/activity-log/tree/1.x"
+            },
+            "time": "2026-04-21T15:23:52+00:00"
         },
         {
             "name": "relaticle/custom-fields",

@@ -23,7 +23,6 @@ parameters:
     paths:
         - app
         - packages
-        - Plugins
         - config
         - bootstrap
         - database/factories
@@ -31,10 +30,6 @@ parameters:
 
     excludePaths:
         - packages/SystemAdmin
-        - Plugins/ActivityLog/vendor (?)
-        - Plugins/ActivityLog/tests/Feature
-        - Plugins/ActivityLog/tests/TestCase.php
-        - Plugins/ActivityLog/tests/Pest.php
 
     configDirectories:
         - config
