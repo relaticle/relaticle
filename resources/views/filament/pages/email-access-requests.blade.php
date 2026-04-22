@@ -99,6 +99,7 @@
             $isDenied   = $request->status === \Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus::DENIED;
             $person     = $tab === 'incoming' ? $request->requester : $request->owner;
             $isOwner    = $request->owner_id === auth()->id();
+            $isRequester = $request->requester_id === auth()->id();
             $email      = $request->email;
             $tier       = \Relaticle\EmailIntegration\Enums\EmailPrivacyTier::from($request->tier_requested);
         @endphp
@@ -177,6 +178,8 @@
                     @if ($isOwner && $isPending)
                         {{ ($this->approveAccessRequestAction)(['requestId' => $request->id]) }}
                         {{ ($this->denyAccessRequestAction)(['requestId' => $request->id]) }}
+                    @elseif ($isRequester && $isPending)
+                        {{ ($this->cancelAccessRequestAction)(['requestId' => $request->id]) }}
                     @endif
                 </div>
             </div>
