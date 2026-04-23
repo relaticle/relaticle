@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Profile;
 
-use App\Actions\Jetstream\DeleteTeam;
+use App\Actions\Jetstream\ScheduleUserDeletion;
 use App\Livewire\BaseLivewireComponent;
-use App\Models\Team;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -60,7 +57,7 @@ final class DeleteAccount extends BaseLivewireComponent
     }
 
     /**
-     * Delete the current user.
+     * Schedule deletion for the current user.
      *
      * @throws ValidationException
      */
@@ -74,26 +71,9 @@ final class DeleteAccount extends BaseLivewireComponent
             ]);
         }
 
-        // Logout before deleting to prevent SessionGuard::logout() from
-        // re-inserting the user when it updates the remember token.
+        resolve(ScheduleUserDeletion::class)->schedule($user);
+
         filament()->auth()->logout();
-
-        DB::transaction(function () use ($user): void {
-            if (config('jetstream.features.teams', false)) {
-                $user->teams()->detach();
-
-                /** @var Collection<int, Team> $ownedTeams */
-                $ownedTeams = $user->ownedTeams;
-                $ownedTeams->each(function (Team $team): void {
-                    resolve(DeleteTeam::class)->delete($team);
-                });
-            }
-
-            $user->deleteProfilePhoto();
-            $user->tokens->each->delete();
-
-            $user->delete();
-        });
 
         return redirect(filament()->getLoginUrl());
     }

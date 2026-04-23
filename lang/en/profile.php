@@ -52,8 +52,8 @@ return [
         ],
         'delete_account' => [
             'title' => 'Delete Account',
-            'description' => 'Permanently delete your account.',
-            'notice' => 'Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.',
+            'description' => 'Schedule your account for deletion.',
+            'notice' => 'Deleting your account will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion by logging back in at any time before that. After the grace period, all your data will be permanently deleted.',
         ],
     ],
 
@@ -74,8 +74,8 @@ return [
 
     'modals' => [
         'delete_account' => [
-            'notice' => 'Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.',
-            'notice_no_password' => 'Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted.',
+            'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed. Please enter your password to confirm.',
+            'notice_no_password' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',

@@ -24,8 +24,8 @@ afterEach(function (): void {
 });
 
 it('filters by custom field equality', function (): void {
-    $opportunity1 = Opportunity::factory()->for($this->team)->create(['name' => 'Deal A']);
-    $opportunity2 = Opportunity::factory()->for($this->team)->create(['name' => 'Deal B']);
+    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deal A']);
+    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deal B']);
 
     $stageField = CustomField::query()
         ->withoutGlobalScopes()
@@ -58,8 +58,8 @@ it('filters by custom field equality', function (): void {
 });
 
 it('filters by currency field with gte operator', function (): void {
-    $opportunity1 = Opportunity::factory()->for($this->team)->create(['name' => 'Big Deal']);
-    $opportunity2 = Opportunity::factory()->for($this->team)->create(['name' => 'Small Deal']);
+    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Big Deal']);
+    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Small Deal']);
 
     $amountField = CustomField::query()
         ->withoutGlobalScopes()
@@ -94,7 +94,7 @@ it('filters by currency field with gte operator', function (): void {
 it('silently ignores unknown field codes', function (): void {
     $countBefore = Opportunity::query()->count();
 
-    Opportunity::factory()->for($this->team)->create();
+    Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $request = new Request([
         'filter' => [
@@ -134,7 +134,7 @@ it('rejects more than 10 filter conditions', function (): void {
 it('handles empty filter object as no-op', function (): void {
     $countBefore = Opportunity::query()->count();
 
-    Opportunity::factory()->for($this->team)->count(3)->create();
+    Opportunity::factory()->recycle([$this->user, $this->team])->count(3)->create();
 
     $request = new Request([
         'filter' => [

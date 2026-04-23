@@ -45,7 +45,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Task::factory(3)->for($this->team)->create();
+    $records = Task::factory(3)->recycle([$this->user, $this->team])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -59,7 +59,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Task::factory(3)->for($this->team)->create();
+    $records = Task::factory(3)->recycle([$this->user, $this->team])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ManageTasks::class)
@@ -69,8 +69,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['title', 'assignees.name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Task::factory()->count(4)->for($this->team)->create();
-    $trashedRecords = Task::factory()->trashed()->count(6)->for($this->team)->create();
+    $records = Task::factory()->count(4)->recycle([$this->user, $this->team])->create();
+    $trashedRecords = Task::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records)
@@ -79,7 +79,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Task::factory(20)->for($this->team)->create();
+    $records = Task::factory(20)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -88,7 +88,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Task::factory(5)->for($this->team)->create();
+    $records = Task::factory(5)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records)
@@ -116,7 +116,7 @@ it('can create a task', function (): void {
 });
 
 it('can edit a task', function (): void {
-    $record = Task::factory()->for($this->team)->create();
+    $record = Task::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -128,7 +128,7 @@ it('can edit a task', function (): void {
 });
 
 it('can delete a task', function (): void {
-    $record = Task::factory()->for($this->team)->create();
+    $record = Task::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -163,7 +163,7 @@ it('sets creator_id and team_id via observer when creating a task', function ():
 });
 
 it('authorizes team member to view and update own team task', function (): void {
-    $record = Task::factory()->for($this->team)->create();
+    $record = Task::factory()->recycle([$this->user, $this->team])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()

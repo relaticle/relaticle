@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Documentation;
 
+use App\Features\Documentation;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Pennant\Feature;
 use Relaticle\Documentation\Services\DocumentationService;
 
 final class DocumentationServiceProvider extends ServiceProvider
@@ -26,6 +28,10 @@ final class DocumentationServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! Feature::active(Documentation::class)) {
+            return;
+        }
+
         $this->registerRoutes();
         $this->registerViews();
         $this->registerComponents();

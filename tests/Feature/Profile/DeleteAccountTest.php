@@ -4,52 +4,62 @@ declare(strict_types=1);
 
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
+use App\Notifications\UserDeletionScheduledNotification;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 mutates(DeleteAccount::class, User::class);
 
-test('social user can delete account without password', function () {
-    $this->actingAs($user = User::factory()->withTeam()->socialOnly()->create());
+test('user can schedule account deletion with correct password', function () {
+    Notification::fake();
 
-    Livewire::test(DeleteAccount::class)
-        ->call('deleteAccount')
-        ->assertRedirect();
-
-    expect($user->fresh())->toBeNull();
-});
-
-test('password user can delete account with correct password', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
     Livewire::test(DeleteAccount::class)
         ->call('deleteAccount', 'password')
         ->assertRedirect();
 
-    expect($user->fresh())->toBeNull();
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
+
+    Notification::assertSentTo($user, UserDeletionScheduledNotification::class);
 });
 
-test('password user cannot delete account with wrong password', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+test('social user can schedule account deletion without password', function () {
+    Notification::fake();
+
+    $this->actingAs($user = User::factory()->withPersonalTeam()->socialOnly()->create());
+
+    Livewire::test(DeleteAccount::class)
+        ->call('deleteAccount')
+        ->assertRedirect();
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
+});
+
+test('user cannot schedule deletion with wrong password', function () {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
     Livewire::test(DeleteAccount::class)
         ->call('deleteAccount', 'wrong-password')
         ->assertHasErrors(['password']);
 
-    expect($user->fresh())->not->toBeNull();
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
-test('password user cannot delete account without password', function () {
+test('user cannot schedule deletion when owning team with members', function () {
+    Notification::fake();
+
     $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
+    $team->users()->attach(User::factory()->create(), ['role' => 'editor']);
 
     Livewire::test(DeleteAccount::class)
-        ->call('deleteAccount')
-        ->assertHasErrors(['password']);
-
-    expect($user->fresh())->not->toBeNull();
+        ->call('deleteAccount', 'password')
+        ->assertHasErrors(['team']);
 });
 
 test('delete account component renders correctly', function () {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
 
     Livewire::test(DeleteAccount::class)
         ->assertSuccessful()

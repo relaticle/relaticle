@@ -26,7 +26,7 @@ it('can render the index page', function (): void {
 });
 
 it('can render the view page', function (): void {
-    $record = Opportunity::factory()->for($this->team)->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ViewOpportunity::class, ['record' => $record->getKey()])
         ->assertOk();
@@ -53,7 +53,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Opportunity::factory(3)->for($this->team)->create();
+    $records = Opportunity::factory(3)->recycle([$this->user, $this->team])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -67,7 +67,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Opportunity::factory(3)->for($this->team)->create();
+    $records = Opportunity::factory(3)->recycle([$this->user, $this->team])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ListOpportunities::class)
@@ -77,8 +77,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Opportunity::factory()->count(4)->for($this->team)->create();
-    $trashedRecords = Opportunity::factory()->trashed()->count(6)->for($this->team)->create();
+    $records = Opportunity::factory()->count(4)->recycle([$this->user, $this->team])->create();
+    $trashedRecords = Opportunity::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records)
@@ -87,7 +87,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Opportunity::factory(20)->for($this->team)->create();
+    $records = Opportunity::factory(20)->recycle([$this->user, $this->team])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -96,7 +96,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Opportunity::factory(5)->for($this->team)->create();
+    $records = Opportunity::factory(5)->recycle([$this->user, $this->team])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records)
@@ -124,7 +124,7 @@ it('can create an opportunity', function (): void {
 });
 
 it('can edit an opportunity', function (): void {
-    $record = Opportunity::factory()->for($this->team)->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ListOpportunities::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -136,7 +136,7 @@ it('can edit an opportunity', function (): void {
 });
 
 it('can delete an opportunity', function (): void {
-    $record = Opportunity::factory()->for($this->team)->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ListOpportunities::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -171,7 +171,7 @@ it('sets creator_id and team_id via observer when creating an opportunity', func
 });
 
 it('authorizes team member to view and update own team opportunity', function (): void {
-    $record = Opportunity::factory()->for($this->team)->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()

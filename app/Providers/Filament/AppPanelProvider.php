@@ -8,6 +8,7 @@ use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
 use App\ActivityLog\MeetingEventPalette;
 use App\ActivityLog\MeetingEventRenderer;
+use App\Features\SocialAuth;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -17,7 +18,9 @@ use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\EmailPrivacySettingsPage;
 use App\Filament\Resources\CompanyResource;
 use App\Http\Middleware\ApplyTenantScopes;
+use App\Http\Middleware\CheckScheduledDeletion;
 use App\Listeners\SwitchTeam;
+use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -49,8 +52,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
+use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
@@ -156,6 +161,11 @@ final class AppPanelProvider extends PanelProvider
             ->spa()
             ->sidebarWidth('67')
             ->maxContentWidth(Width::Full)
+            ->routes(function (): void {
+                Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
+                    ->middleware('auth')
+                    ->name('scheduled-deletion');
+            })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([
@@ -181,6 +191,7 @@ final class AppPanelProvider extends PanelProvider
             ->authPasswordBroker('users')
             ->authMiddleware([
                 Authenticate::class,
+                CheckScheduledDeletion::class,
             ])
             ->tenantMiddleware(
                 [
@@ -205,15 +216,21 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
                 fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                fn (): View|Factory => view('filament.auth.social_login_buttons')
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                fn (): View|Factory => view('filament.auth.social_login_buttons')
-            )
+            );
+
+        if (Feature::active(SocialAuth::class)) {
+            $panel
+                ->renderHook(
+                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                    fn (): View|Factory => view('filament.auth.social_login_buttons')
+                )
+                ->renderHook(
+                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
+                    fn (): View|Factory => view('filament.auth.social_login_buttons')
+                );
+        }
+
+        $panel
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')

@@ -24,7 +24,7 @@ afterEach(function () {
 });
 
 it('can get a company by ID', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCompanyTool::class, ['id' => $company->id])
@@ -43,7 +43,7 @@ describe('team scoping', function () {
             'team_id' => Team::factory()->create()->id,
             'name' => 'Other Team Corp',
         ]));
-        $ownCompany = Company::factory()->for($this->team)->create(['name' => 'Own Team Corp']);
+        $ownCompany = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
@@ -90,10 +90,10 @@ describe('team scoping', function () {
     });
 
     it('excludes soft-deleted companies from list', function (): void {
-        $deleted = Company::factory()->for($this->team)->create(['name' => 'Deleted Corp']);
+        $deleted = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deleted Corp']);
         $deleted->delete();
 
-        $active = Company::factory()->for($this->team)->create(['name' => 'Active Corp']);
+        $active = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Active Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
@@ -105,7 +105,7 @@ describe('team scoping', function () {
 
 describe('pagination', function () {
     it('can paginate companies via MCP tool', function (): void {
-        Company::factory(3)->for($this->team)->create();
+        Company::factory(3)->recycle([$this->user, $this->team])->create();
 
         $page1 = RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, [
@@ -125,7 +125,7 @@ describe('pagination', function () {
     });
 
     it('includes pagination metadata in list responses', function (): void {
-        Company::factory(3)->for($this->team)->create();
+        Company::factory(3)->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, [
@@ -141,7 +141,7 @@ describe('pagination', function () {
 
 describe('custom fields serialization', function () {
     it('returns empty custom_fields as object not array', function (): void {
-        $company = Company::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(GetCompanyTool::class, ['id' => $company->id])

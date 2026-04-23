@@ -48,12 +48,14 @@
                             Pricing
                         </a>
                     </li>
+                    @feature(App\Features\Documentation::class)
                     <li>
                         <a href="{{ route('documentation.index') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
                             Documentation
                         </a>
                     </li>
+                    @endfeature
                     <li>
                         <a href="{{ url('/#features') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">

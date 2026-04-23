@@ -27,6 +27,7 @@
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
         "laravel/mcp": "^0.6.2",
+        "laravel/pennant": "^1.23",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
@@ -73,12 +74,13 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
+        "nunomaduro/pao": "^0.1",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-browser": "^4.3",
         "pestphp/pest-plugin-laravel": "^4.0",
         "pestphp/pest-plugin-type-coverage": "^4.0",
         "rector/rector": "^2.0",
-        "spatie/boost-spatie-guidelines": "^1.1",
+        "spatie/guidelines-skills": "dev-main",
         "spatie/pest-plugin-route-testing": "^1.1"
     },
     "autoload": {

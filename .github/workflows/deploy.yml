@@ -1,0 +1,238 @@
+name: Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-static-analysis:
+    runs-on: ubuntu-latest
+    name: Code Quality Checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: json, dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Prepare Laravel Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
+      - name: Run Lint
+        run: composer test:lint
+
+      - name: Run Refactor Check
+        run: composer test:refactor
+
+      - name: Run Type Coverage
+        run: composer test:type-coverage
+
+      - name: Run Static Analysis
+        run: composer test:types
+
+      - name: Architecture Tests
+        run: composer test:arch
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.4]
+        shard: [1, 2, 3, 4, 5]
+
+    name: Tests (Shard ${{ matrix.shard }}/5)
+
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_DB: relaticle_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json, dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Set up Node & NPM
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+
+      - name: Setup Problem Matches
+        run: |
+          echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+          echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Get NPM cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+
+      - name: Cache dependencies
+        id: npm-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build dependencies
+        run: npm run build
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
+      - name: Tests
+        run: composer test:pest:ci
+        env:
+          SHARD: ${{ matrix.shard }}/5
+
+  browser-tests:
+    runs-on: ubuntu-latest
+    name: Browser Tests
+
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_DB: relaticle_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: json, dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Set up Node & NPM
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Get NPM cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+
+      - name: Cache NPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser Tests
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Forge
+    if: github.event.release.prerelease == false
+    needs: [lint-and-static-analysis, tests, browser-tests]
+
+    steps:
+      - name: Trigger Forge Deploy
+        run: curl --fail --silent --show-error --location "${{ secrets.FORGE_DEPLOY_WEBHOOK }}"

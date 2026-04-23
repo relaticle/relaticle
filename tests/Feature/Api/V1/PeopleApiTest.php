@@ -36,7 +36,7 @@ it('requires authentication', function (): void {
 it('can list people', function (): void {
     Sanctum::actingAs($this->user);
 
-    $people = People::factory(3)->for($this->team)->create();
+    $people = People::factory(3)->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/people');
 
@@ -84,7 +84,7 @@ it('validates required fields on create', function (): void {
 it('can show a person', function (): void {
     Sanctum::actingAs($this->user);
 
-    $person = People::factory()->for($this->team)->create(['name' => 'Show Test']);
+    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Show Test']);
 
     $this->getJson("/api/v1/people/{$person->id}")
         ->assertOk()
@@ -108,7 +108,7 @@ it('can show a person', function (): void {
 it('can update a person', function (): void {
     Sanctum::actingAs($this->user);
 
-    $person = People::factory()->for($this->team)->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
 
     $this->putJson("/api/v1/people/{$person->id}", ['name' => 'Updated Name'])
         ->assertOk()
@@ -129,7 +129,7 @@ it('can update a person', function (): void {
 it('can delete a person', function (): void {
     Sanctum::actingAs($this->user);
 
-    $person = People::factory()->for($this->team)->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
 
     $this->deleteJson("/api/v1/people/{$person->id}")
         ->assertNoContent();
@@ -142,7 +142,7 @@ it('scopes people to current team', function (): void {
 
     Sanctum::actingAs($this->user);
 
-    $ownPerson = People::factory()->for($this->team)->create();
+    $ownPerson = People::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/people');
 
@@ -200,7 +200,7 @@ describe('cross-tenant isolation', function (): void {
     it('rejects company_id from another team on update', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
         $otherTeam = Team::factory()->create();
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
             'team_id' => $otherTeam->id,
@@ -218,7 +218,7 @@ describe('includes', function (): void {
     it('can include creator on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson("/api/v1/people/{$person->id}?include=creator")
             ->assertOk()
@@ -240,7 +240,7 @@ describe('includes', function (): void {
     it('can include creator on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory()->for($this->team)->create();
+        People::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/people?include=creator')
             ->assertOk()
@@ -254,8 +254,8 @@ describe('includes', function (): void {
     it('can include company on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $person = People::factory()->for($this->team)->create(['company_id' => $company->id]);
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
 
         $this->getJson("/api/v1/people/{$person->id}?include=company")
             ->assertOk()
@@ -277,8 +277,8 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $person = People::factory()->for($this->team)->create(['company_id' => $company->id]);
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
 
         $this->getJson("/api/v1/people/{$person->id}?include=creator,company")
             ->assertOk()
@@ -292,7 +292,7 @@ describe('includes', function (): void {
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/people/{$person->id}")
             ->assertOk();
@@ -303,7 +303,7 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson('/api/v1/people?include=tasksCount');
 
@@ -326,8 +326,8 @@ describe('filtering and sorting', function (): void {
     it('can filter people by name', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory()->for($this->team)->create(['name' => 'Alice Johnson']);
-        People::factory()->for($this->team)->create(['name' => 'Bob Smith']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alice Johnson']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Bob Smith']);
 
         $response = $this->getJson('/api/v1/people?filter[name]=Alice');
 
@@ -341,9 +341,9 @@ describe('filtering and sorting', function (): void {
     it('can filter people by company_id', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $matched = People::factory()->for($this->team)->create(['company_id' => $company->id]);
-        $unmatched = People::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $matched = People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
+        $unmatched = People::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/people?filter[company_id]={$company->id}");
 
@@ -357,8 +357,8 @@ describe('filtering and sorting', function (): void {
     it('can sort people by name ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory()->for($this->team)->create(['name' => 'Zulu Person']);
-        People::factory()->for($this->team)->create(['name' => 'Alpha Person']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Person']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Person']);
 
         $response = $this->getJson('/api/v1/people?sort=name');
 
@@ -373,8 +373,8 @@ describe('filtering and sorting', function (): void {
     it('can sort people by name descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory()->for($this->team)->create(['name' => 'Alpha Person']);
-        People::factory()->for($this->team)->create(['name' => 'Zulu Person']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Person']);
+        People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Person']);
 
         $response = $this->getJson('/api/v1/people?sort=-name');
 
@@ -405,7 +405,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory(5)->for($this->team)->create();
+        People::factory(5)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/people?per_page=2')
             ->assertOk()
@@ -415,7 +415,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory(5)->for($this->team)->create();
+        People::factory(5)->recycle([$this->user, $this->team])->create();
 
         $page1 = $this->getJson('/api/v1/people?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/people?per_page=3&page=2');
@@ -439,7 +439,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        People::factory(2)->for($this->team)->create();
+        People::factory(2)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/people?page=999')
             ->assertOk()
@@ -481,7 +481,7 @@ describe('mass assignment protection', function (): void {
     it('ignores team_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
         $otherTeam = Team::factory()->create();
 
         $this->putJson("/api/v1/people/{$person->id}", [
@@ -542,8 +542,8 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted people from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
-        $deleted = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $deleted = People::factory()->recycle([$this->user, $this->team])->create();
         $deleted->delete();
 
         $ids = collect($this->getJson('/api/v1/people')->json('data'))->pluck('id');
@@ -554,7 +554,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted person', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
         $person->delete();
 
         $this->getJson("/api/v1/people/{$person->id}")
@@ -574,8 +574,8 @@ describe('non-existent record', function (): void {
 it('includes company_id in attributes', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->for($this->team)->create();
-    $person = People::factory()->for($this->team)->create([
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create([
         'company_id' => $company->id,
     ]);
 

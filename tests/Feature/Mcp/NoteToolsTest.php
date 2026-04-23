@@ -27,7 +27,7 @@ afterEach(function () {
 });
 
 it('can create a note linked to a company', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateNoteTool::class, [
@@ -43,8 +43,8 @@ it('can create a note linked to a company', function (): void {
 });
 
 it('can update a note to link to an opportunity', function (): void {
-    $note = Note::factory()->for($this->team)->create();
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateNoteTool::class, [
@@ -57,8 +57,8 @@ it('can update a note to link to an opportunity', function (): void {
 });
 
 it('can detach all companies from a note via empty array', function (): void {
-    $note = Note::factory()->for($this->team)->create();
-    $company = Company::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
     $note->companies()->attach($company);
 
     RelaticleServer::actingAs($this->user)
@@ -72,7 +72,7 @@ it('can detach all companies from a note via empty array', function (): void {
 });
 
 it('can get a note by ID', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Meeting Notes']);
+    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Meeting Notes']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetNoteTool::class, ['id' => $note->id])
@@ -81,7 +81,7 @@ it('can get a note by ID', function (): void {
 });
 
 it('can update a note via MCP tool', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Old Note']);
+    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Old Note']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateNoteTool::class, [
@@ -95,7 +95,7 @@ it('can update a note via MCP tool', function (): void {
 });
 
 it('can delete a note via MCP tool', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Delete Me']);
+    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Delete Me']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteNoteTool::class, [
@@ -108,8 +108,8 @@ it('can delete a note via MCP tool', function (): void {
 });
 
 it('can attach a note to a company', function (): void {
-    $note = Note::factory()->for($this->team)->create();
-    $company = Company::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachNoteToEntitiesTool::class, [
@@ -122,8 +122,8 @@ it('can attach a note to a company', function (): void {
 });
 
 it('can detach a note from a company', function (): void {
-    $note = Note::factory()->for($this->team)->create();
-    $company = Company::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
     $note->companies()->attach($company);
 
     RelaticleServer::actingAs($this->user)
@@ -137,9 +137,9 @@ it('can detach a note from a company', function (): void {
 });
 
 it('attach does not remove existing links', function (): void {
-    $note = Note::factory()->for($this->team)->create();
-    $company1 = Company::factory()->for($this->team)->create();
-    $company2 = Company::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $company1 = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company2 = Company::factory()->recycle([$this->user, $this->team])->create();
     $note->companies()->attach($company1);
 
     RelaticleServer::actingAs($this->user)
@@ -162,7 +162,7 @@ describe('team scoping', function () {
             'team_id' => Team::factory()->create()->id,
             'title' => 'Other Team Note',
         ]));
-        $ownNote = Note::factory()->for($this->team)->create(['title' => 'Own Team Note']);
+        $ownNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Own Team Note']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class)

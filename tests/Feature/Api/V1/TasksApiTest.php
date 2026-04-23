@@ -39,7 +39,7 @@ it('can list tasks', function (): void {
     Sanctum::actingAs($this->user);
 
     $seeded = Task::query()->where('team_id', $this->team->id)->count();
-    Task::factory(3)->for($this->team)->create();
+    Task::factory(3)->recycle([$this->user, $this->team])->create();
 
     $this->getJson('/api/v1/tasks')
         ->assertOk()
@@ -84,7 +84,7 @@ it('validates required fields on create', function (): void {
 it('can show a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->for($this->team)->create(['title' => 'Show Test']);
+    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Show Test']);
 
     $this->getJson("/api/v1/tasks/{$task->id}")
         ->assertOk()
@@ -108,7 +108,7 @@ it('can show a task', function (): void {
 it('can update a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
     $this->putJson("/api/v1/tasks/{$task->id}", ['title' => 'Updated Title'])
         ->assertOk()
@@ -129,7 +129,7 @@ it('can update a task', function (): void {
 it('can delete a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
     $this->deleteJson("/api/v1/tasks/{$task->id}")
         ->assertNoContent();
@@ -142,7 +142,7 @@ it('scopes tasks to current team', function (): void {
 
     Sanctum::actingAs($this->user);
 
-    $ownTask = Task::factory()->for($this->team)->create();
+    $ownTask = Task::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/tasks');
 
@@ -156,9 +156,9 @@ it('scopes tasks to current team', function (): void {
 it('can create a task with relationship ids', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->for($this->team)->create();
-    $person = People::factory()->for($this->team)->create();
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $this->postJson('/api/v1/tasks', [
         'title' => 'Linked task',
@@ -226,7 +226,7 @@ describe('includes', function (): void {
     it('can include creator on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=creator")
             ->assertOk()
@@ -248,7 +248,7 @@ describe('includes', function (): void {
     it('can include creator on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->for($this->team)->create();
+        Task::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/tasks?include=creator')
             ->assertOk()
@@ -262,7 +262,7 @@ describe('includes', function (): void {
     it('can include assignees on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
         $task->assignees()->attach($this->user);
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=assignees")
@@ -277,7 +277,7 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
         $task->assignees()->attach($this->user);
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=creator,assignees")
@@ -292,7 +292,7 @@ describe('includes', function (): void {
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/tasks/{$task->id}")
             ->assertOk();
@@ -303,7 +303,7 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson('/api/v1/tasks?include=assigneesCount');
 
@@ -326,8 +326,8 @@ describe('filtering and sorting', function (): void {
     it('ignores assigned_to_me filter when value is false', function (): void {
         Sanctum::actingAs($this->user);
 
-        $unassignedTask = Task::factory()->for($this->team)->create(['title' => 'Unassigned']);
-        $assignedTask = Task::factory()->for($this->team)->create(['title' => 'Assigned']);
+        $unassignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unassigned']);
+        $assignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Assigned']);
         $assignedTask->assignees()->attach($this->user);
 
         $this->getJson('/api/v1/tasks?filter[assigned_to_me]=false')
@@ -339,8 +339,8 @@ describe('filtering and sorting', function (): void {
     it('can filter tasks by title', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->for($this->team)->create(['title' => 'Fix login bug']);
-        Task::factory()->for($this->team)->create(['title' => 'Deploy to staging']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Fix login bug']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Deploy to staging']);
 
         $response = $this->getJson('/api/v1/tasks?filter[title]=login');
 
@@ -354,8 +354,8 @@ describe('filtering and sorting', function (): void {
     it('can sort tasks by title ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->for($this->team)->create(['title' => 'Zulu Task']);
-        Task::factory()->for($this->team)->create(['title' => 'Alpha Task']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Task']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Task']);
 
         $response = $this->getJson('/api/v1/tasks?sort=title');
 
@@ -370,8 +370,8 @@ describe('filtering and sorting', function (): void {
     it('can sort tasks by title descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->for($this->team)->create(['title' => 'Alpha Task']);
-        Task::factory()->for($this->team)->create(['title' => 'Zulu Task']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Task']);
+        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Task']);
 
         $response = $this->getJson('/api/v1/tasks?sort=-title');
 
@@ -402,7 +402,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(5)->for($this->team)->create();
+        Task::factory(5)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/tasks?per_page=2')
             ->assertOk()
@@ -412,7 +412,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(5)->for($this->team)->create();
+        Task::factory(5)->recycle([$this->user, $this->team])->create();
 
         $page1 = $this->getJson('/api/v1/tasks?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/tasks?per_page=3&page=2');
@@ -436,7 +436,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(2)->for($this->team)->create();
+        Task::factory(2)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/tasks?page=999')
             ->assertOk()
@@ -478,7 +478,7 @@ describe('mass assignment protection', function (): void {
     it('ignores team_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
         $otherTeam = Team::factory()->create();
 
         $this->putJson("/api/v1/tasks/{$task->id}", [
@@ -528,8 +528,8 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted tasks from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
-        $deleted = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $deleted = Task::factory()->recycle([$this->user, $this->team])->create();
         $deleted->delete();
 
         $ids = collect($this->getJson('/api/v1/tasks')->json('data'))->pluck('id');
@@ -540,7 +540,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted task', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->for($this->team)->create();
+        $task = Task::factory()->recycle([$this->user, $this->team])->create();
         $task->delete();
 
         $this->getJson("/api/v1/tasks/{$task->id}")

@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Http;
 
 mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class);
 
+beforeEach(function () {
+    Http::fake([
+        'api.github.com/*' => Http::response(['stargazers_count' => 42], 200),
+    ]);
+});
+
 describe('Home page', function () {
     it('returns a successful response', function () {
         $response = $this->get('/');
@@ -18,16 +24,10 @@ describe('Home page', function () {
     });
 
     it('displays the GitHub stars count', function () {
-        Http::fake([
-            'api.github.com/repos/Relaticle/relaticle' => Http::response([
-                'stargazers_count' => 125,
-            ], 200),
-        ]);
-
         $response = $this->get('/');
 
         $response->assertStatus(200);
-        $response->assertSee('125');
+        $response->assertSee('42');
     });
 });
 

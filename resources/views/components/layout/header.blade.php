@@ -20,10 +20,12 @@
                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
                         Pricing
                     </a>
+                    @feature(App\Features\Documentation::class)
                     <a href="{{ route('documentation.index') }}"
                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
                         Documentation
                     </a>
+                    @endfeature
                     <a href="{{ route('discord') }}" target="_blank"
                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors flex items-center gap-1.5">
                         <x-ri-discord-fill class="w-4 h-4"/>

@@ -38,7 +38,7 @@ trait HasCreator
         return Attribute::make(
             get: fn (): string => $this->creation_source === CreationSource::SYSTEM ?
                 '⊙ System' :
-                $this->creator->name ?? 'Unknown',
+                $this->creator?->name ?? 'Former Member', // @phpstan-ignore nullsafe.neverNull (creator_id can reference a deleted user)
         );
     }
 }

@@ -101,6 +101,13 @@ final class UserFactory extends Factory
         ]);
     }
 
+    public function scheduledForDeletion(int $daysFromNow = 30): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'scheduled_deletion_at' => now()->addDays($daysFromNow),
+        ]);
+    }
+
     public function configure(): Factory
     {
         return $this->sequence(fn (Sequence $sequence): array => [

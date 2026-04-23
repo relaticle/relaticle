@@ -23,10 +23,12 @@
                     </p>
 
                     <div class="mt-8 space-y-4">
+                        @feature(App\Features\Documentation::class)
                         <a href="{{ route('documentation.index') }}" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors">
                             <x-ri-book-open-line class="w-4 h-4"/>
                             Documentation
                         </a>
+                        @endfeature
                         <a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors">
                             <x-ri-discord-fill class="w-4 h-4"/>
                             Join Discord community

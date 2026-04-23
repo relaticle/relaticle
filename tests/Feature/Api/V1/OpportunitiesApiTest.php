@@ -40,7 +40,7 @@ it('can list opportunities', function (): void {
     Sanctum::actingAs($this->user);
 
     $seeded = Opportunity::query()->where('team_id', $this->team->id)->count();
-    Opportunity::factory(3)->for($this->team)->create();
+    Opportunity::factory(3)->recycle([$this->user, $this->team])->create();
 
     $this->getJson('/api/v1/opportunities')
         ->assertOk()
@@ -85,7 +85,7 @@ it('validates required fields on create', function (): void {
 it('can show an opportunity', function (): void {
     Sanctum::actingAs($this->user);
 
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Show Test']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Show Test']);
 
     $this->getJson("/api/v1/opportunities/{$opportunity->id}")
         ->assertOk()
@@ -109,7 +109,7 @@ it('can show an opportunity', function (): void {
 it('can update an opportunity', function (): void {
     Sanctum::actingAs($this->user);
 
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $this->putJson("/api/v1/opportunities/{$opportunity->id}", ['name' => 'Updated Name'])
         ->assertOk()
@@ -130,7 +130,7 @@ it('can update an opportunity', function (): void {
 it('can delete an opportunity', function (): void {
     Sanctum::actingAs($this->user);
 
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $this->deleteJson("/api/v1/opportunities/{$opportunity->id}")
         ->assertNoContent();
@@ -143,7 +143,7 @@ it('scopes opportunities to current team', function (): void {
 
     Sanctum::actingAs($this->user);
 
-    $ownOpportunity = Opportunity::factory()->for($this->team)->create();
+    $ownOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/opportunities');
 
@@ -222,7 +222,7 @@ describe('includes', function (): void {
     it('can include creator on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=creator")
             ->assertOk()
@@ -244,7 +244,7 @@ describe('includes', function (): void {
     it('can include creator on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory()->for($this->team)->create();
+        Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/opportunities?include=creator')
             ->assertOk()
@@ -258,8 +258,8 @@ describe('includes', function (): void {
     it('can include company on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $opportunity = Opportunity::factory()->for($this->team)->create(['company_id' => $company->id]);
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
 
         $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=company")
             ->assertOk()
@@ -281,8 +281,8 @@ describe('includes', function (): void {
     it('can include contact on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $person = People::factory()->for($this->team)->create();
-        $opportunity = Opportunity::factory()->for($this->team)->create(['contact_id' => $person->id]);
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['contact_id' => $person->id]);
 
         $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=contact")
             ->assertOk()
@@ -304,8 +304,8 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $opportunity = Opportunity::factory()->for($this->team)->create(['company_id' => $company->id]);
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
 
         $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=creator,company")
             ->assertOk()
@@ -319,7 +319,7 @@ describe('includes', function (): void {
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/opportunities/{$opportunity->id}")
             ->assertOk();
@@ -330,7 +330,7 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson('/api/v1/opportunities?include=tasksCount');
 
@@ -353,8 +353,8 @@ describe('filtering and sorting', function (): void {
     it('can filter opportunities by name', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory()->for($this->team)->create(['name' => 'Enterprise Deal']);
-        Opportunity::factory()->for($this->team)->create(['name' => 'Small Contract']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Enterprise Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Small Contract']);
 
         $response = $this->getJson('/api/v1/opportunities?filter[name]=Enterprise');
 
@@ -368,9 +368,9 @@ describe('filtering and sorting', function (): void {
     it('can filter opportunities by company_id', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $matched = Opportunity::factory()->for($this->team)->create(['company_id' => $company->id]);
-        $unmatched = Opportunity::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $matched = Opportunity::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
+        $unmatched = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/opportunities?filter[company_id]={$company->id}");
 
@@ -384,8 +384,8 @@ describe('filtering and sorting', function (): void {
     it('can sort opportunities by name ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory()->for($this->team)->create(['name' => 'Zulu Deal']);
-        Opportunity::factory()->for($this->team)->create(['name' => 'Alpha Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Deal']);
 
         $response = $this->getJson('/api/v1/opportunities?sort=name');
 
@@ -400,8 +400,8 @@ describe('filtering and sorting', function (): void {
     it('can sort opportunities by name descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory()->for($this->team)->create(['name' => 'Alpha Deal']);
-        Opportunity::factory()->for($this->team)->create(['name' => 'Zulu Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Deal']);
 
         $response = $this->getJson('/api/v1/opportunities?sort=-name');
 
@@ -432,7 +432,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory(5)->for($this->team)->create();
+        Opportunity::factory(5)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/opportunities?per_page=2')
             ->assertOk()
@@ -442,7 +442,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory(5)->for($this->team)->create();
+        Opportunity::factory(5)->recycle([$this->user, $this->team])->create();
 
         $page1 = $this->getJson('/api/v1/opportunities?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/opportunities?per_page=3&page=2');
@@ -466,7 +466,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Opportunity::factory(2)->for($this->team)->create();
+        Opportunity::factory(2)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/opportunities?page=999')
             ->assertOk()
@@ -508,7 +508,7 @@ describe('mass assignment protection', function (): void {
     it('ignores team_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
         $otherTeam = Team::factory()->create();
 
         $this->putJson("/api/v1/opportunities/{$opportunity->id}", [
@@ -578,7 +578,7 @@ describe('input validation', function (): void {
             'validation_rules' => [],
         ]);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $this->putJson("/api/v1/opportunities/{$opportunity->id}", [
             'name' => $opportunity->name,
@@ -613,7 +613,7 @@ describe('input validation', function (): void {
             'validation_rules' => [],
         ]);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
         $this->putJson("/api/v1/opportunities/{$opportunity->id}", [
             'name' => $opportunity->name,
@@ -628,8 +628,8 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted opportunities from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
-        $deleted = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+        $deleted = Opportunity::factory()->recycle([$this->user, $this->team])->create();
         $deleted->delete();
 
         $ids = collect($this->getJson('/api/v1/opportunities')->json('data'))->pluck('id');
@@ -640,7 +640,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted opportunity', function (): void {
         Sanctum::actingAs($this->user);
 
-        $opportunity = Opportunity::factory()->for($this->team)->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
         $opportunity->delete();
 
         $this->getJson("/api/v1/opportunities/{$opportunity->id}")
@@ -660,9 +660,9 @@ describe('non-existent record', function (): void {
 it('includes company_id and contact_id in attributes', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->for($this->team)->create();
-    $person = People::factory()->for($this->team)->create();
-    $opportunity = Opportunity::factory()->for($this->team)->create([
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create([
         'company_id' => $company->id,
         'contact_id' => $person->id,
     ]);
