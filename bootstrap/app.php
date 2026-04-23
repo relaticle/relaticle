@@ -80,6 +80,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('queue:prune-batches --hours=24')->daily();
         $schedule->command('invitations:cleanup')->daily();
         $schedule->command('activitylog:clean')->daily();
+        $schedule->command('app:purge-scheduled-deletions')->daily()->withoutOverlapping()->onOneServer();
 
         // TODO::Separate it in different command class
         $schedule->call(function (): void {

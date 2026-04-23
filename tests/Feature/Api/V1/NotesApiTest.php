@@ -39,7 +39,7 @@ it('can list notes', function (): void {
     Sanctum::actingAs($this->user);
 
     $seeded = Note::query()->where('team_id', $this->team->id)->count();
-    Note::factory(3)->for($this->team)->create();
+    Note::factory(3)->recycle([$this->user, $this->team])->create();
 
     $this->getJson('/api/v1/notes')
         ->assertOk()
@@ -84,7 +84,7 @@ it('validates required fields on create', function (): void {
 it('can show a note', function (): void {
     Sanctum::actingAs($this->user);
 
-    $note = Note::factory()->for($this->team)->create(['title' => 'Show Test']);
+    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Show Test']);
 
     $this->getJson("/api/v1/notes/{$note->id}")
         ->assertOk()
@@ -108,7 +108,7 @@ it('can show a note', function (): void {
 it('can update a note', function (): void {
     Sanctum::actingAs($this->user);
 
-    $note = Note::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
 
     $this->putJson("/api/v1/notes/{$note->id}", ['title' => 'Updated Title'])
         ->assertOk()
@@ -129,7 +129,7 @@ it('can update a note', function (): void {
 it('can delete a note', function (): void {
     Sanctum::actingAs($this->user);
 
-    $note = Note::factory()->for($this->team)->create();
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
 
     $this->deleteJson("/api/v1/notes/{$note->id}")
         ->assertNoContent();
@@ -142,7 +142,7 @@ it('scopes notes to current team', function (): void {
 
     Sanctum::actingAs($this->user);
 
-    $ownNote = Note::factory()->for($this->team)->create();
+    $ownNote = Note::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/notes');
 
@@ -189,7 +189,7 @@ describe('includes', function (): void {
     it('can include creator on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson("/api/v1/notes/{$note->id}?include=creator")
             ->assertOk()
@@ -211,7 +211,7 @@ describe('includes', function (): void {
     it('can include creator on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory()->for($this->team)->create();
+        Note::factory()->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/notes?include=creator')
             ->assertOk()
@@ -225,8 +225,8 @@ describe('includes', function (): void {
     it('can include companies on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $note = Note::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
         $note->companies()->attach($company);
 
         $this->getJson("/api/v1/notes/{$note->id}?include=companies")
@@ -241,8 +241,8 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->for($this->team)->create();
-        $note = Note::factory()->for($this->team)->create();
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
         $note->companies()->attach($company);
 
         $this->getJson("/api/v1/notes/{$note->id}?include=creator,companies")
@@ -257,7 +257,7 @@ describe('includes', function (): void {
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson("/api/v1/notes/{$note->id}")
             ->assertOk();
@@ -268,7 +268,7 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
 
         $response = $this->getJson('/api/v1/notes?include=companiesCount');
 
@@ -291,8 +291,8 @@ describe('filtering and sorting', function (): void {
     it('can filter notes by title', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory()->for($this->team)->create(['title' => 'Meeting summary']);
-        Note::factory()->for($this->team)->create(['title' => 'Code review']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Meeting summary']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Code review']);
 
         $response = $this->getJson('/api/v1/notes?filter[title]=Meeting');
 
@@ -306,8 +306,8 @@ describe('filtering and sorting', function (): void {
     it('can sort notes by title ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory()->for($this->team)->create(['title' => 'Zulu Note']);
-        Note::factory()->for($this->team)->create(['title' => 'Alpha Note']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Note']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Note']);
 
         $response = $this->getJson('/api/v1/notes?sort=title');
 
@@ -322,8 +322,8 @@ describe('filtering and sorting', function (): void {
     it('can sort notes by title descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory()->for($this->team)->create(['title' => 'Alpha Note']);
-        Note::factory()->for($this->team)->create(['title' => 'Zulu Note']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Note']);
+        Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Note']);
 
         $response = $this->getJson('/api/v1/notes?sort=-title');
 
@@ -354,7 +354,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory(5)->for($this->team)->create();
+        Note::factory(5)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/notes?per_page=2')
             ->assertOk()
@@ -364,7 +364,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory(5)->for($this->team)->create();
+        Note::factory(5)->recycle([$this->user, $this->team])->create();
 
         $page1 = $this->getJson('/api/v1/notes?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/notes?per_page=3&page=2');
@@ -388,7 +388,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Note::factory(2)->for($this->team)->create();
+        Note::factory(2)->recycle([$this->user, $this->team])->create();
 
         $this->getJson('/api/v1/notes?page=999')
             ->assertOk()
@@ -430,7 +430,7 @@ describe('mass assignment protection', function (): void {
     it('ignores team_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
         $otherTeam = Team::factory()->create();
 
         $this->putJson("/api/v1/notes/{$note->id}", [
@@ -480,8 +480,8 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted notes from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
-        $deleted = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
+        $deleted = Note::factory()->recycle([$this->user, $this->team])->create();
         $deleted->delete();
 
         $ids = collect($this->getJson('/api/v1/notes')->json('data'))->pluck('id');
@@ -492,7 +492,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted note', function (): void {
         Sanctum::actingAs($this->user);
 
-        $note = Note::factory()->for($this->team)->create();
+        $note = Note::factory()->recycle([$this->user, $this->team])->create();
         $note->delete();
 
         $this->getJson("/api/v1/notes/{$note->id}")
@@ -512,9 +512,9 @@ describe('non-existent record', function (): void {
 it('can create a note with relationship ids', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->for($this->team)->create();
-    $person = People::factory()->for($this->team)->create();
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $this->postJson('/api/v1/notes', [
         'title' => 'Linked note',

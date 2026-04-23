@@ -2,37 +2,42 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Livewire\App\Teams\DeleteTeam;
 use App\Models\User;
-use Laravel\Jetstream\Http\Livewire\DeleteTeamForm;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
-mutates(Team::class);
+mutates(DeleteTeam::class);
 
-test('teams can be deleted', function () {
+test('team owner can schedule team deletion', function () {
+    Notification::fake();
+
     $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
 
-    $user->ownedTeams()->save($team = Team::factory()->make([
-        'personal_team' => false,
-    ]));
+    Livewire::test(DeleteTeam::class, ['team' => $team])
+        ->call('deleteTeam', $team);
 
-    $team->users()->attach(
-        $otherUser = User::factory()->create(), ['role' => 'test-role']
-    );
-
-    Livewire::test(DeleteTeamForm::class, ['team' => $team->fresh()])
-        ->call('deleteTeam');
-
-    expect($team->fresh())->toBeNull();
-    expect($otherUser->fresh()->teams)->toHaveCount(0);
+    expect($team->refresh()->scheduled_deletion_at)->not->toBeNull();
 });
 
-test('personal teams cant be deleted', function () {
+test('team owner can cancel scheduled team deletion', function () {
+    Notification::fake();
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
+    $team->update(['scheduled_deletion_at' => now()->addDays(30)]);
+
+    Livewire::test(DeleteTeam::class, ['team' => $team])
+        ->call('cancelTeamDeletion', $team);
+
+    expect($team->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('personal teams cant be scheduled for deletion', function () {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
-    Livewire::test(DeleteTeamForm::class, ['team' => $user->personalTeam()])
-        ->call('deleteTeam')
+    Livewire::test(DeleteTeam::class, ['team' => $user->personalTeam()])
+        ->call('deleteTeam', $user->personalTeam())
         ->assertHasErrors(['team']);
-
-    expect($user->personalTeam()->fresh())->not->toBeNull();
 });

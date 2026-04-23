@@ -39,7 +39,7 @@ Visit `http://localhost:8000` to access the application.
 ```
 Team ─┬─ User (via Membership)
       ├─ Company ─┬─ People
-      │           └─ Opportunity ─── Contact (People)
+      │           └─ Opportunity ─── People
       ├─ Task (many-to-many with Company, People, Opportunity)
       └─ Note (many-to-many with Company, People, Opportunity)
 ```

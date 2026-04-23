@@ -25,7 +25,7 @@ afterEach(function () {
 });
 
 it('can get an opportunity by ID', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Big Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Big Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetOpportunityTool::class, ['id' => $opportunity->id])
@@ -34,7 +34,7 @@ it('can get an opportunity by ID', function (): void {
 });
 
 it('can update an opportunity via MCP tool', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Old Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateOpportunityTool::class, [
@@ -48,7 +48,7 @@ it('can update an opportunity via MCP tool', function (): void {
 });
 
 it('can delete an opportunity via MCP tool', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Closing Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Closing Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteOpportunityTool::class, [
@@ -61,11 +61,11 @@ it('can delete an opportunity via MCP tool', function (): void {
 });
 
 it('can filter opportunities by contact_id', function (): void {
-    $person = People::factory()->for($this->team)->create();
-    $matchingOpp = Opportunity::factory()->for($this->team)->create([
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $matchingOpp = Opportunity::factory()->recycle([$this->user, $this->team])->create([
         'contact_id' => $person->id,
     ]);
-    $otherOpp = Opportunity::factory()->for($this->team)->create();
+    $otherOpp = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
@@ -86,7 +86,7 @@ describe('team scoping', function () {
             'team_id' => Team::factory()->create()->id,
             'name' => 'Other Team Deal',
         ]));
-        $ownOpportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Own Team Deal']);
+        $ownOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Deal']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListOpportunitiesTool::class)

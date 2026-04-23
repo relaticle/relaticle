@@ -1,3 +1,4 @@
+@feature(App\Features\SocialAuth::class)
 <div class="space-y-3">
     <x-filament::button
         :href="route('auth.socialite.redirect', 'google')"
@@ -44,3 +45,4 @@
     </div>
 
 </div>
+@endfeature

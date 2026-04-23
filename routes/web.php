@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
+use Laravel\Pennant\Feature;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
@@ -27,12 +29,14 @@ use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 */
 
 Route::middleware('guest')->group(function () {
-    Route::get('/auth/redirect/{provider}', RedirectController::class)
-        ->name('auth.socialite.redirect')
-        ->middleware('throttle:10,1');
-    Route::get('/auth/callback/{provider}', CallbackController::class)
-        ->name('auth.socialite.callback')
-        ->middleware('throttle:10,1');
+    if (Feature::active(SocialAuth::class)) {
+        Route::get('/auth/redirect/{provider}', RedirectController::class)
+            ->name('auth.socialite.redirect')
+            ->middleware('throttle:10,1');
+        Route::get('/auth/callback/{provider}', CallbackController::class)
+            ->name('auth.socialite.callback')
+            ->middleware('throttle:10,1');
+    }
 
     Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 

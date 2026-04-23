@@ -41,10 +41,10 @@ it('displays tasks in the correct board columns', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $done = $this->statusField->options->firstWhere('name', 'Done');
 
-    $todoTask = Task::factory()->for($this->team)->create();
+    $todoTask = Task::factory()->recycle([$this->user, $this->team])->create();
     $todoTask->saveCustomFieldValue($this->statusField, $todo->getKey());
 
-    $doneTask = Task::factory()->for($this->team)->create();
+    $doneTask = Task::factory()->recycle([$this->user, $this->team])->create();
     $doneTask->saveCustomFieldValue($this->statusField, $done->getKey());
 
     $board = getTaskBoard();
@@ -71,7 +71,7 @@ it('moves a card between columns via moveCard', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
 
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
     $task->saveCustomFieldValue($this->statusField, $todo->getKey());
 
     livewire(TasksBoard::class)

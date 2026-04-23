@@ -7,7 +7,7 @@
 <h1 align="center">The Open-Source CRM Built for AI Agents</h1>
 
 <p align="center">
-  <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/tests.yml?branch=main&style=for-the-badge&label=tests" alt="Tests"></a>
+  <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/deploy.yml?style=for-the-badge&label=tests" alt="Tests"></a>
   <a href="https://relaticle.com/docs/mcp"><img src="https://img.shields.io/badge/MCP_Tools-30-8A2BE2?style=for-the-badge" alt="30 MCP Tools"></a>
   <a href="https://laravel.com/docs/12.x"><img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel" alt="Laravel 12"></a>
   <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.4-777BB4?style=for-the-badge&logo=php" alt="PHP 8.4"></a>
@@ -43,15 +43,6 @@ Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any A
 - **Multi-Team Isolation** - 5-layer authorization with team-scoped data and workspaces
 - **Modern Tech Stack** - Laravel 12, Filament 5, PHP 8.4, 1,100+ automated tests
 - **Privacy-First** - Self-hosted, AGPL-3.0, your data stays on your server
-
-**vs Other CRMs:**
-
-| | Self-Hosted | Open Source | MCP Tools | Custom Fields | Per-Seat Pricing |
-|---|---|---|---|---|---|
-| **Relaticle** | Yes | AGPL-3.0 | 30 | 22 types | No |
-| **HubSpot** | No | No | 9 | Limited | Yes |
-| **Salesforce** | No | No | 0 | Yes (complex) | Yes |
-| **Attio** | No | No | 0 | Yes | Yes |
 
 # Requirements
 

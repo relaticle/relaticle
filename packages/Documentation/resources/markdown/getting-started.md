@@ -93,10 +93,14 @@ Every entity supports custom fields for tracking data specific to your business.
 3. Choose the entity type (Companies, People, etc.)
 4. Add, edit, or reorder fields
 
-**Field types available:**
-- Text, Number, Date, Email, URL
-- Select (dropdown), Multi-select
-- Boolean (yes/no)
+**22 field types available**, including:
+- Text, Textarea, Number, Date, Date & Time
+- Email, Phone, Link, Color Picker
+- Select, Multi-select, Radio, Checkbox, Checkbox List
+- Toggle, Toggle Buttons, Tags Input
+- Currency, Rich Editor, Markdown Editor
+- File Upload
+- Record (link to another entity)
 
 ---
 

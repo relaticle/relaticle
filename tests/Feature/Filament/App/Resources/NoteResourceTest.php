@@ -45,7 +45,7 @@ it('shows `:dataset` column', function (string $column): void {
 })->with(['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Note::factory(3)->for($this->team)->create();
+    $records = Note::factory(3)->recycle([$this->user, $this->team])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -59,7 +59,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Note::factory(3)->for($this->team)->create();
+    $records = Note::factory(3)->recycle([$this->user, $this->team])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ManageNotes::class)
@@ -69,8 +69,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['title', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Note::factory()->count(4)->for($this->team)->create();
-    $trashedRecords = Note::factory()->trashed()->count(6)->for($this->team)->create();
+    $records = Note::factory()->count(4)->recycle([$this->user, $this->team])->create();
+    $trashedRecords = Note::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -79,7 +79,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Note::factory(20)->for($this->team)->create();
+    $records = Note::factory(20)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -88,7 +88,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Note::factory(5)->for($this->team)->create();
+    $records = Note::factory(5)->recycle([$this->user, $this->team])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -116,7 +116,7 @@ it('can create a note', function (): void {
 });
 
 it('can edit a note', function (): void {
-    $record = Note::factory()->for($this->team)->create();
+    $record = Note::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ManageNotes::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -128,7 +128,7 @@ it('can edit a note', function (): void {
 });
 
 it('can delete a note', function (): void {
-    $record = Note::factory()->for($this->team)->create();
+    $record = Note::factory()->recycle([$this->user, $this->team])->create();
 
     livewire(ManageNotes::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -163,7 +163,7 @@ it('sets creator_id and team_id via observer when creating a note', function ():
 });
 
 it('authorizes team member to view and update own team note', function (): void {
-    $record = Note::factory()->for($this->team)->create();
+    $record = Note::factory()->recycle([$this->user, $this->team])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()

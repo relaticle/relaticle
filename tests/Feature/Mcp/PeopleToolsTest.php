@@ -24,7 +24,7 @@ afterEach(function () {
 });
 
 it('can get a person by ID', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane Doe']);
+    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Jane Doe']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetPeopleTool::class, ['id' => $person->id])
@@ -33,7 +33,7 @@ it('can get a person by ID', function (): void {
 });
 
 it('can update a person via MCP tool', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Old Name']);
+    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Name']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdatePeopleTool::class, [
@@ -47,7 +47,7 @@ it('can update a person via MCP tool', function (): void {
 });
 
 it('can delete a person via MCP tool', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane Doe']);
+    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Jane Doe']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeletePeopleTool::class, [
@@ -68,7 +68,7 @@ describe('team scoping', function () {
         $otherPerson = People::withoutEvents(fn () => People::factory()->for(Team::factory())->create([
             'name' => 'Other Team Person',
         ]));
-        $ownPerson = People::factory()->for($this->team)->create(['name' => 'Own Team Person']);
+        $ownPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Person']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListPeopleTool::class)

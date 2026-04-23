@@ -115,6 +115,16 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
+### Feature Flags
+
+Toggle features on or off. All are enabled by default. Useful for forks and custom deployments that want to disable specific functionality without modifying code.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
+| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/docs` documentation module. Set to `false` to remove documentation routes and navigation links. |
+
 ---
 
 ## Architecture

@@ -41,10 +41,10 @@ it('displays opportunities in the correct board columns', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
     $closedWon = $this->stageField->options->firstWhere('name', 'Closed Won');
 
-    $prospectingOpportunity = Opportunity::factory()->for($this->team)->create();
+    $prospectingOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
     $prospectingOpportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
 
-    $closedWonOpportunity = Opportunity::factory()->for($this->team)->create();
+    $closedWonOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
     $closedWonOpportunity->saveCustomFieldValue($this->stageField, $closedWon->getKey());
 
     $board = getOpportunityBoard();
@@ -71,7 +71,7 @@ it('moves a card between columns via moveCard', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
     $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
 
-    $opportunity = Opportunity::factory()->for($this->team)->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
     $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
 
     livewire(OpportunitiesBoard::class)

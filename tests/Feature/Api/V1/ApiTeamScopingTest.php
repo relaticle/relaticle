@@ -20,7 +20,7 @@ beforeEach(function () {
 it('uses current team by default', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/companies');
 
@@ -38,7 +38,7 @@ it('can switch team via X-Team-Id header', function (): void {
 
     Sanctum::actingAs($this->user);
 
-    Company::factory()->for($this->team)->create();
+    Company::factory()->recycle([$this->user, $this->team])->create();
 
     $response = $this->getJson('/api/v1/companies', ['X-Team-Id' => $otherTeam->id]);
 
@@ -85,7 +85,7 @@ describe('token-based team scoping', function (): void {
         $this->user->teams()->attach($otherTeam);
 
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => $otherTeam->id]));
-        Company::factory()->for($this->team)->create();
+        Company::factory()->recycle([$this->user, $this->team])->create();
 
         $raw = Str::random(40);
         $token = $this->user->tokens()->create([
@@ -111,7 +111,7 @@ describe('token-based team scoping', function (): void {
         $this->user->teams()->attach($otherTeam);
 
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => $otherTeam->id]));
-        Company::factory()->for($this->team)->create();
+        Company::factory()->recycle([$this->user, $this->team])->create();
 
         $raw = Str::random(40);
         $token = $this->user->tokens()->create([

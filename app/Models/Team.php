@@ -7,9 +7,12 @@ namespace App\Models;
 use App\Services\AvatarService;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
@@ -23,6 +26,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property string $name
  * @property string $slug
  * @property EmailPrivacyTier|null $default_email_sharing_tier
+ * @property Carbon|null $scheduled_deletion_at
  */
 final class Team extends JetstreamTeam implements HasAvatar
 {
@@ -59,7 +63,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // App routes
         'companies', 'people', 'tasks', 'opportunities', 'notes',
-        'api-tokens', 'import-history', 'profile',
+        'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
         'opportunities-board', 'tasks-board',
 
         // Content & info pages
@@ -127,6 +131,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         return [
             'personal_team' => 'boolean',
             'default_email_sharing_tier' => EmailPrivacyTier::class,
+            'scheduled_deletion_at' => 'datetime',
         ];
     }
 
@@ -166,6 +171,32 @@ final class Team extends JetstreamTeam implements HasAvatar
     public function isPersonalTeam(): bool
     {
         return $this->personal_team;
+    }
+
+    public function isScheduledForDeletion(): bool
+    {
+        return $this->scheduled_deletion_at !== null;
+    }
+
+    /**
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    #[Scope]
+    protected function scheduledForDeletion(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    #[Scope]
+    protected function expiredDeletion(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at')
+            ->where('scheduled_deletion_at', '<=', now());
     }
 
     public function getFilamentAvatarUrl(): string

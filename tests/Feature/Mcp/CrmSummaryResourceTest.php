@@ -17,9 +17,9 @@ beforeEach(function (): void {
 });
 
 it('returns CRM summary with record counts', function (): void {
-    Company::factory()->for($this->team)->count(3)->create();
-    People::factory()->for($this->team)->count(5)->create();
-    Opportunity::factory()->for($this->team)->count(2)->create();
+    Company::factory()->recycle([$this->user, $this->team])->count(3)->create();
+    People::factory()->recycle([$this->user, $this->team])->count(5)->create();
+    Opportunity::factory()->recycle([$this->user, $this->team])->count(2)->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->resource(CrmSummaryResource::class);
@@ -33,7 +33,7 @@ it('returns CRM summary with record counts', function (): void {
 });
 
 it('includes opportunity pipeline breakdown', function (): void {
-    $opp = Opportunity::factory()->for($this->team)->create();
+    $opp = Opportunity::factory()->recycle([$this->user, $this->team])->create();
 
     $stageField = CustomField::query()
         ->withoutGlobalScopes()
@@ -55,7 +55,7 @@ it('includes opportunity pipeline breakdown', function (): void {
 });
 
 it('includes task overdue and due this week counts', function (): void {
-    Task::factory()->for($this->team)->create();
+    Task::factory()->recycle([$this->user, $this->team])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->resource(CrmSummaryResource::class);
