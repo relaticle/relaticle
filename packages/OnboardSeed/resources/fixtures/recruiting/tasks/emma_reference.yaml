@@ -1,0 +1,8 @@
+title: Check references for Emma
+assigned_people:
+  - emma
+custom_fields:
+  description: Contact Emma Thompson's references from her previous engineering management roles. Focus on her leadership style, team growth track record, and technical decision-making.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

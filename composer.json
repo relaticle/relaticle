@@ -130,6 +130,7 @@
         "test:pest": "pest --parallel --exclude-testsuite=Browser",
         "test:pest:shard": "pest --parallel --shard=${SHARD} --exclude-testsuite=Browser",
         "test:pest:ci": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:update-shards": "pest --parallel --update-shards --exclude-testsuite=Browser",
         "test:browser": "pest tests/Browser/",
         "test": [
             "@test:lint",

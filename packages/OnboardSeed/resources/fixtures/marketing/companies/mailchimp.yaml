@@ -1,0 +1,5 @@
+name: Mailchimp
+custom_fields:
+  domains: https://mailchimp.com
+  icp: true
+  linkedin: https://www.linkedin.com/company/mailchimp

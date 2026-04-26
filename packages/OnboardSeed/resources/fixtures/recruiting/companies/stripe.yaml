@@ -1,0 +1,5 @@
+name: Stripe
+custom_fields:
+  domains: https://stripe.com
+  icp: true
+  linkedin: https://www.linkedin.com/company/stripe

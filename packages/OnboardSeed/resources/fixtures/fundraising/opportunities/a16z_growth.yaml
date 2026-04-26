@@ -1,0 +1,6 @@
+name: a16z Growth Investment
+company: a16z
+custom_fields:
+  amount: 15000000
+  close_date: '{{ +3m }}'
+  stage: Proposal

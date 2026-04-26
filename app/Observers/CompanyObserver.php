@@ -7,9 +7,17 @@ namespace App\Observers;
 use App\Enums\CustomFields\CompanyField;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
+use App\Observers\Concerns\TagsFirstCrmData;
 
 final readonly class CompanyObserver
 {
+    use TagsFirstCrmData;
+
+    public function created(Company $company): void
+    {
+        $this->tagFirstCrmDataIfNeeded($company);
+    }
+
     public function saved(Company $company): void
     {
         $company->invalidateAiSummary();

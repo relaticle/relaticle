@@ -1,0 +1,6 @@
+name: Clearbit Data Integration Campaign
+company: clearbit
+custom_fields:
+  amount: 12000
+  close_date: '{{ +3w }}'
+  stage: Qualification

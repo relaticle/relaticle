@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\OnboardingUseCase;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -19,7 +20,7 @@ test('teams can be created', function () {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
     Livewire::test(CreateTeamForm::class)
-        ->set(['state' => ['name' => 'Test Team', 'slug' => 'test-team']])
+        ->set(['state' => ['name' => 'Test Team', 'slug' => 'test-team', 'onboarding_use_case' => OnboardingUseCase::Other->value]])
         ->call('createTeam');
 
     expect($user->fresh()->ownedTeams)->toHaveCount(2);
@@ -44,7 +45,7 @@ test('non-personal teams do not get demo data seeded', function (): void {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
 
     Livewire::test(CreateTeamForm::class)
-        ->set(['state' => ['name' => 'Work Team', 'slug' => 'work-team']])
+        ->set(['state' => ['name' => 'Work Team', 'slug' => 'work-team', 'onboarding_use_case' => OnboardingUseCase::Other->value]])
         ->call('createTeam');
 
     $workTeam = $user->fresh()->ownedTeams()->where('name', 'Work Team')->first();

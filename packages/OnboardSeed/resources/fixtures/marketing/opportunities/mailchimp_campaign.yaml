@@ -1,0 +1,6 @@
+name: Mailchimp Email Series Launch
+company: mailchimp
+custom_fields:
+  amount: 8000
+  close_date: '{{ +2w }}'
+  stage: Needs Analysis

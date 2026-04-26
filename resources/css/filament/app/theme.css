@@ -410,6 +410,98 @@
     @apply rounded-xl;
 }
 
+/* Onboarding Wizard - Attio-style split-screen layout overrides */
+.fi-body.fi-onboarding-wizard {
+    @apply bg-white dark:bg-gray-950;
+}
+
+.fi-onboarding-wizard .fi-simple-layout {
+    min-height: 100vh;
+}
+
+.fi-onboarding-wizard .fi-simple-main-ctn {
+    flex: 1;
+    align-items: stretch;
+}
+
+.fi-onboarding-wizard .fi-simple-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    background: transparent;
+    box-shadow: none;
+    --tw-ring-shadow: none;
+    --tw-ring-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    max-width: none;
+    width: 100%;
+}
+
+.fi-onboarding-wizard .fi-simple-header,
+.fi-onboarding-wizard .fi-simple-layout-header {
+    display: none;
+}
+
+.fi-onboarding-wizard .fi-sc:has(.fi-sc-wizard),
+.fi-onboarding-wizard .fi-grid-col:has(.fi-sc-wizard),
+.fi-onboarding-wizard .fi-sc-component:has(.fi-sc-wizard),
+.fi-onboarding-wizard form:has(.fi-sc-wizard) {
+    display: contents;
+}
+
+/* Onboarding Wizard - full-width footer buttons */
+.fi-simple-page .fi-sc-wizard:not(.fi-contained) .fi-sc-wizard-footer {
+    @apply flex-col-reverse gap-3 mt-8;
+
+    > div {
+        @apply w-full;
+
+        .fi-btn {
+            @apply w-full justify-center;
+        }
+    }
+}
+
+/* Onboarding Wizard - force table repeater inline at narrow widths */
+.fi-onboarding-wizard .fi-fo-table-repeater {
+    & > table {
+        @apply table;
+
+        & > thead {
+            @apply table-header-group;
+        }
+
+        & > tbody {
+            @apply table-row-group;
+
+            & > tr {
+                @apply table-row p-0;
+
+                & > td {
+                    @apply table-cell px-3 py-2;
+
+                    &.fi-hidden {
+                        @apply table-cell;
+                    }
+
+                    & .fi-fo-field {
+                        @apply gap-y-0;
+                    }
+
+                    & .fi-fo-field-label-content {
+                        @apply hidden;
+                    }
+                }
+            }
+        }
+
+        & .fi-fo-table-repeater-actions {
+            @apply px-3 py-2;
+        }
+    }
+}
+
 /* FlowForge Specific Customizations */
 .flowforge-column-header {
     @apply bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl;

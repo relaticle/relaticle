@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
 use App\Services\AvatarService;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
@@ -24,6 +26,11 @@ use Spatie\Sluggable\SlugOptions;
 /**
  * @property string $name
  * @property string $slug
+ * @property ?string $invite_link_token
+ * @property ?Carbon $invite_link_token_expires_at
+ * @property ?OnboardingUseCase $onboarding_use_case
+ * @property ?array<string, string> $onboarding_context
+ * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property Carbon|null $scheduled_deletion_at
  */
 final class Team extends JetstreamTeam implements HasAvatar
@@ -57,7 +64,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Teams & orgs
         'teams', 'team', 'org', 'organization', 'workspace', 'invitations', 'invite',
-        'team-invitations',
+        'team-invitations', 'join',
 
         // App routes
         'companies', 'people', 'tasks', 'opportunities', 'notes',
@@ -94,6 +101,11 @@ final class Team extends JetstreamTeam implements HasAvatar
     ];
 
     /**
+     * How many days an invite-link token stays valid after creation/rotation.
+     */
+    public const int INVITE_LINK_TTL_DAYS = 7;
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -102,6 +114,14 @@ final class Team extends JetstreamTeam implements HasAvatar
         'name',
         'slug',
         'personal_team',
+        'onboarding_use_case',
+        'onboarding_context',
+        'onboarding_referral_source',
+    ];
+
+    /** @var list<string> */
+    protected $hidden = [
+        'invite_link_token',
     ];
 
     /**
@@ -124,8 +144,39 @@ final class Team extends JetstreamTeam implements HasAvatar
     {
         return [
             'personal_team' => 'boolean',
+            'onboarding_use_case' => OnboardingUseCase::class,
+            'onboarding_context' => 'array',
+            'onboarding_referral_source' => OnboardingReferralSource::class,
+            'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        self::creating(function (Team $team): void {
+            if ($team->invite_link_token === null) {
+                $team->invite_link_token = Str::random(40);
+                $team->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
+            }
+        });
+    }
+
+    public function rotateInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => Str::random(40),
+            'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
+        ])->save();
+    }
+
+    public function isInviteLinkTokenExpired(): bool
+    {
+        if ($this->invite_link_token_expires_at === null) {
+            return true;
+        }
+
+        return $this->invite_link_token_expires_at->isPast();
     }
 
     public function getSlugOptions(): SlugOptions

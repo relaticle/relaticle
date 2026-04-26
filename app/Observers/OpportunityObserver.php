@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Models\Opportunity;
+use App\Observers\Concerns\TagsFirstCrmData;
 
 final readonly class OpportunityObserver
 {
-    /**
-     * Handle the Opportunity "saved" event.
-     * Invalidate AI summary when opportunity data changes.
-     */
+    use TagsFirstCrmData;
+
+    public function created(Opportunity $opportunity): void
+    {
+        $this->tagFirstCrmDataIfNeeded($opportunity);
+    }
+
     public function saved(Opportunity $opportunity): void
     {
         $opportunity->invalidateAiSummary();

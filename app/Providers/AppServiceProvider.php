@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Http\Responses\LoginResponse;
+use App\Listeners\Email\NewSubscriberListener;
+use App\Listeners\Email\RecordLoginTimestampListener;
+use App\Listeners\Email\TeamCreatedTagListener;
+use App\Listeners\Email\TeamMemberAddedListener;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -21,17 +25,22 @@ use App\Models\User;
 use App\Services\GitHubService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
+use Laravel\Jetstream\Events\TeamCreated;
+use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -52,6 +61,11 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(Login::class, RecordLoginTimestampListener::class);
+        Event::listen(Verified::class, NewSubscriberListener::class);
+        Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
+        Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         $this->configurePolicies();
@@ -231,8 +245,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureGitHubStars(): void
     {
-        // Share GitHub stars count with the header component
-        Facades\View::composer('components.layout.header', function (View $view): void {
+        Facades\View::composer(['components.layout.header', 'home.partials.hero'], function (View $view): void {
             $gitHubService = resolve(GitHubService::class);
             $starsCount = $gitHubService->getStarsCount();
             $formattedStarsCount = $gitHubService->getFormattedStarsCount();
