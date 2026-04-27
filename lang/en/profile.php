@@ -70,6 +70,9 @@ return [
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',
         ],
+        'delete_account_blocked' => [
+            'title' => 'Account deletion blocked',
+        ],
     ],
 
     'modals' => [
