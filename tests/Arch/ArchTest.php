@@ -14,6 +14,7 @@ use App\Mcp\Tools\BaseListTool;
 use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\PersonalAccessToken;
+use App\Rules\ArrayExistsForTeam;
 
 arch()->preset()->php();
 
@@ -98,6 +99,7 @@ arch('avoid mutation')
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
         'App\Scribe',
+        ArrayExistsForTeam::class,
     ]);
 
 arch('avoid inheritance')
