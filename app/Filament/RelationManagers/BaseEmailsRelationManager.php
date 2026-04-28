@@ -106,10 +106,17 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         $sharingService->setTierForAllOnRecord($record, $owner, $data['privacy_tier']);
 
                         foreach ($data['shares'] ?? [] as $share) {
+                            $sharedWithUser = User::query()
+                                ->inTeam($owner->current_team_id)
+                                ->whereKey((string) $share['shared_with'])
+                                ->first();
+
+                            abort_if($sharedWithUser === null, 403);
+
                             $sharingService->shareAllOnRecord(
                                 $record,
                                 $owner,
-                                User::query()->findOrFail((string) $share['shared_with']),
+                                $sharedWithUser,
                                 $share['tier'],
                             );
                         }
@@ -248,15 +255,24 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ->action(function (Email $record, array $data, EmailSharingService $sharingService): void {
                             $sharer = $this->authUser();
 
+                            abort_unless($sharer->can('share', $record), 403);
+
                             $sharingService->setEmailTier($record, $data['privacy_tier']);
 
                             $record->shares()->where('shared_by', $sharer->getKey())->delete();
 
                             foreach ($data['shares'] ?? [] as $share) {
+                                $sharedWithUser = User::query()
+                                    ->inTeam($sharer->current_team_id)
+                                    ->whereKey((string) $share['shared_with'])
+                                    ->first();
+
+                                abort_if($sharedWithUser === null, 403);
+
                                 $sharingService->shareEmail(
                                     $record,
                                     $sharer,
-                                    User::query()->findOrFail((string) $share['shared_with']),
+                                    $sharedWithUser,
                                     $share['tier'],
                                 );
                             }
