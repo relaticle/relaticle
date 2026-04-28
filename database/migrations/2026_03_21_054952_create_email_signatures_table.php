@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('email_signatures', function (Blueprint $table): void {
             $table->ulid('id')->primary();
+            $table->teams();
             $table->foreignUlid('connected_account_id')
                 ->constrained('connected_accounts')
                 ->cascadeOnDelete();
@@ -22,6 +23,8 @@ return new class extends Migration
             $table->boolean('is_default')->default(false);
 
             $table->timestamps();
+
+            $table->index(['team_id', 'connected_account_id']);
         });
     }
 
