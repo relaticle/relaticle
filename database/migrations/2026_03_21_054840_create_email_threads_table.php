@@ -28,9 +28,4 @@ return new class extends Migration
             $table->index(['team_id', 'last_email_at']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('email_threads');
-    }
 };

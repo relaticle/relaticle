@@ -22,9 +22,4 @@ return new class extends Migration
             $table->unique(['email_id', 'shared_with'], 'email_shares_email_user_unique');
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('email_shares');
-    }
 };

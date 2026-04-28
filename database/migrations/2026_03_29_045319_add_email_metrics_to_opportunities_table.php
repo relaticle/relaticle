@@ -21,18 +21,4 @@ return new class extends Migration
             $table->integer('outbound_email_count')->default(0);
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('opportunities', function (Blueprint $table): void {
-            $table->dropColumn('last_email_at');
-            $table->dropColumn('last_interaction_at');
-            $table->dropColumn('email_count');
-            $table->dropColumn('inbound_email_count');
-            $table->dropColumn('outbound_email_count');
-        });
-    }
 };

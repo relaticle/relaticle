@@ -21,20 +21,4 @@ return new class extends Migration
             });
         }
     }
-
-    public function down(): void
-    {
-        foreach (['people', 'companies'] as $tbl) {
-            Schema::table($tbl, function (Blueprint $table): void {
-                $table->dropColumn([
-                    'last_email_at',
-                    'last_interaction_at',
-                    'email_count',
-                    'inbound_email_count',
-                    'outbound_email_count',
-                    'avg_response_time_hours',
-                ]);
-            });
-        }
-    }
 };

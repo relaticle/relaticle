@@ -20,9 +20,4 @@ return new class extends Migration
             $table->index(['email_id', 'label']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('email_labels');
-    }
 };

@@ -28,9 +28,4 @@ return new class extends Migration
             $table->index(['connected_account_id', 'started_at']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('connected_account_syncs');
-    }
 };
