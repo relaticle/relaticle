@@ -43,7 +43,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $daysBack = Config::integer('email-integratdion.sync.initial_days', 90);
+        $daysBack = Config::integer('email-integration.sync.initial_days', 90);
 
         $service = GmailService::forAccount($account);
 
