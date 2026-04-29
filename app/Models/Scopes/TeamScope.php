@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Scope;
 
 /**
  * @template TModel of Model
+ *
+ * @implements Scope<TModel>
  */
 final class TeamScope implements Scope
 {

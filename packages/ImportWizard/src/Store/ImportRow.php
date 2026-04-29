@@ -254,6 +254,7 @@ final class ImportRow extends Model
             $bindings[] = '$.'.$column;
         }
 
+        /** @phpstan-ignore-next-line argument.type */
         $result = $query->selectRaw(implode(', ', $selectParts), $bindings)->first();
 
         $statuses = [];
