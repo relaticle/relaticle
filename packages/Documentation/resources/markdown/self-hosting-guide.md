@@ -220,7 +220,7 @@ labels:
   - "traefik.http.services.relaticle.loadbalancer.server.port=8080"
 ```
 
-**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The `TRUSTED_PROXIES` environment variable defaults to `*` in Docker, so forwarded headers are handled automatically.
+**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The app trusts `X-Forwarded-*` headers from RFC1918 private networks, loopback, and IPv6 ULA/link-local — covering Coolify/Dokploy/Traefik on a Docker network and reverse proxies on the host. Headers from public IPs are rejected, preventing spoofing.
 
 ---
 

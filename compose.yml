@@ -1,9 +1,5 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     ports:
@@ -57,10 +53,6 @@ services:
       start_period: 60s
 
   horizon:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     command: ["php", "/var/www/html/artisan", "horizon"]
@@ -97,10 +89,6 @@ services:
       start_period: 10s
 
   scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     command: ["php", "/var/www/html/artisan", "schedule:work"]
