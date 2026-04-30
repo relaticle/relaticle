@@ -21,9 +21,4 @@ return new class extends Migration
             $table->index(['user_id', 'type', 'value']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('email_blocklists');
-    }
 };

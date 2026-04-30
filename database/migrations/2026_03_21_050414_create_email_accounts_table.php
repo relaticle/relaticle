@@ -47,9 +47,4 @@ return new class extends Migration
             $table->index(['team_id', 'status']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('connected_accounts');
-    }
 };

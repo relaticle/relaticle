@@ -20,9 +20,4 @@ return new class extends Migration
             $table->index('email_id');
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('emailables');
-    }
 };
