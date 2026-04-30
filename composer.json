@@ -39,7 +39,7 @@
         "ryangjchandler/laravel-cloudflare-turnstile": "^3.0",
         "scalar/laravel": "^0.2.0",
         "sentry/sentry-laravel": "^4.13",
-        "socialiteproviders/microsoft-azure": "*",
+        "socialiteproviders/microsoft-azure": "^5.2",
         "spatie/cpu-load-health-check": "^1.0",
         "spatie/eloquent-sortable": "^4.4",
         "spatie/laravel-data": "^4.15",
