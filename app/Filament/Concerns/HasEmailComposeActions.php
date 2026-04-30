@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 use RuntimeException;
 
 trait HasEmailComposeActions
@@ -82,6 +83,7 @@ trait HasEmailComposeActions
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
                     'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->composeFormSchema())
@@ -151,6 +153,7 @@ trait HasEmailComposeActions
                     'quoted_body_html' => $email->body->body_html ?? '',
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->replyFormSchema())
@@ -300,6 +303,17 @@ trait HasEmailComposeActions
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Section::make('Schedule')
                 ->collapsed()
                 ->schema([
@@ -406,6 +420,17 @@ trait HasEmailComposeActions
             Hidden::make('mode'),
             Hidden::make('in_reply_to_email_id'),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Placeholder::make('quoted_body_preview')
                 ->hiddenLabel()
                 ->content(function (Get $get): HtmlString {
@@ -468,11 +493,29 @@ trait HasEmailComposeActions
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),
             'in_reply_to_email_id' => $data['in_reply_to_email_id'] ?? null,
             'creation_source' => $source,
-            'privacy_tier' => EmailPrivacyTier::FULL,
+            'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
             'scheduled_for' => $scheduledFor,
             'priority' => EmailPriority::PRIORITY,
         ];
+    }
+
+    private function defaultPrivacyTier(): EmailPrivacyTier
+    {
+        return resolve(PrivacyService::class)->defaultTierForUser($this->getAuthenticatedUser());
+    }
+
+    private function resolvePrivacyTier(mixed $value): EmailPrivacyTier
+    {
+        if ($value instanceof EmailPrivacyTier) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            return EmailPrivacyTier::from($value);
+        }
+
+        return $this->defaultPrivacyTier();
     }
 
     private function hasActiveConnectedAccount(): bool
