@@ -544,7 +544,7 @@ final class EmailInboxPage extends Page
                     return;
                 }
 
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 
@@ -577,7 +577,7 @@ final class EmailInboxPage extends Page
                     return;
                 }
 
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -14,8 +15,10 @@ final readonly class ApproveEmailAccessRequestAction
 {
     public function __construct(private EmailSharingService $sharingService) {}
 
-    public function execute(EmailAccessRequest $accessRequest): void
+    public function execute(EmailAccessRequest $accessRequest, User $actor): void
     {
+        abort_unless($accessRequest->owner_id === $actor->getKey(), 403);
+
         if ($accessRequest->status !== EmailAccessRequestStatus::PENDING) {
             return;
         }
