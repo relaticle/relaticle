@@ -18,6 +18,7 @@ return new class extends Migration
 
             $table->timestamps();
             $table->index('email_id');
+            $table->unique(['email_id', 'emailable_type', 'emailable_id'], 'emailables_unique_link');
         });
     }
 };
