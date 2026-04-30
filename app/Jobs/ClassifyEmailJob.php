@@ -27,7 +27,10 @@ final class ClassifyEmailJob implements ShouldQueue
         'Other',
     ];
 
-    public function __construct(public readonly string $emailId) {}
+    public function __construct(public readonly string $emailId)
+    {
+        $this->onQueue('emails-sync');
+    }
 
     public function handle(): void
     {
