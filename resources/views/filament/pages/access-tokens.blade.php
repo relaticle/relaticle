@@ -6,7 +6,7 @@
             {{ __('access-tokens.integrations.heading') }}
         </p>
         <div class="divide-y divide-gray-200 dark:divide-white/10 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
-            <a href="{{ config('scribe.docs_url') }}" target="_blank" class="flex items-center gap-4 bg-white dark:bg-white/5 px-4 py-3 transition hover:bg-gray-50 dark:hover:bg-white/10 group">
+            <a href="{{ route('scribe') }}" target="_blank" class="flex items-center gap-4 bg-white dark:bg-white/5 px-4 py-3 transition hover:bg-gray-50 dark:hover:bg-white/10 group">
                 <div class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition">
                     <x-heroicon-o-code-bracket class="w-5 h-5" />
                 </div>
