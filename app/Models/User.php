@@ -175,6 +175,20 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
+     * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
+     * verified — every framework, Filament, and policy check that reads
+     * hasVerifiedEmail() honors the flag uniformly through this single override.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        if (! config('app.require_email_verification')) {
+            return true;
+        }
+
+        return parent::hasVerifiedEmail();
+    }
+
+    /**
      * @return Collection<int, Team>
      */
     public function getTenants(Panel $panel): Collection

@@ -39,7 +39,7 @@ final class SystemAdminPanelProvider extends PanelProvider
 
         return $panel
             ->login()
-            ->emailVerification()
+            ->emailVerification(isRequired: config('app.require_email_verification'))
             ->authGuard('sysadmin')
             ->authPasswordBroker('system_administrators')
             ->strictAuthorization()

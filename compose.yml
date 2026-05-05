@@ -12,6 +12,7 @@ services:
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       DB_CONNECTION: pgsql
@@ -64,6 +65,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
@@ -100,6 +102,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres

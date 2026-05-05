@@ -78,6 +78,7 @@ These must be set or the containers will refuse to start.
 | `APP_URL` | `http://localhost` | Full URL where Relaticle is accessible. Include the scheme. |
 | `APP_PORT` | `80` | Host port the app container binds to. |
 | `APP_PANEL_DOMAIN` | (empty) | Set for subdomain routing (e.g., `app.example.com`). Leave empty for path mode (`/app`). |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email — useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach `/app/register` can create a working account. |
 | `LOG_CHANNEL` | `stderr` | Where logs go. `stderr` is recommended for Docker. |
 | `LOG_LEVEL` | `warning` | Minimum log level. Use `debug` for troubleshooting. |
 

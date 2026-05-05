@@ -103,7 +103,7 @@ final class AppPanelProvider extends PanelProvider
             ->authGuard('web')
             ->authPasswordBroker('users')
             ->passwordReset()
-            ->emailVerification()
+            ->emailVerification(isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
             ->databaseNotifications()
