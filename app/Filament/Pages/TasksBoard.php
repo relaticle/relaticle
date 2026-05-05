@@ -113,7 +113,7 @@ final class TasksBoard extends BoardPage
                                 ->alignLeft()
                                 ->imageHeight(20)
                                 ->circular()
-                                ->visible(fn (?string $state): bool => filled($state))
+                                ->visible(fn (mixed $state): bool => filled($state))
                                 ->stacked(),
                         ])->align('center'),
                     ]);
