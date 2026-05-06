@@ -5,7 +5,10 @@ declare(strict_types=1);
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(MakeFilamentUserCommand::class);
 
@@ -33,4 +36,19 @@ it('marks the user verified and dispatches the Verified event so downstream list
         ->and($user->hasVerifiedEmail())->toBeTrue();
 
     Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
+});
+
+it('creates a system administrator with the SuperAdministrator role when targeting the sysadmin panel', function (): void {
+    $this->artisan('make:filament-user', [
+        '--name' => 'SysAdmin',
+        '--email' => 'sysadmin@example.com',
+        '--password' => 'password123',
+        '--panel' => 'sysadmin',
+    ])->assertSuccessful();
+
+    $admin = SystemAdministrator::query()->where('email', 'sysadmin@example.com')->first();
+
+    expect($admin)->not->toBeNull()
+        ->and($admin->role)->toBe(SystemAdministratorRole::SuperAdministrator)
+        ->and($admin->hasVerifiedEmail())->toBeTrue();
 });
