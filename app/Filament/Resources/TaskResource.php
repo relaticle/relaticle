@@ -162,7 +162,7 @@ final class TaskResource extends Resource
                     ->whereColumn('custom_field_values.entity_id', 'tasks.id')
                     ->limit(1)
                     ->getQuery(),
-                $direction
+                strtolower($direction) === 'desc' ? 'desc' : 'asc',
             ))
             ->getTitleFromRecordUsing(function (Task $record) use ($valueResolver, $field, $label): string {
                 $value = $valueResolver->resolve($record, $field);
