@@ -16,6 +16,7 @@ use RectorLaravel\Rector\Class_\HiddenPropertyToHiddenAttributeRector;
 use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
 use RectorLaravel\Rector\Class_\TimeoutPropertyToTimeoutAttributeRector;
 use RectorLaravel\Rector\Class_\TriesPropertyToTriesAttributeRector;
+use RectorLaravel\Rector\Class_\UniqueForPropertyToUniqueForAttributeRector;
 use RectorLaravel\Rector\Class_\UseForwardsCallsTraitRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
 use RectorLaravel\Rector\MethodCall\EloquentWhereTypeHintClosureParameterRector;
@@ -45,6 +46,7 @@ return RectorConfig::configure()
         TablePropertyToTableAttributeRector::class,
         TimeoutPropertyToTimeoutAttributeRector::class,
         TriesPropertyToTriesAttributeRector::class,
+        UniqueForPropertyToUniqueForAttributeRector::class,
         EloquentWhereTypeHintClosureParameterRector::class,
         RemoveUnusedPrivateMethodRector::class => [
             // Skip Filament importer lifecycle hooks - they're called dynamically via callHook()

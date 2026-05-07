@@ -45,9 +45,9 @@ return [
     | response from the server after the connection is made.
     |
     */
-    'timeout' => 0,
+    'timeout' => env('FAVICON_FETCHER_TIMEOUT', 10),
 
-    'connect_timeout' => 0,
+    'connect_timeout' => env('FAVICON_FETCHER_CONNECT_TIMEOUT', 5),
 
     /*
     |--------------------------------------------------------------------------

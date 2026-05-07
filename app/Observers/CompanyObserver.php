@@ -26,6 +26,14 @@ final readonly class CompanyObserver
 
     private function dispatchFaviconFetchIfNeeded(Company $company): void
     {
+        // Once a logo is stored we do not re-fetch on subsequent saves: the observer
+        // fires on every Company update and would otherwise flood the queue with
+        // redundant favicon dispatches against slow remote sites. If the domain
+        // changes, callers must clear the 'logo' media collection to trigger a refetch.
+        if ($company->hasMedia(Company::LOGO_MEDIA_COLLECTION)) {
+            return;
+        }
+
         $domainField = $company->customFields()
             ->whereBelongsTo($company->team)
             ->where('code', CompanyField::DOMAINS->value)
