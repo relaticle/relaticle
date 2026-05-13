@@ -332,7 +332,7 @@ describe('Blog pages', function () {
     });
 
     it('displays published posts on the index', function () {
-        $post = Post::factory()->create();
+        $post = Post::factory()->published()->create();
 
         $this->get('/blog')
             ->assertStatus(200)
@@ -348,7 +348,7 @@ describe('Blog pages', function () {
     });
 
     it('displays a single blog post', function () {
-        $post = Post::factory()->create();
+        $post = Post::factory()->published()->create();
 
         $this->get("/blog/{$post->slug}")
             ->assertStatus(200)
@@ -362,7 +362,7 @@ describe('Blog pages', function () {
 
     it('displays posts filtered by category', function () {
         $category = Category::factory()->create();
-        $post = Post::factory()->create(['category_id' => $category->id]);
+        $post = Post::factory()->published()->create(['category_id' => $category->id]);
 
         $this->get("/blog/category/{$category->slug}")
             ->assertStatus(200)
@@ -371,7 +371,7 @@ describe('Blog pages', function () {
     });
 
     it('returns RSS feed', function () {
-        Post::factory()->create();
+        Post::factory()->published()->create();
 
         $this->get('/blog/feed')
             ->assertStatus(200)
