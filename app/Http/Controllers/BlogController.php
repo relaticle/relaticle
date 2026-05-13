@@ -28,14 +28,7 @@ final readonly class BlogController
             ->where('slug', $slug)
             ->firstOrFail();
 
-        $relatedPosts = Post::query()
-            ->published()
-            ->where('id', '!=', $post->id)
-            ->where('category_id', $post->getAttribute('category_id'))
-            ->with(['category'])
-            ->latest('published_at')
-            ->limit(3)
-            ->get();
+        $relatedPosts = $post->relatedPosts()->with(['category'])->get();
 
         return view('blog.show', ['post' => $post, 'relatedPosts' => $relatedPosts]);
     }

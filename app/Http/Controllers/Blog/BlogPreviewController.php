@@ -15,14 +15,7 @@ final readonly class BlogPreviewController
     {
         $post->load(['category', 'author', 'seo']);
 
-        $relatedPosts = Post::query()
-            ->published()
-            ->where('id', '!=', $post->id)
-            ->where('category_id', $post->getAttribute('category_id'))
-            ->with(['category'])
-            ->latest('published_at')
-            ->limit(3)
-            ->get();
+        $relatedPosts = $post->relatedPosts()->with(['category'])->get();
 
         $user = auth()->user();
 
