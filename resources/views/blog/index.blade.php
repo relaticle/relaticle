@@ -1,7 +1,19 @@
+@php
+    $headingContext = $category->name ?? $tag->name ?? null;
+    $title = $headingContext
+        ? $headingContext.' - '.config('app.name').' Blog'
+        : config('app.name').' - Engineering Blog';
+    $description = match (true) {
+        isset($category) => 'Posts about '.$category->name.' from the Relaticle engineering team.',
+        isset($tag) => 'Posts tagged "'.$tag->name.'" from the Relaticle engineering team.',
+        default => 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.',
+    };
+@endphp
+
 <x-guest-layout
-    :title="isset($category) ? $category->name . ' - ' . config('app.name') . ' Blog' : config('app.name') . ' - Engineering Blog'"
-    :description="isset($category) ? 'Posts about ' . $category->name . ' from the Relaticle engineering team.' : 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.'"
-    :ogTitle="isset($category) ? $category->name . ' - ' . config('app.name') . ' Blog' : config('app.name') . ' - Engineering Blog'">
+    :title="$title"
+    :description="$description"
+    :ogTitle="$title">
     @push('header')
         <x-ink::feed-link />
     @endpush
@@ -16,6 +28,11 @@
                 @if(isset($category))
                     <p class="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
                         Posts in <span class="font-medium text-gray-900 dark:text-white">{{ $category->name }}</span>
+                        &middot; <a href="{{ route('blog.index') }}" class="text-primary dark:text-primary-400 hover:underline">All posts</a>
+                    </p>
+                @elseif(isset($tag))
+                    <p class="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
+                        Posts tagged <span class="font-medium text-gray-900 dark:text-white">#{{ $tag->name }}</span>
                         &middot; <a href="{{ route('blog.index') }}" class="text-primary dark:text-primary-400 hover:underline">All posts</a>
                     </p>
                 @else

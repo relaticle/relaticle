@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\Blog\BlogCategoryController;
 use App\Http\Controllers\Blog\BlogFeedController;
 use App\Http\Controllers\Blog\BlogPreviewController;
+use App\Http\Controllers\Blog\BlogTagController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
@@ -62,6 +63,7 @@ Route::middleware(ProvideMarkdownResponse::class)->prefix('blog')->name('blog.')
     Route::get('/', [BlogController::class, 'index'])->name('index');
     Route::get('/feed', BlogFeedController::class)->name('feed');
     Route::get('/category/{slug}', BlogCategoryController::class)->name('category');
+    Route::get('/tag/{slug}', BlogTagController::class)->name('tag');
     Route::get('/preview/{post}', BlogPreviewController::class)->name('preview')->middleware('signed');
     Route::get('/{slug}', [BlogController::class, 'show'])->name('show');
 });

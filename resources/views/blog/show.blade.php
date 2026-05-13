@@ -26,39 +26,25 @@
 
                     <x-ink::post-header :post="$post" />
                     <x-ink::post-body :post="$post" />
+
+                    @if($post->tags->isNotEmpty())
+                        <div class="mt-12 pt-8 border-t border-gray-200/60 dark:border-white/[0.04] flex flex-wrap items-center gap-2">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">Tagged:</span>
+                            @foreach($post->tags as $tag)
+                                <a href="{{ route('blog.tag', $tag->slug) }}"
+                                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-700 dark:hover:text-primary-300 transition-colors">
+                                    #{{ $tag->name }}
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
                     <x-ink::related-posts :posts="$relatedPosts" />
                 </article>
 
                 <!-- Right Sidebar: Table of Contents -->
                 <aside class="hidden lg:block col-span-4 xl:col-span-3">
-                    @php
-                        $toc = [];
-                        preg_match_all('/<h2.*><a.*id="([^"]+)".*>#<\/a>([^<]+)/', $post->toHtml(), $tocMatches);
-                        if (!empty($tocMatches[1]) && !empty($tocMatches[2])) {
-                            $toc = array_combine($tocMatches[1], $tocMatches[2]);
-                        }
-                    @endphp
-
-                    @if(count($toc))
-                        <div class="sticky top-24 pt-0.5 overflow-y-auto pb-16">
-                            <h3 class="text-sm font-semibold text-black dark:text-white mb-4 flex items-center space-x-2">
-                                <x-heroicon-o-list-bullet class="h-4 w-4 text-primary dark:text-primary-400" />
-                                <span>On this page</span>
-                            </h3>
-                            <nav>
-                                <ul class="space-y-2.5">
-                                    @foreach($toc as $fragment => $title)
-                                        <li class="text-sm">
-                                            <a href="#{{ $fragment }}"
-                                               class="group flex items-center text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors border-l border-gray-200 dark:border-gray-800 pl-3 py-1 hover:border-primary-500 dark:hover:border-primary-400">
-                                                <span class="truncate">{{ $title }}</span>
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </nav>
-                        </div>
-                    @endif
+                    <x-blog.toc :post="$post" />
                 </aside>
             </div>
         </div>

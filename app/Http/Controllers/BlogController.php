@@ -24,7 +24,7 @@ final readonly class BlogController
     {
         $post = Post::query()
             ->published()
-            ->with(['category', 'author', 'seo'])
+            ->with(['category', 'author', 'seo', 'tags'])
             ->where('slug', $slug)
             ->firstOrFail();
 

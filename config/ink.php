@@ -14,7 +14,7 @@ return [
         'public_routes' => false,
         'feed' => false,
         'sitemap' => false,
-        'tags' => false,
+        'tags' => true,
         'media_library' => false,
     ],
 

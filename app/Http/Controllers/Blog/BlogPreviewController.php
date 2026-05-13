@@ -13,7 +13,7 @@ final readonly class BlogPreviewController
 {
     public function __invoke(Post $post): View
     {
-        $post->load(['category', 'author', 'seo']);
+        $post->load(['category', 'author', 'seo', 'tags']);
 
         $relatedPosts = $post->relatedPosts()->with(['category'])->get();
 

@@ -12,6 +12,7 @@ use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Support\Facades\Http;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
+use Relaticle\Ink\Models\Tag;
 
 mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class, BlogCategoryController::class, BlogFeedController::class, BlogPreviewController::class);
 
@@ -368,6 +369,36 @@ describe('Blog pages', function () {
             ->assertStatus(200)
             ->assertSee($post->title)
             ->assertSee($category->name);
+    });
+
+    it('displays posts filtered by tag', function () {
+        $tag = Tag::factory()->create();
+        $taggedPost = Post::factory()->published()->create();
+        $otherPost = Post::factory()->published()->create();
+
+        $taggedPost->tags()->attach($tag);
+
+        $this->get("/blog/tag/{$tag->slug}")
+            ->assertStatus(200)
+            ->assertSee($taggedPost->title)
+            ->assertSee('#'.$tag->name)
+            ->assertDontSee($otherPost->title);
+    });
+
+    it('returns 404 for non-existent tag', function () {
+        $this->get('/blog/tag/non-existent-tag')
+            ->assertStatus(404);
+    });
+
+    it('renders tag pills on a post show page', function () {
+        $tag = Tag::factory()->create();
+        $post = Post::factory()->published()->create();
+        $post->tags()->attach($tag);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee('#'.$tag->name)
+            ->assertSee(route('blog.tag', $tag->slug));
     });
 
     it('returns RSS feed', function () {
