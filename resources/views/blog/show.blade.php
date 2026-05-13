@@ -5,11 +5,11 @@
     :ogDescription="$post->excerpt"
     :ogImage="$post->featured_image ? asset('storage/' . $post->featured_image) : null">
     @push('header')
-        <x-blog::meta-tags :post="$post" />
-        <x-blog::feed-link />
+        <x-ink::meta-tags :post="$post" />
+        <x-ink::feed-link />
     @endpush
 
-    <x-blog::structured-data :post="$post" />
+    <x-ink::structured-data :post="$post" />
 
     <div class="pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-black">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,9 +24,9 @@
                         </a>
                     </div>
 
-                    <x-blog::post-header :post="$post" />
-                    <x-blog::post-body :post="$post" />
-                    <x-blog::related-posts :posts="$relatedPosts" />
+                    <x-ink::post-header :post="$post" />
+                    <x-ink::post-body :post="$post" />
+                    <x-ink::related-posts :posts="$relatedPosts" />
                 </article>
 
                 <!-- Right Sidebar: Table of Contents -->

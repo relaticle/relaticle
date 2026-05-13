@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Blog;
 
 use Illuminate\Http\Response;
-use ManukMinasyan\FilamentBlog\Models\Post;
+use Relaticle\Ink\Models\Post;
 
 final readonly class BlogFeedController
 {

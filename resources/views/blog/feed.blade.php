@@ -1,1 +1,1 @@
-<x-blog::feed :posts="$posts" />
+<x-ink::feed :posts="$posts" />

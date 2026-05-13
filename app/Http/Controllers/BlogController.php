@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use Illuminate\View\View;
-use ManukMinasyan\FilamentBlog\Models\Post;
+use Relaticle\Ink\Models\Post;
 
 final readonly class BlogController
 {
@@ -15,7 +15,7 @@ final readonly class BlogController
             ->published()
             ->with(['category', 'author', 'seo'])
             ->latest('published_at')
-            ->paginate(config('filament-blog.per_page', 12));
+            ->paginate(config('ink.per_page', 12));
 
         return view('blog.index', ['posts' => $posts]);
     }

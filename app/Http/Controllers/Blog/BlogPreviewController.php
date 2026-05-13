@@ -6,8 +6,8 @@ namespace App\Http\Controllers\Blog;
 
 use App\Models\User;
 use Illuminate\View\View;
-use ManukMinasyan\FilamentBlog\Filament\Resources\PostResource;
-use ManukMinasyan\FilamentBlog\Models\Post;
+use Relaticle\Ink\Filament\Resources\PostResource;
+use Relaticle\Ink\Models\Post;
 
 final readonly class BlogPreviewController
 {

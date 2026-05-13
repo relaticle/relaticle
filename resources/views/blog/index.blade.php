@@ -3,7 +3,7 @@
     :description="isset($category) ? 'Posts about ' . $category->name . ' from the Relaticle engineering team.' : 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.'"
     :ogTitle="isset($category) ? $category->name . ' - ' . config('app.name') . ' Blog' : config('app.name') . ' - Engineering Blog'">
     @push('header')
-        <x-blog::feed-link />
+        <x-ink::feed-link />
     @endpush
 
     <div class="pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-black">
@@ -32,7 +32,7 @@
             @else
                 <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
                     @foreach($posts as $post)
-                        <x-blog::post-card :post="$post" />
+                        <x-ink::post-card :post="$post" />
                     @endforeach
                 </div>
 
