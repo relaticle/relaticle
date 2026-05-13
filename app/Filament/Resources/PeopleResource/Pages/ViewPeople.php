@@ -30,11 +30,11 @@ final class ViewPeople extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
-            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
-                        ->label('Copy page URL')
+                        ->label(__('filament/resources/person.pages.view.actions.copy_page_url.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (People $record): void {
                             $jsUrl = Js::from(PeopleResource::getUrl('view', [$record]));
@@ -48,7 +48,7 @@ final class ViewPeople extends ViewRecord
                         ");
                         }),
                     Action::make('copyRecordId')
-                        ->label('Copy record ID')
+                        ->label(__('filament/resources/person.pages.view.actions.copy_record_id.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (People $record): void {
                             $jsId = Js::from((string) $record->getKey());
@@ -73,15 +73,15 @@ final class ViewPeople extends ViewRecord
             Section::make()->schema([
                 Flex::make([
                     ImageEntry::make('avatar')
-                        ->label('')
+                        ->label(__('filament/resources/person.pages.view.infolist.fields.avatar.label'))
                         ->height(30)
                         ->circular()
                         ->grow(false),
                     TextEntry::make('name')
-                        ->label('')
+                        ->label(__('filament/resources/person.pages.view.infolist.fields.name.label'))
                         ->size(TextSize::Large),
                     TextEntry::make('company.name')
-                        ->label('Company')
+                        ->label(__('filament/resources/person.pages.view.infolist.fields.company.label'))
                         ->color('primary')
                         ->url(fn (People $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
                 ]),

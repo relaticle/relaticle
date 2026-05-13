@@ -37,7 +37,8 @@ boost.json
 /.cursor
 /.junie
 /.playwright-mcp
-/docs
+/docs/*
+!/docs/i18n.md
 api.json
 .scribe/
 /public/vendor/scribe

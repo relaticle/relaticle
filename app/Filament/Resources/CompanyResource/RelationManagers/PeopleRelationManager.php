@@ -22,9 +22,14 @@ final class PeopleRelationManager extends RelationManager
 {
     protected static string $relationship = 'people';
 
-    protected static ?string $modelLabel = 'person';
+    protected static ?string $modelLabel = null;
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-user';
+
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/company.relation_managers.people.model_label');
+    }
 
     public function form(Schema $schema): Schema
     {

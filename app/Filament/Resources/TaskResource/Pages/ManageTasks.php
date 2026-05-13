@@ -32,7 +32,7 @@ final class ManageTasks extends ManageRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import tasks')
+                    ->label(__('filament/resources/task.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportTasks::getUrl()),
                 ExportAction::make()->exporter(TaskExporter::class),
@@ -40,7 +40,7 @@ final class ManageTasks extends ManageRecords
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
-                ->label('Import / Export')
+                ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
                 ->size(Size::Small),
             CreateAction::make()
                 ->icon('heroicon-o-plus')

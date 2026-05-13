@@ -88,4 +88,18 @@ return [
     ],
 
     'edit_profile' => 'Edit Profile',
+
+    'scheduled_deletion_interstitial' => [
+        'actions' => [
+            'cancel_deletion' => [
+                'label' => 'Keep my account',
+                'modal_heading' => 'Keep your account?',
+                'modal_description' => 'Your scheduled deletion will be cancelled and all your data will be preserved.',
+                'modal_submit_label' => 'Yes, keep my account',
+            ],
+            'logout' => [
+                'label' => 'Sign out',
+            ],
+        ],
+    ],
 ];

@@ -104,4 +104,13 @@ return [
     ],
 
     'edit_team' => 'Edit Team',
+
+    'roles' => [
+        'admin' => [
+            'description' => 'Administrator users can perform any action.',
+        ],
+        'editor' => [
+            'description' => 'Editor users have the ability to read, create, and update.',
+        ],
+    ],
 ];
