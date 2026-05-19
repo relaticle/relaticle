@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Store;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -43,31 +45,26 @@ use Spatie\LaravelData\DataCollection;
  * @method static Builder<static> searchValue(string $column, string $search)
  * @method static Builder<static> forFilter(ReviewFilter $filter, string $column)
  */
+#[Fillable([
+    'row_number',
+    'raw_data',
+    'validation',
+    'corrections',
+    'skipped',
+    'match_action',
+    'matched_id',
+    'relationships',
+    'processed',
+])]
+#[Table(name: 'import_rows', key: 'row_number')]
 final class ImportRow extends Model
 {
     /** @use HasFactory<Factory<ImportRow>> */
     use HasFactory;
 
-    protected $table = 'import_rows';
-
-    protected $primaryKey = 'row_number';
-
     public $incrementing = false;
 
     public $timestamps = false;
-
-    /** @var list<string> */
-    protected $fillable = [
-        'row_number',
-        'raw_data',
-        'validation',
-        'corrections',
-        'skipped',
-        'match_action',
-        'matched_id',
-        'relationships',
-        'processed',
-    ];
 
     /**
      * @return array<string, string>

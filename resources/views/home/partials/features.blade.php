@@ -15,20 +15,20 @@
                 Built for humans. Accessible to AI.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                30 MCP tools, a REST API, and 22 custom field types. Your team and your AI agents work from the same source of truth.
+                A built-in AI chat for your team, plus 30 MCP tools and a REST API for any agent you bring. One source of truth — humans, in-app chat, and external agents all working on the same data.
             </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-2">
 
-            {{-- Agent-Native Infrastructure — 2col 2row --}}
+            {{-- Agent-Native Infrastructure — 2col 2row — external agents (MCP / REST) --}}
             <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 lg:row-span-2 overflow-hidden flex flex-col">
                 <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
                     <x-ri-git-merge-line class="w-4 h-4 text-primary dark:text-primary-400"/>
-                    Agent-Native Infrastructure
+                    Connect Any External Agent
                 </h3>
                 <p class="{{ $cardDesc }} max-w-md">
-                    Connect any AI agent through the MCP server with 30 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                    Bring your own agent through the MCP server with 30 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
                 </p>
 
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
@@ -138,20 +138,28 @@
                 </div>
             </div>
 
-            {{-- AI-Powered Insights --}}
-            <div id="card-ai" class="{{ $cardBase }} p-6 overflow-hidden">
+            {{-- Built-in AI Chat — the in-app conversational agent --}}
+            <div id="card-builtin-ai" class="{{ $cardBase }} p-6 overflow-hidden">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-lightbulb-flash-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    AI-Powered Insights
+                    <x-ri-chat-smile-3-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
+                    Built-in AI Chat
                 </h3>
                 <p class="{{ $cardDesc }}">
-                    One-click summaries of contacts and deals. AI analyzes notes, tasks, and interactions so you always know what happened and what to do next.
+                    Ask anything about your CRM. @-mention records to scope a question, approve destructive actions, undo with one click. Voice in, persistent searchable history.
                 </p>
-                {{-- Animated insight lines --}}
+                {{-- Mini chat-bubble preview (uses ai-fill for staggered width animation) --}}
                 <div class="mt-4 space-y-2">
-                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/20 dark:bg-primary/30 w-0"></div></div>
-                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
-                    <div class="ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/10 dark:bg-primary/20 w-0"></div></div>
+                    <div class="flex items-start gap-2">
+                        <div class="w-4 h-4 rounded-full bg-gray-200 dark:bg-white/[0.1] shrink-0 mt-px"></div>
+                        <div class="ai-line h-3 rounded-md bg-gray-100 dark:bg-white/[0.04] w-3/5 overflow-hidden"><div class="ai-fill h-full rounded-md bg-gray-300/60 dark:bg-white/[0.12] w-0"></div></div>
+                    </div>
+                    <div class="flex items-start gap-2 justify-end">
+                        <div class="ai-line h-3 rounded-md bg-primary/[0.08] dark:bg-primary/[0.12] w-3/4 overflow-hidden"><div class="ai-fill h-full rounded-md bg-primary/30 dark:bg-primary/40 w-0"></div></div>
+                        <div class="w-4 h-4 rounded-full bg-gray-900 dark:bg-white/[0.18] shrink-0 mt-px flex items-center justify-center">
+                            <x-ri-sparkling-2-fill class="w-2 h-2 text-white dark:text-gray-200"/>
+                        </div>
+                    </div>
+                    <div class="ml-6 ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] w-1/2 overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
                 </div>
             </div>
 
@@ -235,7 +243,7 @@
                             Task Management
                         </h3>
                         <p class="{{ $cardDesc }}">
-                            Create, assign, and track tasks linked to contacts, companies, and deals. Your AI agent can create follow-ups automatically.
+                            Create, assign, and track tasks linked to contacts, companies, and deals. Ask the chat to draft follow-ups, reschedule tasks, or roll up what's due — destructive edits ask before they run.
                         </p>
                     </div>
                     <div class="mt-4 md:mt-0 md:flex-1 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
@@ -276,7 +284,7 @@
                     <x-ri-quill-pen-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
                     Notes & Activity Log
                 </h3>
-                <p class="{{ $cardDesc }}">Capture notes linked to any record. Your AI agent can log meeting notes automatically. Search and retrieve context instantly.</p>
+                <p class="{{ $cardDesc }}">Capture notes linked to any record — by hand, by voice, or by asking the chat. Search and retrieve context instantly across notes, messages, and activity.</p>
             </div>
 
             {{-- CTA Card --}}
@@ -307,17 +315,10 @@
                     animate('.feat-card', { y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
                 }, { amount: 0.1 });
 
-                // AI Insights — scanning lines fill to random widths
-                inView('#card-ai', function() {
-                    animate('.ai-fill', { width: ['0%', '85%'] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.8, ease: e });
-                    setTimeout(function() {
-                        animate('.ai-fill', { width: ['85%', '60%'] }, { delay: stagger(0.08), duration: 0.5, ease: e });
-                        setTimeout(function() {
-                            animate('.ai-fill', { width: ['60%', '92%'] }, { delay: stagger(0.1), duration: 0.6, ease: e });
-                        }, 600);
-                    }, 1000);
-                    // Sparkle icon pulse
-                    animate('#ai-sparkle', { scale: [1, 1.3, 1], rotate: [0, 15, 0] }, { duration: 0.6, delay: 0.2, ease: e });
+                // Built-in AI Chat — bubbles fill in sequence (user → assistant → suggestion)
+                inView('#card-builtin-ai', function() {
+                    animate('#card-builtin-ai .ai-fill', { width: ['0%', '100%'] }, { delay: stagger(0.18, { start: 0.3 }), duration: 0.6, ease: e });
+                    animate('#ai-sparkle', { scale: [1, 1.2, 1] }, { duration: 0.5, delay: 0.2, ease: e });
                 }, { amount: 0.4 });
 
                 // Data Model — form fields slide in from left

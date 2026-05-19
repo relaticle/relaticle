@@ -34,7 +34,10 @@ final readonly class ListPeople
         $request ??= new Request(['filter' => $filters]);
         $filterSchema = new CustomFieldFilterSchema;
 
-        $query = QueryBuilder::for(People::query()->withCustomFieldValues(), $request)
+        $query = QueryBuilder::for(
+            People::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            $request,
+        )
             ->allowedFilters(
                 AllowedFilter::partial('name'),
                 AllowedFilter::exact('company_id'),

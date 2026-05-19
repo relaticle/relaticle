@@ -1,0 +1,354 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\Chat\Jobs;
+
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Laravel\Ai\Responses\Data\ToolResult;
+use Laravel\Ai\Responses\StreamedAgentResponse;
+use Laravel\Ai\Streaming\Events\StreamEvent;
+use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Events\ChatStreamFailed;
+use Relaticle\Chat\Events\ConversationResolved;
+use Relaticle\Chat\Events\FollowUpsSuggested;
+use Relaticle\Chat\Events\PendingActionsSuperseded;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\FollowUpService;
+use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\ChatTelemetry;
+use Throwable;
+
+#[Timeout(120)]
+#[Tries(1)]
+final class ProcessChatMessage implements ShouldQueue
+{
+    use Queueable;
+
+    /**
+     * @param  array{provider: string|null, model: string|null}  $resolved
+     * @param  list<array{type: string, id: string, label: string}>  $mentions
+     * @param  array<string, mixed>  $document
+     */
+    public function __construct(
+        private readonly User $user,
+        private readonly Team $team,
+        public readonly string $message,
+        public readonly string $conversationId,
+        private readonly array $resolved,
+        public readonly array $mentions = [],
+        public readonly array $document = ['type' => 'doc', 'content' => []],
+    ) {
+        $this->onQueue('chat');
+        $this->afterCommit = true;
+    }
+
+    public function handle(CreditService $creditService): void
+    {
+        $this->bindAuth();
+
+        ChatTelemetry::tagCurrentScope(
+            $this->conversationId,
+            (string) $this->team->getKey(),
+            $this->resolved['model'] ?? 'unknown',
+        );
+        ChatTelemetry::breadcrumb('job.started', ['message_length' => strlen($this->message)]);
+
+        $superseded = resolve(PendingActionService::class)
+            ->supersedePendingForConversation($this->conversationId);
+
+        if ($superseded !== []) {
+            ChatTelemetry::breadcrumb('pending_actions.superseded', [
+                'count' => count($superseded),
+            ]);
+            broadcast(new PendingActionsSuperseded(
+                conversationId: $this->conversationId,
+                pendingActionIds: array_map(
+                    static fn (PendingAction $action): string => (string) $action->getKey(),
+                    $superseded,
+                ),
+            ));
+        }
+
+        try {
+            $agent = resolve(CrmAssistant::class);
+            $agent->withConversationId($this->conversationId);
+            $agent->continue($this->conversationId, as: $this->user);
+            $agent->withMentions($this->mentions);
+            $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
+
+            $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
+
+            $response = $agent->stream(
+                prompt: $this->message,
+                provider: $this->resolved['provider'],
+                model: $this->resolved['model'],
+            );
+
+            $cancelled = false;
+            $cacheKey = "chat:cancel:{$this->conversationId}";
+
+            $response->each(function (StreamEvent $event) use ($channel, $cacheKey, &$cancelled): void {
+                if (! $cancelled && Cache::pull($cacheKey) !== null) {
+                    $cancelled = true;
+
+                    return;
+                }
+
+                if ($cancelled) {
+                    return;
+                }
+
+                $event->broadcastNow($channel);
+            });
+
+            if ($cancelled) {
+                $creditService->refundReservation($this->team, idempotencyToken: $this->settlementToken());
+                ChatTelemetry::breadcrumb('stream.cancelled', []);
+
+                return;
+            }
+
+            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService): void {
+                ChatTelemetry::breadcrumb('stream.completed', [
+                    'input_tokens' => $streamedResponse->usage->promptTokens,
+                    'output_tokens' => $streamedResponse->usage->completionTokens,
+                ]);
+
+                broadcast(new ConversationResolved(
+                    userId: (string) $this->user->getKey(),
+                    conversationId: $streamedResponse->conversationId,
+                ));
+
+                Cache::add(
+                    "chat:refund-lock:{$this->team->getKey()}:{$this->settlementToken()}",
+                    '1',
+                    now()->addHour(),
+                );
+
+                $creditService->settleReservation(
+                    team: $this->team,
+                    user: $this->user,
+                    type: AiCreditType::Chat,
+                    model: $streamedResponse->meta->model ?? 'unknown',
+                    inputTokens: $streamedResponse->usage->promptTokens,
+                    outputTokens: $streamedResponse->usage->completionTokens,
+                    toolCallsCount: $streamedResponse->toolCalls->count(),
+                    conversationId: $streamedResponse->conversationId,
+                    idempotencyKey: $streamedResponse->invocationId,
+                );
+
+                $this->persistMentions();
+                $this->persistUserDocument();
+                $this->materializeAssistantDocument($streamedResponse);
+                $this->broadcastFollowUps($streamedResponse);
+            });
+        } finally {
+            $this->releaseAuth();
+        }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        resolve(CreditService::class)->refundReservation(
+            $this->team,
+            idempotencyToken: $this->settlementToken(),
+        );
+
+        ChatTelemetry::breadcrumb('job.failed', [
+            'exception' => $exception?->getMessage(),
+            'class' => $exception instanceof Throwable ? $exception::class : null,
+        ]);
+
+        broadcast(new ChatStreamFailed(
+            conversationId: $this->conversationId,
+            message: 'The assistant encountered an error. Please try again.',
+        ));
+    }
+
+    /**
+     * @param  list<PendingAction>  $superseded
+     * @return list<array{operation: string, entity_type: string, label: string|null}>
+     */
+    private function summarizeSuperseded(array $superseded): array
+    {
+        return array_map(static function (PendingAction $action): array {
+            $data = $action->action_data;
+            $display = $action->display_data;
+
+            $label = null;
+            foreach (['name', 'title'] as $field) {
+                if (isset($display[$field]) && is_string($display[$field]) && $display[$field] !== '') {
+                    $label = $display[$field];
+                    break;
+                }
+                if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
+                    $label = $data[$field];
+                    break;
+                }
+            }
+
+            return [
+                'operation' => $action->operation->value,
+                'entity_type' => $action->entity_type,
+                'label' => $label,
+            ];
+        }, $superseded);
+    }
+
+    private function persistMentions(): void
+    {
+        if ($this->mentions === []) {
+            return;
+        }
+
+        $userMessageId = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $this->conversationId)
+            ->where('role', 'user')
+            ->latest('created_at')
+            ->value('id');
+
+        if ($userMessageId === null) {
+            return;
+        }
+
+        $rows = array_map(static fn (array $m): array => [
+            'id' => (string) Str::ulid(),
+            'message_id' => $userMessageId,
+            'type' => $m['type'],
+            'record_id' => $m['id'],
+            'label' => $m['label'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $this->mentions);
+
+        DB::table('agent_conversation_message_mentions')->insert($rows);
+    }
+
+    /**
+     * Update the latest user message row with the editor's document JSON.
+     *
+     * Runs in the post-stream `then()` callback after the agent's ConversationStore
+     * has inserted the user message row. If this UPDATE fails (DB blip), the row
+     * keeps its column DEFAULT of `{"type":"doc","content":[]}` — the user message
+     * is still readable, just without mention-chip rendering.
+     */
+    private function persistUserDocument(): void
+    {
+        $latestId = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $this->conversationId)
+            ->where('role', 'user')
+            ->latest()
+            ->orderByDesc('id')
+            ->value('id');
+
+        if ($latestId === null) {
+            return;
+        }
+
+        DB::table('agent_conversation_messages')
+            ->where('id', $latestId)
+            ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
+    }
+
+    /**
+     * Materialize the assistant's response as a TipTap document on the
+     * latest assistant message row. Runs after the agent's ConversationStore
+     * has persisted the assistant message with its plain text `content`.
+     *
+     * v1 emits no mention chips in assistant prose — future work can extract
+     * structured entity references from tool results.
+     */
+    private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
+    {
+        $assistantContent = $streamedResponse->text;
+
+        if ($assistantContent === '') {
+            return;
+        }
+
+        $document = $this->getParser()->buildFromText($assistantContent, [], $this->team);
+
+        $latestId = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $this->conversationId)
+            ->where('role', 'assistant')
+            ->latest()
+            ->orderByDesc('id')
+            ->value('id');
+
+        if ($latestId === null) {
+            return;
+        }
+
+        DB::table('agent_conversation_messages')
+            ->where('id', $latestId)
+            ->update(['document' => json_encode($document, JSON_THROW_ON_ERROR)]);
+    }
+
+    private function getParser(): TipTapDocumentParser
+    {
+        return resolve(TipTapDocumentParser::class);
+    }
+
+    private function broadcastFollowUps(StreamedAgentResponse $streamedResponse): void
+    {
+        $conversationId = $streamedResponse->conversationId;
+        if ($conversationId === null) {
+            return;
+        }
+
+        $toolCalls = $streamedResponse->toolResults
+            ->map(static fn (ToolResult $toolResult): array => [
+                'name' => $toolResult->name,
+                'result' => $toolResult->result,
+            ])
+            ->all();
+
+        $chips = resolve(FollowUpService::class)->suggest($toolCalls);
+
+        if ($chips === []) {
+            return;
+        }
+
+        broadcast(new FollowUpsSuggested(
+            conversationId: $conversationId,
+            chips: $chips,
+        ));
+    }
+
+    private function bindAuth(): void
+    {
+        Auth::guard('web')->setUser($this->user);
+    }
+
+    private function releaseAuth(): void
+    {
+        Auth::guard('web')->forgetUser();
+    }
+
+    private function settlementToken(): string
+    {
+        $payload = [
+            $this->conversationId,
+            (string) $this->user->getKey(),
+            (string) $this->team->getKey(),
+            $this->message,
+            $this->resolved['model'] ?? '',
+        ];
+
+        return $this->conversationId.':'.hash('xxh3', implode("\0", $payload));
+    }
+}

@@ -6,4 +6,7 @@ return [
     'groups' => [
         'workspace' => 'Workspace',
     ],
+    'items' => [
+        'dashboard' => 'Home',
+    ],
 ];
