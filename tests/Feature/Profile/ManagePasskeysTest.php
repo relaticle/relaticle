@@ -6,6 +6,8 @@ use App\Livewire\App\Profile\ManagePasskeys;
 use App\Models\User;
 use Laravel\Passkeys\Passkey;
 
+mutates(ManagePasskeys::class);
+
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
@@ -41,7 +43,7 @@ it('does not show passkeys belonging to other users', function (): void {
         ->assertDontSee('Other Device');
 });
 
-it('deletes a passkey owned by the user', function (): void {
+it('deletes a passkey owned by the user when password is correct', function (): void {
     $passkey = Passkey::create([
         'user_id' => $this->user->id,
         'name' => 'Delete Me',
@@ -50,10 +52,25 @@ it('deletes a passkey owned by the user', function (): void {
     ]);
 
     livewire(ManagePasskeys::class)
-        ->call('deletePasskey', $passkey->id)
+        ->call('deletePasskey', $passkey->id, 'password')
         ->assertHasNoErrors();
 
     expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+it('rejects delete when password is wrong', function (): void {
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Keep Me',
+        'credential_id' => 'cred-keep-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskey', $passkey->id, 'wrong-password')
+        ->assertHasErrors(['password']);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
 it('does not delete a passkey belonging to another user', function (): void {
@@ -66,7 +83,7 @@ it('does not delete a passkey belonging to another user', function (): void {
     ]);
 
     livewire(ManagePasskeys::class)
-        ->call('deletePasskey', $passkey->id);
+        ->call('deletePasskey', $passkey->id, 'password');
 
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
@@ -87,4 +104,10 @@ it('refreshes the list after loadPasskeys is called', function (): void {
 it('renders the add passkey button text', function (): void {
     livewire(ManagePasskeys::class)
         ->assertSee('Add passkey');
+});
+
+it('renders the Passkeys section heading and description', function (): void {
+    livewire(ManagePasskeys::class)
+        ->assertSee('Passkeys')
+        ->assertSee('Manage your passkeys for passwordless sign-in.');
 });
