@@ -10,11 +10,9 @@ export default defineConfig({
                 // Marketing website
                 'resources/css/app.css',
                 'resources/js/app.js',
-                // Echo (Reverb WebSocket client)
-                'resources/js/echo.js',
                 'resources/js/motion.js',
-                // Chat
-                'packages/Chat/resources/js/chat.js',
+                // Passkeys client (loaded on demand by Blade components)
+                'resources/js/passkeys.js',
                 // Filament
                 'resources/css/filament/app/theme.css',
                 'resources/css/filament/admin/theme.css',
@@ -29,7 +27,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': '/resources/js',
-            '~': path.resolve(import.meta.dirname, './resources'),
+            '~': path.resolve(__dirname, './resources'),
         },
     },
 });

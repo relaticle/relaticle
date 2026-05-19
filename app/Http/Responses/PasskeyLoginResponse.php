@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Responses;
+
+use Filament\Facades\Filament;
+use Illuminate\Http\JsonResponse;
+use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
+
+final readonly class PasskeyLoginResponse implements PasskeyLoginResponseContract
+{
+    public function toResponse($request): JsonResponse // @pest-ignore-type
+    {
+        return new JsonResponse([
+            'redirect' => Filament::getPanel('app')->getUrl(),
+        ]);
+    }
+}

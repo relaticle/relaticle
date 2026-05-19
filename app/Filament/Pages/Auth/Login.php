@@ -6,6 +6,7 @@ namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
@@ -34,5 +35,15 @@ final class Login extends \Filament\Auth\Pages\Login
             ->size(Size::Medium)
             ->label(__('filament-panels::auth/pages/login.form.actions.authenticate.label'))
             ->submit('authenticate');
+    }
+
+    protected function getEmailFormComponent(): TextInput
+    {
+        return TextInput::make('email')
+            ->label(__('filament-panels::auth/pages/login.form.email.label'))
+            ->email()
+            ->required()
+            ->autocomplete('username webauthn')
+            ->autofocus();
     }
 }

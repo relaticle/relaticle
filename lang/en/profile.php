@@ -60,6 +60,22 @@ return [
             'description' => 'Permanently delete your account after a 30-day grace period.',
             'notice' => 'Your profile and sign-in account will be permanently deleted after 30 days. Workspaces that only you belong to, including their CRM data, will also be deleted. Records in shared workspaces will remain without your profile. Sign in before the deletion date to cancel.',
         ],
+        'passkeys' => [
+            'title' => 'Passkeys',
+            'description' => 'Manage your passkeys for passwordless sign-in.',
+            'unsupported' => 'Passkeys are not supported in this browser.',
+            'empty' => 'No passkeys yet. Add one to sign in without a password.',
+            'added' => 'Added :time',
+            'last_used' => 'Last used :time',
+            'add_passkey' => 'Add passkey',
+            'name_label' => 'Passkey name',
+            'name_placeholder' => 'e.g., MacBook Pro, iPhone',
+            'register' => 'Register passkey',
+            'registering' => 'Registering...',
+            'cancel' => 'Cancel',
+            'remove' => 'Remove',
+            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
+        ],
     ],
 
     'actions' => [
@@ -80,6 +96,9 @@ return [
         ],
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',
+        ],
+        'passkey_removed' => [
+            'success' => 'Passkey removed.',
         ],
     ],
 
