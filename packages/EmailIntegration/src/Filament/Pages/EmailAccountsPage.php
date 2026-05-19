@@ -15,6 +15,8 @@ use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
+use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
+use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
@@ -139,16 +141,13 @@ final class EmailAccountsPage extends Page
                     ]),
             ])
             ->action(function (array $arguments, array $data): void {
-                ConnectedAccount::query()->where('id', $arguments['account_id'])
-                    ->where('user_id', auth()->id())
-                    ->update([
-                        'sync_inbox' => $data['sync_inbox'],
-                        'sync_sent' => $data['sync_sent'],
-                        'contact_creation_mode' => $data['contact_creation_mode'],
-                        'auto_create_companies' => $data['auto_create_companies'],
-                        'hourly_send_limit' => filled($data['hourly_send_limit'] ?? null) ? (int) $data['hourly_send_limit'] : null,
-                        'daily_send_limit' => filled($data['daily_send_limit'] ?? null) ? (int) $data['daily_send_limit'] : null,
-                    ]);
+                $account = $this->findOwnedAccount($arguments);
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                resolve(UpdateConnectedAccountSettingsAction::class)->execute($account, $data);
             })
             ->modalHeading('Account Settings')
             ->modalSubmitActionLabel('Save');
@@ -210,6 +209,16 @@ final class EmailAccountsPage extends Page
         return ConnectedAccount::query()->find((string) $arguments['account_id']);
     }
 
+    /** @param array<string, mixed> $arguments */
+    private function findOwnedAccount(array $arguments): ?ConnectedAccount
+    {
+        /** @var ConnectedAccount|null */
+        return ConnectedAccount::query()
+            ->where('user_id', auth()->id())
+            ->whereKey((string) $arguments['account_id'])
+            ->first();
+    }
+
     public function disconnectAction(): Action
     {
         return Action::make('disconnect')
@@ -219,9 +228,13 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                ConnectedAccount::query()->where('id', $arguments['account_id'])
-                    ->where('user_id', auth()->id())
-                    ->delete();
+                $account = $this->findOwnedAccount($arguments);
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                resolve(DisconnectConnectedAccountAction::class)->execute($account);
             });
     }
 
