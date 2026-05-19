@@ -29,7 +29,9 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
-    ) {}
+    ) {
+        $this->onQueue('emails-sync');
+    }
 
     /**
      * @throws \Throwable
