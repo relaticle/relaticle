@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Listeners\LogPasskeyEvent;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Laravel\Passkeys\Events\PasskeyRegistered;
 use Laravel\Passkeys\Passkey;
+
+mutates(LogPasskeyEvent::class);
 
 it('logs a passkey event with user_id, passkey_id, and ip', function (): void {
     $user = User::factory()->create();

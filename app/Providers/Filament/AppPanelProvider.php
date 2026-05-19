@@ -316,7 +316,7 @@ final class AppPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => Blade::render('<x-auth.passkey-verify />'),
+                fn (): View|Factory => view('filament.auth.passkey_verify'),
             );
 
         if (Feature::active(SocialAuth::class)) {

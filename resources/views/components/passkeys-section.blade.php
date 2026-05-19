@@ -64,14 +64,7 @@
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    wire:click="deletePasskey({{ $passkey['id'] }})"
-                    wire:confirm="{{ __('profile.sections.passkeys.remove_confirm') }}"
-                    class="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                >
-                    {{ __('profile.sections.passkeys.remove') }}
-                </button>
+                {{ ($this->deletePasskeyAction)(['passkeyId' => $passkey['id']]) }}
             </div>
         @empty
             <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">

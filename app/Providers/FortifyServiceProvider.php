@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Http\Responses\PasskeyLoginResponse;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -36,9 +37,7 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
         Passkeys::authorizeLoginUsing(
-            // Hook for future suspension/banning logic. Returning true is the
-            // safe default while no such mechanism exists app-wide.
-            fn (Request $request, PasskeyUser $user, Passkey $passkey): bool => true,
+            fn (Request $request, PasskeyUser $user, Passkey $passkey): bool => ! ($user instanceof User && $user->isScheduledForDeletion()),
         );
 
         RateLimiter::for('login', function (Request $request) {

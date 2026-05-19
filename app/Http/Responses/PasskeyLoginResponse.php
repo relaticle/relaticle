@@ -10,7 +10,7 @@ use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContr
 
 final readonly class PasskeyLoginResponse implements PasskeyLoginResponseContract
 {
-    public function toResponse($request): JsonResponse // @pest-ignore-type
+    public function toResponse(mixed $request): JsonResponse
     {
         return new JsonResponse([
             'redirect' => Filament::getPanel('app')->getUrl(),

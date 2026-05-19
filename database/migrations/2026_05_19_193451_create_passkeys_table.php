@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(Passkeys::userModel(), 'user_id')->constrained()->cascadeOnDelete();
             $table->string('name');
-            $table->string('credential_id')->unique();
+            $table->string('credential_id', 1024)->unique();
             $table->json('credential');
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();

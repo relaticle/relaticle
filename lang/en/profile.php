@@ -74,7 +74,8 @@ return [
             'registering' => 'Registering...',
             'cancel' => 'Cancel',
             'remove' => 'Remove',
-            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
+            'remove_confirm_title' => 'Remove passkey',
+            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in. Enter your password to confirm.',
         ],
     ],
 

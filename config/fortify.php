@@ -171,8 +171,24 @@ return [
     */
 
     'passkeys' => [
-        'relying_party_id' => parse_url((string) config('app.url'), PHP_URL_HOST),
-        'allowed_origins' => [config('app.url')],
+        'relying_party_id' => config('app.app_panel_domain')
+            ?: parse_url((string) config('app.url'), PHP_URL_HOST),
+        'allowed_origins' => [
+            (function (): string {
+                $appUrl = (string) config('app.url');
+                $panelDomain = config('app.app_panel_domain');
+
+                if (! $panelDomain) {
+                    return $appUrl;
+                }
+
+                $parsed = parse_url($appUrl);
+                $scheme = $parsed['scheme'] ?? 'https';
+                $port = isset($parsed['port']) ? ":{$parsed['port']}" : '';
+
+                return "{$scheme}://{$panelDomain}{$port}";
+            })(),
+        ],
         'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
         'timeout' => 60000,
     ],
