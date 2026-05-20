@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('value');
             $table->foreignUlid('created_by')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
+
+            $table->index(['team_id', 'type', 'value']);
         });
     }
 };
