@@ -16,7 +16,7 @@
         "chokidar": "^5.0.0",
         "laravel-vite-plugin": "^3.1.0",
         "playwright": "^1.60.0",
-        "postcss": "^8.5.14",
+        "postcss": "^8.5.15",
         "postcss-nesting": "^14.0.0",
         "tailwindcss": "^4.2.2",
         "vite": "^8.0.13"
@@ -25,7 +25,7 @@
         "@alpinejs/collapse": "^3.15.12",
         "@tailwindcss/vite": "^4.3.0",
         "alpinejs": "^3.15.12",
-        "motion": "^12.38.0",
-        "shiki": "^4.0.2"
+        "motion": "^12.39.0",
+        "shiki": "^4.1.0"
     }
 }
