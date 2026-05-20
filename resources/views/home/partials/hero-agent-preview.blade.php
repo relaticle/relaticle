@@ -182,6 +182,9 @@
                     el.style.opacity = '1';
                     el.style.transform = '';
                 });
+                this.clearComposer();
+                var overlay = this.$root.querySelector('.mcp-cta-overlay');
+                if (overlay) overlay.style.opacity = '0';
             },
 
             scrollMessageIntoView(selector) {
