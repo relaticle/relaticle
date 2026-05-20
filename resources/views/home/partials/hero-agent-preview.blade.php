@@ -33,13 +33,6 @@
          class="absolute inset-0 z-30 cursor-default"
          @contextmenu.prevent></div>
 
-    <div class="mcp-el mcp-cta-overlay pointer-events-none absolute inset-0 z-40 flex items-end justify-center pb-10 sm:pb-14 opacity-0">
-        <div class="rounded-full border border-gray-200/80 bg-white/95 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:border-white/[0.08] dark:bg-gray-900/95 dark:text-gray-200">
-            Try it yourself
-            <span class="ml-1 text-primary-600 dark:text-primary-400">→</span>
-        </div>
-    </div>
-
     @include('home.partials.hero-agent-shell')
 
     {{-- Main pane (chat column) --}}
@@ -68,16 +61,16 @@
         return {
             // Mirrors theme.css --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1)
             ease: [0.16, 1, 0.3, 1],
-            // cycleMs is the total budget for one cycle. The closing "Try it
-            // yourself" overlay finishes its fade-out near t=8.7s; 8800ms gives
-            // the rest of the budget for one final beat before the hold.
-            // holdMs is the extra dwell before the next cycle starts.
+            // cycleMs covers one full cycle through the three exchanges. The
+            // final record card settles near t=10.3s; holdMs lets the viewer
+            // read it before the loop restarts. Per-prompt charMs / per-stream
+            // wordMs are tuned for an unhurried, readable pace.
             prompts: [
-                    { text: "What's overdue this week?", charMs: 32 },
-                    { text: 'Mark them all as done.', charMs: 22 },
-                    { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 15 }
-                ],
-            cycleMs: 8800,
+                { text: "What's overdue this week?", charMs: 55 },
+                { text: 'Mark them all as done.', charMs: 38 },
+                { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 28 }
+            ],
+            cycleMs: 10800,
             holdMs: 1500,
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             paused: false,
@@ -93,11 +86,6 @@
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
                 this.clearComposer();
-                var overlay = this.$root.querySelector('.mcp-cta-overlay');
-                if (overlay) {
-                    overlay.style.opacity = '0';
-                    overlay.style.pointerEvents = 'none';
-                }
             },
 
             clearComposer() {
@@ -183,8 +171,6 @@
                     el.style.transform = '';
                 });
                 this.clearComposer();
-                var overlay = this.$root.querySelector('.mcp-cta-overlay');
-                if (overlay) overlay.style.opacity = '0';
             },
 
             scrollMessageIntoView(selector) {
@@ -239,7 +225,7 @@
                 animate(root.querySelector('.mcp-avatar-1'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-label-1'),  { opacity: [0, 1] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-tool-1'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 65); }, send1At + 600));
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 95); }, send1At + 600));
                 animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: (send1At + 950) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-task-1'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1000) / 1000, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-task-2'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1120) / 1000, duration: 0.3, ease: ease });
@@ -247,7 +233,7 @@
 
                 // ── Exchange 2: bulk approval ──
                 var p2 = this.prompts[1];
-                var typeStart2 = 3050;
+                var typeStart2 = 4200;
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, typeStart2 - 100));
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
                 var send2At = typeStart2 + p2.charMs * p2.text.length + 50;
@@ -255,12 +241,12 @@
                 animate(root.querySelector('.mcp-user-2'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: send2At / 1000, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-avatar-2'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-label-2'),  { opacity: [0, 1] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 60); }, send2At + 300));
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 90); }, send2At + 300));
                 animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (send2At + 750) / 1000, duration: 0.4, ease: ease });
 
                 // ── Exchange 3: create contact (longest prompt) ──
                 var p3 = this.prompts[2];
-                var typeStart3 = 4850;
+                var typeStart3 = 6800;
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, typeStart3 - 100));
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p3.text, p3.charMs); }, typeStart3));
                 var send3At = typeStart3 + p3.charMs * p3.text.length + 50;
@@ -269,14 +255,8 @@
                 animate(root.querySelector('.mcp-avatar-3'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-label-3'),  { opacity: [0, 1] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-tool-3'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 60); }, send3At + 600));
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 90); }, send3At + 600));
                 animate(root.querySelector('.mcp-card'),     { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (send3At + 1050) / 1000, duration: 0.35, ease: ease });
-
-                // ── Closing beat: "Try it yourself" ──
-                var overlayInAt = 7200;
-                var overlayOutAt = 8500;
-                animate(root.querySelector('.mcp-cta-overlay'), { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: overlayInAt / 1000, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-cta-overlay'), { opacity: [1, 0] }, { delay: overlayOutAt / 1000, duration: 0.2, ease: ease });
 
                 var totalMs = this.cycleMs + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
