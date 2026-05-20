@@ -3,8 +3,9 @@
     <div class="mcp-el mcp-input mx-auto w-full max-w-3xl">
         <div class="relative rounded-2xl border border-gray-200 bg-white transition-colors focus-within:border-primary-500 dark:border-gray-700 dark:bg-gray-800">
             {{-- Editor row — placeholder anchored top-left; remaining space mimics a multi-line text input. --}}
-            <div class="px-4 pt-3.5 pb-1.5 min-h-[60px]">
-                <span class="text-sm text-gray-400 dark:text-gray-500">Ask anything…</span>
+            <div class="px-4 pt-3.5 pb-1.5 min-h-[60px] text-sm leading-snug">
+                <span id="hero-composer-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">Ask anything…</span>
+                <span id="hero-composer-typed" class="hero-composer-typed text-gray-900 dark:text-gray-100"></span>
                 <span id="hero-composer-cursor" class="hero-composer-cursor inline-block w-px h-4 align-middle bg-primary/60 dark:bg-primary/80 ml-px" aria-hidden="true"></span>
             </div>
 
@@ -23,6 +24,7 @@
 </div>
 
 <style>
+    #hero-composer-placeholder.is-hidden { display: none; }
     .hero-composer-cursor { animation: hero-composer-blink 1.05s steps(2, end) infinite; }
     @keyframes hero-composer-blink { to { visibility: hidden; } }
     @media (prefers-reduced-motion: reduce) {
