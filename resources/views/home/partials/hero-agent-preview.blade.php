@@ -235,14 +235,20 @@
                 animate(root.querySelector('.mcp-task-2'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1120) / 1000, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-task-3'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1240) / 1000, duration: 0.3, ease: ease });
 
-                // ── Exchange 2 & 3: TEMPORARY — keep legacy fades so we can verify Exchange 1 alone ──
-                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, 4650));
-                animate(root.querySelector('.mcp-user-2'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 5.0, duration: 0.4, ease: ease });
-                animate(root.querySelector('.mcp-avatar-2'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 5.8, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-label-2'),   { opacity: [0, 1] }, { delay: 5.8, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-text-2'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 5.8, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: 6.2, duration: 0.45, ease: ease });
+                // ── Exchange 2: bulk approval ──
+                var p2 = this.prompts[1];
+                var typeStart2 = 3050;
+                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, typeStart2 - 100));
+                this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
+                var send2At = typeStart2 + p2.charMs * p2.text.length + 50;
+                this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send2At));
+                animate(root.querySelector('.mcp-user-2'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: send2At / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-avatar-2'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-label-2'),  { opacity: [0, 1] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 60); }, send2At + 300));
+                animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (send2At + 750) / 1000, duration: 0.4, ease: ease });
 
+                // ── Exchange 3: TEMPORARY — legacy fades, rewritten in next task ──
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, 8150));
                 animate(root.querySelector('.mcp-user-3'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 8.5, duration: 0.4, ease: ease });
                 animate(root.querySelector('.mcp-avatar-3'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 9.3, duration: 0.3, ease: ease });
