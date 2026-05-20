@@ -33,7 +33,7 @@
          class="absolute inset-0 z-30 cursor-default"
          @contextmenu.prevent></div>
 
-    <div class="mcp-cta-overlay pointer-events-none absolute inset-0 z-40 flex items-end justify-center pb-10 sm:pb-14 opacity-0">
+    <div class="mcp-el mcp-cta-overlay pointer-events-none absolute inset-0 z-40 flex items-end justify-center pb-10 sm:pb-14 opacity-0">
         <div class="rounded-full border border-gray-200/80 bg-white/95 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:border-white/[0.08] dark:bg-gray-900/95 dark:text-gray-200">
             Try it yourself
             <span class="ml-1 text-primary-600 dark:text-primary-400">→</span>
@@ -68,10 +68,10 @@
         return {
             // Mirrors theme.css --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1)
             ease: [0.16, 1, 0.3, 1],
-            // cycleMs is the total budget for one animation cycle. Exchange 3
-            // climaxes near t=10.4s, so 12000ms gives ~1.6s to read the final
-            // frame before the hold begins. holdMs is the extra dwell before
-            // the next cycle starts.
+            // cycleMs is the total budget for one cycle. The closing "Try it
+            // yourself" overlay finishes its fade-out near t=8.7s; 8800ms gives
+            // the rest of the budget for one final beat before the hold.
+            // holdMs is the extra dwell before the next cycle starts.
             prompts: [
                     { text: "What's overdue this week?", charMs: 32 },
                     { text: 'Mark them all as done.', charMs: 22 },
