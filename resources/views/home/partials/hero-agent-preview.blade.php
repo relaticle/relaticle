@@ -248,14 +248,19 @@
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 60); }, send2At + 300));
                 animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (send2At + 750) / 1000, duration: 0.4, ease: ease });
 
-                // ── Exchange 3: TEMPORARY — legacy fades, rewritten in next task ──
-                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, 8150));
-                animate(root.querySelector('.mcp-user-3'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 8.5, duration: 0.4, ease: ease });
-                animate(root.querySelector('.mcp-avatar-3'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 9.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-label-3'),   { opacity: [0, 1] }, { delay: 9.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-tool-3'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 9.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-text-3'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 9.7, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-card'),      { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: 10.0, duration: 0.4, ease: ease });
+                // ── Exchange 3: create contact (longest prompt) ──
+                var p3 = this.prompts[2];
+                var typeStart3 = 4850;
+                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, typeStart3 - 100));
+                this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p3.text, p3.charMs); }, typeStart3));
+                var send3At = typeStart3 + p3.charMs * p3.text.length + 50;
+                this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send3At));
+                animate(root.querySelector('.mcp-user-3'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: send3At / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-avatar-3'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-label-3'),  { opacity: [0, 1] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-tool-3'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 60); }, send3At + 600));
+                animate(root.querySelector('.mcp-card'),     { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (send3At + 1050) / 1000, duration: 0.35, ease: ease });
 
                 var totalMs = this.cycleMs + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
