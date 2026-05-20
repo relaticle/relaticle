@@ -33,6 +33,13 @@
          class="absolute inset-0 z-30 cursor-default"
          @contextmenu.prevent></div>
 
+    <div class="mcp-cta-overlay pointer-events-none absolute inset-0 z-40 flex items-end justify-center pb-10 sm:pb-14 opacity-0">
+        <div class="rounded-full border border-gray-200/80 bg-white/95 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:border-white/[0.08] dark:bg-gray-900/95 dark:text-gray-200">
+            Try it yourself
+            <span class="ml-1 text-primary-600 dark:text-primary-400">→</span>
+        </div>
+    </div>
+
     @include('home.partials.hero-agent-shell')
 
     {{-- Main pane (chat column) --}}
@@ -261,6 +268,12 @@
                 animate(root.querySelector('.mcp-tool-3'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 60); }, send3At + 600));
                 animate(root.querySelector('.mcp-card'),     { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (send3At + 1050) / 1000, duration: 0.35, ease: ease });
+
+                // ── Closing beat: "Try it yourself" ──
+                var overlayInAt = 7200;
+                var overlayOutAt = 8500;
+                animate(root.querySelector('.mcp-cta-overlay'), { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: overlayInAt / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-cta-overlay'), { opacity: [1, 0] }, { delay: overlayOutAt / 1000, duration: 0.2, ease: ease });
 
                 var totalMs = this.cycleMs + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
