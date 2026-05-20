@@ -3,7 +3,7 @@
         "setup": [
             "herd link",
             "herd secure",
-            "bin/setup-preview.sh"
+            "bin/setup-workspace.sh"
         ],
         "archive": [
             "herd unsecure",
