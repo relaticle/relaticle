@@ -70,7 +70,7 @@
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             paused: false,
             nextCycleTimer: null,
-            scrollTimers: [],
+            pendingTimers: [],
 
             resetChat() {
                 this.$root.querySelectorAll('.mcp-el').forEach(function(el) {
@@ -80,6 +80,75 @@
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
+                this.clearComposer();
+                var overlay = this.$root.querySelector('.mcp-cta-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    overlay.style.pointerEvents = 'none';
+                }
+            },
+
+            clearComposer() {
+                var typed = this.$root.querySelector('#hero-composer-typed');
+                var placeholder = this.$root.querySelector('#hero-composer-placeholder');
+                if (typed) typed.textContent = '';
+                if (placeholder) placeholder.classList.remove('is-hidden');
+            },
+
+            typeIntoComposer(text, charMs) {
+                var typed = this.$root.querySelector('#hero-composer-typed');
+                var placeholder = this.$root.querySelector('#hero-composer-placeholder');
+                if (!typed) return 0;
+                if (placeholder) placeholder.classList.add('is-hidden');
+                typed.textContent = '';
+                var self = this;
+                for (var i = 0; i < text.length; i++) {
+                    (function(idx) {
+                        self.pendingTimers.push(setTimeout(function() {
+                            typed.textContent += text.charAt(idx);
+                        }, charMs * (idx + 1)));
+                    })(i);
+                }
+                return charMs * text.length;
+            },
+
+            flashSend() {
+                var btn = this.$root.querySelector('#hero-composer-send');
+                if (!btn || typeof animate !== 'function') return;
+                animate(btn, { transform: ['scale(1)', 'scale(0.92)', 'scale(1)'] }, { duration: 0.22, ease: this.ease });
+            },
+
+            streamText(selector, wordMs) {
+                var el = this.$root.querySelector(selector);
+                if (!el) return 0;
+                var original = el.dataset.streamSource;
+                if (!original) {
+                    original = el.textContent.trim();
+                    el.dataset.streamSource = original;
+                }
+                var words = original.split(/\s+/);
+                el.textContent = '';
+                var fragments = [];
+                words.forEach(function(word, idx) {
+                    var span = document.createElement('span');
+                    span.dataset.word = '';
+                    span.style.opacity = '0';
+                    span.textContent = (idx === 0 ? '' : ' ') + word;
+                    el.appendChild(span);
+                    fragments.push(span);
+                });
+                el.style.opacity = '1';
+                var self = this;
+                fragments.forEach(function(span, idx) {
+                    self.pendingTimers.push(setTimeout(function() {
+                        if (typeof animate === 'function') {
+                            animate(span, { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { duration: 0.18, ease: self.ease });
+                        } else {
+                            span.style.opacity = '1';
+                        }
+                    }, wordMs * idx));
+                });
+                return wordMs * words.length;
             },
 
             cancelInflight() {
@@ -92,8 +161,8 @@
                     clearTimeout(this.nextCycleTimer);
                     this.nextCycleTimer = null;
                 }
-                this.scrollTimers.forEach(function(t) { clearTimeout(t); });
-                this.scrollTimers = [];
+                this.pendingTimers.forEach(function(t) { clearTimeout(t); });
+                this.pendingTimers = [];
             },
 
             showAllImmediate() {
@@ -156,7 +225,7 @@
                 // ─── Exchange 2: bulk approval (t=5.0–9.0) ───
                 // 4650ms = delay 5.0s - 350ms (scroll lead). Smooth scroll
                 // takes ~300ms; 350ms lead lets it settle before fade-in.
-                this.scrollTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, 4650));
+                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, 4650));
                 animate(root.querySelector('.mcp-user-2'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 5.0, duration: 0.4, ease: ease });
                 animate(root.querySelector('.mcp-avatar-2'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 5.8, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-label-2'),   { opacity: [0, 1] }, { delay: 5.8, duration: 0.3, ease: ease });
@@ -165,7 +234,7 @@
 
                 // ─── Exchange 3: create with @-mention (t=8.5–10.4) ───
                 // 8150ms = delay 8.5s - 350ms (matches exchange 2 lead).
-                this.scrollTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, 8150));
+                this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, 8150));
                 animate(root.querySelector('.mcp-user-3'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 8.5, duration: 0.4, ease: ease });
                 animate(root.querySelector('.mcp-avatar-3'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 9.3, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-label-3'),   { opacity: [0, 1] }, { delay: 9.3, duration: 0.3, ease: ease });
