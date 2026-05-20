@@ -65,7 +65,12 @@
             // climaxes near t=10.4s, so 12000ms gives ~1.6s to read the final
             // frame before the hold begins. holdMs is the extra dwell before
             // the next cycle starts.
-            cycleMs: 12000,
+            prompts: [
+                    { text: "What's overdue this week?", charMs: 32 },
+                    { text: 'Mark them all as done.', charMs: 22 },
+                    { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 15 }
+                ],
+            cycleMs: 8800,
             holdMs: 1500,
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             paused: false,
@@ -209,22 +214,28 @@
                 var ease = this.ease;
                 var self = this;
 
+                // Composer is always visible — bring it up at t=0.
                 animate(root.querySelector('.mcp-input'), { opacity: [0, 1] }, { duration: 0.3, ease: ease });
 
-                // ─── Exchange 1: overdue tasks (t=0.5–4.5) ───
-                animate(root.querySelector('.mcp-user-1'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 0.5, duration: 0.4, ease: ease });
-                animate(root.querySelector('.mcp-avatar-1'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 1.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-label-1'),   { opacity: [0, 1] }, { delay: 1.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-tool-1'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 1.3, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-text-1'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 1.7, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: 1.95, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-task-1'),    { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: 2.0, duration: 0.35, ease: ease });
-                animate(root.querySelector('.mcp-task-2'),    { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: 2.12, duration: 0.35, ease: ease });
-                animate(root.querySelector('.mcp-task-3'),    { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: 2.24, duration: 0.35, ease: ease });
+                // ── Empty first frame ── (0.0–0.6s)
+                // Nothing fires; the composer reads as a fresh chat ready for input.
 
-                // ─── Exchange 2: bulk approval (t=5.0–9.0) ───
-                // 4650ms = delay 5.0s - 350ms (scroll lead). Smooth scroll
-                // takes ~300ms; 350ms lead lets it settle before fade-in.
+                // ── Exchange 1: type → send → stream → tool result ──
+                var p1 = this.prompts[0];
+                this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p1.text, p1.charMs); }, 600));
+                var send1At = 600 + p1.charMs * p1.text.length + 50;
+                this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send1At));
+                animate(root.querySelector('.mcp-user-1'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: send1At / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-avatar-1'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-label-1'),  { opacity: [0, 1] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-tool-1'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 65); }, send1At + 600));
+                animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: (send1At + 950) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-task-1'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1000) / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-task-2'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1120) / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-task-3'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1240) / 1000, duration: 0.3, ease: ease });
+
+                // ── Exchange 2 & 3: TEMPORARY — keep legacy fades so we can verify Exchange 1 alone ──
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, 4650));
                 animate(root.querySelector('.mcp-user-2'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 5.0, duration: 0.4, ease: ease });
                 animate(root.querySelector('.mcp-avatar-2'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 5.8, duration: 0.3, ease: ease });
@@ -232,8 +243,6 @@
                 animate(root.querySelector('.mcp-text-2'),    { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { delay: 5.8, duration: 0.3, ease: ease });
                 animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: 6.2, duration: 0.45, ease: ease });
 
-                // ─── Exchange 3: create with @-mention (t=8.5–10.4) ───
-                // 8150ms = delay 8.5s - 350ms (matches exchange 2 lead).
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, 8150));
                 animate(root.querySelector('.mcp-user-3'),    { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: 8.5, duration: 0.4, ease: ease });
                 animate(root.querySelector('.mcp-avatar-3'),  { opacity: [0, 1], transform: ['scale(0.8)', 'scale(1)'] }, { delay: 9.3, duration: 0.3, ease: ease });
