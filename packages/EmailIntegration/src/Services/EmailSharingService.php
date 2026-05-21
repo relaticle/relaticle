@@ -23,6 +23,7 @@ final readonly class EmailSharingService
             'email_id' => $email->getKey(),
             'shared_with' => $sharedWith->getKey(),
         ], [
+            'team_id' => $email->team_id,
             'shared_by' => $sharedBy->getKey(),
             'tier' => $tier->value,
         ]);
