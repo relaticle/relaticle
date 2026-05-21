@@ -38,9 +38,4 @@ return new class extends Migration
             $table->index('contact_id');
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('email_participants');
-    }
 };

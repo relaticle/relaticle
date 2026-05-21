@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -20,7 +19,12 @@ final class EmailSignatureFactory extends Factory
     {
         return [
             'connected_account_id' => ConnectedAccount::factory(),
-            'user_id' => User::factory(),
+            'team_id' => fn (array $attributes): string => ConnectedAccount::query()
+                ->whereKey($attributes['connected_account_id'])
+                ->value('team_id'),
+            'user_id' => fn (array $attributes): string => ConnectedAccount::query()
+                ->whereKey($attributes['connected_account_id'])
+                ->value('user_id'),
             'name' => $this->faker->words(2, true),
             'content_html' => '<p>'.$this->faker->sentence().'</p>',
             'is_default' => false,

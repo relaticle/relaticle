@@ -23,8 +23,12 @@ final readonly class UpdateEmailSharingAction
         $email->shares()->where('shared_by', $sharer->getKey())->delete();
 
         foreach ($shares as $share) {
-            /** @var User $sharedWithUser */
-            $sharedWithUser = User::query()->findOrFail((string) $share['shared_with']);
+            $sharedWithUser = User::query()
+                ->inTeam($sharer->current_team_id)
+                ->whereKey($share['shared_with'])
+                ->first();
+
+            abort_if($sharedWithUser === null, 403);
 
             $tierForShare = $share['tier'] instanceof EmailPrivacyTier
                 ? $share['tier']

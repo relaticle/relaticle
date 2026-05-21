@@ -44,11 +44,37 @@ it('cancels a single send within the 30s undo window', function (): void {
     expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
 });
 
-it('rejects an undo after the dispatcher has picked up the email', function (): void {
+it('allows undo while SENDING when Gmail has not been called yet', function (): void {
     $email = ConnectedAccount::withoutEvents(fn (): Email => Email::factory()->create([
         'status' => EmailStatus::SENDING,
+        'provider_message_id' => null,
+    ]));
+
+    resolve(CancelQueuedEmailAction::class)->execute($email);
+
+    expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+});
+
+it('rejects undo once Gmail has accepted the message', function (): void {
+    $email = ConnectedAccount::withoutEvents(fn (): Email => Email::factory()->create([
+        'status' => EmailStatus::SENDING,
+        'provider_message_id' => 'gmail-msg-id-123',
     ]));
 
     expect(fn () => resolve(CancelQueuedEmailAction::class)->execute($email))
         ->toThrow(RuntimeException::class);
 });
+
+it('rejects undo on terminal statuses', function (EmailStatus $status): void {
+    $email = ConnectedAccount::withoutEvents(fn (): Email => Email::factory()->create([
+        'status' => $status,
+        'provider_message_id' => $status === EmailStatus::SENT ? 'gmail-msg-id-xyz' : null,
+    ]));
+
+    expect(fn () => resolve(CancelQueuedEmailAction::class)->execute($email))
+        ->toThrow(RuntimeException::class);
+})->with([
+    EmailStatus::SENT,
+    EmailStatus::CANCELLED,
+    EmailStatus::FAILED,
+]);

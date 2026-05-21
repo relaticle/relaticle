@@ -137,6 +137,16 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * @return Builder<User>
      */
     #[Scope]
+    protected function inTeam(Builder $query, string $teamId): Builder
+    {
+        return $query->where('current_team_id', $teamId);
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
     protected function expiredDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at')

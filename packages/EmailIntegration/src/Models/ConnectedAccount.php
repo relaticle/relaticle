@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\Concerns\HasTeam;
+use App\Models\Team;
 use App\Models\User;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -92,6 +95,22 @@ final class ConnectedAccount extends Model
         'daily_send_limit' => 'integer',
         'hourly_send_limit' => 'integer',
     ];
+
+    // Scopes
+
+    /**
+     * Scope to accounts owned by the given user within the given team.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function ownedBy(Builder $query, User $user, Team $team): Builder
+    {
+        return $query
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $team->getKey());
+    }
 
     // Relations
 

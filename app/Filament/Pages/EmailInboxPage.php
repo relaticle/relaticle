@@ -48,6 +48,7 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final class EmailInboxPage extends Page
 {
@@ -113,7 +114,7 @@ final class EmailInboxPage extends Page
 
         $query = Email::query()
             ->with(['from', 'labels'])
-            ->where('team_id', $user->current_team_id)
+            ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
@@ -142,7 +143,7 @@ final class EmailInboxPage extends Page
         /** @var Email|null */
         return Email::query()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
-            ->where('team_id', $this->authUser()->current_team_id)
+            ->forTeam($this->authUser()->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
@@ -154,7 +155,7 @@ final class EmailInboxPage extends Page
         $user = $this->authUser();
 
         return Email::query()
-            ->where('team_id', $user->current_team_id)
+            ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user))
             ->where('direction', EmailDirection::INBOUND)
             ->whereNull('read_at')
@@ -241,6 +242,7 @@ final class EmailInboxPage extends Page
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
                     'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->composeFormSchema())
@@ -305,6 +307,7 @@ final class EmailInboxPage extends Page
                     'quoted_body_html' => $email->body?->body_html,
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->replyFormSchema())
@@ -374,9 +377,9 @@ final class EmailInboxPage extends Page
                     ]),
             ])
             ->fillForm(function (array $arguments): array {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return [];
                 }
 
@@ -392,11 +395,9 @@ final class EmailInboxPage extends Page
                 ];
             })
             ->action(function (array $data, array $arguments): void {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
 
-                if ($email === null) {
-                    return;
-                }
+                abort_if(! $email instanceof Email, 403);
 
                 resolve(UpdateEmailSharingAction::class)->execute(
                     $email,
@@ -414,6 +415,30 @@ final class EmailInboxPage extends Page
             });
     }
 
+    private function resolveTeamEmail(?string $emailId, string $ability): ?Email
+    {
+        if ($emailId === null) {
+            return null;
+        }
+
+        $user = $this->authUser();
+
+        $email = Email::query()
+            ->forTeam($user->current_team_id)
+            ->whereKey($emailId)
+            ->first();
+
+        if ($email === null) {
+            return null;
+        }
+
+        if (! $user->can($ability, $email)) {
+            return null;
+        }
+
+        return $email;
+    }
+
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
@@ -425,9 +450,9 @@ final class EmailInboxPage extends Page
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'viewBody');
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return view('filament.actions.ai-summary', ['summary' => null]);
                 }
 
@@ -450,11 +475,9 @@ final class EmailInboxPage extends Page
                     ->required(),
             ])
             ->action(function (array $data, array $arguments): void {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'requestAccess');
 
-                if ($email === null) {
-                    return;
-                }
+                abort_if(! $email instanceof Email, 403);
 
                 $request = resolve(RequestEmailAccessAction::class)->execute(
                     $email,
@@ -502,7 +525,7 @@ final class EmailInboxPage extends Page
                     return;
                 }
 
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 
@@ -535,7 +558,7 @@ final class EmailInboxPage extends Page
                     return;
                 }
 
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 
@@ -637,6 +660,17 @@ final class EmailInboxPage extends Page
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Section::make('Signature')
                 ->collapsed()
                 ->schema([
@@ -732,6 +766,17 @@ final class EmailInboxPage extends Page
             Hidden::make('mode'),
             Hidden::make('in_reply_to_email_id'),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Placeholder::make('quoted_body_preview')
                 ->hiddenLabel()
                 ->content(function (Get $get): HtmlString {
@@ -786,9 +831,27 @@ final class EmailInboxPage extends Page
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),
             'in_reply_to_email_id' => $data['in_reply_to_email_id'] ?? null,
             'creation_source' => $source,
-            'privacy_tier' => EmailPrivacyTier::FULL,
+            'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
         ];
+    }
+
+    private function defaultPrivacyTier(): EmailPrivacyTier
+    {
+        return resolve(PrivacyService::class)->defaultTierForUser($this->authUser());
+    }
+
+    private function resolvePrivacyTier(mixed $value): EmailPrivacyTier
+    {
+        if ($value instanceof EmailPrivacyTier) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            return EmailPrivacyTier::from($value);
+        }
+
+        return $this->defaultPrivacyTier();
     }
 
     #[Computed]
