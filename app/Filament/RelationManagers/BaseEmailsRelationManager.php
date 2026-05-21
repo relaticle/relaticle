@@ -107,10 +107,17 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         $sharingService->setTierForAllOnRecord($record, $owner, $data['privacy_tier']);
 
                         foreach ($data['shares'] ?? [] as $share) {
+                            $sharedWithUser = User::query()
+                                ->inTeam($owner->current_team_id)
+                                ->whereKey((string) $share['shared_with'])
+                                ->first();
+
+                            abort_if($sharedWithUser === null, 403);
+
                             $sharingService->shareAllOnRecord(
                                 $record,
                                 $owner,
-                                User::query()->findOrFail((string) $share['shared_with']),
+                                $sharedWithUser,
                                 $share['tier'],
                             );
                         }
@@ -247,6 +254,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 ->all(),
                         ])
                         ->action(function (Email $record, array $data): void {
+                            abort_unless($this->authUser()->can('share', $record), 403);
+
                             resolve(UpdateEmailSharingAction::class)->execute(
                                 $record,
                                 $this->authUser(),

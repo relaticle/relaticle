@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8513bfe4cba6bee9ce9db99799758faa",
+    "content-hash": "ec2a88bdff9ec8c55f2c21bfa05e2162",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -7970,16 +7970,16 @@
         },
         {
             "name": "relaticle/activity-log",
-            "version": "1.x-dev",
+            "version": "v1.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/activity-log.git",
-                "reference": "f8839ef86308a2a31006dbbdeacece41b075cfa8"
+                "reference": "2ae439b1df363302f263ed16bce5606773d4c11f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/f8839ef86308a2a31006dbbdeacece41b075cfa8",
-                "reference": "f8839ef86308a2a31006dbbdeacece41b075cfa8",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/2ae439b1df363302f263ed16bce5606773d4c11f",
+                "reference": "2ae439b1df363302f263ed16bce5606773d4c11f",
                 "shasum": ""
             },
             "require": {
@@ -7998,7 +7998,6 @@
                 "pestphp/pest-plugin-laravel": "^4.0",
                 "pestphp/pest-plugin-livewire": "^4.0"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -8019,9 +8018,9 @@
             "description": "Reusable Filament plugin that renders a unified activity-log timeline for any Eloquent model",
             "support": {
                 "issues": "https://github.com/relaticle/activity-log/issues",
-                "source": "https://github.com/relaticle/activity-log/tree/1.x"
+                "source": "https://github.com/relaticle/activity-log/tree/v1.0.0"
             },
-            "time": "2026-04-21T15:23:52+00:00"
+            "time": "2026-04-26T14:15:07+00:00"
         },
         {
             "name": "relaticle/custom-fields",
@@ -20160,7 +20159,6 @@
     "aliases": [],
     "minimum-stability": "beta",
     "stability-flags": {
-        "relaticle/activity-log": 20,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,

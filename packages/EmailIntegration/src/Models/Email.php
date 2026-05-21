@@ -11,6 +11,8 @@ use App\Models\People;
 use App\Models\User;
 use Database\Factories\EmailFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -115,6 +117,16 @@ final class Email extends Model
         'attempts' => 'integer',
         'priority' => EmailPriority::class,
     ];
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function forTeam(Builder $query, string $teamId): Builder
+    {
+        return $query->where('team_id', $teamId);
+    }
 
     // Relations
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Models\Team;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -12,6 +14,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Size;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
@@ -50,9 +53,7 @@ final class EmailAccountsPage extends Page
      */
     private function getAccounts(): Collection
     {
-        return ConnectedAccount::query()->where('user_id', auth()->id())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->get();
+        return $this->ownedAccountsQuery()->get();
     }
 
     public function connectGmailAction(): Action
@@ -83,7 +84,7 @@ final class EmailAccountsPage extends Page
             ->color('warning')
             ->size(Size::Small)
             ->url(fn (array $arguments): string => route('email-accounts.redirect', [
-                'provider' => ConnectedAccount::query()->find((string) $arguments['account_id'])?->provider->value,
+                'provider' => $this->findAccount($arguments)?->provider->value,
             ]), true);
     }
 
@@ -95,7 +96,7 @@ final class EmailAccountsPage extends Page
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->findOwnedAccountOrFail($arguments);
 
                 return [
                     'sync_inbox' => $account->sync_inbox,
@@ -141,7 +142,7 @@ final class EmailAccountsPage extends Page
                     ]),
             ])
             ->action(function (array $arguments, array $data): void {
-                $account = $this->findOwnedAccount($arguments);
+                $account = $this->findAccount($arguments);
 
                 if (! $account instanceof ConnectedAccount) {
                     return;
@@ -167,7 +168,7 @@ final class EmailAccountsPage extends Page
                 ? 'This will stop syncing calendar events for this account.'
                 : 'You will be redirected to Google to grant calendar access.')
             ->action(function (array $arguments): void {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->findOwnedAccountOrFail($arguments);
 
                 if ($account->hasCalendar()) {
                     $account->disableCalendar();
@@ -190,7 +191,7 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
             ->action(function (array $arguments): void {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->findOwnedAccountOrFail($arguments);
 
                 dispatch(new IncrementalCalendarSyncJob($account));
 
@@ -206,17 +207,27 @@ final class EmailAccountsPage extends Page
     private function findAccount(array $arguments): ?ConnectedAccount
     {
         /** @var ConnectedAccount|null */
-        return ConnectedAccount::query()->find((string) $arguments['account_id']);
+        return $this->ownedAccountsQuery()->find((string) $arguments['account_id']);
     }
 
     /** @param array<string, mixed> $arguments */
-    private function findOwnedAccount(array $arguments): ?ConnectedAccount
+    private function findOwnedAccountOrFail(array $arguments): ConnectedAccount
     {
-        /** @var ConnectedAccount|null */
-        return ConnectedAccount::query()
-            ->where('user_id', auth()->id())
-            ->whereKey((string) $arguments['account_id'])
-            ->first();
+        /** @var ConnectedAccount */
+        return $this->ownedAccountsQuery()->findOrFail((string) $arguments['account_id']);
+    }
+
+    /**
+     * @return Builder<ConnectedAccount>
+     */
+    private function ownedAccountsQuery(): Builder
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        /** @var Team $team */
+        $team = filament()->getTenant();
+
+        return ConnectedAccount::query()->ownedBy($user, $team);
     }
 
     public function disconnectAction(): Action
@@ -228,7 +239,7 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                $account = $this->findOwnedAccount($arguments);
+                $account = $this->findAccount($arguments);
 
                 if (! $account instanceof ConnectedAccount) {
                     return;

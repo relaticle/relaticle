@@ -30,7 +30,9 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly string $messageId,
-    ) {}
+    ) {
+        $this->onQueue('emails-sync');
+    }
 
     /**
      * Unique key prevents duplicate jobs for the same account + message from

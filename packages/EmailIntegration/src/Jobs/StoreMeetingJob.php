@@ -25,7 +25,9 @@ final class StoreMeetingJob implements ShouldQueue
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly string $serializedEvent,
-    ) {}
+    ) {
+        $this->onQueue('emails-sync');
+    }
 
     public function handle(
         StoreMeetingAction $store,

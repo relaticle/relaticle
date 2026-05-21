@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -46,13 +47,14 @@ it('does not update another user\'s account via editSettings', function (): void
         'sync_inbox' => true,
     ]));
 
-    livewire(EmailAccountsPage::class)
+    expect(fn () => livewire(EmailAccountsPage::class)
         ->callAction('editSettings', data: [
             'sync_inbox' => false,
             'sync_sent' => false,
             'contact_creation_mode' => ContactCreationMode::None->value,
             'auto_create_companies' => false,
-        ], arguments: ['account_id' => $otherAccount->id]);
+        ], arguments: ['account_id' => $otherAccount->id]))
+        ->toThrow(ModelNotFoundException::class);
 
     expect($otherAccount->fresh()->sync_inbox)->toBeTrue();
 });
@@ -73,8 +75,9 @@ it('does not delete another user\'s account on disconnect', function (): void {
         'user_id' => $otherUser->id,
     ]));
 
-    livewire(EmailAccountsPage::class)
-        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]);
+    expect(fn () => livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]))
+        ->toThrow(ModelNotFoundException::class);
 
     $this->assertNotSoftDeleted(ConnectedAccount::class, [
         'id' => $otherAccount->id,
