@@ -12,10 +12,10 @@
                 <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Features</span>
             </div>
             <h2 class="font-display text-3xl sm:text-4xl md:text-[2.75rem] font-bold text-gray-950 dark:text-white tracking-[-0.02em] leading-[1.15]">
-                Built for humans. Accessible to AI.
+                One CRM. Three ways to work: UI, chat, and agents.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                A built-in AI chat for your team, plus 30 MCP tools and a REST API for any agent you bring. One source of truth — humans, in-app chat, and external agents all working on the same data.
+                Manage records by hand, ask Relaticle in the app, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
             </p>
         </div>
 
@@ -292,7 +292,7 @@
                 <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-primary/10 dark:bg-primary/15 rounded-full blur-2xl"></div>
                 <div class="relative">
                     <h3 class="{{ $cardTitle }}">Ready to start?</h3>
-                    <p class="{{ $cardDesc }}">Give your AI agents a CRM they can actually use.</p>
+                    <p class="{{ $cardDesc }}">Bring your team and agents onto the same CRM.</p>
                 </div>
                 <div class="relative mt-5">
                     <x-marketing.button size="sm" href="{{ route('register') }}">

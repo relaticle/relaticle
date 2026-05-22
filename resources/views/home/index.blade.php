@@ -13,10 +13,10 @@
 @endphp
 
 <x-guest-layout
-    :title="config('app.name') . ' - ' . __('The Open-Source CRM Built for AI Agents')"
-    description="Open-source, self-hosted CRM with a built-in AI chat agent and a production-grade MCP server. @-mention records, safe approvals, voice input, persistent history. 22 custom field types, REST API, team isolation."
-    :ogTitle="config('app.name') . ' - Open-Source Agent-Native CRM'"
-    ogDescription="Open-source CRM with a built-in AI chat — @-mention records, safe approvals on destructive ops, voice input, persistent history. Plus 30 MCP tools for external agents. Self-hosted, you own your data."
+    :title="config('app.name') . ' - ' . __('CRM Built for People and AI-Powered Work')"
+    description="Open-source, self-hosted CRM with built-in AI chat and 30 MCP tools for external agents. @-mention records, safe approvals, voice input, persistent history, REST API, and team isolation."
+    :ogTitle="config('app.name') . ' - Human-First CRM with Agent-Native Infrastructure'"
+    ogDescription="Open-source CRM for teams and AI-powered work. Use the app, ask the built-in chat, or connect external agents through 30 MCP tools. Self-hosted, you own your data."
     :ogImage="url('/images/open-graph.jpg')">
     @push('header')
         @vite('resources/js/motion.js')
@@ -35,7 +35,7 @@
                 ->applicationCategory('BusinessApplication')
                 ->applicationSubCategory('CRM')
                 ->operatingSystem('Linux, macOS, Windows')
-                ->description('The open-source CRM built for AI agents. Self-hosted with a built-in AI chat (with @-mentions, safe approvals, voice, and persistent history) plus a production-grade MCP server (30 tools), REST API, and 22 custom field types. Connect any external agent -- Claude, GPT, Gemini, or open-source models.')
+                ->description('The open-source CRM built for people and AI-powered work. Self-hosted with a built-in AI chat (with @-mentions, safe approvals, voice, and persistent history) plus a production-grade MCP server (30 tools), REST API, and 22 custom field types. Connect any external agent -- Claude, GPT, Gemini, or open-source models.')
                 ->url(url('/'))
                 ->offers(\Spatie\SchemaOrg\Schema::offer()->price('0')->priceCurrency('USD'))
                 ->setProperty('featureList', [

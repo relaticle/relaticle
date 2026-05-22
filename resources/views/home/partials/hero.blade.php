@@ -21,13 +21,13 @@
             {{-- ── Heading ── --}}
             <div class="text-center max-w-3xl">
                 <h1 class="font-display leading-[1.08] tracking-[-0.035em] text-balance">
-                    <span class="block text-2xl sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem] font-normal text-gray-500 dark:text-gray-400">The Open-Source CRM</span>
-                    <span class="block text-[2.25rem] sm:text-5xl md:text-[3.5rem] lg:text-[3.75rem] font-extrabold text-gray-950 dark:text-white mt-1.5 sm:mt-2">Built for AI Agents</span>
+                    <span class="block text-2xl sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem] font-normal text-gray-500 dark:text-gray-400">The CRM built for people</span>
+                    <span class="block text-[2.25rem] sm:text-5xl md:text-[3.5rem] lg:text-[3.75rem] font-extrabold text-gray-950 dark:text-white mt-1.5 sm:mt-2">and AI-powered work</span>
                 </h1>
 
                 <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
-                    Connect any AI agent with 30 MCP tools.<br class="hidden sm:block"/>
-                    Self-hosted. No per-seat pricing. Yours to own.
+                    Open-source, self-hosted, and human-first.<br class="hidden sm:block"/>
+                    Built-in AI chat plus 30 MCP tools for external agents.
                 </p>
             </div>
 
