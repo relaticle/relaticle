@@ -9,22 +9,26 @@
                 <span id="hero-composer-cursor" class="hero-composer-cursor inline-block w-px h-4 align-middle bg-primary/60 dark:bg-primary/80 ml-px" aria-hidden="true"></span>
             </div>
 
-            {{-- Footer row: model picker on the left, send button on the right --}}
+            {{-- Footer row mirrors the real dashboard composer: spacer on the
+                 left, model picker grouped with the send button on the right. --}}
             <div class="flex items-center justify-between gap-2 px-3 pb-2.5">
-                <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-pico font-medium text-gray-500 dark:text-gray-400">
-                    <span>Auto</span>
-                    <x-heroicon-o-chevron-down class="w-3 h-3"/>
-                </button>
-                <button id="hero-composer-send" type="button" tabindex="-1" aria-hidden="true" class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white">
-                    <x-heroicon-s-arrow-up class="w-4 h-4"/>
-                </button>
+                <div class="flex-1"></div>
+                <div class="flex items-center gap-2">
+                    <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-pico font-medium text-gray-500 dark:text-gray-400">
+                        <span>Auto</span>
+                        <x-heroicon-o-chevron-down class="w-3 h-3"/>
+                    </button>
+                    <button id="hero-composer-send" type="button" tabindex="-1" aria-hidden="true" class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white">
+                        <x-heroicon-s-arrow-up class="w-4 h-4"/>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-    #hero-composer-placeholder.is-hidden { display: none; }
+    .hero-composer-placeholder.is-hidden { display: none; }
     .hero-composer-cursor { animation: hero-composer-blink 1.05s steps(2, end) infinite; }
     @keyframes hero-composer-blink { to { visibility: hidden; } }
     @media (prefers-reduced-motion: reduce) {

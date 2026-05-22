@@ -335,16 +335,15 @@ describe('Hero AI tab — animation timeline', function () {
         expect($body)->toContain('mcp-el mcp-tasks-table');
     });
 
-    it('declares a single hold of ~2s after the final exchange before restart', function () {
+    it('keeps the post-exchange hold window at ~1.5s', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
-
-        // After exchange 3 ends near t=10.4s, the cycle should restart within
-        // ~3s, not sit idle for 8s+. cycleMs is the post-ex3 active+hold budget.
         $body = $response->getContent();
 
-        // 12000 = 12s total cycle (10.4s active + 1.6s rest) — preferred value.
-        expect($body)->toContain('cycleMs: 12000');
+        // Hold is the read-time after exchange 3 settles before the loop
+        // restarts from the entry phase. cycleMs no longer exists as a
+        // single magic number — timing is composed from entryHold +
+        // transition + exchange budgets.
         expect($body)->toContain('holdMs: 1500');
     });
 
@@ -353,21 +352,22 @@ describe('Hero AI tab — animation timeline', function () {
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // After unification: every assistant child uses translateY for its slide.
-        // The legacy mixed translateX(-6) on tool indicators is replaced.
+        // Every assistant child uses translateY for its slide. The legacy
+        // mixed translateX(-6) on tool indicators must stay out.
         expect($body)->not->toContain("translateX('-6px')");
         expect($body)->not->toContain('translateX(-6px)');
     });
 
-    it('schedules scroll-into-view 350ms before the following user message', function () {
+    it('schedules scroll-into-view 100ms before the following user message', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // 4650 = exchange-2 user delay (5000) - 350ms lead
-        // 8150 = exchange-3 user delay (8500) - 350ms lead
-        expect($body)->toContain('4650');
-        expect($body)->toContain('8150');
+        // After the entry-phase rewrite, ex2 and ex3 type-start moments are
+        // computed at runtime relative to conversationStart, but the
+        // scroll-lead offset is the same constant in both call sites.
+        expect($body)->toContain('typeStart2 - 100');
+        expect($body)->toContain('typeStart3 - 100');
     });
 
     it('animates the 3 task rows as a single staggered group with 120ms spacing', function () {
@@ -375,24 +375,57 @@ describe('Hero AI tab — animation timeline', function () {
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // Reduce stagger: 2.0 / 2.12 / 2.24 (was 2.0 / 2.3 / 2.6)
-        expect($body)->toContain('delay: 2.0');
-        expect($body)->toContain('delay: 2.12');
-        expect($body)->toContain('delay: 2.24');
+        // Stagger spacing is 120ms after the table reveal: 1000 / 1120 / 1240
+        // relative to conversationStart.
+        expect($body)->toContain('conversationStart + 1000');
+        expect($body)->toContain('conversationStart + 1120');
+        expect($body)->toContain('conversationStart + 1240');
+    });
+});
+
+describe('Hero AI tab — entry phase', function () {
+    it('renders the dashboard greeting mirroring app /', function () {
+        $response = $this->get('/');
+        $response->assertSuccessful();
+
+        // Mirrors packages/Chat/resources/views/filament/pages/dashboard.blade.php
+        // greeting: large semibold heading + recent-chat link beneath.
+        // assertSee defaults to escape=true; apostrophes are not HTML-escaped
+        // in plain text bodies, so we pass false to compare literally.
+        $response->assertSee('Good morning, Sarah.');
+        $response->assertSee("This week's pipeline review", false);
     });
 
-    it('delays the assistant bubble so it appears together with its first child', function () {
+    it('shows three example prompt chips to anchor the demo', function () {
+        $response = $this->get('/');
+        $response->assertSuccessful();
+
+        $response->assertSee("What's overdue this week?", false);
+        $response->assertSee("Show this week's pipeline", false);
+        $response->assertSee('Add a new contact');
+    });
+
+    it('renders a second composer scoped with entry IDs', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // After fix: bubble + first child share a delay so the bubble never
-        // appears empty. Exchange 1 first child is mcp-tool-1 at delay 1.3.
-        // Exchange 2 first child is mcp-text-2 at delay 5.8.
-        // Exchange 3 first child is mcp-tool-3 at delay 9.3.
-        // The bubble's avatar animation now matches its first child's delay.
-        expect(substr_count($body, 'delay: 1.3,'))->toBeGreaterThanOrEqual(2);
-        expect(substr_count($body, 'delay: 5.8,'))->toBeGreaterThanOrEqual(2);
-        expect(substr_count($body, 'delay: 9.3,'))->toBeGreaterThanOrEqual(2);
+        // Entry composer is a twin of hero-composer-* with entry-scoped IDs
+        // so the heroChat factory can target it independently.
+        expect($body)->toContain('hero-entry-typed');
+        expect($body)->toContain('hero-entry-placeholder');
+        expect($body)->toContain('hero-entry-send');
+    });
+
+    it('wires the entry → conversation transition in the heroChat factory', function () {
+        $response = $this->get('/');
+        $response->assertSuccessful();
+        $body = $response->getContent();
+
+        // Phase machine helpers must be in the factory or the loop has no
+        // way to fade the entry overlay out and the conversation pane in.
+        expect($body)->toContain('transitionToConversation');
+        expect($body)->toContain('entryHoldMs');
+        expect($body)->toContain('entryTransitionMs');
     });
 });

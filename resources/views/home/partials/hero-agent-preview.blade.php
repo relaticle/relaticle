@@ -14,6 +14,10 @@
     .hero-agent-preview .overflow-y-auto::-webkit-scrollbar {
         display: none;
     }
+    /* Conversation title starts hidden so the entry overlay reads as the
+       only foreground surface; the transition fades it in. The sidebar is
+       always visible — it mirrors the real dashboard's persistent shell. */
+    .hero-agent-preview .hero-agent-title { opacity: 0; }
 </style>
 
 <div x-data="heroChat()"
@@ -35,11 +39,13 @@
 
     @include('home.partials.hero-agent-shell')
 
-    {{-- Main pane (chat column) --}}
-    <div class="flex-1 flex flex-col min-w-0">
+    {{-- Main pane (chat column). Relative so the entry overlay can absolutely
+         position itself within this column instead of the whole panel — that
+         keeps the sidebar visible during the entry phase too. --}}
+    <div class="relative flex-1 flex flex-col min-w-0">
 
         {{-- Conversation title — mirrors app chat-page H1: large, bold, left-aligned, no chrome --}}
-        <div class="px-4 sm:px-6 md:px-8 pt-5 pb-3">
+        <div class="hero-agent-title px-4 sm:px-6 md:px-8 pt-5 pb-3">
             <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white truncate">Overdue tasks this week</h2>
         </div>
 
@@ -52,6 +58,10 @@
 
         @include('home.partials.hero-agent-composer')
 
+        {{-- Entry overlay — covers the chat column only, leaving the sidebar
+             visible. Driven by heroChat phase state. --}}
+        @include('home.partials.hero-agent-entry')
+
     </div>
 
 </div>
@@ -61,16 +71,19 @@
         return {
             // Mirrors theme.css --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1)
             ease: [0.16, 1, 0.3, 1],
-            // cycleMs covers one full cycle through the three exchanges. The
-            // final record card settles near t=10.3s; holdMs lets the viewer
-            // read it before the loop restarts. Per-prompt charMs / per-stream
-            // wordMs are tuned for an unhurried, readable pace.
+            // Per-prompt charMs / per-stream wordMs are tuned for an unhurried,
+            // readable pace. holdMs lets the viewer read the final record card
+            // before the loop restarts.
             prompts: [
                 { text: "What's overdue this week?", charMs: 55 },
                 { text: 'Mark them all as done.', charMs: 38 },
                 { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 28 }
             ],
-            cycleMs: 10800,
+            // Entry phase budget — first prompt is typed into the centered
+            // dashboard composer (mirrors app /), then the screen transitions
+            // into the conversation view where exchanges 2 and 3 continue.
+            entryHoldMs: 600,
+            entryTransitionMs: 700,
             holdMs: 1500,
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             paused: false,
@@ -82,22 +95,47 @@
                     el.style.opacity = '0';
                     el.style.transform = '';
                 });
+                // Conversation title has its own CSS opacity:0 rule so it
+                // doesn't ghost in before the transition. Clear inline styles
+                // so the CSS default re-applies. Sidebar is always visible —
+                // mirrors the real dashboard — so it's not touched here.
+                this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
+                    el.style.opacity = '';
+                    el.style.transform = '';
+                });
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
                 this.clearComposer();
+                this.clearEntryComposer();
             },
 
             clearComposer() {
-                var typed = this.$root.querySelector('#hero-composer-typed');
-                var placeholder = this.$root.querySelector('#hero-composer-placeholder');
+                this.clearTypedNode('#hero-composer-typed', '#hero-composer-placeholder');
+            },
+
+            clearEntryComposer() {
+                this.clearTypedNode('#hero-entry-typed', '#hero-entry-placeholder');
+            },
+
+            clearTypedNode(typedSelector, placeholderSelector) {
+                var typed = this.$root.querySelector(typedSelector);
+                var placeholder = this.$root.querySelector(placeholderSelector);
                 if (typed) typed.textContent = '';
                 if (placeholder) placeholder.classList.remove('is-hidden');
             },
 
             typeIntoComposer(text, charMs) {
-                var typed = this.$root.querySelector('#hero-composer-typed');
-                var placeholder = this.$root.querySelector('#hero-composer-placeholder');
+                return this.typeIntoNode('#hero-composer-typed', '#hero-composer-placeholder', text, charMs);
+            },
+
+            typeIntoEntryComposer(text, charMs) {
+                return this.typeIntoNode('#hero-entry-typed', '#hero-entry-placeholder', text, charMs);
+            },
+
+            typeIntoNode(typedSelector, placeholderSelector, text, charMs) {
+                var typed = this.$root.querySelector(typedSelector);
+                var placeholder = this.$root.querySelector(placeholderSelector);
                 if (!typed) return 0;
                 if (placeholder) placeholder.classList.add('is-hidden');
                 typed.textContent = '';
@@ -113,7 +151,15 @@
             },
 
             flashSend() {
-                var btn = this.$root.querySelector('#hero-composer-send');
+                this.flashButton('#hero-composer-send');
+            },
+
+            flashEntrySend() {
+                this.flashButton('#hero-entry-send');
+            },
+
+            flashButton(selector) {
+                var btn = this.$root.querySelector(selector);
                 if (!btn || typeof animate !== 'function') return;
                 animate(btn, { transform: ['scale(1)', 'scale(0.92)', 'scale(1)'] }, { duration: 0.22, ease: this.ease });
             },
@@ -170,7 +216,37 @@
                     el.style.opacity = '1';
                     el.style.transform = '';
                 });
+                // Reduced-motion fallback: viewer sees the final conversation
+                // state, not the entry overlay. Title must override its CSS
+                // opacity:0 default.
+                this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
+                    el.style.opacity = '1';
+                });
+                var entry = this.$root.querySelector('.hero-agent-entry');
+                if (entry) entry.style.opacity = '0';
                 this.clearComposer();
+                this.clearEntryComposer();
+            },
+
+            transitionToConversation() {
+                var ease = this.ease;
+                var d = this.entryTransitionMs / 1000;
+
+                var entry = this.$root.querySelector('.hero-agent-entry');
+                if (entry && typeof animate === 'function') {
+                    animate(entry, {
+                        opacity: [1, 0],
+                        transform: ['scale(1)', 'scale(0.985)']
+                    }, { duration: d, ease: ease });
+                }
+
+                var title = this.$root.querySelector('.hero-agent-title');
+                if (title && typeof animate === 'function') {
+                    animate(title, {
+                        opacity: [0, 1],
+                        transform: ['translateY(-4px)', 'translateY(0px)']
+                    }, { duration: d * 0.85, delay: d * 0.15, ease: ease });
+                }
             },
 
             scrollMessageIntoView(selector) {
@@ -210,30 +286,50 @@
                 var ease = this.ease;
                 var self = this;
 
-                // Composer is always visible — bring it up at t=0.
-                animate(root.querySelector('.mcp-input'), { opacity: [0, 1] }, { duration: 0.3, ease: ease });
+                // ── Entry phase ──
+                // The viewer lands on the centered dashboard (greeting +
+                // composer + chips), watches prompt 1 get typed, then sees
+                // the screen transition into the conversation view.
+                var entry = root.querySelector('.hero-agent-entry');
+                if (entry) {
+                    animate(entry, { opacity: [0, 1] }, { duration: 0.35, ease: ease });
+                }
+                animate(root.querySelector('.mcp-entry-greeting'),  { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.05, ease: ease });
+                animate(root.querySelector('.mcp-entry-recent'),    { opacity: [0, 1] }, { duration: 0.4, delay: 0.18, ease: ease });
+                animate(root.querySelector('.mcp-entry-composer'),  { opacity: [0, 1], transform: ['translateY(12px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.22, ease: ease });
+                animate(root.querySelector('.mcp-entry-chips'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.32, ease: ease });
 
-                // ── Empty first frame ── (0.0–0.6s)
-                // Nothing fires; the composer reads as a fresh chat ready for input.
-
-                // ── Exchange 1: type → send → stream → tool result ──
+                // Type prompt 1 into the entry composer, then send.
                 var p1 = this.prompts[0];
-                this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p1.text, p1.charMs); }, 600));
-                var send1At = 600 + p1.charMs * p1.text.length + 50;
-                this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send1At));
-                animate(root.querySelector('.mcp-user-1'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: send1At / 1000, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-avatar-1'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-label-1'),  { opacity: [0, 1] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-tool-1'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send1At + 300) / 1000, duration: 0.25, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 95); }, send1At + 600));
-                animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: (send1At + 950) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-task-1'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1000) / 1000, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-task-2'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1120) / 1000, duration: 0.3, ease: ease });
-                animate(root.querySelector('.mcp-task-3'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (send1At + 1240) / 1000, duration: 0.3, ease: ease });
+                var entryTypeAt = this.entryHoldMs;
+                var entrySendAt = entryTypeAt + p1.charMs * p1.text.length + 50;
+                var transitionAt = entrySendAt + 200;
+                this.pendingTimers.push(setTimeout(function() { self.typeIntoEntryComposer(p1.text, p1.charMs); }, entryTypeAt));
+                this.pendingTimers.push(setTimeout(function() { self.flashEntrySend(); self.clearEntryComposer(); }, entrySendAt));
+
+                // Transition into the conversation view.
+                this.pendingTimers.push(setTimeout(function() { self.transitionToConversation(); }, transitionAt));
+
+                // Conversation composer fades in during the transition so it's
+                // ready for prompts 2 and 3.
+                animate(root.querySelector('.mcp-input'), { opacity: [0, 1] }, { duration: 0.4, delay: transitionAt / 1000, ease: ease });
+
+                var conversationStart = transitionAt + this.entryTransitionMs;
+
+                // ── Exchange 1: user bubble lands as the transition completes ──
+                animate(root.querySelector('.mcp-user-1'),   { opacity: [0, 1], transform: ['translateX(12px)', 'translateX(0px)'] }, { delay: conversationStart / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-avatar-1'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (conversationStart + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-label-1'),  { opacity: [0, 1] }, { delay: (conversationStart + 300) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-tool-1'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (conversationStart + 300) / 1000, duration: 0.25, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 95); }, conversationStart + 600));
+                animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: (conversationStart + 950) / 1000, duration: 0.25, ease: ease });
+                animate(root.querySelector('.mcp-task-1'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (conversationStart + 1000) / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-task-2'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (conversationStart + 1120) / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-task-3'),   { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { delay: (conversationStart + 1240) / 1000, duration: 0.3, ease: ease });
 
                 // ── Exchange 2: bulk approval ──
                 var p2 = this.prompts[1];
-                var typeStart2 = 4200;
+                var typeStart2 = conversationStart + 2700;
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-2'); }, typeStart2 - 100));
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
                 var send2At = typeStart2 + p2.charMs * p2.text.length + 50;
@@ -246,7 +342,7 @@
 
                 // ── Exchange 3: create contact (longest prompt) ──
                 var p3 = this.prompts[2];
-                var typeStart3 = 6800;
+                var typeStart3 = send2At + 1900;
                 this.pendingTimers.push(setTimeout(function() { self.scrollMessageIntoView('.mcp-user-3'); }, typeStart3 - 100));
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p3.text, p3.charMs); }, typeStart3));
                 var send3At = typeStart3 + p3.charMs * p3.text.length + 50;
@@ -258,7 +354,8 @@
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 90); }, send3At + 600));
                 animate(root.querySelector('.mcp-card'),     { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (send3At + 1050) / 1000, duration: 0.35, ease: ease });
 
-                var totalMs = this.cycleMs + this.holdMs;
+                var cycleEnd = send3At + 1400;
+                var totalMs = cycleEnd + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
                     if (!self.paused) self.animateChat();
                 }, totalMs);
