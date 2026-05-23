@@ -23,15 +23,9 @@
 <div x-data="heroChat()"
      @hero-chat-reset.window="cancelInflight(); resetChat()"
      @hero-chat-animate.window="animateChat()"
-     @mouseenter="pause()"
-     @mouseleave="resume()"
-     @focusin="pause()"
-     @focusout="resume()"
      class="hero-agent-preview relative bg-gray-50 dark:bg-gray-950 flex h-[520px] sm:h-[580px] md:h-[640px]">
 
-    {{-- Non-interactive overlay: blocks clicks, right-click, drag.
-         Mouseenter/leave on the root still fire — they trigger from cursor
-         crossing the bounding rect, not from event dispatch on a specific child.
+    {{-- Non-interactive overlay: blocks clicks, right-click, and drag.
          z-30 puts it above all panel content. --}}
     <div aria-hidden="true"
          class="absolute inset-0 z-30 cursor-default"
@@ -86,7 +80,6 @@
             entryTransitionMs: 700,
             holdMs: 1500,
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-            paused: false,
             nextCycleTimer: null,
             pendingTimers: [],
 
@@ -357,19 +350,8 @@
                 var cycleEnd = send3At + 1400;
                 var totalMs = cycleEnd + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
-                    if (!self.paused) self.animateChat();
+                    self.animateChat();
                 }, totalMs);
-            },
-
-            pause() {
-                this.paused = true;
-                this.cancelInflight();
-            },
-
-            resume() {
-                if (!this.paused) return;
-                this.paused = false;
-                this.animateChat();
             }
         };
     }

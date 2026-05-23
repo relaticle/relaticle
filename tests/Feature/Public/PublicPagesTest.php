@@ -347,6 +347,22 @@ describe('Hero AI tab — animation timeline', function () {
         expect($body)->toContain('holdMs: 1500');
     });
 
+    it('does not restart the AI demo on hover or focus changes', function () {
+        $response = $this->get('/');
+        $response->assertSuccessful();
+        $body = $response->getContent();
+
+        // Hovering between the preview and the Ask Relaticle tab must not
+        // cancel timers and call animateChat(), because that restarts the demo.
+        expect($body)
+            ->not->toContain('@mouseenter="pause()"')
+            ->not->toContain('@mouseleave="resume()"')
+            ->not->toContain('@focusin="pause()"')
+            ->not->toContain('@focusout="resume()"')
+            ->not->toContain('pause() {')
+            ->not->toContain('resume() {');
+    });
+
     it('uses a unified Y-slide for assistant content', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
