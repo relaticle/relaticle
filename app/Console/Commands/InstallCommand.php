@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
@@ -18,14 +20,12 @@ use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
 use function Laravel\Prompts\warning;
 
+#[Description('Install and configure Relaticle')]
+#[Signature('relaticle:install
+                            {--force : Force installation even if already configured}
+                            {--env-file= : Custom path to .env file (for testing)}')]
 final class InstallCommand extends Command
 {
-    protected $signature = 'relaticle:install
-                            {--force : Force installation even if already configured}
-                            {--env-file= : Custom path to .env file (for testing)}';
-
-    protected $description = 'Install and configure Relaticle';
-
     public function handle(): int
     {
         $this->displayWelcome();

@@ -9,28 +9,18 @@ use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\Task;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
+#[Description('Backfill colors for existing custom field options (Task status/priority and Opportunity stages)')]
+#[Signature('custom-fields:backfill-colors
+                            {--team= : Specific team ID to backfill (optional)}
+                            {--dry-run : Show what would be updated without making changes}')]
 final class BackfillCustomFieldColorsCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'custom-fields:backfill-colors
-                            {--team= : Specific team ID to backfill (optional)}
-                            {--dry-run : Show what would be updated without making changes}';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Backfill colors for existing custom field options (Task status/priority and Opportunity stages)';
-
     /**
      * Execute the console command.
      */

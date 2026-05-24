@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Date;
@@ -23,16 +25,14 @@ use Symfony\Component\Finder\Finder;
  * Snapshots live at `lang/.snapshots/<locale>.json` and should be committed
  * to the fork so team members share translation state.
  */
-final class LocaleDiffCommand extends Command
-{
-    protected $signature = 'locale:diff
+#[Description('Compare keys/values between lang/en/ and lang/<locale>/, report missing, orphaned, and stale translations')]
+#[Signature('locale:diff
         {locale : Locale code (ISO 15897, e.g. fr, pt_BR)}
         {--lang-path= : Override lang directory root}
         {--format=text : Output format: text or json}
-        {--update-snapshot : Write the current en hashes as the new baseline; skip diff output}';
-
-    protected $description = 'Compare keys/values between lang/en/ and lang/<locale>/, report missing, orphaned, and stale translations';
-
+        {--update-snapshot : Write the current en hashes as the new baseline; skip diff output}')]
+final class LocaleDiffCommand extends Command
+{
     public function handle(): int
     {
         $locale = (string) $this->argument('locale');
