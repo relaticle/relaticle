@@ -12,15 +12,15 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Str;
 use Throwable;
 
+#[DeleteWhenMissingModels]
 final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use Queueable;
-
-    public bool $deleteWhenMissingModels = true;
 
     public int $tries = 1;
 
