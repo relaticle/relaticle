@@ -26,6 +26,7 @@ it('redirects to Microsoft with mail Graph scopes and prompt=consent', function 
         ->toContain('prompt=consent')
         ->toContain(urlencode('https://graph.microsoft.com/Mail.Read'))
         ->toContain(urlencode('https://graph.microsoft.com/Mail.Send'))
+        ->toContain(urlencode('https://graph.microsoft.com/User.Read'))
         ->toContain(urlencode('offline_access'))
         ->not->toContain(urlencode('https://graph.microsoft.com/Calendars.Read'));
 });
