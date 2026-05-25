@@ -133,12 +133,12 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     {
         $payload = [
             'message' => [
-                'subject' => (string) $data['subject'],
+                'subject' => $data['subject'],
                 'body' => [
                     'contentType' => 'HTML',
-                    'content' => (string) ($data['body_html'] ?? ''),
+                    'content' => $data['body_html'],
                 ],
-                'toRecipients' => $this->formatRecipients($data['to'] ?? []),
+                'toRecipients' => $this->formatRecipients($data['to']),
                 'ccRecipients' => $this->formatRecipients($data['cc'] ?? []),
                 'bccRecipients' => $this->formatRecipients($data['bcc'] ?? []),
             ],
