@@ -39,10 +39,9 @@ it('stores an azure connected account and flips calendar capability when Graph c
         'offline_access',
     ];
 
-    Socialite::shouldReceive('driver')->with('azure')->andReturnSelf();
-    Socialite::shouldReceive('user')->andReturn($social);
+    Socialite::fake('azure', $social);
 
-    $this->get(route('email-accounts.callback', ['provider' => 'azure']).'?capability=calendar')
+    $this->get(route('email-accounts.callback', ['provider' => 'azure']))
         ->assertRedirect();
 
     $account = ConnectedAccount::query()
@@ -53,5 +52,5 @@ it('stores an azure connected account and flips calendar capability when Graph c
     expect($account->hasCalendar())->toBeTrue()
         ->and($account->capabilities['email'])->toBeTrue();
 
-    Bus::assertDispatched(InitialCalendarSyncJob::class, fn ($job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });
