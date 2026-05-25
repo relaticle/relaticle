@@ -12,6 +12,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Size;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
@@ -48,9 +49,17 @@ final class EmailAccountsPage extends Page
      */
     private function getAccounts(): Collection
     {
-        return ConnectedAccount::query()->where('user_id', auth()->id())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->get();
+        return $this->scopedQuery()->get();
+    }
+
+    /**
+     * @return Builder<ConnectedAccount>
+     */
+    private function scopedQuery(): Builder
+    {
+        return ConnectedAccount::query()
+            ->where('user_id', auth()->id())
+            ->where('team_id', filament()->getTenant()?->getKey());
     }
 
     public function connectGmailAction(): Action
@@ -81,7 +90,7 @@ final class EmailAccountsPage extends Page
             ->color('warning')
             ->size(Size::Small)
             ->url(fn (array $arguments): string => route('email-accounts.redirect', [
-                'provider' => ConnectedAccount::query()->find((string) $arguments['account_id'])?->provider->value,
+                'provider' => $this->scopedQuery()->find((string) $arguments['account_id'])?->provider->value,
             ]), true);
     }
 
@@ -93,7 +102,7 @@ final class EmailAccountsPage extends Page
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->scopedQuery()->findOrFail((string) $arguments['account_id']);
 
                 return [
                     'sync_inbox' => $account->sync_inbox,
@@ -168,7 +177,7 @@ final class EmailAccountsPage extends Page
                 ? 'This will stop syncing calendar events for this account.'
                 : 'You will be redirected to Google to grant calendar access.')
             ->action(function (array $arguments): void {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->scopedQuery()->findOrFail((string) $arguments['account_id']);
 
                 if ($account->hasCalendar()) {
                     $account->disableCalendar();
@@ -191,7 +200,7 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
             ->action(function (array $arguments): void {
-                $account = ConnectedAccount::query()->findOrFail((string) $arguments['account_id']);
+                $account = $this->scopedQuery()->findOrFail((string) $arguments['account_id']);
 
                 dispatch(new IncrementalCalendarSyncJob($account));
 
@@ -207,7 +216,7 @@ final class EmailAccountsPage extends Page
     private function findAccount(array $arguments): ?ConnectedAccount
     {
         /** @var ConnectedAccount|null */
-        return ConnectedAccount::query()->find((string) $arguments['account_id']);
+        return $this->scopedQuery()->find((string) $arguments['account_id']);
     }
 
     public function disconnectAction(): Action
