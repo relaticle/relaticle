@@ -24,11 +24,8 @@ final readonly class RedirectController
                 ->redirect(),
 
             'azure' => $this->driver('azure')
-                ->scopes([
-                    'https://outlook.office.com/IMAP.AccessAsUser.All',
-                    'https://outlook.office.com/Mail.Read',
-                    'offline_access',
-                ])
+                ->scopes($this->azureScopes($includeCalendar))
+                ->with(['prompt' => 'consent'])
                 ->redirect(),
 
             default => back(),
@@ -45,6 +42,23 @@ final readonly class RedirectController
 
         if ($includeCalendar) {
             $scopes[] = 'https://www.googleapis.com/auth/calendar.readonly';
+        }
+
+        return $scopes;
+    }
+
+    /** @return array<int, string> */
+    private function azureScopes(bool $includeCalendar): array
+    {
+        $scopes = [
+            'https://graph.microsoft.com/Mail.Read',
+            'https://graph.microsoft.com/Mail.Send',
+            'https://graph.microsoft.com/User.Read',
+            'offline_access',
+        ];
+
+        if ($includeCalendar) {
+            $scopes[] = 'https://graph.microsoft.com/Calendars.Read';
         }
 
         return $scopes;
