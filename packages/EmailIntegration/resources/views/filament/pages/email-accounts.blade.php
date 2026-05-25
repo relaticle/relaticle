@@ -29,7 +29,7 @@
         <x-filament::section heading="Connect an Account">
             <div class="flex gap-3">
                 {{ $this->connectGmailAction }}
-{{--                {{ $this->connectAzureAction }}--}}
+                {{ $this->connectAzureAction }}
             </div>
         </x-filament::section>
     </div>
