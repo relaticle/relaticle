@@ -21,16 +21,6 @@ final readonly class GmailService implements MailServiceInterface
     public function __construct(private ConnectedAccount $account, private Gmail $gmail) {}
 
     /**
-     * @deprecated Temporary bridge. Removed in Task 9 (Microsoft OAuth plan)
-     *             once callers resolve via MailServiceFactoryInterface.
-     */
-    public static function forAccount(ConnectedAccount $account): self
-    {
-        /** @phpstan-ignore return.type */
-        return resolve(Factories\GmailServiceFactory::class)->make($account);
-    }
-
-    /**
      * Fetch messages newer than the given cursor (incremental sync).
      * Returns new message IDs and IDs of messages where UNREAD was removed (marked as read).
      */

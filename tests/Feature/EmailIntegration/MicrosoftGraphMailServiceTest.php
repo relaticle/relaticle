@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -18,6 +19,10 @@ beforeEach(function (): void {
     config()->set('services.azure.client_id', 'azure-client-id');
     config()->set('services.azure.client_secret', 'azure-client-secret');
     config()->set('services.azure.tenant', 'common');
+
+    // Prevent the ConnectedAccountObserver from running InitialEmailSyncJob synchronously
+    // during account creation, which would issue unfaked Graph requests.
+    Bus::fake();
 });
 
 function makeAzureAccount(): ConnectedAccount

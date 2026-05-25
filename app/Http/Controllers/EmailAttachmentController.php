@@ -7,11 +7,16 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Services\Factories\GmailServiceFactory;
 use Relaticle\EmailIntegration\Services\GmailService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final readonly class EmailAttachmentController
 {
+    public function __construct(
+        private GmailServiceFactory $gmailServiceFactory,
+    ) {}
+
     public function __invoke(Request $request, string $attachmentId): StreamedResponse
     {
         /** @var EmailAttachment $attachment */
@@ -41,8 +46,10 @@ final readonly class EmailAttachmentController
         set_time_limit(120);
 
         // Fetch the binary before streaming so any API/auth errors surface as proper HTTP responses
-        $binary = GmailService::forAccount($connectedAccount)
-            ->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
+        $gmailService = $this->gmailServiceFactory->make($connectedAccount);
+        assert($gmailService instanceof GmailService);
+
+        $binary = $gmailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
 
         $filename = $attachment->filename ?? 'attachment';
 

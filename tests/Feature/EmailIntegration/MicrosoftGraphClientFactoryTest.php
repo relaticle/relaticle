@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
@@ -13,6 +14,10 @@ beforeEach(function (): void {
     config()->set('services.azure.client_id', 'azure-client-id');
     config()->set('services.azure.client_secret', 'azure-client-secret');
     config()->set('services.azure.tenant', 'common');
+
+    // Prevent the ConnectedAccountObserver from running InitialEmailSyncJob synchronously
+    // during account creation, which would issue unfaked Graph requests.
+    Bus::fake();
 });
 
 it('returns a pre-authorized PendingRequest with the access token', function (): void {

@@ -13,10 +13,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
@@ -35,17 +34,13 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
     /**
      * @throws \Throwable
      */
-    public function handle(): void
+    public function handle(MailServiceFactoryInterface $mailFactory): void
     {
         $account = $this->connectedAccount;
 
-        if ($account->provider !== EmailProvider::GMAIL) {
-            return;
-        }
-
         $daysBack = Config::integer('email-integration.sync.initial_days', 90);
 
-        $service = GmailService::forAccount($account);
+        $service = $mailFactory->make($account);
 
         $data = $service->initialBackfill($daysBack);
 

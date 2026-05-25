@@ -11,10 +11,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
 final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
@@ -31,7 +30,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $this->onQueue('emails-sync');
     }
 
-    public function handle(): void
+    public function handle(MailServiceFactoryInterface $mailFactory): void
     {
         $account = $this->connectedAccount;
 
@@ -39,11 +38,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if ($account->provider !== EmailProvider::GMAIL) {
-            return;
-        }
-
-        $service = GmailService::forAccount($account);
+        $service = $mailFactory->make($account);
         $delta = $service->fetchDelta($account->sync_cursor);
 
         $allIds = $delta->messageIds->all();
