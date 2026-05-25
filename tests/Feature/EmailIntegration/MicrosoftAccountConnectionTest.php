@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use App\Providers\AppServiceProvider;
 use Laravel\Socialite\Facades\Socialite;
 
-it('resolves the azure socialite driver', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $this->actingAs($user);
+mutates(AppServiceProvider::class);
 
+it('resolves the azure socialite driver', function (): void {
     expect(fn () => Socialite::driver('azure'))->not->toThrow(Throwable::class);
 });
