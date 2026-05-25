@@ -20,6 +20,10 @@ final readonly class GmailService implements MailServiceInterface
 {
     public function __construct(private ConnectedAccount $account, private Gmail $gmail) {}
 
+    /**
+     * @deprecated Temporary bridge. Removed in Task 9 (Microsoft OAuth plan)
+     *             once callers resolve via MailServiceFactoryInterface.
+     */
     public static function forAccount(ConnectedAccount $account): self
     {
         /** @phpstan-ignore return.type */
@@ -50,6 +54,7 @@ final readonly class GmailService implements MailServiceInterface
                 }
             }
 
+            // Track messages where the UNREAD label was removed (user read the email)
             foreach ($item->getLabelsRemoved() ?? [] as $change) {
                 if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
                     $id = $change->getMessage()->getId();
@@ -150,7 +155,8 @@ final readonly class GmailService implements MailServiceInterface
         $message->setRaw(rtrim(strtr(base64_encode($raw), '+/', '-_'), '='));
 
         if ($isReply) {
-            $message->setThreadId($data['thread_id'] ?? '');
+            assert(isset($data['thread_id']), 'thread_id is required when in_reply_to is set');
+            $message->setThreadId($data['thread_id']);
         }
 
         $sent = $this->gmail->users_messages->send('me', $message);
