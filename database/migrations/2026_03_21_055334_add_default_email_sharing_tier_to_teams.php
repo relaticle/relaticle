@@ -16,11 +16,4 @@ return new class extends Migration
                 ->after('personal_team');
         });
     }
-
-    public function down(): void
-    {
-        Schema::table('teams', function (Blueprint $table): void {
-            $table->dropColumn('default_email_sharing_tier');
-        });
-    }
 };

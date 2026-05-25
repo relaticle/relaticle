@@ -12,6 +12,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\View\View;
+use Relaticle\EmailIntegration\Actions\UpdateUserEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
@@ -100,35 +101,18 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
             ->statePath('data');
     }
 
-    public function save(): void
+    public function save(UpdateUserEmailPrivacySettingsAction $action): void
     {
         $data = $this->form->getState();
-        $user = $this->authUser();
-        $teamId = $user->currentTeam->getKey();
 
-        $user->update([
-            'default_email_sharing_tier' => $data['default_email_sharing_tier'] ?: null,
-        ]);
+        $tierValue = $data['default_email_sharing_tier'] ?? null;
+        $defaultTier = match (true) {
+            $tierValue instanceof EmailPrivacyTier => $tierValue,
+            filled($tierValue) => EmailPrivacyTier::from($tierValue),
+            default => null,
+        };
 
-        EmailBlocklist::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', $teamId)
-            ->delete();
-
-        foreach ($data['blocklist'] as $entry) {
-            $value = strtolower(trim((string) $entry['value']));
-
-            if ($value === '') {
-                continue;
-            }
-
-            EmailBlocklist::query()->create([
-                'user_id' => $user->getKey(),
-                'team_id' => $teamId,
-                'type' => $entry['type'],
-                'value' => $value,
-            ]);
-        }
+        $action->execute($this->authUser(), $defaultTier, $data['blocklist'] ?? []);
 
         $this->sendNotification('Email privacy settings saved.');
     }

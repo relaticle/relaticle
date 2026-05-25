@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models;
 
+use App\Models\Team;
 use App\Models\User;
 use Database\Factories\EmailShareFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -24,11 +25,20 @@ final class EmailShare extends Model
     }
 
     protected $fillable = [
+        'team_id',
         'email_id',
         'shared_by',
         'shared_with',
         'tier',
     ];
+
+    /**
+     * @return BelongsTo<Team, $this>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
 
     /**
      * @return BelongsTo<Email, $this>
