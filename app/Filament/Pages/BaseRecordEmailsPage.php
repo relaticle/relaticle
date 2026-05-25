@@ -361,7 +361,7 @@ abstract class BaseRecordEmailsPage extends Page
                     return;
                 }
 
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 
@@ -394,7 +394,7 @@ abstract class BaseRecordEmailsPage extends Page
                     return;
                 }
 
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 unset($this->selectedEmail);
 

@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(ApproveEmailAccessRequestAction::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class);
 
@@ -49,7 +50,7 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         $this->assertDatabaseHas('email_shares', [
             'email_id' => $this->email->getKey(),
@@ -67,7 +68,7 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
     });
@@ -81,7 +82,7 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
     });
@@ -95,7 +96,7 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
         expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
@@ -110,9 +111,28 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(ApproveEmailAccessRequestAction::class)->execute($request);
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+    });
+
+    it('aborts with 403 when actor is not the owner', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        Notification::fake();
+
+        expect(fn () => app(ApproveEmailAccessRequestAction::class)->execute($request, $intruder))
+            ->toThrow(HttpException::class);
+
+        Notification::assertNothingSent();
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
         expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
     });
 });
@@ -127,7 +147,7 @@ describe('DenyEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(DenyEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
     });
@@ -141,7 +161,7 @@ describe('DenyEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(DenyEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
     });
@@ -155,7 +175,7 @@ describe('DenyEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(DenyEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
     });
@@ -169,7 +189,7 @@ describe('DenyEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(DenyEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
@@ -184,9 +204,27 @@ describe('DenyEmailAccessRequestAction', function (): void {
 
         Notification::fake();
 
-        app(DenyEmailAccessRequestAction::class)->execute($request);
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
+    });
+
+    it('aborts with 403 when actor is not the owner', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        Notification::fake();
+
+        expect(fn () => app(DenyEmailAccessRequestAction::class)->execute($request, $intruder))
+            ->toThrow(HttpException::class);
+
+        Notification::assertNothingSent();
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
     });
 });
 

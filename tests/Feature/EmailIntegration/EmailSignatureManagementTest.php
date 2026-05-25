@@ -42,6 +42,7 @@ it('creates a signature record', function (): void {
 
 it('sets new signature as default and unsets the previous default', function (): void {
     $existingDefault = EmailSignature::create([
+        'team_id' => $this->team->id,
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
         'name' => 'Old Default',
@@ -78,6 +79,7 @@ it('allows multiple non-default signatures', function (): void {
 
 it('updates signature name', function (): void {
     $signature = EmailSignature::create([
+        'team_id' => $this->team->id,
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
         'name' => 'Original Name',
@@ -92,6 +94,7 @@ it('updates signature name', function (): void {
 
 it('setting is_default clears other defaults for the same account', function (): void {
     $sigA = EmailSignature::create([
+        'team_id' => $this->team->id,
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
         'name' => 'Sig A',
@@ -100,6 +103,7 @@ it('setting is_default clears other defaults for the same account', function ():
     ]);
 
     $sigB = EmailSignature::create([
+        'team_id' => $this->team->id,
         'connected_account_id' => $this->account->getKey(),
         'user_id' => $this->user->id,
         'name' => 'Sig B',

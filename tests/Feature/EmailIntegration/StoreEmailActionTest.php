@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\CustomField;
+use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
@@ -64,7 +66,7 @@ it('persists the email record with correct fields', function (): void {
         'isRead' => false,
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email)->toBeInstanceOf(Email::class)
         ->and($email->team_id)->toBe($this->team->id)
@@ -85,7 +87,7 @@ it('sets read_at when isRead is true', function (): void {
     $sentAt = now()->subHour();
     $data = makeFetchedEmailData(['sentAt' => $sentAt, 'isRead' => true]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->read_at)->not->toBeNull()
         ->and($email->read_at->toDateTimeString())->toBe($sentAt->toDateTimeString());
@@ -97,7 +99,7 @@ it('stores body_text and body_html in email_bodies', function (): void {
         'bodyHtml' => '<p>Rich <b>HTML</b> content</p>',
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->body)->not->toBeNull()
         ->and($email->body->body_text)->toBe('Plain text content')
@@ -113,7 +115,7 @@ it('creates email participants', function (): void {
         ],
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->participants)->toHaveCount(3);
 
@@ -136,7 +138,7 @@ it('creates email attachments', function (): void {
         ],
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->attachments)->toHaveCount(1);
 
@@ -157,7 +159,7 @@ it('marks email as internal when all participants are team members', function ()
         ],
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->is_internal)->toBeTrue();
 });
@@ -170,7 +172,7 @@ it('does not mark email as internal when at least one external participant exist
         ],
     ]);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->is_internal)->toBeFalse();
 });
@@ -178,7 +180,7 @@ it('does not mark email as internal when at least one external participant exist
 it('stores the email in the database', function (): void {
     $data = makeFetchedEmailData(['providerMessageId' => 'stored-msg-001']);
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     $this->assertDatabaseHas('emails', [
         'id' => $email->getKey(),
@@ -187,10 +189,48 @@ it('stores the email in the database', function (): void {
     ]);
 });
 
+it('runs CRM linking exactly once (no double email_count bump)', function (): void {
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if (! $emailField) {
+        $this->markTestSkipped('No emails custom field seeded for this team.');
+    }
+
+    $person = People::query()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Counted Person',
+        'creator_id' => $this->user->id,
+        'email_count' => 0,
+    ]);
+
+    $person->saveCustomFieldValue($emailField, ['counted@partner.com'], $this->team);
+
+    $data = makeFetchedEmailData([
+        'direction' => EmailDirection::INBOUND,
+        'participants' => [
+            ['email_address' => 'counted@partner.com', 'name' => 'Counted Person', 'role' => 'from'],
+            ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'to'],
+        ],
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $fresh = $person->fresh();
+
+    expect($fresh->email_count)->toBe(1)
+        ->and($fresh->inbound_email_count)->toBe(1)
+        ->and($fresh->outbound_email_count)->toBe(0);
+});
+
 it('stores body in email_bodies table', function (): void {
     $data = makeFetchedEmailData();
 
-    $email = app(StoreEmailAction::class)->execute($this->account, $data);
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     $this->assertDatabaseHas('email_bodies', [
         'email_id' => $email->getKey(),

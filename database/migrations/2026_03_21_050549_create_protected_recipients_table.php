@@ -17,11 +17,8 @@ return new class extends Migration
             $table->string('value');
             $table->foreignUlid('created_by')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
-        });
-    }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('protected_recipients');
+            $table->index(['team_id', 'type', 'value']);
+        });
     }
 };

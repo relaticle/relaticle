@@ -65,9 +65,4 @@ return new class extends Migration
             $table->index(['user_id', 'status'], 'idx_emails_user_status');
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('emails');
-    }
 };

@@ -67,8 +67,6 @@ final readonly class StoreEmailAction
                 ]);
             }
 
-            resolve(LinkEmailAction::class)->execute($email);
-
             $teamUserEmails = User::query()
                 ->where('current_team_id', $email->team_id)
                 ->pluck('email')

@@ -19,9 +19,4 @@ return new class extends Migration
             $table->unique(['team_id', 'domain']);
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('public_email_domains');
-    }
 };

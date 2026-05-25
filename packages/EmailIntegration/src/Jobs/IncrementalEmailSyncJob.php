@@ -28,7 +28,9 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
-    ) {}
+    ) {
+        $this->onQueue('emails-sync');
+    }
 
     public function handle(): void
     {

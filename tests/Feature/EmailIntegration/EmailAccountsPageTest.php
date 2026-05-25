@@ -47,17 +47,14 @@ it('does not update another user\'s account via editSettings', function (): void
         'sync_inbox' => true,
     ]));
 
-    try {
-        livewire(EmailAccountsPage::class)
-            ->callAction('editSettings', data: [
-                'sync_inbox' => false,
-                'sync_sent' => false,
-                'contact_creation_mode' => ContactCreationMode::None->value,
-                'auto_create_companies' => false,
-            ], arguments: ['account_id' => $otherAccount->id]);
-    } catch (ModelNotFoundException) {
-        // expected — cross-tenant access is rejected during fillForm
-    }
+    expect(fn () => livewire(EmailAccountsPage::class)
+        ->callAction('editSettings', data: [
+            'sync_inbox' => false,
+            'sync_sent' => false,
+            'contact_creation_mode' => ContactCreationMode::None->value,
+            'auto_create_companies' => false,
+        ], arguments: ['account_id' => $otherAccount->id]))
+        ->toThrow(ModelNotFoundException::class);
 
     expect($otherAccount->fresh()->sync_inbox)->toBeTrue();
 });
@@ -78,8 +75,9 @@ it('does not delete another user\'s account on disconnect', function (): void {
         'user_id' => $otherUser->id,
     ]));
 
-    livewire(EmailAccountsPage::class)
-        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]);
+    expect(fn () => livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]))
+        ->toThrow(ModelNotFoundException::class);
 
     $this->assertNotSoftDeleted(ConnectedAccount::class, [
         'id' => $otherAccount->id,

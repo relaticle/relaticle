@@ -7,6 +7,7 @@ namespace App\Jobs;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -69,6 +70,11 @@ final class SendEmailJob implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        Log::error('SendEmailJob failed', [
+            'email_id' => $this->emailId,
+            'exception' => $exception,
+        ]);
+
         /** @var Email|null $email */
         $email = Email::query()->find($this->emailId);
 
@@ -78,7 +84,7 @@ final class SendEmailJob implements ShouldQueue
 
         $email->update([
             'status' => EmailStatus::FAILED,
-            'last_error' => $exception->getMessage(),
+            'last_error' => sprintf('%s: %s', $exception::class, $exception->getMessage()),
         ]);
 
         if ($email->batch_id !== null) {

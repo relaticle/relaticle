@@ -12,7 +12,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
-use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
@@ -54,10 +53,8 @@ final class EmailSignaturesPage extends Page
     private function loadSignatures(): Collection
     {
         return EmailSignature::query()
-            ->whereHas('connectedAccount', fn (Builder $accountQuery) => $accountQuery
-                ->where('user_id', auth()->id())
-                ->where('team_id', filament()->getTenant()?->getKey())
-            )
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where('user_id', auth()->id())
             ->with('connectedAccount')
             ->get();
     }
@@ -175,7 +172,8 @@ final class EmailSignaturesPage extends Page
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
                 $deleted = EmailSignature::query()->where('id', $arguments['signature_id'])
-                    ->whereHas('connectedAccount', fn (Builder $accountQuery) => $accountQuery->where('user_id', auth()->id()))
+                    ->where('team_id', filament()->getTenant()?->getKey())
+                    ->where('user_id', auth()->id())
                     ->delete();
 
                 $this->signatures = $this->loadSignatures();

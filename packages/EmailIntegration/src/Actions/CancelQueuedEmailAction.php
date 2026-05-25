@@ -17,7 +17,13 @@ final readonly class CancelQueuedEmailAction
             /** @var Email $lockedEmail */
             $lockedEmail = Email::query()->lockForUpdate()->findOrFail($email->getKey());
 
-            if ($lockedEmail->status !== EmailStatus::QUEUED) {
+            $isCancellable = match (true) {
+                $lockedEmail->status === EmailStatus::QUEUED => true,
+                $lockedEmail->status === EmailStatus::SENDING && $lockedEmail->provider_message_id === null => true,
+                default => false,
+            };
+
+            if (! $isCancellable) {
                 throw new RuntimeException("Email cannot be cancelled — status is {$lockedEmail->status->value}.");
             }
 

@@ -16,11 +16,4 @@ return new class extends Migration
                 ->after('profile_photo_path');
         });
     }
-
-    public function down(): void
-    {
-        Schema::table('users', function (Blueprint $table): void {
-            $table->dropColumn('default_email_sharing_tier');
-        });
-    }
 };
