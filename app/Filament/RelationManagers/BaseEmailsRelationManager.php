@@ -21,6 +21,8 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
@@ -28,7 +30,6 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
@@ -252,30 +253,18 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 ])
                                 ->all(),
                         ])
-                        ->action(function (Email $record, array $data, EmailSharingService $sharingService): void {
-                            $sharer = $this->authUser();
+                        ->action(function (Email $record, array $data): void {
+                            abort_unless($this->authUser()->can('share', $record), 403);
 
-                            abort_unless($sharer->can('share', $record), 403);
+                            resolve(UpdateEmailSharingAction::class)->execute(
+                                $record,
+                                $this->authUser(),
+                                $data['privacy_tier'] instanceof EmailPrivacyTier
+                                    ? $data['privacy_tier']
+                                    : EmailPrivacyTier::from($data['privacy_tier']),
+                                $data['shares'] ?? [],
+                            );
 
-                            $sharingService->setEmailTier($record, $data['privacy_tier']);
-
-                            $record->shares()->where('shared_by', $sharer->getKey())->delete();
-
-                            foreach ($data['shares'] ?? [] as $share) {
-                                $sharedWithUser = User::query()
-                                    ->inTeam($sharer->current_team_id)
-                                    ->whereKey((string) $share['shared_with'])
-                                    ->first();
-
-                                abort_if($sharedWithUser === null, 403);
-
-                                $sharingService->shareEmail(
-                                    $record,
-                                    $sharer,
-                                    $sharedWithUser,
-                                    $share['tier'],
-                                );
-                            }
                             Notification::make()
                                 ->success()
                                 ->title('Sharing settings saved.')
@@ -296,14 +285,15 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 ->required(),
                         ])
                         ->action(function (Email $record, array $data): void {
-                            $requester = $this->authUser();
+                            $request = resolve(RequestEmailAccessAction::class)->execute(
+                                $record,
+                                $this->authUser(),
+                                $data['tier_requested'] instanceof EmailPrivacyTier
+                                    ? $data['tier_requested']
+                                    : EmailPrivacyTier::from($data['tier_requested']),
+                            );
 
-                            $existing = EmailAccessRequest::query()->where('email_id', $record->getKey())
-                                ->where('requester_id', $requester->getKey())
-                                ->where('status', 'pending')
-                                ->exists();
-
-                            if ($existing) {
+                            if (! $request instanceof EmailAccessRequest) {
                                 Notification::make()
                                     ->warning()
                                     ->title('You already have a pending request for this email.')
@@ -311,16 +301,6 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
                                 return;
                             }
-
-                            $request = EmailAccessRequest::query()->create([
-                                'email_id' => $record->getKey(),
-                                'requester_id' => $requester->getKey(),
-                                'owner_id' => $record->user_id,
-                                'tier_requested' => $data['tier_requested'],
-                                'status' => 'pending',
-                            ]);
-
-                            $record->user?->notify(new EmailAccessRequestedNotification($request));
 
                             Notification::make()
                                 ->success()

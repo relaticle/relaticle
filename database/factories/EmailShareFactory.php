@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -21,6 +22,7 @@ final class EmailShareFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
+            'team_id' => fn (array $attributes): mixed => Email::query()->whereKey($attributes['email_id'])->value('team_id') ?? Team::factory(),
             'shared_by' => User::factory(),
             'shared_with' => User::factory(),
             'tier' => EmailPrivacyTier::FULL->value,

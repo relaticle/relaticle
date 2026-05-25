@@ -30,7 +30,9 @@ use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -44,10 +46,9 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
-use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final class EmailInboxPage extends Page
 {
@@ -241,6 +242,7 @@ final class EmailInboxPage extends Page
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
                     'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->composeFormSchema())
@@ -305,6 +307,7 @@ final class EmailInboxPage extends Page
                     'quoted_body_html' => $email->body?->body_html,
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
+                    'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
             ->schema($this->replyFormSchema())
@@ -391,31 +394,19 @@ final class EmailInboxPage extends Page
                         ->all(),
                 ];
             })
-            ->action(function (array $data, array $arguments, EmailSharingService $sharingService): void {
+            ->action(function (array $data, array $arguments): void {
                 $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
 
                 abort_if(! $email instanceof Email, 403);
 
-                $sharer = $this->authUser();
-
-                $sharingService->setEmailTier($email, $data['privacy_tier']);
-                $email->shares()->where('shared_by', $sharer->getKey())->delete();
-
-                foreach ($data['shares'] ?? [] as $share) {
-                    $sharedWithUser = User::query()
-                        ->inTeam($sharer->current_team_id)
-                        ->whereKey($share['shared_with'])
-                        ->first();
-
-                    abort_if($sharedWithUser === null, 403);
-
-                    $sharingService->shareEmail(
-                        $email,
-                        $sharer,
-                        $sharedWithUser,
-                        EmailPrivacyTier::from($share['tier']),
-                    );
-                }
+                resolve(UpdateEmailSharingAction::class)->execute(
+                    $email,
+                    $this->authUser(),
+                    $data['privacy_tier'] instanceof EmailPrivacyTier
+                        ? $data['privacy_tier']
+                        : EmailPrivacyTier::from($data['privacy_tier']),
+                    $data['shares'] ?? [],
+                );
 
                 Notification::make()
                     ->success()
@@ -488,15 +479,15 @@ final class EmailInboxPage extends Page
 
                 abort_if(! $email instanceof Email, 403);
 
-                $requester = $this->authUser();
+                $request = resolve(RequestEmailAccessAction::class)->execute(
+                    $email,
+                    $this->authUser(),
+                    $data['tier_requested'] instanceof EmailPrivacyTier
+                        ? $data['tier_requested']
+                        : EmailPrivacyTier::from($data['tier_requested']),
+                );
 
-                $existing = EmailAccessRequest::query()
-                    ->where('email_id', $email->getKey())
-                    ->where('requester_id', $requester->getKey())
-                    ->where('status', 'pending')
-                    ->exists();
-
-                if ($existing) {
+                if (! $request instanceof EmailAccessRequest) {
                     Notification::make()
                         ->warning()
                         ->title('You already have a pending request for this email.')
@@ -504,16 +495,6 @@ final class EmailInboxPage extends Page
 
                     return;
                 }
-
-                $request = EmailAccessRequest::query()->create([
-                    'email_id' => $email->getKey(),
-                    'requester_id' => $requester->getKey(),
-                    'owner_id' => $email->user_id,
-                    'tier_requested' => $data['tier_requested'],
-                    'status' => 'pending',
-                ]);
-
-                $email->user?->notify(new EmailAccessRequestedNotification($request));
 
                 Notification::make()
                     ->success()
@@ -679,6 +660,17 @@ final class EmailInboxPage extends Page
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Section::make('Signature')
                 ->collapsed()
                 ->schema([
@@ -774,6 +766,17 @@ final class EmailInboxPage extends Page
             Hidden::make('mode'),
             Hidden::make('in_reply_to_email_id'),
 
+            Section::make('Privacy')
+                ->collapsed()
+                ->schema([
+                    Select::make('privacy_tier')
+                        ->label('Who can see this email?')
+                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->options(EmailPrivacyTier::class)
+                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
+                        ->required(),
+                ]),
+
             Placeholder::make('quoted_body_preview')
                 ->hiddenLabel()
                 ->content(function (Get $get): HtmlString {
@@ -828,9 +831,27 @@ final class EmailInboxPage extends Page
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),
             'in_reply_to_email_id' => $data['in_reply_to_email_id'] ?? null,
             'creation_source' => $source,
-            'privacy_tier' => EmailPrivacyTier::FULL,
+            'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
         ];
+    }
+
+    private function defaultPrivacyTier(): EmailPrivacyTier
+    {
+        return resolve(PrivacyService::class)->defaultTierForUser($this->authUser());
+    }
+
+    private function resolvePrivacyTier(mixed $value): EmailPrivacyTier
+    {
+        if ($value instanceof EmailPrivacyTier) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            return EmailPrivacyTier::from($value);
+        }
+
+        return $this->defaultPrivacyTier();
     }
 
     #[Computed]

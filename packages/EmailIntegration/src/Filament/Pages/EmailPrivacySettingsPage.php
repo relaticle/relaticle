@@ -15,6 +15,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
@@ -61,35 +62,14 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
             ->action(function (): void {
                 /** @var User $user */
                 $user = auth()->user();
-                $team = $user->currentTeam;
 
-                $team->update([
-                    'default_email_sharing_tier' => $this->default_email_sharing_tier,
-                ]);
-
-                ProtectedRecipient::query()->where('team_id', $team->getKey())->delete();
-
-                foreach ($this->protected_emails as $email) {
-                    if (filled($email)) {
-                        ProtectedRecipient::query()->create([
-                            'team_id' => $team->getKey(),
-                            'type' => 'email',
-                            'value' => strtolower(trim($email)),
-                            'created_by' => $user->getKey(),
-                        ]);
-                    }
-                }
-
-                foreach ($this->protected_domains as $domain) {
-                    if (filled($domain)) {
-                        ProtectedRecipient::query()->create([
-                            'team_id' => $team->getKey(),
-                            'type' => 'domain',
-                            'value' => strtolower(trim($domain)),
-                            'created_by' => $user->getKey(),
-                        ]);
-                    }
-                }
+                resolve(UpdateTeamEmailPrivacySettingsAction::class)->execute(
+                    $user->currentTeam,
+                    $user,
+                    EmailPrivacyTier::from($this->default_email_sharing_tier),
+                    $this->protected_emails,
+                    $this->protected_domains,
+                );
 
                 Notification::make()
                     ->success()

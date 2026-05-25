@@ -45,14 +45,21 @@ final readonly class EmailAttachmentController
             ->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
 
         $filename = $attachment->filename ?? 'attachment';
-        $mimeType = $attachment->mime_type ?? 'application/octet-stream';
 
+        // Force a generic binary content-type and tell browsers not to MIME-sniff.
+        // Sender-controlled mime types (image/svg+xml, text/html) combined with
+        // browser sniffing could otherwise lead to scripts executing in the app
+        // origin if the disposition header were ever weakened.
         return response()->streamDownload(
             function () use ($binary): void {
                 echo $binary;
             },
             $filename,
-            ['Content-Type' => $mimeType],
+            [
+                'Content-Type' => 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+                'Content-Security-Policy' => "default-src 'none'; sandbox",
+            ],
         );
     }
 }

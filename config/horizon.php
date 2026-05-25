@@ -88,6 +88,7 @@ return [
     'waits' => [
         'redis:default' => 60,
         'redis:imports' => 120,
+        'redis:emails-sync' => 300,
     ],
 
     /*
@@ -264,6 +265,20 @@ return [
             'timeout' => 120,
             'nice' => 5,
         ],
+        'supervisor-emails-sync' => [
+            'connection' => 'redis',
+            'queue' => ['emails-sync'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 10,
+            'minProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 5,
+        ],
     ],
 
     'environments' => [
@@ -345,6 +360,20 @@ return [
                 'timeout' => 120,
                 'nice' => 5,
             ],
+            'supervisor-emails-sync' => [
+                'connection' => 'redis',
+                'queue' => ['emails-sync'],
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'maxProcesses' => 20,
+                'minProcesses' => 3,
+                'balanceMaxShift' => 5,
+                'balanceCooldown' => 2,
+                'memory' => 256,
+                'tries' => 3,
+                'timeout' => 300,
+                'nice' => 5,
+            ],
         ],
 
         'local' => [
@@ -358,6 +387,9 @@ return [
                 'maxProcesses' => 3,
             ],
             'supervisor-imports' => [
+                'maxProcesses' => 5,
+            ],
+            'supervisor-emails-sync' => [
                 'maxProcesses' => 5,
             ],
         ],
