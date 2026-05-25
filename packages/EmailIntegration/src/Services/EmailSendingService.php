@@ -8,9 +8,14 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 
 final readonly class EmailSendingService
 {
+    public function __construct(
+        private MailServiceFactoryInterface $mailFactory,
+    ) {}
+
     /**
      * Send a pre-queued Email via the connected account's provider and update the row.
      */
@@ -32,7 +37,7 @@ final readonly class EmailSendingService
         /** @var EmailBody|null $body */
         $body = $email->body;
 
-        $service = GmailService::forAccount($account);
+        $service = $this->mailFactory->make($account);
 
         $participants = $email->participants;
 
