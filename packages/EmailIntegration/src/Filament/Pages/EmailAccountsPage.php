@@ -240,11 +240,7 @@ final class EmailAccountsPage extends Page
             ->size(Size::Small)
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                $account = $this->findAccount($arguments);
-
-                if (! $account instanceof ConnectedAccount) {
-                    return;
-                }
+                $account = $this->findOwnedAccountOrFail($arguments);
 
                 resolve(DisconnectConnectedAccountAction::class)->execute($account);
             });
