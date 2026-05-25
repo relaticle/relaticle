@@ -6,8 +6,11 @@ namespace Relaticle\EmailIntegration\Services;
 
 use Google\Client as GoogleClient;
 use Google\Service\Calendar;
+use Google\Service\Calendar\Event as GoogleEvent;
 use Google\Service\Exception;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Data;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 
@@ -83,7 +86,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             $response = $this->client->events->listEvents('primary', $params);
 
             foreach ($response->getItems() as $event) {
-                $events[] = $event;
+                $events[] = $this->normalizeGoogleEvent($event);
             }
 
             $pageToken = $response->getNextPageToken();
@@ -124,7 +127,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             }
 
             foreach ($response->getItems() as $event) {
-                $events[] = $event;
+                $events[] = $this->normalizeGoogleEvent($event);
             }
 
             $pageToken = $response->getNextPageToken();
@@ -132,5 +135,49 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         } while ($pageToken !== null);
 
         return new Data\CalendarSyncResult(events: $events, nextSyncToken: $nextSyncToken);
+    }
+
+    private function normalizeGoogleEvent(GoogleEvent $event): CalendarEventData
+    {
+        $start = $event->getStart();
+        $end = $event->getEnd();
+
+        $startDate = (string) $start->getDate();
+        $endDate = (string) $end->getDate();
+        $isAllDay = $startDate !== '';
+
+        $startsAt = Date::parse($isAllDay ? $startDate : (string) $start->getDateTime());
+        $endsAt = Date::parse($isAllDay ? $endDate : (string) $end->getDateTime());
+
+        $attendees = [];
+        foreach ($event->getAttendees() as $attendee) {
+            $attendees[] = [
+                'email' => strtolower((string) $attendee->getEmail()),
+                'name' => $attendee->getDisplayName(),
+                'response_status' => $attendee->getResponseStatus(),
+                'is_organizer' => (bool) $attendee->getOrganizer(),
+            ];
+        }
+
+        $status = (string) $event->getStatus();
+        $organizer = $event->getOrganizer();
+
+        return new CalendarEventData(
+            providerEventId: (string) $event->getId(),
+            providerRecurringEventId: $event->getRecurringEventId(),
+            iCalUid: $event->getICalUID(),
+            title: $event->getSummary(),
+            description: $event->getDescription(),
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            isAllDay: $isAllDay,
+            location: $event->getLocation(),
+            htmlLink: $event->getHtmlLink(),
+            status: $status !== '' ? $status : 'confirmed',
+            visibility: $event->getVisibility(),
+            organizerEmail: $organizer->getEmail(),
+            organizerName: $organizer->getDisplayName(),
+            attendees: $attendees,
+        );
     }
 }

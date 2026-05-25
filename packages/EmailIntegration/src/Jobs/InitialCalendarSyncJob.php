@@ -41,7 +41,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         $result = $service->initialSync();
 
         foreach ($result->events as $event) {
-            dispatch(new StoreMeetingJob($account, serialize($event)));
+            dispatch(new StoreMeetingJob($account, $event));
         }
 
         $account->update([
