@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Commands;
 
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 
+#[Description('Clean up stale and completed import files')]
+#[Signature('import:cleanup
+        {--hours=24 : Delete abandoned imports older than this many hours}
+        {--completed-hours=2 : Delete completed/failed import files older than this many hours}')]
 final class CleanupImportsCommand extends Command
 {
-    protected $signature = 'import:cleanup
-        {--hours=24 : Delete abandoned imports older than this many hours}
-        {--completed-hours=2 : Delete completed/failed import files older than this many hours}';
-
-    protected $description = 'Clean up stale and completed import files';
-
     public function handle(): void
     {
         $staleHours = (int) $this->option('hours');

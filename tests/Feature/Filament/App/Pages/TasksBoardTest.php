@@ -67,6 +67,19 @@ it('does not show tasks from other teams', function (): void {
     expect($allRecordIds)->not->toContain($otherTask->id);
 });
 
+it('renders the board when a task has multiple assignees', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+
+    $secondMember = User::factory()->create();
+    $this->team->users()->attach($secondMember);
+    $task->assignees()->attach([$this->user->id, $secondMember->id]);
+
+    livewire(TasksBoard::class)->assertOk();
+});
+
 it('moves a card between columns via moveCard', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');

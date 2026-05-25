@@ -1,0 +1,6 @@
+name: Sequoia Series A
+company: sequoia
+custom_fields:
+  amount: 5000000
+  close_date: '{{ +2m }}'
+  stage: Qualification

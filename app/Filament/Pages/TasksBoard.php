@@ -35,13 +35,28 @@ use UnitEnum;
 
 final class TasksBoard extends BoardPage
 {
-    protected static ?string $navigationLabel = 'Board';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Tasks';
+    protected static ?string $title = null;
 
     protected static ?string $navigationParentItem = 'Tasks';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Workspace';
+    protected static string|null|UnitEnum $navigationGroup = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/boards.navigation_label');
+    }
+
+    public function getTitle(): string
+    {
+        return __('filament/pages/boards.tasks.title');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.workspace');
+    }
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
@@ -113,14 +128,14 @@ final class TasksBoard extends BoardPage
                                 ->alignLeft()
                                 ->imageHeight(20)
                                 ->circular()
-                                ->visible(fn (?string $state): bool => filled($state))
+                                ->visible(fn (mixed $state): bool => filled($state))
                                 ->stacked(),
                         ])->align('center'),
                     ]);
             })
             ->columnActions([
                 CreateAction::make()
-                    ->label('Add Task')
+                    ->label(__('filament/pages/boards.tasks.actions.add'))
                     ->icon('heroicon-o-plus')
                     ->iconButton()
                     ->modalWidth(Width::TwoExtraLarge)
@@ -147,7 +162,7 @@ final class TasksBoard extends BoardPage
             ])
             ->cardActions([
                 Action::make('edit')
-                    ->label('Edit')
+                    ->label(__('filament/pages/boards.tasks.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ThreeExtraLarge)
                     ->icon('heroicon-o-pencil-square')
@@ -159,7 +174,7 @@ final class TasksBoard extends BoardPage
                         $record->update($data);
                     }),
                 Action::make('delete')
-                    ->label('Delete')
+                    ->label(__('filament/pages/boards.tasks.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
@@ -169,7 +184,7 @@ final class TasksBoard extends BoardPage
             ])
             ->filters([
                 SelectFilter::make('assignees')
-                    ->label('Assignee')
+                    ->label(__('filament/pages/boards.tasks.filters.assignee'))
                     ->relationship('assignees', 'name')
                     ->multiple(),
             ])

@@ -1,0 +1,8 @@
+title: Prepare due diligence materials for Sequoia
+assigned_people:
+  - alfred
+custom_fields:
+  description: Compile financials, cap table, and product metrics for Sequoia's due diligence review.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

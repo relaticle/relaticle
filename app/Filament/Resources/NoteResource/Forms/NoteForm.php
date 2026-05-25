@@ -21,7 +21,7 @@ final class NoteForm
     {
         $components = [
             TextInput::make('title')
-                ->label('Title')
+                ->label(__('filament/resources/note.fields.title.label'))
                 ->rules(['max:255'])
                 ->columnSpanFull()
                 ->required(),
@@ -29,14 +29,14 @@ final class NoteForm
 
         if (! in_array('companies', $excludeFields)) {
             $components[] = Select::make('companies')
-                ->label('Companies')
+                ->label(__('filament/resources/note.fields.companies.label'))
                 ->multiple()
                 ->relationship('companies', 'name');
         }
 
         if (! in_array('people', $excludeFields)) {
             $components[] = Select::make('people')
-                ->label('People')
+                ->label(__('filament/resources/note.fields.people.label'))
                 ->multiple()
                 ->relationship('people', 'name')
                 ->nullable();

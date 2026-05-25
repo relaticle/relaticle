@@ -15,5 +15,6 @@ final class SubscriberData extends Data
         /** @var array<string> */
         public ?array $tags = [],
         public bool $skip_confirmation = true,
+        public ?string $user_id = null,
     ) {}
 }

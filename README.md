@@ -75,6 +75,10 @@ composer lint
 
 See the [Self-Hosting Guide](https://relaticle.com/docs/self-hosting) for Docker and manual deployment instructions.
 
+# Internationalization
+
+Relaticle ships English-only in the main repository, but the codebase is fully i18n-ready. Self-host forks can drop a `lang/<locale>/` directory in place to translate the entire app. See [`docs/i18n.md`](docs/i18n.md) for the override workflow and CI guardrails.
+
 # Documentation
 
 Visit our [documentation](https://relaticle.com/docs) for guides on business usage, technical architecture, MCP server setup, REST API integration, and more.

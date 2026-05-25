@@ -1,0 +1,5 @@
+name: HubSpot
+custom_fields:
+  domains: https://hubspot.com
+  icp: true
+  linkedin: https://www.linkedin.com/company/hubspot

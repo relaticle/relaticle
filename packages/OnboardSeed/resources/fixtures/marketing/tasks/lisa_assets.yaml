@@ -1,0 +1,8 @@
+title: Request brand assets from Lisa
+assigned_people:
+  - lisa
+custom_fields:
+  description: Reach out to Lisa for updated brand guidelines and design assets needed for the co-branded campaign materials.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Low

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
@@ -13,6 +14,7 @@ use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
 
 final class Register extends BaseRegister
@@ -54,12 +56,13 @@ final class Register extends BaseRegister
      */
     protected function handleRegistration(array $data): Model
     {
+        /** @var User $user */
         $user = $this->getUserModel()::query()->create($data);
 
         $invitation = $this->getTeamInvitationFromSession();
 
-        if ($invitation && $invitation->email === $data['email']) {
-            $user->forceFill(['email_verified_at' => now()])->save();
+        if ($invitation && $invitation->email === $data['email'] && $user->markEmailAsVerified()) {
+            event(new Verified($user));
         }
 
         return $user;

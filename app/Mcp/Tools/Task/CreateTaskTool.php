@@ -9,6 +9,7 @@ use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -52,11 +53,11 @@ final class CreateTaskTool extends BaseCreateTool
         return [
             'title' => ['required', 'string', 'max:255'],
             'company_ids' => ['sometimes', 'array'],
-            'company_ids.*' => ['string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
             'people_ids' => ['sometimes', 'array'],
-            'people_ids.*' => ['string', Rule::exists('people', 'id')->where('team_id', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
             'opportunity_ids' => ['sometimes', 'array'],
-            'opportunity_ids.*' => ['string', Rule::exists('opportunities', 'id')->where('team_id', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
             'assignee_ids' => ['sometimes', 'array'],
             'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
         ];

@@ -1,0 +1,5 @@
+title: Mailchimp campaign performance benchmarks
+noteable_type: company
+noteable_key: mailchimp
+custom_fields:
+  body: "<p>Mailchimp shared their latest benchmarks for SaaS email campaigns. They reported a 22% average open rate and 3.1% click-through rate. David suggested we test a 5-part drip sequence with personalized subject lines before scaling to the full list. Their A/B testing tools could help optimize send times.</p>"

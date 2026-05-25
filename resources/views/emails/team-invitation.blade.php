@@ -1,27 +1,13 @@
 @component('mail::message')
-{{ __('You have been invited to join the :team team!', ['team' => $invitation->team->name]) }}
-
-@if (Laravel\Fortify\Features::enabled(Laravel\Fortify\Features::registration()))
-{{ __('If you do not have an account, you may create one by clicking the button below. After creating an account, you may click the invitation acceptance button in this email to accept the team invitation:') }}
-
-@component('mail::button', ['url' => route('register')])
-{{ __('Create Account') }}
-@endcomponent
-
-{{ __('If you already have an account, you may accept this invitation by clicking the button below:') }}
-
-@else
-{{ __('You may accept this invitation by clicking the button below:') }}
-@endif
-
+{{ __('You\'ve been invited to join the :team team on Relaticle.', ['team' => $invitation->team->name]) }}
 
 @component('mail::button', ['url' => $acceptUrl])
 {{ __('Accept Invitation') }}
 @endcomponent
 
 @if($invitation->expires_at)
-{{ __('This invitation will expire :expiry.', ['expiry' => $invitation->expires_at->diffForHumans()]) }}
+{{ __('This invitation expires :expiry.', ['expiry' => $invitation->expires_at->diffForHumans()]) }}
 @endif
 
-{{ __('If you did not expect to receive an invitation to this team, you may discard this email.') }}
+{{ __('If you weren\'t expecting this, you can safely ignore this email.') }}
 @endcomponent

@@ -1,0 +1,8 @@
+title: Review term sheet from Benchmark
+assigned_people:
+  - peter
+custom_fields:
+  description: Review and redline the term sheet received from Benchmark for the seed round.
+  due_date: '{{ +3d }}'
+  status: In progress
+  priority: High

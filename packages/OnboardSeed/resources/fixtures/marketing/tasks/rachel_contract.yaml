@@ -1,0 +1,8 @@
+title: Finalize co-marketing agreement with Rachel
+assigned_people:
+  - rachel
+custom_fields:
+  description: Complete the co-marketing partnership terms with HubSpot and send the final agreement to Rachel for sign-off.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

@@ -18,7 +18,7 @@ final class NoteExporter extends BaseExporter
     {
         return [
             ExportColumn::make('id')
-                ->label('ID'),
+                ->label(__('filament/exports.columns.id')),
             ExportColumn::make('team.name'),
             ExportColumn::make('creator.name'),
             ExportColumn::make('creation_source')
