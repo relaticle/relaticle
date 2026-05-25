@@ -31,6 +31,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -45,6 +46,8 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Azure\AzureExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -63,6 +66,11 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        Event::listen(
+            SocialiteWasCalled::class,
+            [AzureExtendSocialite::class, 'handle'],
+        );
 
         $this->configurePolicies();
         $this->configureModels();
