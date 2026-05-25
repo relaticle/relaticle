@@ -21,7 +21,6 @@ use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -67,7 +66,6 @@ final class EmailAccountsPage extends Page
 
     public function connectAzureAction(): Action
     {
-        // TODO::Implement after azure setup
         return Action::make('connectAzure')
             ->label('Connect Outlook')
             ->icon('heroicon-o-plus')
@@ -161,12 +159,12 @@ final class EmailAccountsPage extends Page
             ->icon('heroicon-o-calendar')
             ->color(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'warning' : 'success')
             ->size(Size::Small)
-            ->visible(fn (array $arguments): bool => $this->findAccount($arguments)?->provider === EmailProvider::GMAIL)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments) !== null)
             ->requiresConfirmation(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
             ->modalHeading(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Enable calendar sync')
             ->modalDescription(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
                 ? 'This will stop syncing calendar events for this account.'
-                : 'You will be redirected to Google to grant calendar access.')
+                : sprintf('You will be redirected to %s to grant calendar access.', $this->findAccount($arguments)?->provider->getLabel() ?? 'the provider'))
             ->action(function (array $arguments): void {
                 $account = $this->findOwnedAccountOrFail($arguments);
 
@@ -177,8 +175,8 @@ final class EmailAccountsPage extends Page
                     return;
                 }
 
-                // Always re-run OAuth when enabling so Google grants the calendar scope on the token.
-                $this->redirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
+                // Always re-run OAuth when enabling so the provider grants the calendar scope on the token.
+                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]).'?capability=calendar');
             });
     }
 

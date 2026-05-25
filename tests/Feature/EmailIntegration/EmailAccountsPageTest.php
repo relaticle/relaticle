@@ -99,3 +99,10 @@ it('only loads the authenticated user\'s accounts in the current team on mount',
     expect($ids)->toContain($this->account->id)
         ->not->toContain($otherAccount->id);
 });
+
+it('renders both Connect Gmail and Connect Outlook actions', function (): void {
+    livewire(EmailAccountsPage::class)
+        ->assertActionExists('connectGmail')
+        ->assertActionExists('connectAzure')
+        ->assertActionVisible('connectAzure');
+});
