@@ -24,7 +24,7 @@ final readonly class RedirectController
                 ->redirect(),
 
             'azure' => $this->driver('azure')
-                ->scopes($this->azureScopes($includeCalendar))
+                ->setScopes($this->azureScopes($includeCalendar))
                 ->with(['prompt' => 'consent'])
                 ->redirect(),
 
