@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Google\Service\Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,7 +34,6 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * @throws \Throwable
-     * @throws Exception
      */
     public function handle(): void
     {
@@ -49,9 +47,9 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $service = GmailService::forAccount($account);
 
-        $data = $service->fetchInitialMessages($daysBack);
+        $data = $service->initialBackfill($daysBack);
 
-        $account->update(['sync_cursor' => $data['history_id']]);
+        $account->update(['sync_cursor' => $data['cursor']]);
 
         $allIds = $data['message_ids']->all();
 

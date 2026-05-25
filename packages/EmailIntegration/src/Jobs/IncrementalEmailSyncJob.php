@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -45,11 +44,9 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $service = GmailService::forAccount($account);
-        $data = $service->fetchDelta($account->sync_cursor);
+        $delta = $service->fetchDelta($account->sync_cursor);
 
-        Log::info("Fetched delta for account {$account->id}: ".json_encode($data));
-
-        $allIds = $data['message_ids']->all();
+        $allIds = $delta->messageIds->all();
 
         // Bulk dedup: exclude IDs already stored for this account
         $storedIds = Email::query()
@@ -65,7 +62,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         // Mark emails as read when UNREAD label was removed in Gmail
-        $readIds = $data['read_message_ids']->all();
+        $readIds = $delta->readMessageIds->all();
 
         if ($readIds !== []) {
             Email::query()
@@ -76,7 +73,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $account->update([
-            'sync_cursor' => $data['new_history_id'],
+            'sync_cursor' => $delta->newCursor,
             'last_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,

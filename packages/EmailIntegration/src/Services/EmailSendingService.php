@@ -61,8 +61,6 @@ final readonly class EmailSendingService
         if ($email->in_reply_to !== null) {
             $payload['in_reply_to'] = (string) $email->in_reply_to;
             $payload['thread_id'] = (string) $email->thread_id;
-
-            return $service->replyToThread($payload);
         }
 
         return $service->sendMessage($payload);
