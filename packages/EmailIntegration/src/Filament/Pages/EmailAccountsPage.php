@@ -45,6 +45,7 @@ final class EmailAccountsPage extends Page
     public function mount(): void
     {
         $this->sendSuccessNotification();
+        $this->sendErrorNotification();
         $this->connectedAccounts = $this->getAccounts();
     }
 
@@ -255,6 +256,16 @@ final class EmailAccountsPage extends Page
             Notification::make()
                 ->title(Session::get('success'))
                 ->success()
+                ->send();
+        }
+    }
+
+    public function sendErrorNotification(): void
+    {
+        if (Session::has('error')) {
+            Notification::make()
+                ->title(Session::get('error'))
+                ->danger()
                 ->send();
         }
     }
