@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use Google\Service\Calendar\Event;
-use Google\Service\Calendar\EventDateTime;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
@@ -45,17 +45,23 @@ it('dispatches StoreMeetingJob per delta event and updates cursor', function ():
         'calendar_sync_cursor' => 'valid-token',
     ]));
 
-    $event = new Event;
-    $event->setId('evt-delta');
-    $start = new EventDateTime;
-    $start->setDateTime(now()->addDay()->toRfc3339String());
-    $end = new EventDateTime;
-    $end->setDateTime(now()->addDay()->addHour()->toRfc3339String());
-    $event->setStart($start);
-    $event->setEnd($end);
-    $event->setSummary('Delta event');
-    $event->setStatus('confirmed');
-    $event->setVisibility('default');
+    $event = new CalendarEventData(
+        providerEventId: 'evt-delta',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Delta event',
+        description: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [],
+    );
 
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('fetchDelta')->once()->with('valid-token')

@@ -56,7 +56,7 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         foreach ($result->events as $event) {
-            dispatch(new StoreMeetingJob($account, serialize($event)));
+            dispatch(new StoreMeetingJob($account, $event));
         }
 
         $account->update([
