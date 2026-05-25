@@ -25,7 +25,8 @@ final class OpportunityFactory extends Factory
         ];
     }
 
-    public function configure(): Factory
+    /** @phpstan-return static */
+    public function configure(): static
     {
         $factory = $this->sequence(fn (Sequence $sequence): array => [
             'created_at' => now()->subMinutes($sequence->index),

@@ -182,3 +182,17 @@ it('denies non-team-member from viewing another team note', function (): void {
         ->and($this->user->can('update', $record))->toBeFalse()
         ->and($this->user->can('delete', $record))->toBeFalse();
 });
+
+it('accepts deeply nested rich-editor JSON in custom field action data', function (): void {
+    // The Filament RichEditor JS-side state is the TipTap document JSON,
+    // entangled to $wire.mountedActions.0.data.custom_fields.<field>. As the user
+    // edits nested lists/blockquotes, Livewire diffs the document and pushes
+    // partial updates with deeply nested dot paths. The default Livewire 4
+    // payload.max_nesting_depth = 10 is insufficient: the prefix
+    // (mountedActions.0.data.custom_fields.<field>) already consumes 5 levels,
+    // leaving only 5 for TipTap content — easily exceeded.
+    $deepPath = 'mountedActions.0.data.custom_fields.body.content.1.content.1.content.2.content.0.content';
+
+    livewire(ManageNotes::class)
+        ->set($deepPath, [['type' => 'text', 'text' => 'hello']]);
+})->throwsNoExceptions();

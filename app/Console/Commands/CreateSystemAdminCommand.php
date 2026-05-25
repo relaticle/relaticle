@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -13,25 +15,13 @@ use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
 
-final class CreateSystemAdminCommand extends Command
-{
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'sysadmin:create
+#[Description('Create a new system administrator account')]
+#[Signature('sysadmin:create
                             {--name= : The name of the system administrator}
                             {--email= : The email address of the system administrator}
-                            {--password= : The password for the system administrator}';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Create a new system administrator account';
-
+                            {--password= : The password for the system administrator}')]
+final class CreateSystemAdminCommand extends Command
+{
     /**
      * Execute the console command.
      */

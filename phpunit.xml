@@ -8,6 +8,10 @@
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
         </testsuite>
+        <testsuite name="PHPStan">
+            <directory>tests/PHPStan</directory>
+            <exclude>tests/PHPStan/Rules/data</exclude>
+        </testsuite>
         <testsuite name="Smoke">
             <directory>tests/Smoke</directory>
         </testsuite>

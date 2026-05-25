@@ -86,6 +86,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Email Verification Requirement
+    |--------------------------------------------------------------------------
+    |
+    | When true, users must verify their email before using the panels. Set to
+    | false for self-hosted deployments without SMTP configured, so the admin
+    | created via `php artisan make:filament-user` (or any other registrant)
+    | can sign in immediately. Cloud / production deployments should keep the
+    | default of true.
+    |
+    */
+
+    'require_email_verification' => filter_var(env('REQUIRE_EMAIL_VERIFICATION', true), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
     | MCP Server Configuration
     |--------------------------------------------------------------------------
     |

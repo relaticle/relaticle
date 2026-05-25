@@ -26,7 +26,7 @@ final class TaskForm
 
         if (! in_array('companies', $excludeFields)) {
             $components[] = Select::make('companies')
-                ->label('Companies')
+                ->label(__('filament/resources/task.fields.companies.label'))
                 ->multiple()
                 ->relationship('companies', 'name')
                 ->columnSpanFull();
@@ -34,14 +34,14 @@ final class TaskForm
 
         if (! in_array('people', $excludeFields)) {
             $components[] = Select::make('people')
-                ->label('People')
+                ->label(__('filament/resources/task.fields.people.label'))
                 ->multiple()
                 ->relationship('people', 'name')
                 ->nullable();
         }
 
         $components[] = Select::make('assignees')
-            ->label('Assignees')
+            ->label(__('filament/resources/task.fields.assignees.label'))
             ->multiple()
             ->relationship('assignees', 'name')
             ->nullable();

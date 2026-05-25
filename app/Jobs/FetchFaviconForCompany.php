@@ -6,20 +6,27 @@ namespace App\Jobs;
 
 use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
+use App\Services\Favicon\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
-use Exception;
-use Illuminate\Contracts\Broadcasting\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Str;
+use Throwable;
 
+#[DeleteWhenMissingModels]
 final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use Queueable;
 
-    public bool $deleteWhenMissingModels = true;
+    public int $tries = 1;
+
+    public int $timeout = 30;
+
+    public int $uniqueFor = 600;
 
     public function __construct(public readonly Company $company) {}
 
@@ -38,12 +45,22 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $domainName = Str::start($domainName, 'https://');
+            if (! Str::startsWith($domainName, ['http://', 'https://'])) {
+                $domainName = 'https://'.$domainName;
+            }
 
             $favicon = Favicon::driver('high-quality')->fetch($domainName);
             $url = $favicon?->getFaviconUrl();
 
             if ($url === null) {
+                return;
+            }
+
+            if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+                return;
+            }
+
+            if (! SsrfGuard::isAllowed($url)) {
                 return;
             }
 
@@ -67,10 +84,10 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                     'icon_type' => $favicon->getIconType(),
                     'fetched_at' => now()->toIso8601String(),
                 ])
-                ->toMediaCollection('logo');
+                ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 
-            $this->company->clearMediaCollectionExcept('logo', $logo);
-        } catch (Exception $exception) {
+            $this->company->clearMediaCollectionExcept(Company::LOGO_MEDIA_COLLECTION, $logo);
+        } catch (Throwable $exception) {
             report($exception);
         }
     }

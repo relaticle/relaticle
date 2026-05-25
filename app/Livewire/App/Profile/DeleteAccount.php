@@ -9,6 +9,7 @@ use App\Livewire\BaseLivewireComponent;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -50,7 +51,7 @@ final class DeleteAccount extends BaseLivewireComponent
                                         ->required()
                                         ->currentPassword(),
                                 ] : [])
-                                ->action(fn (array $data): Redirector|RedirectResponse => $this->deleteAccount($data['password'] ?? null)),
+                                ->action(fn (array $data): Redirector|RedirectResponse|null => $this->deleteAccount($data['password'] ?? null)),
                         ]),
                     ]),
             ]);
@@ -61,7 +62,7 @@ final class DeleteAccount extends BaseLivewireComponent
      *
      * @throws ValidationException
      */
-    public function deleteAccount(?string $password = null): Redirector|RedirectResponse
+    public function deleteAccount(?string $password = null): Redirector|RedirectResponse|null
     {
         $user = $this->authUser();
 
@@ -71,7 +72,18 @@ final class DeleteAccount extends BaseLivewireComponent
             ]);
         }
 
-        resolve(ScheduleUserDeletion::class)->schedule($user);
+        try {
+            resolve(ScheduleUserDeletion::class)->schedule($user);
+        } catch (ValidationException $e) {
+            Notification::make()
+                ->danger()
+                ->title(__('profile.notifications.delete_account_blocked.title'))
+                ->body($e->validator->errors()->first())
+                ->persistent()
+                ->send();
+
+            return null;
+        }
 
         filament()->auth()->logout();
 

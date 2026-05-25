@@ -18,31 +18,31 @@ final class OpportunityExporter extends BaseExporter
     {
         return [
             ExportColumn::make('id')
-                ->label('ID'),
+                ->label(__('filament/exports.columns.id')),
             ExportColumn::make('name')
-                ->label('Opportunity Name'),
+                ->label(__('filament/exports.columns.opportunity_name')),
             ExportColumn::make('company.name')
-                ->label('Company'),
+                ->label(__('filament/exports.columns.company')),
             ExportColumn::make('contact.name')
-                ->label('Contact Person'),
+                ->label(__('filament/exports.columns.contact_person')),
             ExportColumn::make('team.name')
-                ->label('Team'),
+                ->label(__('filament/exports.columns.team')),
             ExportColumn::make('creator.name')
-                ->label('Created By'),
+                ->label(__('filament/exports.columns.creator')),
             ExportColumn::make('notes_count')
-                ->label('Number of Notes')
+                ->label(__('filament/exports.columns.notes_count'))
                 ->state(fn (Opportunity $opportunity): int => $opportunity->notes()->count()),
             ExportColumn::make('tasks_count')
-                ->label('Number of Tasks')
+                ->label(__('filament/exports.columns.tasks_count'))
                 ->state(fn (Opportunity $opportunity): int => $opportunity->tasks()->count()),
             ExportColumn::make('created_at')
-                ->label('Created At')
+                ->label(__('filament/exports.columns.created_at'))
                 ->formatStateUsing(fn (Carbon $state): string => $state->format('Y-m-d H:i:s')),
             ExportColumn::make('updated_at')
-                ->label('Updated At')
+                ->label(__('filament/exports.columns.updated_at'))
                 ->formatStateUsing(fn (Carbon $state): string => $state->format('Y-m-d H:i:s')),
             ExportColumn::make('creation_source')
-                ->label('Creation Source')
+                ->label(__('filament/exports.columns.creation_source'))
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
 
             // Add all custom fields automatically

@@ -18,11 +18,11 @@ final class PeopleExporter extends BaseExporter
     {
         return [
             ExportColumn::make('id')
-                ->label('ID'),
+                ->label(__('filament/exports.columns.id')),
             ExportColumn::make('team.name'),
             ExportColumn::make('creator.name'),
             ExportColumn::make('creation_source')
-                ->label('Creation Source')
+                ->label(__('filament/exports.columns.creation_source'))
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
             ExportColumn::make('company.name'),
             ExportColumn::make('name'),

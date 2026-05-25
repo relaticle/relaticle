@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\PersonalAccessTokenObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
 
 /** Cannot be final — Sanctum::actingAs() uses Mockery to mock this class in tests */
+#[ObservedBy(PersonalAccessTokenObserver::class)]
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     /** @var array<int, string> */

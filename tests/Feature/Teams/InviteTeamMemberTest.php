@@ -51,7 +51,7 @@ test('invitation expires_at is set based on config', function () {
     expect((int) round($invitation->expires_at->diffInDays(now(), absolute: true)))->toBe(14);
 });
 
-test('team member invitations can be cancelled', function () {
+test('team member invitations can be revoked', function () {
     livewire(AddTeamMember::class, ['team' => $this->team])
         ->fillForm([
             'email' => 'test@example.com',
@@ -64,7 +64,7 @@ test('team member invitations can be cancelled', function () {
     $invitation = $this->team->fresh()->teamInvitations->first();
 
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->callAction(TestAction::make('cancelTeamInvitation')->table($invitation));
+        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation));
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });

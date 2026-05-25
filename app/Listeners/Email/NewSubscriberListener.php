@@ -6,47 +6,62 @@ namespace App\Listeners\Email;
 
 use App\Data\SubscriberData;
 use App\Enums\SubscriberTagEnum;
-use App\Jobs\Email\CreateSubscriberJob;
-use App\Jobs\Email\UpdateSubscriberJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
-use Exception;
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
-use Spatie\MailcoachSdk\Facades\Mailcoach;
-use Throwable;
 
-final class NewSubscriberListener implements ShouldHandleEventsAfterCommit, ShouldQueue
+final class NewSubscriberListener
 {
-    use InteractsWithQueue;
-
-    /**
-     * @throws Exception
-     * @throws Throwable
-     */
     public function handle(Verified $event): void
     {
         /** @var User $user */
         $user = $event->user;
 
-        if ($user->hasVerifiedEmail() && config('mailcoach-sdk.enabled_subscribers_sync', false)) {
-            $subscriber = retry(10, fn (): mixed => Mailcoach::findByEmail(config('mailcoach-sdk.subscribers_list_id'), $user->email), fn (int $attempt): int => $attempt * 100 * random_int(1, 15));
-
-            if ($subscriber) {
-                dispatch(new UpdateSubscriberJob(SubscriberData::from([
-                    'email' => $user->email,
-                    'tags' => [SubscriberTagEnum::VERIFIED->value],
-                ])));
-            }
-
-            dispatch(new CreateSubscriberJob(SubscriberData::from([
-                'email' => $user->email,
-                'first_name' => $user->name,
-                'last_name' => $user->name,
-                'tags' => [SubscriberTagEnum::VERIFIED->value],
-                'skip_confirmation' => true,
-            ])));
+        if (! $user->hasVerifiedEmail() || ! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
+            return;
         }
+
+        $signupSourceTag = $user->socialAccounts()->exists()
+            ? SubscriberTagEnum::SignupSourceSocial->value
+            : SubscriberTagEnum::SignupSourceOrganic->value;
+
+        $tags = [SubscriberTagEnum::Verified->value, $signupSourceTag];
+
+        $team = $user->currentTeam;
+
+        if ($team?->onboarding_use_case) {
+            $tags[] = $team->onboarding_use_case->toSubscriberTag();
+        }
+
+        if ($team?->onboarding_referral_source) {
+            $tags[] = $team->onboarding_referral_source->toSubscriberTag();
+        }
+
+        [$firstName, $lastName] = $this->splitName($user->name);
+
+        dispatch(new SyncSubscriberJob(SubscriberData::from([
+            'email' => $user->email,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'tags' => $tags,
+            'skip_confirmation' => true,
+            'user_id' => (string) $user->id,
+        ])))->afterCommit();
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function splitName(string $fullName): array
+    {
+        $trimmed = trim($fullName);
+
+        if ($trimmed === '') {
+            return ['', ''];
+        }
+
+        $parts = preg_split('/\s+/', $trimmed, 2) ?: [$trimmed];
+
+        return [$parts[0], $parts[1] ?? ''];
     }
 }

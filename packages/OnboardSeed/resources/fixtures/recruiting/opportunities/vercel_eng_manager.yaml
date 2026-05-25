@@ -1,0 +1,6 @@
+name: Engineering Manager
+company: vercel
+custom_fields:
+  amount: 200000
+  close_date: '{{ +8w }}'
+  stage: Prospecting

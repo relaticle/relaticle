@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\EmailAttachmentController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Session\Middleware\AuthenticateSession;
@@ -64,6 +65,17 @@ Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::cla
 Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
     ->middleware(['auth', 'verified', AuthenticateSession::class])
     ->name('email-attachments.download');
+
+Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
+    ->group(function (): void {
+        Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
+            ->where('token', '[A-Za-z0-9]{40}')
+            ->name('teams.join');
+
+        Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
+            ->where('token', '[A-Za-z0-9]{40}')
+            ->name('teams.join.confirm');
+    });
 
 // Legacy documentation redirects
 Route::get('/documentation/{slug?}', fn (string $slug = '') => redirect("/docs/{$slug}", 301))

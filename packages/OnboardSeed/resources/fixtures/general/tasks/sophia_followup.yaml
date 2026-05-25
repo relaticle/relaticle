@@ -1,0 +1,8 @@
+title: Follow up with Sophia on retainer terms
+assigned_people:
+  - sophia
+custom_fields:
+  description: Reach out to Sophia to discuss retainer structure, deliverables, and billing terms for the advisory engagement.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

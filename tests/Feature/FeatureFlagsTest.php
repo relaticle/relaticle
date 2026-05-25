@@ -27,6 +27,7 @@ describe('OnboardSeed', function (): void {
         livewire(CreateTeam::class)
             ->fillForm([
                 'name' => 'Seed Enabled Team',
+                'onboarding_use_case' => 'other',
             ])
             ->call('register')
             ->assertHasNoFormErrors();
@@ -46,6 +47,7 @@ describe('OnboardSeed', function (): void {
         livewire(CreateTeam::class)
             ->fillForm([
                 'name' => 'Seed Disabled Team',
+                'onboarding_use_case' => 'other',
             ])
             ->call('register')
             ->assertHasNoFormErrors();

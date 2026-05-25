@@ -1,0 +1,8 @@
+title: Review Marcus's portfolio
+assigned_people:
+  - marcus
+custom_fields:
+  description: Review Marcus Rivera's design portfolio and case studies. Evaluate his product thinking and visual design skills against Linear's design team standards.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

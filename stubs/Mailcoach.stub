@@ -17,6 +17,8 @@ class Subscriber
 namespace Spatie\MailcoachSdk\Facades;
 
 /**
+ * @method static mixed post(string $uri, array<string, mixed> $payload = [])
+ * @method static mixed delete(string $uri, array<string, mixed> $payload = [])
  * @method static \Spatie\MailcoachSdk\Resources\Subscriber createSubscriber(string $emailListUuid, array<string, mixed> $attributes)
  * @method static ?\Spatie\MailcoachSdk\Resources\Subscriber findByEmail(string $emailListUuid, string $email)
  * @method static \Spatie\MailcoachSdk\Resources\Subscriber updateSubscriber(string $subscriberUuid, array<string, mixed> $attributes)
