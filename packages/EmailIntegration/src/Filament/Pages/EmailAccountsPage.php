@@ -159,7 +159,7 @@ final class EmailAccountsPage extends Page
             ->icon('heroicon-o-calendar')
             ->color(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'warning' : 'success')
             ->size(Size::Small)
-            ->visible(fn (array $arguments): bool => $this->findAccount($arguments) !== null)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
             ->requiresConfirmation(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
             ->modalHeading(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Enable calendar sync')
             ->modalDescription(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
