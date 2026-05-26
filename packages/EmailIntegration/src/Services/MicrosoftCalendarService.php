@@ -1,0 +1,113 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\EmailIntegration\Services;
+
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Date;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Data\CalendarSyncResult;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
+use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
+
+final readonly class MicrosoftCalendarService implements CalendarServiceInterface
+{
+    public function __construct(
+        private ConnectedAccount $account,
+        private MicrosoftGraphClientFactory $clientFactory,
+    ) {}
+
+    public function initialSync(): CalendarSyncResult
+    {
+        $start = now()->subDays(90)->toIso8601String();
+        $end = now()->addDays(180)->toIso8601String();
+
+        $url = '/me/calendarView/delta?startDateTime='.rawurlencode($start).'&endDateTime='.rawurlencode($end);
+
+        return $this->drain($url);
+    }
+
+    public function fetchDelta(string $syncToken): CalendarSyncResult
+    {
+        return $this->drain($syncToken);
+    }
+
+    private function drain(string $url): CalendarSyncResult
+    {
+        $http = $this->clientFactory->make($this->account);
+
+        $events = [];
+        $deltaLink = null;
+
+        do {
+            try {
+                $response = $http->get($url)->throw()->json();
+            } catch (RequestException $e) {
+                if ($e->response->status() === 410) {
+                    throw CalendarSyncTokenExpired::forAccount($this->account->getKey());
+                }
+
+                throw $e;
+            }
+
+            foreach ($response['value'] ?? [] as $event) {
+                $events[] = $this->normalize($event);
+            }
+
+            $url = $response['@odata.nextLink'] ?? null;
+            $deltaLink = $response['@odata.deltaLink'] ?? $deltaLink;
+        } while ($url !== null);
+
+        return new CalendarSyncResult(events: $events, nextSyncToken: $deltaLink);
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    private function normalize(array $event): CalendarEventData
+    {
+        $startsAt = Date::parse(
+            (string) ($event['start']['dateTime'] ?? ''),
+            (string) ($event['start']['timeZone'] ?? 'UTC'),
+        );
+        $endsAt = Date::parse(
+            (string) ($event['end']['dateTime'] ?? ''),
+            (string) ($event['end']['timeZone'] ?? 'UTC'),
+        );
+
+        $organizerEmail = $event['organizer']['emailAddress']['address'] ?? null;
+
+        $attendees = [];
+        foreach ($event['attendees'] ?? [] as $attendee) {
+            $attendeeEmail = strtolower((string) ($attendee['emailAddress']['address'] ?? ''));
+            $attendees[] = [
+                'email' => $attendeeEmail,
+                'name' => $attendee['emailAddress']['name'] ?? null,
+                'response_status' => $attendee['status']['response'] ?? null,
+                'is_organizer' => $organizerEmail !== null
+                    && strtolower((string) $organizerEmail) === $attendeeEmail,
+            ];
+        }
+
+        return new CalendarEventData(
+            providerEventId: (string) $event['id'],
+            providerRecurringEventId: $event['seriesMasterId'] ?? null,
+            iCalUid: $event['iCalUId'] ?? null,
+            title: $event['subject'] ?? null,
+            description: $event['bodyPreview'] ?? null,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            isAllDay: (bool) ($event['isAllDay'] ?? false),
+            location: $event['location']['displayName'] ?? null,
+            htmlLink: $event['webLink'] ?? null,
+            status: ($event['isCancelled'] ?? false) ? 'cancelled' : 'confirmed',
+            visibility: $event['sensitivity'] ?? null,
+            organizerEmail: $organizerEmail,
+            organizerName: $event['organizer']['emailAddress']['name'] ?? null,
+            attendees: $attendees,
+        );
+    }
+}

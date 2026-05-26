@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Google\Service\Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,10 +13,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
@@ -35,23 +33,18 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * @throws \Throwable
-     * @throws Exception
      */
-    public function handle(): void
+    public function handle(MailServiceFactoryInterface $mailFactory): void
     {
         $account = $this->connectedAccount;
 
-        if ($account->provider !== EmailProvider::GMAIL) {
-            return;
-        }
-
         $daysBack = Config::integer('email-integration.sync.initial_days', 90);
 
-        $service = GmailService::forAccount($account);
+        $service = $mailFactory->make($account);
 
-        $data = $service->fetchInitialMessages($daysBack);
+        $data = $service->initialBackfill($daysBack);
 
-        $account->update(['sync_cursor' => $data['history_id']]);
+        $account->update(['sync_cursor' => $data['cursor']]);
 
         $allIds = $data['message_ids']->all();
 

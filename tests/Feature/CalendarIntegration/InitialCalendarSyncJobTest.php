@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use Google\Service\Calendar\Event;
-use Google\Service\Calendar\EventDateTime;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
@@ -21,17 +21,23 @@ it('dispatches a StoreMeetingJob per event and stores the sync token', function 
         'capabilities' => ['email' => true, 'calendar' => true],
     ]));
 
-    $event = new Event;
-    $event->setId('evt-A');
-    $start = new EventDateTime;
-    $start->setDateTime(now()->addDay()->toRfc3339String());
-    $end = new EventDateTime;
-    $end->setDateTime(now()->addDay()->addHour()->toRfc3339String());
-    $event->setStart($start);
-    $event->setEnd($end);
-    $event->setSummary('Test');
-    $event->setStatus('confirmed');
-    $event->setVisibility('default');
+    $event = new CalendarEventData(
+        providerEventId: 'evt-A',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Test',
+        description: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [],
+    );
 
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('initialSync')->once()
