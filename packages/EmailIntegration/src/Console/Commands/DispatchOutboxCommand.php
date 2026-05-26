@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Console\Commands;
 
 use App\Jobs\SendEmailJob;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -15,12 +17,10 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
+#[Description('Release due queued emails subject to per-account rate limits.')]
+#[Signature('email:dispatch-outbox')]
 final class DispatchOutboxCommand extends Command
 {
-    protected $signature = 'email:dispatch-outbox';
-
-    protected $description = 'Release due queued emails subject to per-account rate limits.';
-
     public function handle(): int
     {
         $defaultHourly = Config::integer('email-integration.outbox.defaults.hourly_send_limit');
