@@ -29,6 +29,7 @@ final class TeamFactory extends Factory
         ];
     }
 
+    /** @phpstan-return static */
     public function configure(): static
     {
         $factory = $this->afterMaking(function (Team $team): void {

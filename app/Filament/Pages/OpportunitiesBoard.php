@@ -39,13 +39,28 @@ use UnitEnum;
 
 final class OpportunitiesBoard extends BoardPage
 {
-    protected static ?string $navigationLabel = 'Board';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Opportunities';
+    protected static ?string $title = null;
 
     protected static ?string $navigationParentItem = 'Opportunities';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Workspace';
+    protected static string|null|UnitEnum $navigationGroup = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/boards.navigation_label');
+    }
+
+    public function getTitle(): string
+    {
+        return __('filament/pages/boards.opportunities.title');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.workspace');
+    }
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
@@ -115,7 +130,7 @@ final class OpportunitiesBoard extends BoardPage
             })
             ->columnActions([
                 CreateAction::make()
-                    ->label('Add Opportunity')
+                    ->label(__('filament/pages/boards.opportunities.actions.add'))
                     ->icon('heroicon-o-plus')
                     ->iconButton()
                     ->modalWidth(Width::Large)
@@ -125,7 +140,7 @@ final class OpportunitiesBoard extends BoardPage
                         ->components([
                             TextInput::make('name')
                                 ->required()
-                                ->placeholder('Enter opportunity title')
+                                ->placeholder(__('filament/pages/boards.opportunities.form.name_placeholder'))
                                 ->columnSpanFull(),
                             Select::make('company_id')
                                 ->relationship('company', 'name')
@@ -162,7 +177,7 @@ final class OpportunitiesBoard extends BoardPage
             ])
             ->cardActions([
                 Action::make('edit')
-                    ->label('Edit')
+                    ->label(__('filament/pages/boards.opportunities.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ExtraLarge)
                     ->icon('heroicon-o-pencil-square')
@@ -176,7 +191,7 @@ final class OpportunitiesBoard extends BoardPage
                         $record->update($data);
                     }),
                 Action::make('delete')
-                    ->label('Delete')
+                    ->label(__('filament/pages/boards.opportunities.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
@@ -186,11 +201,11 @@ final class OpportunitiesBoard extends BoardPage
             ])
             ->filters([
                 SelectFilter::make('companies')
-                    ->label('Company')
+                    ->label(__('filament/pages/boards.opportunities.filters.company'))
                     ->relationship('company', 'name')
                     ->multiple(),
                 SelectFilter::make('contacts')
-                    ->label('Contact')
+                    ->label(__('filament/pages/boards.opportunities.filters.contact'))
                     ->relationship('contact', 'name')
                     ->multiple(),
             ])

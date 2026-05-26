@@ -1,0 +1,8 @@
+title: Schedule technical interview with Sarah
+assigned_people:
+  - sarah
+custom_fields:
+  description: Coordinate with the Stripe engineering team to set up a technical interview for Sarah Chen. Include a system design round and a live coding session.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

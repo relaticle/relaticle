@@ -1,0 +1,6 @@
+name: Senior Software Engineer
+company: stripe
+custom_fields:
+  amount: 180000
+  close_date: '{{ +6w }}'
+  stage: Qualification

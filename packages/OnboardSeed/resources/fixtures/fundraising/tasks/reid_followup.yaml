@@ -1,0 +1,8 @@
+title: Follow up with Reid on market analysis
+assigned_people:
+  - reid
+custom_fields:
+  description: Send the updated market analysis and competitive landscape document Reid requested.
+  due_date: '{{ +4d }}'
+  status: To do
+  priority: Medium

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -19,6 +20,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -91,6 +93,14 @@ final class UserResource extends Resource
                         ->boolean(),
                     TextEntry::make('currentTeam.name')
                         ->label('Current Team'),
+                    TextEntry::make('last_login_at')
+                        ->label('Last Login')
+                        ->dateTime()
+                        ->placeholder('Never'),
+                    TextEntry::make('subscriber_recency_bucket')
+                        ->label('Engagement')
+                        ->badge()
+                        ->placeholder('—'),
                     TextEntry::make('created_at')
                         ->dateTime(),
                     TextEntry::make('updated_at')
@@ -120,6 +130,18 @@ final class UserResource extends Resource
                 TextColumn::make('currentTeam.name')
                     ->label('Current Team')
                     ->sortable(),
+                TextColumn::make('last_login_at')
+                    ->label('Last Login')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('Never'),
+                TextColumn::make('subscriber_recency_bucket')
+                    ->label('Engagement')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('—'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -131,6 +153,13 @@ final class UserResource extends Resource
                 TernaryFilter::make('email_verified_at')
                     ->label('Email Verified')
                     ->nullable(),
+                SelectFilter::make('subscriber_recency_bucket')
+                    ->label('Engagement')
+                    ->options([
+                        SubscriberTagEnum::Active7d->value => 'Active (7d)',
+                        SubscriberTagEnum::Active30d->value => 'Active (30d)',
+                        SubscriberTagEnum::Dormant->value => 'Dormant',
+                    ]),
             ])
             ->recordActions([
                 ViewAction::make(),

@@ -43,11 +43,13 @@ final class OpportunityResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    protected static ?string $modelLabel = null;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trophy';
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Workspace';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     public static function form(Schema $schema): Schema
     {
@@ -61,7 +63,7 @@ final class OpportunityResource extends Resource
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('creator.name')
-                    ->label('Created By')
+                    ->label(__('filament/resources/opportunity.fields.creator.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable()
@@ -82,7 +84,7 @@ final class OpportunityResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label(__('filament/resources/opportunity.fields.creation_source.label'))
                     ->options(CreationSource::class)
                     ->multiple(),
                 TrashedFilter::make(),
@@ -126,6 +128,26 @@ final class OpportunityResource extends Resource
             'view' => ViewOpportunity::route('/{record}'),
             'emails' => OpportunityEmailsPage::route('/{record}/emails'),
         ];
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/opportunity.label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('filament/resources/opportunity.plural_label');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/resources/opportunity.navigation_label');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.workspace');
     }
 
     public static function getEloquentQuery(): Builder

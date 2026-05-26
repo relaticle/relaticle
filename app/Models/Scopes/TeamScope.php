@@ -11,13 +11,15 @@ use Illuminate\Database\Eloquent\Scope;
 
 /**
  * @template TModel of Model
+ *
+ * @implements Scope<TModel>
  */
 final class TeamScope implements Scope
 {
     /**
      * Apply the scope to a given Eloquent query builder.
      *
-     * @param  Builder<TModel>  $builder
+     * @param  Builder<covariant TModel>  $builder
      */
     public function apply(Builder $builder, Model $model): void
     {

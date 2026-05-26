@@ -1,0 +1,8 @@
+title: Review content calendar with David
+assigned_people:
+  - david
+custom_fields:
+  description: Go over the Q2 content calendar with David and align on email campaign topics and publishing cadence.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

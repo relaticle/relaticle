@@ -31,15 +31,15 @@ final class ViewOpportunity extends ViewRecord
         return [
             GenerateRecordSummaryAction::make(),
             Action::make('viewEmails')
-                ->label('Emails')
+                ->label(__('filament/resources/opportunity.pages.view.actions.view_emails.label'))
                 ->icon('heroicon-o-envelope')
                 ->color('gray')
                 ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
-            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
-                        ->label('Copy page URL')
+                        ->label(__('filament/resources/opportunity.pages.view.actions.copy_page_url.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Opportunity $record): void {
                             $jsUrl = Js::from(OpportunityResource::getUrl('view', [$record]));
@@ -53,7 +53,7 @@ final class ViewOpportunity extends ViewRecord
                         ");
                         }),
                     Action::make('copyRecordId')
-                        ->label('Copy record ID')
+                        ->label(__('filament/resources/opportunity.pages.view.actions.copy_record_id.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Opportunity $record): void {
                             $jsId = Js::from((string) $record->getKey());
@@ -79,12 +79,12 @@ final class ViewOpportunity extends ViewRecord
                 Flex::make([
                     TextEntry::make('name')->grow(true),
                     TextEntry::make('company.name')
-                        ->label('Company')
+                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
                         ->color('primary')
                         ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null)
                         ->grow(false),
                     TextEntry::make('contact.name')
-                        ->label('Point of Contact')
+                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
                         ->color('primary')
                         ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null)
                         ->grow(false),

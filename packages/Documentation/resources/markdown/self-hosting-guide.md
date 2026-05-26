@@ -78,6 +78,7 @@ These must be set or the containers will refuse to start.
 | `APP_URL` | `http://localhost` | Full URL where Relaticle is accessible. Include the scheme. |
 | `APP_PORT` | `80` | Host port the app container binds to. |
 | `APP_PANEL_DOMAIN` | (empty) | Set for subdomain routing (e.g., `app.example.com`). Leave empty for path mode (`/app`). |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email — useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach `/app/register` can create a working account. |
 | `LOG_CHANNEL` | `stderr` | Where logs go. `stderr` is recommended for Docker. |
 | `LOG_LEVEL` | `warning` | Minimum log level. Use `debug` for troubleshooting. |
 
@@ -161,9 +162,17 @@ After starting the containers, create your first admin user:
 docker compose exec app php artisan make:filament-user
 ```
 
-You will be prompted for a name, email, and password. Once created, access the CRM panel at `{APP_URL}/app`.
+When prompted to pick a panel, choose `app`, then enter a name, email, and password. Once created, access the CRM panel at `{APP_URL}/app`. (To create the instance-wide system administrator instead, see the next section.)
 
 **Note**: By default the CRM panel is available at the `/app` path. To use subdomain routing instead (e.g., `app.example.com`), set the `APP_PANEL_DOMAIN` environment variable.
+
+### System Administrator Account
+
+The `sysadmin` panel at `{APP_URL}/sysadmin` is a separate, instance-wide admin surface for managing every team and user on your installation. To create a system administrator, you can either pick `sysadmin` from the `make:filament-user` panel prompt, or use the dedicated command:
+
+```bash
+docker compose exec app php artisan sysadmin:create
+```
 
 ---
 
@@ -220,7 +229,7 @@ labels:
   - "traefik.http.services.relaticle.loadbalancer.server.port=8080"
 ```
 
-**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The `TRUSTED_PROXIES` environment variable defaults to `*` in Docker, so forwarded headers are handled automatically.
+**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The app trusts `X-Forwarded-*` headers from RFC1918 private networks, loopback, and IPv6 ULA/link-local — covering Coolify/Dokploy/Traefik on a Docker network and reverse proxies on the host. Headers from public IPs are rejected, preventing spoofing.
 
 ---
 

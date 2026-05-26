@@ -1,0 +1,6 @@
+name: Media Partnership
+company: coastal_media
+custom_fields:
+  amount: 22000
+  close_date: '{{ +10w }}'
+  stage: Prospecting

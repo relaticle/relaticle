@@ -18,29 +18,29 @@ final class CompanyExporter extends BaseExporter
     {
         return [
             ExportColumn::make('id')
-                ->label('ID'),
+                ->label(__('filament/exports.columns.id')),
             ExportColumn::make('name')
-                ->label('Company Name'),
+                ->label(__('filament/exports.columns.company_name')),
             ExportColumn::make('team.name')
-                ->label('Team'),
+                ->label(__('filament/exports.columns.team')),
             ExportColumn::make('accountOwner.name')
-                ->label('Account Owner'),
+                ->label(__('filament/exports.columns.account_owner')),
             ExportColumn::make('creator.name')
-                ->label('Created By'),
+                ->label(__('filament/exports.columns.creator')),
             ExportColumn::make('people_count')
-                ->label('Number of People')
+                ->label(__('filament/exports.columns.people_count'))
                 ->state(fn (Company $company): int => $company->people()->count()),
             ExportColumn::make('opportunities_count')
-                ->label('Number of Opportunities')
+                ->label(__('filament/exports.columns.opportunities_count'))
                 ->state(fn (Company $company): int => $company->opportunities()->count()),
             ExportColumn::make('created_at')
-                ->label('Created At')
+                ->label(__('filament/exports.columns.created_at'))
                 ->formatStateUsing(fn (Carbon $state): string => $state->format('Y-m-d H:i:s')),
             ExportColumn::make('updated_at')
-                ->label('Updated At')
+                ->label(__('filament/exports.columns.updated_at'))
                 ->formatStateUsing(fn (Carbon $state): string => $state->format('Y-m-d H:i:s')),
             ExportColumn::make('creation_source')
-                ->label('Creation Source')
+                ->label(__('filament/exports.columns.creation_source'))
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
 
             // Add all custom fields automatically

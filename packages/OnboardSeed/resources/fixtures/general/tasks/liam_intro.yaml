@@ -1,0 +1,8 @@
+title: Introductory call with Liam
+assigned_people:
+  - liam
+custom_fields:
+  description: Set up a 30-minute introductory call with Liam to explore media partnership opportunities and mutual fit.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

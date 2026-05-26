@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +24,7 @@ final class TeamInvitationFactory extends Factory
         return [
             'team_id' => Team::factory(),
             'email' => $this->faker->unique()->safeEmail(),
-            'role' => $this->faker->randomElement(['admin', 'editor']),
+            'role' => $this->faker->randomElement([TeamRole::Admin->value, TeamRole::Editor->value]),
             'expires_at' => now()->addDays(config('jetstream.invitation_expiry_days', 7)),
         ];
     }

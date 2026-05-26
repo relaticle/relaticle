@@ -18,6 +18,7 @@ use App\Mcp\Tools\BaseListTool;
 use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\PersonalAccessToken;
+use App\Rules\ArrayExistsForTeam;
 
 arch()->preset()->php();
 
@@ -115,6 +116,7 @@ arch('avoid mutation')
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
         'App\Scribe',
+        ArrayExistsForTeam::class,
     ]);
 
 arch('avoid inheritance')
@@ -153,6 +155,7 @@ arch('main app must not depend on SystemAdmin module')
         'App\Providers\AppServiceProvider',
         'App\Console\Commands\InstallCommand',
         'App\Console\Commands\CreateSystemAdminCommand',
+        'App\Console\Commands\MakeFilamentUserCommand',
     ]);
 
 arch('SystemAdmin module must not depend on main app namespace')

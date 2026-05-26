@@ -1,0 +1,8 @@
+title: Send project proposal to Noah
+assigned_people:
+  - noah
+custom_fields:
+  description: Prepare and send the brand redesign proposal including scope, timeline, and pricing to Noah for review.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

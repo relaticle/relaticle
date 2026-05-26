@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\WhoAmiTool;
 use App\Models\User;
-use Laravel\Sanctum\Exceptions\MissingAbilityException;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -52,8 +51,9 @@ describe('token abilities', function (): void {
         $this->user->withAccessToken($token->accessToken);
 
         RelaticleServer::actingAs($this->user)
-            ->tool(WhoAmiTool::class);
-    })->throws(MissingAbilityException::class);
+            ->tool(WhoAmiTool::class)
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 
     it('allows read-only token', function (): void {
         $token = $this->user->createToken('test', ['read']);

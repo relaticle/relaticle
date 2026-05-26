@@ -9,7 +9,6 @@ use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Models\Company;
 use App\Models\User;
-use Laravel\Sanctum\Exceptions\MissingAbilityException;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -30,8 +29,9 @@ describe('read-only token', function (): void {
 
     it('cannot create a company', function (): void {
         RelaticleServer::actingAs($this->user)
-            ->tool(CreateCompanyTool::class, ['name' => 'Blocked']);
-    })->throws(MissingAbilityException::class);
+            ->tool(CreateCompanyTool::class, ['name' => 'Blocked'])
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 
     it('cannot update a company', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->team])->create();
@@ -40,8 +40,9 @@ describe('read-only token', function (): void {
             ->tool(UpdateCompanyTool::class, [
                 'id' => $company->id,
                 'name' => 'Blocked',
-            ]);
-    })->throws(MissingAbilityException::class);
+            ])
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 
     it('cannot delete a company', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->team])->create();
@@ -49,8 +50,9 @@ describe('read-only token', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
                 'id' => $company->id,
-            ]);
-    })->throws(MissingAbilityException::class);
+            ])
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 });
 
 describe('create-only token', function (): void {
@@ -61,8 +63,9 @@ describe('create-only token', function (): void {
 
     it('cannot list companies', function (): void {
         RelaticleServer::actingAs($this->user)
-            ->tool(ListCompaniesTool::class);
-    })->throws(MissingAbilityException::class);
+            ->tool(ListCompaniesTool::class)
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 
     it('can create a company', function (): void {
         RelaticleServer::actingAs($this->user)
@@ -76,8 +79,9 @@ describe('create-only token', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
                 'id' => $company->id,
-            ]);
-    })->throws(MissingAbilityException::class);
+            ])
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
 });
 
 describe('wildcard token', function (): void {
