@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -49,4 +50,34 @@ it('disables calendar sync when already enabled', function (): void {
 
     expect($account->fresh()?->hasCalendar())->toBeFalse();
     Bus::assertNotDispatched(InitialCalendarSyncJob::class);
+});
+
+it('does not disable another user\'s calendar via syncCalendar', function (): void {
+    $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherUser->id,
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionHidden('syncCalendar', ['account_id' => $otherAccount->id]);
+
+    expect($otherAccount->fresh()?->hasCalendar())->toBeTrue();
+});
+
+it('does not dispatch sync for another user\'s account via syncCalendarNow', function (): void {
+    Bus::fake([IncrementalCalendarSyncJob::class]);
+
+    $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherUser->id,
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionHidden('syncCalendarNow', ['account_id' => $otherAccount->id]);
+
+    Bus::assertNotDispatched(IncrementalCalendarSyncJob::class);
 });
