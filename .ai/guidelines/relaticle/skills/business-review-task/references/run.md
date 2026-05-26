@@ -87,7 +87,7 @@ The plan file at `$REVIEW_DIR/plan.md` has a JSON frontmatter block (HTML commen
     {
       "id": "1.1",
       "name": "Create company with new industry field",
-      "acs": ["AC-1"],
+      "acs": [1],
       "mode": "browser",
       "setup": ["login as manuk.minasyan1@gmail.com", "navigate to /app/<team>/companies/create"],
       "verification_steps": [
@@ -135,7 +135,7 @@ The plan file at `$REVIEW_DIR/plan.md` has a JSON frontmatter block (HTML commen
 |---|---|---|
 | `id` | yes | dotted identifier like `1.1`, `2.3` — unique within the plan |
 | `name` | yes | human-readable case name |
-| `acs` | yes | array of AC IDs covered (e.g. `["AC-1"]`), or `["implicit"]` for checks-matrix scenarios not tied to an AC |
+| `acs` | yes | array of integer AC IDs covered (e.g. `[1, 2]`), matching the `id` fields in `acceptance-criteria.json`. Use `["implicit"]` for checks-matrix scenarios not tied to an AC. |
 | `mode` | yes | `browser` or `pest-only` |
 | `change_types` | no | subset of frontmatter's `change_types` this case targets |
 | `viewport` | no | e.g. `"375x667"` for mobile cases; default `1920x1080` |

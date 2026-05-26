@@ -310,9 +310,10 @@ Cross-reference with the [Per-element checks](#per-element-checks) section above
 | `tenant` | `Team` / `Membership` / tenant middleware changed | Cross-team data leak · team switch persistence · invite/remove flows |
 | `route` | `routes/*.php` touched | Route resolves with auth · route resolves without auth (where appropriate) · middleware stack applies |
 | `api` | `routes/api.php` or `app/Http/Controllers/Api/` touched | Auth required · tenant scope · QueryBuilder filter/sort/paginate · validation errors · Scribe docs generate |
-| `infra_only` | Only `app/Console/`, `app/Jobs/`, `tests/Unit/`, `database/` migrations, `config/*.php` (non-pennant) | Skip browser; run Pest tests only |
 
-### When `infra_only` is the only classification
+> **`infra_only` is NOT in `change_types[]`.** `classify_diff.py` emits it as a separate top-level boolean field on the JSON output. When `infra_only: true` AND `change_types: []`, treat the diff as backend-only and skip the browser — see below.
+
+### When `infra_only: true` and `change_types: []`
 
 Skip the browser. Run the relevant Pest test file(s) instead:
 
