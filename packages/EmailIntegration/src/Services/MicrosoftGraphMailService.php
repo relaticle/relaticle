@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
@@ -76,7 +76,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ...$this->mapAddresses('bcc', array_column($message['bccRecipients'] ?? [], 'emailAddress')),
         ];
 
-        $sentAt = Carbon::parse((string) ($message['receivedDateTime'] ?? $message['sentDateTime'] ?? now()->toIso8601String()));
+        $sentAt = Date::parse((string) ($message['receivedDateTime'] ?? $message['sentDateTime'] ?? now()->toIso8601String()));
         $folder = $this->resolveFolder((string) ($message['parentFolderId'] ?? ''));
         $isOutbound = $folder === EmailFolder::Sent;
 
@@ -170,7 +170,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             'emailAddress' => array_filter([
                 'address' => $r['email'],
                 'name' => $r['name'] ?? null,
-            ], static fn ($v): bool => $v !== null && $v !== ''),
+            ], static fn (?string $v): bool => $v !== null && $v !== ''),
         ], $recipients);
     }
 
@@ -183,14 +183,17 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         $out = [];
 
         foreach ($addresses as $address) {
-            if ($address === null || empty($address['address'])) {
+            if ($address === null) {
                 continue;
             }
-
+            $email = $address['address'] ?? null;
+            if (blank($email)) {
+                continue;
+            }
             $out[] = [
                 'role' => $role,
-                'email_address' => strtolower((string) $address['address']),
-                'name' => isset($address['name']) ? (string) $address['name'] : null,
+                'email_address' => strtolower($email),
+                'name' => $address['name'] ?? null,
             ];
         }
 
