@@ -55,6 +55,8 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Azure\AzureExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -84,6 +86,11 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        Event::listen(
+            SocialiteWasCalled::class,
+            [AzureExtendSocialite::class, 'handle'],
+        );
 
         $this->configurePolicies();
         $this->configureModels();

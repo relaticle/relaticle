@@ -10,12 +10,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
 final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
@@ -32,7 +30,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $this->onQueue('emails-sync');
     }
 
-    public function handle(): void
+    public function handle(MailServiceFactoryInterface $mailFactory): void
     {
         $account = $this->connectedAccount;
 
@@ -40,16 +38,10 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if ($account->provider !== EmailProvider::GMAIL) {
-            return;
-        }
+        $service = $mailFactory->make($account);
+        $delta = $service->fetchDelta($account->sync_cursor);
 
-        $service = GmailService::forAccount($account);
-        $data = $service->fetchDelta($account->sync_cursor);
-
-        Log::info("Fetched delta for account {$account->id}: ".json_encode($data));
-
-        $allIds = $data['message_ids']->all();
+        $allIds = $delta->messageIds->all();
 
         // Bulk dedup: exclude IDs already stored for this account
         $storedIds = Email::query()
@@ -65,7 +57,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         // Mark emails as read when UNREAD label was removed in Gmail
-        $readIds = $data['read_message_ids']->all();
+        $readIds = $delta->readMessageIds->all();
 
         if ($readIds !== []) {
             Email::query()
@@ -76,7 +68,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $account->update([
-            'sync_cursor' => $data['new_history_id'],
+            'sync_cursor' => $delta->newCursor,
             'last_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,

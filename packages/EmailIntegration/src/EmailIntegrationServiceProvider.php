@@ -16,7 +16,9 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Factories\GoogleCalendarServiceFactory;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
+use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
@@ -24,7 +26,8 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/email-integration.php', 'email-integration');
 
-        $this->app->bind(CalendarServiceFactoryInterface::class, GoogleCalendarServiceFactory::class);
+        $this->app->bind(CalendarServiceFactoryInterface::class, CalendarServiceFactory::class);
+        $this->app->bind(MailServiceFactoryInterface::class, MailServiceFactory::class);
     }
 
     public function boot(): void

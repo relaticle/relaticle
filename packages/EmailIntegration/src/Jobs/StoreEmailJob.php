@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Exception;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -13,10 +12,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
@@ -46,7 +44,7 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
     /**
      * @throws Throwable
      */
-    public function handle(StoreEmailAction $action): void
+    public function handle(MailServiceFactoryInterface $mailFactory, StoreEmailAction $action): void
     {
         if ($this->batch()?->cancelled()) {
             return;
@@ -61,10 +59,7 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $fetched = match ($this->connectedAccount->provider) {
-            EmailProvider::GMAIL => GmailService::forAccount($this->connectedAccount)->fetchMessage($this->messageId),
-            EmailProvider::AZURE => throw new Exception('Azure email provider is not yet implemented.'),
-        };
+        $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
 
         $action->execute($this->connectedAccount, $fetched);
     }

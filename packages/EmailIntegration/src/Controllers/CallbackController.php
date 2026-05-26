@@ -42,8 +42,9 @@ final readonly class CallbackController
 
         throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
 
+        /** @var array<int, string> $grantedScopes */
         $grantedScopes = $socialUser->approvedScopes;
-        $hasCalendar = in_array('https://www.googleapis.com/auth/calendar.readonly', $grantedScopes, true);
+        $hasCalendar = $this->detectCalendarCapability($provider, $grantedScopes);
 
         $account = DB::transaction(fn (): ConnectedAccount => ConnectedAccount::query()->updateOrCreate(
             [
@@ -92,5 +93,17 @@ final readonly class CallbackController
         return redirect(EmailAccountsPage::getUrl([
             'tenant' => $user->currentTeam->slug,
         ]))->with('error', $message);
+    }
+
+    /**
+     * @param  array<int, string>  $approvedScopes
+     */
+    private function detectCalendarCapability(string $provider, array $approvedScopes): bool
+    {
+        return match ($provider) {
+            'gmail' => in_array('https://www.googleapis.com/auth/calendar.readonly', $approvedScopes, true),
+            'azure' => in_array('https://graph.microsoft.com/Calendars.Read', $approvedScopes, true),
+            default => false,
+        };
     }
 }

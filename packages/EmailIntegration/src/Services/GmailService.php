@@ -4,38 +4,30 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
-use Google\Service\Exception;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartHeader;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
-final readonly class GmailService
+final readonly class GmailService implements MailServiceInterface
 {
     public function __construct(private ConnectedAccount $account, private Gmail $gmail) {}
 
-    public static function forAccount(ConnectedAccount $account): self
-    {
-        $client = resolve(Factories\GoogleClientFactory::class)->make($account);
-
-        return new self($account, new Gmail($client));
-    }
-
     /**
-     * Fetch messages newer than the given historyId (incremental sync).
+     * Fetch messages newer than the given cursor (incremental sync).
      * Returns new message IDs and IDs of messages where UNREAD was removed (marked as read).
-     *
-     * @return array{message_ids: Collection<int, string>, read_message_ids: Collection<int, string>, new_history_id: string}
      */
-    public function fetchDelta(string $historyId): array
+    public function fetchDelta(string $cursor): MailDeltaResult
     {
         $history = $this->gmail->users_history->listUsersHistory('me', [
-            'startHistoryId' => $historyId,
+            'startHistoryId' => $cursor,
             'historyTypes' => ['messageAdded', 'labelsRemoved'],
         ]);
 
@@ -63,11 +55,11 @@ final readonly class GmailService
             }
         }
 
-        return [
-            'message_ids' => collect($messageIds),
-            'read_message_ids' => collect($readMessageIds),
-            'new_history_id' => $history->getHistoryId() ?? $historyId,
-        ];
+        return new MailDeltaResult(
+            messageIds: collect($messageIds),
+            readMessageIds: collect($readMessageIds),
+            newCursor: (string) ($history->getHistoryId() ?? $cursor),
+        );
     }
 
     /**
@@ -102,13 +94,11 @@ final readonly class GmailService
     }
 
     /**
-     * Get initial historyId and list of message IDs for backfill.
+     * Get initial cursor and list of message IDs for backfill.
      *
-     * @return array<string, mixed>
-     *
-     * @throws Exception
+     * @return array{message_ids: Collection<int, string>, cursor: string}
      */
-    public function fetchInitialMessages(int $daysBack = 90): array
+    public function initialBackfill(int $daysBack): array
     {
         $after = now()->subDays($daysBack)->timestamp;
 
@@ -121,75 +111,43 @@ final readonly class GmailService
 
         $messageIds = $this->pluckMessageIds($response->getMessages());
 
-        $profile = $this->gmail
-            ->users
-            ->getProfile('me');
-
-        $historyId = $profile->getHistoryId();
+        $profile = $this->gmail->users->getProfile('me');
 
         return [
             'message_ids' => $messageIds,
-            'history_id' => $historyId,
+            'cursor' => (string) $profile->getHistoryId(),
         ];
     }
 
     /**
-     * Send a new email (new thread).
+     * Send a new email or reply to an existing thread.
+     * Pass `in_reply_to` and `thread_id` in $data to send as a reply.
      *
      * @param array{
      *     subject: string,
      *     body_html: string,
      *     body_text?: string,
-     *     to: array<array{email: string, name: ?string}>,
-     *     cc?: array<array{email: string, name: ?string}>,
-     *     bcc?: array<array{email: string, name: ?string}>,
+     *     to: array<int, array{email: string, name: ?string}>,
+     *     cc?: array<int, array{email: string, name: ?string}>,
+     *     bcc?: array<int, array{email: string, name: ?string}>,
      *     from_name?: string,
+     *     in_reply_to?: string,
+     *     thread_id?: string,
      * } $data
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
-     *
-     * @throws Exception
      */
     public function sendMessage(array $data): array
     {
-        $raw = $this->buildMimeMessage($data, null);
+        $isReply = isset($data['in_reply_to']);
+        $raw = $this->buildMimeMessage($data, $data['in_reply_to'] ?? null);
 
         $message = new Message;
         $message->setRaw(rtrim(strtr(base64_encode($raw), '+/', '-_'), '='));
 
-        $sent = $this->gmail->users_messages->send('me', $message);
-
-        return [
-            'provider_message_id' => $sent->getId(),
-            'thread_id' => $sent->getThreadId(),
-            'rfc_message_id' => '<'.$sent->getId().'@mail.gmail.com>',
-        ];
-    }
-
-    /**
-     * Reply to an existing thread.
-     *
-     * @param array{
-     *     subject: string,
-     *     body_html: string,
-     *     body_text?: string,
-     *     to: array<array{email: string, name: ?string}>,
-     *     cc?: array<array{email: string, name: ?string}>,
-     *     bcc?: array<array{email: string, name: ?string}>,
-     *     from_name?: string,
-     *     in_reply_to: string,
-     *     thread_id: string,
-     * } $data
-     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
-     *
-     * @throws Exception
-     */
-    public function replyToThread(array $data): array
-    {
-        $raw = $this->buildMimeMessage($data, $data['in_reply_to']);
-
-        $message = new Message;
-        $message->setRaw(rtrim(strtr(base64_encode($raw), '+/', '-_'), '='));
-        $message->setThreadId($data['thread_id']);
+        if ($isReply) {
+            assert(isset($data['thread_id']), 'thread_id is required when in_reply_to is set');
+            $message->setThreadId($data['thread_id']);
+        }
 
         $sent = $this->gmail->users_messages->send('me', $message);
 
@@ -286,8 +244,6 @@ final readonly class GmailService
     /**
      * Download an attachment binary from the Gmail API.
      * Returns the raw decoded bytes.
-     *
-     * @throws Exception
      */
     public function downloadAttachment(string $messageId, string $attachmentId): string
     {
