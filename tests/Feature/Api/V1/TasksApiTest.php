@@ -14,6 +14,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -188,6 +189,22 @@ it('rejects cross-tenant relationship ids on task create', function (): void {
     ])
         ->assertUnprocessable()
         ->assertInvalid(['company_ids.0']);
+});
+
+it('reports per-item validation errors with correct array index', function (): void {
+    Sanctum::actingAs($this->user);
+
+    $validCompany = Company::factory()->recycle([$this->user, $this->team])->create();
+    $otherTeam = Team::factory()->create();
+    $invalidCompany = Company::factory()->for($otherTeam)->create();
+
+    $this->postJson('/api/v1/tasks', [
+        'title' => 'Mixed valid and invalid',
+        'company_ids' => [$validCompany->id, $invalidCompany->id, $validCompany->id],
+    ])
+        ->assertUnprocessable()
+        ->assertInvalid(['company_ids.1'])
+        ->assertValid(['company_ids.0', 'company_ids.2']);
 });
 
 describe('cross-tenant isolation', function (): void {
@@ -555,4 +572,32 @@ describe('non-existent record', function (): void {
         $this->getJson('/api/v1/tasks/'.Str::ulid())
             ->assertNotFound();
     });
+});
+
+it('validates large arrays of relationship ids in a bounded number of queries', function (): void {
+    Sanctum::actingAs($this->user);
+
+    $companies = Company::factory()->count(10)->recycle([$this->user, $this->team])->create();
+    $people = People::factory()->count(10)->recycle([$this->user, $this->team])->create();
+    $opportunities = Opportunity::factory()->count(10)->recycle([$this->user, $this->team])->create();
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $this->postJson('/api/v1/tasks', [
+        'title' => 'Large task',
+        'company_ids' => $companies->pluck('id')->all(),
+        'people_ids' => $people->pluck('id')->all(),
+        'opportunity_ids' => $opportunities->pluck('id')->all(),
+    ])->assertCreated();
+
+    $log = DB::getQueryLog();
+
+    $companyLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'team_id'))->count();
+    $peopleLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "people"') && str_contains($q['query'], 'team_id'))->count();
+    $opportunityLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "opportunities"') && str_contains($q['query'], 'team_id'))->count();
+
+    expect($companyLookupCount)->toBeLessThanOrEqual(3, 'company validation should not be N+1');
+    expect($peopleLookupCount)->toBeLessThanOrEqual(3, 'people validation should not be N+1');
+    expect($opportunityLookupCount)->toBeLessThanOrEqual(3, 'opportunity validation should not be N+1');
 });

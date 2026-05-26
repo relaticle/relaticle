@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\SubscriberTagEnum;
 use App\Filament\Pages\Auth\Register;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 
 test('guest with no account clicking invitation link is redirected to register page', function () {
@@ -156,4 +159,66 @@ test('user registering with different email than invitation does not get auto-ve
     $user = User::where('email', 'different@gmail.com')->first();
     expect($user)->not->toBeNull();
     expect($user->hasVerifiedEmail())->toBeFalse();
+});
+
+test('user registering via invitation link gets mailcoach subscriber synced', function (): void {
+    Queue::fake([SyncSubscriberJob::class]);
+    config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
+    config()->set('mailcoach-sdk.subscribers_list_id', 'test-list-id');
+
+    $team = Team::factory()->create();
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'invited@gmail.com',
+    ]);
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->get($acceptUrl);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Invited User',
+            'email' => 'invited@gmail.com',
+            'password' => 'password',
+            'passwordConfirmation' => 'password',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $user = User::where('email', 'invited@gmail.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->hasVerifiedEmail())->toBeTrue();
+
+    Queue::assertPushed(SyncSubscriberJob::class, function (SyncSubscriberJob $job) use ($user): bool {
+        $data = invade($job)->data;
+
+        return $data->email === $user->email
+            && in_array(SubscriberTagEnum::Verified->value, $data->tags, true)
+            && in_array(SubscriberTagEnum::SignupSourceOrganic->value, $data->tags, true)
+            && $data->user_id === (string) $user->id;
+    });
+});
+
+test('user registering without invitation does not trigger subscriber sync', function (): void {
+    Queue::fake([SyncSubscriberJob::class]);
+    config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
+    config()->set('mailcoach-sdk.subscribers_list_id', 'test-list-id');
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Normal User',
+            'email' => 'noninvited@gmail.com',
+            'password' => 'password',
+            'passwordConfirmation' => 'password',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $user = User::where('email', 'noninvited@gmail.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->hasVerifiedEmail())->toBeFalse();
+
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });

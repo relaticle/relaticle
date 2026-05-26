@@ -11,7 +11,7 @@
                 <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
                    class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
                     <x-ri-github-fill class="h-3.5 w-3.5"/>
-                    <span class="text-gray-900 dark:text-white font-semibold">{{ $formattedGithubStars ?? '1.2K' }}+ stars</span>
+                    <span class="text-gray-900 dark:text-white font-semibold">{{ $formattedGithubStars }}+ stars</span>
                     <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
                     <span>Open Source</span>
                     <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>

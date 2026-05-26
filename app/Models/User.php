@@ -36,6 +36,9 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
  * @property Carbon|null $email_verified_at
+ * @property Carbon|null $last_login_at
+ * @property string|null $mailcoach_subscriber_uuid
+ * @property string|null $subscriber_recency_bucket
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
@@ -78,6 +81,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'mailcoach_subscriber_uuid',
+        'subscriber_recency_bucket',
     ];
 
     /**
@@ -98,6 +103,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
             'default_email_sharing_tier' => EmailPrivacyTier::class,
             'scheduled_deletion_at' => 'datetime',
@@ -180,6 +186,20 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function canAccessPanel(Panel $panel): bool
     {
         return $panel->getId() === 'app';
+    }
+
+    /**
+     * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
+     * verified — every framework, Filament, and policy check that reads
+     * hasVerifiedEmail() honors the flag uniformly through this single override.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        if (! config('app.require_email_verification')) {
+            return true;
+        }
+
+        return parent::hasVerifiedEmail();
     }
 
     /**

@@ -48,7 +48,7 @@ final class PeopleResource extends Resource
 {
     protected static ?string $model = People::class;
 
-    protected static ?string $modelLabel = 'person';
+    protected static ?string $modelLabel = null;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -56,7 +56,7 @@ final class PeopleResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Workspace';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     public static function form(Schema $schema): Schema
     {
@@ -80,7 +80,7 @@ final class PeopleResource extends Resource
                                         Select::make('account_owner_id')
                                             ->model(Company::class)
                                             ->relationship('accountOwner', 'name')
-                                            ->label('Account Owner')
+                                            ->label(__('filament/resources/person.fields.account_owner_id.label'))
                                             ->preload()
                                             ->searchable(),
                                         CustomFields::form()->forModel(Company::class)->build()->columns(1),
@@ -107,17 +107,17 @@ final class PeopleResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Person')
+                    ->label(__('filament/resources/person.fields.name.label'))
                     ->searchable()
                     ->sortable()
                     ->view('filament.tables.columns.avatar-name-column'),
                 TextColumn::make('company.name')
-                    ->label('Company')
+                    ->label(__('filament/resources/person.fields.company.label'))
                     ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('creator.name')
-                    ->label('Created By')
+                    ->label(__('filament/resources/person.fields.creator.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable()
@@ -139,7 +139,7 @@ final class PeopleResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label(__('filament/resources/person.fields.creation_source.label'))
                     ->options(CreationSource::class)
                     ->multiple(),
                 TrashedFilter::make(),
@@ -183,6 +183,26 @@ final class PeopleResource extends Resource
             'view' => ViewPeople::route('/{record}'),
             'emails' => PeopleEmailsPage::route('/{record}/emails'),
         ];
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/person.label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('filament/resources/person.plural_label');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/resources/person.navigation_label');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.workspace');
     }
 
     public static function getEloquentQuery(): Builder

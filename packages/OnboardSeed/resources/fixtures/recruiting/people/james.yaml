@@ -1,0 +1,8 @@
+name: James Park
+company: supabase
+custom_fields:
+  emails:
+    - james.park@hey.com
+  phone_number: "+14155550158"
+  job_title: Backend Developer
+  linkedin: https://www.linkedin.com/in/jamespark/

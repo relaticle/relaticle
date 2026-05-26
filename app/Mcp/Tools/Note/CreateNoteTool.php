@@ -8,8 +8,8 @@ use App\Actions\Note\CreateNote;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
+use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 
 #[Description('Create a new note in the CRM. Use the crm-schema resource to discover available custom fields.')]
@@ -47,11 +47,11 @@ final class CreateNoteTool extends BaseCreateTool
         return [
             'title' => ['required', 'string', 'max:255'],
             'company_ids' => ['sometimes', 'array'],
-            'company_ids.*' => ['string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
             'people_ids' => ['sometimes', 'array'],
-            'people_ids.*' => ['string', Rule::exists('people', 'id')->where('team_id', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
             'opportunity_ids' => ['sometimes', 'array'],
-            'opportunity_ids.*' => ['string', Rule::exists('opportunities', 'id')->where('team_id', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
         ];
     }
 }

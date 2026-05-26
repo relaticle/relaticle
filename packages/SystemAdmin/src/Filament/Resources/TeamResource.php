@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
 use App\Models\Team;
 use App\Rules\ValidTeamSlug;
 use Filament\Actions\BulkActionGroup;
@@ -20,6 +22,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Override;
@@ -93,6 +96,18 @@ final class TeamResource extends Resource
                     IconEntry::make('personal_team')
                         ->label('Personal')
                         ->boolean(),
+                    TextEntry::make('onboarding_use_case')
+                        ->label('Use Case')
+                        ->badge()
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_referral_source')
+                        ->label('Referral Source')
+                        ->badge()
+                        ->placeholder('—'),
+                    TextEntry::make('invite_link_token_expires_at')
+                        ->label('Invite Link Expires')
+                        ->dateTime()
+                        ->placeholder('—'),
                     TextEntry::make('created_at')
                         ->dateTime(),
                     TextEntry::make('updated_at')
@@ -121,6 +136,18 @@ final class TeamResource extends Resource
                 IconColumn::make('personal_team')
                     ->label('Personal')
                     ->boolean(),
+                TextColumn::make('onboarding_use_case')
+                    ->label('Use Case')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_referral_source')
+                    ->label('Referral')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -131,6 +158,12 @@ final class TeamResource extends Resource
             ->filters([
                 TernaryFilter::make('personal_team')
                     ->label('Personal Team'),
+                SelectFilter::make('onboarding_use_case')
+                    ->label('Use Case')
+                    ->options(OnboardingUseCase::class),
+                SelectFilter::make('onboarding_referral_source')
+                    ->label('Referral Source')
+                    ->options(OnboardingReferralSource::class),
             ])
             ->recordActions([
                 ViewAction::make(),

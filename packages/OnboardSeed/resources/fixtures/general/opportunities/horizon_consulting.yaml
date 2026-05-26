@@ -1,0 +1,6 @@
+name: Consulting Engagement
+company: horizon_labs
+custom_fields:
+  amount: 30000
+  close_date: '{{ +6w }}'
+  stage: Qualification

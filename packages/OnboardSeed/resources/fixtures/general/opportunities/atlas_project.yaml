@@ -1,0 +1,6 @@
+name: Brand Redesign Project
+company: atlas_design
+custom_fields:
+  amount: 18000
+  close_date: '{{ +3w }}'
+  stage: Proposal/Price Quote

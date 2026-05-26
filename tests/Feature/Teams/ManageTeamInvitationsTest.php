@@ -40,26 +40,6 @@ test('invitation expiring exactly now is expired', function () {
     expect($invitation->isExpired())->toBeTrue();
 });
 
-// --- Extend invitation ---
-
-test('team owner can extend an invitation', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
-
-    $invitation = TeamInvitation::factory()->expired()->create([
-        'team_id' => $user->currentTeam->id,
-    ]);
-
-    expect($invitation->isExpired())->toBeTrue();
-
-    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
-        ->callAction(TestAction::make('extendTeamInvitation')->table($invitation));
-
-    $invitation->refresh();
-
-    expect($invitation->isExpired())->toBeFalse()
-        ->and($invitation->expires_at->isFuture())->toBeTrue();
-});
-
 // --- Copy invite link ---
 
 test('team owner can copy invite link', function () {
@@ -126,4 +106,35 @@ test('cleanup command handles empty table', function () {
     $this->artisan(CleanupExpiredInvitationsCommand::class)
         ->expectsOutputToContain('Purged 0 expired invitation(s)')
         ->assertExitCode(0);
+});
+
+// --- Revoke invitation (renamed from cancel) ---
+
+test('team owner can revoke a pending invitation', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $user->currentTeam->id,
+    ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
+        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation))
+        ->assertNotified(__('teams.notifications.team_invitation_revoked.success'));
+
+    expect(TeamInvitation::query()->whereKey($invitation->getKey())->exists())->toBeFalse();
+});
+
+test('revoke action label reads "Revoke"', function () {
+    expect(__('teams.actions.revoke_team_invitation'))->toBe('Revoke');
+});
+
+test('old cancel action name is gone', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $user->currentTeam->id,
+    ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
+        ->assertActionDoesNotExist(TestAction::make('cancelTeamInvitation')->table($invitation));
 });

@@ -25,7 +25,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.4
-          extensions: json, dom, curl, libxml, mbstring, zip
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
 
       - name: Install PHP dependencies
@@ -95,7 +95,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: json, dom, curl, libxml, mbstring, zip
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
           coverage: none
 
@@ -180,7 +180,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.4
-          extensions: json, dom, curl, libxml, mbstring, zip
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
           coverage: none
 

@@ -12,8 +12,8 @@ final class OnboardSeeder extends Seeder
 {
     public function __construct(private readonly OnboardSeedManager $manager) {}
 
-    public function run(Authenticatable $user, ?Team $team = null): void
+    public function run(Authenticatable $user, ?Team $team = null, string $fixtureSet = 'sales'): void
     {
-        $this->manager->generateFor($user, $team);
+        $this->manager->generateFor($user, $team, $fixtureSet);
     }
 }

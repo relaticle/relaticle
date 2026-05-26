@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Store;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
+use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -43,6 +45,8 @@ use Spatie\LaravelData\DataCollection;
  * @method static Builder<static> searchValue(string $column, string $search)
  * @method static Builder<static> forFilter(ReviewFilter $filter, string $column)
  */
+#[WithoutIncrementing]
+#[WithoutTimestamps]
 final class ImportRow extends Model
 {
     /** @use HasFactory<Factory<ImportRow>> */
@@ -51,10 +55,6 @@ final class ImportRow extends Model
     protected $table = 'import_rows';
 
     protected $primaryKey = 'row_number';
-
-    public $incrementing = false;
-
-    public $timestamps = false;
 
     /** @var list<string> */
     protected $fillable = [
@@ -254,6 +254,7 @@ final class ImportRow extends Model
             $bindings[] = '$.'.$column;
         }
 
+        /** @phpstan-ignore-next-line argument.type */
         $result = $query->selectRaw(implode(', ', $selectParts), $bindings)->first();
 
         $statuses = [];

@@ -1,0 +1,8 @@
+title: Schedule kickoff meeting with Olivia
+assigned_people:
+  - olivia
+custom_fields:
+  description: Coordinate a kickoff meeting with Olivia to align on project goals and timelines for the consulting engagement.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

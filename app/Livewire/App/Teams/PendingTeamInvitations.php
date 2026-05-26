@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Teams;
 
+use App\Actions\Jetstream\ResendTeamInvitation;
+use App\Actions\Jetstream\RevokeTeamInvitation;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -14,10 +16,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
-use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
 
 final class PendingTeamInvitations extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
@@ -53,12 +53,6 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
             ])
             ->paginated(false)
             ->recordActions([
-                Action::make('extendTeamInvitation')
-                    ->label(__('teams.actions.extend_team_invitation'))
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->visible(fn () => Gate::check('updateTeamMember', $this->team))
-                    ->action(fn (Model $record) => $this->extendTeamInvitation($record)),
                 Action::make('copyInviteLink')
                     ->label(__('teams.actions.copy_invite_link'))
                     ->color('gray')
@@ -70,31 +64,21 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
                     ->requiresConfirmation()
                     ->visible(fn () => Gate::check('updateTeamMember', $this->team))
                     ->action($this->resendTeamInvitation(...)),
-                Action::make('cancelTeamInvitation')
-                    ->label(__('teams.actions.cancel_team_invitation'))
+                Action::make('revokeTeamInvitation')
+                    ->label(__('teams.actions.revoke_team_invitation'))
                     ->color('danger')
                     ->visible(fn () => Gate::check('removeTeamMember', $this->team))
                     ->requiresConfirmation()
-                    ->action(fn (Model $record) => $this->cancelTeamInvitation($this->team, $record)),
+                    ->action(fn (Model $record) => $this->revokeTeamInvitation($record)),
             ]);
-    }
-
-    public function extendTeamInvitation(Model $invitation): void
-    {
-        Gate::authorize('updateTeamMember', $this->team);
-
-        $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
-
-        $invitation->update([
-            'expires_at' => now()->addDays($expiryDays),
-        ]);
-
-        $this->sendNotification(__('teams.notifications.team_invitation_extended.success'));
     }
 
     public function copyInviteLink(Model $invitation): void
     {
+        /** @var TeamInvitation $invitation */
         Gate::authorize('updateTeamMember', $this->team);
+
+        abort_unless($invitation->team_id === $this->team->id, 403);
 
         $url = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
 
@@ -105,7 +89,10 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
 
     public function resendTeamInvitation(Model $invitation): void
     {
+        /** @var TeamInvitation $invitation */
         Gate::authorize('updateTeamMember', $this->team);
+
+        abort_unless($invitation->team_id === $this->team->id, 403);
 
         $key = "resend-invitation:{$invitation->getKey()}";
 
@@ -119,19 +106,21 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
 
         RateLimiter::hit($key, 60);
 
-        /** @var \Laravel\Jetstream\TeamInvitation $invitation */
-        Mail::to($invitation->email)->send(new TeamInvitationMail($invitation));
+        resolve(ResendTeamInvitation::class)->resend($invitation);
 
         $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
     }
 
-    public function cancelTeamInvitation(Team $team, Model $invitation): void
+    public function revokeTeamInvitation(Model $invitation): void
     {
-        $invitation->delete();
+        /** @var TeamInvitation $invitation */
+        Gate::authorize('removeTeamMember', $this->team);
 
-        $team->fresh();
+        abort_unless($invitation->team_id === $this->team->id, 403);
 
-        $this->sendNotification(__('teams.notifications.team_invitation_cancelled.success'));
+        resolve(RevokeTeamInvitation::class)->revoke($invitation);
+
+        $this->sendNotification(__('teams.notifications.team_invitation_revoked.success'));
     }
 
     public function render(): View
