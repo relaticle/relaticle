@@ -191,6 +191,12 @@ def run_tests() -> int:
     assert is_local is False, f"got is_local={is_local!r}"
     print("PASS")
 
+    print("test_pr_num_rejects_path_traversal ...", end=" ")
+    assert main(["sanitize_pr.py", "../etc/passwd"]) == 2
+    assert main(["sanitize_pr.py", "12abc"]) == 2
+    assert main(["sanitize_pr.py", "-1"]) == 2
+    print("PASS")
+
     print("test_local_mode_requires_review_dir ...", end=" ")
     # main() in local mode without REVIEW_DIR set returns 2
     import os as _os
@@ -274,6 +280,14 @@ def main(argv: list[str]) -> int:
 
     # PR mode
     pr_num = argv[1]
+    # Reject anything that isn't a plain PR number — a value like "../etc/passwd"
+    # would otherwise let an untrusted caller write outside .context/reviews/.
+    if not pr_num.isdigit():
+        print(
+            f"PR_NUM must be a positive integer; got {pr_num!r}",
+            file=sys.stderr,
+        )
+        return 2
     review_dir = Path(os.environ.get("REVIEW_DIR", f".context/reviews/{pr_num}"))
     review_dir.mkdir(parents=True, exist_ok=True)
     try:

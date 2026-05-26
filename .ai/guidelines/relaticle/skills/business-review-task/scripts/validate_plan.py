@@ -186,9 +186,9 @@ def validate_schema(plan: dict, ac_ids: set[int]) -> tuple[list[str], list[str]]
                         errors.append(
                             f"case {cid} screenshot has 'none' AND populated {sorted(extra)}; use one or the other"
                         )
-                    elif not shot["none"]:
+                    elif not isinstance(shot["none"], str) or not shot["none"].strip():
                         errors.append(
-                            f"case {cid} screenshot.none is empty; provide a reason string"
+                            f"case {cid} screenshot.none must be a non-empty string explaining why"
                         )
                 else:
                     missing = SCREENSHOT_FIELDS - shot.keys()
@@ -351,6 +351,25 @@ def run_tests() -> int:
     plan["cases"][0]["screenshot"] = {"none": "x", "selector": ".y"}
     errors, warnings = validate_schema(plan, ac_ids)
     check(name, any("none" in e and ("AND" in e or "one or the other" in e) for e in errors), str(errors))
+
+    # T-screenshot-none-rejects-non-string
+    name = "T-screenshot-none-rejects-non-string"
+    for bad in [True, 1, [], {}, None]:
+        plan = _minimal_plan()
+        plan["cases"][0]["screenshot"] = {"none": bad}
+        errors, warnings = validate_schema(plan, ac_ids)
+        if not any("non-empty string" in e for e in errors):
+            check(name, False, f"accepted {bad!r}: {errors}")
+            break
+    else:
+        check(name, True)
+
+    # T-screenshot-none-rejects-whitespace-only
+    name = "T-screenshot-none-rejects-whitespace-only"
+    plan = _minimal_plan()
+    plan["cases"][0]["screenshot"] = {"none": "   "}
+    errors, warnings = validate_schema(plan, ac_ids)
+    check(name, any("non-empty string" in e for e in errors), str(errors))
 
     # T-step-missing-evidence_type
     name = "T-step-missing-evidence_type"

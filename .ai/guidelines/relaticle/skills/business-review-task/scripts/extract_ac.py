@@ -15,11 +15,31 @@ Pure stdlib.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
 import sys
 from pathlib import Path
+
+# AC quoted in PR comments and REVIEW.md must be safe to render verbatim.
+# Per sanitization policy: truncate to 140 chars, HTML-escape, neutralize backticks
+# so injected commands like `whoami` don't render as code in markdown.
+AC_TEXT_MAX_LEN = 140
+
+
+def clip_and_escape(text: str) -> str:
+    """Sanitize an AC string for safe verbatim quoting.
+
+    1. HTML-escape so `<script>` cannot render as a tag.
+    2. Replace backticks with their HTML entity so markdown code spans cannot
+       be injected from PR body text.
+    3. Truncate to AC_TEXT_MAX_LEN chars with an ellipsis if longer.
+    """
+    cleaned = html.escape(text).replace("`", "&#96;")
+    if len(cleaned) > AC_TEXT_MAX_LEN:
+        cleaned = cleaned[: AC_TEXT_MAX_LEN - 1].rstrip() + "…"
+    return cleaned
 
 # Headings that signal an AC section in PR body
 AC_HEADING_RE = re.compile(
@@ -112,11 +132,13 @@ def infer_ac_from_diff(diff: str, title: str) -> list[dict]:
 def write_output(out_path: Path, source: str, criteria: list) -> None:
     if source == "pr-body-explicit":
         payload_criteria = [
-            {"id": i, "text": item, "source_files": []}
+            {"id": i, "text": clip_and_escape(item), "source_files": []}
             for i, item in enumerate(criteria, start=1)
         ]
     else:
-        payload_criteria = criteria
+        payload_criteria = [
+            {**c, "text": clip_and_escape(c["text"])} for c in criteria
+        ]
     payload = {"source": source, "criteria": payload_criteria}
     out_path.write_text(json.dumps(payload, indent=2))
 
@@ -205,6 +227,47 @@ Some text.
 """
     items = extract_explicit_ac(body)
     assert items == ["First AC", "Second AC"], items
+    print("PASS")
+
+    print("test_clip_and_escape_short_safe ...", end=" ")
+    assert clip_and_escape("plain AC") == "plain AC"
+    print("PASS")
+
+    print("test_clip_and_escape_html ...", end=" ")
+    out = clip_and_escape('<script>alert("x")</script>')
+    assert "<script>" not in out, out
+    assert "&lt;script&gt;" in out, out
+    print("PASS")
+
+    print("test_clip_and_escape_backticks ...", end=" ")
+    out = clip_and_escape("malicious `whoami` command")
+    assert "`" not in out, out
+    assert "&#96;" in out, out
+    print("PASS")
+
+    print("test_clip_and_escape_truncates ...", end=" ")
+    long = "A" * 200
+    out = clip_and_escape(long)
+    assert len(out) <= AC_TEXT_MAX_LEN, len(out)
+    assert out.endswith("…"), out
+    print("PASS")
+
+    print("test_write_output_escapes_pr_body ...", end=" ")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "out.json"
+        write_output(out, "pr-body-explicit", ["<b>bad</b> AC"])
+        data = json.loads(out.read_text())
+        assert "&lt;b&gt;" in data["criteria"][0]["text"], data["criteria"][0]["text"]
+    print("PASS")
+
+    print("test_write_output_escapes_inferred ...", end=" ")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "out.json"
+        write_output(out, "inferred-from-diff", [
+            {"id": 1, "text": "uses `code`", "source_files": []},
+        ])
+        data = json.loads(out.read_text())
+        assert "`" not in data["criteria"][0]["text"]
     print("PASS")
 
     print("test_tasks_heading_does_not_count_as_ac ...", end=" ")

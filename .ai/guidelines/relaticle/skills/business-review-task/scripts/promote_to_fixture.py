@@ -14,12 +14,17 @@ Pure stdlib.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
 
 SKILL_DIR = Path(".ai/guidelines/relaticle/skills/business-review-task")
 FIXTURES_DIR = SKILL_DIR / "evals" / "fixtures"
+
+# Fixture names go straight into a filesystem path — restrict to a safe alphabet
+# so `../escape` or absolute paths cannot land outside FIXTURES_DIR.
+FIXTURE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
 
 def next_fixture_id() -> str:
@@ -31,6 +36,12 @@ def next_fixture_id() -> str:
 
 
 def promote(pr_num: str, fixture_name: str) -> Path:
+    if not FIXTURE_NAME_RE.match(fixture_name):
+        raise ValueError(
+            f"fixture_name must be lowercase letters/digits/hyphens, 2-64 chars; "
+            f"got {fixture_name!r}"
+        )
+
     src = Path(f".context/reviews/{pr_num}")
     if not src.exists():
         raise FileNotFoundError(
@@ -60,11 +71,19 @@ def promote(pr_num: str, fixture_name: str) -> Path:
                 shutil.copy2(src_path, dst_path)
 
     verdict_path = src / "verdict-final.json"
+    ac_path = src / "acceptance-criteria.json"
     if verdict_path.exists():
         verdict = json.loads(verdict_path.read_text())
+        # AC count comes from acceptance-criteria.json (the source of truth);
+        # aggregate_verdicts.py doesn't emit `ac_coverage`.
+        ac_count = (
+            len(json.loads(ac_path.read_text())["criteria"])
+            if ac_path.exists()
+            else 1
+        )
         expected = {
             "expected_label": verdict["label"],
-            "expected_ac_count_min": verdict["ac_coverage"]["total"],
+            "expected_ac_count_min": ac_count,
             "must_contain_substrings": ["br-sha:"],
             "must_not_contain": ["<placeholder>", "TBD"],
         }
@@ -112,6 +131,48 @@ def run_tests() -> int:
     print("PASS")
 
     FIXTURES_DIR = original
+
+    print("test_fixture_name_rejects_path_traversal ...", end=" ")
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as tmp:
+        FIXTURES_DIR = Path(tmp)
+        FIXTURES_DIR.mkdir(exist_ok=True)
+        for bad in ["../escape", "/abs/path", "UPPER", "with space", "x"]:
+            try:
+                promote("999999", bad)
+                print(f"FAIL: accepted bad name {bad!r}")
+                return 1
+            except ValueError:
+                pass
+    FIXTURES_DIR = original
+    print("PASS")
+
+    print("test_promote_derives_ac_count_from_criteria_file ...", end=" ")
+    with _tempfile.TemporaryDirectory() as tmp:
+        review = Path(tmp) / ".context" / "reviews" / "42"
+        review.mkdir(parents=True)
+        (review / "verdict-final.json").write_text(
+            json.dumps({"label": "ai-approved"})
+        )
+        (review / "acceptance-criteria.json").write_text(
+            json.dumps({"criteria": [{"id": 1}, {"id": 2}, {"id": 3}]})
+        )
+        fdir = Path(tmp) / "fixtures"
+        fdir.mkdir()
+        FIXTURES_DIR = fdir
+        # Patch the source path: promote() builds it from cwd, so chdir.
+        import os as _os
+        prev_cwd = _os.getcwd()
+        _os.chdir(tmp)
+        try:
+            dst = promote("42", "demo-fixture")
+            data = json.loads((dst / "expected.json").read_text())
+            assert data["expected_ac_count_min"] == 3, data
+            assert data["expected_label"] == "ai-approved", data
+        finally:
+            _os.chdir(prev_cwd)
+            FIXTURES_DIR = original
+    print("PASS")
 
     print("\nAll tests passed.")
     return 0
