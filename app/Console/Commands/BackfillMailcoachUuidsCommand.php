@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Sleep;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
 use Spatie\MailcoachSdk\Resources\Subscriber;
 
+#[Description('Backfill mailcoach_subscriber_uuid for existing users from the Mailcoach API')]
+#[Signature('subscribers:backfill-uuids')]
 final class BackfillMailcoachUuidsCommand extends Command
 {
-    protected $signature = 'subscribers:backfill-uuids';
-
-    protected $description = 'Backfill mailcoach_subscriber_uuid for existing users from the Mailcoach API';
-
     public function handle(): int
     {
         $query = User::query()
