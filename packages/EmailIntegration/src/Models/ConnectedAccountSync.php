@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Models;
 
 use Database\Factories\ConnectedAccountSyncFactory;
+use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[WithoutTimestamps]
 final class ConnectedAccountSync extends Model
 {
     /**
@@ -21,8 +23,6 @@ final class ConnectedAccountSync extends Model
     {
         return ConnectedAccountSyncFactory::new();
     }
-
-    public $timestamps = false;
 
     protected $fillable = [
         'connected_account_id',
