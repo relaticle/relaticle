@@ -36,6 +36,27 @@ return [
         ],
     ],
 
+    'communication_intelligence' => [
+        'fields' => [
+            'last_interaction_at' => [
+                'label' => 'Last Interaction',
+                'placeholder' => 'Never',
+            ],
+            'last_email_at' => [
+                'label' => 'Last Email',
+                'placeholder' => 'Never',
+            ],
+            'days_since_last_email' => [
+                'label' => 'Days Since Last Email',
+                'days_ago' => ':count days ago',
+                'no_emails_yet' => 'No emails yet',
+            ],
+            'email_count' => [
+                'label' => 'Total Emails',
+            ],
+        ],
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

@@ -31,7 +31,12 @@ final class EmailTemplateResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/resources/email-template.navigation.group');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -45,7 +50,7 @@ final class EmailTemplateResource extends Resource
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Body')
+                ->label(__('filament/resources/email-template.fields.body.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->activePanel('mergeTags')
@@ -57,8 +62,8 @@ final class EmailTemplateResource extends Resource
                 ->columnSpanFull(),
 
             Toggle::make('is_shared')
-                ->label('Share with team')
-                ->helperText('When enabled, all team members can use this template.'),
+                ->label(__('filament/resources/email-template.fields.is_shared.label'))
+                ->helperText(__('filament/resources/email-template.fields.is_shared.helper_text')),
         ]);
     }
 
@@ -77,18 +82,18 @@ final class EmailTemplateResource extends Resource
 
                 TextColumn::make('subject')
                     ->limit(60)
-                    ->placeholder('—'),
+                    ->placeholder(__('filament/resources/email-template.fields.subject.placeholder')),
 
                 IconColumn::make('is_shared')
-                    ->label('Shared')
+                    ->label(__('filament/resources/email-template.fields.is_shared.column_label'))
                     ->boolean(),
 
                 TextColumn::make('creator.name')
-                    ->label('Created By')
-                    ->placeholder('—'),
+                    ->label(__('filament/resources/email-template.fields.creator.label'))
+                    ->placeholder(__('filament/resources/email-template.fields.creator.placeholder')),
 
                 TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label(__('filament/resources/email-template.fields.created_at.label'))
                     ->date()
                     ->sortable(),
             ])
@@ -97,7 +102,7 @@ final class EmailTemplateResource extends Resource
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
 
                 DeleteAction::make()
-                    ->label('Delete')
+                    ->label(__('filament/resources/email-template.actions.delete.label'))
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
             ])
             ->toolbarActions([

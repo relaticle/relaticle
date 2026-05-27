@@ -29,11 +29,21 @@ final class EmailAccessRequestsPage extends Page
 
     protected string $view = 'filament.pages.email-access-requests';
 
-    protected static ?string $navigationLabel = 'Access Requests';
+    protected static ?string $navigationLabel = null;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 4;
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/email-access-requests.navigation.label');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/pages/email-access-requests.navigation.group');
+    }
 
     public string $tab = 'incoming';
 
@@ -190,7 +200,7 @@ final class EmailAccessRequestsPage extends Page
     protected function openEmailAction(): Action
     {
         return Action::make('openEmail')
-            ->label('Open in inbox')
+            ->label(__('filament/pages/email-access-requests.open_email.label'))
             ->icon('heroicon-m-arrow-top-right-on-square')
             ->color('gray')
             ->size(Size::ExtraSmall)
@@ -203,12 +213,12 @@ final class EmailAccessRequestsPage extends Page
     protected function approveAccessRequestAction(): Action
     {
         return Action::make('approveAccessRequest')
-            ->label('Approve')
+            ->label(__('filament/pages/email-access-requests.approve_access_request.label'))
             ->icon('heroicon-m-check')
             ->color('success')
             ->size(Size::ExtraSmall)
             ->requiresConfirmation()
-            ->modalHeading('Approve access request')
+            ->modalHeading(__('filament/pages/email-access-requests.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -232,7 +242,7 @@ final class EmailAccessRequestsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request approved.')
+                    ->title(__('filament/pages/email-access-requests.approve_access_request.notifications.approved.title'))
                     ->send();
             });
     }
@@ -240,13 +250,13 @@ final class EmailAccessRequestsPage extends Page
     protected function denyAccessRequestAction(): Action
     {
         return Action::make('denyAccessRequest')
-            ->label('Deny')
+            ->label(__('filament/pages/email-access-requests.deny_access_request.label'))
             ->icon('heroicon-m-x-mark')
             ->color('danger')
             ->size(Size::ExtraSmall)
             ->outlined()
             ->requiresConfirmation()
-            ->modalHeading('Deny access request')
+            ->modalHeading(__('filament/pages/email-access-requests.deny_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Deny %s\'s access request?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -270,7 +280,7 @@ final class EmailAccessRequestsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request denied.')
+                    ->title(__('filament/pages/email-access-requests.deny_access_request.notifications.denied.title'))
                     ->send();
             });
     }
@@ -278,13 +288,13 @@ final class EmailAccessRequestsPage extends Page
     protected function cancelAccessRequestAction(): Action
     {
         return Action::make('cancelAccessRequest')
-            ->label('Cancel request')
+            ->label(__('filament/pages/email-access-requests.cancel_access_request.label'))
             ->icon('heroicon-m-x-mark')
             ->color('danger')
             ->size(Size::ExtraSmall)
             ->outlined()
             ->requiresConfirmation()
-            ->modalHeading('Cancel access request')
+            ->modalHeading(__('filament/pages/email-access-requests.cancel_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Withdraw your request for access to %s\'s email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->owner->name ?? 'this user',
@@ -307,7 +317,7 @@ final class EmailAccessRequestsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request cancelled.')
+                    ->title(__('filament/pages/email-access-requests.cancel_access_request.notifications.cancelled.title'))
                     ->send();
             });
     }

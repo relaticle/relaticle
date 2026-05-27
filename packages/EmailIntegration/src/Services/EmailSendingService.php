@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 
 final readonly class EmailSendingService
@@ -44,22 +46,32 @@ final readonly class EmailSendingService
         $bodyHtml = $body instanceof EmailBody ? (string) $body->body_html : '';
         $bodyText = $body instanceof EmailBody ? (string) $body->body_text : strip_tags($bodyHtml);
 
+        $toRecipients = [];
+        $ccRecipients = [];
+        $bccRecipients = [];
+
+        /** @var EmailParticipant $participant */
+        foreach ($participants as $participant) {
+            $entry = [
+                'email' => (string) $participant->email_address,
+                'name' => $participant->name,
+            ];
+
+            match ($participant->role) {
+                EmailParticipantRole::TO => $toRecipients[] = $entry,
+                EmailParticipantRole::CC => $ccRecipients[] = $entry,
+                EmailParticipantRole::BCC => $bccRecipients[] = $entry,
+                default => null,
+            };
+        }
+
         $payload = [
             'subject' => (string) $email->subject,
             'body_html' => $bodyHtml,
             'body_text' => $bodyText,
-            'to' => $participants->where('role', 'to')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
-                ->values()
-                ->all(),
-            'cc' => $participants->where('role', 'cc')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
-                ->values()
-                ->all(),
-            'bcc' => $participants->where('role', 'bcc')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
-                ->values()
-                ->all(),
+            'to' => $toRecipients,
+            'cc' => $ccRecipients,
+            'bcc' => $bccRecipients,
             'from_name' => $account->display_name,
         ];
 

@@ -31,7 +31,12 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     protected static ?int $navigationSort = 11;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/pages/email-privacy-settings.navigation.group');
+    }
 
     public string $default_email_sharing_tier = 'metadata_only';
 
@@ -58,7 +63,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     public function saveAction(): Action
     {
         return Action::make('save')
-            ->label('Save')
+            ->label(__('filament/pages/email-privacy-settings.actions.save.label'))
             ->action(function (): void {
                 /** @var User $user */
                 $user = auth()->user();
@@ -73,7 +78,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
                 Notification::make()
                     ->success()
-                    ->title('Privacy settings saved.')
+                    ->title(__('filament/pages/email-privacy-settings.notifications.saved.title'))
                     ->send();
             });
     }
@@ -82,34 +87,34 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     {
         return $schema->schema([
             Section::make('Workspace Default Sharing Tier')
-                ->description('Applied to all newly synced emails unless a team member sets their own preference.')
+                ->description(__('filament/pages/email-privacy-settings.workspace_default.description'))
                 ->schema([
                     Select::make('default_email_sharing_tier')
-                        ->label('Default Sharing Tier for Connected Email Accounts')
+                        ->label(__('filament/pages/email-privacy-settings.workspace_default.fields.default_email_sharing_tier.label'))
                         ->options(EmailPrivacyTier::class)
                         ->required(),
                 ])->compact(),
 
             Section::make('Auto-hide Internal Emails')
-                ->description('Internal emails are automatically hidden from teammates\' views.')
+                ->description(__('filament/pages/email-privacy-settings.auto_hide_internal.description'))
                 ->compact()
                 ->schema([
                     Placeholder::make('internal_emails_info')
-                        ->label('')
-                        ->content('Emails where every participant is a member of this workspace are classified as internal and are automatically hidden from all teammates. Only the syncing user can see them. This behaviour is always on and cannot be disabled.'),
+                        ->hiddenLabel()
+                        ->content(__('filament/pages/email-privacy-settings.auto_hide_internal.fields.internal_emails_info.content')),
                 ]),
 
             Section::make('Protected Recipients')
                 ->compact()
-                ->description('Emails involving these addresses or domains are hidden from all teammates workspace-wide. Only the syncing user can see them.')
+                ->description(__('filament/pages/email-privacy-settings.protected_recipients.description'))
                 ->schema([
                     TagsInput::make('protected_emails')
-                        ->label('Email addresses')
-                        ->placeholder('e.g. legal@acme.com')
+                        ->label(__('filament/pages/email-privacy-settings.protected_recipients.fields.protected_emails.label'))
+                        ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.fields.protected_emails.placeholder'))
                         ->afterLabel('Press Enter(⏎) to add each address.'),
                     TagsInput::make('protected_domains')
-                        ->label('Domains')
-                        ->placeholder('e.g. acme.com')
+                        ->label(__('filament/pages/email-privacy-settings.protected_recipients.fields.protected_domains.label'))
+                        ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.fields.protected_domains.placeholder'))
                         ->afterLabel('All emails from these domains will be protected.'),
                 ]),
         ]);

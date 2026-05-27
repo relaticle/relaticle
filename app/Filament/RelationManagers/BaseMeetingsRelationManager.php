@@ -43,16 +43,16 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->searchable()
                     ->limit(60),
                 TextColumn::make('starts_at')
-                    ->label('Time')
+                    ->label(__('filament/relation-managers/base-meetings.columns.starts_at.label'))
                     ->dateTime('M j, Y · g:i a')
                     ->sortable(),
                 TextColumn::make('attendees_count')
                     ->counts('attendees')
-                    ->label('Attendees'),
+                    ->label(__('filament/relation-managers/base-meetings.columns.attendees_count.label')),
                 TextColumn::make('status')
                     ->badge(),
                 TextColumn::make('response_status')
-                    ->label('My RSVP')
+                    ->label(__('filament/relation-managers/base-meetings.columns.response_status.label'))
                     ->badge(),
             ])
             ->defaultSort('starts_at', 'desc')
@@ -66,7 +66,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                 ViewAction::make()
                     ->schema(fn (Schema $schema): Schema => $this->detailSchema($schema)),
                 Action::make('linkToRecord')
-                    ->label('Link to record')
+                    ->label(__('filament/relation-managers/base-meetings.link_to_record.label'))
                     ->icon(Heroicon::Link)
                     ->color('gray')
                     ->schema([
@@ -89,11 +89,11 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
                         Notification::make()
                             ->success()
-                            ->title('Meeting linked successfully.')
+                            ->title(__('filament/relation-managers/base-meetings.link_to_record.notifications.linked.title'))
                             ->send();
                     }),
                 Action::make('unlinkFromRecord')
-                    ->label('Unlink from this record')
+                    ->label(__('filament/relation-managers/base-meetings.unlink_from_record.label'))
                     ->icon(Heroicon::LinkSlash)
                     ->color('danger')
                     ->visible(fn (Meeting $record): bool => $record->isLinkedTo($this->getOwnerRecord()))
@@ -104,7 +104,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
                         Notification::make()
                             ->success()
-                            ->title('Meeting unlinked successfully.')
+                            ->title(__('filament/relation-managers/base-meetings.unlink_from_record.notifications.unlinked.title'))
                             ->send();
                     }),
             ]);
@@ -118,12 +118,12 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                 TextEntry::make('starts_at')->dateTime('M j, Y · g:i a'),
                 TextEntry::make('ends_at')->dateTime('M j, Y · g:i a'),
                 TextEntry::make('location')->default('—'),
-                TextEntry::make('organizer_name')->label('Organizer'),
+                TextEntry::make('organizer_name')->label(__('filament/relation-managers/base-meetings.detail.organizer.label')),
             ]),
             Section::make('Attendees')->schema([
                 RepeatableEntry::make('attendees')->schema([
                     TextEntry::make('name')->default(fn (Model $record): string => $record->email_address),  // @phpstan-ignore-line
-                    TextEntry::make('email_address')->label('Email'),
+                    TextEntry::make('email_address')->label(__('filament/relation-managers/base-meetings.detail.email_address.label')),
                     TextEntry::make('response_status')->badge(),
                 ]),
             ]),
@@ -132,7 +132,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             ]),
             Section::make('Link')->schema([
                 TextEntry::make('html_link')
-                    ->label('Open in Google Calendar')
+                    ->label(__('filament/relation-managers/base-meetings.detail.html_link.label'))
                     ->url(fn (Model $record): ?string => $record->html_link, shouldOpenInNewTab: true),  // @phpstan-ignore-line
             ]),
         ]);
