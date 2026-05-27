@@ -41,6 +41,7 @@ final class AiCreditTransactionsTable
                         AiCreditType::Summary => 'info',
                         AiCreditType::Embedding => 'gray',
                         AiCreditType::Adjustment => 'warning',
+                        AiCreditType::Refund => 'success',
                     }),
                 TextColumn::make('model')
                     ->searchable(),

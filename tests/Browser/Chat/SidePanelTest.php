@@ -15,7 +15,6 @@ it('renders the side panel on the dashboard', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}/companies")
-        ->navigate("/app/{$team->slug}")
+        ->assertPathIs("/app/{$team->slug}")
         ->assertSourceHas('data-chat-side-panel');
 });

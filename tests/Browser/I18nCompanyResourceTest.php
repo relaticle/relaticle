@@ -18,7 +18,8 @@ it('renders CompanyResource list page with French labels when locale is fr', fun
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/companies")
         ->assertSee('Entreprises')
         ->assertSee('Espace de travail');
 });
@@ -34,7 +35,8 @@ it('renders CompanyResource list page with English labels when locale is en', fu
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/companies")
         ->assertSee('Companies')
         ->assertSee('Workspace');
 });

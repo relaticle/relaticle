@@ -134,8 +134,10 @@
 
             {{-- Credit balance footer --}}
             @php
-                $usedPct = $this->plan->credits() > 0
-                    ? 1 - ($this->creditsRemaining / $this->plan->credits())
+                $allowance = $this->plan->credits();
+                $exceedsAllowance = $this->creditsRemaining > $allowance;
+                $usedPct = $allowance > 0 && ! $exceedsAllowance
+                    ? 1 - ($this->creditsRemaining / $allowance)
                     : 0;
             @endphp
             <div class="border-t border-gray-200 px-4 py-2.5 dark:border-gray-700">
@@ -149,7 +151,7 @@
                         'text-amber-600 dark:text-amber-400' => $usedPct >= 0.5 && $usedPct < 0.8,
                         'text-red-600 dark:text-red-400' => $usedPct >= 0.8,
                     ])>
-                        {{ number_format($this->creditsRemaining) }} / {{ number_format($this->plan->credits()) }}
+                        {{ number_format($this->creditsRemaining) }}@unless ($exceedsAllowance) / {{ number_format($allowance) }}@endunless
                     </span>
                 </div>
                 @if ($this->plan === \App\Enums\Plan::Free)
