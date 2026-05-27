@@ -96,24 +96,24 @@ final class ViewOpportunity extends ViewRecord
                 ->icon(Heroicon::ChartBar)
                 ->schema([
                     TextEntry::make('last_interaction_at')
-                        ->label('Last Interaction')
+                        ->label(__('filament/resources/opportunity.communication_intelligence.fields.last_interaction_at.label'))
                         ->dateTime()
-                        ->placeholder('Never'),
+                        ->placeholder(__('filament/resources/opportunity.communication_intelligence.fields.last_interaction_at.placeholder')),
 
                     TextEntry::make('last_email_at')
-                        ->label('Last Email')
+                        ->label(__('filament/resources/opportunity.communication_intelligence.fields.last_email_at.label'))
                         ->dateTime()
-                        ->placeholder('Never'),
+                        ->placeholder(__('filament/resources/opportunity.communication_intelligence.fields.last_email_at.placeholder')),
 
                     TextEntry::make('days_since_last_email')
-                        ->label('Days Since Last Email')
+                        ->label(__('filament/resources/opportunity.communication_intelligence.fields.days_since_last_email.label'))
                         ->getStateUsing(fn (Opportunity $record): string => $record->last_email_at
-                            ? now()->diffInDays($record->last_email_at).' days ago'
-                            : 'No emails yet'
+                            ? __('filament/resources/opportunity.communication_intelligence.fields.days_since_last_email.days_ago', ['count' => (int) now()->diffInDays($record->last_email_at)])
+                            : __('filament/resources/opportunity.communication_intelligence.fields.days_since_last_email.no_emails_yet')
                         ),
 
                     TextEntry::make('email_count')
-                        ->label('Total Emails')
+                        ->label(__('filament/resources/opportunity.communication_intelligence.fields.email_count.label'))
                         ->default(0),
                 ])
                 ->columns(2)

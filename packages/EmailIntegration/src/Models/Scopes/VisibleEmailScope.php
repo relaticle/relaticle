@@ -13,6 +13,8 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 /**
  * Excludes emails that are entirely private to another user.
  * Fine-grained field masking happens at the view/policy layer.
+ *
+ * @implements Scope<Model>
  */
 final readonly class VisibleEmailScope implements Scope
 {

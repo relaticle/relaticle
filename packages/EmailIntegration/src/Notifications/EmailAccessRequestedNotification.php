@@ -48,7 +48,7 @@ final class EmailAccessRequestedNotification extends Notification
         if ($team !== null) {
             $actions = [
                 Action::make('review')
-                    ->label('Review request')
+                    ->label(__('email-integration/notifications/email-access-requested.actions.review.label'))
                     ->url(EmailAccessRequestsPage::getUrl(
                         parameters: ['request' => $this->request->getKey()],
                         tenant: $team,
@@ -56,15 +56,13 @@ final class EmailAccessRequestedNotification extends Notification
                     ->button(),
             ];
 
-            if ($email !== null) {
-                $actions[] = Action::make('view')
-                    ->label('View email')
-                    ->url(EmailInboxPage::getUrl(
-                        parameters: ['email' => $email->getKey()],
-                        tenant: $team,
-                    ))
-                    ->color('gray');
-            }
+            $actions[] = Action::make('view')
+                ->label(__('email-integration/notifications/email-access-requested.actions.view.label'))
+                ->url(EmailInboxPage::getUrl(
+                    parameters: ['email' => $email->getKey()],
+                    tenant: $team,
+                ))
+                ->color('gray');
 
             $notification->actions($actions);
         }

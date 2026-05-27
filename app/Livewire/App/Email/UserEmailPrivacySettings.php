@@ -44,33 +44,33 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
             ->schema([
                 Section::make('My Email Sharing Preference')
                     ->aside()
-                    ->description('Overrides the workspace default for emails you sync. Set to blank to use the workspace default.')
+                    ->description(__('livewire/user-email-privacy.sharing_preference.description'))
                     ->schema([
                         Select::make('default_email_sharing_tier')
-                            ->label('Default sharing tier')
+                            ->label(__('livewire/user-email-privacy.sharing_preference.fields.default_email_sharing_tier.label'))
                             ->options(
                                 collect(EmailPrivacyTier::cases())
                                     ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => $tier->getLabel()])
                                     ->prepend('Use workspace default', '')
                                     ->all()
                             )
-                            ->placeholder('Use workspace default'),
+                            ->placeholder(__('livewire/user-email-privacy.sharing_preference.fields.default_email_sharing_tier.placeholder')),
                         Actions::make([
                             Action::make('saveTier')
-                                ->label('Save')
+                                ->label(__('livewire/user-email-privacy.sharing_preference.actions.save.label'))
                                 ->submit('save'),
                         ]),
                     ]),
 
                 Section::make('Blocked Addresses & Domains')
                     ->aside()
-                    ->description('Emails involving these addresses or domains will be hidden from your view.')
+                    ->description(__('livewire/user-email-privacy.blocklist.description'))
                     ->schema([
                         Repeater::make('blocklist')
-                            ->label('')
+                            ->label(__('livewire/user-email-privacy.blocklist.label'))
                             ->schema([
                                 Select::make('type')
-                                    ->label('Type')
+                                    ->label(__('livewire/user-email-privacy.blocklist.fields.type.label'))
                                     ->options(
                                         collect(EmailBlocklistType::cases())
                                             ->mapWithKeys(fn (EmailBlocklistType $type): array => [$type->value => $type->getLabel()])
@@ -78,8 +78,8 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                                     )
                                     ->required(),
                                 Select::make('value')
-                                    ->label('Value')
-                                    ->placeholder('e.g. spam@example.com or spammy.com')
+                                    ->label(__('livewire/user-email-privacy.blocklist.fields.value.label'))
+                                    ->placeholder(__('livewire/user-email-privacy.blocklist.fields.value.placeholder'))
                                     ->required()
                                     ->searchable()
                                     ->allowHtml(false)
@@ -93,7 +93,7 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                             ->reorderable(false),
                         Actions::make([
                             Action::make('saveBlocklist')
-                                ->label('Save')
+                                ->label(__('livewire/user-email-privacy.blocklist.actions.save.label'))
                                 ->submit('save'),
                         ]),
                     ]),
