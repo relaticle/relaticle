@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Jobs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
@@ -14,11 +15,10 @@ use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Factories\NormalizedMeetingPayloadFactory;
 
+#[DeleteWhenMissingModels]
 final class StoreMeetingJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public bool $deleteWhenMissingModels = true;
 
     public int $tries = 3;
 

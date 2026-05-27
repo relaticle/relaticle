@@ -8,6 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -15,11 +16,10 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Throwable;
 
+#[DeleteWhenMissingModels]
 final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public bool $deleteWhenMissingModels = true;
 
     public int $tries = 3;
 
