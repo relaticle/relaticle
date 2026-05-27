@@ -55,7 +55,11 @@ test('user cannot schedule deletion when owning team with members', function () 
 
     Livewire::test(DeleteAccount::class)
         ->call('deleteAccount', 'password')
-        ->assertHasErrors(['team']);
+        ->assertHasNoErrors()
+        ->assertNotified(__('profile.notifications.delete_account_blocked.title'));
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+    Notification::assertNothingSentTo($user);
 });
 
 test('delete account component renders correctly', function () {

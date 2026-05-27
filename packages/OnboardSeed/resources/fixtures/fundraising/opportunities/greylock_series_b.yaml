@@ -1,0 +1,6 @@
+name: Greylock Series B
+company: greylock
+custom_fields:
+  amount: 25000000
+  close_date: '{{ +6w }}'
+  stage: Negotiation

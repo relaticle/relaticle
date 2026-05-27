@@ -1,0 +1,8 @@
+title: Review Clearbit integration proposal
+assigned_people:
+  - alex
+custom_fields:
+  description: Review the data enrichment integration proposal from Clearbit and prepare feedback for the next sync.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

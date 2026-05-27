@@ -30,7 +30,7 @@ final class ManageNotes extends ManageRecords
         return [
             ActionGroup::make([
                 Action::make('import')
-                    ->label('Import notes')
+                    ->label(__('filament/resources/note.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportNotes::getUrl()),
                 ExportAction::make()->exporter(NoteExporter::class),
@@ -38,7 +38,7 @@ final class ManageNotes extends ManageRecords
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
-                ->label('Import / Export')
+                ->label(__('filament/resources/note.pages.list.actions.import_export.label'))
                 ->size(Size::Small),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];

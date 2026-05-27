@@ -45,7 +45,8 @@ final class SystemAdministratorFactory extends Factory
         ]);
     }
 
-    public function configure(): Factory
+    /** @phpstan-return static */
+    public function configure(): static
     {
         return $this->sequence(fn (Sequence $sequence): array => [
             'created_at' => now()->subMinutes($sequence->index),

@@ -8,13 +8,16 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use RuntimeException;
+use Throwable;
 
 final readonly class CallbackController
 {
@@ -25,7 +28,17 @@ final readonly class CallbackController
 
         $driver = Socialite::driver($this->resolveDriver($provider));
 
-        $socialUser = $driver->user();
+        try {
+            $socialUser = $driver->user();
+        } catch (InvalidStateException) {
+            Log::warning('OAuth callback state mismatch.', ['provider' => $provider, 'user_id' => $user->getKey()]);
+
+            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.');
+        } catch (Throwable $e) {
+            Log::error('OAuth callback failed.', ['provider' => $provider, 'user_id' => $user->getKey(), 'exception' => $e]);
+
+            return $this->redirectWithError($user, 'We could not connect that account. Please try again.');
+        }
 
         throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
 
@@ -73,6 +86,13 @@ final readonly class CallbackController
             'azure' => 'azure',
             default => $provider,
         };
+    }
+
+    private function redirectWithError(User $user, string $message): RedirectResponse
+    {
+        return redirect(EmailAccountsPage::getUrl([
+            'tenant' => $user->currentTeam->slug,
+        ]))->with('error', $message);
     }
 
     /**

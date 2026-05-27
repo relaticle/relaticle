@@ -1,9 +1,5 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     ports:
@@ -16,6 +12,7 @@ services:
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       DB_CONNECTION: pgsql
@@ -57,10 +54,6 @@ services:
       start_period: 60s
 
   horizon:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     command: ["php", "/var/www/html/artisan", "horizon"]
@@ -72,6 +65,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres
@@ -97,10 +91,6 @@ services:
       start_period: 10s
 
   scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     image: ghcr.io/relaticle/relaticle:latest
     restart: unless-stopped
     command: ["php", "/var/www/html/artisan", "schedule:work"]
@@ -112,6 +102,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost}
       APP_PANEL_DOMAIN: ${APP_PANEL_DOMAIN:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       DB_CONNECTION: pgsql
       DB_HOST: postgres

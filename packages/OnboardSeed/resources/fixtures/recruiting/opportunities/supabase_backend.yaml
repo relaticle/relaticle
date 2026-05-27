@@ -1,0 +1,6 @@
+name: Backend Developer
+company: supabase
+custom_fields:
+  amount: 150000
+  close_date: '{{ +3w }}'
+  stage: Proposal/Price Quote

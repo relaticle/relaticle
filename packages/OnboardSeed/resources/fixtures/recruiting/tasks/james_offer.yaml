@@ -1,0 +1,8 @@
+title: Prepare offer letter for James
+assigned_people:
+  - james
+custom_fields:
+  description: Draft the offer letter for James Park including compensation package, equity details, and start date. Align with Supabase's standard backend developer offer template.
+  due_date: '{{ +1d }}'
+  status: To do
+  priority: High

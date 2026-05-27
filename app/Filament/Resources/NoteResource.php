@@ -39,7 +39,27 @@ final class NoteResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Workspace';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/note.label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('filament/resources/note.plural_label');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/resources/note.navigation_label');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.workspace');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -53,13 +73,13 @@ final class NoteResource extends Resource
                 TextColumn::make('title')
                     ->searchable(),
                 TextColumn::make('companies.name')
-                    ->label('Companies')
+                    ->label(__('filament/resources/note.fields.companies.label'))
                     ->toggleable(),
                 TextColumn::make('people.name')
-                    ->label('People')
+                    ->label(__('filament/resources/note.fields.people.label'))
                     ->toggleable(),
                 TextColumn::make('creator.name')
-                    ->label('Created By')
+                    ->label(__('filament/resources/note.fields.creator.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable()
@@ -70,12 +90,12 @@ final class NoteResource extends Resource
                     ->toggleable()
                     ->toggledHiddenByDefault(),
                 TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label(__('filament/resources/note.fields.created_at.label'))
                     ->dateTime('Y-m-d H:i:s')
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('updated_at')
-                    ->label('Updated At')
+                    ->label(__('filament/resources/note.fields.updated_at.label'))
                     ->dateTime('Y-m-d H:i:s')
                     ->sortable()
                     ->toggleable()
@@ -84,7 +104,7 @@ final class NoteResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label(__('filament/resources/note.filters.creation_source.label'))
                     ->options(CreationSource::class)
                     ->multiple(),
                 TrashedFilter::make(),

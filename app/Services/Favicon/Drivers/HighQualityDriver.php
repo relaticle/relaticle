@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Favicon\Drivers;
 
+use App\Services\Favicon\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Collections\FaviconCollection;
 use AshAllenDesign\FaviconFetcher\Concerns\HasDefaultFunctionality;
 use AshAllenDesign\FaviconFetcher\Concerns\MakesHttpRequests;
@@ -31,6 +32,10 @@ final class HighQualityDriver implements Fetcher
     public function fetch(string $url): ?Favicon
     {
         throw_unless($this->urlIsValid($url), InvalidUrlException::class, $url.' is not a valid URL');
+
+        if (! SsrfGuard::isAllowed($url)) {
+            return null;
+        }
 
         if ($this->useCache && $favicon = $this->attemptToFetchFromCache($url)) {
             return $favicon;
@@ -72,8 +77,21 @@ final class HighQualityDriver implements Fetcher
 
             $html = $response->body();
 
-            if (preg_match('/<link[^>]+rel=["\']apple-touch-icon["\'][^>]+href=["\'](.*?)["\']/i', (string) $html, $matches)) {
-                $iconUrl = $this->convertToAbsoluteUrl($url, $matches[1]);
+            $appleTouchPatterns = [
+                '/<link\b[^>]*\brel=["\']apple-touch-icon["\'][^>]*\bhref=["\']([^"\']+)["\']/i',
+                '/<link\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*\brel=["\']apple-touch-icon["\']/i',
+            ];
+
+            $matchedIconUrl = null;
+            foreach ($appleTouchPatterns as $appleTouchPattern) {
+                if (preg_match($appleTouchPattern, (string) $html, $matches)) {
+                    $matchedIconUrl = $matches[1];
+                    break;
+                }
+            }
+
+            if ($matchedIconUrl !== null) {
+                $iconUrl = $this->convertToAbsoluteUrl($url, $matchedIconUrl);
 
                 return new Favicon(
                     url: $url,
@@ -114,35 +132,22 @@ final class HighQualityDriver implements Fetcher
                 return null;
             }
 
-            $html = $response->body();
+            $html = (string) $response->body();
 
-            $patterns = [
-                '/sizes=["\']512x512["\'][^>]+href=["\'](.*?)["\']/i',
-                '/href=["\'](.*?)["\']\s+[^>]*sizes=["\']512x512["\']/i',
-                '/sizes=["\']256x256["\'][^>]+href=["\'](.*?)["\']/i',
-                '/href=["\'](.*?)["\']\s+[^>]*sizes=["\']256x256["\']/i',
-                '/sizes=["\']192x192["\'][^>]+href=["\'](.*?)["\']/i',
-                '/href=["\'](.*?)["\']\s+[^>]*sizes=["\']192x192["\']/i',
-            ];
+            foreach ([512, 256, 192] as $size) {
+                $patterns = [
+                    "/<link\\b[^>]*\\bsizes=[\"']{$size}x{$size}[\"'][^>]*\\bhref=[\"']([^\"']+)[\"']/i",
+                    "/<link\\b[^>]*\\bhref=[\"']([^\"']+)[\"'][^>]*\\bsizes=[\"']{$size}x{$size}[\"']/i",
+                ];
 
-            foreach ($patterns as $pattern) {
-                if (preg_match($pattern, (string) $html, $matches)) {
-                    $iconUrl = $this->convertToAbsoluteUrl($url, $matches[1]);
-
-                    preg_match('/(\d+)x\d+/', $pattern, $sizeMatch);
-                    $size = isset($sizeMatch[1]) ? (int) $sizeMatch[1] : null;
-
-                    $favicon = new Favicon(
-                        url: $url,
-                        faviconUrl: $iconUrl,
-                        fromDriver: $this,
-                    );
-
-                    if ($size !== null) {
-                        $favicon->setIconSize($size);
+                foreach ($patterns as $pattern) {
+                    if (preg_match($pattern, $html, $matches)) {
+                        return new Favicon(
+                            url: $url,
+                            faviconUrl: $this->convertToAbsoluteUrl($url, $matches[1]),
+                            fromDriver: $this,
+                        )->setIconSize($size);
                     }
-
-                    return $favicon;
                 }
             }
 
@@ -159,6 +164,10 @@ final class HighQualityDriver implements Fetcher
             $urlWithoutProtocol = str_replace(['https://', 'http://'], '', $url);
 
             $faviconUrl = 'https://www.google.com/s2/favicons?sz=256&domain='.$urlWithoutProtocol;
+
+            if (! SsrfGuard::isAllowed($faviconUrl)) {
+                return null;
+            }
 
             $response = $this->withRequestExceptionHandling(
                 fn () => $this->httpClient()->get($faviconUrl)
@@ -184,6 +193,10 @@ final class HighQualityDriver implements Fetcher
         $urlWithoutProtocol = str_replace(['https://', 'http://'], '', $url);
         $faviconUrl = 'https://icons.duckduckgo.com/ip3/'.$urlWithoutProtocol.'.ico';
 
+        if (! SsrfGuard::isAllowed($faviconUrl)) {
+            return null;
+        }
+
         try {
             $response = $this->withRequestExceptionHandling(
                 fn () => $this->httpClient()->get($faviconUrl)
@@ -206,9 +219,15 @@ final class HighQualityDriver implements Fetcher
 
     private function faviconIsAccessible(Favicon $favicon): bool
     {
+        $faviconUrl = $favicon->getFaviconUrl();
+
+        if (! SsrfGuard::isAllowed($faviconUrl)) {
+            return false;
+        }
+
         try {
             /** @var Response $response */
-            $response = $this->httpClient()->head($favicon->getFaviconUrl());
+            $response = $this->httpClient()->head($faviconUrl);
 
             return $response->successful();
         } catch (\Exception) {

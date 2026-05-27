@@ -1,0 +1,8 @@
+title: Schedule partner meeting with a16z
+assigned_people:
+  - marc
+custom_fields:
+  description: Coordinate calendars and prepare pitch deck for the full partner meeting at Andreessen Horowitz.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

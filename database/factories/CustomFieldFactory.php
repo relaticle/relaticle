@@ -32,6 +32,7 @@ final class CustomFieldFactory extends Factory
         ];
     }
 
+    /** @phpstan-return static */
     public function configure(): static
     {
         if (config('scribe.generating')) {

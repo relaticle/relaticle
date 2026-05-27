@@ -17,7 +17,7 @@ final class OpportunityForm
             ->components([
                 TextInput::make('name')
                     ->required()
-                    ->placeholder('Enter opportunity title')
+                    ->placeholder(__('filament/resources/opportunity.fields.name.placeholder'))
                     ->columnSpanFull(),
                 Select::make('company_id')
                     ->relationship('company', 'name')
