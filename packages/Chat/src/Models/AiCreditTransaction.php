@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Models;
 use App\Models\Concerns\HasTeam;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,6 +41,7 @@ use Relaticle\Chat\Enums\AiCreditType;
     'metadata',
     'created_at',
 ])]
+#[WithoutTimestamps]
 final class AiCreditTransaction extends Model
 {
     /** @use HasFactory<Factory<static>> */
@@ -47,8 +49,6 @@ final class AiCreditTransaction extends Model
 
     use HasTeam;
     use HasUlids;
-
-    public $timestamps = false;
 
     /** @return array<string, string> */
     protected function casts(): array

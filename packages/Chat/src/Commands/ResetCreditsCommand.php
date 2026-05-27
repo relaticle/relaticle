@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Commands;
 
 use App\Models\Team;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
+#[Description('Reset AI credits for teams whose billing period has ended')]
+#[Signature('chat:reset-credits')]
 final class ResetCreditsCommand extends Command
 {
-    protected $signature = 'chat:reset-credits';
-
-    protected $description = 'Reset AI credits for teams whose billing period has ended';
-
     public function handle(CreditService $service): int
     {
         $expired = AiCreditBalance::query()

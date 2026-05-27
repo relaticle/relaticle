@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Models;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Table;
+use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,12 +22,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Table(name: 'agent_conversations', keyType: 'string')]
+#[WithoutIncrementing]
 final class AgentConversation extends Model
 {
     /** @use HasFactory<Factory<static>> */
     use HasFactory;
-
-    public $incrementing = false;
 
     protected $guarded = [];
 
