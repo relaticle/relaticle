@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Jobs;
 
 use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use Carbon\Carbon;
@@ -79,6 +80,9 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var list<array<string, mixed>> */
     private array $pendingCustomFieldValues = [];
 
+    /** @var array<string, array{field: CustomField, values: array<int, string>}> */
+    private array $pendingTagOptions = [];
+
     public function __construct(
         private readonly string $importId,
         private readonly string $teamId,
@@ -138,6 +142,7 @@ final class ExecuteImportJob implements ShouldQueue
                         $this->flushProcessedRows($store);
                     }
                     $this->flushCustomFieldValues();
+                    $this->flushTagOptions();
                     $this->flushFailedRows($import);
                     $this->persistResults($import, $results);
                 });
@@ -352,8 +357,10 @@ final class ExecuteImportJob implements ShouldQueue
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
             }
 
-            if (is_array($safeValue)) {
-                app(EnsureTagOptionsExist::class)->handle($cf, $safeValue);
+            $cfType = $cf->type instanceof \BackedEnum ? $cf->type->value : (string) $cf->type;
+
+            if ($cfType === CustomFieldType::TAGS_INPUT->value && is_array($safeValue)) {
+                $this->accumulateTagOptions($cf, $safeValue);
             }
 
             $row = [
@@ -453,6 +460,31 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $this->pendingCustomFieldValues = [];
+    }
+
+    /** @param array<int, mixed> $values */
+    private function accumulateTagOptions(CustomField $cf, array $values): void
+    {
+        $code = $cf->code;
+
+        if (! isset($this->pendingTagOptions[$code])) {
+            $this->pendingTagOptions[$code] = ['field' => $cf, 'values' => []];
+        }
+
+        foreach ($values as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                $this->pendingTagOptions[$code]['values'][] = $value;
+            }
+        }
+    }
+
+    private function flushTagOptions(): void
+    {
+        foreach ($this->pendingTagOptions as $pending) {
+            app(EnsureTagOptionsExist::class)->handle($pending['field'], $pending['values']);
+        }
+
+        $this->pendingTagOptions = [];
     }
 
     private function markProcessed(ImportRow $row): void

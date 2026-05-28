@@ -2275,6 +2275,9 @@ it('adds a new imported tags-input value to the field option list', function ():
     $optionNames = $cf->refresh()->options->pluck('name')->all();
     expect($optionNames)->toContain('Existing')
         ->toContain('BrandNewTag');
+
+    $newOption = $cf->refresh()->options()->withoutGlobalScopes()->where('name', 'BrandNewTag')->first();
+    expect((int) $newOption->sort_order)->toBeGreaterThan(0);
 });
 
 it('does not duplicate an imported tag that already exists as an option (case-insensitive)', function (): void {
@@ -2290,6 +2293,21 @@ it('does not duplicate an imported tag that already exists as an option (case-in
     runImportJob($this);
 
     expect($cf->refresh()->options()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+it('does not create options when importing an arbitrary email custom field', function (): void {
+    $cf = createTestCustomField($this, 'contact_emails282', 'email', 'company');
+
+    createImportReadyStore($this, ['Name', 'Emails'], [
+        makeRow(2, ['Name' => 'Email Co 282', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Emails', target: 'custom_fields_contact_emails282'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    expect($cf->refresh()->options()->withoutGlobalScopes()->count())->toBe(0);
 });
 
 // --- Issue #282 Bug 1: soft-deleted records must not be matched ---
