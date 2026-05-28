@@ -6,7 +6,6 @@ namespace App\Actions\CustomFields;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
-use BackedEnum;
 use Illuminate\Support\Collection;
 
 /**
@@ -19,7 +18,7 @@ final class EnsureTagOptionsExist
 {
     public function handle(CustomField $field, mixed $values): void
     {
-        if ($this->fieldType($field) !== CustomFieldType::TAGS_INPUT->value) {
+        if ($field->type !== CustomFieldType::TAGS_INPUT->value) {
             return;
         }
 
@@ -35,11 +34,12 @@ final class EnsureTagOptionsExist
 
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
+        /** @var array<string, true> $existing */
         $existing = $field->options()
             ->withoutGlobalScopes()
             ->pluck('name')
-            ->map(fn (?string $name): string => mb_strtolower(trim((string) $name)))
-            ->flip();
+            ->mapWithKeys(fn (?string $name): array => [mb_strtolower(trim((string) $name)) => true])
+            ->all();
 
         $sortOrder = (int) $field->options()
             ->withoutGlobalScopes()
@@ -48,7 +48,7 @@ final class EnsureTagOptionsExist
         foreach ($candidates as $value) {
             $key = mb_strtolower($value);
 
-            if ($existing->has($key)) {
+            if (isset($existing[$key])) {
                 continue;
             }
 
@@ -58,12 +58,7 @@ final class EnsureTagOptionsExist
                 'sort_order' => ++$sortOrder,
             ]);
 
-            $existing->put($key, true);
+            $existing[$key] = true;
         }
-    }
-
-    private function fieldType(CustomField $field): string
-    {
-        return $field->type instanceof BackedEnum ? $field->type->value : (string) $field->type;
     }
 }

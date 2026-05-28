@@ -17,6 +17,7 @@ final readonly class CustomFieldValueObserver
     {
         $field = $value->customField;
 
+        // @phpstan-ignore identical.alwaysFalse (the customField relation can resolve to null for an orphaned value row)
         if ($field === null) {
             return;
         }

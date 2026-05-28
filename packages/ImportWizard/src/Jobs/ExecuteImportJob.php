@@ -357,9 +357,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
             }
 
-            $cfType = $cf->type instanceof \BackedEnum ? $cf->type->value : (string) $cf->type;
-
-            if ($cfType === CustomFieldType::TAGS_INPUT->value && is_array($safeValue)) {
+            if ($cf->type === CustomFieldType::TAGS_INPUT->value && is_array($safeValue)) {
                 $this->accumulateTagOptions($cf, $safeValue);
             }
 
