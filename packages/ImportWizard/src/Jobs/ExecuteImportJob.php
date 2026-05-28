@@ -481,7 +481,7 @@ final class ExecuteImportJob implements ShouldQueue
     private function flushTagOptions(): void
     {
         foreach ($this->pendingTagOptions as $pending) {
-            app(EnsureTagOptionsExist::class)->handle($pending['field'], $pending['values']);
+            resolve(EnsureTagOptionsExist::class)->handle($pending['field'], $pending['values']);
         }
 
         $this->pendingTagOptions = [];
