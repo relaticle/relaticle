@@ -6,6 +6,7 @@ namespace App\Actions\CustomFields;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Collection;
  * Gated strictly to the `tags-input` field type — email/phone are also arbitrary
  * multi-choice fields but must NOT grow an option list.
  */
-final class EnsureTagOptionsExist
+final readonly class EnsureTagOptionsExist
 {
     public function handle(CustomField $field, mixed $values): void
     {
@@ -52,11 +53,16 @@ final class EnsureTagOptionsExist
                 continue;
             }
 
-            $field->options()->create([
-                $tenantKey => $field->{$tenantKey},
-                'name' => $value,
-                'sort_order' => ++$sortOrder,
-            ]);
+            try {
+                $field->options()->create([
+                    $tenantKey => $field->{$tenantKey},
+                    'name' => $value,
+                    'sort_order' => ++$sortOrder,
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent import/edit created this option first — the option
+                // now exists, so treat it as a no-op rather than failing the row.
+            }
 
             $existing[$key] = true;
         }
