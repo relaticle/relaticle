@@ -19,13 +19,17 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -2247,4 +2251,51 @@ it('does not auto-create record for custom field entity link', function (): void
 
     $companyCountAfter = Company::where('team_id', $this->team->id)->count();
     expect($companyCountAfter)->toBe($companyCountBefore);
+});
+
+// --- Issue #282 Bug 1: soft-deleted records must not be matched ---
+
+it('does not match a soft-deleted company by domain (resolver)', function (): void {
+    $domainField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+
+    $live = Company::factory()->create(['name' => 'Live Co', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $live->id, 'tenant_id' => $this->team->id, 'json_value' => ['live282.com']]);
+
+    $trashed = Company::factory()->create(['name' => 'Trashed Co', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $trashed->id, 'tenant_id' => $this->team->id, 'json_value' => ['ghost282.com']]);
+    $trashed->delete();
+
+    $resolver = new EntityLinkResolver((string) $this->team->id);
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'company', targetModelClass: Company::class);
+    $matcher = MatchableField::domain('custom_fields_domains');
+
+    $resolved = $resolver->batchResolve($link, $matcher, ['live282.com', 'ghost282.com']);
+
+    expect((string) ($resolved['live282.com'] ?? 'null'))->toBe((string) $live->id)
+        ->and($resolved['ghost282.com'] ?? null)->toBeNull();
+});
+
+it('creates a new company when re-importing a domain whose company was soft-deleted', function (): void {
+    $domainField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+
+    $original = Company::factory()->create(['name' => 'Acme Original 282', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $original->id, 'tenant_id' => $this->team->id, 'json_value' => ['acme282.com']]);
+    $original->delete();
+
+    createImportReadyStore($this, ['Name', 'Domain'], [
+        makeRow(2, ['Name' => 'Acme Reimport 282', 'Domain' => 'acme282.com']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    (new ResolveMatchesJob($this->import->id))->handle();
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->skipped_rows)->toBe(0)
+        ->and(Company::where('team_id', $this->team->id)->where('name', 'Acme Reimport 282')->exists())->toBeTrue();
 });
