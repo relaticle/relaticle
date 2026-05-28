@@ -1,4 +1,5 @@
 @php
+    use App\Support\EmailHtmlSanitizer;
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 
@@ -7,7 +8,18 @@
     $threadCount = $emails->count();
 @endphp
 
-<div class="flex flex-col min-h-full">
+<div
+    class="flex flex-col min-h-full"
+    x-data
+    x-on:message.window="
+        if ($event.data?.type === 'email-frame-height' && $event.data.id) {
+            const frame = $root.querySelector('iframe[data-email-frame=&quot;' + CSS.escape($event.data.id) + '&quot;]');
+            if (frame && $event.data.height) {
+                frame.style.height = (parseInt($event.data.height, 10) + 16) + 'px';
+            }
+        }
+    "
+>
 
     {{-- ── Thread subject bar ──────────────────────────────────────── --}}
     @if ($firstEmail && $threadCount > 1)
@@ -40,7 +52,13 @@
             $isOutbound     = $email->direction === EmailDirection::OUTBOUND;
 
             $safeHtml = $canViewBody && $email->body?->body_html
-                ? preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $email->body->body_html)
+                ? EmailHtmlSanitizer::sanitize($email->body->body_html)
+                : null;
+
+            // Trusted resize messenger injected into the sandboxed (opaque-origin)
+            // iframe so the parent can size it without sharing its origin.
+            $resizeScript = $safeHtml
+                ? '<script>(function(){function p(){var h=document.documentElement.scrollHeight||document.body.scrollHeight;parent.postMessage({type:"email-frame-height",id:'.json_encode((string) $email->id).',height:h},"*");}window.addEventListener("load",p);if(window.ResizeObserver){new ResizeObserver(p).observe(document.documentElement);}setTimeout(p,60);})();<\/script>'
                 : null;
         @endphp
 
@@ -168,11 +186,11 @@
                     <div class="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-7 py-5 shadow-xs">
                         @if ($safeHtml)
                             <iframe
-                                srcdoc="{{ $safeHtml }}"
-                                sandbox="allow-same-origin allow-popups"
+                                data-email-frame="{{ $email->id }}"
+                                srcdoc="{{ $safeHtml . $resizeScript }}"
+                                sandbox="allow-scripts allow-popups"
                                 class="w-full rounded-lg border-0"
                                 style="min-height: 150px"
-                                onload="this.style.height = this.contentDocument.body.scrollHeight + 'px'"
                             ></iframe>
                         @elseif ($email->body?->body_text)
                             <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $email->body->body_text }}</pre>
