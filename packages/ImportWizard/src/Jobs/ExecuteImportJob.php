@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Jobs;
 
+use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
@@ -349,6 +350,10 @@ final class ExecuteImportJob implements ShouldQueue
 
             if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
+            }
+
+            if (is_array($safeValue)) {
+                app(EnsureTagOptionsExist::class)->handle($cf, $safeValue);
             }
 
             $row = [

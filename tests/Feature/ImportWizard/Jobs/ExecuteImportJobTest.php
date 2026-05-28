@@ -2253,6 +2253,45 @@ it('does not auto-create record for custom field entity link', function (): void
     expect($companyCountAfter)->toBe($companyCountBefore);
 });
 
+// --- Issue #282 Bug 2: imported tags-input values become options ---
+
+it('adds a new imported tags-input value to the field option list', function (): void {
+    $cf = createTestCustomField($this, 'labels282', 'tags-input', 'company', ['Existing']);
+
+    createImportReadyStore($this, ['Name', 'Labels'], [
+        makeRow(2, ['Name' => 'Tagged Co 282', 'Labels' => 'Existing, BrandNewTag'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Tagged Co 282')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $company->id, (string) $cf->id);
+
+    expect(collect($cfv->json_value)->all())->toContain('BrandNewTag');
+
+    $optionNames = $cf->refresh()->options->pluck('name')->all();
+    expect($optionNames)->toContain('Existing')
+        ->toContain('BrandNewTag');
+});
+
+it('does not duplicate an imported tag that already exists as an option (case-insensitive)', function (): void {
+    $cf = createTestCustomField($this, 'labels282b', 'tags-input', 'company', ['VIP']);
+
+    createImportReadyStore($this, ['Name', 'Labels'], [
+        makeRow(2, ['Name' => 'Dup Co 282', 'Labels' => 'vip'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282b'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    expect($cf->refresh()->options()->withoutGlobalScopes()->count())->toBe(1);
+});
+
 // --- Issue #282 Bug 1: soft-deleted records must not be matched ---
 
 it('does not match a soft-deleted company by domain (resolver)', function (): void {
