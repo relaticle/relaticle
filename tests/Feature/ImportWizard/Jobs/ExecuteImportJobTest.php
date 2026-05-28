@@ -2316,6 +2316,8 @@ it('does not match a soft-deleted company by domain (resolver)', function (): vo
     $domainField = CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
 
+    expect($domainField)->not->toBeNull();
+
     $live = Company::factory()->create(['name' => 'Live Co', 'team_id' => $this->team->id]);
     CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $live->id, 'tenant_id' => $this->team->id, 'json_value' => ['live282.com']]);
 
@@ -2336,6 +2338,8 @@ it('does not match a soft-deleted company by domain (resolver)', function (): vo
 it('creates a new company when re-importing a domain whose company was soft-deleted', function (): void {
     $domainField = CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+
+    expect($domainField)->not->toBeNull();
 
     $original = Company::factory()->create(['name' => 'Acme Original 282', 'team_id' => $this->team->id]);
     CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $original->id, 'tenant_id' => $this->team->id, 'json_value' => ['acme282.com']]);
