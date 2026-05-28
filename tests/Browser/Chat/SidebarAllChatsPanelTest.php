@@ -32,7 +32,7 @@ it('opens the all-chats flyout from the sidebar trigger and lists chats', functi
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->assertSourceHas('aria-label="Open all chats"');
 
     $page->click('button[aria-label="Open all chats"]');
@@ -74,7 +74,7 @@ it('navigates to a chat when clicked from the panel', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->click('button[aria-label="Open all chats"]');
 
     // Wait for Livewire to process the dispatched window event and re-render

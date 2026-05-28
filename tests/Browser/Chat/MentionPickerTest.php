@@ -14,7 +14,7 @@ it('opens a picker when @ is typed and inserts a token on selection', function (
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
@@ -77,7 +77,7 @@ it('closes the picker via closeMention', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats");
 
     $page->script(<<<'JS'
@@ -131,7 +131,7 @@ it('does not open the picker for queries shorter than 2 chars', function (): voi
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats");
 
     $page->script(<<<'JS'
@@ -170,7 +170,7 @@ it('aborts the in-flight fetch when the query drops below the 2-char minimum', f
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats");
 
     // Simulate: user types @ac (triggers fetch), then backspaces to @a (should abort)
@@ -219,7 +219,7 @@ it('searches for a multi-word company name', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats");
 
     $page->script(<<<'JS'
@@ -262,7 +262,7 @@ it('removes a selected mention via chip × button', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats");
 
     $page->script(<<<'JS'

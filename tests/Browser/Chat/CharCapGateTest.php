@@ -12,7 +12,7 @@ it('does not send when input exceeds the character cap and Enter is pressed', fu
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs('/app/{->slug}')
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
