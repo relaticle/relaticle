@@ -42,7 +42,7 @@ final readonly class LinkEmailAction
                 $company = Company::query()->where('team_id', $teamId)
                     ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
                         ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('code', 'domains'))
-                        ->whereRaw('json_value::text like ?', ["%{$domain}%"])
+                        ->whereRaw('json_value::text ~* ?', [$this->domainMatchPattern($domain)])
                     )
                     ->first();
 
@@ -158,6 +158,17 @@ final readonly class LinkEmailAction
         $parts = explode('@', $email);
 
         return count($parts) === 2 ? strtolower($parts[1]) : null;
+    }
+
+    /**
+     * Build a POSIX regex matching the domain as a complete host token inside the
+     * JSON-encoded domains array. Tolerates scheme/subdomain/path variants while
+     * avoiding substring collisions (e.g. "acme.co" vs "acme.com.au") and
+     * neutralising LIKE wildcards present in sender-controlled input.
+     */
+    private function domainMatchPattern(string $domain): string
+    {
+        return '(^|["/.])'.preg_quote($domain).'(["/:]|$)';
     }
 
     private function updatePersonMetrics(People $person, Email $email): void
