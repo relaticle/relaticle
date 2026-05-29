@@ -8,6 +8,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 
 final readonly class EmailSendingService
@@ -49,15 +50,15 @@ final readonly class EmailSendingService
             'body_html' => $bodyHtml,
             'body_text' => $bodyText,
             'to' => $participants->where('role', 'to')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
+                ->map(fn (EmailParticipant $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
                 ->values()
                 ->all(),
             'cc' => $participants->where('role', 'cc')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
+                ->map(fn (EmailParticipant $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
                 ->values()
                 ->all(),
             'bcc' => $participants->where('role', 'bcc')
-                ->map(fn (object $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
+                ->map(fn (EmailParticipant $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
                 ->values()
                 ->all(),
             'from_name' => $account->display_name,
