@@ -1,4 +1,5 @@
 @php
+    use App\Support\EmailHtmlSanitizer;
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -188,7 +189,7 @@
             <div class="w-full max-w-3xl rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-8 py-6 shadow-xs">
                 @if ($record->body?->body_html)
                     @php
-                        $safeHtml = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $record->body->body_html);
+                        $safeHtml = EmailHtmlSanitizer::sanitize($record->body->body_html);
                     @endphp
                     <iframe
                         srcdoc="{{ $safeHtml }}"

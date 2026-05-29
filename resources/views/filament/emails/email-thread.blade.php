@@ -1,4 +1,5 @@
 @php
+    use App\Support\EmailHtmlSanitizer;
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 
@@ -40,7 +41,7 @@
             $isOutbound     = $email->direction === EmailDirection::OUTBOUND;
 
             $safeHtml = $canViewBody && $email->body?->body_html
-                ? preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $email->body->body_html)
+                ? EmailHtmlSanitizer::sanitize($email->body->body_html)
                 : null;
         @endphp
 
