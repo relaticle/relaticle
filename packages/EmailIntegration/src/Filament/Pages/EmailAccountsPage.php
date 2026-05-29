@@ -34,7 +34,12 @@ final class EmailAccountsPage extends Page
 
     protected static ?int $navigationSort = 10;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.emails');
+    }
 
     /**
      * @var Collection<int, ConnectedAccount>
@@ -59,7 +64,7 @@ final class EmailAccountsPage extends Page
     public function connectGmailAction(): Action
     {
         return Action::make('connectGmail')
-            ->label('Connect Gmail')
+            ->label(__('filament/pages/email-accounts.actions.connect_gmail'))
             ->icon('heroicon-o-plus')
             ->size(Size::Small)
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'gmail']), true);
@@ -68,7 +73,7 @@ final class EmailAccountsPage extends Page
     public function connectAzureAction(): Action
     {
         return Action::make('connectAzure')
-            ->label('Connect Outlook')
+            ->label(__('filament/pages/email-accounts.actions.connect_azure'))
             ->icon('heroicon-o-plus')
             ->color('info')
             ->size(Size::Small)
@@ -78,7 +83,7 @@ final class EmailAccountsPage extends Page
     public function reAuthAction(): Action
     {
         return Action::make('reAuth')
-            ->label('Re-authenticate')
+            ->label(__('filament/pages/email-accounts.actions.re_auth'))
             ->icon('heroicon-o-arrow-path')
             ->color('warning')
             ->size(Size::Small)
@@ -90,7 +95,7 @@ final class EmailAccountsPage extends Page
     public function editSettingsAction(): Action
     {
         return Action::make('editSettings')
-            ->label('Settings')
+            ->label(__('filament/pages/email-accounts.actions.edit_settings'))
             ->icon('heroicon-o-cog-6-tooth')
             ->color('gray')
             ->size(Size::Small)
@@ -110,34 +115,34 @@ final class EmailAccountsPage extends Page
                 Grid::make(2)
                     ->schema([
                         Toggle::make('sync_inbox')
-                            ->label('Sync inbox')
-                            ->helperText('Sync incoming emails to this account.'),
+                            ->label(__('filament/pages/email-accounts.settings.sync_inbox.label'))
+                            ->helperText(__('filament/pages/email-accounts.settings.sync_inbox.helper_text')),
                         Toggle::make('sync_sent')
-                            ->label('Sync sent')
-                            ->helperText('Sync emails you send from this account.'),
+                            ->label(__('filament/pages/email-accounts.settings.sync_sent.label'))
+                            ->helperText(__('filament/pages/email-accounts.settings.sync_sent.helper_text')),
                     ]),
                 Select::make('contact_creation_mode')
-                    ->label('Auto-create contacts')
+                    ->label(__('filament/pages/email-accounts.settings.contact_creation_mode.label'))
                     ->options(ContactCreationMode::class)
                     ->required()
-                    ->helperText('Controls when new Person records are created from email participants.'),
+                    ->helperText(__('filament/pages/email-accounts.settings.contact_creation_mode.helper_text')),
                 Toggle::make('auto_create_companies')
-                    ->label('Auto-create companies')
-                    ->helperText('Create Company records for unrecognised business domains (public domains like gmail.com are always excluded).'),
+                    ->label(__('filament/pages/email-accounts.settings.auto_create_companies.label'))
+                    ->helperText(__('filament/pages/email-accounts.settings.auto_create_companies.helper_text')),
                 Grid::make(2)
                     ->schema([
                         TextInput::make('hourly_send_limit')
-                            ->label('Hourly send limit')
+                            ->label(__('filament/pages/email-accounts.settings.hourly_send_limit.label'))
                             ->numeric()
                             ->minValue(1)
-                            ->placeholder(sprintf('Default: %d', Config::integer('email-integration.outbox.defaults.hourly_send_limit')))
-                            ->helperText('Leave blank to use the workspace default.'),
+                            ->placeholder(__('filament/pages/email-accounts.settings.hourly_send_limit.placeholder', ['default' => Config::integer('email-integration.outbox.defaults.hourly_send_limit')]))
+                            ->helperText(__('filament/pages/email-accounts.settings.hourly_send_limit.helper_text')),
                         TextInput::make('daily_send_limit')
-                            ->label('Daily send limit')
+                            ->label(__('filament/pages/email-accounts.settings.daily_send_limit.label'))
                             ->numeric()
                             ->minValue(1)
-                            ->placeholder(sprintf('Default: %d', Config::integer('email-integration.outbox.defaults.daily_send_limit')))
-                            ->helperText('Leave blank to use the workspace default.'),
+                            ->placeholder(__('filament/pages/email-accounts.settings.daily_send_limit.placeholder', ['default' => Config::integer('email-integration.outbox.defaults.daily_send_limit')]))
+                            ->helperText(__('filament/pages/email-accounts.settings.daily_send_limit.helper_text')),
                     ]),
             ])
             ->action(function (array $arguments, array $data): void {
@@ -149,23 +154,29 @@ final class EmailAccountsPage extends Page
 
                 resolve(UpdateConnectedAccountSettingsAction::class)->execute($account, $data);
             })
-            ->modalHeading('Account Settings')
-            ->modalSubmitActionLabel('Save');
+            ->modalHeading(__('filament/pages/email-accounts.settings.modal_heading'))
+            ->modalSubmitActionLabel(__('filament/pages/email-accounts.settings.submit_label'));
     }
 
     public function syncCalendarAction(): Action
     {
         return Action::make('syncCalendar')
-            ->label(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Sync calendar')
+            ->label(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
+                ? __('filament/pages/email-accounts.actions.sync_calendar.disable_label')
+                : __('filament/pages/email-accounts.actions.sync_calendar.enable_label'))
             ->icon('heroicon-o-calendar')
             ->color(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'warning' : 'success')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
             ->requiresConfirmation(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
-            ->modalHeading(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'Disable calendar sync' : 'Enable calendar sync')
+            ->modalHeading(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
+                ? __('filament/pages/email-accounts.actions.sync_calendar.disable_heading')
+                : __('filament/pages/email-accounts.actions.sync_calendar.enable_heading'))
             ->modalDescription(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
-                ? 'This will stop syncing calendar events for this account.'
-                : sprintf('You will be redirected to %s to grant calendar access.', $this->findAccount($arguments)?->provider->getLabel() ?? 'the provider'))
+                ? __('filament/pages/email-accounts.actions.sync_calendar.disable_description')
+                : __('filament/pages/email-accounts.actions.sync_calendar.enable_description', [
+                    'provider' => $this->findAccount($arguments)?->provider->getLabel() ?? __('filament/pages/email-accounts.actions.sync_calendar.fallback_provider'),
+                ]))
             ->action(function (array $arguments): void {
                 $account = $this->findOwnedAccountOrFail($arguments);
 
@@ -184,7 +195,7 @@ final class EmailAccountsPage extends Page
     public function syncCalendarNowAction(): Action
     {
         return Action::make('syncCalendarNow')
-            ->label('Sync now')
+            ->label(__('filament/pages/email-accounts.actions.sync_calendar_now'))
             ->icon('heroicon-o-arrow-path')
             ->color('primary')
             ->size(Size::Small)
@@ -196,8 +207,8 @@ final class EmailAccountsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Calendar sync queued.')
-                    ->body('New events should appear within a minute.')
+                    ->title(__('filament/pages/email-accounts.notifications.calendar_sync_queued.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.calendar_sync_queued.body'))
                     ->send();
             });
     }
@@ -232,7 +243,7 @@ final class EmailAccountsPage extends Page
     public function disconnectAction(): Action
     {
         return Action::make('disconnect')
-            ->label('Disconnect')
+            ->label(__('filament/pages/email-accounts.actions.disconnect'))
             ->icon('heroicon-o-trash')
             ->color('danger')
             ->size(Size::Small)

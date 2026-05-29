@@ -40,15 +40,15 @@ final class EmailAccessRequestedNotification extends Notification
         $requesterName = $this->request->requester->name;
 
         $notification = FilamentNotification::make()
-            ->title("{$requesterName} requested email access")
-            ->body("They requested access to: {$subject}")
+            ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
+            ->body(__('filament/notifications/email-access-requested.body', ['subject' => $subject]))
             ->warning()
             ->icon('heroicon-o-key');
 
         if ($team !== null) {
             $actions = [
                 Action::make('review')
-                    ->label('Review request')
+                    ->label(__('filament/notifications/email-access-requested.actions.review'))
                     ->url(EmailAccessRequestsPage::getUrl(
                         parameters: ['request' => $this->request->getKey()],
                         tenant: $team,
@@ -56,15 +56,13 @@ final class EmailAccessRequestedNotification extends Notification
                     ->button(),
             ];
 
-            if ($email !== null) {
-                $actions[] = Action::make('view')
-                    ->label('View email')
-                    ->url(EmailInboxPage::getUrl(
-                        parameters: ['email' => $email->getKey()],
-                        tenant: $team,
-                    ))
-                    ->color('gray');
-            }
+            $actions[] = Action::make('view')
+                ->label(__('filament/notifications/email-access-requested.actions.view'))
+                ->url(EmailInboxPage::getUrl(
+                    parameters: ['email' => $email->getKey()],
+                    tenant: $team,
+                ))
+                ->color('gray');
 
             $notification->actions($actions);
         }

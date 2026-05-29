@@ -13,6 +13,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 
+/**
+ * @property string $email_address
+ * @property string|null $name
+ * @property EmailParticipantRole $role
+ */
 final class EmailParticipant extends Model
 {
     /**

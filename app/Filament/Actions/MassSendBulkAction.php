@@ -32,7 +32,7 @@ final class MassSendBulkAction extends BulkAction
         $action = parent::make($name ?? 'massSend');
 
         return $action
-            ->label('Send Email')
+            ->label(__('filament/actions/mass-send.label'))
             ->icon('heroicon-o-paper-airplane')
             ->modalWidth(Width::ThreeExtraLarge)
             ->visible(fn (): bool => ConnectedAccount::query()
@@ -43,7 +43,7 @@ final class MassSendBulkAction extends BulkAction
             )
             ->schema([
                 Select::make('connected_account_id')
-                    ->label('From')
+                    ->label(__('filament/actions/mass-send.fields.from.label'))
                     ->options(fn (): array => ConnectedAccount::query()
                         ->where('user_id', auth()->id())
                         ->where('team_id', filament()->getTenant()?->getKey())
@@ -55,8 +55,8 @@ final class MassSendBulkAction extends BulkAction
                     ->required(),
 
                 Select::make('template_id')
-                    ->label('Template')
-                    ->placeholder('None — write below')
+                    ->label(__('filament/actions/mass-send.fields.template.label'))
+                    ->placeholder(__('filament/actions/mass-send.fields.template.placeholder'))
                     ->options(fn (): array => EmailTemplate::query()
                         ->where(fn (Builder $q) => $q
                             ->where('created_by', auth()->id())
@@ -86,7 +86,7 @@ final class MassSendBulkAction extends BulkAction
                     ->maxLength(255),
 
                 RichEditor::make('body_html')
-                    ->label('Body')
+                    ->label(__('filament/actions/mass-send.fields.body.label'))
                     ->required()
                     ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                     ->toolbarButtons([
@@ -116,8 +116,8 @@ final class MassSendBulkAction extends BulkAction
 
                 if ($validRecipients->isEmpty()) {
                     Notification::make()
-                        ->title('No valid recipients')
-                        ->body('None of the selected people have an email address.')
+                        ->title(__('filament/actions/mass-send.notifications.no_recipients.title'))
+                        ->body(__('filament/actions/mass-send.notifications.no_recipients.body'))
                         ->warning()
                         ->send();
 
@@ -164,8 +164,8 @@ final class MassSendBulkAction extends BulkAction
                 }
 
                 Notification::make()
-                    ->title('Mass email queued')
-                    ->body("Sending to {$validRecipients->count()} recipient(s).")
+                    ->title(__('filament/actions/mass-send.notifications.queued.title'))
+                    ->body(__('filament/actions/mass-send.notifications.queued.body', ['count' => $validRecipients->count()]))
                     ->success()
                     ->send();
             });
