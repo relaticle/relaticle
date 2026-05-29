@@ -23,6 +23,7 @@ use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -150,11 +151,7 @@ abstract class BaseRecordEmailsPage extends Page
         $this->selectedEmailId = $id;
 
         // Optimistically mark the email as read so the unread count updates immediately
-        Email::query()
-            ->whereKey($id)
-            ->where('user_id', $this->authUser()->getKey())
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        app(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
