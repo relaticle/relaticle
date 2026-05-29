@@ -56,7 +56,7 @@ trait HasEmailComposeActions
     protected function composeEmailAction(): Action
     {
         return Action::make('composeEmail')
-            ->label('Compose')
+            ->label(__('filament/concerns/email-compose.actions.compose.label'))
             ->slideOver()
             ->icon('heroicon-o-pencil-square')
             ->modalWidth(Width::SevenExtraLarge)
@@ -189,21 +189,21 @@ trait HasEmailComposeActions
     private function sendQueuedNotification(Email $email): void
     {
         $notification = Notification::make()
-            ->title('Email queued')
-            ->body('Your email is being sent.')
+            ->title(__('filament/concerns/email-compose.notifications.queued.title'))
+            ->body(__('filament/concerns/email-compose.notifications.queued.body'))
             ->success();
 
         if ($email->scheduled_for !== null && $email->scheduled_for->isFuture()) {
             $notification->actions([
                 Action::make('undo')
-                    ->label('Undo')
+                    ->label(__('filament/concerns/email-compose.actions.undo.label'))
                     ->link()
                     ->action(function () use ($email): void {
                         try {
                             resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
-                            Notification::make()->title('Send cancelled')->success()->send();
+                            Notification::make()->title(__('filament/concerns/email-compose.notifications.cancelled.title'))->success()->send();
                         } catch (RuntimeException) {
-                            Notification::make()->title('Too late — email already sent')->danger()->send();
+                            Notification::make()->title(__('filament/concerns/email-compose.notifications.too_late.title'))->danger()->send();
                         }
                     }),
             ]);
@@ -221,7 +221,7 @@ trait HasEmailComposeActions
             Grid::make(2)
                 ->schema([
                     Select::make('connected_account_id')
-                        ->label('From')
+                        ->label(__('filament/concerns/email-compose.fields.from.label'))
                         ->options(fn (): array => $this->activeAccountOptions())
                         ->required()
                         ->live()
@@ -243,8 +243,8 @@ trait HasEmailComposeActions
                         }),
 
                     Select::make('template_id')
-                        ->label('Template')
-                        ->placeholder('Apply a template…')
+                        ->label(__('filament/concerns/email-compose.fields.template.label'))
+                        ->placeholder(__('filament/concerns/email-compose.fields.template.placeholder'))
                         ->options(fn (): array => $this->templateOptions())
                         ->live()
                         ->afterStateUpdated(function (?string $state, Set $set): void {
@@ -268,8 +268,8 @@ trait HasEmailComposeActions
                 ]),
 
             TagsInput::make('to')
-                ->label('To')
-                ->placeholder('email@example.com')
+                ->label(__('filament/concerns/email-compose.fields.to.label'))
+                ->placeholder(__('filament/concerns/email-compose.fields.to.placeholder'))
                 ->required()
                 ->splitKeys(['Tab', ',', ' '])
                 ->suggestions(fn (): array => $this->contactEmailSuggestions()),
@@ -277,14 +277,14 @@ trait HasEmailComposeActions
             Grid::make(2)
                 ->schema([
                     TagsInput::make('cc')
-                        ->label('CC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/concerns/email-compose.fields.cc.label'))
+                        ->placeholder(__('filament/concerns/email-compose.fields.cc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
 
                     TagsInput::make('bcc')
-                        ->label('BCC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/concerns/email-compose.fields.bcc.label'))
+                        ->placeholder(__('filament/concerns/email-compose.fields.bcc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
                 ]),
@@ -294,7 +294,7 @@ trait HasEmailComposeActions
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Body')
+                ->label(__('filament/concerns/email-compose.fields.body.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
@@ -307,8 +307,8 @@ trait HasEmailComposeActions
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
-                        ->label('Who can see this email?')
-                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->label(__('filament/concerns/email-compose.fields.privacy_tier.label'))
+                        ->helperText(__('filament/concerns/email-compose.fields.privacy_tier.helper_text'))
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),
@@ -318,8 +318,8 @@ trait HasEmailComposeActions
                 ->collapsed()
                 ->schema([
                     DateTimePicker::make('scheduled_for')
-                        ->label('Send at')
-                        ->helperText('Leave blank to send with a 30-second undo window.')
+                        ->label(__('filament/concerns/email-compose.fields.scheduled_for.label'))
+                        ->helperText(__('filament/concerns/email-compose.fields.scheduled_for.helper_text'))
                         ->seconds(false)
                         ->minDate(now())
                         ->nullable(),
@@ -330,7 +330,7 @@ trait HasEmailComposeActions
                 ->schema([
                     Select::make('signature_id')
                         ->hiddenLabel()
-                        ->placeholder('No signature')
+                        ->placeholder(__('filament/concerns/email-compose.fields.signature.placeholder'))
                         ->options(fn (Get $get): array => EmailSignature::query()
                             ->where('connected_account_id', $get('connected_account_id'))
                             ->pluck('name', 'id')
@@ -376,13 +376,13 @@ trait HasEmailComposeActions
     {
         return [
             Select::make('connected_account_id')
-                ->label('From')
+                ->label(__('filament/concerns/email-compose.fields.from.label'))
                 ->options(fn (): array => $this->activeAccountOptions())
                 ->required(),
 
             TagsInput::make('to')
-                ->label('To')
-                ->placeholder('email@example.com')
+                ->label(__('filament/concerns/email-compose.fields.to.label'))
+                ->placeholder(__('filament/concerns/email-compose.fields.to.placeholder'))
                 ->required()
                 ->splitKeys(['Tab', ',', ' '])
                 ->suggestions(fn (): array => $this->contactEmailSuggestions()),
@@ -390,14 +390,14 @@ trait HasEmailComposeActions
             Grid::make(2)
                 ->schema([
                     TagsInput::make('cc')
-                        ->label('CC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/concerns/email-compose.fields.cc.label'))
+                        ->placeholder(__('filament/concerns/email-compose.fields.cc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
 
                     TagsInput::make('bcc')
-                        ->label('BCC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/concerns/email-compose.fields.bcc.label'))
+                        ->placeholder(__('filament/concerns/email-compose.fields.bcc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
                 ]),
@@ -407,7 +407,7 @@ trait HasEmailComposeActions
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Message')
+                ->label(__('filament/concerns/email-compose.fields.message.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
@@ -424,8 +424,8 @@ trait HasEmailComposeActions
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
-                        ->label('Who can see this email?')
-                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->label(__('filament/concerns/email-compose.fields.privacy_tier.label'))
+                        ->helperText(__('filament/concerns/email-compose.fields.privacy_tier.helper_text'))
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),

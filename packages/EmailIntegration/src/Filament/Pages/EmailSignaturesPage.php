@@ -28,7 +28,12 @@ final class EmailSignaturesPage extends Page
 
     protected static ?int $navigationSort = 6;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.emails');
+    }
 
     /**
      * @var Collection<int, EmailSignature>
@@ -62,12 +67,12 @@ final class EmailSignaturesPage extends Page
     public function createSignatureAction(): Action
     {
         return Action::make('createSignature')
-            ->label('New Signature')
+            ->label(__('filament/pages/email-signatures.actions.create'))
             ->icon('heroicon-o-plus')
             ->size(Size::Small)
             ->schema([
                 Select::make('connected_account_id')
-                    ->label('Email account')
+                    ->label(__('filament/pages/email-signatures.fields.connected_account'))
                     ->options(fn (): array => ConnectedAccount::query()
                         ->where('user_id', auth()->id())
                         ->where('team_id', filament()->getTenant()?->getKey())
@@ -81,17 +86,17 @@ final class EmailSignaturesPage extends Page
                     ->required(),
 
                 TextInput::make('name')
-                    ->label('Signature name')
+                    ->label(__('filament/pages/email-signatures.fields.name'))
                     ->required()
                     ->maxLength(100),
 
                 RichEditor::make('content_html')
-                    ->label('Signature content')
+                    ->label(__('filament/pages/email-signatures.fields.content'))
                     ->required()
                     ->toolbarButtons(['bold', 'italic', 'underline', 'link']),
 
                 Toggle::make('is_default')
-                    ->label('Set as default for this account'),
+                    ->label(__('filament/pages/email-signatures.fields.is_default')),
             ])
             ->action(function (array $data, CreateSignatureAction $createSignatureAction): void {
                 /** @var ConnectedAccount $account */
@@ -106,7 +111,7 @@ final class EmailSignaturesPage extends Page
                 $this->signatures = $this->loadSignatures();
 
                 Notification::make()
-                    ->title('Signature created.')
+                    ->title(__('filament/pages/email-signatures.notifications.created'))
                     ->success()
                     ->send();
             });
@@ -115,7 +120,7 @@ final class EmailSignaturesPage extends Page
     public function editSignatureAction(): Action
     {
         return Action::make('editSignature')
-            ->label('Edit')
+            ->label(__('filament/pages/email-signatures.actions.edit'))
             ->icon('heroicon-o-pencil-square')
             ->color('gray')
             ->size(Size::Small)
@@ -131,17 +136,17 @@ final class EmailSignaturesPage extends Page
             })
             ->schema([
                 TextInput::make('name')
-                    ->label('Signature name')
+                    ->label(__('filament/pages/email-signatures.fields.name'))
                     ->required()
                     ->maxLength(100),
 
                 RichEditor::make('content_html')
-                    ->label('Signature content')
+                    ->label(__('filament/pages/email-signatures.fields.content'))
                     ->required()
                     ->toolbarButtons(['bold', 'italic', 'underline', 'link']),
 
                 Toggle::make('is_default')
-                    ->label('Set as default for this account'),
+                    ->label(__('filament/pages/email-signatures.fields.is_default')),
             ])
             ->action(function (array $arguments, array $data, UpdateSignatureAction $updateSignatureAction): void {
                 /** @var EmailSignature $signature */
@@ -156,7 +161,7 @@ final class EmailSignaturesPage extends Page
                 $this->signatures = $this->loadSignatures();
 
                 Notification::make()
-                    ->title('Signature updated.')
+                    ->title(__('filament/pages/email-signatures.notifications.updated'))
                     ->success()
                     ->send();
             });
@@ -165,7 +170,7 @@ final class EmailSignaturesPage extends Page
     public function deleteSignatureAction(): Action
     {
         return Action::make('deleteSignature')
-            ->label('Delete')
+            ->label(__('filament/pages/email-signatures.actions.delete'))
             ->icon('heroicon-o-trash')
             ->color('danger')
             ->size(Size::Small)
@@ -180,7 +185,7 @@ final class EmailSignaturesPage extends Page
 
                 if ($deleted > 0) {
                     Notification::make()
-                        ->title('Signature deleted.')
+                        ->title(__('filament/pages/email-signatures.notifications.deleted'))
                         ->success()
                         ->send();
                 }
