@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\RelationManagers\BaseEmailsRelationManager;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
@@ -10,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;

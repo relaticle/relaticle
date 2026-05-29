@@ -8,18 +8,7 @@
     $threadCount = $emails->count();
 @endphp
 
-<div
-    class="flex flex-col min-h-full"
-    x-data
-    x-on:message.window="
-        if ($event.data?.type === 'email-frame-height' && $event.data.id) {
-            const frame = $root.querySelector('iframe[data-email-frame=&quot;' + CSS.escape($event.data.id) + '&quot;]');
-            if (frame && $event.data.height) {
-                frame.style.height = (parseInt($event.data.height, 10) + 16) + 'px';
-            }
-        }
-    "
->
+<div class="flex flex-col min-h-full">
 
     {{-- ── Thread subject bar ──────────────────────────────────────── --}}
     @if ($firstEmail && $threadCount > 1)
@@ -53,12 +42,6 @@
 
             $safeHtml = $canViewBody && $email->body?->body_html
                 ? EmailHtmlSanitizer::sanitize($email->body->body_html)
-                : null;
-
-            // Trusted resize messenger injected into the sandboxed (opaque-origin)
-            // iframe so the parent can size it without sharing its origin.
-            $resizeScript = $safeHtml
-                ? '<script>(function(){function p(){var h=document.documentElement.scrollHeight||document.body.scrollHeight;parent.postMessage({type:"email-frame-height",id:'.json_encode((string) $email->id).',height:h},"*");}window.addEventListener("load",p);if(window.ResizeObserver){new ResizeObserver(p).observe(document.documentElement);}setTimeout(p,60);})();<\/script>'
                 : null;
         @endphp
 
@@ -186,11 +169,11 @@
                     <div class="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-7 py-5 shadow-xs">
                         @if ($safeHtml)
                             <iframe
-                                data-email-frame="{{ $email->id }}"
-                                srcdoc="{{ $safeHtml . $resizeScript }}"
-                                sandbox="allow-scripts allow-popups"
+                                srcdoc="{{ $safeHtml }}"
+                                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                                referrerpolicy="no-referrer"
                                 class="w-full rounded-lg border-0"
-                                style="min-height: 150px"
+                                style="min-height: 200px; height: 60vh"
                             ></iframe>
                         @elseif ($email->body?->body_text)
                             <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $email->body->body_text }}</pre>

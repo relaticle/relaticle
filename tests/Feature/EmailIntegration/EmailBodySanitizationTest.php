@@ -85,7 +85,8 @@ it('renders the email view iframe without a same-origin sandbox', function (): v
 
     expect($html)
         ->toContain('<iframe')
-        ->toContain('sandbox="allow-popups"')
+        ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->toContain('referrerpolicy="no-referrer"')
         ->not->toContain('allow-same-origin');
 });
 
@@ -106,6 +107,7 @@ it('sandboxes the threaded iframe without same-origin access', function (): void
     $html = view('filament.emails.email-thread', ['emails' => collect([$email])])->render();
 
     expect($html)
-        ->toContain('sandbox="allow-scripts allow-popups"')
+        ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->not->toContain('allow-scripts')
         ->not->toContain('allow-same-origin');
 });

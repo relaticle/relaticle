@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use App\Filament\Concerns\HasEmailComposeActions;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -24,9 +23,11 @@ use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -150,11 +151,7 @@ abstract class BaseRecordEmailsPage extends Page
         $this->selectedEmailId = $id;
 
         // Optimistically mark the email as read so the unread count updates immediately
-        Email::query()
-            ->whereKey($id)
-            ->where('user_id', $this->authUser()->getKey())
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
@@ -178,24 +175,24 @@ abstract class BaseRecordEmailsPage extends Page
     protected function manageSharingAction(): Action
     {
         return Action::make('manageSharing')
-            ->label('Sharing')
+            ->label(__('filament/pages/record-emails.actions.manage_sharing.label'))
             ->icon('heroicon-o-lock-open')
-            ->modalHeading('Sharing settings')
-            ->modalSubmitActionLabel('Save')
+            ->modalHeading(__('filament/pages/record-emails.actions.manage_sharing.modal_heading'))
+            ->modalSubmitActionLabel(__('filament/pages/record-emails.actions.manage_sharing.submit'))
             ->schema([
                 Select::make('privacy_tier')
-                    ->label('Who can see this email?')
+                    ->label(__('filament/pages/record-emails.fields.privacy_tier.label'))
                     ->options(EmailPrivacyTier::class)
                     ->required(),
 
                 Repeater::make('shares')
-                    ->label('Share with specific teammates')
+                    ->label(__('filament/pages/record-emails.fields.shares.label'))
                     ->defaultItems(0)
                     ->addActionLabel('Add teammate')
                     ->columns(2)
                     ->schema([
                         Select::make('shared_with')
-                            ->label('Teammate')
+                            ->label(__('filament/pages/record-emails.fields.shared_with.label'))
                             ->options(function (): array {
                                 $user = $this->authUser();
 
@@ -210,7 +207,7 @@ abstract class BaseRecordEmailsPage extends Page
                             ->distinct(),
 
                         Select::make('tier')
-                            ->label('Access level')
+                            ->label(__('filament/pages/record-emails.fields.tier.label'))
                             ->options(EmailPrivacyTier::class)
                             ->required(),
                     ]),
@@ -258,7 +255,7 @@ abstract class BaseRecordEmailsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Sharing settings saved.')
+                    ->title(__('filament/pages/record-emails.notifications.sharing_saved.title'))
                     ->send();
             });
     }
@@ -266,11 +263,11 @@ abstract class BaseRecordEmailsPage extends Page
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
-            ->label('Summarize Thread')
+            ->label(__('filament/pages/record-emails.actions.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
             ->visible(false)
-            ->modalHeading('AI Thread Summary')
+            ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
@@ -287,11 +284,11 @@ abstract class BaseRecordEmailsPage extends Page
     protected function requestAccessAction(): Action
     {
         return Action::make('requestAccess')
-            ->label('Request Access')
+            ->label(__('filament/pages/record-emails.actions.request_access.label'))
             ->icon('heroicon-o-key')
             ->schema([
                 Select::make('tier_requested')
-                    ->label('Access level requested')
+                    ->label(__('filament/pages/record-emails.fields.tier_requested.label'))
                     ->options([
                         EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
                         EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
@@ -316,7 +313,7 @@ abstract class BaseRecordEmailsPage extends Page
                 if ($existing) {
                     Notification::make()
                         ->warning()
-                        ->title('You already have a pending request for this email.')
+                        ->title(__('filament/pages/record-emails.notifications.pending_request.title'))
                         ->send();
 
                     return;
@@ -334,7 +331,7 @@ abstract class BaseRecordEmailsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request sent.')
+                    ->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))
                     ->send();
             });
     }
@@ -343,7 +340,7 @@ abstract class BaseRecordEmailsPage extends Page
     {
         return Action::make('approveAccessRequest')
             ->requiresConfirmation()
-            ->modalHeading('Approve access request')
+            ->modalHeading(__('filament/pages/record-emails.actions.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -367,7 +364,7 @@ abstract class BaseRecordEmailsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request approved.')
+                    ->title(__('filament/pages/record-emails.notifications.access_request_approved.title'))
                     ->send();
             });
     }
@@ -376,7 +373,7 @@ abstract class BaseRecordEmailsPage extends Page
     {
         return Action::make('denyAccessRequest')
             ->requiresConfirmation()
-            ->modalHeading('Deny access request')
+            ->modalHeading(__('filament/pages/record-emails.actions.deny_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Deny %s\'s request for access to this email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -400,7 +397,7 @@ abstract class BaseRecordEmailsPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request denied.')
+                    ->title(__('filament/pages/record-emails.notifications.access_request_denied.title'))
                     ->send();
             });
     }

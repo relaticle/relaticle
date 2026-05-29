@@ -13,11 +13,18 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 /**
  * Excludes emails that are entirely private to another user.
  * Fine-grained field masking happens at the view/policy layer.
+ *
+ * @template TModel of Model
+ *
+ * @implements Scope<TModel>
  */
 final readonly class VisibleEmailScope implements Scope
 {
     public function __construct(private User $viewer) {}
 
+    /**
+     * @param  Builder<covariant TModel>  $builder
+     */
     public function apply(Builder $builder, Model $model): void
     {
         $viewerId = $this->viewer->getKey();
