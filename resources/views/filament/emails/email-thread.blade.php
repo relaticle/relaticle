@@ -169,10 +169,10 @@
                         @if ($safeHtml)
                             <iframe
                                 srcdoc="{{ $safeHtml }}"
-                                sandbox="allow-same-origin allow-popups"
+                                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                                referrerpolicy="no-referrer"
                                 class="w-full rounded-lg border-0"
-                                style="min-height: 150px"
-                                onload="this.style.height = this.contentDocument.body.scrollHeight + 'px'"
+                                style="min-height: 200px; height: 60vh"
                             ></iframe>
                         @elseif ($email->body?->body_text)
                             <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $email->body->body_text }}</pre>

@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
-use App\Filament\Pages\BaseRecordEmailsPage;
 use App\Filament\Pages\Import\ImportPage;
 use App\Filament\RelationManagers\BaseActivityTimelineRelationManager;
-use App\Filament\RelationManagers\BaseEmailsRelationManager;
-use App\Filament\RelationManagers\BaseMeetingsRelationManager;
 use App\Livewire\BaseLivewireComponent;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
@@ -19,6 +16,9 @@ use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\PersonalAccessToken;
 use App\Rules\ArrayExistsForTeam;
+use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager;
 
 arch()->preset()->php();
 
