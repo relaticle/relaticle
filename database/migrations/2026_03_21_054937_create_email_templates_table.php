@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUlid('created_by')->constrained('users')->cascadeOnDelete();
 
             $table->string('name');
-            $table->string('subject');
+            $table->text('subject');
             $table->longText('body_html');
             $table->json('variables')->nullable();            // available placeholders
             $table->boolean('is_shared')->default(false);
