@@ -21,6 +21,6 @@ final readonly class HtmlSanitizerService
             ->forceAttribute('a', 'rel', 'noopener noreferrer nofollow')
             ->forceAttribute('a', 'target', '_blank');
 
-        return (new HtmlSanitizer($config))->sanitize($html);
+        return new HtmlSanitizer($config)->sanitize($html);
     }
 }
