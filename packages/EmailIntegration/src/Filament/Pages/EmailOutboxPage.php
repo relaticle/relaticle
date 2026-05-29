@@ -39,7 +39,12 @@ final class EmailOutboxPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 2;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.emails');
+    }
 
     public function table(Table $table): Table
     {
@@ -58,11 +63,11 @@ final class EmailOutboxPage extends Page implements HasTable
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')
-                    ->label('Recipients')
+                    ->label(__('filament/pages/email-outbox.columns.recipients'))
                     ->state(fn (Email $record): string => $record->participants
                         ->where('role', 'to')->pluck('email_address')->implode(', ')),
                 TextColumn::make('status')->badge(),
-                TextColumn::make('scheduled_for')->dateTime()->label('Scheduled for'),
+                TextColumn::make('scheduled_for')->dateTime()->label(__('filament/pages/email-outbox.columns.scheduled_for')),
                 TextColumn::make('priority')->badge(),
                 TextColumn::make('last_error')->toggleable(isToggledHiddenByDefault: true)->wrap(),
             ])
@@ -74,14 +79,14 @@ final class EmailOutboxPage extends Page implements HasTable
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
                     ->action(function (Email $record): void {
                         resolve(CancelQueuedEmailAction::class)->execute($record);
-                        Notification::make()->title('Cancelled')->success()->send();
+                        Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
                     }),
                 Action::make('reschedule')
                     ->icon(Heroicon::OutlinedClock)
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
                     ->schema([
                         DateTimePicker::make('scheduled_for')
-                            ->label('Send at')
+                            ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
                             ->seconds(false)
                             ->minDate(now())
                             ->required(),
@@ -89,7 +94,7 @@ final class EmailOutboxPage extends Page implements HasTable
                     ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
                     ->action(function (Email $record, array $data): void {
                         resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
-                        Notification::make()->title('Rescheduled')->success()->send();
+                        Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
                     }),
                 Action::make('retry')
                     ->icon(Heroicon::OutlinedArrowPath)
@@ -97,12 +102,12 @@ final class EmailOutboxPage extends Page implements HasTable
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
                     ->action(function (Email $record): void {
                         resolve(RetryFailedEmailAction::class)->execute($record);
-                        Notification::make()->title('Retry queued')->success()->send();
+                        Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
                     }),
             ])
             ->toolbarActions([
                 BulkAction::make('bulkCancel')
-                    ->label('Cancel selected')
+                    ->label(__('filament/pages/email-outbox.actions.bulk_cancel'))
                     ->color('danger')
                     ->icon(Heroicon::OutlinedXMark)
                     ->requiresConfirmation()
@@ -114,7 +119,7 @@ final class EmailOutboxPage extends Page implements HasTable
                                 $cancelled++;
                             }
                         }
-                        Notification::make()->title("Cancelled {$cancelled} emails")->success()->send();
+                        Notification::make()->title(__('filament/pages/email-outbox.notifications.bulk_cancelled', ['count' => $cancelled]))->success()->send();
                     }),
             ]);
     }

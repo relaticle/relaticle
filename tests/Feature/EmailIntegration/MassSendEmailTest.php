@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Actions\MassSendBulkAction;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Models\People;
 use App\Models\User;
@@ -11,6 +10,7 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBatch;
