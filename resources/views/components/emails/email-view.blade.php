@@ -194,7 +194,8 @@
                     @endphp
                     <iframe
                         srcdoc="{{ $safeHtml }}"
-                        sandbox="allow-same-origin allow-popups"
+                        sandbox="allow-popups allow-popups-to-escape-sandbox"
+                        referrerpolicy="no-referrer"
                         class="w-full rounded-lg border-0"
                         style="min-height: 100vh"
                     ></iframe>
