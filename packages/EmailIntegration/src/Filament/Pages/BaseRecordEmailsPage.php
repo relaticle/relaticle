@@ -151,7 +151,7 @@ abstract class BaseRecordEmailsPage extends Page
         $this->selectedEmailId = $id;
 
         // Optimistically mark the email as read so the unread count updates immediately
-        app(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
