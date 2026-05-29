@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\RelationManagers;
+namespace Relaticle\EmailIntegration\Filament\RelationManagers;
 
-use App\Filament\Concerns\HasEmailComposeActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
