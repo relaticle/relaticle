@@ -15,7 +15,6 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
-use App\Filament\Pages\EmailPrivacySettingsPage;
 use App\Filament\Resources\CompanyResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
@@ -58,6 +57,7 @@ use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -139,7 +139,7 @@ final class AppPanelProvider extends PanelProvider
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
                 Action::make('email_privacy')
-                    ->label('Email privacy')
+                    ->label(__('filament/panel.user_menu.email_privacy'))
                     ->icon('heroicon-m-shield-check')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EmailPrivacySettingsPage::getUrl())
@@ -156,7 +156,6 @@ final class AppPanelProvider extends PanelProvider
             ->pages([
                 EditProfile::class,
                 AccessTokens::class,
-                EmailPrivacySettingsPage::class,
             ])
             ->spa()
             ->sidebarWidth('67')
@@ -173,7 +172,7 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('heroicon-o-shopping-cart'),
                 NavigationGroup::make()
-                    ->label('Emails')
+                    ->label(__('filament/panel.navigation_groups.emails'))
                     ->icon('heroicon-o-envelope'),
             ])
             ->middleware([

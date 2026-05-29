@@ -100,31 +100,31 @@ final class ViewPeople extends ViewRecord
                 ->icon(Heroicon::ChartBar)
                 ->schema([
                     TextEntry::make('last_interaction_at')
-                        ->label('Last Interaction')
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.last_interaction.label'))
                         ->dateTime()
-                        ->placeholder('Never'),
+                        ->placeholder(__('filament/resources/person.pages.view.communication_intelligence.fields.last_interaction.placeholder')),
 
                     TextEntry::make('last_email_at')
-                        ->label('Last Email')
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.last_email.label'))
                         ->dateTime()
-                        ->placeholder('Never'),
+                        ->placeholder(__('filament/resources/person.pages.view.communication_intelligence.fields.last_email.placeholder')),
 
                     TextEntry::make('days_since_last_email')
-                        ->label('Days Since Last Email')
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.days_since_last_email.label'))
                         ->getStateUsing(fn (People $record): string => $record->last_email_at
-                            ? now()->diffInDays($record->last_email_at).' days ago'
-                            : 'No emails yet'
+                            ? __('filament/resources/person.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => now()->diffInDays($record->last_email_at)])
+                            : __('filament/resources/person.pages.view.communication_intelligence.fields.days_since_last_email.empty')
                         ),
 
                     TextEntry::make('email_count')
-                        ->label('Total Emails')
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.email_count.label'))
                         ->default(0),
 
                     TextEntry::make('inbound_email_count')
-                        ->label('Received'),
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.inbound_email_count.label')),
 
                     TextEntry::make('outbound_email_count')
-                        ->label('Sent'),
+                        ->label(__('filament/resources/person.pages.view.communication_intelligence.fields.outbound_email_count.label')),
                 ])
                 ->columns(3)
                 ->columnSpanFull()
