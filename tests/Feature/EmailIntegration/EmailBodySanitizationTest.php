@@ -61,6 +61,23 @@ it('strips scripts, event handlers and javascript urls from the email view', fun
         ->and($html)->toContain('hello');
 });
 
+it('preserves inline styles and presentational attributes used by email layouts', function (): void {
+    $email = makeEmailWithBody(
+        '<table bgcolor="#eeeeee" width="600"><tr>'
+        .'<td align="center" style="color:#ff0000;padding:10px">'
+        .'<p class="lead" style="font-weight:bold">Styled</p>'
+        .'</td></tr></table>'
+    );
+
+    $html = view('filament.emails.email-view', ['record' => $email])->render();
+
+    expect($html)
+        ->toContain('bgcolor=&quot;#eeeeee&quot;')
+        ->toContain('style=&quot;color:#ff0000;padding:10px&quot;')
+        ->toContain('class=&quot;lead&quot;')
+        ->toContain('align=&quot;center&quot;');
+});
+
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
