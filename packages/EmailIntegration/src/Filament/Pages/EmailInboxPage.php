@@ -30,6 +30,7 @@ use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
@@ -176,11 +177,7 @@ final class EmailInboxPage extends Page
     {
         $this->selectedEmailId = $id;
 
-        Email::query()
-            ->whereKey($id)
-            ->where('user_id', $this->authUser()->getKey())
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        app(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
