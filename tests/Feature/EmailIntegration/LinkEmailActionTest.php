@@ -73,6 +73,71 @@ it('links email to an existing company matched by domain', function (): void {
     }
 });
 
+it('does not match a company on a substring domain collision', function (): void {
+    $domainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if (! $domainsField) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $company = Company::create([
+        'team_id' => $this->team->id,
+        'name' => 'Acme AU',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $company->saveCustomFieldValue($domainsField, 'https://acme.com.au', $this->team);
+
+    $email = makeLinkEmail();
+
+    // Sender is acme.co — must NOT collide with the stored acme.com.au domain.
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'contact@acme.co',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($email->companies()->where('companies.id', $company->getKey())->exists())->toBeFalse();
+});
+
+it('does not treat LIKE wildcards in the sender domain as a match', function (): void {
+    $domainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if (! $domainsField) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $company = Company::create([
+        'team_id' => $this->team->id,
+        'name' => 'Wildcard Co',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $company->saveCustomFieldValue($domainsField, 'https://wildcard.com', $this->team);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'spoof@wild_ard.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($email->companies()->where('companies.id', $company->getKey())->exists())->toBeFalse();
+});
+
 it('skips company matching for public email domains', function (): void {
     $email = makeLinkEmail();
 
