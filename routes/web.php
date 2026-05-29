@@ -61,7 +61,6 @@ Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::cla
     ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
     ->name('team-invitations.accept');
 
-// TODO::Remove after check all features.
 Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
     ->middleware(['auth', 'verified', AuthenticateSession::class])
     ->name('email-attachments.download');
