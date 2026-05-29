@@ -12,6 +12,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
@@ -52,11 +53,31 @@ final class EmailSignaturesPage extends Page
      */
     private function loadSignatures(): Collection
     {
-        return EmailSignature::query()
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('user_id', auth()->id())
+        return $this->ownedSignatures()
             ->with('connectedAccount')
             ->get();
+    }
+
+    /**
+     * Signatures scoped to the current user and tenant.
+     *
+     * @return Builder<EmailSignature>
+     */
+    private function ownedSignatures(): Builder
+    {
+        return EmailSignature::query()
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where('user_id', auth()->id());
+    }
+
+    private function findOwnedAccount(string $id): ConnectedAccount
+    {
+        /** @var ConnectedAccount */
+        return ConnectedAccount::query()
+            ->whereKey($id)
+            ->where('user_id', auth()->id())
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->firstOrFail();
     }
 
     public function createSignatureAction(): Action
@@ -94,8 +115,7 @@ final class EmailSignaturesPage extends Page
                     ->label('Set as default for this account'),
             ])
             ->action(function (array $data, CreateSignatureAction $createSignatureAction): void {
-                /** @var ConnectedAccount $account */
-                $account = ConnectedAccount::query()->whereKey($data['connected_account_id'])->firstOrFail();
+                $account = $this->findOwnedAccount($data['connected_account_id']);
 
                 $createSignatureAction->execute($account, [
                     'name' => $data['name'],
@@ -120,8 +140,7 @@ final class EmailSignaturesPage extends Page
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
-                /** @var EmailSignature|null $signature */
-                $signature = EmailSignature::query()->whereKey($arguments['signature_id'])->first();
+                $signature = $this->ownedSignatures()->whereKey($arguments['signature_id'])->first();
 
                 return [
                     'name' => $signature === null ? '' : $signature->name,
@@ -144,8 +163,11 @@ final class EmailSignaturesPage extends Page
                     ->label('Set as default for this account'),
             ])
             ->action(function (array $arguments, array $data, UpdateSignatureAction $updateSignatureAction): void {
-                /** @var EmailSignature $signature */
-                $signature = EmailSignature::query()->whereKey($arguments['signature_id'])->firstOrFail();
+                $signature = $this->ownedSignatures()->whereKey($arguments['signature_id'])->first();
+
+                if ($signature === null) {
+                    return;
+                }
 
                 $updateSignatureAction->execute($signature, [
                     'name' => $data['name'],
@@ -171,9 +193,8 @@ final class EmailSignaturesPage extends Page
             ->size(Size::Small)
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                $deleted = EmailSignature::query()->where('id', $arguments['signature_id'])
-                    ->where('team_id', filament()->getTenant()?->getKey())
-                    ->where('user_id', auth()->id())
+                $deleted = $this->ownedSignatures()
+                    ->whereKey($arguments['signature_id'])
                     ->delete();
 
                 $this->signatures = $this->loadSignatures();

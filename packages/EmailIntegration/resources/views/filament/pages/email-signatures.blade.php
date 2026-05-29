@@ -15,7 +15,7 @@
                             {{ $signature->connectedAccount->email_address }}
                         </p>
                         <div class="prose prose-xs dark:prose-invert mt-2 max-w-none rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800">
-                            {!! $signature->content_html !!}
+                            {!! app(\Relaticle\EmailIntegration\Services\HtmlSanitizerService::class)->sanitizeRichText($signature->content_html) !!}
                         </div>
                     </div>
 
