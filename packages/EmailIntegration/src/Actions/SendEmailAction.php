@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -44,8 +45,14 @@ final readonly class SendEmailAction
      */
     public function execute(array $data, ?string $linkToType = null, ?string $linkToId = null): Email
     {
+        /** @var User $user */
+        $user = auth()->user();
+
         /** @var ConnectedAccount $account */
-        $account = ConnectedAccount::query()->findOrFail($data['connected_account_id']);
+        $account = ConnectedAccount::query()
+            ->ownedBy($user, $user->currentTeam)
+            ->whereKey($data['connected_account_id'])
+            ->firstOrFail();
         $priority = $data['priority'] ?? EmailPriority::BULK;
 
         $this->assertUnderMaxQueued((string) $account->user_id);

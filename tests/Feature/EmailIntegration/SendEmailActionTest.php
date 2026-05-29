@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -81,6 +82,31 @@ it('links the queued email to a CRM record via emailables', function (): void {
         'emailable_id' => $person->id,
         'link_source' => 'manual',
     ]);
+});
+
+it('rejects sending through a connected account owned by another user', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+
+    $foreignAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $otherUser->currentTeam->id,
+        'user_id' => $otherUser->id,
+        'email_address' => 'victim@example.com',
+    ]));
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $foreignAccount->id,
+        'subject' => 'Impersonation attempt',
+        'body_html' => '<p>nope</p>',
+        'to' => [['email' => 'x@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]))->toThrow(ModelNotFoundException::class);
+
+    $this->assertDatabaseMissing('emails', ['subject' => 'Impersonation attempt']);
 });
 
 it('throws when the user has hit the max queued limit', function (): void {
