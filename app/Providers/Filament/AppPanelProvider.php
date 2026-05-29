@@ -139,7 +139,7 @@ final class AppPanelProvider extends PanelProvider
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
                 Action::make('email_privacy')
-                    ->label('Email privacy')
+                    ->label(__('filament/panel.user_menu.email_privacy'))
                     ->icon('heroicon-m-shield-check')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EmailPrivacySettingsPage::getUrl())
@@ -173,7 +173,7 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('heroicon-o-shopping-cart'),
                 NavigationGroup::make()
-                    ->label('Emails')
+                    ->label(__('filament/panel.navigation_groups.emails'))
                     ->icon('heroicon-o-envelope'),
             ])
             ->middleware([

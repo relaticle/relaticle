@@ -31,7 +31,12 @@ final class MeetingResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.emails');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -46,12 +51,12 @@ final class MeetingResource extends Resource
                 TextEntry::make('starts_at')->dateTime('M j, Y · g:i a'),
                 TextEntry::make('ends_at')->dateTime('M j, Y · g:i a'),
                 TextEntry::make('location')->default('—'),
-                TextEntry::make('organizer_name')->label('Organizer'),
+                TextEntry::make('organizer_name')->label(__('filament/resources/meeting.fields.organizer.label')),
             ]),
             Section::make('Attendees')->schema([
                 RepeatableEntry::make('attendees')->schema([
                     TextEntry::make('name')->default(fn (MeetingAttendee $record): string => $record->email_address),
-                    TextEntry::make('email_address')->label('Email'),
+                    TextEntry::make('email_address')->label(__('filament/resources/meeting.fields.email_address.label')),
                     TextEntry::make('response_status')->badge(),
                 ]),
             ]),
@@ -60,7 +65,7 @@ final class MeetingResource extends Resource
             ]),
             Section::make('Link')->schema([
                 TextEntry::make('html_link')
-                    ->label('Open in Google Calendar')
+                    ->label(__('filament/resources/meeting.fields.html_link.label'))
                     ->color('primary')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->iconPosition(IconPosition::After)
@@ -78,32 +83,32 @@ final class MeetingResource extends Resource
                     ->sortable()
                     ->limit(60),
                 TextColumn::make('starts_at')
-                    ->label('Time')
+                    ->label(__('filament/resources/meeting.columns.starts_at.label'))
                     ->dateTime('M j, Y · g:i a')
                     ->sortable(),
                 TextColumn::make('organizer_name')
-                    ->label('Organizer')
+                    ->label(__('filament/resources/meeting.columns.organizer_name.label'))
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('attendees_count')
                     ->counts('attendees')
-                    ->label('Attendees'),
+                    ->label(__('filament/resources/meeting.columns.attendees_count.label')),
                 TextColumn::make('people_count')
                     ->counts('people')
-                    ->label('People')
+                    ->label(__('filament/resources/meeting.columns.people_count.label'))
                     ->toggleable(),
                 TextColumn::make('companies_count')
                     ->counts('companies')
-                    ->label('Companies')
+                    ->label(__('filament/resources/meeting.columns.companies_count.label'))
                     ->toggleable(),
                 TextColumn::make('opportunities_count')
                     ->counts('opportunities')
-                    ->label('Opportunities')
+                    ->label(__('filament/resources/meeting.columns.opportunities_count.label'))
                     ->toggleable(),
                 TextColumn::make('status')
                     ->badge(),
                 TextColumn::make('response_status')
-                    ->label('My RSVP')
+                    ->label(__('filament/resources/meeting.columns.response_status.label'))
                     ->badge()
                     ->toggleable(),
             ])
@@ -118,7 +123,7 @@ final class MeetingResource extends Resource
                 SelectFilter::make('status')
                     ->options(CalendarEventStatus::class),
                 SelectFilter::make('response_status')
-                    ->label('My RSVP')
+                    ->label(__('filament/resources/meeting.filters.response_status.label'))
                     ->options(AttendeeResponseStatus::class),
             ])
             ->recordActions([
