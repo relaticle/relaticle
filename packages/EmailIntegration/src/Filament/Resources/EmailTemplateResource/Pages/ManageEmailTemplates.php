@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages;
 
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
 use Override;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 
 final class ManageEmailTemplates extends ManageRecords
 {
