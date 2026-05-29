@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
-use App\Filament\Pages\EmailAccessRequestsPage;
-use App\Filament\Pages\EmailInboxPage;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 final class EmailAccessRequestedNotification extends Notification

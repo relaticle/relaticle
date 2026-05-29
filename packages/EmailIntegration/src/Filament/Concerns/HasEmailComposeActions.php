@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Concerns;
+namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\User;
 use Filament\Actions\Action;
