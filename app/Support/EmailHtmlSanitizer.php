@@ -7,7 +7,7 @@ namespace App\Support;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
-final class EmailHtmlSanitizer
+final readonly class EmailHtmlSanitizer
 {
     /**
      * Sanitize untrusted email body HTML before rendering it in an iframe.
@@ -22,10 +22,26 @@ final class EmailHtmlSanitizer
             return null;
         }
 
+        // Presentational attributes/elements emails rely on for layout.
+        // CSS values are not deep-sanitized, but the body is rendered in an
+        // opaque-origin sandboxed iframe, so CSS cannot read cookies or run JS.
         $config = (new HtmlSanitizerConfig)
             ->allowSafeElements()
+            ->allowElement('style')
             ->allowRelativeLinks()
             ->allowRelativeMedias()
+            ->allowAttribute('style', '*')
+            ->allowAttribute('class', '*')
+            ->allowAttribute('id', '*')
+            ->allowAttribute('align', '*')
+            ->allowAttribute('valign', '*')
+            ->allowAttribute('bgcolor', '*')
+            ->allowAttribute('color', '*')
+            ->allowAttribute('width', '*')
+            ->allowAttribute('height', '*')
+            ->allowAttribute('border', '*')
+            ->allowAttribute('cellpadding', '*')
+            ->allowAttribute('cellspacing', '*')
             ->forceAttribute('a', 'target', '_blank')
             ->forceAttribute('a', 'rel', 'noopener noreferrer nofollow');
 
