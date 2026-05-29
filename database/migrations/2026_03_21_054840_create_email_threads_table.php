@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUlid('connected_account_id')->constrained('connected_accounts')->cascadeOnDelete();
 
             $table->string('thread_id');                     // provider thread/conversation ID
-            $table->string('subject')->nullable();
+            $table->text('subject')->nullable();
             $table->unsignedInteger('email_count')->default(0);
             $table->unsignedInteger('participant_count')->default(0);
             $table->timestamp('first_email_at')->nullable();

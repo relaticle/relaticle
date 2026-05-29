@@ -15,7 +15,6 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
-use App\Filament\Pages\EmailPrivacySettingsPage;
 use App\Filament\Resources\CompanyResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
@@ -58,6 +57,7 @@ use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -156,7 +156,6 @@ final class AppPanelProvider extends PanelProvider
             ->pages([
                 EditProfile::class,
                 AccessTokens::class,
-                EmailPrivacySettingsPage::class,
             ])
             ->spa()
             ->sidebarWidth('67')
