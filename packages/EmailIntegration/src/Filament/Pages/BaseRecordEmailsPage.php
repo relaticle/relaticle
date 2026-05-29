@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use App\Filament\Concerns\HasEmailComposeActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;

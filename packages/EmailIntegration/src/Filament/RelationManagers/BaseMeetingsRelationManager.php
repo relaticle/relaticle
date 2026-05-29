@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\RelationManagers;
+namespace Relaticle\EmailIntegration\Filament\RelationManagers;
 
 use App\Models\Company;
 use App\Models\Opportunity;

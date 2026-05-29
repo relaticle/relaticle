@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Actions;
+namespace Relaticle\EmailIntegration\Filament\Actions;
 
 use App\Models\People;
 use Filament\Actions\BulkAction;
