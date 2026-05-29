@@ -177,7 +177,7 @@ final class EmailInboxPage extends Page
     {
         $this->selectedEmailId = $id;
 
-        app(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
