@@ -10,8 +10,27 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
 
 mutates(EmailSignaturesPage::class);
+mutates(HtmlSanitizerService::class);
+
+function foreignAccount(string $accountId, string $email): ConnectedAccount
+{
+    $otherUser = User::factory()->withTeam()->create();
+
+    return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::create([
+        'team_id' => $otherUser->currentTeam->id,
+        'user_id' => $otherUser->id,
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => $accountId,
+        'email_address' => $email,
+        'display_name' => 'Other Sender',
+        'access_token' => 'fake-token',
+        'status' => EmailAccountStatus::ACTIVE,
+        'contact_creation_mode' => ContactCreationMode::None,
+    ]));
+}
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -82,6 +101,21 @@ it('requires content_html when creating a signature', function (): void {
         ->assertHasActionErrors(['content_html']);
 });
 
+it('rejects creating a signature for an account the user does not own', function (): void {
+    $foreignAccount = foreignAccount('foreign-create-account', 'foreign-create@example.com');
+
+    livewire(EmailSignaturesPage::class)
+        ->callAction('createSignature', data: [
+            'connected_account_id' => $foreignAccount->id,
+            'name' => 'Hijacked Signature',
+            'content_html' => '<p>nope</p>',
+            'is_default' => false,
+        ])
+        ->assertNotNotified('Signature created.');
+
+    expect(EmailSignature::where('connected_account_id', $foreignAccount->id)->exists())->toBeFalse();
+});
+
 // ── editSignature ─────────────────────────────────────────────────────────────
 
 it('updates name and content and sends success notification', function (): void {
@@ -130,6 +164,29 @@ it('clears previous default when is_default is toggled on', function (): void {
 
     expect($other->fresh()->is_default)->toBeTrue()
         ->and($previousDefault->fresh()->is_default)->toBeFalse();
+});
+
+it('does not update another user\'s signature', function (): void {
+    $foreignAccount = foreignAccount('foreign-edit-account', 'foreign-edit@example.com');
+
+    $otherSignature = EmailSignature::factory()->create([
+        'connected_account_id' => $foreignAccount->id,
+        'user_id' => $foreignAccount->user_id,
+        'name' => 'Theirs',
+        'content_html' => '<p>Original</p>',
+    ]);
+
+    livewire(EmailSignaturesPage::class)
+        ->callAction('editSignature', arguments: ['signature_id' => $otherSignature->id], data: [
+            'name' => 'Hijacked',
+            'content_html' => '<p><img src=x onerror=alert(1)></p>',
+            'is_default' => false,
+        ])
+        ->assertNotNotified('Signature updated.');
+
+    expect($otherSignature->fresh())
+        ->name->toBe('Theirs')
+        ->content_html->toBe('<p>Original</p>');
 });
 
 // ── deleteSignature ───────────────────────────────────────────────────────────
@@ -245,4 +302,20 @@ it('excludes another user\'s signatures even when in the same team', function ()
     $ids = $component->get('signatures')->pluck('id')->all();
 
     expect($ids)->not->toContain($teammateSignature->id);
+});
+
+// ── render sanitization ───────────────────────────────────────────────────────
+
+it('sanitizes signature html when rendering the page', function (): void {
+    EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'user_id' => $this->user->id,
+        'name' => 'XSS Signature',
+        'content_html' => '<b>hi</b><script>alert(document.cookie)</script><img src=x onerror=alert(1)>',
+    ]);
+
+    livewire(EmailSignaturesPage::class)
+        ->assertDontSee('<script>', escape: false)
+        ->assertDontSee('onerror', escape: false)
+        ->assertSee('hi');
 });

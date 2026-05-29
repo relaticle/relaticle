@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('thread_id')->nullable();             // Provider's thread/conversation ID
             $table->string('in_reply_to')->nullable();           // RFC 2822 In-Reply-To (reply chain)
 
-            $table->string('subject')->nullable();
+            $table->text('subject')->nullable();
             $table->string('snippet', 255)->nullable();          // Preview text for list views
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('scheduled_for')->nullable();

@@ -9,10 +9,12 @@ return [
 
     'user_menu' => [
         'profile' => 'Profile',
+        'email_privacy' => 'Email privacy',
     ],
 
     'navigation_groups' => [
         'tasks' => 'Tasks',
+        'emails' => 'Emails',
     ],
 
     'tenant_menu' => [

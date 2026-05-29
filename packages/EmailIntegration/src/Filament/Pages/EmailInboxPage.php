@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use App\Models\User;
 use Filament\Actions\Action;
@@ -30,6 +30,7 @@ use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
@@ -56,15 +57,25 @@ final class EmailInboxPage extends Page
 
     protected string $view = 'filament.pages.email-inbox';
 
-    protected static ?string $navigationLabel = 'Email';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $title = 'Email';
 
     protected static ?string $slug = 'email';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Emails';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 1;
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/email-inbox.navigation_label');
+    }
+
+    public static function getNavigationGroup(): string
+    {
+        return __('filament/navigation.groups.emails');
+    }
 
     public EmailFolder $folder = EmailFolder::Inbox;
 
@@ -166,11 +177,7 @@ final class EmailInboxPage extends Page
     {
         $this->selectedEmailId = $id;
 
-        Email::query()
-            ->whereKey($id)
-            ->where('user_id', $this->authUser()->getKey())
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
     }
@@ -215,7 +222,7 @@ final class EmailInboxPage extends Page
     protected function composeEmailAction(): Action
     {
         return Action::make('composeEmail')
-            ->label('Compose')
+            ->label(__('filament/pages/email-inbox.compose.label'))
             ->slideOver()
             ->icon('heroicon-o-pencil-square')
             ->modalWidth(Width::SevenExtraLarge)
@@ -252,8 +259,8 @@ final class EmailInboxPage extends Page
                 );
 
                 Notification::make()
-                    ->title('Email queued')
-                    ->body('Your email is being sent.')
+                    ->title(__('filament/pages/email-inbox.compose.notifications.queued.title'))
+                    ->body(__('filament/pages/email-inbox.compose.notifications.queued.body'))
                     ->success()
                     ->send();
             });
@@ -264,9 +271,9 @@ final class EmailInboxPage extends Page
         return Action::make('replyForwardEmail')
             ->slideOver()
             ->modalHeading(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
-                'reply_all' => 'Reply All',
-                'forward' => 'Forward',
-                default => 'Reply',
+                'reply_all' => __('filament/pages/email-inbox.reply_forward.modal_headings.reply_all'),
+                'forward' => __('filament/pages/email-inbox.reply_forward.modal_headings.forward'),
+                default => __('filament/pages/email-inbox.reply_forward.modal_headings.reply'),
             })
             ->modalWidth(Width::SevenExtraLarge)
             ->fillForm(function (array $arguments): array {
@@ -332,31 +339,31 @@ final class EmailInboxPage extends Page
                     data: $this->buildSendData($data, $source),
                 );
 
-                Notification::make()->title('Email queued')->success()->send();
+                Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
             });
     }
 
     protected function manageSharingAction(): Action
     {
         return Action::make('manageSharing')
-            ->label('Sharing')
+            ->label(__('filament/pages/email-inbox.sharing.label'))
             ->icon('heroicon-o-lock-open')
-            ->modalHeading('Sharing settings')
+            ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
             ->modalSubmitActionLabel('Save')
             ->schema([
                 Select::make('privacy_tier')
-                    ->label('Who can see this email?')
+                    ->label(__('filament/pages/email-inbox.sharing.fields.privacy_tier.label'))
                     ->options(EmailPrivacyTier::class)
                     ->required(),
 
                 Repeater::make('shares')
-                    ->label('Share with specific teammates')
+                    ->label(__('filament/pages/email-inbox.sharing.fields.shares.label'))
                     ->defaultItems(0)
-                    ->addActionLabel('Add teammate')
+                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
                     ->columns(2)
                     ->schema([
                         Select::make('shared_with')
-                            ->label('Teammate')
+                            ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
                             ->options(function (): array {
                                 $user = $this->authUser();
 
@@ -371,7 +378,7 @@ final class EmailInboxPage extends Page
                             ->distinct(),
 
                         Select::make('tier')
-                            ->label('Access level')
+                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
                             ->options(EmailPrivacyTier::class)
                             ->required(),
                     ]),
@@ -410,7 +417,7 @@ final class EmailInboxPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Sharing settings saved.')
+                    ->title(__('filament/pages/email-inbox.sharing.notifications.saved.title'))
                     ->send();
             });
     }
@@ -442,11 +449,11 @@ final class EmailInboxPage extends Page
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
-            ->label('Summarize Thread')
+            ->label(__('filament/pages/email-inbox.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
             ->visible(false)
-            ->modalHeading('AI Thread Summary')
+            ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
@@ -463,11 +470,11 @@ final class EmailInboxPage extends Page
     protected function requestAccessAction(): Action
     {
         return Action::make('requestAccess')
-            ->label('Request Access')
+            ->label(__('filament/pages/email-inbox.request_access.label'))
             ->icon('heroicon-o-key')
             ->schema([
                 Select::make('tier_requested')
-                    ->label('Access level requested')
+                    ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))
                     ->options([
                         EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
                         EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
@@ -490,7 +497,7 @@ final class EmailInboxPage extends Page
                 if (! $request instanceof EmailAccessRequest) {
                     Notification::make()
                         ->warning()
-                        ->title('You already have a pending request for this email.')
+                        ->title(__('filament/pages/email-inbox.request_access.notifications.pending.title'))
                         ->send();
 
                     return;
@@ -498,7 +505,7 @@ final class EmailInboxPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request sent.')
+                    ->title(__('filament/pages/email-inbox.request_access.notifications.sent.title'))
                     ->send();
             });
     }
@@ -507,7 +514,7 @@ final class EmailInboxPage extends Page
     {
         return Action::make('approveAccessRequest')
             ->requiresConfirmation()
-            ->modalHeading('Approve access request')
+            ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -531,7 +538,7 @@ final class EmailInboxPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request approved.')
+                    ->title(__('filament/pages/email-inbox.approve_access_request.notifications.approved.title'))
                     ->send();
             });
     }
@@ -540,7 +547,7 @@ final class EmailInboxPage extends Page
     {
         return Action::make('denyAccessRequest')
             ->requiresConfirmation()
-            ->modalHeading('Deny access request')
+            ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Deny %s\'s request for access to this email?',
                 EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
@@ -564,7 +571,7 @@ final class EmailInboxPage extends Page
 
                 Notification::make()
                     ->success()
-                    ->title('Access request denied.')
+                    ->title(__('filament/pages/email-inbox.deny_access_request.notifications.denied.title'))
                     ->send();
             });
     }
@@ -578,7 +585,7 @@ final class EmailInboxPage extends Page
             Grid::make(2)
                 ->schema([
                     Select::make('connected_account_id')
-                        ->label('From')
+                        ->label(__('filament/pages/email-inbox.compose_form.from.label'))
                         ->options(fn (): array => $this->activeAccountOptions())
                         ->required()
                         ->live()
@@ -600,8 +607,8 @@ final class EmailInboxPage extends Page
                         }),
 
                     Select::make('template_id')
-                        ->label('Template')
-                        ->placeholder('Apply a template…')
+                        ->label(__('filament/pages/email-inbox.compose_form.template.label'))
+                        ->placeholder(__('filament/pages/email-inbox.compose_form.template.placeholder'))
                         ->options(fn (): array => $this->templateOptions())
                         ->live()
                         ->afterStateUpdated(function (?string $state, Set $set): void {
@@ -625,8 +632,8 @@ final class EmailInboxPage extends Page
                 ]),
 
             TagsInput::make('to')
-                ->label('To')
-                ->placeholder('email@example.com')
+                ->label(__('filament/pages/email-inbox.compose_form.to.label'))
+                ->placeholder(__('filament/pages/email-inbox.compose_form.to.placeholder'))
                 ->required()
                 ->splitKeys(['Tab', ',', ' '])
                 ->suggestions(fn (): array => $this->contactEmailSuggestions()),
@@ -634,14 +641,14 @@ final class EmailInboxPage extends Page
             Grid::make(2)
                 ->schema([
                     TagsInput::make('cc')
-                        ->label('CC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/pages/email-inbox.compose_form.cc.label'))
+                        ->placeholder(__('filament/pages/email-inbox.compose_form.cc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
 
                     TagsInput::make('bcc')
-                        ->label('BCC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/pages/email-inbox.compose_form.bcc.label'))
+                        ->placeholder(__('filament/pages/email-inbox.compose_form.bcc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
                 ]),
@@ -651,7 +658,7 @@ final class EmailInboxPage extends Page
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Body')
+                ->label(__('filament/pages/email-inbox.compose_form.body.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
@@ -664,8 +671,8 @@ final class EmailInboxPage extends Page
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
-                        ->label('Who can see this email?')
-                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->label(__('filament/pages/email-inbox.compose_form.privacy.label'))
+                        ->helperText(__('filament/pages/email-inbox.compose_form.privacy.helper_text'))
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),
@@ -676,7 +683,7 @@ final class EmailInboxPage extends Page
                 ->schema([
                     Select::make('signature_id')
                         ->hiddenLabel()
-                        ->placeholder('No signature')
+                        ->placeholder(__('filament/pages/email-inbox.compose_form.signature.placeholder'))
                         ->options(fn (Get $get): array => EmailSignature::query()
                             ->where('connected_account_id', $get('connected_account_id'))
                             ->pluck('name', 'id')
@@ -722,13 +729,13 @@ final class EmailInboxPage extends Page
     {
         return [
             Select::make('connected_account_id')
-                ->label('From')
+                ->label(__('filament/pages/email-inbox.reply_form.from.label'))
                 ->options(fn (): array => $this->activeAccountOptions())
                 ->required(),
 
             TagsInput::make('to')
-                ->label('To')
-                ->placeholder('email@example.com')
+                ->label(__('filament/pages/email-inbox.reply_form.to.label'))
+                ->placeholder(__('filament/pages/email-inbox.reply_form.to.placeholder'))
                 ->required()
                 ->splitKeys(['Tab', ',', ' '])
                 ->suggestions(fn (): array => $this->contactEmailSuggestions()),
@@ -736,14 +743,14 @@ final class EmailInboxPage extends Page
             Grid::make(2)
                 ->schema([
                     TagsInput::make('cc')
-                        ->label('CC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/pages/email-inbox.reply_form.cc.label'))
+                        ->placeholder(__('filament/pages/email-inbox.reply_form.cc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
 
                     TagsInput::make('bcc')
-                        ->label('BCC')
-                        ->placeholder('email@example.com')
+                        ->label(__('filament/pages/email-inbox.reply_form.bcc.label'))
+                        ->placeholder(__('filament/pages/email-inbox.reply_form.bcc.placeholder'))
                         ->splitKeys(['Tab', ',', ' '])
                         ->suggestions(fn (): array => $this->contactEmailSuggestions()),
                 ]),
@@ -753,7 +760,7 @@ final class EmailInboxPage extends Page
                 ->maxLength(255),
 
             RichEditor::make('body_html')
-                ->label('Message')
+                ->label(__('filament/pages/email-inbox.reply_form.message.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->toolbarButtons([
@@ -770,8 +777,8 @@ final class EmailInboxPage extends Page
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
-                        ->label('Who can see this email?')
-                        ->helperText('Defaults to your team or personal sharing setting.')
+                        ->label(__('filament/pages/email-inbox.reply_form.privacy.label'))
+                        ->helperText(__('filament/pages/email-inbox.reply_form.privacy.helper_text'))
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),
