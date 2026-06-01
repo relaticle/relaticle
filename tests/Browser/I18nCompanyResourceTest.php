@@ -21,7 +21,7 @@ it('renders CompanyResource list page with French labels when locale is fr', fun
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->assertSee('Entreprises')
-        ->assertSee('Espace de travail');
+        ->assertSee('Importer / Exporter');
 });
 
 it('renders CompanyResource list page with English labels when locale is en', function (): void {
@@ -38,5 +38,5 @@ it('renders CompanyResource list page with English labels when locale is en', fu
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->assertSee('Companies')
-        ->assertSee('Workspace');
+        ->assertSee('Import / Export');
 });
