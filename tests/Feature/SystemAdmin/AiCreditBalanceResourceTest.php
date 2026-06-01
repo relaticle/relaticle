@@ -52,6 +52,7 @@ it('filters by expired period', function (): void {
     AiCreditBalance::query()->where('team_id', $team1->getKey())->delete();
     $expired = AiCreditBalance::factory()->create([
         'team_id' => $team1->getKey(),
+        'period_starts_at' => now()->subMonth(),
         'period_ends_at' => now()->subDay(),
     ]);
     AiCreditBalance::query()->where('team_id', $team2->getKey())->delete();
