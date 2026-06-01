@@ -18,7 +18,7 @@
         <div class="mcp-el mcp-tool mcp-tool-1 flex items-center gap-2 text-micro">
             <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
             <span class="font-medium text-gray-600 dark:text-gray-300">Searching tasks…</span>
-            <span class="text-emerald-600 dark:text-emerald-400 font-medium">done</span>
+            <span class="mcp-el mcp-tool-done text-emerald-600 dark:text-emerald-400 font-medium">done</span>
         </div>
 
         <div class="mcp-el mcp-text mcp-text-1 mt-2 leading-relaxed text-gray-700 dark:text-gray-200">
@@ -32,35 +32,35 @@
          ghost through before exchange 1 begins. --}}
     <div class="mcp-el mcp-tasks-table max-w-[85%] overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div class="divide-y divide-gray-100 dark:divide-gray-700">
-            <div class="mcp-el mcp-task-card mcp-task-1 flex items-center justify-between px-3 py-2.5">
-                <div class="flex items-center gap-2.5">
+            <div class="mcp-el mcp-task-card mcp-task-1 flex items-center justify-between gap-3 px-3 py-2.5">
+                <div class="flex items-center gap-2.5 min-w-0">
                     <x-heroicon-o-stop-circle class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0"/>
                     <div>
                         <div class="text-sm font-medium text-gray-900 dark:text-white">Call Sarah Chen</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due yesterday · Kovra Systems</div>
                     </div>
                 </div>
-                <span class="text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
+                <span class="shrink-0 text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
             </div>
-            <div class="mcp-el mcp-task-card mcp-task-2 flex items-center justify-between px-3 py-2.5">
-                <div class="flex items-center gap-2.5">
+            <div class="mcp-el mcp-task-card mcp-task-2 flex items-center justify-between gap-3 px-3 py-2.5">
+                <div class="flex items-center gap-2.5 min-w-0">
                     <x-heroicon-o-stop-circle class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0"/>
                     <div>
                         <div class="text-sm font-medium text-gray-900 dark:text-white">Send proposal to Trellis Labs</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due 2 days ago · Trellis Labs</div>
                     </div>
                 </div>
-                <span class="text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
+                <span class="shrink-0 text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
             </div>
-            <div class="mcp-el mcp-task-card mcp-task-3 flex items-center justify-between px-3 py-2.5">
-                <div class="flex items-center gap-2.5">
+            <div class="mcp-el mcp-task-card mcp-task-3 flex items-center justify-between gap-3 px-3 py-2.5">
+                <div class="flex items-center gap-2.5 min-w-0">
                     <x-heroicon-o-stop-circle class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0"/>
                     <div>
                         <div class="text-sm font-medium text-gray-900 dark:text-white">Schedule demo with Kovra Systems</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due 3 days ago · Kovra Systems</div>
                     </div>
                 </div>
-                <span class="text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
+                <span class="shrink-0 text-pico font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue</span>
             </div>
         </div>
     </div>
@@ -94,15 +94,27 @@
                 <span class="text-gray-900 dark:text-white">Call Sarah Chen · Send proposal · Schedule demo</span>
             </div>
         </div>
-        <div class="mt-3 flex items-center gap-2">
-            <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white">
-                <x-heroicon-o-check class="w-3.5 h-3.5"/>
-                Approve
-            </button>
-            <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white">
-                <x-heroicon-o-x-mark class="w-3.5 h-3.5"/>
-                Reject
-            </button>
+        {{-- Grid-stack the pending buttons and the confirmed state in one cell
+             so the row sizes to whichever is taller (the confirmation can wrap
+             on narrow widths) and the two cross-fade without overlap. --}}
+        <div class="mt-3 grid">
+            <div class="mcp-approve-actions col-start-1 row-start-1 flex items-center gap-2">
+                <button id="hero-approve-btn" type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white">
+                    <x-heroicon-o-check class="w-3.5 h-3.5"/>
+                    Approve
+                </button>
+                <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white">
+                    <x-heroicon-o-x-mark class="w-3.5 h-3.5"/>
+                    Reject
+                </button>
+            </div>
+            {{-- Confirmed state — cross-fades in over the buttons once the
+                 approval resolves, so the safe-approval flow reads end-to-end
+                 instead of leaving a pending card behind. --}}
+            <div class="mcp-el mcp-approve-done col-start-1 row-start-1 flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+                <x-heroicon-o-check-circle class="w-4 h-4 shrink-0"/>
+                <span>Approved · 3 tasks marked complete</span>
+            </div>
         </div>
     </div>
 </div>
@@ -121,7 +133,7 @@
         <div class="mcp-el mcp-tool mcp-tool-3 flex items-center gap-2 text-micro">
             <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
             <span class="font-medium text-gray-600 dark:text-gray-300">Creating contact…</span>
-            <span class="text-emerald-600 dark:text-emerald-400 font-medium">done</span>
+            <span class="mcp-el mcp-tool-done text-emerald-600 dark:text-emerald-400 font-medium">done</span>
         </div>
 
         <div class="mcp-el mcp-text mcp-text-3 mt-2 leading-relaxed text-gray-700 dark:text-gray-200">

@@ -374,16 +374,23 @@ describe('Hero AI tab — animation timeline', function () {
         expect($body)->not->toContain('translateX(-6px)');
     });
 
-    it('schedules scroll-into-view 100ms before the following user message', function () {
+    it('reveals new messages at the bottom so earlier ones stay visible', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // After the entry-phase rewrite, ex2 and ex3 type-start moments are
-        // computed at runtime relative to conversationStart, but the
-        // scroll-lead offset is the same constant in both call sites.
-        expect($body)->toContain('typeStart2 - 100');
-        expect($body)->toContain('typeStart3 - 100');
+        // Real-chat scroll: the view follows each newly revealed message/card
+        // down to the bottom (scrollToShow only scrolls down), so the previous
+        // exchange stays on screen instead of being yanked to the top before
+        // the next message has even appeared.
+        expect($body)
+            ->toContain('scrollToShow')
+            ->toContain("scrollToShow('.mcp-user-2')")
+            ->toContain("scrollToShow('.mcp-user-3')")
+            ->toContain("scrollToShow('.mcp-action-card')")
+            ->not->toContain('scrollMessageIntoView')
+            ->not->toContain('typeStart2 - 100')
+            ->not->toContain('typeStart3 - 100');
     });
 
     it('animates the 3 task rows as a single staggered group with 120ms spacing', function () {

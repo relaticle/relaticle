@@ -116,8 +116,10 @@
                             </div>
                         </div>
 
-                        {{-- Tab panels — grid stacking for Safari-smooth crossfade --}}
-                        <div class="relative grid overflow-hidden">
+                        {{-- Tab panels — grid stacking for Safari-smooth crossfade.
+                             min-height matches the live chat panel so switching to a
+                             shorter (16:10) image tab can't collapse the mockup frame. --}}
+                        <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
                             {{-- AI Agent tab (default — featured) --}}
                             <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1">
                                 @include('home.partials.hero-agent-preview')
