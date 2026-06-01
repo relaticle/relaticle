@@ -13,7 +13,7 @@
         {{-- Greeting --}}
         <div class="text-center">
             <h2 class="mcp-el mcp-entry-greeting text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                Good morning, Sarah.
+                Good morning, Marcus.
             </h2>
 
             <div class="mcp-el mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400">

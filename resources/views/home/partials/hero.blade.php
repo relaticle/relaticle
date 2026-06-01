@@ -100,9 +100,9 @@
                     <div class="hidden md:block absolute -top-[110px] right-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
                     <div class="absolute -inset-3 rounded-3xl bg-gradient-to-b from-black/[0.03] via-black/[0.015] to-transparent dark:from-white/[0.04] dark:via-white/[0.02] dark:to-transparent blur-xl pointer-events-none" aria-hidden="true"></div>
                     <div class="absolute -inset-[3px] rounded-[18px] bg-gradient-to-b from-gray-300/40 via-gray-200/20 to-gray-100/5 dark:from-white/[0.07] dark:via-white/[0.03] dark:to-transparent blur-[3px] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-px rounded-2xl bg-gradient-to-b from-gray-300/50 via-gray-200/30 to-gray-200/10 dark:from-white/[0.12] dark:via-white/[0.06] dark:to-white/[0.02] pointer-events-none" aria-hidden="true"></div>
+                    <div class="absolute -inset-0.5 rounded-[18px] bg-gradient-to-b from-gray-300/50 via-gray-200/30 to-gray-200/10 dark:from-white/[0.12] dark:via-white/[0.06] dark:to-white/[0.02] pointer-events-none" aria-hidden="true"></div>
 
-                    <div class="relative rounded-2xl overflow-hidden bg-white dark:bg-neutral-950 transform-gpu hover:[transform:rotateX(1deg)] transition-transform duration-700 ease-out">
+                    <div class="relative rounded-2xl overflow-hidden border-[3px] border-gray-300/70 bg-white dark:border-white/[0.12] dark:bg-neutral-950 transform-gpu hover:[transform:rotateX(1deg)] transition-transform duration-700 ease-out">
 
                         {{-- Browser chrome --}}
                         <div class="bg-gray-50 dark:bg-neutral-900 border-b border-gray-200/60 dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between">

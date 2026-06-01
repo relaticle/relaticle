@@ -231,19 +231,22 @@ describe('Hero AI tab — app shell', function () {
         $response->assertSee('Notes');
     });
 
-    it('marks the active chat conversation in the Chats group', function () {
+    it('marks Home as the active navigation item', function () {
         $response = $this->get('/');
 
         $response->assertStatus(200);
-        $response->assertSee('hero-shell-chat-active', false);
+        $response->assertSee('hero-shell-nav-home', false);
         $response->assertSee('Chats');
     });
 
-    it('renders the conversation title with the chat name', function () {
+    it('renders recent conversation examples and the All chats trigger', function () {
         $response = $this->get('/');
 
         $response->assertStatus(200);
         $response->assertSee('Overdue tasks this week');
+        $response->assertSee('Add Sarah Chen to Kovra Systems');
+        $response->assertSee('Follow up with Trellis Labs');
+        $response->assertSee('All chats');
     });
 
     it('renders the composer with model picker and send button affordance', function () {
@@ -415,7 +418,7 @@ describe('Hero AI tab — entry phase', function () {
         // greeting: large semibold heading + recent-chat link beneath.
         // assertSee defaults to escape=true; apostrophes are not HTML-escaped
         // in plain text bodies, so we pass false to compare literally.
-        $response->assertSee('Good morning, Sarah.');
+        $response->assertSee('Good morning, Marcus.');
         $response->assertSee("This week's pipeline review", false);
     });
 
