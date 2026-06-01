@@ -18,17 +18,19 @@ it('does not push two user messages when sendMessage is called twice in the same
 
     $userCount = (int) $page->script(<<<'JS'
         (async () => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            const data = Alpine.$data(visible);
-            data.input = 'race test';
+            const host = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'))
+                .find((el) => el.offsetParent !== null);
+            const data = Alpine.$data(host);
+
+            // sendMessage() reads the composer via localEditor().getText().
+            data.localEditor().setText('race test');
 
             // Stub fetch so the test never hits the real /chat endpoint, but keep
-            // sendMessage's flow up through the await on subscribeToConversation.
+            // sendMessage's flow up through the await on conversation creation.
             window.fetch = () => new Promise(() => {});
 
-            const a = data.sendMessage();
-            const b = data.sendMessage();
+            data.sendMessage();
+            data.sendMessage();
 
             await Promise.resolve();
             await new Promise((r) => setTimeout(r, 50));

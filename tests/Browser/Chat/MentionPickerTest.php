@@ -5,7 +5,37 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\User;
 
-it('opens a picker when @ is typed and inserts a token on selection', function (): void {
+/**
+ * Mentions are powered by a TipTap suggestion plugin (chat-mention-suggestion.js):
+ * typing "@" + >=2 chars renders a popup (role="listbox", aria-label
+ * "Mention suggestions") appended to <body>, each result is a
+ * button[role="option"], and picking one inserts an atomic mention chip
+ * (span[data-mention-id]) into the contenteditable composer.
+ *
+ * These tests drive the real editor with keystrokes rather than poking Alpine
+ * internals, because the suggestion only fires from genuine ProseMirror input.
+ */
+
+/** Selector for the visible conversation composer's contenteditable surface. */
+const EDITOR = '[data-chat-context="conversation"] [contenteditable="true"]';
+
+/** Poll until the mention popup renders at least one option, returning its labels. */
+const WAIT_FOR_OPTIONS = <<<'JS'
+    (async () => {
+        const start = Date.now();
+        while (Date.now() - start < 5000) {
+            const popup = document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
+            const options = popup ? popup.querySelectorAll('button[role="option"]') : [];
+            if (options.length > 0) {
+                return Array.from(options).map((o) => o.textContent.trim());
+            }
+            await new Promise((r) => setTimeout(r, 50));
+        }
+        return [];
+    })()
+JS;
+
+it('opens a picker when @ is typed and inserts a chip on selection', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
@@ -18,150 +48,38 @@ it('opens a picker when @ is typed and inserts a token on selection', function (
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            data.input = '@ac';
-            const ta = visible.querySelector('#chat-message-input');
-            ta.value = '@ac';
-            ta.focus();
-            ta.setSelectionRange(3, 3);
-            data.detectMentionTrigger(ta);
-            return true;
-        })();
-    JS);
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);
 
-    $resultsCount = $page->script(<<<'JS'
+    $label = $page->script(<<<'JS'
         (async () => {
-            const data = Alpine.$data(window.__mentionHost);
             const start = Date.now();
-            while (data.mention.results.length === 0 && Date.now() - start < 5000) {
+            let option = null;
+            while (Date.now() - start < 5000) {
+                const popup = document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
+                option = popup?.querySelector('button[role="option"]');
+                if (option) break;
                 await new Promise((r) => setTimeout(r, 50));
             }
-            return data.mention.results.length;
+            if (! option) return null;
+            const text = option.textContent.trim();
+            option.click();
+            return text;
         })();
     JS);
 
-    expect($resultsCount)->toBeGreaterThan(0);
+    expect($label)->toContain('AcmeQA');
 
-    $page->script(<<<'JS'
+    $chip = $page->script(<<<'JS'
         (() => {
-            const data = Alpine.$data(window.__mentionHost);
-            data.selectMention(data.mention.results[0]);
-            return true;
+            const node = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"] span[data-mention-id]');
+            return node ? node.textContent.trim() : null;
         })();
     JS);
 
-    $value = $page->script(<<<'JS'
-        (() => Alpine.$data(window.__mentionHost).input)();
-    JS);
-
-    expect($value)->toContain('@AcmeQA ');
-
-    $isOpen = $page->script(<<<'JS'
-        (() => Alpine.$data(window.__mentionHost).mention.open)();
-    JS);
-
-    expect($isOpen)->toBeFalse();
-});
-
-it('closes the picker via closeMention', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'EscapeCo']);
-
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats");
-
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            data.input = '@es';
-            const ta = visible.querySelector('#chat-message-input');
-            ta.value = '@es';
-            ta.focus();
-            ta.setSelectionRange(3, 3);
-            data.detectMentionTrigger(ta);
-            return true;
-        })();
-    JS);
-
-    $resultsCount = $page->script(<<<'JS'
-        (async () => {
-            const data = Alpine.$data(window.__mentionHost);
-            const start = Date.now();
-            while (data.mention.results.length === 0 && Date.now() - start < 5000) {
-                await new Promise((r) => setTimeout(r, 50));
-            }
-            return data.mention.results.length;
-        })();
-    JS);
-
-    expect($resultsCount)->toBeGreaterThan(0);
-
-    $page->script(<<<'JS'
-        (() => {
-            Alpine.$data(window.__mentionHost).closeMention();
-            return true;
-        })();
-    JS);
-
-    $isOpen = $page->script(<<<'JS'
-        (() => Alpine.$data(window.__mentionHost).mention.open)();
-    JS);
-
-    expect($isOpen)->toBeFalse();
+    expect($chip)->toContain('@AcmeQA');
 });
 
 it('does not open the picker for queries shorter than 2 chars', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats");
-
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            data.input = '@a';
-            const ta = visible.querySelector('#chat-message-input');
-            ta.value = '@a';
-            ta.focus();
-            ta.setSelectionRange(2, 2);
-            data.detectMentionTrigger(ta);
-            return true;
-        })();
-    JS);
-
-    $state = $page->script(<<<'JS'
-        (() => {
-            const m = Alpine.$data(window.__mentionHost).mention;
-            return { open: m.open, results: m.results.length };
-        })();
-    JS);
-
-    expect($state['open'])->toBeTrue();
-    expect($state['results'])->toBe(0);
-});
-
-it('aborts the in-flight fetch when the query drops below the 2-char minimum', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
@@ -171,45 +89,83 @@ it('aborts the in-flight fetch when the query drops below the 2-char minimum', f
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats");
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
 
-    // Simulate: user types @ac (triggers fetch), then backspaces to @a (should abort)
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            const ta = visible.querySelector('#chat-message-input');
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'a']);
 
-            data.input = '@ac';
-            ta.value = '@ac';
-            ta.focus();
-            ta.setSelectionRange(3, 3);
-            data.detectMentionTrigger(ta);
-
-            // Immediately backspace to @a before fetch resolves
-            data.input = '@a';
-            ta.value = '@a';
-            ta.setSelectionRange(2, 2);
-            data.detectMentionTrigger(ta);
-            return true;
+    $popupVisible = $page->script(<<<'JS'
+        (async () => {
+            await new Promise((r) => setTimeout(r, 400));
+            return !! document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
         })();
     JS);
 
-    // Wait long enough for any pending fetch to have completed
-    $page->script(<<<'JS'
-        (() => new Promise((resolve) => setTimeout(resolve, 500)))();
-    JS);
-
-    $resultsLength = $page->script(<<<'JS'
-        (() => Alpine.$data(window.__mentionHost).mention.results.length)();
-    JS);
-
-    expect($resultsLength)->toBe(0);
+    expect($popupVisible)->toBeFalse();
 });
 
-it('searches for a multi-word company name', function (): void {
+it('closes the picker when Escape is pressed', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    Company::factory()->for($team)->create(['name' => 'EscapeCo']);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'E', 's']);
+
+    $opened = $page->script(WAIT_FOR_OPTIONS);
+    expect($opened)->not->toBeEmpty();
+
+    $page->keys(EDITOR, ['Escape']);
+
+    $stillOpen = $page->script(<<<'JS'
+        (async () => {
+            await new Promise((r) => setTimeout(r, 200));
+            return !! document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
+        })();
+    JS);
+
+    expect($stillOpen)->toBeFalse();
+});
+
+it('closes the picker when the query drops below the 2-char minimum', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    Company::factory()->for($team)->create(['name' => 'AcmeQA']);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);
+
+    $opened = $page->script(WAIT_FOR_OPTIONS);
+    expect($opened)->not->toBeEmpty();
+
+    // Backspace back down to "@A" (one char) — the suggestion must close.
+    $page->keys(EDITOR, ['Backspace']);
+
+    $stillOpen = $page->script(<<<'JS'
+        (async () => {
+            await new Promise((r) => setTimeout(r, 300));
+            return !! document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
+        })();
+    JS);
+
+    expect($stillOpen)->toBeFalse();
+});
+
+it('searches across a multi-word company name', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'Acme Corp']);
@@ -220,40 +176,19 @@ it('searches for a multi-word company name', function (): void {
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats");
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
 
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            data.input = '@Acme C';
-            const ta = visible.querySelector('#chat-message-input');
-            ta.value = '@Acme C';
-            ta.focus();
-            ta.setSelectionRange(7, 7);
-            data.detectMentionTrigger(ta);
-            return true;
-        })();
-    JS);
+    // allowSpaces is enabled, so "@Acme C" stays a single mention query.
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c', 'm', 'e', ' ', 'C']);
 
-    $resultsCount = $page->script(<<<'JS'
-        (async () => {
-            const data = Alpine.$data(window.__mentionHost);
-            const start = Date.now();
-            while (data.mention.results.length === 0 && Date.now() - start < 5000) {
-                await new Promise((r) => setTimeout(r, 50));
-            }
-            return data.mention.results.map((r) => r.label);
-        })();
-    JS);
+    $labels = $page->script(WAIT_FOR_OPTIONS);
 
-    expect($resultsCount)->toContain('Acme Corp');
-    expect($resultsCount)->not->toContain('Globex');
+    expect(implode('|', $labels))->toContain('Acme Corp');
+    expect(implode('|', $labels))->not->toContain('Globex');
 });
 
-it('removes a selected mention via chip × button', function (): void {
+it('removes a selected mention chip with backspace', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
@@ -263,44 +198,44 @@ it('removes a selected mention via chip × button', function (): void {
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats");
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
 
-    $page->script(<<<'JS'
-        (() => {
-            const candidates = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
-            window.__mentionHost = visible;
-            const data = Alpine.$data(visible);
-            data.input = '@ac';
-            const ta = visible.querySelector('#chat-message-input');
-            ta.value = '@ac';
-            ta.focus();
-            ta.setSelectionRange(3, 3);
-            data.detectMentionTrigger(ta);
-            return true;
-        })();
-    JS);
+    $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);
 
-    $page->script('(() => new Promise(r => setTimeout(r, 500)))();');
-
-    $page->script(<<<'JS'
-        (() => {
-            const data = Alpine.$data(window.__mentionHost);
-            if (data.mention.results.length > 0) {
-                data.selectMention(data.mention.results[0]);
+    $chipCount = $page->script(<<<'JS'
+        (async () => {
+            const start = Date.now();
+            let option = null;
+            while (Date.now() - start < 5000) {
+                const popup = document.querySelector('[role="listbox"][aria-label="Mention suggestions"]');
+                option = popup?.querySelector('button[role="option"]');
+                if (option) break;
+                await new Promise((r) => setTimeout(r, 50));
             }
-            return true;
+            if (! option) return -1;
+            option.click();
+            await new Promise((r) => setTimeout(r, 100));
+            return document.querySelectorAll('[data-chat-context="conversation"] [contenteditable="true"] span[data-mention-id]').length;
         })();
     JS);
 
-    $countBefore = $page->script('(() => Alpine.$data(window.__mentionHost).selectedMentions.length)();');
-    expect($countBefore)->toBe(1);
+    expect($chipCount)->toBe(1);
 
-    $page->click('button[data-mention-remove]');
+    // A trailing space follows the inserted chip; two backspaces remove the
+    // space then the whole chip atomically (no per-character "@AcmeQ" residue).
+    $page->keys(EDITOR, ['Backspace', 'Backspace']);
 
-    $countAfter = $page->script('(() => Alpine.$data(window.__mentionHost).selectedMentions.length)();');
-    expect($countAfter)->toBe(0);
+    $after = $page->script(<<<'JS'
+        (() => {
+            const editor = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]');
+            return {
+                chips: editor.querySelectorAll('span[data-mention-id]').length,
+                text: editor.textContent,
+            };
+        })();
+    JS);
 
-    $inputAfter = $page->script('(() => Alpine.$data(window.__mentionHost).input)();');
-    expect($inputAfter)->not->toContain('@AcmeQA');
+    expect($after['chips'])->toBe(0);
+    expect($after['text'])->not->toContain('Acme');
 });
