@@ -114,7 +114,7 @@
             // Reset only the entry (dashboard) layer so it can replay its intro,
             // without disturbing a conversation that may still be on screen.
             resetEntryOnly() {
-                this.$root.querySelectorAll('.mcp-entry-greeting, .mcp-entry-recent, .mcp-entry-composer, .mcp-entry-chips').forEach(function(el) {
+                this.$root.querySelectorAll('.mcp-entry-greeting, .mcp-entry-recent, .mcp-entry-composer, .mcp-entry-chips, .mcp-entry-tasks').forEach(function(el) {
                     el.style.opacity = '0';
                     el.style.transform = '';
                 });
@@ -351,6 +351,7 @@
                 animate(root.querySelector('.mcp-entry-recent'),    { opacity: [0, 1] }, { duration: 0.4, delay: 0.18, ease: ease });
                 animate(root.querySelector('.mcp-entry-composer'),  { opacity: [0, 1], transform: ['translateY(12px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.22, ease: ease });
                 animate(root.querySelector('.mcp-entry-chips'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.32, ease: ease });
+                animate(root.querySelector('.mcp-entry-tasks'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.42, ease: ease });
 
                 // Loop restart: the entry curtain (above) has now faded in over
                 // the previous conversation. Clear that conversation underneath

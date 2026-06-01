@@ -60,5 +60,29 @@
                 Add a new contact
             </span>
         </div>
+
+        {{-- My Tasks (empty state) — mirrors chat::filament.pages.partials.my-tasks,
+             which the real dashboard renders below the composer. Presentational only;
+             the whole preview is non-interactive. --}}
+        <div class="mcp-el mcp-entry-tasks mt-10 text-start">
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    <span>Tasks</span>
+                    <span class="text-gray-400 dark:text-gray-500">0</span>
+                </h3>
+                <span class="text-xs text-gray-500 dark:text-gray-400">View all</span>
+            </div>
+
+            <div class="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center dark:border-gray-700 dark:bg-gray-800">
+                <p class="text-sm font-medium text-gray-900 dark:text-white">Stay on top of work</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Create tasks for yourself or your team to track next steps</p>
+                <div class="mt-4 flex justify-center">
+                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white">
+                        <x-heroicon-o-plus class="h-3.5 w-3.5"/>
+                        New task
+                    </span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

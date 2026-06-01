@@ -244,8 +244,8 @@ describe('Hero AI tab — app shell', function () {
 
         $response->assertStatus(200);
         $response->assertSee('Overdue tasks this week');
-        $response->assertSee('Add Sarah Chen to Kovra Systems');
-        $response->assertSee('Follow up with Trellis Labs');
+        $response->assertSee('Follow up with Priya Nair');
+        $response->assertSee('Renewal prep — Daniel Okafor', false);
         $response->assertSee('All chats');
     });
 
@@ -429,6 +429,15 @@ describe('Hero AI tab — entry phase', function () {
         $response->assertSee("What's overdue this week?", false);
         $response->assertSee("Show this week's pipeline", false);
         $response->assertSee('Add a new contact');
+    });
+
+    it('renders the empty My Tasks section mirroring the dashboard', function () {
+        $response = $this->get('/');
+        $response->assertSuccessful();
+
+        $response->assertSee(__('filament/pages/dashboard.tasks.empty.title'));
+        $response->assertSee(__('filament/pages/dashboard.tasks.empty.description'));
+        $response->assertSee(__('filament/pages/dashboard.tasks.view_all'));
     });
 
     it('renders a second composer scoped with entry IDs', function () {

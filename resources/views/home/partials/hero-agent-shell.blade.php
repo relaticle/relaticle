@@ -78,8 +78,8 @@
             @foreach ([
                 'Overdue tasks this week',
                 "This week's pipeline review",
-                'Add Sarah Chen to Kovra Systems',
-                'Follow up with Trellis Labs',
+                'Follow up with Priya Nair',
+                'Renewal prep — Daniel Okafor',
             ] as $heroChatTitle)
                 <div class="flex items-center gap-2 rounded-md px-2 py-1.5 text-gray-700 dark:text-gray-300">
                     <x-heroicon-o-chat-bubble-left class="w-4 h-4 shrink-0"/>
