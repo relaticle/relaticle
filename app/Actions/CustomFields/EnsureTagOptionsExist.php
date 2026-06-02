@@ -4,28 +4,28 @@ declare(strict_types=1);
 
 namespace App\Actions\CustomFields;
 
-use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 
 /**
- * Promote newly-seen tags-input values into the field's CustomFieldOption list.
+ * Promote newly-seen values into a field's user-managed option list.
  *
- * Gated strictly to the `tags-input` field type — email/phone are also arbitrary
- * multi-choice fields but must NOT grow an option list.
+ * Gated to field types that accept arbitrary values AND own an option list
+ * (tags-input). Email/phone/link also accept arbitrary values but own no
+ * option list, so they are excluded — see CustomField::promotesValuesToOptions().
  */
 final readonly class EnsureTagOptionsExist
 {
     public function handle(CustomField $field, mixed $values): void
     {
-        if ($field->type !== CustomFieldType::TAGS_INPUT->value) {
+        if (! $field->promotesValuesToOptions()) {
             return;
         }
 
         $candidates = collect($values instanceof Collection ? $values->all() : (array) $values)
-            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
-            ->map(fn (string $value): string => trim($value))
+            ->map(fn (mixed $value): string => is_string($value) ? trim($value) : '')
+            ->filter(fn (string $value): bool => $value !== '')
             ->unique()
             ->values();
 
@@ -35,16 +35,15 @@ final readonly class EnsureTagOptionsExist
 
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
+        $options = $field->options()->withoutGlobalScopes()->get(['name', 'sort_order']);
+
         /** @var array<string, true> $existing */
-        $existing = $field->options()
-            ->withoutGlobalScopes()
+        $existing = $options
             ->pluck('name')
             ->mapWithKeys(fn (?string $name): array => [mb_strtolower(trim((string) $name)) => true])
             ->all();
 
-        $sortOrder = (int) $field->options()
-            ->withoutGlobalScopes()
-            ->max('sort_order');
+        $sortOrder = (int) $options->max('sort_order');
 
         foreach ($candidates as $value) {
             $key = mb_strtolower($value);

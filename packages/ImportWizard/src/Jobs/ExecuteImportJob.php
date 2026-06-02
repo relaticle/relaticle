@@ -6,7 +6,6 @@ namespace Relaticle\ImportWizard\Jobs;
 
 use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
-use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use Carbon\Carbon;
@@ -357,7 +356,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
             }
 
-            if ($cf->type === CustomFieldType::TAGS_INPUT->value && is_array($safeValue)) {
+            if ($cf->promotesValuesToOptions() && is_array($safeValue)) {
                 $this->accumulateTagOptions($cf, $safeValue);
             }
 
