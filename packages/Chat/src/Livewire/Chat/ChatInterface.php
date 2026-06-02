@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Actions\ListConversationMessages;
 
 final class ChatInterface extends BaseLivewireComponent
@@ -81,6 +82,37 @@ final class ChatInterface extends BaseLivewireComponent
         $this->hasMoreMessages = count($earlier) === self::PAGE_SIZE;
 
         $this->dispatch('chat:messages-prepended', messages: $earlier, hasMore: $this->hasMoreMessages);
+    }
+
+    /**
+     * Authoritative latest assistant message for the conversation, used by the
+     * client to reconcile the streamed bubble against persisted state on stream_end.
+     *
+     * @return array{id: string, content: string}|null
+     */
+    public function latestAssistantMessage(): ?array
+    {
+        if ($this->conversationId === null) {
+            return null;
+        }
+
+        $user = $this->authUser();
+
+        $row = DB::table('agent_conversation_messages as m')
+            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
+            ->where('m.conversation_id', $this->conversationId)
+            ->where('m.user_id', $user->getKey())
+            ->where('c.team_id', $user->current_team_id)
+            ->where('m.role', 'assistant')
+            ->latest('m.created_at')
+            ->orderByDesc('m.id')
+            ->first(['m.id', 'm.content']);
+
+        if ($row === null) {
+            return null;
+        }
+
+        return ['id' => (string) $row->id, 'content' => (string) $row->content];
     }
 
     public function render(): View

@@ -15,9 +15,12 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\BaseWriteUpdateTool;
+use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
 final class UpdateTaskTool extends BaseWriteUpdateTool
 {
+    use NormalizesToolInput;
+
     public function description(): string
     {
         return 'Propose updating an existing task. Returns a proposal for user approval.';
@@ -67,7 +70,7 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
                 continue;
             }
 
-            $data[$key] = $this->idArray($request, $key);
+            $data[$key] = $this->idListOrNull($request, $key);
         }
 
         return array_filter($data, static fn (mixed $v): bool => $v !== null);
@@ -85,22 +88,22 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
             $fields[] = ['label' => 'Title', 'old' => $model->getAttribute('title'), 'new' => $payload['title']];
         }
 
-        $peopleIds = $this->idArray($request, 'people_ids');
+        $peopleIds = $this->idListOrNull($request, 'people_ids');
         if ($peopleIds !== null) {
             $fields[] = ['label' => 'Linked people', 'value' => $this->namesForIds($peopleIds, People::class, 'name', $team)];
         }
 
-        $companyIds = $this->idArray($request, 'company_ids');
+        $companyIds = $this->idListOrNull($request, 'company_ids');
         if ($companyIds !== null) {
             $fields[] = ['label' => 'Linked companies', 'value' => $this->namesForIds($companyIds, Company::class, 'name', $team)];
         }
 
-        $opportunityIds = $this->idArray($request, 'opportunity_ids');
+        $opportunityIds = $this->idListOrNull($request, 'opportunity_ids');
         if ($opportunityIds !== null) {
             $fields[] = ['label' => 'Linked opportunities', 'value' => $this->namesForIds($opportunityIds, Opportunity::class, 'name', $team)];
         }
 
-        $assigneeIds = $this->idArray($request, 'assignee_ids');
+        $assigneeIds = $this->idListOrNull($request, 'assignee_ids');
         if ($assigneeIds !== null) {
             $fields[] = ['label' => 'Assignees', 'value' => $this->namesForIds($assigneeIds, User::class, 'name', null)];
         }
@@ -110,33 +113,6 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
             'summary' => "Update task \"{$model->getAttribute('title')}\"",
             'fields' => $fields,
         ];
-    }
-
-    /**
-     * Returns the array of IDs (possibly empty) when the field is present and an array,
-     * or null when the field is absent / not an array (meaning "no change").
-     *
-     * @return list<string>|null
-     */
-    private function idArray(Request $request, string $key): ?array
-    {
-        if (! array_key_exists($key, $request->all())) {
-            return null;
-        }
-
-        $value = $request[$key];
-        if (! is_array($value)) {
-            return null;
-        }
-
-        $clean = [];
-        foreach ($value as $id) {
-            if (is_string($id) && $id !== '') {
-                $clean[] = $id;
-            }
-        }
-
-        return $clean;
     }
 
     /**

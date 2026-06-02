@@ -74,12 +74,12 @@ it('reserve + settle + refund cycles move credits_used in lockstep with the chat
         model: 'claude-opus-4-7',
         inputTokens: 100,
         outputTokens: 200,
-        idempotencyKey: 'turn-success',
+        resolutionKey: 'turn-success',
     );
 
     // Failed turn: reserve(1) + refund(-1) = net 0 to used.
     $service->reserveCredit($team);
-    $service->refundReservation($team, idempotencyToken: 'turn-failed');
+    $service->refundReservation($team, resolutionKey: 'turn-failed');
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
     expect($balance->credits_used)->toBe(3)

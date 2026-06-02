@@ -10,10 +10,13 @@ use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseReadListTool implements Tool
 {
+    use NormalizesToolInput;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -78,7 +81,7 @@ abstract class BaseReadListTool implements Tool
     {
         $input = [];
 
-        $nativeFilters = array_filter(array_merge(
+        $nativeFilters = $this->dropNull(array_merge(
             [$this->searchFilterName() => $request['search'] ?? null],
             $this->additionalFilters($request),
         ));

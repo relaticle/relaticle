@@ -115,6 +115,22 @@ it('UpdateNoteTool can resync linked people via people_ids', function (): void {
         ->toContain((string) $alice->id);
 });
 
+it('coerces a scalar people id into a single-element list on note update', function (): void {
+    $note = Note::factory()->for($this->team)->create(['title' => 'Note']);
+    $person = People::factory()->for($this->team)->create(['name' => 'Jane']);
+
+    $tool = new UpdateNoteTool;
+
+    $request = new Request([
+        'id' => (string) $note->id,
+        'people_ids' => (string) $person->id,
+    ]);
+
+    $data = (fn (): array => $this->extractActionData($request))->call($tool);
+
+    expect($data['people_ids'] ?? null)->toBe([(string) $person->id]);
+});
+
 it('UpdateOpportunityTool proposes a name change and approval persists it', function (): void {
     $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Old deal']);
 

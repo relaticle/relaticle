@@ -14,7 +14,7 @@ it('writes a Refund transaction row when refundReservation is called', function 
     $service = app(CreditService::class);
 
     $service->reserveCredit($team);
-    $service->refundReservation($team, idempotencyToken: 'job-abc');
+    $service->refundReservation($team, resolutionKey: 'job-abc');
 
     $refund = AiCreditTransaction::query()
         ->where('team_id', $team->getKey())
@@ -23,7 +23,8 @@ it('writes a Refund transaction row when refundReservation is called', function 
 
     expect($refund)->not->toBeNull()
         ->and($refund->credits_charged)->toBe(1)
-        ->and($refund->metadata['idempotency_token'])->toBe('job-abc');
+        ->and($refund->idempotency_key)->toBe('job-abc')
+        ->and($refund->metadata['reason'])->toBe('reservation_refund');
 });
 
 it('refund is idempotent on the ledger — second call writes no extra row', function (): void {
@@ -32,8 +33,8 @@ it('refund is idempotent on the ledger — second call writes no extra row', fun
     $service = app(CreditService::class);
 
     $service->reserveCredit($team);
-    $service->refundReservation($team, idempotencyToken: 'job-xyz');
-    $service->refundReservation($team, idempotencyToken: 'job-xyz');
+    $service->refundReservation($team, resolutionKey: 'job-xyz');
+    $service->refundReservation($team, resolutionKey: 'job-xyz');
 
     expect(
         AiCreditTransaction::query()
@@ -50,7 +51,7 @@ it('balance and ledger stay consistent after a reserve + refund cycle', function
     $startBalance = (int) AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining');
 
     $service->reserveCredit($team);
-    $service->refundReservation($team, idempotencyToken: 'job-1');
+    $service->refundReservation($team, resolutionKey: 'job-1');
 
     $endBalance = (int) AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining');
     expect($endBalance)->toBe($startBalance);

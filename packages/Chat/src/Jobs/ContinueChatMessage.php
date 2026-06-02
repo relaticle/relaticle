@@ -9,10 +9,10 @@ use App\Models\User;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
-use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -25,7 +25,7 @@ use Relaticle\Chat\Support\ChatTelemetry;
 use Throwable;
 
 #[Timeout(120)]
-#[Tries(1)]
+#[MaxExceptions(1)]
 final class ContinueChatMessage implements ShouldQueue
 {
     use Queueable;
@@ -35,8 +35,31 @@ final class ContinueChatMessage implements ShouldQueue
         public readonly Team $team,
         public readonly string $conversationId,
         public readonly string $prompt,
+        public readonly string $turnId = '',
     ) {
         $this->onQueue('chat');
+    }
+
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addMinutes(3);
+    }
+
+    /**
+     * One streaming turn per conversation at a time. A second turn (new send,
+     * continuation, or another tab) is released back to the queue and retried
+     * until retryUntil(); a real exception trips maxExceptions=1 and fails fast
+     * (no re-stream). Lock contention is not an exception, so it does not count.
+     *
+     * @return array<int, WithoutOverlapping>
+     */
+    public function middleware(): array
+    {
+        return [
+            new WithoutOverlapping($this->conversationId)
+                ->releaseAfter(5)
+                ->expireAfter(150),
+        ];
     }
 
     public function handle(CreditService $creditService, AiModelResolver $modelResolver): void
@@ -52,6 +75,10 @@ final class ContinueChatMessage implements ShouldQueue
 
         if (! $creditService->reserveCredit($this->team)) {
             ChatTelemetry::breadcrumb('continuation.credits_exhausted', []);
+            broadcast(new ChatStreamFailed(
+                conversationId: $this->conversationId,
+                message: "You're out of AI credits, so I can't continue here. Add credits to keep going — the change you approved was still saved.",
+            ));
             $this->releaseAuth();
 
             return;
@@ -65,7 +92,23 @@ final class ContinueChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
+        } catch (Throwable $e) {
+            $creditService->refundReservation(
+                $this->team,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+            ChatTelemetry::breadcrumb('continuation.pre_model_failed', ['exception' => $e->getMessage()]);
+            broadcast(new ChatStreamFailed(
+                conversationId: $this->conversationId,
+                message: 'The assistant could not continue. Please try again.',
+            ));
+            $this->releaseAuth();
 
+            return;
+        }
+
+        try {
             $response = $agent->stream(
                 prompt: $this->prompt,
                 provider: $resolved['provider'],
@@ -82,12 +125,6 @@ final class ContinueChatMessage implements ShouldQueue
                     conversationId: $streamedResponse->conversationId,
                 ));
 
-                Cache::add(
-                    "chat:refund-lock:{$this->team->getKey()}:{$this->settlementToken()}",
-                    '1',
-                    now()->addHour(),
-                );
-
                 $creditService->settleReservation(
                     team: $this->team,
                     user: $this->user,
@@ -97,7 +134,7 @@ final class ContinueChatMessage implements ShouldQueue
                     outputTokens: $streamedResponse->usage->completionTokens,
                     toolCallsCount: $streamedResponse->toolCalls->count(),
                     conversationId: $streamedResponse->conversationId,
-                    idempotencyKey: $streamedResponse->invocationId,
+                    resolutionKey: $this->resolutionKey(),
                 );
             });
         } finally {
@@ -107,9 +144,12 @@ final class ContinueChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(CreditService::class)->refundReservation(
-            $this->team,
-            idempotencyToken: $this->settlementToken(),
+        resolve(CreditService::class)->settleReservedMinimum(
+            team: $this->team,
+            user: $this->user,
+            conversationId: $this->conversationId,
+            resolutionKey: $this->resolutionKey(),
+            reason: 'continuation_failed',
         );
 
         ChatTelemetry::breadcrumb('continuation.failed', [
@@ -132,15 +172,8 @@ final class ContinueChatMessage implements ShouldQueue
         Auth::guard('web')->forgetUser();
     }
 
-    private function settlementToken(): string
+    private function resolutionKey(): string
     {
-        $payload = [
-            $this->conversationId,
-            (string) $this->user->getKey(),
-            (string) $this->team->getKey(),
-            $this->prompt,
-        ];
-
-        return $this->conversationId.':'.hash('xxh3', implode("\0", $payload));
+        return 'resolve-'.$this->turnId;
     }
 }

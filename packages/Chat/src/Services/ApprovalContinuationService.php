@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 
@@ -34,6 +35,7 @@ final readonly class ApprovalContinuationService
             team: $team,
             conversationId: (string) $pendingAction->conversation_id,
             prompt: $prompt,
+            turnId: (string) Str::ulid(),
         ));
     }
 

@@ -144,6 +144,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
+            turnId: (string) Str::ulid(),
         ));
 
         return response()->json([

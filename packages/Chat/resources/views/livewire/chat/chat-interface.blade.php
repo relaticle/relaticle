@@ -866,20 +866,23 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         const readyPromise = new Promise((resolve) => {
             const pusherChannel = this.channel.subscription ?? this.channel;
-            const onSucceeded = () => {
-                this.channel.subscribed = true;
-                resolve();
-            };
-            const onError = () => {
-                resolve();
+            let settled = false;
+            const finish = (confirmed) => {
+                if (settled) return;
+                settled = true;
+                this.channel.subscribed = confirmed;
+                resolve(confirmed);
             };
             if (typeof pusherChannel.bind === 'function') {
-                pusherChannel.bind('pusher:subscription_succeeded', onSucceeded);
-                pusherChannel.bind('pusher:subscription_error', onError);
+                pusherChannel.bind('pusher:subscription_succeeded', () => finish(true));
+                pusherChannel.bind('pusher:subscription_error', () => finish(false));
+                // Bounded fallback: proceed unconfirmed after 8s, but stream_end
+                // reconciliation (handleStreamEnd) guarantees the final message is
+                // correct even if early deltas were missed.
+                setTimeout(() => finish(false), 8000);
             } else {
-                setTimeout(resolve, 0);
+                finish(true);
             }
-            setTimeout(() => resolve(), 1500);
         });
 
         this.channel.readyPromise = readyPromise;
@@ -1371,10 +1374,23 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    handleStreamEnd() {
+    async handleStreamEnd() {
         this.currentToolStatus = null;
         const assistantMsg = this.messages[this.messages.length - 1];
         if (assistantMsg?.role === 'assistant') {
+            // Reconcile against the persisted message so missed live deltas
+            // (subscription lag / drop) never leave a truncated final bubble.
+            try {
+                const authoritative = await this.$wire.latestAssistantMessage();
+                if (authoritative && authoritative.content && authoritative.content !== assistantMsg.content) {
+                    assistantMsg.content = authoritative.content;
+                    assistantMsg.id = authoritative.id;
+                    assistantMsg.rendered = false;
+                    assistantMsg.prerendered = false;
+                }
+            } catch (e) {
+                // Non-fatal: keep the streamed content if reconciliation fails.
+            }
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
         }

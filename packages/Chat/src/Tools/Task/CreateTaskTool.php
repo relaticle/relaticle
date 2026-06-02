@@ -14,9 +14,12 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
+use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
 final class CreateTaskTool extends BaseWriteCreateTool
 {
+    use NormalizesToolInput;
+
     public function description(): string
     {
         return 'Propose creating a new task. Optionally link to people, companies, opportunities, and assign users.';
@@ -47,10 +50,10 @@ final class CreateTaskTool extends BaseWriteCreateTool
     {
         return array_filter([
             'title' => (string) $request->string('title'),
-            'assignee_ids' => $this->idArray($request, 'assignee_ids'),
-            'people_ids' => $this->idArray($request, 'people_ids'),
-            'company_ids' => $this->idArray($request, 'company_ids'),
-            'opportunity_ids' => $this->idArray($request, 'opportunity_ids'),
+            'assignee_ids' => $this->idListOrNull($request, 'assignee_ids'),
+            'people_ids' => $this->idListOrNull($request, 'people_ids'),
+            'company_ids' => $this->idListOrNull($request, 'company_ids'),
+            'opportunity_ids' => $this->idListOrNull($request, 'opportunity_ids'),
         ], static fn (mixed $v): bool => ! in_array($v, [null, '', []], true));
     }
 
@@ -63,22 +66,22 @@ final class CreateTaskTool extends BaseWriteCreateTool
         $title = (string) $request->string('title');
         $fields = [['label' => 'Title', 'value' => $title]];
 
-        $peopleNames = $this->namesForIds($this->idArray($request, 'people_ids'), People::class, 'name', $team);
+        $peopleNames = $this->namesForIds($this->idListOrNull($request, 'people_ids'), People::class, 'name', $team);
         if ($peopleNames !== '') {
             $fields[] = ['label' => 'Linked people', 'value' => $peopleNames];
         }
 
-        $companyNames = $this->namesForIds($this->idArray($request, 'company_ids'), Company::class, 'name', $team);
+        $companyNames = $this->namesForIds($this->idListOrNull($request, 'company_ids'), Company::class, 'name', $team);
         if ($companyNames !== '') {
             $fields[] = ['label' => 'Linked companies', 'value' => $companyNames];
         }
 
-        $opportunityNames = $this->namesForIds($this->idArray($request, 'opportunity_ids'), Opportunity::class, 'name', $team);
+        $opportunityNames = $this->namesForIds($this->idListOrNull($request, 'opportunity_ids'), Opportunity::class, 'name', $team);
         if ($opportunityNames !== '') {
             $fields[] = ['label' => 'Linked opportunities', 'value' => $opportunityNames];
         }
 
-        $assigneeNames = $this->namesForIds($this->idArray($request, 'assignee_ids'), User::class, 'name', null);
+        $assigneeNames = $this->namesForIds($this->idListOrNull($request, 'assignee_ids'), User::class, 'name', null);
         if ($assigneeNames !== '') {
             $fields[] = ['label' => 'Assignees', 'value' => $assigneeNames];
         }
@@ -88,26 +91,6 @@ final class CreateTaskTool extends BaseWriteCreateTool
             'summary' => "Create task \"{$title}\"",
             'fields' => $fields,
         ];
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private function idArray(Request $request, string $key): ?array
-    {
-        $value = $request[$key] ?? null;
-        if (! is_array($value)) {
-            return null;
-        }
-
-        $clean = [];
-        foreach ($value as $id) {
-            if (is_string($id) && $id !== '') {
-                $clean[] = $id;
-            }
-        }
-
-        return $clean === [] ? null : $clean;
     }
 
     /**

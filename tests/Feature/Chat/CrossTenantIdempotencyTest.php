@@ -27,12 +27,12 @@ it('allows the same idempotency key in two different teams', function (): void {
     $service->settleReservation(
         team: $userA->currentTeam, user: $userA, type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
-        idempotencyKey: 'shared-key',
+        resolutionKey: 'shared-key',
     );
     $service->settleReservation(
         team: $userB->currentTeam, user: $userB, type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
-        idempotencyKey: 'shared-key',
+        resolutionKey: 'shared-key',
     );
 
     expect(AiCreditTransaction::query()->where('idempotency_key', 'shared-key')->count())->toBe(2);

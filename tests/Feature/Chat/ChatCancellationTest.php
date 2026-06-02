@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Http\Controllers\ChatController;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\ChatDocument;
 
 use function Pest\Laravel\actingAs;
@@ -97,4 +100,47 @@ it('returns 404 when a teammate (same team, different user) tries to cancel anot
 it('returns 401 for unauthenticated cancel', function (): void {
     postJson(route('chat.cancel', ['conversationId' => 'x']))
         ->assertUnauthorized();
+});
+
+it('settles the reserved minimum (not refund) when a stream is cancelled mid-flight', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'team_id' => $team->getKey(),
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    resolve(CreditService::class)->reserveCredit($team);
+
+    Cache::put("chat:cancel:{$conversationId}", (string) $user->getKey());
+
+    CrmAssistant::fake(['Some streamed answer.']);
+
+    new ProcessChatMessage(
+        user: $user,
+        team: $team,
+        message: 'Show me my deals',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        turnId: '01TURNCANCELAAAAAAAAAAAAAA',
+    )->handle(resolve(CreditService::class));
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    expect($balance->credits_used)->toBe(1)
+        ->and($balance->credits_remaining)->toBe(99);
 });

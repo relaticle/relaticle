@@ -26,12 +26,12 @@ it('does not double-refund when failed() runs after a cancel-path refund', funct
 
     $cancelToken = 'job-test-token';
 
-    $service->refundReservation($team, idempotencyToken: $cancelToken);
+    $service->refundReservation($team, resolutionKey: $cancelToken);
 
     $balance->refresh();
     expect($balance->credits_remaining)->toBe(10);
 
-    $service->refundReservation($team, idempotencyToken: $cancelToken);
+    $service->refundReservation($team, resolutionKey: $cancelToken);
 
     $balance->refresh();
     expect($balance->credits_remaining)->toBe(10);
