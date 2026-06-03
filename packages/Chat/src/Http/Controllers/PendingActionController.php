@@ -141,7 +141,14 @@ final readonly class PendingActionController
      */
     private function resolveDeletedRecordReference(PendingAction $pendingAction): ?array
     {
-        $recordId = $pendingAction->action_data['_record_id'] ?? null;
+        $ids = $pendingAction->action_data['_record_ids'] ?? null;
+
+        // Only a single restored record gets a "View" link; a bulk restore has no one target.
+        if (! is_array($ids) || count($ids) !== 1) {
+            return null;
+        }
+
+        $recordId = array_values($ids)[0];
 
         if (! is_string($recordId) && ! is_int($recordId)) {
             return null;

@@ -234,7 +234,7 @@ it('restores a soft-deleted record within the undo window', function (): void {
         'operation' => PendingActionOperation::Delete,
         'entity_type' => 'company',
         'action_data' => [
-            '_record_id' => $company->getKey(),
+            '_record_ids' => [$company->getKey()],
             '_model_class' => Company::class,
         ],
         'display_data' => [],
@@ -253,6 +253,39 @@ it('restores a soft-deleted record within the undo window', function (): void {
     expect($pending->fresh()->status)->toBe(PendingActionStatus::Restored);
 });
 
+it('restores a bulk-deleted set of records and returns null record reference', function (): void {
+    $c1 = Company::factory()->for($this->team)->create(['name' => 'Bulk Corp One']);
+    $c2 = Company::factory()->for($this->team)->create(['name' => 'Bulk Corp Two']);
+    $c1->delete();
+    $c2->delete();
+    insertConversation('conv-restore-bulk', $this->user, $this->team);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => 'conv-restore-bulk',
+        'action_class' => DeleteCompany::class,
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'company',
+        'action_data' => [
+            '_record_ids' => [$c1->getKey(), $c2->getKey()],
+            '_model_class' => Company::class,
+        ],
+        'display_data' => [],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now()->subMinute(),
+    ]);
+
+    $this->postJson(route('chat.actions.restore', $pending))
+        ->assertOk()
+        ->assertJsonPath('status', 'restored')
+        ->assertJsonPath('record', null);
+
+    expect($c1->fresh()->trashed())->toBeFalse();
+    expect($c2->fresh()->trashed())->toBeFalse();
+});
+
 it('rejects restore after the 5-minute window', function (): void {
     $company = Company::factory()->for($this->team)->create();
     $company->delete();
@@ -266,7 +299,7 @@ it('rejects restore after the 5-minute window', function (): void {
         'operation' => PendingActionOperation::Delete,
         'entity_type' => 'company',
         'action_data' => [
-            '_record_id' => $company->getKey(),
+            '_record_ids' => [$company->getKey()],
             '_model_class' => Company::class,
         ],
         'display_data' => [],
@@ -318,7 +351,7 @@ it('rejects restore for cross-team users', function (): void {
         'operation' => PendingActionOperation::Delete,
         'entity_type' => 'company',
         'action_data' => [
-            '_record_id' => $company->getKey(),
+            '_record_ids' => [$company->getKey()],
             '_model_class' => Company::class,
         ],
         'display_data' => [],
