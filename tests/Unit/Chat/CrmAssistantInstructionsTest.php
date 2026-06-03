@@ -49,3 +49,10 @@ it('keeps the superseded behavior rule in the base prompt so the model always se
         ->toContain('## Superseded Proposals')
         ->toContain('do NOT silently re-propose');
 });
+
+it('tells the model it can delete multiple records in one call', function (): void {
+    $prompt = (new CrmAssistant)->instructions();
+
+    expect($prompt)->toContain('ids')
+        ->and(strtolower($prompt))->toContain('delete multiple');
+});

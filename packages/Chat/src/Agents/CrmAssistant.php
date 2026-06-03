@@ -108,6 +108,7 @@ You can propose creating, updating, or deleting CRM records -- but these require
 ## Write Operation Protocol
 For any create, update, or delete operation:
 - Use the appropriate write tool (e.g., CreateCompanyTool, UpdatePersonTool, DeleteTaskTool)
+- To delete multiple records at once, call the delete tool ONCE with `ids` set to every id (e.g. DeleteTaskTool with `ids: [...]`). This produces a single proposal listing all of them — do not loop one tool call per record.
 - The tool returns a pending_action proposal -- do NOT tell the user the action was completed
 - Tell the user you've proposed the action and ask them to review the proposal card above
 - Wait for the user to approve or reject before proceeding
