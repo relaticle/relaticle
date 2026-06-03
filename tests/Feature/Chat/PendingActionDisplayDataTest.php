@@ -26,7 +26,7 @@ it('DeleteCompanyTool does not include record ID in action card display fields',
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
 
-    $tool->handle(new Request(['id' => $company->getKey()]));
+    $tool->handle(new Request(['ids' => [$company->getKey()]]));
 
     $pending = PendingAction::query()
         ->where('user_id', $this->user->getKey())
@@ -44,11 +44,11 @@ it('DeleteCompanyTool returns the record ID in the LLM-facing JSON payload (inte
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
 
-    $json = $tool->handle(new Request(['id' => $company->getKey()]));
+    $json = $tool->handle(new Request(['ids' => [$company->getKey()]]));
 
     $payload = json_decode($json, true);
 
-    expect($payload['data']['id'])->toBe($company->getKey());
+    expect($payload['data']['ids'])->toContain($company->getKey());
 
     $pending = PendingAction::query()
         ->where('user_id', $this->user->getKey())

@@ -6,7 +6,9 @@ namespace Relaticle\Chat\Tools;
 
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -39,7 +41,8 @@ abstract class BaseWriteDeleteTool implements Tool
         $label = strtolower($this->entityLabel());
 
         return [
-            'id' => $schema->string()->description("The {$label} ID to delete.")->required(),
+            'ids' => $schema->array()->items($schema->string())->required()
+                ->description("The {$label} IDs to delete. Pass one id to delete a single {$label}, or many to delete them all in one call."),
         ];
     }
 
@@ -48,42 +51,42 @@ abstract class BaseWriteDeleteTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $id = $request->string('id');
-        $modelClass = $this->modelClass();
-        $model = $modelClass::query()
+        $requestedIds = $this->requestedIds($request);
+
+        if ($requestedIds === []) {
+            return (string) json_encode(['error' => 'Provide `ids` (a non-empty array) of records to delete.']);
+        }
+
+        /** @var Collection<int, Model> $models */
+        $models = $this->modelClass()::query()
             ->whereBelongsTo($user->currentTeam)
-            ->whereKey($id)
-            ->first();
+            ->whereKey($requestedIds)
+            ->with('team')
+            ->get();
 
-        if (! $model instanceof Model) {
-            return (string) json_encode(['error' => "{$this->entityLabel()} with ID [{$id}] not found."]);
+        $deletable = $models->filter(fn (Model $model): bool => $user->can('delete', $model))->values();
+
+        $foundIds = $deletable->map(fn (Model $model): string => (string) $model->getKey())->all();
+        $skipped = array_values(array_diff($requestedIds, $foundIds));
+
+        if ($deletable->isEmpty()) {
+            return (string) json_encode([
+                'error' => "No matching {$this->entityLabel()} records you can delete were found.",
+                'skipped' => $skipped,
+            ]);
         }
 
-        if ($user->cannot('delete', $model)) {
-            return (string) json_encode(['error' => "You do not have permission to delete this {$this->entityLabel()}."]);
-        }
-
-        $conversationId = $this->resolveConversationId();
-        $entityName = $model->{$this->nameAttribute()};
-
-        $service = resolve(PendingActionService::class);
-        $pending = $service->createProposal(
+        $pending = resolve(PendingActionService::class)->createProposal(
             user: $user,
-            conversationId: $conversationId,
+            conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Delete,
             entityType: $this->entityType(),
             actionData: [
-                '_record_id' => $model->getKey(),
-                '_model_class' => $model::class,
+                '_record_ids' => $deletable->map(fn (Model $model) => $model->getKey())->all(),
+                '_model_class' => $this->modelClass(),
             ],
-            displayData: [
-                'title' => "Delete {$this->entityLabel()}",
-                'summary' => "Delete {$this->entityLabel()} \"{$entityName}\"",
-                'fields' => [
-                    ['label' => 'Name', 'value' => $entityName],
-                ],
-            ],
+            displayData: $this->displayData($deletable),
         );
 
         return (string) json_encode([
@@ -92,9 +95,55 @@ abstract class BaseWriteDeleteTool implements Tool
             'action' => class_basename($this->actionClass()),
             'entity_type' => $this->entityType(),
             'operation' => 'delete',
-            'data' => ['id' => $model->getKey(), 'name' => $entityName],
+            'data' => ['ids' => $foundIds],
+            'skipped' => $skipped,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
         ], JSON_PRETTY_PRINT);
+    }
+
+    /** @return list<string> */
+    private function requestedIds(Request $request): array
+    {
+        $ids = $request['ids'] ?? null;
+
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        $ids = array_filter(array_map(
+            static fn (mixed $id): string => is_scalar($id) ? (string) $id : '',
+            $ids,
+        ), static fn (string $id): bool => $id !== '');
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  Collection<int, Model>  $models
+     * @return array<string, mixed>
+     */
+    private function displayData(Collection $models): array
+    {
+        $count = $models->count();
+        $isSingle = $count === 1;
+        $plural = Str::plural(strtolower($this->entityLabel()), $count);
+
+        $fields = $models->values()
+            ->map(fn (Model $model, int $i): array => [
+                'label' => $isSingle ? 'Name' : "{$this->entityLabel()} ".($i + 1),
+                'value' => (string) $model->{$this->nameAttribute()},
+            ])
+            ->all();
+
+        $summary = $isSingle
+            ? "Delete {$this->entityLabel()} \"".$models->first()->{$this->nameAttribute()}.'"'
+            : "Delete {$count} {$plural}";
+
+        return [
+            'title' => $isSingle ? "Delete {$this->entityLabel()}" : "Delete {$count} {$plural}",
+            'summary' => $summary,
+            'fields' => $fields,
+        ];
     }
 }

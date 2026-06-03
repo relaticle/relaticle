@@ -294,16 +294,13 @@ final readonly class PendingActionService
 
     private function executeDelete(object $action, User $user, PendingAction $pendingAction): mixed
     {
-        $data = $pendingAction->action_data;
-        $modelClass = $this->resolveModelClass($data);
-
-        $model = $this->resolveModel($modelClass, $pendingAction);
-
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
         }
 
-        $action->execute($user, $model);
+        foreach ($this->resolveDeleteModels($pendingAction) as $model) {
+            $action->execute($user, $model);
+        }
 
         return null;
     }
@@ -330,6 +327,30 @@ final readonly class PendingActionService
         return $modelClass::query()
             ->where('team_id', $pendingAction->team_id)
             ->findOrFail($recordId);
+    }
+
+    /**
+     * @return list<Model>
+     */
+    private function resolveDeleteModels(PendingAction $pendingAction): array
+    {
+        $modelClass = $this->resolveModelClass($pendingAction->action_data);
+        $ids = $pendingAction->action_data['_record_ids'] ?? null;
+
+        throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
+
+        $eagerLoad = array_values(array_filter(
+            ['team', 'companies', 'people', 'opportunities'],
+            static fn (string $relation): bool => method_exists($modelClass, $relation),
+        ));
+
+        return array_values(
+            $modelClass::query()
+                ->with($eagerLoad)
+                ->where('team_id', $pendingAction->team_id)
+                ->findOrFail($ids)
+                ->all(),
+        );
     }
 
     /**
