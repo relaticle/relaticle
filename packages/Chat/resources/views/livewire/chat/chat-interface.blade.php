@@ -367,7 +367,10 @@
                     data-chat-context="{{ $context ?? 'conversation' }}"
                     class="relative rounded-2xl border border-gray-200 bg-white transition focus-within:border-primary-500 dark:border-gray-700 dark:bg-gray-800"
                 >
-                    <div x-ref="editor" class="relative"></div>
+                    {{-- wire:ignore: TipTap mounts into this node imperatively; without it
+                         Livewire's morphdom wipes the editor on every chat-interface re-render
+                         (e.g. after the first message), leaving an empty, unusable composer. --}}
+                    <div x-ref="editor" class="relative" wire:ignore></div>
 
                     <div class="flex items-center justify-between gap-2 px-3 pb-2">
                         <span
