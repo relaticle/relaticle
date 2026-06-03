@@ -115,4 +115,6 @@ it('rolls back the whole batch if one record disappears before approval', functi
 
     expect(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeTrue()
         ->and(Task::query()->whereKey($tasks[2]->getKey())->exists())->toBeTrue();
+
+    expect($pending->refresh()->status->value)->toBe('pending');
 });

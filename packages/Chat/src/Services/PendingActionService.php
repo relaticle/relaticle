@@ -21,6 +21,7 @@ use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Models\Company;
+use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -166,17 +167,19 @@ final readonly class PendingActionService
 
             throw_unless(in_array(SoftDeletes::class, class_uses_recursive($modelClass), true), RuntimeException::class, 'This record cannot be restored');
 
-            $recordId = $locked->action_data['_record_id'] ?? null;
+            $ids = $locked->action_data['_record_ids'] ?? null;
 
-            throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in action data');
+            throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
 
-            $record = $this->findTrashedRecord($modelClass, $locked->team_id, $recordId);
+            foreach ($ids as $recordId) {
+                $record = $this->findTrashedRecord($modelClass, $locked->team_id, $recordId);
 
-            throw_if(! $record instanceof Model, RuntimeException::class, 'Record not found');
+                throw_if(! $record instanceof Model, RuntimeException::class, 'Record not found');
 
-            abort_unless($user->can('restore', $record), 403);
+                abort_unless($user->can('restore', $record), 403);
 
-            $this->restoreTrashedRecord($record);
+                $this->restoreTrashedRecord($record);
+            }
 
             $locked->update([
                 'status' => PendingActionStatus::Restored,
@@ -339,18 +342,34 @@ final readonly class PendingActionService
 
         throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
 
-        $eagerLoad = array_values(array_filter(
-            ['team', 'companies', 'people', 'opportunities'],
-            static fn (string $relation): bool => method_exists($modelClass, $relation),
-        ));
-
         return array_values(
             $modelClass::query()
-                ->with($eagerLoad)
+                ->with($this->deleteEagerLoads($modelClass))
                 ->where('team_id', $pendingAction->team_id)
                 ->findOrFail($ids)
                 ->all(),
         );
+    }
+
+    /**
+     * Relations to load before deleting so model observers (AI-summary
+     * invalidation) don't trip Model::preventLazyLoading() in dev/test.
+     *
+     * @param  class-string<Model>  $modelClass
+     * @return list<string>
+     */
+    private function deleteEagerLoads(string $modelClass): array
+    {
+        $relations = ['team'];
+
+        if (in_array(InvalidatesRelatedAiSummaries::class, class_uses_recursive($modelClass), true)) {
+            $relations = array_merge($relations, array_values(array_filter(
+                InvalidatesRelatedAiSummaries::summaryRelations(),
+                static fn (string $relation): bool => method_exists($modelClass, $relation),
+            )));
+        }
+
+        return $relations;
     }
 
     /**
