@@ -12,7 +12,11 @@ use AshAllenDesign\FaviconFetcher\Concerns\ValidatesUrls;
 use AshAllenDesign\FaviconFetcher\Contracts\Fetcher;
 use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 final class HighQualityDriver implements Fetcher
 {
@@ -64,11 +68,38 @@ final class HighQualityDriver implements Fetcher
         throw new \Exception('fetchAll not supported by HighQualityDriver');
     }
 
+    /**
+     * The favicon HTTP client re-validates every redirect hop against {@see SsrfGuard}.
+     *
+     * The underlying client follows redirects by default, so validating only the
+     * initial URL would let an attacker-controlled public host redirect the request
+     * to an internal address (SSRF, CWE-918). The on_redirect callback throws a
+     * SsrfGuardException for any non-public hop, aborting the request before it is sent.
+     */
+    private function guardedHttpClient(): PendingRequest
+    {
+        return $this->httpClient()->withOptions([
+            'allow_redirects' => [
+                'max' => 5,
+                'strict' => true,
+                'referer' => false,
+                'protocols' => ['http', 'https'],
+                'on_redirect' => static function (
+                    RequestInterface $request,
+                    ResponseInterface $response,
+                    UriInterface $uri,
+                ): void {
+                    SsrfGuard::assertPublicHost((string) $uri);
+                },
+            ],
+        ]);
+    }
+
     private function tryAppleTouchIcon(string $url): ?Favicon
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($url)
+                fn () => $this->guardedHttpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -103,7 +134,7 @@ final class HighQualityDriver implements Fetcher
 
             $iconUrl = $this->stripPathFromUrl($url).'/apple-touch-icon.png';
             /** @var Response $testResponse */
-            $testResponse = $this->httpClient()->head($iconUrl);
+            $testResponse = $this->guardedHttpClient()->head($iconUrl);
 
             if ($testResponse->successful()) {
                 return new Favicon(
@@ -125,7 +156,7 @@ final class HighQualityDriver implements Fetcher
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($url)
+                fn () => $this->guardedHttpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -170,7 +201,7 @@ final class HighQualityDriver implements Fetcher
             }
 
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($faviconUrl)
+                fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -199,7 +230,7 @@ final class HighQualityDriver implements Fetcher
 
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($faviconUrl)
+                fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -227,7 +258,7 @@ final class HighQualityDriver implements Fetcher
 
         try {
             /** @var Response $response */
-            $response = $this->httpClient()->head($faviconUrl);
+            $response = $this->guardedHttpClient()->head($faviconUrl);
 
             return $response->successful();
         } catch (\Exception) {
