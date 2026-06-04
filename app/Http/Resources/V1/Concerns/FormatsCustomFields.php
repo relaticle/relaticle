@@ -18,8 +18,7 @@ trait FormatsCustomFields
         }
 
         $result = $record->getRelation('customFieldValues')
-            /** @phpstan-ignore notIdentical.alwaysTrue (orphaned values can exist when a custom field is deleted) */
-            ->filter(fn (CustomFieldValue $fieldValue): bool => $fieldValue->customField !== null)
+            ->filter(fn (CustomFieldValue $fieldValue): bool => $fieldValue->getRelationValue('customField') !== null)
             ->mapWithKeys(fn (CustomFieldValue $fieldValue): array => [
                 $fieldValue->customField->code => $this->resolveFieldValue($fieldValue),
             ])
