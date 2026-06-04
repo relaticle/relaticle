@@ -14,9 +14,6 @@ use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
 
 final class HighQualityDriver implements Fetcher
 {
@@ -69,30 +66,12 @@ final class HighQualityDriver implements Fetcher
     }
 
     /**
-     * The favicon HTTP client re-validates every redirect hop against {@see SsrfGuard}.
-     *
-     * The underlying client follows redirects by default, so validating only the
-     * initial URL would let an attacker-controlled public host redirect the request
-     * to an internal address (SSRF, CWE-918). The on_redirect callback throws a
-     * SsrfGuardException for any non-public hop, aborting the request before it is sent.
+     * The favicon-fetcher HTTP client, hardened so every redirect hop is
+     * re-validated against {@see SsrfGuard} (SSRF, CWE-918).
      */
     private function guardedHttpClient(): PendingRequest
     {
-        return $this->httpClient()->withOptions([
-            'allow_redirects' => [
-                'max' => 5,
-                'strict' => true,
-                'referer' => false,
-                'protocols' => ['http', 'https'],
-                'on_redirect' => static function (
-                    RequestInterface $request,
-                    ResponseInterface $response,
-                    UriInterface $uri,
-                ): void {
-                    SsrfGuard::assertPublicHost((string) $uri);
-                },
-            ],
-        ]);
+        return $this->httpClient()->withOptions(SsrfGuard::redirectGuardOptions());
     }
 
     private function tryAppleTouchIcon(string $url): ?Favicon
