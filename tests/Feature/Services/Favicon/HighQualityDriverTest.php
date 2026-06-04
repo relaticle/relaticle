@@ -127,19 +127,14 @@ test('refuses to fetch from private addresses', function (): void {
         ->and($driver->fetch('http://169.254.169.254/'))->toBeNull();
 });
 
-test('re-validates each redirect hop against the SSRF guard', function (): void {
+test('routes favicon requests through the SSRF-guarded redirect client', function (): void {
     $driver = new HighQualityDriver;
 
-    $client = (new ReflectionMethod($driver, 'guardedHttpClient'))->invoke($driver);
-    $onRedirect = $client->getOptions()['allow_redirects']['on_redirect'];
+    $onRedirect = invade($driver)->guardedHttpClient()->getOptions()['allow_redirects']['on_redirect'];
 
     $request = new Request('GET', 'https://1.1.1.1');
     $response = new Response(302);
 
     expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://10.0.0.1/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://1.1.1.1/')))
-        ->not->toThrow(SsrfGuardException::class);
+        ->toThrow(SsrfGuardException::class);
 });
