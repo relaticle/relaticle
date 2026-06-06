@@ -363,7 +363,7 @@ final readonly class PendingActionService
         $relations = ['team'];
 
         if (in_array(InvalidatesRelatedAiSummaries::class, class_uses_recursive($modelClass), true)) {
-            $relations = array_merge($relations, array_values(array_filter(
+            return array_merge($relations, array_values(array_filter(
                 InvalidatesRelatedAiSummaries::summaryRelations(),
                 static fn (string $relation): bool => method_exists($modelClass, $relation),
             )));
