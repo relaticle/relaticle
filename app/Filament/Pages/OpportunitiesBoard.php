@@ -35,7 +35,6 @@ use Relaticle\Flowforge\BoardPage;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
-use UnitEnum;
 
 final class OpportunitiesBoard extends BoardPage
 {
@@ -45,8 +44,6 @@ final class OpportunitiesBoard extends BoardPage
 
     protected static ?string $navigationParentItem = 'Opportunities';
 
-    protected static string|null|UnitEnum $navigationGroup = null;
-
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/boards.navigation_label');
@@ -55,11 +52,6 @@ final class OpportunitiesBoard extends BoardPage
     public function getTitle(): string
     {
         return __('filament/pages/boards.opportunities.title');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';

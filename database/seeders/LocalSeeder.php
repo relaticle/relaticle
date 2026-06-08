@@ -13,6 +13,10 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 
 final class LocalSeeder extends Seeder
 {
@@ -52,6 +56,8 @@ final class LocalSeeder extends Seeder
                     'role' => 'member',
                 ]);
             });
+
+        $this->topUpAiCreditsForLocalTeams();
         //
         //        // Set the current user and tenant.
         //        Auth::setUser($user);
@@ -87,5 +93,43 @@ final class LocalSeeder extends Seeder
         //                $opportunity->saveCustomFieldValue($customFields->get('stage'), $customFields->get('stage')->options->random()->id);
         //            })
         //            ->create();
+    }
+
+    /**
+     * Bump every existing AI credit balance to a developer-friendly ceiling so
+     * local chat sessions don't hit the free plan's 100-credit allowance while
+     * exercising features. Production runs this seeder behind the isLocal()
+     * gate at the top of run(), so this only ever fires in dev.
+     */
+    private function topUpAiCreditsForLocalTeams(): void
+    {
+        $target = 1_000_000;
+
+        AiCreditBalance::query()
+            ->where('credits_remaining', '<', $target)
+            ->cursor()
+            ->each(function (AiCreditBalance $balance) use ($target): void {
+                $delta = $target - $balance->credits_remaining;
+
+                $balance->update(['credits_remaining' => $target]);
+
+                AiCreditTransaction::query()->create([
+                    'team_id' => $balance->team_id,
+                    'user_id' => null,
+                    'conversation_id' => null,
+                    'idempotency_key' => 'local-dev-grant-'.Str::ulid(),
+                    'type' => AiCreditType::Adjustment,
+                    'model' => 'system',
+                    'input_tokens' => 0,
+                    'output_tokens' => 0,
+                    'credits_charged' => 0,
+                    'metadata' => [
+                        'action' => 'local_dev_grant',
+                        'delta' => $delta,
+                        'target' => $target,
+                    ],
+                    'created_at' => now(),
+                ]);
+            });
     }
 }

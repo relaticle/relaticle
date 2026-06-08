@@ -9,7 +9,6 @@ use App\Actions\Jetstream\InviteTeamMember;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\TeamRole;
-use App\Filament\Resources\CompanyResource;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ValidTeamSlug;
@@ -367,7 +366,7 @@ final class CreateTeam extends RegisterTenant
     #[Override]
     protected function getRedirectUrl(): string
     {
-        return CompanyResource::getUrl('index', ['tenant' => $this->tenant]);
+        return Dashboard::getUrl(['tenant' => $this->tenant]);
     }
 
     #[Override]

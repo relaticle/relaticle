@@ -23,11 +23,13 @@
         "doctrine/dbal": "^4.4",
         "filament/filament": "^5.0",
         "knuckleswtf/scribe": "^5.8",
+        "laravel/ai": "~0.6.8",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
-        "laravel/mcp": "^0.6.2",
+        "laravel/mcp": "^0.7.0",
         "laravel/pennant": "^1.23",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^3.0",
@@ -65,7 +67,6 @@
     "require-dev": {
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
-        "itsgoingd/clockwork": "^5.3",
         "larastan/larastan": "^3.0",
         "laravel-lang/lang": "^15.29",
         "laravel-lang/publisher": "^16.8",
@@ -87,6 +88,7 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
+            "Relaticle\\Chat\\": "packages/Chat/src",
             "Relaticle\\SystemAdmin\\": "packages/SystemAdmin/src",
             "Relaticle\\Documentation\\": "packages/Documentation/src",
             "Relaticle\\OnboardSeed\\": "packages/OnboardSeed/src",
@@ -98,7 +100,10 @@
     "autoload-dev": {
         "psr-4": {
             "Tests\\": "tests/"
-        }
+        },
+        "exclude-from-classmap": [
+            "tests/PHPStan/Rules/data/"
+        ]
     },
     "scripts": {
         "post-autoload-dump": [

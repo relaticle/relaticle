@@ -39,8 +39,6 @@ final class NoteResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
     public static function getModelLabel(): string
     {
         return __('filament/resources/note.label');
@@ -54,11 +52,6 @@ final class NoteResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/note.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function form(Schema $schema): Schema

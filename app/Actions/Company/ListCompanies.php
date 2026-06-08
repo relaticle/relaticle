@@ -34,7 +34,10 @@ final readonly class ListCompanies
         $request ??= new Request(['filter' => $filters]);
         $filterSchema = new CustomFieldFilterSchema;
 
-        $query = QueryBuilder::for(Company::query()->withCustomFieldValues(), $request)
+        $query = QueryBuilder::for(
+            Company::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            $request,
+        )
             ->allowedFilters(
                 AllowedFilter::partial('name'),
                 AllowedFilter::custom('custom_fields', new CustomFieldFilter('company')),

@@ -6,7 +6,7 @@
             </h1>
 
             <p class="mt-4 text-gray-600 dark:text-gray-400">
-                {{ __('This invite link has expired. Please ask the team owner to share a new link.') }}
+                {{ __('This invite link has expired. Please ask the workspace owner to share a new link.') }}
             </p>
 
             <div class="mt-8">

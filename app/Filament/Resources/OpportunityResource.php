@@ -45,8 +45,6 @@ final class OpportunityResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
     public static function form(Schema $schema): Schema
     {
         return OpportunityForm::get($schema);
@@ -135,11 +133,6 @@ final class OpportunityResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/opportunity.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function getEloquentQuery(): Builder

@@ -2,8 +2,14 @@
 @import '../../fonts.css';
 @import '../../theme.css';
 
+@plugin "@tailwindcss/typography";
+
 @source '../../../../app/Filament';
 @source '../../../../resources/views';
+
+/* Chat */
+@source '../../../../packages/Chat/resources/views';
+@source '../../../../packages/Chat/resources/js';
 
 /* ImportWizard */
 @source '../../../../packages/ImportWizard/resources';
@@ -505,4 +511,43 @@
 /* FlowForge Specific Customizations */
 .flowforge-column-header {
     @apply bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl;
+}
+
+/* Chat Side Panel */
+[data-chat-side-panel] [data-chat-messages] {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.gray.400') transparent;
+}
+
+/* Chat Loading Shimmer */
+@keyframes chat-shimmer {
+    0%   { background-position: 200% 0%; }
+    100% { background-position: -200% 0%; }
+}
+
+[data-chat-loading-label] {
+    background-image: linear-gradient(90deg, #9ca3af 0%, #f3f4f6 50%, #9ca3af 100%);
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: chat-shimmer 1.8s linear infinite;
+}
+
+.dark [data-chat-loading-label] {
+    background-image: linear-gradient(90deg, #6b7280 0%, #e5e7eb 50%, #6b7280 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-chat-loading-label] {
+        animation: none;
+        background: none;
+        color: #6b7280;
+        -webkit-background-clip: unset;
+        background-clip: unset;
+    }
+
+    .dark [data-chat-loading-label] {
+        color: #9ca3af;
+    }
 }
