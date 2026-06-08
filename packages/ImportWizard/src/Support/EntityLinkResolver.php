@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
 
@@ -185,18 +186,50 @@ final class EntityLinkResolver
 
         $valueColumn = $customField->getValueColumn();
 
-        if ($valueColumn === 'json_value') {
-            return $this->resolveViaJsonColumn($link->targetEntity, $customField->getKey(), $uniqueValues);
+        $resolved = $valueColumn === 'json_value'
+            ? $this->resolveViaJsonColumn($link->targetEntity, $customField->getKey(), $uniqueValues)
+            : CustomFieldValue::query()
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $this->teamId)
+                ->where('custom_field_id', $customField->id)
+                ->where('entity_type', $link->targetEntity)
+                ->whereIn($valueColumn, $uniqueValues)
+                ->pluck('entity_id', $valueColumn)
+                ->all();
+
+        return $this->rejectInaccessibleEntities($link->targetModelClass, $resolved);
+    }
+
+    /**
+     * Drop matches whose owning entity cannot be loaded for write (soft-deleted
+     * or belonging to another team). The matcher reads custom_field_values
+     * directly, bypassing model scopes; the executor loads records through the
+     * default-scoped model query, so an unfiltered match becomes a silently
+     * skipped row. Filtering here keeps the two in sync.
+     *
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, int|string>  $valueToEntityId
+     * @return array<string, int|string>
+     */
+    private function rejectInaccessibleEntities(string $modelClass, array $valueToEntityId): array
+    {
+        if ($valueToEntityId === []) {
+            return [];
         }
 
-        return CustomFieldValue::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
-            ->where('custom_field_id', $customField->id)
-            ->where('entity_type', $link->targetEntity)
-            ->whereIn($valueColumn, $uniqueValues)
-            ->pluck('entity_id', $valueColumn)
-            ->all();
+        $keyName = (new $modelClass)->getKeyName();
+
+        $accessibleIds = $modelClass::query()
+            ->where('team_id', $this->teamId)
+            ->whereIn($keyName, array_values($valueToEntityId))
+            ->pluck($keyName)
+            ->map(fn (int|string $id): string => (string) $id)
+            ->flip();
+
+        return array_filter(
+            $valueToEntityId,
+            fn (int|string $entityId): bool => $accessibleIds->has((string) $entityId),
+        );
     }
 
     /**

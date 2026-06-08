@@ -6,10 +6,12 @@ use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 mutates(CompanyResource::class);
 
@@ -197,4 +199,43 @@ it('denies non-team-member from viewing another team company', function (): void
     expect($this->user->can('view', $record))->toBeFalse()
         ->and($this->user->can('update', $record))->toBeFalse()
         ->and($this->user->can('delete', $record))->toBeFalse();
+});
+
+// --- Issue #282 Bug 3: adding a new tag while editing adds it to the option list ---
+
+it('adds a newly typed tags-input value to the option list when editing a company', function (): void {
+    $cf = CustomField::forceCreate([
+        'tenant_id' => $this->team->id,
+        'code' => 'edit_labels282',
+        'name' => 'Edit Labels',
+        'type' => 'tags-input',
+        'entity_type' => 'company',
+        'sort_order' => 50,
+        'active' => true,
+        'system_defined' => false,
+        'validation_rules' => [],
+        'settings' => new CustomFieldSettingsData,
+    ]);
+    $cf->options()->forceCreate([
+        'custom_field_id' => $cf->id,
+        'tenant_id' => $this->team->id,
+        'name' => 'Existing',
+        'sort_order' => 1,
+    ]);
+
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+    livewire(ListCompanies::class)
+        ->callAction(
+            TestAction::make('edit')->table($company),
+            data: [
+                'name' => $company->name,
+                'custom_fields' => ['edit_labels282' => ['Existing', 'TypedDuringEdit']],
+            ],
+        )
+        ->assertHasNoActionErrors();
+
+    $optionNames = $cf->refresh()->options->pluck('name')->all();
+    expect($optionNames)->toContain('Existing')
+        ->toContain('TypedDuringEdit');
 });

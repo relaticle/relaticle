@@ -19,13 +19,17 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Enums\DateFormat;
+use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -2247,4 +2251,112 @@ it('does not auto-create record for custom field entity link', function (): void
 
     $companyCountAfter = Company::where('team_id', $this->team->id)->count();
     expect($companyCountAfter)->toBe($companyCountBefore);
+});
+
+// --- Issue #282 Bug 2: imported tags-input values become options ---
+
+it('adds a new imported tags-input value to the field option list', function (): void {
+    $cf = createTestCustomField($this, 'labels282', 'tags-input', 'company', ['Existing']);
+
+    createImportReadyStore($this, ['Name', 'Labels'], [
+        makeRow(2, ['Name' => 'Tagged Co 282', 'Labels' => 'Existing, BrandNewTag'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    $company = Company::where('team_id', $this->team->id)->where('name', 'Tagged Co 282')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $company->id, (string) $cf->id);
+
+    expect(collect($cfv->json_value)->all())->toContain('BrandNewTag');
+
+    $optionNames = $cf->refresh()->options->pluck('name')->all();
+    expect($optionNames)->toContain('Existing')
+        ->toContain('BrandNewTag');
+
+    $newOption = $cf->refresh()->options()->withoutGlobalScopes()->where('name', 'BrandNewTag')->first();
+    expect((int) $newOption->sort_order)->toBeGreaterThan(0);
+});
+
+it('does not duplicate an imported tag that already exists as an option (case-insensitive)', function (): void {
+    $cf = createTestCustomField($this, 'labels282b', 'tags-input', 'company', ['VIP']);
+
+    createImportReadyStore($this, ['Name', 'Labels'], [
+        makeRow(2, ['Name' => 'Dup Co 282', 'Labels' => 'vip'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282b'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    expect($cf->refresh()->options()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+it('does not create options when importing an arbitrary email custom field', function (): void {
+    $cf = createTestCustomField($this, 'contact_emails282', 'email', 'company');
+
+    createImportReadyStore($this, ['Name', 'Emails'], [
+        makeRow(2, ['Name' => 'Email Co 282', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Emails', target: 'custom_fields_contact_emails282'),
+    ], ImportEntityType::Company);
+
+    runImportJob($this);
+
+    expect($cf->refresh()->options()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+// --- Issue #282 Bug 1: soft-deleted records must not be matched ---
+
+it('does not match a soft-deleted company by domain (resolver)', function (): void {
+    $domainField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+
+    expect($domainField)->not->toBeNull();
+
+    $live = Company::factory()->create(['name' => 'Live Co', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $live->id, 'tenant_id' => $this->team->id, 'json_value' => ['live282.com']]);
+
+    $trashed = Company::factory()->create(['name' => 'Trashed Co', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $trashed->id, 'tenant_id' => $this->team->id, 'json_value' => ['ghost282.com']]);
+    $trashed->delete();
+
+    $resolver = new EntityLinkResolver((string) $this->team->id);
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'company', targetModelClass: Company::class);
+    $matcher = MatchableField::domain('custom_fields_domains');
+
+    $resolved = $resolver->batchResolve($link, $matcher, ['live282.com', 'ghost282.com']);
+
+    expect((string) ($resolved['live282.com'] ?? 'null'))->toBe((string) $live->id)
+        ->and($resolved['ghost282.com'] ?? null)->toBeNull();
+});
+
+it('creates a new company when re-importing a domain whose company was soft-deleted', function (): void {
+    $domainField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+
+    expect($domainField)->not->toBeNull();
+
+    $original = Company::factory()->create(['name' => 'Acme Original 282', 'team_id' => $this->team->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $original->id, 'tenant_id' => $this->team->id, 'json_value' => ['acme282.com']]);
+    $original->delete();
+
+    createImportReadyStore($this, ['Name', 'Domain'], [
+        makeRow(2, ['Name' => 'Acme Reimport 282', 'Domain' => 'acme282.com']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    (new ResolveMatchesJob($this->import->id))->handle();
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+    expect($import->created_rows)->toBe(1)
+        ->and($import->skipped_rows)->toBe(0)
+        ->and(Company::where('team_id', $this->team->id)->where('name', 'Acme Reimport 282')->exists())->toBeTrue();
 });
