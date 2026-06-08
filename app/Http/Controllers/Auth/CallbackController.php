@@ -8,10 +8,12 @@ use App\Contracts\User\CreatesNewSocialUsers;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use Filament\Notifications\Notification;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -35,11 +37,31 @@ final readonly class CallbackController
             return $this->loginAndRedirect($user);
         } catch (InvalidStateException) {
             return $this->handleError('Authentication state mismatch. Please try again.');
+        } catch (RequestException $e) {
+            return $this->handleProviderRequestException($e, $provider);
         } catch (Throwable $e) {
             report($e);
 
             return $this->handleError($this->parseProviderError($e->getMessage(), $provider));
         }
+    }
+
+    private function handleProviderRequestException(RequestException $e, string $provider): RedirectResponse
+    {
+        $status = $e->getResponse()?->getStatusCode();
+
+        if ($status === 429 || ($status !== null && $status >= 500)) {
+            Log::warning('Socialite provider returned a transient error.', [
+                'provider' => $provider,
+                'status' => $status,
+            ]);
+
+            return $this->handleError(sprintf('%s is busy right now. Please wait a moment and try again.', ucfirst($provider)));
+        }
+
+        report($e);
+
+        return $this->handleError($this->parseProviderError($e->getMessage(), $provider));
     }
 
     /**

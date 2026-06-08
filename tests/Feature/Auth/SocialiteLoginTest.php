@@ -7,6 +7,11 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Psr7\Request as GuzzleRequest;
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -107,6 +112,64 @@ test('callback from socialite provider handles error gracefully', function () {
 
     $response->assertRedirect(route('login'));
     $response->assertSessionHasErrors(['login']);
+});
+
+test('callback does not report transient provider rate limit to sentry', function () {
+    Exceptions::fake();
+
+    Socialite::fake(
+        SocialiteProvider::GITHUB->value,
+        fn () => throw new ClientException(
+            'Client error: `POST https://github.com/login/oauth/access_token` resulted in a `429 Too Many Requests` response',
+            new GuzzleRequest('POST', 'https://github.com/login/oauth/access_token'),
+            new GuzzleResponse(429),
+        ),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GITHUB->value, 'code' => 'test-code']));
+
+    $response->assertRedirect(route('login'));
+
+    $errors = session('errors')->getBag('default');
+    expect($errors->first('login'))->toBe('Github is busy right now. Please wait a moment and try again.');
+
+    Exceptions::assertNothingReported();
+});
+
+test('callback does not report transient provider server error to sentry', function () {
+    Exceptions::fake();
+
+    Socialite::fake(
+        SocialiteProvider::GITHUB->value,
+        fn () => throw new ServerException(
+            'Server error: `POST https://github.com/login/oauth/access_token` resulted in a `503 Service Unavailable` response',
+            new GuzzleRequest('POST', 'https://github.com/login/oauth/access_token'),
+            new GuzzleResponse(503),
+        ),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GITHUB->value, 'code' => 'test-code']));
+
+    $response->assertRedirect(route('login'));
+    Exceptions::assertNothingReported();
+});
+
+test('callback still reports actionable provider client errors to sentry', function () {
+    Exceptions::fake();
+
+    Socialite::fake(
+        SocialiteProvider::GITHUB->value,
+        fn () => throw new ClientException(
+            'Client error: `POST https://github.com/login/oauth/access_token` resulted in a `401 Unauthorized` response',
+            new GuzzleRequest('POST', 'https://github.com/login/oauth/access_token'),
+            new GuzzleResponse(401),
+        ),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GITHUB->value, 'code' => 'test-code']));
+
+    $response->assertRedirect(route('login'));
+    Exceptions::assertReported(ClientException::class);
 });
 
 test('callback from socialite provider handles missing code parameter', function () {
