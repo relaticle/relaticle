@@ -63,7 +63,7 @@ final class ChatServiceProvider extends ServiceProvider
 
     private function registerChannels(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../routes/channels.php');
+        require __DIR__.'/../routes/channels.php';
     }
 
     private function registerViews(): void
