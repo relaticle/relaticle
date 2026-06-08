@@ -45,8 +45,6 @@ final class TaskResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
     public static function getModelLabel(): string
     {
         return __('filament/resources/task.label');
@@ -60,11 +58,6 @@ final class TaskResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/task.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function form(Schema $schema): Schema

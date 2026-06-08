@@ -49,7 +49,7 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
         $owner = $team->owner;
         if ($teamMember->id === $owner->id) {
             throw ValidationException::withMessages([
-                'team' => [__('You may not leave a team that you created.')],
+                'team' => [__('You may not leave a workspace that you created.')],
             ])->errorBag('removeTeamMember');
         }
     }

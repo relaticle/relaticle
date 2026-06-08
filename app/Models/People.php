@@ -13,6 +13,7 @@ use App\Models\Concerns\HasTeam;
 use App\Observers\PeopleObserver;
 use App\Services\AvatarService;
 use Database\Factories\PeopleFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +30,10 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
  * @property CreationSource $creation_source
  */
 #[ObservedBy(PeopleObserver::class)]
+#[Fillable([
+    'name',
+    'creation_source',
+])]
 final class People extends Model implements HasCustomFields
 {
     use BelongsToTeamCreator;
@@ -43,16 +48,6 @@ final class People extends Model implements HasCustomFields
     use HasUlids;
     use SoftDeletes;
     use UsesCustomFields;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

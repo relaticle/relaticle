@@ -9,6 +9,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -20,6 +22,8 @@ use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 
+#[Timeout(120)]
+#[Tries(1)]
 final class ValidateColumnJob implements ShouldQueue
 {
     use Batchable;
@@ -27,10 +31,6 @@ final class ValidateColumnJob implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
-
-    public int $timeout = 120;
-
-    public int $tries = 1;
 
     public function __construct(
         private readonly string $importId,

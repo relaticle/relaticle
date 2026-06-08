@@ -92,9 +92,11 @@ return [
             CustomFieldsFeature::UI_TABLE_COLUMNS,
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
-            CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
         )->disable(
+            // Hide the package's management page from the sidebar; reachable via the
+            // tenant dropdown's "Custom Fields" entry. The page route is still registered.
+            CustomFieldsFeature::SYSTEM_MANAGEMENT_INTERFACE,
             CustomFieldsFeature::FIELD_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::FIELD_VALIDATION_RULES,
             CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,

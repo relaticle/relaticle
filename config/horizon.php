@@ -169,7 +169,7 @@ return [
     |
     */
 
-    'memory_limit' => 64,
+    'memory_limit' => 256,
 
     /*
     |--------------------------------------------------------------------------
@@ -289,6 +289,19 @@ return [
                 'timeout' => 300,
                 'nice' => 0,
             ],
+            'chat-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['chat'],
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'minProcesses' => env('HORIZON_CHAT_MIN', 1),
+                'maxProcesses' => env('HORIZON_CHAT_MAX', 3),
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 130,
+            ],
         ],
 
         'local' => [
@@ -303,6 +316,19 @@ return [
             ],
             'supervisor-imports' => [
                 'maxProcesses' => 5,
+            ],
+            'chat-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['chat'],
+                'balance' => 'auto',
+                'autoScalingStrategy' => 'time',
+                'minProcesses' => env('HORIZON_CHAT_MIN', 1),
+                'maxProcesses' => env('HORIZON_CHAT_MAX', 3),
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 130,
             ],
         ],
     ],

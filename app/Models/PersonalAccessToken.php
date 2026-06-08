@@ -12,16 +12,14 @@ use LogicException;
 
 /** Cannot be final — Sanctum::actingAs() uses Mockery to mock this class in tests */
 #[ObservedBy(PersonalAccessTokenObserver::class)]
+#[\Illuminate\Database\Eloquent\Attributes\Fillable([
+    'name',
+    'abilities',
+    'expires_at',
+    'team_id',
+])]
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
-    /** @var array<int, string> */
-    protected $fillable = [
-        'name',
-        'abilities',
-        'expires_at',
-        'team_id',
-    ];
-
     protected static function booted(): void
     {
         self::creating(function (PersonalAccessToken $token): void {

@@ -8,12 +8,16 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
 
+#[Timeout(120)]
+#[Tries(1)]
 final class ResolveMatchesJob implements ShouldQueue
 {
     use Batchable;
@@ -21,10 +25,6 @@ final class ResolveMatchesJob implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
-
-    public int $timeout = 120;
-
-    public int $tries = 1;
 
     public function __construct(
         private readonly string $importId,

@@ -6,7 +6,7 @@ use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Filament\Pages\CreateTeam;
-use App\Filament\Resources\CompanyResource;
+use App\Filament\Pages\Dashboard;
 use App\Listeners\CreateTeamCustomFields;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -169,7 +169,7 @@ it('marks subsequent teams as non-personal', function (): void {
     expect($secondTeam->personal_team)->toBeFalse();
 });
 
-it('redirects first team to companies index with notification', function (): void {
+it('redirects first team to dashboard with notification', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -183,10 +183,10 @@ it('redirects first team to companies index with notification', function (): voi
         ->call('register')
         ->assertHasNoFormErrors()
         ->assertNotified('Workspace created')
-        ->assertRedirect(CompanyResource::getUrl('index', ['tenant' => $user->fresh()->currentTeam]));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $user->fresh()->currentTeam]));
 });
 
-it('redirects subsequent teams to companies index', function (): void {
+it('redirects subsequent teams to dashboard', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
     $this->actingAs($user);
@@ -198,7 +198,7 @@ it('redirects subsequent teams to companies index', function (): void {
         ])
         ->call('register')
         ->assertHasNoFormErrors()
-        ->assertRedirect(CompanyResource::getUrl('index', ['tenant' => $user->fresh()->currentTeam]));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $user->fresh()->currentTeam]));
 });
 
 it('seeds sales demo data for sales use case', function (): void {

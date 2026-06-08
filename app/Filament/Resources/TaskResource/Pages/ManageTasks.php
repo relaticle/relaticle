@@ -15,6 +15,7 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
+use Livewire\Attributes\On;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
 use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
@@ -50,5 +51,11 @@ final class ManageTasks extends ManageRecords
                     resolve(NotifyTaskAssignees::class)->execute($record);
                 }),
         ];
+    }
+
+    #[On('ai-write-completed')]
+    public function refreshOnAiWrite(): void
+    {
+        // Filament table auto-refreshes on Livewire re-render
     }
 }

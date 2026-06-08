@@ -18,15 +18,25 @@ business-review --describe "<text>" # no diff input; AC come from text
 business-review --no-prompt         # local mode, suppress end-of-run prompt
 ```
 
-**Skill is one-process** — every stage runs in the same shell so environment variables and the agent-browser session persist. Subagents are forbidden in Stages 2 and 3 except the parallel diff/intent analyzer pair at the start of Stage 2 (planning carve-out).
+**Skill is one-process** — every stage runs in the same shell so environment variables and the agent-browser session persist. Subagent allow-list:
+
+- Stage 1 close: `code-context-analyzer` (mandatory for non-trivial diffs — see `references/understand.md` Step 1a).
+- Stage 2 planning start: `diff-analyzer` + `intent-analyzer` parallel pair (planning carve-out).
+- Stage 3: none — eval harness only.
+
+No other subagents at any stage.
 
 ## Autonomy contract
 
-**Question budget: ≤1 mid-run question + 1 end-of-run push prompt per invocation.**
+**Question budget: 0–N at end of Stage 1, each justified. No mid-run questions in Stage 2 or Stage 3.** End-of-run push prompt is separate from this budget.
 
-Mid-run question fires only on **intent mismatch**: AC source is `inferred-from-diff` AND the user provided `--describe` or the parent agent passed verbal intent AND the inferred candidates disagree with that intent (overlap < 40% by tokenized word set). Otherwise, inferred AC are used silently and reported in REVIEW.md as `"AC source: inferred-from-diff (no user confirmation)"`.
+After reading the available context (CLAUDE.md, `.ai/guidelines/`, README, PR body, linked issues, diff, AC, `code-context.json`, past `.context/reviews/*/REVIEW.md`), you decide whether enough is known to plan high-quality cases. If yes, ask zero questions. If no, batch all questions into a single end-of-Stage-1 ask — never piecewise, never mid-run.
 
-All other current pause-points become auto-decisions — see `references/understand.md` "Auto-decisions" table. Summary:
+For each question asked, write a one-line justification under `## Context gaps` in REVIEW.md (e.g. *"Asked which tenant role matters most — diff touches both admin and member surfaces but CLAUDE.md doesn't state review-time priority."*). If you ask zero questions, REVIEW.md states `Context gaps: none — sufficient from <sources>`. The justification list is the audit trail: under-asking and over-asking both leave a visible record.
+
+Intent mismatch (inferred AC disagree with `--describe` text or parent-agent verbal intent — overlap < 40% by tokenized word set) is a strong signal that a question is warranted — but it is no longer the ONLY trigger. Use judgment.
+
+All other historical pause-points are auto-decisions — see `references/understand.md` "Auto-decisions" table. Summary:
 
 | Condition | Auto-decision |
 |---|---|
@@ -59,7 +69,7 @@ Idempotency in PR mode: if a posted comment on the PR ends with `br-sha:$SHORT_S
 
 Detail in `references/understand.md`. Covers invocation parsing, diff derivation (PR vs local vs describe), preflight, setup matrix (install/build/migrate), sanitization envelope (PR mode only), AC extraction with source attribution, auto-decisions.
 
-**Outputs:** `$REVIEW_DIR/{requirements.md, acceptance-criteria.json, pr-diff.patch, pr-files.txt, [untrusted/]}`
+**Outputs:** `$REVIEW_DIR/{requirements.md, acceptance-criteria.json, pr-diff.patch, pr-files.txt, code-context.json, [untrusted/]}`
 
 **Local-mode shortcuts:**
 - Diff source: `git diff main...HEAD` (committed) or `git diff main` (with `--working-tree`).
@@ -150,8 +160,10 @@ Run "git checkout $PRIOR_BRANCH" when ready.
 - Never auto-publish without `--publish`. Default = end-of-run prompt.
 - Never publish anything to GitHub from pure local mode without an explicit PR number supplied at the prompt.
 - Never include AC inferred from diff in final `acceptance-criteria.json` without confirmation when intent mismatch is detected.
-- Never invoke a subagent during Stage 2 (execution) or Stage 3 (report). Stage 2 carve-out is the diff/intent analyzer parallel pair at planning start.
-- Never ask more than one mid-run question per invocation.
+- Never invoke a subagent outside the allow-list above (code-context-analyzer at Stage 1 close, diff/intent-analyzer at Stage 2 planning start).
+- Never bulk-read changed source files / tests / git history yourself in Stage 1 — that's the code-context-analyzer subagent's job. Lazy Read during Stage 2 planning is allowed and audited via `setup_context_reads`.
+- Never ask a question without a one-line justification in REVIEW.md `## Context gaps`.
+- Never ask mid-run during Stage 2 or Stage 3 — all questions must batch at end of Stage 1.
 
 ## What this skill does NOT cover
 
@@ -180,4 +192,6 @@ When args include `--eval-mode --review-dir <PATH>`, skip Stage 1's preflight + 
 
 ## Agents
 
-`agents/diff-analyzer.md`, `agents/intent-analyzer.md`, `agents/grader.md` — invoked only in the Stage 2 carve-out (planning start, parallel pair) and the eval harness.
+- `agents/code-context-analyzer.md` — Stage 1 close. Reads full changed files + matching tests + git history, returns `code-context.json` (≤ 600 words). Mandatory for non-trivial diffs.
+- `agents/diff-analyzer.md`, `agents/intent-analyzer.md` — Stage 2 planning start, parallel pair (existing carve-out).
+- `agents/grader.md` — eval harness only.

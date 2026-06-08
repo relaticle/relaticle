@@ -18,8 +18,8 @@ trait FormatsCustomFields
         }
 
         $result = $record->getRelation('customFieldValues')
-            /** @phpstan-ignore notIdentical.alwaysTrue (orphaned values can exist when a custom field is deleted) */
-            ->filter(fn (CustomFieldValue $fieldValue): bool => $fieldValue->customField !== null)
+            // Skip orphaned values whose custom field was deleted: the eager-loaded relation is null.
+            ->filter(fn (CustomFieldValue $fieldValue): bool => isset($fieldValue->getRelations()['customField']))
             ->mapWithKeys(fn (CustomFieldValue $fieldValue): array => [
                 $fieldValue->customField->code => $this->resolveFieldValue($fieldValue),
             ])

@@ -22,6 +22,7 @@ return [
         'app.relaticle.test',
         parse_url((string) config('app.url'), PHP_URL_HOST),
         config('app.app_panel_domain'),
+        config('app.sysadmin_domain'),
     ]),
 
     /*

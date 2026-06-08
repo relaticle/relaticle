@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ValidTeamSlug;
@@ -83,6 +84,7 @@ final readonly class CreateTeam implements CreatesTeams
             'name' => $input['name'],
             'slug' => $input['slug'],
             'personal_team' => $isFirstTeam,
+            'plan' => Plan::default(),
             'onboarding_use_case' => $input['onboarding_use_case'] ?? null,
             'onboarding_context' => $input['onboarding_context'] ?? null,
             'onboarding_referral_source' => $input['onboarding_referral_source'] ?? null,

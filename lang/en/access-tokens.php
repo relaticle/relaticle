@@ -18,7 +18,7 @@ return [
 
     'form' => [
         'name' => 'Token Name',
-        'team' => 'Team',
+        'team' => 'Workspace',
         'expiration' => 'Expiration',
         'expiration_placeholder' => 'Select expiration...',
         'permissions' => 'Permissions',
@@ -28,7 +28,7 @@ return [
     'table' => [
         'columns' => [
             'name' => 'Name',
-            'team' => 'Team',
+            'team' => 'Workspace',
             'abilities' => 'Permissions',
             'expires_at' => 'Expires',
             'last_used_at' => 'Last Used',

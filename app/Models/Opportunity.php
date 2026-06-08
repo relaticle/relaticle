@@ -12,6 +12,7 @@ use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
 use App\Observers\OpportunityObserver;
 use Database\Factories\OpportunityFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +30,9 @@ use Spatie\EloquentSortable\SortableTrait;
  * @property CreationSource $creation_source
  */
 #[ObservedBy(OpportunityObserver::class)]
+#[Fillable([
+    'creation_source',
+])]
 final class Opportunity extends Model implements HasCustomFields
 {
     use BelongsToTeamCreator;
@@ -44,15 +48,6 @@ final class Opportunity extends Model implements HasCustomFields
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

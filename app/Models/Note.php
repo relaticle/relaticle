@@ -11,6 +11,7 @@ use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,6 +29,9 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
  * @property CreationSource $creation_source
  */
 #[ObservedBy(NoteObserver::class)]
+#[Fillable([
+    'creation_source',
+])]
 final class Note extends Model implements HasCustomFields
 {
     use BelongsToTeamCreator;
@@ -41,15 +45,6 @@ final class Note extends Model implements HasCustomFields
     use InvalidatesRelatedAiSummaries;
     use SoftDeletes;
     use UsesCustomFields;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

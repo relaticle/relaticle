@@ -1,4 +1,4 @@
-@props(['title', 'description' => 'Relaticle - The open-source CRM built for AI agents. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
+@props(['title', 'description' => 'Relaticle - The open-source CRM built for people and AI-powered work. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -25,7 +25,7 @@
     <meta name="twitter:description" content="{{ $ogDescription ?? $description }}" />
     <meta name="twitter:image" content="{{ $ogImage ?? url('/images/open-graph.jpg') }}" />
 
-    <title>{{ $title ?? config('app.name', 'Relaticle - The Open-Source CRM Built for AI Agents') }}</title>
+    <title>{{ $title ?? config('app.name', 'Relaticle - CRM Built for People and AI-Powered Work') }}</title>
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />

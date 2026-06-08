@@ -34,7 +34,10 @@ final readonly class ListNotes
         $request ??= new Request(['filter' => $filters]);
         $filterSchema = new CustomFieldFilterSchema;
 
-        $query = QueryBuilder::for(Note::query()->withCustomFieldValues(), $request)
+        $query = QueryBuilder::for(
+            Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            $request,
+        )
             ->allowedFilters(
                 AllowedFilter::partial('title'),
                 AllowedFilter::scope('notable_type', 'forNotableType'),

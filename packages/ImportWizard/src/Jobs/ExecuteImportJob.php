@@ -15,6 +15,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
@@ -43,6 +46,9 @@ use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkStorage\EntityLinkStorageInterface;
 
+#[Backoff([10, 30])]
+#[Timeout(300)]
+#[Tries(3)]
 final class ExecuteImportJob implements ShouldQueue
 {
     use Batchable;
@@ -50,13 +56,6 @@ final class ExecuteImportJob implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
-
-    public int $timeout = 300;
-
-    public int $tries = 3;
-
-    /** @var list<int> */
-    public array $backoff = [10, 30];
 
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 

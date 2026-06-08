@@ -12,14 +12,17 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class SystemAdminPanelProvider extends PanelProvider
 {
@@ -57,6 +60,8 @@ final class SystemAdminPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('User Management'),
                 NavigationGroup::make()
+                    ->label('AI'),
+                NavigationGroup::make()
                     ->label('CRM'),
                 NavigationGroup::make()
                     ->label('Task Management'),
@@ -87,6 +92,19 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                fn (): string => Blade::render('@env(\'local\')<x-login-link email="sysadmin@relaticle.com" guard="sysadmin" user-model="'.SystemAdministrator::class.'" redirect-url="'.$this->sysadminHomeUrl().'" />@endenv'),
+            )
             ->viteTheme('resources/css/filament/admin/theme.css');
+    }
+
+    private function sysadminHomeUrl(): string
+    {
+        if ($domain = config('app.sysadmin_domain')) {
+            return 'https://'.$domain.'/';
+        }
+
+        return url('/'.config('app.sysadmin_path', 'sysadmin'));
     }
 }

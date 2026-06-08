@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasTeam;
 use App\Observers\AiSummaryObserver;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -14,6 +15,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 #[ObservedBy(AiSummaryObserver::class)]
+#[Fillable([
+    'team_id',
+    'summarizable_type',
+    'summarizable_id',
+    'summary',
+    'model_used',
+    'prompt_tokens',
+    'completion_tokens',
+])]
 final class AiSummary extends Model
 {
     /** @use HasFactory<Factory<self>> */
@@ -21,19 +31,6 @@ final class AiSummary extends Model
 
     use HasTeam;
     use HasUlids;
-
-    /**
-     * @var list<string>
-     */
-    protected $fillable = [
-        'team_id',
-        'summarizable_type',
-        'summarizable_id',
-        'summary',
-        'model_used',
-        'prompt_tokens',
-        'completion_tokens',
-    ];
 
     /**
      * @return array<string, string>
