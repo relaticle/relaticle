@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
 use Database\Factories\UserFactory;
 use Exception;
@@ -199,5 +200,21 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->belongsToTeam($tenant);
+    }
+
+    /**
+     * Whether the user owns or is an Administrator of at least one team.
+     * Team owners are implicitly administrators. Used to gate team creation
+     * when teams.creation_admins_only is enabled.
+     */
+    public function administersAnyTeam(): bool
+    {
+        if ($this->ownedTeams()->exists()) {
+            return true;
+        }
+
+        return $this->teams->contains(
+            fn (Team $team): bool => $this->hasTeamRole($team, TeamRole::Admin->value)
+        );
     }
 }

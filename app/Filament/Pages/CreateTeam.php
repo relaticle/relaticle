@@ -36,6 +36,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -52,6 +53,18 @@ final class CreateTeam extends RegisterTenant
     public function getMaxContentWidth(): Width
     {
         return Width::FiveExtraLarge;
+    }
+
+    /**
+     * Hide the team-registration page (and "new workspace" menu entry) from
+     * users who are not allowed to create teams, per TeamPolicy::create.
+     */
+    public static function canView(): bool
+    {
+        /** @var User|null $user */
+        $user = auth('web')->user();
+
+        return $user !== null && Gate::forUser($user)->check('create', Team::class);
     }
 
     #[Override]

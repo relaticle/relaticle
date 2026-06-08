@@ -30,4 +30,37 @@ return [
         'documentation' => (bool) env('RELATICLE_FEATURE_DOCUMENTATION', true),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registration access control
+    |--------------------------------------------------------------------------
+    |
+    | When invitation_only is true, a new account can only be created for an
+    | email address that has at least one unexpired pending team invitation.
+    | This applies to both password registration and social login
+    | (Google/GitHub) — an uninvited email cannot bootstrap an account.
+    | Existing users are unaffected. Defaults to false so the very first
+    | account/team can be created.
+    |
+    */
+
+    'registration' => [
+        'invitation_only' => (bool) env('RELATICLE_REGISTRATION_INVITATION_ONLY', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Team creation access control
+    |--------------------------------------------------------------------------
+    |
+    | When creation_admins_only is true, only a user who owns or is an
+    | Administrator of at least one existing team may create new teams.
+    | Defaults to false so the first team can be created by anyone.
+    |
+    */
+
+    'teams' => [
+        'creation_admins_only' => (bool) env('RELATICLE_TEAM_CREATION_ADMINS_ONLY', false),
+    ],
+
 ];
