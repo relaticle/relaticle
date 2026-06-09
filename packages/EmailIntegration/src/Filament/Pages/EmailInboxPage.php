@@ -38,6 +38,7 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -53,6 +54,7 @@ use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final class EmailInboxPage extends Page
 {
+    use HasEmailFeatureFlag;
     use WithPagination;
 
     protected string $view = 'filament.pages.email-inbox';

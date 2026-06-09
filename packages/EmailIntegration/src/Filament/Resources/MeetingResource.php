@@ -19,12 +19,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 
 final class MeetingResource extends Resource
 {
+    use HasEmailFeatureFlag;
+
     protected static ?string $model = Meeting::class;
 
     protected static ?string $recordTitleAttribute = 'title';

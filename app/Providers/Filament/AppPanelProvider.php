@@ -8,6 +8,7 @@ use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
 use App\ActivityLog\MeetingEventPalette;
 use App\ActivityLog\MeetingEventRenderer;
+use App\Features\EmailIntegration;
 use App\Features\SocialAuth;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
@@ -138,18 +139,10 @@ final class AppPanelProvider extends PanelProvider
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
-                Action::make('email_privacy')
-                    ->label(__('filament/panel.user_menu.email_privacy'))
-                    ->icon('heroicon-m-shield-check')
-                    ->url(fn (): string => $this->shouldRegisterMenuItem()
-                        ? url(EmailPrivacySettingsPage::getUrl())
-                        : url($panel->getPath())),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
-            ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
-            ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
@@ -227,6 +220,20 @@ final class AppPanelProvider extends PanelProvider
                     PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
                     fn (): View|Factory => view('filament.auth.social_login_buttons')
                 );
+        }
+
+        if (Feature::active(EmailIntegration::class)) {
+            $panel
+                ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
+                ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
+                ->userMenuItems([
+                    Action::make('email_privacy')
+                        ->label(__('filament/panel.user_menu.email_privacy'))
+                        ->icon('heroicon-m-shield-check')
+                        ->url(fn (): string => $this->shouldRegisterMenuItem()
+                            ? url(EmailPrivacySettingsPage::getUrl())
+                            : url($panel->getPath())),
+                ]);
         }
 
         $panel
