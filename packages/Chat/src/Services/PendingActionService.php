@@ -108,31 +108,38 @@ final readonly class PendingActionService
         // Filament panel middleware and therefore leave no tenant context. Without one,
         // the custom-fields TenantScope no-ops and saveCustomFields() iterates EVERY
         // tenant's field definitions — writing value rows across all tenants (cross-tenant
-        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team.
+        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team,
+        // and restore the prior value afterward so the override never outlives this call
+        // (TenantContextService resolves its context before the Filament tenant).
+        $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 
-        $resolved = DB::transaction(function () use ($pendingAction, $user): PendingAction {
-            /** @var PendingAction $pendingAction */
-            $pendingAction = PendingAction::query()
-                ->lockForUpdate()
-                ->findOrFail($pendingAction->getKey());
+        try {
+            $resolved = DB::transaction(function () use ($pendingAction, $user): PendingAction {
+                /** @var PendingAction $pendingAction */
+                $pendingAction = PendingAction::query()
+                    ->lockForUpdate()
+                    ->findOrFail($pendingAction->getKey());
 
-            $this->validateResolvable($pendingAction);
+                $this->validateResolvable($pendingAction);
 
-            $result = $this->executeAction($pendingAction, $user);
+                $result = $this->executeAction($pendingAction, $user);
 
-            $resultData = $result instanceof Model
-                ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
-                : ['success' => true];
+                $resultData = $result instanceof Model
+                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
+                    : ['success' => true];
 
-            $pendingAction->update([
-                'status' => PendingActionStatus::Approved,
-                'resolved_at' => now(),
-                'result_data' => $resultData,
-            ]);
+                $pendingAction->update([
+                    'status' => PendingActionStatus::Approved,
+                    'resolved_at' => now(),
+                    'result_data' => $resultData,
+                ]);
 
-            return $pendingAction->refresh();
-        });
+                return $pendingAction->refresh();
+            });
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+        }
 
         $this->continuation->dispatchAfterApproval($resolved, 'approved');
 
