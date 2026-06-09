@@ -898,7 +898,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.stream.failed', (e) => this.handleStreamFailed(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
-            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
+            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
+            .listen('.chat.paused', (e) => this.handleChatPaused(e));
 
         return readyPromise;
     },
@@ -1431,6 +1432,19 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.queuedSend = null;
         this.clearStreamTimeout();
         this.restoreInputFocus();
+    },
+
+    handleChatPaused(event) {
+        const nowIso = new Date().toISOString();
+        this.messages.push({
+            role: 'assistant',
+            content: event?.message || 'Paused. Say "continue" to keep going.',
+            pending_actions: [], paywall: null, sessionExpired: false,
+            rendered: true, prerendered: false, copiedAt: 0, follow_ups: [],
+            created_at: nowIso,
+        });
+        this.isStreaming = false;
+        this.$nextTick(() => this.restoreInputFocus());
     },
 
     restoreInputFocus() {

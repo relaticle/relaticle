@@ -26,7 +26,9 @@ it('settles or broadcasts on every ContinueChatMessage failure exit', function (
     $failedPos = strpos($source, 'public function failed(');
     expect($failedPos)->not->toBeFalse();
 
-    $failedBody = substr($source, (int) $failedPos, 600);
+    // Scan from failed() to end of file rather than a fixed window: failed() is the
+    // last method that settles/broadcasts, so both markers only appear in its body.
+    $failedBody = substr($source, (int) $failedPos);
     expect($failedBody)->toContain('settleReservedMinimum')
         ->and($failedBody)->toContain('new ChatStreamFailed(');
 });

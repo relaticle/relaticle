@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Events\ChatPaused;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 
@@ -25,6 +26,13 @@ final readonly class ApprovalContinuationService
         }
 
         if ($this->chainCapReached($pendingAction->conversation_id)) {
+            if ($pendingAction->conversation_id !== null) {
+                broadcast(new ChatPaused(
+                    conversationId: (string) $pendingAction->conversation_id,
+                    message: 'Paused after several approvals. Say "continue" to keep going.',
+                ));
+            }
+
             return;
         }
 

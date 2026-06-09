@@ -13,6 +13,8 @@ use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Ai\Exceptions\ProviderOverloadedException;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -21,6 +23,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Throwable;
 
@@ -29,6 +32,8 @@ use Throwable;
 final class ContinueChatMessage implements ShouldQueue
 {
     use Queueable;
+
+    private const int MAX_RATE_LIMIT_RETRIES = 5;
 
     public function __construct(
         public readonly User $user,
@@ -73,7 +78,7 @@ final class ContinueChatMessage implements ShouldQueue
         );
         ChatTelemetry::breadcrumb('continuation.started', ['prompt_length' => strlen($this->prompt)]);
 
-        if (! $creditService->reserveCredit($this->team)) {
+        if ($this->attempts() === 1 && ! $creditService->reserveCredit($this->team)) {
             ChatTelemetry::breadcrumb('continuation.credits_exhausted', []);
             broadcast(new ChatStreamFailed(
                 conversationId: $this->conversationId,
@@ -90,6 +95,10 @@ final class ContinueChatMessage implements ShouldQueue
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
+            $agent->withResolvedActions(
+                resolve(PendingActionService::class)
+                    ->resolvedSinceLastAssistantMessage($this->conversationId),
+            );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
         } catch (Throwable $e) {
@@ -137,9 +146,23 @@ final class ContinueChatMessage implements ShouldQueue
                     resolutionKey: $this->resolutionKey(),
                 );
             });
+        } catch (RateLimitedException|ProviderOverloadedException $e) {
+            if ($this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
+                ChatTelemetry::breadcrumb('continuation.rate_limited_retry', ['attempt' => $this->attempts()]);
+                $this->release($this->retryDelaySeconds($this->attempts()));
+
+                return;
+            }
+
+            throw $e;
         } finally {
             $this->releaseAuth();
         }
+    }
+
+    public function retryDelaySeconds(int $attempts): int
+    {
+        return (int) min(2 ** $attempts, 30);
     }
 
     public function failed(?Throwable $exception): void
@@ -156,9 +179,13 @@ final class ContinueChatMessage implements ShouldQueue
             'exception' => $exception?->getMessage(),
         ]);
 
+        $message = ($exception instanceof RateLimitedException || $exception instanceof ProviderOverloadedException)
+            ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
+            : 'Could not continue the conversation. Please try again.';
+
         broadcast(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: 'Could not continue the conversation. Please try again.',
+            message: $message,
         ));
     }
 
