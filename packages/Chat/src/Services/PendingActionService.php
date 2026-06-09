@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 final readonly class PendingActionService
@@ -102,28 +103,43 @@ final readonly class PendingActionService
 
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
-        $resolved = DB::transaction(function () use ($pendingAction, $user): PendingAction {
-            /** @var PendingAction $pendingAction */
-            $pendingAction = PendingAction::query()
-                ->lockForUpdate()
-                ->findOrFail($pendingAction->getKey());
+        // The action executes the underlying CRM write, which may persist custom-field
+        // values. Approvals arrive via the /chat/actions/* routes, which bypass the
+        // Filament panel middleware and therefore leave no tenant context. Without one,
+        // the custom-fields TenantScope no-ops and saveCustomFields() iterates EVERY
+        // tenant's field definitions — writing value rows across all tenants (cross-tenant
+        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team,
+        // and restore the prior value afterward so the override never outlives this call
+        // (TenantContextService resolves its context before the Filament tenant).
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($pendingAction->team_id);
 
-            $this->validateResolvable($pendingAction);
+        try {
+            $resolved = DB::transaction(function () use ($pendingAction, $user): PendingAction {
+                /** @var PendingAction $pendingAction */
+                $pendingAction = PendingAction::query()
+                    ->lockForUpdate()
+                    ->findOrFail($pendingAction->getKey());
 
-            $result = $this->executeAction($pendingAction, $user);
+                $this->validateResolvable($pendingAction);
 
-            $resultData = $result instanceof Model
-                ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
-                : ['success' => true];
+                $result = $this->executeAction($pendingAction, $user);
 
-            $pendingAction->update([
-                'status' => PendingActionStatus::Approved,
-                'resolved_at' => now(),
-                'result_data' => $resultData,
-            ]);
+                $resultData = $result instanceof Model
+                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
+                    : ['success' => true];
 
-            return $pendingAction->refresh();
-        });
+                $pendingAction->update([
+                    'status' => PendingActionStatus::Approved,
+                    'resolved_at' => now(),
+                    'result_data' => $resultData,
+                ]);
+
+                return $pendingAction->refresh();
+            });
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+        }
 
         $this->continuation->dispatchAfterApproval($resolved, 'approved');
 
