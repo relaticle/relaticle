@@ -21,11 +21,14 @@ use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final class EmailAccountsPage extends Page
 {
+    use HasEmailFeatureFlag;
+
     protected string $view = 'email-integration::filament.pages.email-accounts';
 
     protected static ?string $slug = 'settings/email-accounts';

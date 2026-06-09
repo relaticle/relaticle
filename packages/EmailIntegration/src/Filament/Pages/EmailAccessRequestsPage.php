@@ -19,10 +19,12 @@ use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 final class EmailAccessRequestsPage extends Page
 {
+    use HasEmailFeatureFlag;
     use WithPagination;
 
     private const int PER_PAGE = 20;
