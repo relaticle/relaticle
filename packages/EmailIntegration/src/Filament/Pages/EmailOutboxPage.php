@@ -24,11 +24,13 @@ use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\Email;
 use UnitEnum;
 
 final class EmailOutboxPage extends Page implements HasTable
 {
+    use HasEmailFeatureFlag;
     use InteractsWithTable;
 
     protected string $view = 'email-integration::filament.pages.email-outbox';

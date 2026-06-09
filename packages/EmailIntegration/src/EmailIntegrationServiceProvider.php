@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration;
 
+use App\Features\EmailIntegration;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
@@ -32,6 +34,10 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if (! Feature::active(EmailIntegration::class)) {
+            return;
+        }
+
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
 
         Email::observe(EmailObserver::class);
