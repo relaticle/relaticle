@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 final readonly class PendingActionService
@@ -102,6 +103,14 @@ final readonly class PendingActionService
 
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
+        // The action executes the underlying CRM write, which may persist custom-field
+        // values. Approvals arrive via the /chat/actions/* routes, which bypass the
+        // Filament panel middleware and therefore leave no tenant context. Without one,
+        // the custom-fields TenantScope no-ops and saveCustomFields() iterates EVERY
+        // tenant's field definitions — writing value rows across all tenants (cross-tenant
+        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team.
+        TenantContextService::setTenantId($pendingAction->team_id);
+
         $resolved = DB::transaction(function () use ($pendingAction, $user): PendingAction {
             /** @var PendingAction $pendingAction */
             $pendingAction = PendingAction::query()
