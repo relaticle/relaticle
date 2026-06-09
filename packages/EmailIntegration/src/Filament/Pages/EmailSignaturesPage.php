@@ -16,11 +16,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
 final class EmailSignaturesPage extends Page
 {
+    use HasEmailFeatureFlag;
+
     protected string $view = 'email-integration::filament.pages.email-signatures';
 
     protected static ?string $slug = 'settings/email-signatures';

@@ -17,10 +17,12 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
+    use HasEmailFeatureFlag;
     use InteractsWithSchemas;
 
     protected string $view = 'email-integration::filament.pages.email-privacy-settings';
