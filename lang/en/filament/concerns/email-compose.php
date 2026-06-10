@@ -58,7 +58,13 @@ return [
             'helper_text' => 'Leave blank to send with a 30-second undo window.',
         ],
         'signature' => [
+            'label' => 'Signature',
             'placeholder' => 'No signature',
+        ],
+    ],
+    'sections' => [
+        'settings' => [
+            'description' => 'Privacy, scheduling, and signature options for this email.',
         ],
     ],
 ];
