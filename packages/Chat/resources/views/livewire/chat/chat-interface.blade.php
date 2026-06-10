@@ -1373,6 +1373,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     async retryTurn(msg) {
         if (this.isStreaming) return;
+        if (msg._retrying) return;
+        msg._retrying = true;
 
         if (msg.isContinuation) {
             msg.streamError = null;
@@ -1391,6 +1393,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     const body = await res.json().catch(() => ({}));
                     msg.streamError = body.error || 'Could not resume. Please try again.';
                     msg.retryable = res.status !== 409;
+                    msg._retrying = false;
                     msg.rendered = true;
                     this.isStreaming = false;
                     this.clearStreamTimeout();
@@ -1398,10 +1401,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             } catch {
                 msg.streamError = 'Network error. Please try again.';
                 msg.retryable = true;
+                msg._retrying = false;
                 msg.rendered = true;
                 this.isStreaming = false;
                 this.clearStreamTimeout();
             }
+            msg._retrying = false;
             return;
         }
 
@@ -1412,7 +1417,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         for (let i = idx - 1; i >= 0; i--) {
             if (this.messages[i].role === 'user') { userIndex = i; break; }
         }
-        if (userIndex === -1) return;
+        if (userIndex === -1) {
+            msg._retrying = false;
+            return;
+        }
         const userText = this.messages[userIndex].content;
         this.messages.splice(userIndex);
         this.input = userText;
@@ -1579,7 +1587,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             b.prerendered = false;
         }
         this.isStreaming = false;
+        const queued = this.queuedSend;
         this.queuedSend = null;
+        if (queued) {
+            this.$nextTick(() => this.localEditor()?.setDocument?.(queued.document));
+        }
         this.clearStreamTimeout();
         this.restoreInputFocus();
     },
