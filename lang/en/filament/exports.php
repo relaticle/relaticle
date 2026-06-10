@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'columns' => [
         'id' => 'ID',
-        'team' => 'Team',
+        'team' => 'Workspace',
         'account_owner' => 'Account Owner',
         'creator' => 'Created By',
         'creation_source' => 'Creation Source',

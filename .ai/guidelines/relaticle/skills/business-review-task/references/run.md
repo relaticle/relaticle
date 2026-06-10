@@ -23,6 +23,8 @@ After Stage 1 (Understand) has produced `requirements.md`, write the plan file. 
 
    - Open `checks-matrix.md` — for each element type in `change_types`, scan the per-element checks table and the suggested scenarios column.
    - Read `requirements.md` — confirm the AC list and intent.
+   - Read `$REVIEW_DIR/code-context.json` — module summaries, what tests claim, history signals, blind spots. This is the digested output of Stage 1's code-context-analyzer subagent and the primary source for *what the touched code actually does*.
+   - **Lazy escalation:** if a case needs detail beyond what the summary gives (e.g. exact method signature, full body of a related test), Read the specific file. Record the path in the case's `setup_context_reads: []` — this is the audit trail showing what additional reads were necessary. Do NOT pre-emptively bulk-read; the subagent already did that work in an isolated context.
 
 3. **Plan cases through three lenses**
 
@@ -140,6 +142,7 @@ The plan file at `$REVIEW_DIR/plan.md` has a JSON frontmatter block (HTML commen
 | `change_types` | no | subset of frontmatter's `change_types` this case targets |
 | `viewport` | no | e.g. `"375x667"` for mobile cases; default `1920x1080` |
 | `setup` | yes | array of human-readable setup steps |
+| `setup_context_reads` | no | array of file paths the agent Read during planning beyond what `code-context.json` already summarized — audit trail for lazy escalation (see `references/understand.md` Step 1a) |
 | `verification_steps` | yes | array of step objects — must be non-empty |
 | `screenshot` | yes when `mode: browser` | screenshot spec for the case's main evidence shot |
 

@@ -12,6 +12,7 @@ use AshAllenDesign\FaviconFetcher\Concerns\ValidatesUrls;
 use AshAllenDesign\FaviconFetcher\Contracts\Fetcher;
 use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 
 final class HighQualityDriver implements Fetcher
@@ -64,11 +65,20 @@ final class HighQualityDriver implements Fetcher
         throw new \Exception('fetchAll not supported by HighQualityDriver');
     }
 
+    /**
+     * The favicon-fetcher HTTP client, hardened so every redirect hop is
+     * re-validated against {@see SsrfGuard} (SSRF, CWE-918).
+     */
+    private function guardedHttpClient(): PendingRequest
+    {
+        return $this->httpClient()->withOptions(SsrfGuard::redirectGuardOptions());
+    }
+
     private function tryAppleTouchIcon(string $url): ?Favicon
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($url)
+                fn () => $this->guardedHttpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -103,7 +113,7 @@ final class HighQualityDriver implements Fetcher
 
             $iconUrl = $this->stripPathFromUrl($url).'/apple-touch-icon.png';
             /** @var Response $testResponse */
-            $testResponse = $this->httpClient()->head($iconUrl);
+            $testResponse = $this->guardedHttpClient()->head($iconUrl);
 
             if ($testResponse->successful()) {
                 return new Favicon(
@@ -125,7 +135,7 @@ final class HighQualityDriver implements Fetcher
     {
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($url)
+                fn () => $this->guardedHttpClient()->get($url)
             );
 
             if (! $response->successful()) {
@@ -170,7 +180,7 @@ final class HighQualityDriver implements Fetcher
             }
 
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($faviconUrl)
+                fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -199,7 +209,7 @@ final class HighQualityDriver implements Fetcher
 
         try {
             $response = $this->withRequestExceptionHandling(
-                fn () => $this->httpClient()->get($faviconUrl)
+                fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
             if ($response->successful()) {
@@ -227,7 +237,7 @@ final class HighQualityDriver implements Fetcher
 
         try {
             /** @var Response $response */
-            $response = $this->httpClient()->head($faviconUrl);
+            $response = $this->guardedHttpClient()->head($faviconUrl);
 
             return $response->successful();
         } catch (\Exception) {

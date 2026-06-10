@@ -56,8 +56,6 @@ final class PeopleResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -198,11 +196,6 @@ final class PeopleResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/person.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function getEloquentQuery(): Builder

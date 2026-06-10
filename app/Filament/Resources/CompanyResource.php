@@ -45,8 +45,6 @@ final class CompanyResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -160,11 +158,6 @@ final class CompanyResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/company.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function getGloballySearchableAttributes(): array

@@ -23,6 +23,12 @@ abstract class TestCase extends BaseTestCase
         Http::preventStrayRequests();
         Sleep::fake(syncWithCarbon: true);
         Exceptions::fake();
-        $this->withoutVite();
+
+        // Browser tests drive a real browser and need the built front-end
+        // assets (chat.js registers the `chatEditor` Alpine factory, etc.).
+        // Stubbing @vite would leave those scripts out and break the page.
+        if (! str_contains(static::class, '\\Browser\\')) {
+            $this->withoutVite();
+        }
     }
 }

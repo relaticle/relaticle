@@ -7,4 +7,7 @@ return [
         'workspace' => 'Workspace',
         'emails' => 'Emails',
     ],
+    'items' => [
+        'dashboard' => 'Home',
+    ],
 ];

@@ -19,7 +19,7 @@ final readonly class ScheduleTeamDeletion
 
         if ($team->isPersonalTeam()) {
             throw ValidationException::withMessages([
-                'team' => ['Personal teams cannot be deleted directly.'],
+                'team' => ['Personal workspaces cannot be deleted directly.'],
             ]);
         }
 

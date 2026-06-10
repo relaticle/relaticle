@@ -39,6 +39,7 @@ arch()->preset()
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
         'App\ActivityLog',
+        'Relaticle\Chat',
     ]);
 
 arch('strict types')
@@ -97,10 +98,12 @@ arch('avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
         'App\Health',
+        'App\Http\Controllers\Chat',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -124,6 +127,7 @@ arch('avoid inheritance')
     ->classes()
     ->toExtendNothing()
     ->ignoring([
+        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
@@ -141,11 +145,6 @@ arch('avoid inheritance')
         'App\Scribe',
         'App\View',
     ]);
-
-// arch('annotations')
-//    ->expect('App')
-//    ->toHavePropertiesDocumented()
-//    ->toHaveMethodsDocumented();
 
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
