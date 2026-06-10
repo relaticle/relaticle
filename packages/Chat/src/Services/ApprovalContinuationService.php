@@ -18,6 +18,26 @@ final readonly class ApprovalContinuationService
 
     public function dispatchAfterApproval(PendingAction $pendingAction, string $status): void
     {
+        if ($this->chainCapReached($pendingAction->conversation_id)) {
+            if ($pendingAction->conversation_id !== null) {
+                broadcast(new ChatPaused(
+                    conversationId: (string) $pendingAction->conversation_id,
+                    message: 'Paused after several approvals — press Continue to keep going.',
+                ));
+            }
+
+            return;
+        }
+
+        $this->dispatchContinuation($pendingAction, $status);
+    }
+
+    /**
+     * Resume is an explicit user action, so it bypasses the chain cap — it IS
+     * the cap's escape hatch.
+     */
+    public function dispatchContinuation(PendingAction $pendingAction, string $status): void
+    {
         $team = Team::query()->find($pendingAction->team_id);
         $user = User::query()->find($pendingAction->user_id);
 
@@ -25,24 +45,11 @@ final readonly class ApprovalContinuationService
             return;
         }
 
-        if ($this->chainCapReached($pendingAction->conversation_id)) {
-            if ($pendingAction->conversation_id !== null) {
-                broadcast(new ChatPaused(
-                    conversationId: (string) $pendingAction->conversation_id,
-                    message: 'Paused after several approvals. Say "continue" to keep going.',
-                ));
-            }
-
-            return;
-        }
-
-        $prompt = $this->buildPrompt($pendingAction, $status);
-
         dispatch(new ContinueChatMessage(
             user: $user,
             team: $team,
             conversationId: (string) $pendingAction->conversation_id,
-            prompt: $prompt,
+            prompt: $this->buildPrompt($pendingAction, $status),
             turnId: (string) Str::ulid(),
         ));
     }

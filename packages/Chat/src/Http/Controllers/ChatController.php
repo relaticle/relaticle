@@ -24,8 +24,11 @@ use Relaticle\Chat\Actions\RenameConversation;
 use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
+use Relaticle\Chat\Services\ApprovalContinuationService;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\TitleSanitizer;
@@ -216,6 +219,31 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
+    }
+
+    public function resume(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if($conversation === null, 404);
+        abort_if(
+            $conversation->user_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+            403,
+        );
+
+        $action = resolve(PendingActionService::class)->latestUnjournaledResolvedAction($conversationId);
+
+        if (! $action instanceof PendingAction) {
+            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
+        }
+
+        resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
+
+        return response()->json(['status' => 'resuming']);
     }
 
     public function mentions(Request $request): JsonResponse

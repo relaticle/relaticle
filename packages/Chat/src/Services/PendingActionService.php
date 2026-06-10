@@ -314,6 +314,35 @@ final readonly class PendingActionService
         ], $actions->all()));
     }
 
+    /**
+     * The most recently resolved (approved/rejected) action that no assistant
+     * turn has journaled yet — i.e. the action whose continuation was lost.
+     * Used by the resume endpoint to re-drive the chain.
+     */
+    public function latestUnjournaledResolvedAction(string $conversationId): ?PendingAction
+    {
+        $lastAssistantAt = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'assistant')
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->value('created_at');
+
+        $query = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->whereIn('status', [
+                PendingActionStatus::Approved->value,
+                PendingActionStatus::Rejected->value,
+            ])
+            ->whereNotNull('resolved_at');
+
+        if ($lastAssistantAt !== null) {
+            $query->where('resolved_at', '>', $lastAssistantAt);
+        }
+
+        return $query->latest('resolved_at')->orderByDesc('id')->first();
+    }
+
     private function resolveActionLabel(PendingAction $action): ?string
     {
         $display = $action->display_data;
