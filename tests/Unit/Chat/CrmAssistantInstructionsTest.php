@@ -45,9 +45,15 @@ it('appends a superseded_proposals block when proposals are passed in', function
 it('keeps the superseded behavior rule in the base prompt so the model always sees it', function (): void {
     $instructions = (new CrmAssistant)->instructions();
 
+    expect($instructions)->toContain('## Superseded Proposals');
+});
+
+it('forbids pointing the user at a superseded proposal and re-proposes on resume (F-1 deadlock guard)', function (): void {
+    $instructions = (new CrmAssistant)->instructions();
+
     expect($instructions)
-        ->toContain('## Superseded Proposals')
-        ->toContain('do NOT silently re-propose');
+        ->toContain('NEVER tell the user to approve or reject a superseded proposal')
+        ->toContain('create a FRESH proposal for the next step');
 });
 
 it('tells the model it can delete multiple records in one call', function (): void {

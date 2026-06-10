@@ -966,8 +966,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     startStreamTimeout() {
         this.clearStreamTimeout();
-        this.streamTimeoutId = setTimeout(() => {
+        this.streamTimeoutId = setTimeout(async () => {
             if (!this.isStreaming) return;
+            // A lost stream_end stranded this turn: reconcile from the DB so the
+            // final text AND any proposal card self-heal instead of showing a
+            // truncated bubble with a missing approve/reject CTA until reload.
+            await this.reconcileLatestAssistant();
             const assistantMsg = this.messages[this.messages.length - 1];
             if (assistantMsg?.role === 'assistant') {
                 if (!assistantMsg.content) {
@@ -1378,23 +1382,39 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
+    // Reconcile the last assistant bubble against persisted state: pull the
+    // authoritative text (missed deltas) AND merge any still-pending proposal
+    // cards the client never received (a dropped .tool_result would otherwise
+    // leave the approve/reject CTA missing until a full reload). Purely additive
+    // for cards — on the happy path the card is already present, so this is a
+    // no-op. Used by both stream_end and the watchdog timeout.
+    async reconcileLatestAssistant() {
+        const assistantMsg = this.messages[this.messages.length - 1];
+        if (assistantMsg?.role !== 'assistant') return;
+        try {
+            const authoritative = await this.$wire.latestAssistantMessage();
+            if (!authoritative) return;
+            if (authoritative.content && authoritative.content !== assistantMsg.content) {
+                assistantMsg.content = authoritative.content;
+                assistantMsg.id = authoritative.id;
+                assistantMsg.rendered = false;
+                assistantMsg.prerendered = false;
+            }
+            if (!Array.isArray(assistantMsg.pending_actions)) assistantMsg.pending_actions = [];
+            const have = new Set(assistantMsg.pending_actions.map((a) => a.pending_action_id));
+            for (const card of (authoritative.pending_actions || [])) {
+                if (!have.has(card.pending_action_id)) assistantMsg.pending_actions.push(card);
+            }
+        } catch (e) {
+            // Non-fatal: keep the streamed content if reconciliation fails.
+        }
+    },
+
     async handleStreamEnd() {
         this.currentToolStatus = null;
+        await this.reconcileLatestAssistant();
         const assistantMsg = this.messages[this.messages.length - 1];
         if (assistantMsg?.role === 'assistant') {
-            // Reconcile against the persisted message so missed live deltas
-            // (subscription lag / drop) never leave a truncated final bubble.
-            try {
-                const authoritative = await this.$wire.latestAssistantMessage();
-                if (authoritative && authoritative.content && authoritative.content !== assistantMsg.content) {
-                    assistantMsg.content = authoritative.content;
-                    assistantMsg.id = authoritative.id;
-                    assistantMsg.rendered = false;
-                    assistantMsg.prerendered = false;
-                }
-            } catch (e) {
-                // Non-fatal: keep the streamed content if reconciliation fails.
-            }
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
         }

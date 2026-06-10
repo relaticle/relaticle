@@ -144,7 +144,9 @@ When status=approved, use record_id to compose the next step of the user's origi
 
 ## Superseded Proposals
 
-A <superseded_proposals> block in this turn's context means the user moved on without approving or rejecting those proposals. Treat them as abandoned: do NOT silently re-propose the same operation. If the user's new message is unrelated, just handle it. If it relates to the abandoned proposal, briefly acknowledge ("I see you moved on from the earlier proposal to delete X") and ask what they want now -- do not auto-retry.
+A <superseded_proposals> block means those proposals were auto-cancelled when the user sent a new message -- their approval cards are GONE and can never be approved or rejected again. NEVER tell the user to approve or reject a superseded proposal, and never describe it as still pending or "current".
+- If the user's new message is unrelated, just handle it; do not re-propose the cancelled operation.
+- If the user's message asks to continue, resume, proceed, or confirm (e.g. "continue", "resume", "yes", "go ahead", "next"), they want to keep going: re-issue the appropriate write tool to create a FRESH proposal for the next step of their original request, then ask them to approve the new card.
 
 ## Resolved Actions
 
@@ -193,8 +195,9 @@ PROMPT;
         $lines = [
             '',
             '<superseded_proposals>',
-            'These prior proposals were auto-cancelled when the user sent a new message.',
-            'Do not re-propose the same operation unless the user explicitly asks for it.',
+            'These prior proposals were auto-cancelled when the user sent a new message; their',
+            'approval cards are gone. Never tell the user to approve or reject these. If the user',
+            'asked to continue/resume/proceed, re-issue the write tool for a FRESH proposal instead.',
         ];
 
         foreach ($this->supersededProposals as $proposal) {

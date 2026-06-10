@@ -8,6 +8,8 @@ use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Actions\ListConversationMessages;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -86,9 +88,13 @@ final class ChatInterface extends BaseLivewireComponent
 
     /**
      * Authoritative latest assistant message for the conversation, used by the
-     * client to reconcile the streamed bubble against persisted state on stream_end.
+     * client to reconcile the streamed bubble against persisted state on stream_end
+     * (and on the watchdog timeout). Also returns the conversation's still-pending
+     * proposal cards so a dropped `.tool_result` websocket event — which would
+     * otherwise leave the approve/reject CTA missing until a full reload — is
+     * self-healed by the client merging any cards it never received.
      *
-     * @return array{id: string, content: string}|null
+     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>}|null
      */
     public function latestAssistantMessage(): ?array
     {
@@ -112,7 +118,39 @@ final class ChatInterface extends BaseLivewireComponent
             return null;
         }
 
-        return ['id' => (string) $row->id, 'content' => (string) $row->content];
+        return [
+            'id' => (string) $row->id,
+            'content' => (string) $row->content,
+            'pending_actions' => $this->pendingActionCards(),
+        ];
+    }
+
+    /**
+     * Still-pending (and not-yet-expired) proposal cards for this conversation,
+     * shaped exactly as the live `.tool_result` payload the client renders. Used
+     * only for reconciliation, so the conversation ownership is already verified
+     * by latestAssistantMessage()'s scoped query before this runs.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pendingActionCards(): array
+    {
+        $actions = PendingAction::query()
+            ->where('conversation_id', $this->conversationId)
+            ->where('status', PendingActionStatus::Pending)
+            ->where('expires_at', '>', now())
+            ->oldest()
+            ->get();
+
+        return array_values(array_map(static fn (PendingAction $action): array => [
+            'type' => 'pending_action',
+            'pending_action_id' => (string) $action->getKey(),
+            'operation' => $action->operation->value,
+            'entity_type' => $action->entity_type,
+            'data' => $action->action_data,
+            'display' => $action->display_data,
+            'status' => 'pending',
+        ], $actions->all()));
     }
 
     public function render(): View
