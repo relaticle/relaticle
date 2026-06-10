@@ -80,6 +80,8 @@ final class EmailAccountsPage extends Page
             ->icon('heroicon-o-plus')
             ->color('info')
             ->size(Size::Small)
+            // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
+            ->hidden()
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
     }
 
