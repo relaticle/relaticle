@@ -251,6 +251,73 @@ final readonly class PendingActionService
         });
     }
 
+    /**
+     * Actions on this conversation resolved AFTER the latest assistant message —
+     * i.e. decisions the replayed transcript does not yet reflect. Used to inject
+     * a <resolved_actions> block so the model's knowledge of approvals does not
+     * depend on the AI continuation having successfully journaled them.
+     *
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     */
+    public function resolvedSinceLastAssistantMessage(string $conversationId): array
+    {
+        $lastAssistantAt = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'assistant')
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->value('created_at');
+
+        $query = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->whereIn('status', [
+                PendingActionStatus::Approved->value,
+                PendingActionStatus::Rejected->value,
+                PendingActionStatus::Expired->value,
+                PendingActionStatus::Superseded->value,
+            ])
+            ->whereNotNull('resolved_at');
+
+        if ($lastAssistantAt !== null) {
+            $query->where('resolved_at', '>', $lastAssistantAt);
+        }
+
+        $actions = $query->oldest('resolved_at')->limit(20)->get();
+
+        return array_values(array_map(fn (PendingAction $action): array => [
+            'operation' => $action->operation->value,
+            'entity_type' => $action->entity_type,
+            'status' => $action->status->value,
+            'label' => $this->resolveActionLabel($action),
+            'record_id' => $this->resolveResultRecordId($action),
+        ], $actions->all()));
+    }
+
+    private function resolveActionLabel(PendingAction $action): ?string
+    {
+        $display = $action->display_data;
+        $data = $action->action_data;
+
+        foreach (['name', 'title'] as $field) {
+            if (isset($display[$field]) && is_string($display[$field]) && $display[$field] !== '') {
+                return $display[$field];
+            }
+            if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
+                return $data[$field];
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveResultRecordId(PendingAction $action): ?string
+    {
+        $resultData = $action->result_data;
+        $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
+
+        return is_string($recordId) && $recordId !== '' ? $recordId : null;
+    }
+
     private function validateResolvable(PendingAction $pendingAction): void
     {
         if ($pendingAction->isPending() && $pendingAction->isExpired()) {

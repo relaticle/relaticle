@@ -79,6 +79,15 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public array $supersededProposals = [];
 
+    /**
+     * Actions already resolved (approved/rejected/expired/superseded) since the
+     * last assistant turn, injected so the model knows their outcome even if the
+     * approval continuation never journaled them into the transcript.
+     *
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     */
+    public array $resolvedActions = [];
+
     public function withConversationId(?string $conversationId): self
     {
         $this->conversationId = $conversationId;
@@ -112,6 +121,7 @@ For any create, update, or delete operation:
 - The tool returns a pending_action proposal -- do NOT tell the user the action was completed
 - Tell the user you've proposed the action and ask them to review the proposal card above
 - Wait for the user to approve or reject before proceeding
+- If a multi-step sequence pauses, tell the user it paused and that they can say "continue" to resume; then resume from the resolved actions when they do
 
 ## Formatting
 - Use markdown for rich text formatting
@@ -135,9 +145,17 @@ When status=approved, use record_id to compose the next step of the user's origi
 ## Superseded Proposals
 
 A <superseded_proposals> block in this turn's context means the user moved on without approving or rejecting those proposals. Treat them as abandoned: do NOT silently re-propose the same operation. If the user's new message is unrelated, just handle it. If it relates to the abandoned proposal, briefly acknowledge ("I see you moved on from the earlier proposal to delete X") and ask what they want now -- do not auto-retry.
+
+## Resolved Actions
+
+A <resolved_actions> block lists proposals the user has ALREADY approved or rejected
+since your last reply. They are final -- never re-propose them. When an item is
+"approved" and carries an id, use that id to continue any multi-step request the user
+started (e.g. propose the next item, or link to the just-created record). When an item
+is "rejected", do not retry it; ask what the user wants instead.
 PROMPT;
 
-        $suffix = $this->mentionsBlock().$this->supersededBlock();
+        $suffix = $this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
 
         return $suffix === '' ? $base : $base.$suffix;
     }
@@ -191,6 +209,36 @@ PROMPT;
         return "\n".implode("\n", $lines);
     }
 
+    private function resolvedBlock(): string
+    {
+        if ($this->resolvedActions === []) {
+            return '';
+        }
+
+        $lines = [
+            '',
+            '<resolved_actions>',
+            'These proposals were already decided by the user. Do not re-propose them.',
+            'Use an approved record id to continue any multi-step request still in progress.',
+        ];
+
+        foreach ($this->resolvedActions as $action) {
+            $label = $action['label'] !== null
+                ? '"'.$this->sanitizeLabel($action['label']).'"'
+                : '(unnamed)';
+
+            $idPart = ($action['status'] === 'approved' && isset($action['record_id']) && $action['record_id'] !== '')
+                ? " (id: {$action['record_id']})"
+                : '';
+
+            $lines[] = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$label}{$idPart}";
+        }
+
+        $lines[] = '</resolved_actions>';
+
+        return "\n".implode("\n", $lines);
+    }
+
     /**
      * Set the per-turn mention context that will be appended to instructions().
      *
@@ -209,6 +257,16 @@ PROMPT;
     public function withSupersededProposals(array $proposals): self
     {
         $this->supersededProposals = $proposals;
+
+        return $this;
+    }
+
+    /**
+     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>  $resolved
+     */
+    public function withResolvedActions(array $resolved): self
+    {
+        $this->resolvedActions = $resolved;
 
         return $this;
     }

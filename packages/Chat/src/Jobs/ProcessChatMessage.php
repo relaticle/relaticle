@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Exceptions\ProviderOverloadedException;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\StreamEvent;
@@ -38,6 +41,8 @@ use Throwable;
 final class ProcessChatMessage implements ShouldQueue
 {
     use Queueable;
+
+    private const int MAX_RATE_LIMIT_RETRIES = 5;
 
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
@@ -91,8 +96,8 @@ final class ProcessChatMessage implements ShouldQueue
         );
         ChatTelemetry::breadcrumb('job.started', ['message_length' => strlen($this->message)]);
 
-        $superseded = resolve(PendingActionService::class)
-            ->supersedePendingForConversation($this->conversationId);
+        $pendingActions = resolve(PendingActionService::class);
+        $superseded = $pendingActions->supersedePendingForConversation($this->conversationId);
 
         if ($superseded !== []) {
             ChatTelemetry::breadcrumb('pending_actions.superseded', [
@@ -113,6 +118,9 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withMentions($this->mentions);
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
+            $agent->withResolvedActions(
+                $pendingActions->resolvedSinceLastAssistantMessage($this->conversationId),
+            );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
         } catch (Throwable $e) {
@@ -200,9 +208,42 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->materializeAssistantDocument($streamedResponse);
                 $this->broadcastFollowUps($streamedResponse);
             });
+        } catch (Throwable $e) {
+            // Rate-limit / overloaded errors are transient -> release with backoff.
+            // release() does not count against MaxExceptions(1); attempts() increments
+            // each retry. Bounded by this cap AND the job's retryUntil() (now+3min).
+            // Anything else rethrows and fails fast, exactly as before.
+            if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
+                ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
+                $this->release($this->retryDelaySeconds($this->attempts()));
+
+                return;
+            }
+
+            throw $e;
         } finally {
             $this->releaseAuth();
         }
+    }
+
+    public function retryDelaySeconds(int $attempts): int
+    {
+        return (int) min(2 ** $attempts, 30);
+    }
+
+    /**
+     * The provider surfaces a 429 as a typed RateLimitedException on its wrapped
+     * (non-streaming) path, but as a raw HTTP-client RequestException on the
+     * streaming path. Treat both — plus overloaded (529/503) — as retryable.
+     */
+    public function isRateLimited(?Throwable $e): bool
+    {
+        if ($e instanceof RateLimitedException || $e instanceof ProviderOverloadedException) {
+            return true;
+        }
+
+        return $e instanceof RequestException
+            && in_array($e->response->status(), [429, 529, 503], true);
     }
 
     public function failed(?Throwable $exception): void
@@ -220,9 +261,13 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
+        $message = $this->isRateLimited($exception)
+            ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
+            : 'The assistant encountered an error. Please try again.';
+
         broadcast(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: 'The assistant encountered an error. Please try again.',
+            message: $message,
         ));
     }
 
