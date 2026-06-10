@@ -7,15 +7,14 @@ namespace Relaticle\EmailIntegration\Controllers;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as TwoUser;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
+use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use RuntimeException;
 use Throwable;
 
@@ -46,28 +45,17 @@ final readonly class CallbackController
         $grantedScopes = $socialUser->approvedScopes;
         $hasCalendar = $this->detectCalendarCapability($provider, $grantedScopes);
 
-        $account = DB::transaction(fn (): ConnectedAccount => ConnectedAccount::query()->updateOrCreate(
-            [
-                'user_id' => $user->getKey(),
-                'provider' => $provider,
-                'email_address' => $socialUser->getEmail(),
-                'team_id' => $user->currentTeam->getKey(),
-            ],
-            [
-                'display_name' => $socialUser->getName(),
-                'provider_account_id' => $socialUser->getId(),
-                'access_token' => $socialUser->token,
-                'refresh_token' => $socialUser->refreshToken,
-                'token_expires_at' => now()->addSeconds($socialUser->expiresIn),
-                'status' => 'active',
-                'last_error' => null,
-                'auto_create_companies' => true,
-                'contact_creation_mode' => ContactCreationMode::All,
-                'capabilities' => [
-                    'email' => true,
-                    'calendar' => $hasCalendar,
-                ],
-            ]
+        $account = resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
+            userId: $user->getKey(),
+            teamId: $user->currentTeam->getKey(),
+            provider: $provider,
+            emailAddress: $socialUser->getEmail(),
+            displayName: $socialUser->getName(),
+            providerAccountId: $socialUser->getId(),
+            accessToken: $socialUser->token,
+            refreshToken: $socialUser->refreshToken,
+            tokenExpiresAt: now()->addSeconds($socialUser->expiresIn),
+            hasCalendar: $hasCalendar,
         ));
 
         if ($hasCalendar) {
