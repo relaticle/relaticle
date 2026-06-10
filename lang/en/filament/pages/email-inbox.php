@@ -113,7 +113,11 @@ return [
             'helper_text' => 'Defaults to your team or personal sharing setting.',
         ],
         'signature' => [
+            'label' => 'Signature',
             'placeholder' => 'No signature',
+        ],
+        'settings' => [
+            'description' => 'Privacy and signature options for this email.',
         ],
     ],
     'reply_form' => [

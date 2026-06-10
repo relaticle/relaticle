@@ -19,6 +19,15 @@
                                 Synced {{ $account->last_synced_at->diffForHumans() }}
                             </span>
                         @endif
+                        <div class="flex shrink-0 items-center gap-2">
+                            @if (in_array($account->status, [\Relaticle\EmailIntegration\Enums\EmailAccountStatus::REAUTH_REQUIRED, \Relaticle\EmailIntegration\Enums\EmailAccountStatus::ERROR], true))
+                                {{ ($this->reAuthAction)(['account_id' => $account->id]) }}
+                            @endif
+                            {{ ($this->syncCalendarNowAction)(['account_id' => $account->id]) }}
+                            {{ ($this->syncCalendarAction)(['account_id' => $account->id]) }}
+                            {{ ($this->editSettingsAction)(['account_id' => $account->id]) }}
+                            {{ ($this->disconnectAction)(['account_id' => $account->id]) }}
+                        </div>
                     </div>
                 </div>
             @empty
@@ -33,4 +42,6 @@
             </div>
         </x-filament::section>
     </div>
+
+    <x-filament-actions::modals />
 </x-filament-panels::page>
