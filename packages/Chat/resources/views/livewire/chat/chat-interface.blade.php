@@ -1460,7 +1460,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 assistantMsg.prerendered = false;
             }
             if (!Array.isArray(assistantMsg.pending_actions)) assistantMsg.pending_actions = [];
-            const have = new Set(assistantMsg.pending_actions.map((a) => a.pending_action_id));
+            // Span ALL bubbles: a card already rendered in an earlier bubble must
+            // not be merged again into this one (it would show twice).
+            const have = new Set(this.messages.flatMap((m) =>
+                (m.pending_actions || []).map((a) => a.pending_action_id)));
             for (const card of (authoritative.pending_actions || [])) {
                 if (!have.has(card.pending_action_id)) assistantMsg.pending_actions.push(card);
             }
