@@ -465,6 +465,63 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (! wrapper || ! window.Alpine) return null;
         return window.Alpine.$data(wrapper);
     },
+
+    // Single source of truth for the assistant-bubble shape. Every streamed
+    // turn renders into a stub minted here; invocationId binds the bubble to
+    // one laravel/ai stream() call (fresh uuid per job attempt), which is what
+    // prevents retry re-streams and later turns from appending into it.
+    mintAssistantStub(extra = {}) {
+        const stub = {
+            role: 'assistant',
+            content: '',
+            pending_actions: [],
+            paywall: null,
+            sessionExpired: false,
+            rendered: false,
+            prerendered: false,
+            copiedAt: 0,
+            follow_ups: [],
+            created_at: new Date().toISOString(),
+            invocationId: null,
+            streamError: null,
+            retryable: false,
+            isContinuation: false,
+            ...extra,
+        };
+        this.messages.push(stub);
+        return stub;
+    },
+
+    lastAssistantBubble() {
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'assistant') return this.messages[i];
+        }
+        return null;
+    },
+
+    // Resolve which bubble a stream event belongs to.
+    //  - same invocation        -> that bubble
+    //  - unbound in-flight stub -> bind it (first event of the turn)
+    //  - different invocation on an UNRENDERED bubble -> the job retried and is
+    //    re-streaming from the top: reset the partial text, rebind (de-dupes)
+    //  - otherwise (last bubble already rendered) -> a turn we never minted a
+    //    stub for (e.g. resume) -> mint one bound to this invocation
+    targetBubbleFor(invocationId) {
+        const b = this.lastAssistantBubble();
+        if (b && b.invocationId === invocationId) return b;
+        if (b && !b.rendered) {
+            if (b.invocationId == null) {
+                b.invocationId = invocationId;
+                return b;
+            }
+            b.invocationId = invocationId;
+            b.content = '';
+            b._needsSeparator = false;
+            return b;
+        }
+        return this.mintAssistantStub({ invocationId });
+    },
+
     modelOptions: [
         { value: 'auto', label: 'Auto', provider: null },
         { value: 'claude-sonnet', label: 'Sonnet 4.6', provider: 'anthropic' },
@@ -891,6 +948,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.channel.readyPromise = readyPromise;
 
         this.channel
+            .listen('.stream_start', (e) => this.handleStreamStart(e))
             .listen('.text_delta', (e) => this.handleTextDelta(e))
             .listen('.tool_call', (e) => this.handleToolCall(e))
             .listen('.tool_result', (e) => this.handleToolResult(e))
@@ -1042,7 +1100,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
             this.messages.push({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso });
-            this.messages.push({ role: 'assistant', content: '', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, copiedAt: 0, follow_ups: [], created_at: nowIso });
+            this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
             this.currentToolStatus = null;
@@ -1173,7 +1231,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.input = '';
         this.currentToolStatus = null;
 
-        this.messages.push({ role: 'assistant', content: '', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, copiedAt: 0, follow_ups: [], created_at: nowIso });
+        this.mintAssistantStub();
 
         const url = this.conversationId
             ? sendUrl.replace(/\/$/, '') + '/' + this.conversationId
@@ -1287,21 +1345,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.restoreInputFocus();
     },
 
+    handleStreamStart(event) {
+        this.startStreamTimeout();
+        this.targetBubbleFor(event.invocation_id ?? null);
+    },
+
     handleTextDelta(event) {
         this.startStreamTimeout();
         this.currentToolStatus = null;
-        const assistantMsg = this.messages[this.messages.length - 1];
-        if (assistantMsg?.role === 'assistant') {
-            let delta = event.delta || '';
+        const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
+        let delta = event.delta || '';
 
-            if (assistantMsg._needsSeparator && delta && !/^\s/.test(delta)) {
-                delta = ' ' + delta;
-                assistantMsg._needsSeparator = false;
-            }
-
-            assistantMsg.content += delta;
-            this.scrollToBottom();
+        if (assistantMsg._needsSeparator && delta && !/^\s/.test(delta)) {
+            delta = ' ' + delta;
+            assistantMsg._needsSeparator = false;
         }
+
+        assistantMsg.content += delta;
+        this.scrollToBottom();
     },
 
     // Approve/reject triggers a backend continuation that streams a fresh
@@ -1317,21 +1378,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // mint the stub (leaving isStreaming permanently true on an empty bubble).
     // Returns a revert handle for use when the POST fails.
     beginContinuationTurn() {
-        if (this.isStreaming) return () => {};
-
-        const stub = {
-            role: 'assistant',
-            content: '',
-            pending_actions: [],
-            paywall: null,
-            sessionExpired: false,
-            rendered: false,
-            prerendered: false,
-            copiedAt: 0,
-            follow_ups: [],
-            created_at: new Date().toISOString(),
-        };
-        this.messages.push(stub);
+        const stub = this.mintAssistantStub({ isContinuation: true });
         this.currentToolStatus = null;
         this.isStreaming = true;
         this.startStreamTimeout();
@@ -1354,8 +1401,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     handleToolCall(event) {
         this.startStreamTimeout();
         this.currentToolStatus = this.friendlyToolStatus(event?.tool_name);
-        const assistantMsg = this.messages[this.messages.length - 1];
-        if (assistantMsg?.role === 'assistant' && assistantMsg.content && !/\s$/.test(assistantMsg.content)) {
+        const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
+        if (assistantMsg.content && !/\s$/.test(assistantMsg.content)) {
             assistantMsg._needsSeparator = true;
         }
         this.scrollToBottom();
