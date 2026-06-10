@@ -88,6 +88,7 @@ return [
     'waits' => [
         'redis:default' => 60,
         'redis:imports' => 120,
+        'redis:chat' => 30,
     ],
 
     /*
