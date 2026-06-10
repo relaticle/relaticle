@@ -11,7 +11,6 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
-use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class CreateOpportunityTool extends BaseWriteCreateTool
@@ -40,30 +39,34 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
         ];
     }
 
-    protected function extractActionData(Request $request): array
+    protected function extractRecordData(array $record): array
     {
         return array_filter([
-            'name' => (string) $request->string('name'),
-            'company_id' => $request['company_id'] ?? null,
-            'contact_id' => $request['contact_id'] ?? null,
+            'name' => (string) ($record['name'] ?? ''),
+            'company_id' => $record['company_id'] ?? null,
+            'contact_id' => $record['contact_id'] ?? null,
         ], static fn (mixed $v): bool => $v !== null && $v !== '');
     }
 
-    protected function buildDisplayData(Request $request): array
+    protected function buildRecordDisplay(array $record): array
     {
         /** @var User $user */
         $user = auth()->user();
         $team = $user->currentTeam;
 
-        $name = (string) $request->string('name');
+        $name = (string) ($record['name'] ?? '');
         $fields = [['label' => 'Name', 'value' => $name]];
 
-        $companyName = $this->nameForId($this->stringOrNull($request, 'company_id'), Company::class, 'name', $team);
+        $companyId = $record['company_id'] ?? null;
+        $companyId = is_string($companyId) && $companyId !== '' ? $companyId : null;
+        $companyName = $this->nameForId($companyId, Company::class, 'name', $team);
         if ($companyName !== '') {
             $fields[] = ['label' => 'Company', 'value' => $companyName];
         }
 
-        $contactName = $this->nameForId($this->stringOrNull($request, 'contact_id'), People::class, 'name', $team);
+        $contactId = $record['contact_id'] ?? null;
+        $contactId = is_string($contactId) && $contactId !== '' ? $contactId : null;
+        $contactName = $this->nameForId($contactId, People::class, 'name', $team);
         if ($contactName !== '') {
             $fields[] = ['label' => 'Contact', 'value' => $contactName];
         }
@@ -73,13 +76,6 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
             'summary' => "Create opportunity \"{$name}\"",
             'fields' => $fields,
         ];
-    }
-
-    private function stringOrNull(Request $request, string $key): ?string
-    {
-        $value = $request[$key] ?? null;
-
-        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

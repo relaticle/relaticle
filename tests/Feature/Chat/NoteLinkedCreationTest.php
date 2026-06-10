@@ -35,15 +35,11 @@ beforeEach(function (): void {
     ]);
 });
 
-it('CreateNoteTool exposes people_ids, company_ids, and opportunity_ids in the schema', function (): void {
+it('CreateNoteTool wraps entity fields inside a records[] schema', function (): void {
     $tool = resolve(CreateNoteTool::class);
     $schema = $tool->schema(new JsonSchemaTypeFactory);
 
-    expect($schema)
-        ->toHaveKey('title')
-        ->toHaveKey('people_ids')
-        ->toHaveKey('company_ids')
-        ->toHaveKey('opportunity_ids');
+    expect($schema)->toHaveKey('records');
 });
 
 it('persists people_ids in the pending action data', function (): void {
@@ -53,8 +49,7 @@ it('persists people_ids in the pending action data', function (): void {
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'title' => 'Discovery call notes',
-        'people_ids' => [(string) $angel->id],
+        'records' => [['title' => 'Discovery call notes', 'people_ids' => [(string) $angel->id]]],
     ]));
 
     $pending = PendingAction::query()
@@ -134,9 +129,7 @@ it('renders linked names in the proposal display data', function (): void {
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'title' => 'Discovery',
-        'people_ids' => [(string) $angel->id],
-        'company_ids' => [(string) $acme->id],
+        'records' => [['title' => 'Discovery', 'people_ids' => [(string) $angel->id], 'company_ids' => [(string) $acme->id]]],
     ]));
 
     $pending = PendingAction::query()

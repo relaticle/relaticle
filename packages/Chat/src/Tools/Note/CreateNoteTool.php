@@ -12,7 +12,6 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
-use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
@@ -45,36 +44,36 @@ final class CreateNoteTool extends BaseWriteCreateTool
         ];
     }
 
-    protected function extractActionData(Request $request): array
+    protected function extractRecordData(array $record): array
     {
         return array_filter([
-            'title' => (string) $request->string('title'),
-            'people_ids' => $this->idListOrNull($request, 'people_ids'),
-            'company_ids' => $this->idListOrNull($request, 'company_ids'),
-            'opportunity_ids' => $this->idListOrNull($request, 'opportunity_ids'),
+            'title' => (string) ($record['title'] ?? ''),
+            'people_ids' => $this->idListFromArray($record, 'people_ids'),
+            'company_ids' => $this->idListFromArray($record, 'company_ids'),
+            'opportunity_ids' => $this->idListFromArray($record, 'opportunity_ids'),
         ], static fn (mixed $v): bool => ! in_array($v, [null, '', []], true));
     }
 
-    protected function buildDisplayData(Request $request): array
+    protected function buildRecordDisplay(array $record): array
     {
         /** @var User $user */
         $user = auth()->user();
         $team = $user->currentTeam;
 
-        $title = (string) $request->string('title');
+        $title = (string) ($record['title'] ?? '');
         $fields = [['label' => 'Title', 'value' => $title]];
 
-        $peopleNames = $this->namesForIds($this->idListOrNull($request, 'people_ids'), People::class, 'name', $team);
+        $peopleNames = $this->namesForIds($this->idListFromArray($record, 'people_ids'), People::class, 'name', $team);
         if ($peopleNames !== '') {
             $fields[] = ['label' => 'Linked people', 'value' => $peopleNames];
         }
 
-        $companyNames = $this->namesForIds($this->idListOrNull($request, 'company_ids'), Company::class, 'name', $team);
+        $companyNames = $this->namesForIds($this->idListFromArray($record, 'company_ids'), Company::class, 'name', $team);
         if ($companyNames !== '') {
             $fields[] = ['label' => 'Linked companies', 'value' => $companyNames];
         }
 
-        $opportunityNames = $this->namesForIds($this->idListOrNull($request, 'opportunity_ids'), Opportunity::class, 'name', $team);
+        $opportunityNames = $this->namesForIds($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, 'name', $team);
         if ($opportunityNames !== '') {
             $fields[] = ['label' => 'Linked opportunities', 'value' => $opportunityNames];
         }

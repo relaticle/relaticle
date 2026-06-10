@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -19,6 +20,8 @@ abstract class BaseWriteCreateTool implements Tool
 {
     use WithConversationContext;
 
+    private const int MAX_BATCH_SIZE = 25;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -29,11 +32,17 @@ abstract class BaseWriteCreateTool implements Tool
     /** @return array<string, mixed> */
     abstract protected function entitySchema(JsonSchema $schema): array;
 
-    /** @return array<string, mixed> */
-    abstract protected function buildDisplayData(Request $request): array;
+    /**
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    abstract protected function buildRecordDisplay(array $record): array;
 
-    /** @return array<string, mixed> */
-    abstract protected function extractActionData(Request $request): array;
+    /**
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    abstract protected function extractRecordData(array $record): array;
 
     public function schema(JsonSchema $schema): array
     {
@@ -43,10 +52,21 @@ abstract class BaseWriteCreateTool implements Tool
             ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, $this->entityType())
             : 'Custom field values as key-value pairs.';
 
-        return array_merge(
+        $recordProperties = array_merge(
             $this->entitySchema($schema),
             ['custom_fields' => $schema->object()->description($customFieldsDescription)],
         );
+
+        return [
+            'records' => $schema->array()
+                ->items($schema->object($recordProperties))
+                ->required()
+                ->description(
+                    "The {$this->entityType()} records to create. Pass ONE item for a single record,"
+                    .' or up to '.self::MAX_BATCH_SIZE.' items to create them all in ONE proposal'
+                    .' (never loop one call per record).',
+                ),
+        ];
     }
 
     public function handle(Request $request): string
@@ -54,34 +74,66 @@ abstract class BaseWriteCreateTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $validation = resolve(CustomFieldsRequestValidator::class)
-            ->validate($user, $this->entityType(), $request['custom_fields'] ?? null);
+        $records = $request['records'] ?? null;
 
-        if ($validation->error !== null) {
-            return (string) json_encode(['error' => $validation->error]);
+        if (! is_array($records) || $records === []) {
+            return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.']);
         }
 
-        $conversationId = $this->resolveConversationId();
-
-        /** @var array<string, mixed> $actionData */
-        $actionData = $this->extractActionData($request);
-        if ($validation->cleanFields !== []) {
-            $actionData['custom_fields'] = $validation->cleanFields;
+        if (count($records) > self::MAX_BATCH_SIZE) {
+            return (string) json_encode(['error' => 'Too many records — at most '.self::MAX_BATCH_SIZE.' per proposal.']);
         }
 
-        $displayData = $this->buildDisplayData($request);
-        $customFieldRows = resolve(CustomFieldsDisplayFormatter::class)
-            ->format($user, $this->entityType(), $validation->cleanFields, oldModel: null);
+        $validator = resolve(CustomFieldsRequestValidator::class);
+        $formatter = resolve(CustomFieldsDisplayFormatter::class);
 
-        if ($customFieldRows !== []) {
-            $existingFields = $displayData['fields'] ?? [];
-            $displayData['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
+        $actionRecords = [];
+        $items = [];
+
+        foreach (array_values($records) as $index => $record) {
+            if (! is_array($record)) {
+                return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+            }
+
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null);
+
+            if ($validation->error !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
+            }
+
+            $data = $this->extractRecordData($record);
+            if ($validation->cleanFields !== []) {
+                $data['custom_fields'] = $validation->cleanFields;
+            }
+
+            $display = $this->buildRecordDisplay($record);
+            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: null);
+            if ($customFieldRows !== []) {
+                $existingFields = $display['fields'] ?? [];
+                $display['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
+            }
+
+            $actionRecords[] = $data;
+            $items[] = $display;
         }
 
-        $service = resolve(PendingActionService::class);
-        $pending = $service->createProposal(
+        $isBatch = count($actionRecords) > 1;
+
+        $actionData = $isBatch
+            ? ['_batch' => true, 'records' => $actionRecords]
+            : $actionRecords[0];
+
+        $displayData = $isBatch
+            ? [
+                'title' => 'Create '.Str::plural(Str::headline($this->entityType()), count($items)),
+                'summary' => sprintf('Create %d %s', count($items), Str::plural($this->entityType(), count($items))),
+                'items' => $items,
+            ]
+            : $items[0];
+
+        $pending = resolve(PendingActionService::class)->createProposal(
             user: $user,
-            conversationId: $conversationId,
+            conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Create,
             entityType: $this->entityType(),
