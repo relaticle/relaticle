@@ -1062,7 +1062,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return `Preparing ${op} ${entity} proposal…`;
     },
 
-    startStreamTimeout() {
+    startStreamTimeout(timeoutMs = null) {
         this.clearStreamTimeout();
         this.streamTimeoutId = setTimeout(async () => {
             if (!this.isStreaming) return;
@@ -1082,7 +1082,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.currentToolStatus = null;
             this.isStreaming = false;
             this.restoreInputFocus();
-        }, this.streamTimeoutMs);
+        }, timeoutMs ?? this.streamTimeoutMs);
     },
 
     clearStreamTimeout() {
@@ -1615,8 +1615,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // The job hit a provider 429/529 and will re-stream this turn from the top
     // after `delaySeconds`. Pre-clear the partial text (the re-stream replays it)
     // and tell the user what's happening instead of going silent.
+    // Ghost-guard: if there is no unrendered bubble and we are not streaming, this
+    // event is a stale broadcast from a previous turn — ignore it entirely.
     handleStreamRetrying(event) {
         const b = this.lastAssistantBubble();
+        if ((!b || b.rendered) && !this.isStreaming) return;
         if (b && !b.rendered) {
             b.content = '';
             b.invocationId = null;
@@ -1624,7 +1627,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
         this.isStreaming = true;
         this.currentToolStatus = `Provider is busy — retrying (attempt ${event?.attempt ?? '?'} of ${event?.maxAttempts ?? 5})…`;
-        this.startStreamTimeout();
+        this.startStreamTimeout(((event?.delaySeconds ?? 0) * 1000) + this.streamTimeoutMs);
     },
 
     handleChatPaused(event) {

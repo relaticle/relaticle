@@ -219,7 +219,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $delay = $this->retryDelaySeconds($this->attempts());
                 broadcast(new ChatStreamRetrying(
                     conversationId: $this->conversationId,
-                    attempt: $this->attempts(),
+                    attempt: $this->attempts() + 1,
                     maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
                     delaySeconds: $delay,
                 ));
