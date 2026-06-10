@@ -669,7 +669,22 @@ final class EmailInboxPage extends Page
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
-            Section::make('Privacy')
+            Section::make('Attachments')
+                ->collapsed()
+                ->schema([
+                    FileUpload::make('attachments')
+                        ->hiddenLabel()
+                        ->multiple()
+                        ->visibility('private')
+                        ->disk('local')
+                        ->directory('email-attachments')
+                        ->maxSize(10240)
+                        ->nullable(),
+                ]),
+
+            Section::make('Settings')
+                ->description(__('filament/pages/email-inbox.compose_form.settings.description'))
+                ->icon('heroicon-o-cog-6-tooth')
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
@@ -678,13 +693,9 @@ final class EmailInboxPage extends Page
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),
-                ]),
 
-            Section::make('Signature')
-                ->collapsed()
-                ->schema([
                     Select::make('signature_id')
-                        ->hiddenLabel()
+                        ->label(__('filament/pages/email-inbox.compose_form.signature.label'))
                         ->placeholder(__('filament/pages/email-inbox.compose_form.signature.placeholder'))
                         ->options(fn (Get $get): array => EmailSignature::query()
                             ->where('connected_account_id', $get('connected_account_id'))
@@ -707,19 +718,6 @@ final class EmailInboxPage extends Page
                             $body = $get('body_html') ?? '';
                             $set('body_html', ($body !== '' ? $body : '<p></p>').'<hr>'.$sig->content_html);
                         }),
-                ]),
-
-            Section::make('Attachments')
-                ->collapsed()
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->hiddenLabel()
-                        ->multiple()
-                        ->visibility('private')
-                        ->disk('local')
-                        ->directory('email-attachments')
-                        ->maxSize(10240)
-                        ->nullable(),
                 ]),
         ];
     }
