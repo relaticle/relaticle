@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Ai\Exceptions\RateLimitedException;
@@ -23,6 +26,11 @@ function seedRateLimitConversation(string $id, User $user): void
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+}
+
+function httpClientException(int $status): RequestException
+{
+    return new RequestException(new ClientResponse(new Psr7Response($status)));
 }
 
 it('computes capped exponential backoff', function (): void {
@@ -48,6 +56,42 @@ it('broadcasts a rate-limit-specific message when a rate-limited job ultimately 
     );
 
     $job->failed(new RateLimitedException('rate limited', 429));
+
+    Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $e): bool => str_contains($e->message, 'rate-limited'));
+});
+
+it('treats a raw streaming 429/529/503 RequestException as rate-limited, but not a 400', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $job = new ProcessChatMessage(
+        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNDDDDDDDDDDDDDDDDDDDDD',
+    );
+    $cont = new ContinueChatMessage(
+        user: $user, team: $user->currentTeam, conversationId: 'c-1',
+        prompt: '[approval]', turnId: '01TURNEEEEEEEEEEEEEEEEEEEEE',
+    );
+
+    expect($job->isRateLimited(httpClientException(429)))->toBeTrue()
+        ->and($job->isRateLimited(httpClientException(529)))->toBeTrue()
+        ->and($job->isRateLimited(httpClientException(503)))->toBeTrue()
+        ->and($job->isRateLimited(httpClientException(400)))->toBeFalse()
+        ->and($job->isRateLimited(new RuntimeException('boom')))->toBeFalse()
+        ->and($job->isRateLimited(null))->toBeFalse()
+        ->and($cont->isRateLimited(httpClientException(429)))->toBeTrue()
+        ->and($cont->isRateLimited(httpClientException(400)))->toBeFalse();
+});
+
+it('broadcasts the rate-limit message for a raw 429 RequestException failure', function (): void {
+    Event::fake([ChatStreamFailed::class]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    seedRateLimitConversation('c-1', $user);
+    $job = new ProcessChatMessage(
+        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNFFFFFFFFFFFFFFFFFFFFF',
+    );
+
+    $job->failed(httpClientException(429));
 
     Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $e): bool => str_contains($e->message, 'rate-limited'));
 });

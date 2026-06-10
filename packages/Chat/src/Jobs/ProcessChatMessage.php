@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -207,10 +208,12 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->materializeAssistantDocument($streamedResponse);
                 $this->broadcastFollowUps($streamedResponse);
             });
-        } catch (RateLimitedException|ProviderOverloadedException $e) {
+        } catch (Throwable $e) {
+            // Rate-limit / overloaded errors are transient -> release with backoff.
             // release() does not count against MaxExceptions(1); attempts() increments
             // each retry. Bounded by this cap AND the job's retryUntil() (now+3min).
-            if ($this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
+            // Anything else rethrows and fails fast, exactly as before.
+            if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
                 $this->release($this->retryDelaySeconds($this->attempts()));
 
@@ -228,6 +231,21 @@ final class ProcessChatMessage implements ShouldQueue
         return (int) min(2 ** $attempts, 30);
     }
 
+    /**
+     * The provider surfaces a 429 as a typed RateLimitedException on its wrapped
+     * (non-streaming) path, but as a raw HTTP-client RequestException on the
+     * streaming path. Treat both — plus overloaded (529/503) — as retryable.
+     */
+    public function isRateLimited(?Throwable $e): bool
+    {
+        if ($e instanceof RateLimitedException || $e instanceof ProviderOverloadedException) {
+            return true;
+        }
+
+        return $e instanceof RequestException
+            && in_array($e->response->status(), [429, 529, 503], true);
+    }
+
     public function failed(?Throwable $exception): void
     {
         resolve(CreditService::class)->settleReservedMinimum(
@@ -243,7 +261,7 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $message = ($exception instanceof RateLimitedException || $exception instanceof ProviderOverloadedException)
+        $message = $this->isRateLimited($exception)
             ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
             : 'The assistant encountered an error. Please try again.';
 
