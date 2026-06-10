@@ -178,6 +178,19 @@
                                 </div>
                             </template>
 
+                            <template x-if="msg.pausedResume">
+                                <div class="mt-2">
+                                    <button
+                                        type="button"
+                                        x-show="!isStreaming"
+                                        x-on:click="msg.pausedResume = false; retryTurn(Object.assign(msg, { isContinuation: true, rendered: false, prerendered: false, content: '' }))"
+                                        class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                                    >
+                                        Continue
+                                    </button>
+                                </div>
+                            </template>
+
                             <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <template x-for="chip in msg.follow_ups" :key="chip.prompt">
@@ -1597,13 +1610,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     handleChatPaused(event) {
-        const nowIso = new Date().toISOString();
-        this.messages.push({
-            role: 'assistant',
-            content: event?.message || 'Paused. Say "continue" to keep going.',
-            pending_actions: [], paywall: null, sessionExpired: false,
-            rendered: true, prerendered: false, copiedAt: 0, follow_ups: [],
-            created_at: nowIso,
+        this.mintAssistantStub({
+            content: event?.message || 'Paused. Press Continue to keep going.',
+            rendered: true,
+            pausedResume: true,
         });
         this.isStreaming = false;
         this.$nextTick(() => this.restoreInputFocus());
