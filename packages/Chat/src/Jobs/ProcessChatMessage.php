@@ -25,6 +25,7 @@ use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Events\ChatStreamFailed;
+use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\FollowUpsSuggested;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
@@ -215,7 +216,14 @@ final class ProcessChatMessage implements ShouldQueue
             // Anything else rethrows and fails fast, exactly as before.
             if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
-                $this->release($this->retryDelaySeconds($this->attempts()));
+                $delay = $this->retryDelaySeconds($this->attempts());
+                broadcast(new ChatStreamRetrying(
+                    conversationId: $this->conversationId,
+                    attempt: $this->attempts(),
+                    maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
+                    delaySeconds: $delay,
+                ));
+                $this->release($delay);
 
                 return;
             }

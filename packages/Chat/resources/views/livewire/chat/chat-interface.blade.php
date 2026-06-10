@@ -993,6 +993,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.tool_result', (e) => this.handleToolResult(e))
             .listen('.stream_end', () => this.handleStreamEnd())
             .listen('.stream.failed', (e) => this.handleStreamFailed(e))
+            .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
             .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
@@ -1609,6 +1610,21 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
         this.clearStreamTimeout();
         this.restoreInputFocus();
+    },
+
+    // The job hit a provider 429/529 and will re-stream this turn from the top
+    // after `delaySeconds`. Pre-clear the partial text (the re-stream replays it)
+    // and tell the user what's happening instead of going silent.
+    handleStreamRetrying(event) {
+        const b = this.lastAssistantBubble();
+        if (b && !b.rendered) {
+            b.content = '';
+            b.invocationId = null;
+            b._needsSeparator = false;
+        }
+        this.isStreaming = true;
+        this.currentToolStatus = `Provider is busy — retrying (attempt ${event?.attempt ?? '?'} of ${event?.maxAttempts ?? 5})…`;
+        this.startStreamTimeout();
     },
 
     handleChatPaused(event) {
