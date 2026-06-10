@@ -62,4 +62,9 @@ return [
             'placeholder' => 'No signature',
         ],
     ],
+    'sections' => [
+        'settings' => [
+            'description' => 'Privacy, scheduling, and signature options for this email.',
+        ],
+    ],
 ];

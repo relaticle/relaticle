@@ -683,7 +683,7 @@ final class EmailInboxPage extends Page
                 ]),
 
             Section::make('Settings')
-                ->description('Privacy and signature options for this email.')
+                ->description(__('filament/pages/email-inbox.compose_form.settings.description'))
                 ->icon('heroicon-o-cog-6-tooth')
                 ->collapsed()
                 ->schema([

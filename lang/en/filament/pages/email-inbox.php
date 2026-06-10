@@ -116,6 +116,9 @@ return [
             'label' => 'Signature',
             'placeholder' => 'No signature',
         ],
+        'settings' => [
+            'description' => 'Privacy and signature options for this email.',
+        ],
     ],
     'reply_form' => [
         'from' => [
