@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Models\PendingAction;
 use Tests\Helpers\ChatDocument;
 
 it('returns the persisted latest assistant message for reconciliation', function (): void {
@@ -43,6 +47,89 @@ it('returns the persisted latest assistant message for reconciliation', function
     $result = $component->instance()->latestAssistantMessage();
 
     expect($result['content'])->toBe('Final answer');
+});
+
+it('returns still-pending proposal cards so a dropped tool_result can be reconciled (R7)', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => 'T',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::ulid(),
+        'conversation_id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Proposed it',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $pending = PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Reconcile me'],
+        'display_data' => ['summary' => 'Create task', 'title' => 'Reconcile me'],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $result = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->instance()->latestAssistantMessage();
+
+    expect($result['pending_actions'])->toHaveCount(1)
+        ->and($result['pending_actions'][0]['pending_action_id'])->toBe((string) $pending->getKey())
+        ->and($result['pending_actions'][0]['status'])->toBe('pending')
+        ->and($result['pending_actions'][0]['operation'])->toBe('create');
+});
+
+it('does not return resolved or expired cards for reconciliation', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId, 'user_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(), 'title' => 'T',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::ulid(), 'conversation_id' => $conversationId,
+        'user_id' => (string) $user->getKey(), 'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant', 'content' => 'x', 'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]', 'tool_calls' => '[]', 'tool_results' => '[]', 'usage' => '{}', 'meta' => '{}',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $base = [
+        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId, 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
+        'action_data' => ['title' => 'x'], 'display_data' => ['title' => 'x'],
+    ];
+    PendingAction::query()->create([...$base, 'status' => PendingActionStatus::Approved, 'expires_at' => now()->addMinutes(15), 'resolved_at' => now()]);
+    PendingAction::query()->create([...$base, 'status' => PendingActionStatus::Pending, 'expires_at' => now()->subMinute()]);
+
+    $result = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->instance()->latestAssistantMessage();
+
+    expect($result['pending_actions'])->toBeEmpty();
 });
 
 it('returns the most recent assistant message when several exist', function (): void {
