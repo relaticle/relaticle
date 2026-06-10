@@ -12,6 +12,7 @@ use App\Models\User;
 use Database\Factories\EmailFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +29,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
 
 /**
@@ -57,6 +59,7 @@ use Relaticle\EmailIntegration\Observers\EmailObserver;
  * @property EmailPriority $priority
  */
 #[ObservedBy(EmailObserver::class)]
+#[ScopedBy([ActiveAccountScope::class])]
 final class Email extends Model
 {
     /**
