@@ -303,7 +303,22 @@ trait HasEmailComposeActions
                     'blockquote', 'h2', 'h3', 'undo', 'redo',
                 ]),
 
-            Section::make('Privacy')
+            Section::make('Attachments')
+                ->collapsed()
+                ->schema([
+                    FileUpload::make('attachments')
+                        ->hiddenLabel()
+                        ->multiple()
+                        ->visibility('private')
+                        ->disk('local')
+                        ->directory('email-attachments')
+                        ->maxSize(10240)
+                        ->nullable(),
+                ]),
+
+            Section::make('Settings')
+                ->description('Privacy, scheduling, and signature options for this email.')
+                ->icon('heroicon-o-cog-6-tooth')
                 ->collapsed()
                 ->schema([
                     Select::make('privacy_tier')
@@ -312,24 +327,16 @@ trait HasEmailComposeActions
                         ->options(EmailPrivacyTier::class)
                         ->default(fn (): string => $this->defaultPrivacyTier()->value)
                         ->required(),
-                ]),
 
-            Section::make('Schedule')
-                ->collapsed()
-                ->schema([
                     DateTimePicker::make('scheduled_for')
                         ->label(__('filament/concerns/email-compose.fields.scheduled_for.label'))
                         ->helperText(__('filament/concerns/email-compose.fields.scheduled_for.helper_text'))
                         ->seconds(false)
                         ->minDate(now())
                         ->nullable(),
-                ]),
 
-            Section::make('Signature')
-                ->collapsed()
-                ->schema([
                     Select::make('signature_id')
-                        ->hiddenLabel()
+                        ->label(__('filament/concerns/email-compose.fields.signature.label'))
                         ->placeholder(__('filament/concerns/email-compose.fields.signature.placeholder'))
                         ->options(fn (Get $get): array => EmailSignature::query()
                             ->where('connected_account_id', $get('connected_account_id'))
@@ -352,19 +359,6 @@ trait HasEmailComposeActions
                             $body = $get('body_html') ?? '';
                             $set('body_html', ($body !== '' ? $body : '<p></p>').'<hr>'.$sig->content_html);
                         }),
-                ]),
-
-            Section::make('Attachments')
-                ->collapsed()
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->hiddenLabel()
-                        ->multiple()
-                        ->visibility('private')
-                        ->disk('local')
-                        ->directory('email-attachments')
-                        ->maxSize(10240)
-                        ->nullable(),
                 ]),
         ];
     }

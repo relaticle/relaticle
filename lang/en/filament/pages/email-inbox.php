@@ -113,6 +113,7 @@ return [
             'helper_text' => 'Defaults to your team or personal sharing setting.',
         ],
         'signature' => [
+            'label' => 'Signature',
             'placeholder' => 'No signature',
         ],
     ],
