@@ -56,5 +56,9 @@ return [
             'title' => 'Calendar sync queued.',
             'body' => 'New events should appear within a minute.',
         ],
+        'disconnected' => [
+            'title' => 'Account disconnected.',
+            'body' => 'The account and its signatures have been removed.',
+        ],
     ],
 ];
