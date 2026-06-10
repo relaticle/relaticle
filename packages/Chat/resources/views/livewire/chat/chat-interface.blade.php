@@ -134,9 +134,9 @@
                     </template>
 
                     {{-- Assistant message --}}
-                    <template x-if="msg.role === 'assistant' && (msg.rendered || msg.content || (index === messages.length - 1 && isStreaming && currentToolStatus))">
+                    <template x-if="msg.role === 'assistant' && (msg.rendered || msg.content || msg.streamError || (index === messages.length - 1 && isStreaming && currentToolStatus))">
                         <div class="flex flex-col items-start">
-                            <div class="flex w-full justify-start">
+                            <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                                 <div
                                     :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
                                     class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-p:my-2 prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-gray-900 dark:prose-headings:text-white prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-1 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-1 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
@@ -162,6 +162,21 @@
                                     </template>
                                 </div>
                             </div>
+
+                            <template x-if="msg.streamError">
+                                <div class="mt-2 flex max-w-[85%] items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20" role="alert">
+                                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                                    <span class="flex-1 text-xs text-amber-800 dark:text-amber-200" x-text="msg.streamError"></span>
+                                    <button
+                                        type="button"
+                                        x-show="msg.retryable && !isStreaming"
+                                        x-on:click="retryTurn(msg)"
+                                        class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            </template>
 
                             <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                                 <div class="mt-2 flex flex-wrap gap-2">
@@ -1356,6 +1371,55 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.restoreInputFocus();
     },
 
+    async retryTurn(msg) {
+        if (this.isStreaming) return;
+
+        if (msg.isContinuation) {
+            msg.streamError = null;
+            msg.retryable = false;
+            msg.rendered = false;
+            this.isStreaming = true;
+            this.startStreamTimeout();
+            try {
+                const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/resume', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    msg.streamError = body.error || 'Could not resume. Please try again.';
+                    msg.retryable = res.status !== 409;
+                    msg.rendered = true;
+                    this.isStreaming = false;
+                    this.clearStreamTimeout();
+                }
+            } catch {
+                msg.streamError = 'Network error. Please try again.';
+                msg.retryable = true;
+                msg.rendered = true;
+                this.isStreaming = false;
+                this.clearStreamTimeout();
+            }
+            return;
+        }
+
+        // Failed user turn: the server never stored the message — re-send the
+        // preceding user message from local state (same flow as edit-resend).
+        const idx = this.messages.indexOf(msg);
+        let userIndex = -1;
+        for (let i = idx - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'user') { userIndex = i; break; }
+        }
+        if (userIndex === -1) return;
+        const userText = this.messages[userIndex].content;
+        this.messages.splice(userIndex);
+        this.input = userText;
+        this.localEditor()?.setText(userText);
+        this.$nextTick(() => this.sendMessage());
+    },
+
     handleStreamStart(event) {
         this.startStreamTimeout();
         this.targetBubbleFor(event.invocation_id ?? null);
@@ -1453,7 +1517,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         try {
             const authoritative = await this.$wire.latestAssistantMessage();
             if (!authoritative) return;
-            if (authoritative.content && authoritative.content !== assistantMsg.content) {
+            const isUnstartedStub = assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered;
+            if (authoritative.content && authoritative.content !== assistantMsg.content && !isUnstartedStub) {
                 assistantMsg.content = authoritative.content;
                 assistantMsg.id = authoritative.id;
                 assistantMsg.rendered = false;
@@ -1479,6 +1544,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (assistantMsg?.role === 'assistant') {
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
+            assistantMsg.streamError = null;
+            assistantMsg.retryable = false;
         }
         this.isStreaming = false;
         this.clearStreamTimeout();
@@ -1502,13 +1569,14 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     handleStreamFailed(event) {
         this.currentToolStatus = null;
-        const assistantMsg = this.messages[this.messages.length - 1];
-        if (assistantMsg?.role === 'assistant') {
-            if (!assistantMsg.content) {
-                assistantMsg.content = event?.message || 'The assistant encountered an error. Please try again.';
-            }
-            assistantMsg.rendered = true;
-            assistantMsg.prerendered = false;
+        const b = this.lastAssistantBubble();
+        if (b && !b.rendered) {
+            b.content = '';
+            b.invocationId = null;
+            b.streamError = event?.message || 'The assistant encountered an error. Please try again.';
+            b.retryable = true;
+            b.rendered = true;
+            b.prerendered = false;
         }
         this.isStreaming = false;
         this.queuedSend = null;
