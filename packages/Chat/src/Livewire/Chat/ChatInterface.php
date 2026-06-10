@@ -135,22 +135,22 @@ final class ChatInterface extends BaseLivewireComponent
      */
     private function pendingActionCards(): array
     {
-        return PendingAction::query()
+        $actions = PendingAction::query()
             ->where('conversation_id', $this->conversationId)
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
-            ->orderBy('created_at')
-            ->get()
-            ->map(static fn (PendingAction $action): array => [
-                'type' => 'pending_action',
-                'pending_action_id' => (string) $action->getKey(),
-                'operation' => $action->operation->value,
-                'entity_type' => $action->entity_type,
-                'data' => $action->action_data,
-                'display' => $action->display_data,
-                'status' => 'pending',
-            ])
-            ->all();
+            ->oldest()
+            ->get();
+
+        return array_values(array_map(static fn (PendingAction $action): array => [
+            'type' => 'pending_action',
+            'pending_action_id' => (string) $action->getKey(),
+            'operation' => $action->operation->value,
+            'entity_type' => $action->entity_type,
+            'data' => $action->action_data,
+            'display' => $action->display_data,
+            'status' => 'pending',
+        ], $actions->all()));
     }
 
     public function render(): View
