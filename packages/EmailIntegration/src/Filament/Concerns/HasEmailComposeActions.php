@@ -317,7 +317,7 @@ trait HasEmailComposeActions
                 ]),
 
             Section::make('Settings')
-                ->description('Privacy, scheduling, and signature options for this email.')
+                ->description(__('filament/concerns/email-compose.sections.settings.description'))
                 ->icon('heroicon-o-cog-6-tooth')
                 ->collapsed()
                 ->schema([
