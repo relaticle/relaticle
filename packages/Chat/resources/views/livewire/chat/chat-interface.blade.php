@@ -486,6 +486,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             streamError: null,
             retryable: false,
             isContinuation: false,
+            _needsSeparator: false,
             ...extra,
         };
         this.messages.push(stub);
@@ -500,15 +501,22 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     // Resolve which bubble a stream event belongs to.
-    //  - same invocation        -> that bubble
+    //  - exact invocation match anywhere -> that bubble (trailing deltas of a
+    //    still-open turn keep landing in THEIR bubble even after a continuation
+    //    stub was minted after it)
     //  - unbound in-flight stub -> bind it (first event of the turn)
     //  - different invocation on an UNRENDERED bubble -> the job retried and is
-    //    re-streaming from the top: reset the partial text, rebind (de-dupes)
+    //    re-streaming from the top: reset the partial state, rebind (de-dupes)
     //  - otherwise (last bubble already rendered) -> a turn we never minted a
     //    stub for (e.g. resume) -> mint one bound to this invocation
     targetBubbleFor(invocationId) {
+        if (invocationId !== null) {
+            for (let i = this.messages.length - 1; i >= 0; i--) {
+                const m = this.messages[i];
+                if (m.role === 'assistant' && m.invocationId === invocationId) return m;
+            }
+        }
         const b = this.lastAssistantBubble();
-        if (b && b.invocationId === invocationId) return b;
         if (b && !b.rendered) {
             if (b.invocationId == null) {
                 b.invocationId = invocationId;
@@ -517,6 +525,9 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             b.invocationId = invocationId;
             b.content = '';
             b._needsSeparator = false;
+            b.pending_actions = [];
+            b.paywall = null;
+            b.streamError = null;
             return b;
         }
         return this.mintAssistantStub({ invocationId });
