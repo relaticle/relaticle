@@ -86,6 +86,27 @@ final readonly class PendingActionService
     ): PendingAction {
         $expiryMinutes = (int) config('chat.pending_action_expiry_minutes', 15);
 
+        // Idempotency across job retries. A continuation creates its proposal mid-stream; if a
+        // later chunk throws a transient error (429/529/503) the job is retried from the top and
+        // re-emits the identical tool call. Without this guard every retry inserts another
+        // duplicate proposal card. Collapse an identical still-pending proposal in the same
+        // conversation instead of inserting a duplicate. Only PENDING rows match, so an already
+        // approved/rejected proposal never absorbs a legitimate fresh one.
+        if ($conversationId !== null) {
+            $duplicate = PendingAction::query()
+                ->where('conversation_id', $conversationId)
+                ->where('action_class', $actionClass)
+                ->where('operation', $operation)
+                ->where('entity_type', $entityType)
+                ->pending()
+                ->get()
+                ->first(static fn (PendingAction $existing): bool => $existing->action_data === $actionData);
+
+            if ($duplicate instanceof PendingAction) {
+                return $duplicate;
+            }
+        }
+
         return PendingAction::query()->create([
             'team_id' => $user->currentTeam->getKey(),
             'user_id' => $user->getKey(),
@@ -447,7 +468,7 @@ final readonly class PendingActionService
 
         if (in_array(InvalidatesRelatedAiSummaries::class, class_uses_recursive($modelClass), true)) {
             return array_merge($relations, array_values(array_filter(
-                InvalidatesRelatedAiSummaries::summaryRelations(),
+                $modelClass::summaryRelations(),
                 static fn (string $relation): bool => method_exists($modelClass, $relation),
             )));
         }
