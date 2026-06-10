@@ -74,3 +74,18 @@ it('rejects resuming another user\'s conversation', function (): void {
 
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
+
+it('dispatches only one continuation when resume is double-posted', function (): void {
+    Bus::fake();
+    makeResolvedAction($this->convId, $this->user);
+
+    $this->actingAs($this->user)
+        ->postJson("/chat/conversations/{$this->convId}/resume")
+        ->assertOk();
+
+    $this->actingAs($this->user)
+        ->postJson("/chat/conversations/{$this->convId}/resume")
+        ->assertStatus(409);
+
+    Bus::assertDispatchedTimes(ContinueChatMessage::class, 1);
+});

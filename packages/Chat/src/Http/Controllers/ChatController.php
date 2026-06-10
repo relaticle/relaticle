@@ -241,6 +241,14 @@ final readonly class ChatController
             return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
         }
 
+        if ($action->user_id !== $user->getKey()) {
+            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
+        }
+
+        if (! Cache::add("chat:resume:{$conversationId}", 1, 30)) {
+            return response()->json(['error' => 'A resume is already in progress.'], 409);
+        }
+
         resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
 
         return response()->json(['status' => 'resuming']);
