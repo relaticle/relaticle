@@ -21,6 +21,7 @@ use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
+use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -35,6 +36,7 @@ use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ProviderStreamError;
 use Throwable;
 
 #[Timeout(120)]
@@ -151,6 +153,10 @@ final class ProcessChatMessage implements ShouldQueue
             $cacheKey = "chat:cancel:{$this->conversationId}";
 
             $response->each(function (StreamEvent $event) use ($channel, $cacheKey, &$cancelled): void {
+                if ($event instanceof Error) {
+                    throw ProviderStreamError::toException($event);
+                }
+
                 if (! $cancelled && Cache::pull($cacheKey) !== null) {
                     $cancelled = true;
 

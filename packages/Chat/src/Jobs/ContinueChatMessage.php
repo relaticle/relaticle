@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\StreamedAgentResponse;
+use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -27,6 +28,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ProviderStreamError;
 use Throwable;
 
 #[Timeout(120)]
@@ -127,6 +129,10 @@ final class ContinueChatMessage implements ShouldQueue
             );
 
             $response->each(function (StreamEvent $event) use ($channel): void {
+                if ($event instanceof Error) {
+                    throw ProviderStreamError::toException($event);
+                }
+
                 $event->broadcastNow($channel);
             });
 
