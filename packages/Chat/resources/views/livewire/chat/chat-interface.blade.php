@@ -1422,22 +1422,23 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     handleToolResult(event) {
         this.startStreamTimeout();
         this.currentToolStatus = null;
-        const assistantMsg = this.messages[this.messages.length - 1];
-        if (assistantMsg?.role === 'assistant') {
-            if (assistantMsg.content && !/\s$/.test(assistantMsg.content)) {
-                assistantMsg._needsSeparator = true;
-            }
-            if (event.result) {
-                try {
-                    const result = typeof event.result === 'string' ? JSON.parse(event.result) : event.result;
-                    if (result.type === 'pending_action') {
-                        result.status = 'pending';
-                        assistantMsg.pending_actions.push(result);
-                        this.scrollToBottom();
-                    }
-                } catch { /* not pending action JSON */ }
-            }
+        const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
+        if (assistantMsg.content && !/\s$/.test(assistantMsg.content)) {
+            assistantMsg._needsSeparator = true;
         }
+        if (!event.result) return;
+        try {
+            const result = typeof event.result === 'string' ? JSON.parse(event.result) : event.result;
+            if (result.type !== 'pending_action') return;
+            // A retried job re-emits the same proposal (server collapses it to the
+            // same id) — rendering it twice would show two identical cards.
+            const seen = this.messages.some((m) =>
+                (m.pending_actions || []).some((a) => a.pending_action_id === result.pending_action_id));
+            if (seen) return;
+            result.status = 'pending';
+            assistantMsg.pending_actions.push(result);
+            this.scrollToBottom();
+        } catch { /* not pending action JSON */ }
     },
 
     // Reconcile the last assistant bubble against persisted state: pull the
