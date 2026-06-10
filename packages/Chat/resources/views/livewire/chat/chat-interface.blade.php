@@ -1072,7 +1072,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             const assistantMsg = this.messages[this.messages.length - 1];
             if (assistantMsg?.role === 'assistant') {
                 if (!assistantMsg.content) {
-                    assistantMsg.content = 'The assistant took too long to respond. Please try again.';
+                    assistantMsg.streamError = 'The assistant took too long to respond.';
+                    assistantMsg.retryable = true;
                 }
                 assistantMsg.rendered = true;
                 assistantMsg.prerendered = false;
@@ -1395,6 +1396,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             msg.rendered = false;
             this.isStreaming = true;
             this.startStreamTimeout();
+            this.restoreInputFocus();
             try {
                 const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/resume', {
                     method: 'POST',
