@@ -9,8 +9,11 @@ use Relaticle\Chat\Support\ProviderStreamError;
 it('maps overload and rate-limit stream errors to a retryable exception', function (string $type): void {
     $event = new Error('evt-1', $type, 'provider says no', false, time());
 
-    expect(ProviderStreamError::toException($event))
-        ->toBeInstanceOf(ProviderOverloadedException::class);
+    $exception = ProviderStreamError::toException($event);
+
+    expect($exception)->toBeInstanceOf(ProviderOverloadedException::class)
+        ->and($exception->getMessage())->toContain($type)
+        ->and($exception->getMessage())->toContain('provider says no');
 })->with(['overloaded_error', 'rate_limit_error']);
 
 it('maps unknown stream errors to a non-retryable runtime exception', function (): void {
