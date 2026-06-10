@@ -255,6 +255,14 @@ final class EmailAccountsPage extends Page
                 $account = $this->findOwnedAccountOrFail($arguments);
 
                 resolve(DisconnectConnectedAccountAction::class)->execute($account);
+
+                $this->connectedAccounts = $this->getAccounts();
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-accounts.notifications.disconnected.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.disconnected.body'))
+                    ->send();
             });
     }
 
