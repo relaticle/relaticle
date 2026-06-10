@@ -11,6 +11,7 @@ use App\Providers\HorizonServiceProvider;
 use App\Providers\JetstreamServiceProvider;
 use App\Providers\LocaleServiceProvider;
 use App\Providers\MacroServiceProvider;
+use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\Documentation\DocumentationServiceProvider;
 use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\ImportWizard\ImportWizardNewServiceProvider;
@@ -26,6 +27,7 @@ return [
     JetstreamServiceProvider::class,
     LocaleServiceProvider::class,
     MacroServiceProvider::class,
+    ChatServiceProvider::class,
     DocumentationServiceProvider::class,
     EmailIntegrationServiceProvider::class,
     ImportWizardNewServiceProvider::class,

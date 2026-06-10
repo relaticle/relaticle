@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Models;
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -36,26 +37,24 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
  * @property int $skipped_rows
  * @property int $failed_rows
  */
+#[Fillable([
+    'team_id',
+    'user_id',
+    'entity_type',
+    'file_name',
+    'status',
+    'total_rows',
+    'headers',
+    'column_mappings',
+    'created_rows',
+    'updated_rows',
+    'skipped_rows',
+    'failed_rows',
+    'completed_at',
+])]
 final class Import extends Model
 {
     use HasUlids;
-
-    /** @var list<string> */
-    protected $fillable = [
-        'team_id',
-        'user_id',
-        'entity_type',
-        'file_name',
-        'status',
-        'total_rows',
-        'headers',
-        'column_mappings',
-        'created_rows',
-        'updated_rows',
-        'skipped_rows',
-        'failed_rows',
-        'completed_at',
-    ];
 
     private ?BaseImporter $importerCache = null;
 

@@ -11,11 +11,22 @@ namespace App\Models\Concerns;
 trait InvalidatesRelatedAiSummaries
 {
     /**
+     * Relations whose summaries are invalidated when this record changes.
+     * Single source of truth — also consumed when eager-loading before delete.
+     *
+     * @return list<string>
+     */
+    public static function summaryRelations(): array
+    {
+        return ['companies', 'people', 'opportunities'];
+    }
+
+    /**
      * Invalidate AI summaries for all related summarizable records.
      */
     public function invalidateRelatedSummaries(): void
     {
-        foreach (['companies', 'people', 'opportunities'] as $relation) {
+        foreach (self::summaryRelations() as $relation) {
             if (method_exists($this, $relation)) {
                 $this->{$relation}->each->invalidateAiSummary();
             }

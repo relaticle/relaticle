@@ -18,6 +18,41 @@
     --color-primary-900: oklch(0.380 0.178 293.745);
     --color-primary-950: oklch(0.283 0.135 291.089);
     --color-primary: oklch(0.541 0.247 293.009); /* DEFAULT: primary-600 */
+
+    /* Off-step typography for compact UI surfaces */
+    --text-pico: 0.625rem;     /* 10px */
+    --text-pico--line-height: 0.875rem;
+    --text-micro: 0.6875rem;   /* 11px */
+    --text-micro--line-height: 0.9375rem;
+}
+
+/* ─── Motion tokens ─── */
+/* If you change --ease-out-expo, also update the `ease` array in hero-agent-preview.blade.php */
+:root {
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-fast: 200ms;
+    --duration-base: 350ms;
+    --duration-slow: 800ms;
+}
+
+/* ─── Surface tokens ─── */
+/* Light values in :root; dark overrides in .dark. Used via bg-[var(--name)] in Blade. */
+:root {
+    --surface-card-bg: rgb(249 250 251 / 0.8);            /* gray-50/80 */
+    --surface-card-border: rgb(229 231 235 / 0.8);        /* gray-200/80 */
+    --surface-shell-bg: rgb(249 250 251 / 0.6);           /* gray-50/60 */
+    --surface-shell-divider: rgb(229 231 235 / 0.6);      /* gray-200/60 */
+    --surface-input-bg: rgb(249 250 251 / 0.8);           /* gray-50/80 */
+    --surface-input-border: rgb(229 231 235 / 0.8);       /* gray-200/80 */
+}
+
+.dark {
+    --surface-card-bg: rgb(255 255 255 / 0.02);
+    --surface-card-border: rgb(255 255 255 / 0.06);
+    --surface-shell-bg: rgb(255 255 255 / 0.015);
+    --surface-shell-divider: rgb(255 255 255 / 0.06);
+    --surface-input-bg: rgb(255 255 255 / 0.03);
+    --surface-input-border: rgb(255 255 255 / 0.06);
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -100,7 +135,7 @@
 
 .hero-enter {
     opacity: 0;
-    animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: hero-fade-up var(--duration-slow) var(--ease-out-expo) forwards;
 }
 
 .hero-enter-1 { animation-delay: 0ms; }
@@ -112,8 +147,8 @@
 
 /* Tab active indicator slide */
 .hero-tab-indicator {
-    transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: left var(--duration-base) var(--ease-out-expo),
+                width var(--duration-base) var(--ease-out-expo);
 }
 
 /* Respect reduced motion preference */

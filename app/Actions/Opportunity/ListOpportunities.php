@@ -34,7 +34,10 @@ final readonly class ListOpportunities
         $request ??= new Request(['filter' => $filters]);
         $filterSchema = new CustomFieldFilterSchema;
 
-        $query = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+        $query = QueryBuilder::for(
+            Opportunity::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            $request,
+        )
             ->allowedFilters(
                 AllowedFilter::partial('name'),
                 AllowedFilter::exact('company_id'),

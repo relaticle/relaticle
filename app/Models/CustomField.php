@@ -23,6 +23,16 @@ final class CustomField extends BaseCustomField
 {
     use HasUlids;
 
+    /**
+     * Whether saving an arbitrary value to this field should promote that value
+     * into the field's user-managed option list. True for tags-input; false for
+     * email/phone/link, which also accept arbitrary values but own no option list.
+     */
+    public function promotesValuesToOptions(): bool
+    {
+        return $this->typeData->acceptsArbitraryValues && ! $this->typeData->withoutUserOptions;
+    }
+
     /** @return CustomFieldFactory */
     protected static function newFactory(): Factory
     {

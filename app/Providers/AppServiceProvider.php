@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Enums\Plan;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
 use App\Listeners\Email\TeamMemberAddedListener;
+use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -32,6 +34,7 @@ use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
@@ -44,9 +47,11 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
+use Laravel\Ai\AiManager;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
+use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -67,6 +72,8 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
+
+        $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
     }
 
     /**
@@ -84,6 +91,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(Verified::class, NewSubscriberListener::class);
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
+        Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
@@ -190,6 +198,31 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('mcp', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
+
+        RateLimiter::for('chat-send', function (Request $request) {
+            /** @var User|null $user */
+            $user = $request->user();
+            $team = $user?->currentTeam;
+
+            if ($team === null) {
+                return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
+            }
+
+            return Limit::perMinute($team->plan->rateLimit())
+                ->by($team->getKey())
+                ->response(function (Request $request, array $headers) use ($team) {
+                    ChatTelemetry::rateLimited(
+                        teamId: (string) $team->getKey(),
+                        plan: $team->plan->value,
+                    );
+
+                    return response()->json([
+                        'error' => 'rate_limited',
+                        'retry_after_seconds' => (int) ($headers['Retry-After'] ?? 0),
+                        'plan' => $team->plan->value,
+                    ], 429, $headers);
+                });
+        });
     }
 
     private function configureScribe(): void

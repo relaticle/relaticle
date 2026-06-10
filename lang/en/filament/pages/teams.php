@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'create_team' => [
-        'label' => 'Create Team',
+        'label' => 'Create Workspace',
         'steps' => [
             'workspace' => 'Workspace',
             'attribution' => 'Attribution',

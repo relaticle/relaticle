@@ -10,6 +10,7 @@ use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersAction;
 use Filament\Widgets\WidgetConfiguration;
 use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 
 final class EngagementDashboard extends BaseDashboard
@@ -38,6 +39,7 @@ final class EngagementDashboard extends BaseDashboard
         return [
             ActivationRateWidget::class,
             UserRetentionChartWidget::class,
+            AiSpendStatsWidget::class,
         ];
     }
 

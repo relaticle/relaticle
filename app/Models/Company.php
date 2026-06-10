@@ -15,6 +15,7 @@ use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\CompanyObserver;
 use App\Services\AvatarService;
 use Database\Factories\CompanyFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -45,6 +46,10 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
+#[Fillable([
+    'name',
+    'creation_source',
+])]
 final class Company extends Model implements HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
@@ -66,14 +71,6 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
     use UsesCustomFields;
 
     public const string LOGO_MEDIA_COLLECTION = 'logo';
-
-    /**
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

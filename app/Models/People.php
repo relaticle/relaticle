@@ -15,6 +15,7 @@ use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\PeopleObserver;
 use App\Services\AvatarService;
 use Database\Factories\PeopleFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,6 +41,10 @@ use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
  * @property float|null $avg_response_time_hours
  */
 #[ObservedBy(PeopleObserver::class)]
+#[Fillable([
+    'name',
+    'creation_source',
+])]
 final class People extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
@@ -58,16 +63,6 @@ final class People extends Model implements HasCustomFields, HasTimeline
     use LogsCrmActivity;
     use SoftDeletes;
     use UsesCustomFields;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

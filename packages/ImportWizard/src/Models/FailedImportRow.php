@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -17,18 +18,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, mixed> $data
  * @property string|null $validation_error
  */
+#[Fillable([
+    'import_id',
+    'team_id',
+    'data',
+    'validation_error',
+])]
 final class FailedImportRow extends Model
 {
     use HasUlids;
     use MassPrunable;
-
-    /** @var list<string> */
-    protected $fillable = [
-        'import_id',
-        'team_id',
-        'data',
-        'validation_error',
-    ];
 
     protected function casts(): array
     {

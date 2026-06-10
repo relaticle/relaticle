@@ -12,6 +12,7 @@ use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,6 +36,11 @@ use Spatie\EloquentSortable\SortableTrait;
  * @method void saveCustomFieldValue(CustomField $field, mixed $value)
  */
 #[ObservedBy(TaskObserver::class)]
+#[Fillable([
+    'user_id',
+    'title',
+    'creation_source',
+])]
 final class Task extends Model implements HasCustomFields
 {
     use BelongsToTeamCreator;
@@ -50,12 +56,6 @@ final class Task extends Model implements HasCustomFields
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;
-
-    protected $fillable = [
-        'user_id',
-        'title',
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

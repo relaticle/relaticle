@@ -74,8 +74,16 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 default => 'logo.png',
             };
 
+            $response = SsrfGuard::guardedHttpClient()
+                ->timeout(15)
+                ->get($url);
+
+            if (! $response->successful()) {
+                return;
+            }
+
             $logo = $this->company
-                ->addMediaFromUrl($url)
+                ->addMediaFromString($response->body())
                 ->usingFileName($filename)
                 ->usingName('company_logo')
                 ->withCustomProperties([

@@ -32,7 +32,11 @@ boost.json
 /.fleet
 /.idea
 /.vscode
-/.claude
+/.claude/*
+!/.claude/skills
+!/.claude/skills/**
+!/.claude/commands
+!/.claude/commands/**
 /.superset
 /.cursor
 /.junie

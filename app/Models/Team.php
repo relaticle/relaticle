@@ -6,20 +6,25 @@ namespace App\Models;
 
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
 use App\Services\AvatarService;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
@@ -28,6 +33,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property string $name
  * @property string $slug
  * @property EmailPrivacyTier|null $default_email_sharing_tier
+ * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?Carbon $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
@@ -35,6 +41,18 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property Carbon|null $scheduled_deletion_at
  */
+#[Fillable([
+    'name',
+    'slug',
+    'personal_team',
+    'default_email_sharing_tier',
+    'onboarding_use_case',
+    'onboarding_context',
+    'onboarding_referral_source',
+])]
+#[Hidden([
+    'invite_link_token',
+])]
 final class Team extends JetstreamTeam implements HasAvatar
 {
     /** @use HasFactory<TeamFactory> */
@@ -71,7 +89,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         // App routes
         'companies', 'people', 'tasks', 'opportunities', 'notes',
         'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
-        'opportunities-board', 'tasks-board',
+        'opportunities-board', 'tasks-board', 'chat',
 
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
@@ -90,6 +108,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Infrastructure & framework
         'filament', 'livewire', 'storage', 'imports', 'horizon', 'scalar', 'engagement',
+        'broadcasting',
         'system-administrators',
         'up', 'health', 'status', 'metrics',
         'static', 'assets', 'cdn', 'public', 'uploads',
@@ -109,26 +128,6 @@ final class Team extends JetstreamTeam implements HasAvatar
      * How many days an invite-link token stays valid after creation/rotation.
      */
     public const int INVITE_LINK_TTL_DAYS = 7;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'slug',
-        'personal_team',
-        'default_email_sharing_tier',
-        'onboarding_use_case',
-        'onboarding_context',
-        'onboarding_referral_source',
-    ];
-
-    /** @var list<string> */
-    protected $hidden = [
-        'invite_link_token',
-    ];
 
     /**
      * The event map for the model.
@@ -151,6 +150,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         return [
             'personal_team' => 'boolean',
             'default_email_sharing_tier' => EmailPrivacyTier::class,
+            'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
@@ -293,5 +293,13 @@ final class Team extends JetstreamTeam implements HasAvatar
     public function notes(): HasMany
     {
         return $this->hasMany(Note::class);
+    }
+
+    /**
+     * @return HasOne<AiCreditBalance, $this>
+     */
+    public function aiCreditBalance(): HasOne
+    {
+        return $this->hasOne(AiCreditBalance::class);
     }
 }
