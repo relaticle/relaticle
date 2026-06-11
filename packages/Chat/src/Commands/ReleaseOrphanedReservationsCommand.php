@@ -8,6 +8,7 @@ use App\Models\Team;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
@@ -31,7 +32,7 @@ final class ReleaseOrphanedReservationsCommand extends Command
             ->where('type', AiCreditType::Reservation->value)
             ->where('created_at', '<', now()->subMinutes($age))
             ->where('idempotency_key', 'like', 'reserve-%')
-            ->whereNotExists(function ($query): void {
+            ->whereNotExists(function (Builder $query): void {
                 $query->selectRaw('1')
                     ->from('ai_credit_transactions as resolved')
                     ->whereColumn('resolved.team_id', 'ai_credit_transactions.team_id')
