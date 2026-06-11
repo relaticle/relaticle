@@ -112,6 +112,18 @@ final class ConnectedAccount extends Model
             ->where('team_id', $team->getKey());
     }
 
+    /**
+     * Scope to accounts that are connected and authorised (safe to sync/send through).
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function active(Builder $query): Builder
+    {
+        return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
     // Relations
 
     /**
