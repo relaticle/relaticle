@@ -11,7 +11,6 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -28,7 +27,7 @@ final class DispatchOutboxCommand extends Command
         $defaultDaily = Config::integer('email-integration.outbox.defaults.daily_send_limit');
 
         ConnectedAccount::query()
-            ->where('status', EmailAccountStatus::ACTIVE)
+            ->active()
             ->whereHas('outgoingEmails', fn (Builder $emailQuery): Builder => $emailQuery
                 ->where('status', EmailStatus::QUEUED)
                 ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now()))
