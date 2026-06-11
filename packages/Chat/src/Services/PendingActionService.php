@@ -593,7 +593,7 @@ final readonly class PendingActionService
             $existingLower = $this->proposedTitles($existing->action_data);
             $overlap = array_intersect($incomingLower, $existingLower);
             if ($overlap !== []) {
-                $matchedLower = (string) array_values($overlap)[0];
+                $matchedLower = array_values($overlap)[0];
                 $label = $titleMap[$matchedLower];
 
                 return "Heads up: \"{$label}\" was already proposed or created a moment ago — approving this may create a duplicate.";

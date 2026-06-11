@@ -11,10 +11,10 @@ use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
 
-final class StreamEventBroadcaster
+final readonly class StreamEventBroadcaster
 {
     public function __construct(
-        private readonly Channel $channel,
+        private Channel $channel,
     ) {}
 
     /**
@@ -61,6 +61,12 @@ final class StreamEventBroadcaster
 
         if ($event instanceof ToolCall) {
             return self::payloadForToolCall($event);
+        }
+
+        // The abstract StreamEvent doesn't declare toArray(); every concrete
+        // laravel/ai event implements it (type() depends on it internally).
+        if (! method_exists($event, 'toArray')) {
+            return null;
         }
 
         return [
