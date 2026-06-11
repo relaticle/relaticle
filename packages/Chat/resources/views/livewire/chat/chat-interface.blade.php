@@ -1618,9 +1618,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (assistantMsg?.role === 'assistant') {
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
-            assistantMsg.streamError = null;
-            assistantMsg.retryable = false;
         }
+        // A completed turn means the conversation recovered — failure banners on
+        // earlier bubbles describe a state that no longer exists (and reload
+        // would drop them anyway, since failed turns are never persisted).
+        this.messages.forEach((m) => {
+            if (m.role === 'assistant' && m.streamError) {
+                m.streamError = null;
+                m.retryable = false;
+            }
+        });
         this.isStreaming = false;
         this.clearStreamTimeout();
         this.scrollToBottom();
