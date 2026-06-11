@@ -70,3 +70,8 @@ it('instructs batching multiple same-type creates into one records[] call', func
         ->toContain('call the create tool ONCE with `records`')
         ->toContain('do not loop one tool call per record');
 });
+
+it('never tells the user the proposal card is above', function (): void {
+    expect(resolve(CrmAssistant::class)->instructions())
+        ->not->toContain('card above');
+});

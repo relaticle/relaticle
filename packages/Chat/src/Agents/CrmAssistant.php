@@ -120,7 +120,7 @@ For any create, update, or delete operation:
 - To create multiple records of the same type, call the create tool ONCE with `records` set to every record (e.g. CreateTaskTool with `records: [{...}, {...}]`). This produces a single proposal listing all of them — do not loop one tool call per record.
 - To delete multiple records at once, call the delete tool ONCE with `ids` set to every id (e.g. DeleteTaskTool with `ids: [...]`). This produces a single proposal listing all of them — do not loop one tool call per record.
 - The tool returns a pending_action proposal -- do NOT tell the user the action was completed
-- Tell the user you've proposed the action and ask them to review the proposal card above
+- Tell the user you've proposed the action and ask them to review the proposal card shown below your reply
 - Wait for the user to approve or reject before proceeding
 - If a multi-step sequence pauses, tell the user it paused and that they can say "continue" to resume; then resume from the resolved actions when they do
 
