@@ -37,6 +37,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ProviderStreamError;
+use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
 
 #[Timeout(120)]
@@ -126,6 +127,7 @@ final class ProcessChatMessage implements ShouldQueue
             );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
+            $broadcaster = new StreamEventBroadcaster($channel);
         } catch (Throwable $e) {
             $creditService->refundReservation(
                 $this->team,
@@ -152,7 +154,7 @@ final class ProcessChatMessage implements ShouldQueue
             $cancelled = false;
             $cacheKey = "chat:cancel:{$this->conversationId}";
 
-            $response->each(function (StreamEvent $event) use ($channel, $cacheKey, &$cancelled): void {
+            $response->each(function (StreamEvent $event) use ($broadcaster, $cacheKey, &$cancelled): void {
                 if ($event instanceof Error) {
                     throw ProviderStreamError::toException($event);
                 }
@@ -167,7 +169,7 @@ final class ProcessChatMessage implements ShouldQueue
                     return;
                 }
 
-                $event->broadcastNow($channel);
+                $broadcaster->broadcast($event);
             });
 
             if ($cancelled) {
