@@ -32,7 +32,7 @@ final class MessageFeedbackController
 
         $message = $this->ownAssistantMessage($user, $messageId);
 
-        abort_if($message === null, 404);
+        abort_if(! $message instanceof \stdClass, 404);
 
         $meta = json_decode((string) ($message->meta ?? '{}'), true);
 
@@ -73,7 +73,7 @@ final class MessageFeedbackController
         /** @var User $user */
         $user = $request->user();
 
-        abort_if($this->ownAssistantMessage($user, $messageId) === null, 404);
+        abort_if(! $this->ownAssistantMessage($user, $messageId) instanceof \stdClass, 404);
 
         ChatMessageFeedback::query()
             ->where('user_id', $user->getKey())
