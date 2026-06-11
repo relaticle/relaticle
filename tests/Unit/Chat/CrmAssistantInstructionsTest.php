@@ -105,3 +105,74 @@ it('keeps per-turn context out of the static (cacheable) instructions', function
         ->toContain('Dynamic thing')
         ->toContain('## Current Date');
 });
+
+it('enumerates team members with ids and warns they are not contacts', function (): void {
+    $agent = new CrmAssistant;
+    $agent->withTeamMembers([
+        ['id' => '01ABC', 'name' => 'Alex Owner', 'email' => 'alex@example.test'],
+    ]);
+
+    $instructions = $agent->instructions();
+
+    expect($instructions)->toContain('## Team Members')
+        ->toContain('Alex Owner (alex@example.test) -- id: 01ABC')
+        ->toContain('users, not CRM contacts');
+});
+
+it('omits the team members block when no members are injected', function (): void {
+    $agent = new CrmAssistant;
+
+    expect($agent->instructions())->not->toContain('## Team Members');
+});
+
+it('keeps team members out of the static cacheable instructions', function (): void {
+    $agent = new CrmAssistant;
+    $agent->withTeamMembers([
+        ['id' => '01ABC', 'name' => 'Alex Owner', 'email' => 'alex@example.test'],
+    ]);
+
+    expect($agent->staticInstructions())->not->toContain('Alex Owner');
+});
+
+it('instructs batching every clarifying question into a single message', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('ask ONCE')
+        ->toContain('batch every clarifying question into a single message');
+});
+
+it('instructs proceeding instead of asking when only one record can match', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('when only one record can match')
+        ->toContain('proceed with it and state the assumption');
+});
+
+it('forbids narrating tool usage', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('Never narrate tool usage')
+        ->toContain('Call tools silently');
+});
+
+it('teaches field truth: account owner is a team member set via account_owner_id', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('## Field Truth')
+        ->toContain('account_owner_id')
+        ->toContain('contacts/people records are NOT valid values');
+});
+
+it('forbids recommending shadow custom fields and apology loops for core fields', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('Never suggest creating a custom field that duplicates a core field')
+        ->toContain('Do not apologize and then repeat the same conclusion');
+});
+
+it('instructs executing accepted offers without re-asking named details', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
+
+    expect($static)->toContain('execute exactly what you offered')
+        ->toContain('never re-ask for details your own offer already named');
+});

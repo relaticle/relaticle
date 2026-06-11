@@ -95,6 +95,15 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public ?string $userTimezone = null;
 
+    /**
+     * Workspace members — the only valid values for team-member fields
+     * (company account owner, task assignees). Without this the model cannot
+     * map a name to a user id and denies the field exists (observed live).
+     *
+     * @var list<array{id: string, name: string, email: string}>
+     */
+    public array $teamMembers = [];
+
     public function withConversationId(?string $conversationId): self
     {
         $this->conversationId = $conversationId;
@@ -105,6 +114,14 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
     public function withUserTimezone(?string $timezone): self
     {
         $this->userTimezone = $timezone;
+
+        return $this;
+    }
+
+    /** @param list<array{id: string, name: string, email: string}> $members */
+    public function withTeamMembers(array $members): self
+    {
+        $this->teamMembers = $members;
 
         return $this;
     }
@@ -137,8 +154,9 @@ You can propose creating, updating, or deleting CRM records -- but these require
 4. Never fabricate data. If a search returns no results, say so.
 5. Use entity names the user would recognize: "companies" not "organizations", "people" or "contacts" interchangeably, "opportunities" or "deals" interchangeably, "tasks", "notes".
 6. Never expose record IDs to the user. IDs in tool results are internal-only -- use them silently for follow-up tool calls (chaining writes, mentioning records to other tools) but do NOT include them in your prose response, in tables, or in markdown links to the user. Refer to records by their human name only.
-7. If the user's request is ambiguous, ask for clarification rather than guessing.
+7. If the user's request is ambiguous, ask for clarification rather than guessing -- but ask ONCE: batch every clarifying question into a single message. Never ask about something you can resolve yourself; when only one record can match (e.g. the CRM has a single company), proceed with it and state the assumption instead of asking. When the user accepts an offer you just made ("yes", "do it", "go ahead"), execute exactly what you offered -- never re-ask for details your own offer already named.
 8. Be concise. Don't over-explain CRM concepts the user likely knows.
+9. Never narrate tool usage ("Let me fetch that", "I'll now look it up", "Let me check"). Call tools silently and reply once with the outcome.
 
 ## Write Operation Protocol
 For any create, update, or delete operation:
@@ -149,6 +167,13 @@ For any create, update, or delete operation:
 - Tell the user you've proposed the action and ask them to review the proposal card shown below your reply
 - Wait for the user to approve or reject before proceeding
 - If a multi-step sequence pauses, tell the user it paused and that they can say "continue" to resume; then resume from the resolved actions when they do
+
+## Field Truth
+Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND team-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
+- A company's "account owner" is the TEAM MEMBER responsible for it -- set it with account_owner_id. Task assignees are also team members. Valid team members are listed in the Team Members context; contacts/people records are NOT valid values for these fields. If a name matches both a team member and a contact, ask which one the user means.
+- Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
+- If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
+- If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion -- either correct yourself with the real field, or explain concretely what IS available.
 
 ## Formatting
 - Use markdown for rich text formatting
@@ -185,7 +210,35 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+        return $this->dateBlock().$this->teamMembersBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+    }
+
+    /**
+     * Team-member fields (account owner, assignees) only accept workspace
+     * users. Enumerating them is what lets the model resolve "set the owner
+     * to Alex" into a user id instead of denying the field exists.
+     */
+    private function teamMembersBlock(): string
+    {
+        if ($this->teamMembers === []) {
+            return '';
+        }
+
+        $lines = [
+            '',
+            '## Team Members',
+            'Workspace members -- the ONLY valid values for team-member fields (company account_owner_id, task assignee_ids). These are users, not CRM contacts:',
+        ];
+
+        foreach ($this->teamMembers as $member) {
+            $name = $this->sanitizeLabel($member['name']);
+            $email = $this->sanitizeLabel($member['email']);
+            $lines[] = "- {$name} ({$email}) -- id: {$member['id']}";
+        }
+
+        $lines[] = 'Use these ids silently; never display them to the user.';
+
+        return "\n".implode("\n", $lines);
     }
 
     /**

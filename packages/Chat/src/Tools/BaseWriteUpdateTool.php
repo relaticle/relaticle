@@ -41,6 +41,15 @@ abstract class BaseWriteUpdateTool implements Tool
     /** @return array<string, mixed> */
     abstract protected function extractActionData(Request $request): array;
 
+    /**
+     * Entity-specific request validation beyond custom fields. Return an
+     * error message to abort the proposal, or null to proceed.
+     */
+    protected function validateRequest(Request $request, User $user): ?string
+    {
+        return null;
+    }
+
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
@@ -83,6 +92,12 @@ abstract class BaseWriteUpdateTool implements Tool
 
         if ($validation->error !== null) {
             return (string) json_encode(['error' => $validation->error]);
+        }
+
+        $requestError = $this->validateRequest($request, $user);
+
+        if ($requestError !== null) {
+            return (string) json_encode(['error' => $requestError]);
         }
 
         $conversationId = $this->resolveConversationId();

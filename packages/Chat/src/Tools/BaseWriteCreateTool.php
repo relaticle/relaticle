@@ -45,6 +45,17 @@ abstract class BaseWriteCreateTool implements Tool
      */
     abstract protected function extractRecordData(array $record): array;
 
+    /**
+     * Entity-specific per-record validation beyond custom fields. Return an
+     * error message to abort the proposal, or null to proceed.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    protected function validateRecord(array $record, User $user): ?string
+    {
+        return null;
+    }
+
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
@@ -105,6 +116,12 @@ abstract class BaseWriteCreateTool implements Tool
 
             if ($validation->error !== null) {
                 return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
+            }
+
+            $recordError = $this->validateRecord($record, $user);
+
+            if ($recordError !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"]);
             }
 
             $data = $this->extractRecordData($record);

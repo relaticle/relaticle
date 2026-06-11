@@ -13,6 +13,7 @@ use App\Models\People;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
@@ -223,4 +224,87 @@ it('UpdatePersonTool can repoint company_id and persist it', function (): void {
     resolve(UpdatePeople::class)->execute($this->user, $person, $pending->action_data);
 
     expect($person->refresh()->company_id)->toBe((string) $newCompany->id);
+});
+
+it('UpdateCompanyTool proposes an account owner change with names in the display and approval persists it', function (): void {
+    $teammate = User::factory()->create(['name' => 'Alex Owner']);
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+    $company = Company::factory()->for($this->team)->create(['name' => 'Owned Co']);
+
+    $tool = resolve(UpdateCompanyTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000099');
+
+    $response = $tool->handle(new Request([
+        'id' => (string) $company->id,
+        'account_owner_id' => (string) $teammate->getKey(),
+    ]));
+
+    expect($response)->toContain('pending_action');
+
+    $pending = PendingAction::query()
+        ->where('team_id', $this->team->getKey())
+        ->latest()
+        ->firstOrFail();
+
+    expect($pending->action_data)->toHaveKey('account_owner_id', (string) $teammate->getKey());
+
+    $ownerRow = collect($pending->display_data['fields'])->firstWhere('label', 'Account Owner');
+    expect($ownerRow)->not->toBeNull()
+        ->and($ownerRow['new'])->toBe('Alex Owner');
+
+    resolve(UpdateCompany::class)->execute($this->user, $company, $pending->action_data);
+
+    expect($company->refresh()->account_owner_id)->toBe((string) $teammate->getKey());
+});
+
+it('UpdateCompanyTool rejects a non-member account_owner_id without creating a proposal', function (): void {
+    $stranger = User::factory()->withPersonalTeam()->create(['name' => 'Foreign Frank']);
+    $company = Company::factory()->for($this->team)->create(['name' => 'Guarded Co']);
+
+    $tool = resolve(UpdateCompanyTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000099');
+
+    $response = $tool->handle(new Request([
+        'id' => (string) $company->id,
+        'account_owner_id' => (string) $stranger->getKey(),
+    ]));
+
+    expect($response)->toContain('must be a workspace team member')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('UpdateCompanyTool unassigns the account owner when an empty string is passed', function (): void {
+    $company = Company::factory()->for($this->team)->create([
+        'name' => 'Unowned Co',
+        'account_owner_id' => (string) $this->user->getKey(),
+    ]);
+
+    $tool = resolve(UpdateCompanyTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000099');
+
+    $tool->handle(new Request([
+        'id' => (string) $company->id,
+        'account_owner_id' => '',
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('team_id', $this->team->getKey())
+        ->latest()
+        ->firstOrFail();
+
+    expect($pending->action_data)->toHaveKey('account_owner_id')
+        ->and($pending->action_data['account_owner_id'])->toBeNull();
+
+    resolve(UpdateCompany::class)->execute($this->user, $company, $pending->action_data);
+
+    expect($company->refresh()->account_owner_id)->toBeNull();
+});
+
+it('UpdateCompany action rejects an account_owner_id outside the workspace', function (): void {
+    $stranger = User::factory()->withPersonalTeam()->create();
+    $company = Company::factory()->for($this->team)->create(['name' => 'Tenant Safe Co']);
+
+    expect(fn () => resolve(UpdateCompany::class)->execute($this->user, $company, [
+        'account_owner_id' => (string) $stranger->getKey(),
+    ]))->toThrow(ValidationException::class);
 });

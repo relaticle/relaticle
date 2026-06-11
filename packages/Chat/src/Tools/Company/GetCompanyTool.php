@@ -29,4 +29,9 @@ final class GetCompanyTool extends BaseReadShowTool
     {
         return 'Company';
     }
+
+    protected function eagerLoad(): array
+    {
+        return [...parent::eagerLoad(), 'accountOwner'];
+    }
 }
