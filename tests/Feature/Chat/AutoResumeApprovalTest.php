@@ -147,6 +147,33 @@ it('approving a pending action via the service dispatches a continuation job', f
     Bus::assertDispatched(ContinueChatMessage::class);
 });
 
+it('includes all record ids and a batch label for an approved batch', function (): void {
+    Bus::fake();
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [['title' => 'A'], ['title' => 'B']]],
+        'display_data' => ['summary' => 'Create 2 tasks', 'items' => [
+            ['summary' => 'Create task "A"'], ['summary' => 'Create task "B"'],
+        ]],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['ids' => ['01aa0000000000000000000000', '01bb0000000000000000000000'], 'type' => 'task', 'count' => 2],
+    ]);
+
+    resolve(ApprovalContinuationService::class)->dispatchAfterApproval($action, 'approved');
+
+    Bus::assertDispatched(ContinueChatMessage::class, fn (ContinueChatMessage $job): bool => str_contains($job->prompt, '01aa0000000000000000000000')
+        && str_contains($job->prompt, '01bb0000000000000000000000')
+        && str_contains($job->prompt, '2 records'));
+});
+
 it('rejecting a pending action also dispatches a continuation', function (): void {
     Bus::fake();
 

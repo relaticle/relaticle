@@ -285,6 +285,25 @@
                                         </template>
                                     </div>
 
+                                    {{-- Batch items (records[] proposals) --}}
+                                    <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
+                                        <div class="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
+                                            <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
+                                                <div class="py-2 first:pt-0 last:pb-0">
+                                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
+                                                    <div class="mt-1 space-y-0.5">
+                                                        <template x-for="field in (item.fields || [])" :key="field.label">
+                                                            <div class="flex gap-2 text-xs">
+                                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
+                                                                <span class="text-gray-700 dark:text-gray-300" x-text="field.new || field.value"></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
                                     {{-- Action buttons --}}
                                     <template x-if="action.status === 'pending'">
                                         <div class="mt-3 flex gap-2">
@@ -332,6 +351,16 @@
                                                     View
                                                     <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                                 </a>
+                                            </template>
+                                            <template x-if="(action.status === 'approved' || action.status === 'restored') && Array.isArray(action.records) && action.records.length > 0">
+                                                <span class="flex flex-wrap gap-2">
+                                                    <template x-for="ref in action.records" :key="ref.id">
+                                                        <a :href="ref.url" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">
+                                                            View
+                                                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                                                        </a>
+                                                    </template>
+                                                </span>
                                             </template>
                                         </div>
                                     </template>
@@ -1676,6 +1705,9 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 const body = await res.json().catch(() => ({}));
                 if (body.record) {
                     action.record = body.record;
+                }
+                if (body.records) {
+                    action.records = body.records;
                 }
                 if (action.operation === 'delete') {
                     this.showUndoToast(action);

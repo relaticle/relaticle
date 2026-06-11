@@ -90,6 +90,11 @@ final readonly class ApprovalContinuationService
                 $lines[] = "record_id: {$recordId}";
             }
 
+            $recordIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
+            if (is_array($recordIds) && $recordIds !== []) {
+                $lines[] = 'record_ids: '.implode(',', array_map(strval(...), $recordIds));
+            }
+
             $label = $this->resolveLabel($pendingAction);
             if ($label !== null) {
                 $lines[] = "record_label: {$label}";
@@ -103,10 +108,22 @@ final readonly class ApprovalContinuationService
 
     private function resolveLabel(PendingAction $pendingAction): ?string
     {
+        $display = $pendingAction->display_data;
+
+        if (isset($display['items']) && is_array($display['items'])) {
+            $titles = array_values(array_filter(array_map(
+                static fn (mixed $item): ?string => is_array($item) && is_string($item['summary'] ?? null) ? $item['summary'] : null,
+                $display['items'],
+            )));
+            $count = count($display['items']);
+            $shown = implode('; ', array_slice($titles, 0, 5));
+
+            return "{$count} records: {$shown}".($count > 5 ? '; …' : '');
+        }
+
         $data = $pendingAction->action_data;
 
-        $candidates = ['name', 'title'];
-        foreach ($candidates as $field) {
+        foreach (['name', 'title'] as $field) {
             if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
                 return $data[$field];
             }
