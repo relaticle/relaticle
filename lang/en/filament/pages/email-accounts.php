@@ -7,6 +7,7 @@ return [
     'actions' => [
         'connect_gmail' => 'Connect Gmail',
         'connect_azure' => 'Connect Outlook',
+        'manage' => 'Manage',
         're_auth' => 'Re-authenticate',
         'edit_settings' => 'Settings',
         'disconnect' => 'Disconnect',
