@@ -1024,7 +1024,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.text_delta', (e) => this.handleTextDelta(e))
             .listen('.tool_call', (e) => this.handleToolCall(e))
             .listen('.tool_result', (e) => this.handleToolResult(e))
-            .listen('.stream_end', () => this.handleStreamEnd())
+            .listen('.stream_end', (e) => this.handleStreamEnd(e))
             .listen('.stream.failed', (e) => this.handleStreamFailed(e))
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
@@ -1102,8 +1102,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             // A lost stream_end stranded this turn: reconcile from the DB so the
             // final text AND any proposal card self-heal instead of showing a
             // truncated bubble with a missing approve/reject CTA until reload.
-            await this.reconcileLatestAssistant();
-            const assistantMsg = this.messages[this.messages.length - 1];
+            const assistantMsg = this.lastAssistantBubble();
+            await this.reconcileLatestAssistant(assistantMsg);
             if (assistantMsg?.role === 'assistant') {
                 if (!assistantMsg.content) {
                     assistantMsg.streamError = 'The assistant took too long to respond.';
@@ -1562,14 +1562,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         } catch { /* not pending action JSON */ }
     },
 
-    // Reconcile the last assistant bubble against persisted state: pull the
-    // authoritative text (missed deltas) AND merge any still-pending proposal
-    // cards the client never received (a dropped .tool_result would otherwise
-    // leave the approve/reject CTA missing until a full reload). Purely additive
-    // for cards — on the happy path the card is already present, so this is a
-    // no-op. Used by both stream_end and the watchdog timeout.
-    async reconcileLatestAssistant() {
-        const assistantMsg = this.messages[this.messages.length - 1];
+    // Reconcile a bubble against persisted state: pull the authoritative text
+    // (missed deltas) AND merge any still-pending proposal cards the client
+    // never received. Targets the bubble whose stream just ended when known;
+    // falls back to the last assistant bubble (watchdog path).
+    async reconcileLatestAssistant(target = null) {
+        const assistantMsg = target ?? this.lastAssistantBubble();
         if (assistantMsg?.role !== 'assistant') return;
         try {
             const authoritative = await this.$wire.latestAssistantMessage();
@@ -1594,10 +1592,29 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    async handleStreamEnd() {
+    async handleStreamEnd(event) {
         this.currentToolStatus = null;
-        await this.reconcileLatestAssistant();
-        const assistantMsg = this.messages[this.messages.length - 1];
+        const inv = event?.invocation_id ?? null;
+        let assistantMsg = null;
+        if (inv !== null) {
+            for (let i = this.messages.length - 1; i >= 0; i--) {
+                const m = this.messages[i];
+                if (m.role === 'assistant' && m.invocationId === inv) { assistantMsg = m; break; }
+            }
+        }
+        if (!assistantMsg) {
+            assistantMsg = this.lastAssistantBubble();
+            // Never finalize an unstarted continuation stub minted AFTER the
+            // ended stream — the ended turn is the assistant bubble before it.
+            if (assistantMsg && assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered) {
+                const idx = this.messages.indexOf(assistantMsg);
+                for (let i = idx - 1; i >= 0; i--) {
+                    const m = this.messages[i];
+                    if (m.role === 'assistant') { assistantMsg = m; break; }
+                }
+            }
+        }
+        await this.reconcileLatestAssistant(assistantMsg);
         if (assistantMsg?.role === 'assistant') {
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
