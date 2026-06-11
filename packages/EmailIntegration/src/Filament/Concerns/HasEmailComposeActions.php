@@ -116,17 +116,17 @@ trait HasEmailComposeActions
             })
             ->modalWidth(Width::SevenExtraLarge)
             ->fillForm(function (array $arguments): array {
-                /** @var Email|null $email */
-                $email = Email::query()->with(['participants', 'body'])->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveComposableEmail($arguments['emailId'] ?? null);
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return [];
                 }
 
+                $user = $this->getAuthenticatedUser();
                 $mode = $arguments['mode'] ?? 'reply';
 
                 $account = ConnectedAccount::query()
-                    ->where('user_id', $this->getAuthenticatedUser()->getKey())
+                    ->where('user_id', $user->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
                     ->first();
@@ -143,6 +143,9 @@ trait HasEmailComposeActions
                         ->all(),
                 };
 
+                // Only quote the original body when the viewer is entitled to read it.
+                $quotedBody = $user->can('viewBody', $email) ? ($email->body->body_html ?? '') : '';
+
                 $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
 
                 return [
@@ -150,7 +153,7 @@ trait HasEmailComposeActions
                     'to' => $toParticipants,
                     'subject' => $subjectPrefix.($email->subject ?? ''),
                     'body_html' => '',
-                    'quoted_body_html' => $email->body->body_html ?? '',
+                    'quoted_body_html' => $quotedBody,
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
                     'privacy_tier' => $this->defaultPrivacyTier()->value,
@@ -572,6 +575,36 @@ trait HasEmailComposeActions
             )
             ->pluck('name', 'id')
             ->all();
+    }
+
+    /**
+     * Resolve an email for reply/forward, scoped to the active team and gated by the
+     * `view` policy. Returns null when the email is outside the viewer's team or hidden.
+     */
+    private function resolveComposableEmail(?string $emailId): ?Email
+    {
+        if ($emailId === null) {
+            return null;
+        }
+
+        $user = $this->getAuthenticatedUser();
+
+        /** @var Email|null $email */
+        $email = Email::query()
+            ->forTeam($user->current_team_id)
+            ->with(['participants', 'body'])
+            ->whereKey($emailId)
+            ->first();
+
+        if ($email === null) {
+            return null;
+        }
+
+        if (! $user->can('view', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     private function getAuthenticatedUser(): User

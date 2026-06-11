@@ -9,7 +9,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
-final readonly class PrivacyService
+final class PrivacyService
 {
     /**
      * Resolve the effective privacy tier this $viewer can see on $email.
@@ -32,10 +32,10 @@ final readonly class PrivacyService
             return null;
         }
 
-        // 3. Per-email share overrides the email's own tier
-        $share = $email->shares()
-            ->where('shared_with', $viewer->getKey())
-            ->first();
+        // 3. Per-email share overrides the email's own tier (uses the loaded relation when
+        // eager-loaded, so filtering a list of emails doesn't issue a query per row).
+        $email->loadMissing('shares');
+        $share = $email->shares->firstWhere('shared_with', $viewer->getKey());
 
         if ($share) {
             return EmailPrivacyTier::from($share->tier);
@@ -65,37 +65,59 @@ final readonly class PrivacyService
     }
 
     /**
+     * Per-team protected recipient lists, memoized for the lifetime of this instance to
+     * avoid two ProtectedRecipient queries per email when filtering a list of emails.
+     *
+     * @var array<string, array{emails: list<string>, domains: list<string>}>
+     */
+    private array $protectedCache = [];
+
+    /**
      * Check whether any participant on this email matches a protected_recipients row.
      */
     private function isProtected(Email $email): bool
     {
         $email->loadMissing(['participants']);
 
-        $teamId = $email->team_id;
-
-        $protectedEmails = ProtectedRecipient::query()->where('team_id', $teamId)
-            ->where('type', 'email')
-            ->pluck('value')
-            ->map(fn (mixed $value): string => strtolower((string) $value));
-
-        $protectedDomains = ProtectedRecipient::query()->where('team_id', $teamId)
-            ->where('type', 'domain')
-            ->pluck('value')
-            ->map(fn (mixed $value): string => strtolower((string) $value));
+        ['emails' => $protectedEmails, 'domains' => $protectedDomains] = $this->protectedRecipients($email->team_id);
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);
             $domain = explode('@', $address)[1] ?? '';
 
-            if ($protectedEmails->contains($address)) {
+            if (in_array($address, $protectedEmails, true)) {
                 return true;
             }
 
-            if ($protectedDomains->contains($domain)) {
+            if ($domain !== '' && in_array($domain, $protectedDomains, true)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @return array{emails: list<string>, domains: list<string>}
+     */
+    private function protectedRecipients(string $teamId): array
+    {
+        if (isset($this->protectedCache[$teamId])) {
+            return $this->protectedCache[$teamId];
+        }
+
+        $byType = ProtectedRecipient::query()
+            ->where('team_id', $teamId)
+            ->whereIn('type', ['email', 'domain'])
+            ->get(['type', 'value']);
+
+        return $this->protectedCache[$teamId] = [
+            'emails' => array_values($byType->where('type', 'email')
+                ->map(fn (ProtectedRecipient $r): string => strtolower((string) $r->value))
+                ->all()),
+            'domains' => array_values($byType->where('type', 'domain')
+                ->map(fn (ProtectedRecipient $r): string => strtolower((string) $r->value))
+                ->all()),
+        ];
     }
 }

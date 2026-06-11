@@ -236,7 +236,7 @@ describe('CancelEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        app(CancelEmailAccessRequestAction::class)->execute($request);
+        app(CancelEmailAccessRequestAction::class)->execute($request, $this->requester);
 
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeFalse();
     });
@@ -248,7 +248,7 @@ describe('CancelEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        app(CancelEmailAccessRequestAction::class)->execute($request);
+        app(CancelEmailAccessRequestAction::class)->execute($request, $this->requester);
 
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeTrue();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
@@ -261,9 +261,22 @@ describe('CancelEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        app(CancelEmailAccessRequestAction::class)->execute($request);
+        app(CancelEmailAccessRequestAction::class)->execute($request, $this->requester);
 
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeTrue();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
+    });
+
+    it('aborts when the actor is not the requester', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        expect(fn () => app(CancelEmailAccessRequestAction::class)->execute($request, $this->owner))
+            ->toThrow(HttpException::class);
+
+        expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeTrue();
     });
 });

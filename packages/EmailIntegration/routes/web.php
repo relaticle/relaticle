@@ -9,9 +9,11 @@ use Relaticle\EmailIntegration\Controllers\RedirectController as EmailRedirectCo
 Route::middleware(['web', 'auth', 'verified'])->group(function (): void {
     Route::get('/email-accounts/redirect/{provider}', EmailRedirectController::class)
         ->name('email-accounts.redirect')
+        ->whereIn('provider', ['gmail', 'azure'])
         ->middleware('throttle:10,1');
 
     Route::get('/email-accounts/callback/{provider}', EmailCallbackController::class)
         ->name('email-accounts.callback')
+        ->whereIn('provider', ['gmail', 'azure'])
         ->middleware('throttle:10,1');
 });

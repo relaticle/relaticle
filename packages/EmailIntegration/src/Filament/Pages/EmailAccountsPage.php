@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -14,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Size;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -266,6 +269,33 @@ final class EmailAccountsPage extends Page
                     ->body(__('filament/pages/email-accounts.notifications.disconnected.body'))
                     ->send();
             });
+    }
+
+    /**
+     * Native Filament dropdown grouping the per-account actions. Arguments are baked onto
+     * each child action so the group can be rendered once per account in the blade.
+     */
+    public function accountActions(ConnectedAccount $account): ActionGroup
+    {
+        $arguments = ['account_id' => $account->getKey()];
+
+        // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
+        // into the mountAction() click handler, which reads getInvokedArguments().
+        return ActionGroup::make([
+            ($this->reAuthAction())($arguments)
+                ->visible(in_array($account->status, [
+                    EmailAccountStatus::REAUTH_REQUIRED,
+                    EmailAccountStatus::ERROR,
+                ], true)),
+            ($this->syncCalendarNowAction())($arguments),
+            ($this->syncCalendarAction())($arguments),
+            ($this->editSettingsAction())($arguments),
+            ($this->disconnectAction())($arguments),
+        ])
+            ->label(__('filament/pages/email-accounts.actions.manage'))
+            ->icon(Heroicon::EllipsisVertical)
+            ->size(Size::Small)
+            ->button();
     }
 
     public function sendSuccessNotification(): void

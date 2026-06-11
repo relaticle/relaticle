@@ -146,8 +146,10 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         $endDate = (string) $end->getDate();
         $isAllDay = $startDate !== '';
 
-        $startsAt = Date::parse($isAllDay ? $startDate : (string) $start->getDateTime());
-        $endsAt = Date::parse($isAllDay ? $endDate : (string) $end->getDateTime());
+        // All-day events carry a bare Y-m-d with no zone; parse as UTC so a server in a
+        // timezone behind UTC doesn't roll the stored date back a day.
+        $startsAt = $isAllDay ? Date::parse($startDate, 'UTC') : Date::parse((string) $start->getDateTime());
+        $endsAt = $isAllDay ? Date::parse($endDate, 'UTC') : Date::parse((string) $end->getDateTime());
 
         $attendees = [];
         foreach ($event->getAttendees() as $attendee) {

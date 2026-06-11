@@ -131,9 +131,9 @@ final class EmailInboxPage extends Page
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
-            $query->where('direction', EmailDirection::OUTBOUND);
+            $query->sent();
         } elseif ($this->folder === EmailFolder::Inbox) {
-            $query->where('direction', EmailDirection::INBOUND);
+            $query->inbox();
         }
 
         if (filled($this->search)) {
@@ -279,17 +279,19 @@ final class EmailInboxPage extends Page
             })
             ->modalWidth(Width::SevenExtraLarge)
             ->fillForm(function (array $arguments): array {
-                /** @var Email|null $email */
-                $email = Email::query()->with(['participants', 'body'])->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'view');
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return [];
                 }
 
+                $email->loadMissing(['participants', 'body']);
+
+                $user = $this->authUser();
                 $mode = $arguments['mode'] ?? 'reply';
 
                 $account = ConnectedAccount::query()
-                    ->where('user_id', $this->authUser()->getKey())
+                    ->where('user_id', $user->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
                     ->first();
@@ -306,6 +308,9 @@ final class EmailInboxPage extends Page
                         ->all(),
                 };
 
+                // Only quote the original body when the viewer is entitled to read it.
+                $quotedBody = $user->can('viewBody', $email) ? $email->body?->body_html : null;
+
                 $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
 
                 return [
@@ -313,7 +318,7 @@ final class EmailInboxPage extends Page
                     'to' => $toParticipants,
                     'subject' => $subjectPrefix.($email->subject ?? ''),
                     'body_html' => '',
-                    'quoted_body_html' => $email->body?->body_html,
+                    'quoted_body_html' => $quotedBody,
                     'mode' => $mode,
                     'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
                     'privacy_tier' => $this->defaultPrivacyTier()->value,
@@ -448,6 +453,18 @@ final class EmailInboxPage extends Page
         return $email;
     }
 
+    private function requesterNameForOwnedRequest(?string $requestId): string
+    {
+        if ($requestId === null) {
+            return 'this user';
+        }
+
+        return EmailAccessRequest::query()
+            ->whereKey($requestId)
+            ->where('owner_id', $this->authUser()->getKey())
+            ->first()?->requester->name ?? 'this user';
+    }
+
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
@@ -519,7 +536,7 @@ final class EmailInboxPage extends Page
             ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
-                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ))
             ->modalSubmitActionLabel('Approve')
             ->color('success')
@@ -552,7 +569,7 @@ final class EmailInboxPage extends Page
             ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Deny %s\'s request for access to this email?',
-                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ))
             ->modalSubmitActionLabel('Deny')
             ->color('danger')

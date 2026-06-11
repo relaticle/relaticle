@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -14,19 +15,21 @@ final readonly class CreateSignatureAction
      */
     public function execute(ConnectedAccount $account, array $data): EmailSignature
     {
-        if ($data['is_default']) {
-            EmailSignature::query()->where('connected_account_id', $account->getKey())
-                ->where('is_default', true)
-                ->update(['is_default' => false]);
-        }
+        return DB::transaction(function () use ($account, $data): EmailSignature {
+            if ($data['is_default']) {
+                EmailSignature::query()->where('connected_account_id', $account->getKey())
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
+            }
 
-        return EmailSignature::query()->create([
-            'team_id' => $account->team_id,
-            'connected_account_id' => $account->getKey(),
-            'user_id' => $account->user_id,
-            'name' => $data['name'],
-            'content_html' => $data['content_html'],
-            'is_default' => $data['is_default'],
-        ]);
+            return EmailSignature::query()->create([
+                'team_id' => $account->team_id,
+                'connected_account_id' => $account->getKey(),
+                'user_id' => $account->user_id,
+                'name' => $data['name'],
+                'content_html' => $data['content_html'],
+                'is_default' => $data['is_default'],
+            ]);
+        });
     }
 }
