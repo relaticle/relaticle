@@ -76,32 +76,53 @@ final readonly class ApprovalContinuationService
 
     private function buildPrompt(PendingAction $pendingAction, string $status): string
     {
+        $label = $this->resolveLabel($pendingAction) ?? "the {$pendingAction->entity_type} record(s)";
+
+        if ($status !== 'approved') {
+            return implode("\n", [
+                '[approval]',
+                "The user REJECTED the proposal to {$pendingAction->operation->value} {$label}.",
+                "Do not silently retry it. Ask the user what they'd prefer instead.",
+            ]);
+        }
+
         $lines = [
             '[approval]',
-            "status: {$status}",
-            "operation: {$pendingAction->operation->value}",
-            "entity_type: {$pendingAction->entity_type}",
+            "The user APPROVED — and the system has already EXECUTED — this action: {$pendingAction->operation->value} {$label}.",
         ];
 
-        if ($status === 'approved') {
-            $resultData = $pendingAction->result_data;
-            $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
-            if (is_string($recordId) && $recordId !== '') {
-                $lines[] = "record_id: {$recordId}";
-            }
+        $resultData = $pendingAction->result_data;
+        $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
+        $recordIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
 
-            $recordIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
-            if (is_array($recordIds) && $recordIds !== []) {
-                $lines[] = 'record_ids: '.implode(',', array_map(strval(...), $recordIds));
-            }
-
-            $label = $this->resolveLabel($pendingAction);
-            if ($label !== null) {
-                $lines[] = "record_label: {$label}";
-            }
-        } else {
-            $lines[] = 'note: User rejected the proposed action. Ask before reproposing.';
+        if (is_string($recordId) && $recordId !== '') {
+            $lines[] = "Record id: {$recordId} (internal — use for follow-up tool calls, never show it to the user).";
         }
+
+        if (is_array($recordIds) && $recordIds !== []) {
+            $lines[] = 'Record ids: '.implode(',', array_map(strval(...), $recordIds)).' (internal — use for follow-up tool calls, never show them to the user).';
+        }
+
+        $plan = $pendingAction->display_data['plan'] ?? null;
+
+        if (is_array($plan)
+            && is_string($plan['original_request'] ?? null)
+            && is_numeric($plan['position'] ?? null)
+            && is_numeric($plan['total'] ?? null)) {
+            $position = (int) $plan['position'];
+            $total = (int) $plan['total'];
+            $lines[] = sprintf(
+                'Original request: "%s". Progress: %d of %d done. %s',
+                $plan['original_request'],
+                $position,
+                $total,
+                $position < $total
+                    ? 'Propose the next item now.'
+                    : 'Everything requested is done — confirm with a one-line summary naming each record.',
+            );
+        }
+
+        $lines[] = 'Confirm to the user by the record title(s) above. Never echo operation or entity_type tokens as if they were names.';
 
         return implode("\n", $lines);
     }

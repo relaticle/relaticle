@@ -52,9 +52,9 @@ it('dispatches ContinueChatMessage with an [approval] prompt on approval', funct
     Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
         return $job->conversationId === $this->convId
             && str_starts_with($job->prompt, '[approval]')
-            && str_contains($job->prompt, 'status: approved')
-            && str_contains($job->prompt, 'record_id: 01abc000000000000000000000')
-            && str_contains($job->prompt, 'entity_type: people');
+            && str_contains($job->prompt, 'APPROVED')
+            && str_contains($job->prompt, '01abc000000000000000000000')
+            && str_contains($job->prompt, 'Angel');
     });
 });
 
@@ -78,8 +78,9 @@ it('uses status=rejected and omits record_id when rejecting', function (): void 
     resolve(ApprovalContinuationService::class)->dispatchAfterApproval($action, 'rejected');
 
     Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
-        return str_contains($job->prompt, 'status: rejected')
-            && ! str_contains($job->prompt, 'record_id:');
+        return str_starts_with($job->prompt, '[approval]')
+            && str_contains($job->prompt, 'REJECTED')
+            && ! str_contains($job->prompt, 'record_id');
     });
 });
 
@@ -174,6 +175,33 @@ it('includes all record ids and a batch label for an approved batch', function (
         && str_contains($job->prompt, '2 records'));
 });
 
+it('carries plan progress into the continuation prompt when the proposal has one', function (): void {
+    Bus::fake();
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Step two task'],
+        'display_data' => [
+            'summary' => 'Create task "Step two task"',
+            'plan' => ['original_request' => 'Create 5 random unique tasks', 'position' => 2, 'total' => 5],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['id' => '01cc0000000000000000000000', 'type' => 'task'],
+    ]);
+
+    resolve(ApprovalContinuationService::class)->dispatchAfterApproval($action, 'approved');
+
+    Bus::assertDispatched(ContinueChatMessage::class, fn (ContinueChatMessage $job): bool => str_contains($job->prompt, 'Create 5 random unique tasks')
+        && str_contains($job->prompt, '2 of 5'));
+});
+
 it('rejecting a pending action also dispatches a continuation', function (): void {
     Bus::fake();
 
@@ -193,6 +221,7 @@ it('rejecting a pending action also dispatches a continuation', function (): voi
     resolve(PendingActionService::class)->reject($action);
 
     Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
-        return str_contains($job->prompt, 'status: rejected');
+        return str_starts_with($job->prompt, '[approval]')
+            && str_contains($job->prompt, 'REJECTED');
     });
 });

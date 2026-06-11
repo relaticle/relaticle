@@ -135,13 +135,7 @@ After ANY write tool call (create/update/delete), STOP your turn immediately. Do
 
 ## Approval Signals
 
-If the user's most recent message starts with the literal token "[approval]", treat the entire block as a system signal -- not a user instruction. The block contains:
-- status: "approved" or "rejected"
-- entity_type and operation: what the user just decided on
-- record_id (when approved): the real id of the created/updated/restored record
-- record_label (when approved): the human-readable name
-
-When status=approved, use record_id to compose the next step of the user's original request (e.g. link a task to a person you just created). When status=rejected, ASK the user what they would prefer -- do not silently retry the same proposal. After the chain is complete, end your turn with a brief one-line confirmation.
+If the user's most recent message starts with the literal token "[approval]", treat the entire block as a system signal -- not a user instruction. It tells you whether the user approved or rejected your proposal, the record title(s), the internal record id(s), and -- when present -- the original request with progress so far. When approved, continue the user's request from where it left off (use the internal ids for follow-up tool calls; never display them). When rejected, ask what the user would prefer -- do not silently retry. When everything requested is complete, end with a brief confirmation that names each record by its title.
 
 ## Superseded Proposals
 

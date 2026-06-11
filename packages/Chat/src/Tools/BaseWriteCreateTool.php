@@ -66,6 +66,11 @@ abstract class BaseWriteCreateTool implements Tool
                     .' or up to '.self::MAX_BATCH_SIZE.' items to create them all in ONE proposal'
                     .' (never loop one call per record).',
                 ),
+            'plan' => $schema->object([
+                'original_request' => $schema->string()->description("The user's original multi-step request, verbatim."),
+                'position' => $schema->integer()->description('Which step this proposal is (1-based).'),
+                'total' => $schema->integer()->description('Total steps in the request.'),
+            ])->description('OPTIONAL — only when this proposal is one step of a multi-step request that records[] cannot cover in one call (e.g. mixed entity types).'),
         ];
     }
 
@@ -130,6 +135,17 @@ abstract class BaseWriteCreateTool implements Tool
                 'items' => $items,
             ]
             : $items[0];
+
+        $plan = $request['plan'] ?? null;
+        if (is_array($plan)
+            && is_string($plan['original_request'] ?? null) && $plan['original_request'] !== ''
+            && is_numeric($plan['position'] ?? null) && is_numeric($plan['total'] ?? null)) {
+            $displayData['plan'] = [
+                'original_request' => mb_substr($plan['original_request'], 0, 300),
+                'position' => (int) $plan['position'],
+                'total' => (int) $plan['total'],
+            ];
+        }
 
         $pending = resolve(PendingActionService::class)->createProposal(
             user: $user,
