@@ -24,8 +24,11 @@ use Relaticle\Chat\Actions\RenameConversation;
 use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
+use Relaticle\Chat\Services\ApprovalContinuationService;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\TitleSanitizer;
@@ -95,7 +98,9 @@ final readonly class ChatController
             }
         }
 
-        if (! $this->creditService->reserveCredit($team)) {
+        $turnId = (string) Str::ulid();
+
+        if (! $this->creditService->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             $balance = AiCreditBalance::query()
                 ->where('team_id', $team->getKey())
                 ->first();
@@ -144,7 +149,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
-            turnId: (string) Str::ulid(),
+            turnId: $turnId,
         ));
 
         return response()->json([
@@ -216,6 +221,113 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
+    }
+
+    public function resume(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        // 404 (not 403) for a missing OR foreign conversation so the endpoint
+        // never confirms a conversation id exists to a different tenant — same
+        // hide-existence posture as the /chat/actions/* endpoints.
+        abort_if(
+            $conversation === null
+                || $conversation->user_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+            404,
+        );
+
+        $action = resolve(PendingActionService::class)->latestUnjournaledResolvedAction($conversationId);
+
+        if (! $action instanceof PendingAction) {
+            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
+        }
+
+        if ($action->user_id !== $user->getKey()) {
+            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
+        }
+
+        if (! Cache::add("chat:resume:{$conversationId}", 1, 30)) {
+            return response()->json([
+                'error' => 'A resume is already in progress — try again in a moment.',
+                'code' => 'resume_in_progress',
+            ], 409);
+        }
+
+        resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
+
+        return response()->json(['status' => 'resuming']);
+    }
+
+    /**
+     * Mark a turn (and everything after it) superseded — the server-truth side
+     * of Regenerate/Edit. Without this the client splice is a lie: reload
+     * resurrects the replaced turns and the model keeps them in its history.
+     *
+     * anchor_id targets a persisted user message; when the client only has an
+     * optimistic (not yet persisted) message it sends anchor_content instead,
+     * which must match the latest user row — a mismatch means that row belongs
+     * to an OLDER turn (the optimistic one never persisted), and superseding it
+     * would hide a good turn, so we refuse and supersede nothing.
+     */
+    public function supersedeMessages(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'anchor_id' => ['nullable', 'string', 'max:36'],
+            'anchor_content' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if(
+            $conversation === null
+                || $conversation->user_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+            404,
+        );
+
+        $anchorId = $validated['anchor_id'] ?? null;
+
+        if ($anchorId !== null) {
+            $anchor = DB::table('agent_conversation_messages')
+                ->where('conversation_id', $conversationId)
+                ->where('id', $anchorId)
+                ->first();
+
+            abort_if($anchor === null, 404);
+            abort_if((string) $anchor->role !== 'user', 422, 'Only user messages can anchor a supersede.');
+        } else {
+            $anchor = DB::table('agent_conversation_messages')
+                ->where('conversation_id', $conversationId)
+                ->where('role', 'user')
+                ->whereNull('superseded_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($anchor === null) {
+                return response()->json(['superseded' => 0]);
+            }
+
+            $expected = trim((string) ($validated['anchor_content'] ?? ''));
+
+            if ($expected !== '' && trim((string) $anchor->content) !== $expected) {
+                return response()->json(['superseded' => 0]);
+            }
+        }
+
+        $superseded = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('id', '>=', (string) $anchor->id)
+            ->whereNull('superseded_at')
+            ->update(['superseded_at' => now(), 'updated_at' => now()]);
+
+        return response()->json(['superseded' => $superseded]);
     }
 
     public function mentions(Request $request): JsonResponse

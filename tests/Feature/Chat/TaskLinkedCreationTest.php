@@ -33,16 +33,11 @@ beforeEach(function (): void {
     ]);
 });
 
-it('CreateTaskTool exposes people_ids, assignee_ids, and other linkage fields in the schema', function (): void {
+it('CreateTaskTool wraps entity fields inside a records[] schema', function (): void {
     $tool = resolve(CreateTaskTool::class);
     $schema = $tool->schema(new JsonSchemaTypeFactory);
 
-    expect($schema)
-        ->toHaveKey('title')
-        ->toHaveKey('people_ids')
-        ->toHaveKey('assignee_ids')
-        ->toHaveKey('company_ids')
-        ->toHaveKey('opportunity_ids');
+    expect($schema)->toHaveKey('records');
 });
 
 it('persists people_ids in the pending action data', function (): void {
@@ -52,8 +47,7 @@ it('persists people_ids in the pending action data', function (): void {
     $tool->setConversationId('019df800-3333-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'title' => 'Follow up call',
-        'people_ids' => [(string) $angel->id],
+        'records' => [['title' => 'Follow up call', 'people_ids' => [(string) $angel->id]]],
     ]));
 
     $pending = PendingAction::query()
@@ -97,8 +91,7 @@ it('renders linked names in the proposal display data', function (): void {
     $tool->setConversationId('019df800-3333-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'title' => 'Follow up',
-        'people_ids' => [(string) $angel->id],
+        'records' => [['title' => 'Follow up', 'people_ids' => [(string) $angel->id]]],
     ]));
 
     $pending = PendingAction::query()

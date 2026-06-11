@@ -107,6 +107,13 @@ final readonly class PendingActionService
             }
         }
 
+        if ($conversationId !== null && $operation === PendingActionOperation::Create) {
+            $warning = $this->duplicateCreateWarning($conversationId, $actionClass, $entityType, $actionData);
+            if ($warning !== null) {
+                $displayData['duplicate_warning'] = $warning;
+            }
+        }
+
         return PendingAction::query()->create([
             'team_id' => $user->currentTeam->getKey(),
             'user_id' => $user->getKey(),
@@ -146,9 +153,15 @@ final readonly class PendingActionService
 
                 $result = $this->executeAction($pendingAction, $user);
 
-                $resultData = $result instanceof Model
-                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
-                    : ['success' => true];
+                $resultData = match (true) {
+                    $result instanceof Model => ['id' => $result->getKey(), 'type' => $result->getMorphClass()],
+                    is_array($result) && $result !== [] && $result[0] instanceof Model => [
+                        'ids' => array_values(array_map(static fn (Model $m) => $m->getKey(), $result)),
+                        'type' => $result[0]->getMorphClass(),
+                        'count' => count($result),
+                    ],
+                    default => ['success' => true],
+                };
 
                 $pendingAction->update([
                     'status' => PendingActionStatus::Approved,
@@ -278,16 +291,11 @@ final readonly class PendingActionService
      * a <resolved_actions> block so the model's knowledge of approvals does not
      * depend on the AI continuation having successfully journaled them.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>}>
      */
     public function resolvedSinceLastAssistantMessage(string $conversationId): array
     {
-        $lastAssistantAt = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'assistant')
-            ->latest('created_at')
-            ->orderByDesc('id')
-            ->value('created_at');
+        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
 
         $query = PendingAction::query()
             ->where('conversation_id', $conversationId)
@@ -311,7 +319,32 @@ final readonly class PendingActionService
             'status' => $action->status->value,
             'label' => $this->resolveActionLabel($action),
             'record_id' => $this->resolveResultRecordId($action),
+            'record_ids' => $this->resolveResultRecordIds($action),
         ], $actions->all()));
+    }
+
+    /**
+     * The most recently resolved (approved/rejected) action that no assistant
+     * turn has journaled yet — i.e. the action whose continuation was lost.
+     * Used by the resume endpoint to re-drive the chain.
+     */
+    public function latestUnjournaledResolvedAction(string $conversationId): ?PendingAction
+    {
+        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
+
+        $query = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->whereIn('status', [
+                PendingActionStatus::Approved->value,
+                PendingActionStatus::Rejected->value,
+            ])
+            ->whereNotNull('resolved_at');
+
+        if ($lastAssistantAt !== null) {
+            $query->where('resolved_at', '>', $lastAssistantAt);
+        }
+
+        return $query->latest('resolved_at')->orderByDesc('id')->first();
     }
 
     private function resolveActionLabel(PendingAction $action): ?string
@@ -331,12 +364,39 @@ final readonly class PendingActionService
         return null;
     }
 
+    private function lastAssistantMessageAt(string $conversationId): ?string
+    {
+        return DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'assistant')
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->value('created_at');
+    }
+
     private function resolveResultRecordId(PendingAction $action): ?string
     {
         $resultData = $action->result_data;
         $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
 
         return is_string($recordId) && $recordId !== '' ? $recordId : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveResultRecordIds(PendingAction $action): array
+    {
+        $resultData = $action->result_data;
+
+        if (! is_array($resultData) || ! isset($resultData['ids']) || ! is_array($resultData['ids'])) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(static fn (mixed $id): string => (string) $id, $resultData['ids']),
+            static fn (string $id): bool => $id !== '',
+        ));
     }
 
     private function validateResolvable(PendingAction $pendingAction): void
@@ -374,13 +434,43 @@ final readonly class PendingActionService
         );
 
         $action = app()->make($actionClass);
-        $data = $pendingAction->action_data;
 
         return match ($pendingAction->operation) {
-            PendingActionOperation::Create => $action->execute($user, $data, CreationSource::CHAT),
+            PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction),
             PendingActionOperation::Update => $this->executeUpdate($action, $user, $pendingAction),
             PendingActionOperation::Delete => $this->executeDelete($action, $user, $pendingAction),
         };
+    }
+
+    /**
+     * @return Model|list<Model>
+     */
+    private function executeCreate(object $action, User $user, PendingAction $pendingAction): mixed
+    {
+        if (! method_exists($action, 'execute')) {
+            throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        $data = $pendingAction->action_data;
+
+        if (($data['_batch'] ?? false) !== true) {
+            return $action->execute($user, $data, CreationSource::CHAT);
+        }
+
+        $records = $data['records'] ?? null;
+
+        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
+
+        throw_if(
+            array_filter($records, static fn (mixed $record): bool => ! is_array($record)) !== [],
+            RuntimeException::class,
+            'Batch record data is malformed',
+        );
+
+        return array_values(array_map(
+            fn (array $record): Model => $action->execute($user, $record, CreationSource::CHAT),
+            $records,
+        ));
     }
 
     private function executeUpdate(object $action, User $user, PendingAction $pendingAction): mixed
@@ -489,6 +579,89 @@ final readonly class PendingActionService
             Note::class => Note::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
             default => null,
         };
+    }
+
+    /**
+     * A same-titled create was proposed/approved moments ago — usually a model
+     * regeneration after a transient failure. Approving both would write real
+     * duplicate records, so the card carries an explicit warning.
+     *
+     * @param  array<string, mixed>  $actionData
+     */
+    private function duplicateCreateWarning(string $conversationId, string $actionClass, string $entityType, array $actionData): ?string
+    {
+        $titleMap = $this->proposedTitleMap($actionData);
+
+        if ($titleMap === []) {
+            return null;
+        }
+
+        $recent = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->where('action_class', $actionClass)
+            ->where('entity_type', $entityType)
+            ->where('operation', PendingActionOperation::Create)
+            ->whereIn('status', [PendingActionStatus::Pending, PendingActionStatus::Approved])
+            ->where('created_at', '>=', now()->subMinutes(15))
+            ->get();
+
+        $incomingLower = array_keys($titleMap);
+
+        foreach ($recent as $existing) {
+            $existingLower = $this->proposedTitles($existing->action_data);
+            $overlap = array_intersect($incomingLower, $existingLower);
+            if ($overlap !== []) {
+                $matchedLower = array_values($overlap)[0];
+                $label = $titleMap[$matchedLower];
+
+                return "Heads up: \"{$label}\" was already proposed or created a moment ago — approving this may create a duplicate.";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns a map of lowercased title => original-cased title for all records
+     * in the given action data (handles both single and batch shapes).
+     *
+     * @param  array<string, mixed>  $actionData
+     * @return array<string, string>
+     */
+    private function proposedTitleMap(array $actionData): array
+    {
+        $records = ($actionData['_batch'] ?? false) === true && is_array($actionData['records'] ?? null)
+            ? $actionData['records']
+            : [$actionData];
+
+        $map = [];
+
+        foreach ($records as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+            foreach (['name', 'title'] as $field) {
+                if (is_string($record[$field] ?? null) && $record[$field] !== '') {
+                    $lower = mb_strtolower(trim($record[$field]));
+                    $map[$lower] = trim($record[$field]);
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Returns lowercased titles for all records in the given action data.
+     * Used when checking existing proposals against incoming ones.
+     *
+     * @param  array<string, mixed>  $actionData
+     * @return list<string>
+     */
+    private function proposedTitles(array $actionData): array
+    {
+        return array_keys($this->proposedTitleMap($actionData));
     }
 
     private function restoreTrashedRecord(Model $record): void

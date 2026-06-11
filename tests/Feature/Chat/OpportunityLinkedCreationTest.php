@@ -38,14 +38,11 @@ beforeEach(function (): void {
     ]);
 });
 
-it('CreateOpportunityTool exposes company_id and contact_id in the schema', function (): void {
+it('CreateOpportunityTool wraps entity fields inside a records[] schema', function (): void {
     $tool = resolve(CreateOpportunityTool::class);
     $schema = $tool->schema(new JsonSchemaTypeFactory);
 
-    expect($schema)
-        ->toHaveKey('name')
-        ->toHaveKey('company_id')
-        ->toHaveKey('contact_id');
+    expect($schema)->toHaveKey('records');
 });
 
 it('persists company_id and contact_id in the pending action data', function (): void {
@@ -56,9 +53,7 @@ it('persists company_id and contact_id in the pending action data', function ():
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'name' => 'Acme deal',
-        'company_id' => (string) $company->id,
-        'contact_id' => (string) $contact->id,
+        'records' => [['name' => 'Acme deal', 'company_id' => (string) $company->id, 'contact_id' => (string) $contact->id]],
     ]));
 
     $pending = PendingAction::query()
@@ -122,9 +117,7 @@ it('renders linked company and contact names in the create proposal display data
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
 
     $tool->handle(new Request([
-        'name' => 'Acme deal',
-        'company_id' => (string) $company->id,
-        'contact_id' => (string) $contact->id,
+        'records' => [['name' => 'Acme deal', 'company_id' => (string) $company->id, 'contact_id' => (string) $contact->id]],
     ]));
 
     $pending = PendingAction::query()

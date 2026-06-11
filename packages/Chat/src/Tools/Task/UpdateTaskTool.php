@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
@@ -55,6 +56,11 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
             'company_ids' => $schema->array()->description('Company ULIDs to link. Pass [] to clear linked companies.'),
             'opportunity_ids' => $schema->array()->description('Opportunity ULIDs to link. Pass [] to clear linked opportunities.'),
         ];
+    }
+
+    protected function validateRequest(Request $request, User $user): ?string
+    {
+        return TeamMembersContext::memberFieldError($user, 'assignee_ids', $request['assignee_ids'] ?? null);
     }
 
     protected function extractActionData(Request $request): array

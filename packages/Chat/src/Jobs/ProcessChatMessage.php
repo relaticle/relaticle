@@ -21,10 +21,12 @@ use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
+use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Events\ChatStreamFailed;
+use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\FollowUpsSuggested;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
@@ -34,6 +36,9 @@ use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ProviderRateGate;
+use Relaticle\Chat\Support\ProviderStreamError;
+use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
 
 #[Timeout(120)]
@@ -103,7 +108,7 @@ final class ProcessChatMessage implements ShouldQueue
             ChatTelemetry::breadcrumb('pending_actions.superseded', [
                 'count' => count($superseded),
             ]);
-            broadcast(new PendingActionsSuperseded(
+            $this->broadcastSafely(new PendingActionsSuperseded(
                 conversationId: $this->conversationId,
                 pendingActionIds: array_map(
                     static fn (PendingAction $action): string => (string) $action->getKey(),
@@ -116,6 +121,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
+            $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
@@ -123,6 +129,7 @@ final class ProcessChatMessage implements ShouldQueue
             );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
+            $broadcaster = new StreamEventBroadcaster($channel);
         } catch (Throwable $e) {
             $creditService->refundReservation(
                 $this->team,
@@ -130,11 +137,19 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
             );
             ChatTelemetry::breadcrumb('stream.pre_model_failed', ['exception' => $e->getMessage()]);
-            broadcast(new ChatStreamFailed(
+            $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
                 message: 'The assistant could not start. Please try again.',
             ));
             $this->releaseAuth();
+
+            return;
+        }
+
+        if (! ProviderRateGate::tryAcquire($this->resolved['provider'])) {
+            ChatTelemetry::breadcrumb('stream.provider_gate_release', ['attempt' => $this->attempts()]);
+            $this->releaseAuth();
+            $this->release(random_int(1, 4));
 
             return;
         }
@@ -149,7 +164,11 @@ final class ProcessChatMessage implements ShouldQueue
             $cancelled = false;
             $cacheKey = "chat:cancel:{$this->conversationId}";
 
-            $response->each(function (StreamEvent $event) use ($channel, $cacheKey, &$cancelled): void {
+            $response->each(function (StreamEvent $event) use ($broadcaster, $cacheKey, &$cancelled): void {
+                if ($event instanceof Error) {
+                    throw ProviderStreamError::toException($event);
+                }
+
                 if (! $cancelled && Cache::pull($cacheKey) !== null) {
                     $cancelled = true;
 
@@ -160,7 +179,7 @@ final class ProcessChatMessage implements ShouldQueue
                     return;
                 }
 
-                $event->broadcastNow($channel);
+                $broadcaster->broadcast($event);
             });
 
             if ($cancelled) {
@@ -172,7 +191,7 @@ final class ProcessChatMessage implements ShouldQueue
                     reason: 'cancelled',
                 );
                 ChatTelemetry::breadcrumb('stream.cancelled', []);
-                broadcast(new ChatStreamFailed(
+                $this->broadcastSafely(new ChatStreamFailed(
                     conversationId: $this->conversationId,
                     message: 'Generation stopped.',
                 ));
@@ -186,7 +205,7 @@ final class ProcessChatMessage implements ShouldQueue
                     'output_tokens' => $streamedResponse->usage->completionTokens,
                 ]);
 
-                broadcast(new ConversationResolved(
+                $this->broadcastSafely(new ConversationResolved(
                     userId: (string) $this->user->getKey(),
                     conversationId: $streamedResponse->conversationId,
                 ));
@@ -215,7 +234,16 @@ final class ProcessChatMessage implements ShouldQueue
             // Anything else rethrows and fails fast, exactly as before.
             if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
-                $this->release($this->retryDelaySeconds($this->attempts()));
+                // Honor the provider's Retry-After when present; jitter spreads
+                // the re-dispatch so concurrent 429ed jobs don't stampede back.
+                $delay = $this->retryDelaySeconds($this->attempts(), $e) + random_int(0, 3);
+                $this->broadcastSafely(new ChatStreamRetrying(
+                    conversationId: $this->conversationId,
+                    attempt: $this->attempts() + 1,
+                    maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
+                    delaySeconds: $delay,
+                ));
+                $this->release($delay);
 
                 return;
             }
@@ -226,9 +254,15 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
-    public function retryDelaySeconds(int $attempts): int
+    public function retryDelaySeconds(int $attempts, ?Throwable $e = null): int
     {
-        return (int) min(2 ** $attempts, 30);
+        $base = (int) min(2 ** $attempts, 30);
+
+        $retryAfter = $e instanceof RequestException
+            ? (int) ($e->response->header('Retry-After') ?: 0)
+            : 0;
+
+        return max($base, min($retryAfter, 60));
     }
 
     /**
@@ -265,7 +299,7 @@ final class ProcessChatMessage implements ShouldQueue
             ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
             : 'The assistant encountered an error. Please try again.';
 
-        broadcast(new ChatStreamFailed(
+        $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
             message: $message,
         ));
@@ -415,10 +449,19 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
-        broadcast(new FollowUpsSuggested(
+        $this->broadcastSafely(new FollowUpsSuggested(
             conversationId: $conversationId,
             chips: $chips,
         ));
+    }
+
+    private function broadcastSafely(object $event): void
+    {
+        try {
+            broadcast($event);
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('broadcast.dropped', ['event' => $event::class, 'reason' => $e->getMessage()]);
+        }
     }
 
     private function bindAuth(): void

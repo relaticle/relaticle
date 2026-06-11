@@ -27,7 +27,7 @@ it('persists the active conversation id on pending actions when a tool handles a
     $tool = app(CreateCompanyTool::class);
     $tool->setConversationId($conversationId);
 
-    $tool->handle(new Request(['name' => 'Acme Corp']));
+    $tool->handle(new Request(['records' => [['name' => 'Acme Corp']]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $user->currentTeam->getKey())
@@ -44,7 +44,7 @@ it('persists null conversation id when none is set on the tool', function (): vo
     /** @var CreateCompanyTool $tool */
     $tool = app(CreateCompanyTool::class);
 
-    $tool->handle(new Request(['name' => 'Acme Corp']));
+    $tool->handle(new Request(['records' => [['name' => 'Acme Corp']]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $user->currentTeam->getKey())
