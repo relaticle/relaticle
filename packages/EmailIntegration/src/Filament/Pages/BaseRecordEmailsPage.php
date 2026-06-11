@@ -101,9 +101,9 @@ abstract class BaseRecordEmailsPage extends Page
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
-            $query->where('direction', EmailDirection::OUTBOUND);
+            $query->sent();
         } elseif ($this->folder === EmailFolder::Inbox) {
-            $query->where('direction', EmailDirection::INBOUND);
+            $query->inbox();
         }
 
         if (filled($this->search)) {
