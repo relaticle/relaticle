@@ -409,7 +409,6 @@ final readonly class PendingActionService
         );
 
         $action = app()->make($actionClass);
-        $data = $pendingAction->action_data;
 
         return match ($pendingAction->operation) {
             PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction),
@@ -436,6 +435,12 @@ final readonly class PendingActionService
         $records = $data['records'] ?? null;
 
         throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
+
+        throw_if(
+            array_filter($records, static fn (mixed $record): bool => ! is_array($record)) !== [],
+            RuntimeException::class,
+            'Batch record data is malformed',
+        );
 
         return array_values(array_map(
             fn (array $record): Model => $action->execute($user, $record, CreationSource::CHAT),
