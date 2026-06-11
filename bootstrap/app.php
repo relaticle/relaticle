@@ -15,6 +15,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
+use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
@@ -89,6 +90,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
         $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson());
+
+        // Stale tabs and deploy boundaries produce checksum failures that
+        // Livewire already renders as 419 (page expired -> client refreshes).
+        // They are user-state noise, not actionable errors — keep them out of
+        // Sentry (issue #125406836).
+        $exceptions->dontReport(CorruptComponentPayloadException::class);
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('app:generate-sitemap')->daily();
