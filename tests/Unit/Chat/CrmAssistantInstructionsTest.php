@@ -62,3 +62,11 @@ it('tells the model it can delete multiple records in one call', function (): vo
     expect($prompt)->toContain('ids')
         ->and(strtolower($prompt))->toContain('delete multiple');
 });
+
+it('instructs batching multiple same-type creates into one records[] call', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('call the create tool ONCE with `records`')
+        ->toContain('do not loop one tool call per record');
+});
