@@ -228,11 +228,14 @@ final readonly class ChatController
 
         $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
 
-        abort_if($conversation === null, 404);
+        // 404 (not 403) for a missing OR foreign conversation so the endpoint
+        // never confirms a conversation id exists to a different tenant — same
+        // hide-existence posture as the /chat/actions/* endpoints.
         abort_if(
-            $conversation->user_id !== (string) $user->getKey()
+            $conversation === null
+                || $conversation->user_id !== (string) $user->getKey()
                 || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
-            403,
+            404,
         );
 
         $action = resolve(PendingActionService::class)->latestUnjournaledResolvedAction($conversationId);

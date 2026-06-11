@@ -64,13 +64,13 @@ it('returns 409 when there is nothing to resume', function (): void {
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('rejects resuming another user\'s conversation', function (): void {
+it('hides a foreign conversation behind a 404 instead of confirming it exists', function (): void {
     Bus::fake();
     $other = User::factory()->withPersonalTeam()->create();
 
     $this->actingAs($other)
         ->postJson("/chat/conversations/{$this->convId}/resume")
-        ->assertForbidden();
+        ->assertNotFound();
 
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
