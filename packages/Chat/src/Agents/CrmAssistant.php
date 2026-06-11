@@ -24,6 +24,7 @@ use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
+use Relaticle\Chat\Tools\ListTeamMembersTool;
 use Relaticle\Chat\Tools\Note\CreateNoteTool as ChatCreateNoteTool;
 use Relaticle\Chat\Tools\Note\DeleteNoteTool as ChatDeleteNoteTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool as ChatGetNoteTool;
@@ -95,15 +96,6 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public ?string $userTimezone = null;
 
-    /**
-     * Workspace members — the only valid values for team-member fields
-     * (company account owner, task assignees). Without this the model cannot
-     * map a name to a user id and denies the field exists (observed live).
-     *
-     * @var list<array{id: string, name: string, email: string}>
-     */
-    public array $teamMembers = [];
-
     public function withConversationId(?string $conversationId): self
     {
         $this->conversationId = $conversationId;
@@ -114,14 +106,6 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
     public function withUserTimezone(?string $timezone): self
     {
         $this->userTimezone = $timezone;
-
-        return $this;
-    }
-
-    /** @param list<array{id: string, name: string, email: string}> $members */
-    public function withTeamMembers(array $members): self
-    {
-        $this->teamMembers = $members;
 
         return $this;
     }
@@ -170,7 +154,7 @@ For any create, update, or delete operation:
 
 ## Field Truth
 Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND team-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
-- A company's "account owner" is the TEAM MEMBER responsible for it -- set it with account_owner_id. Task assignees are also team members. Valid team members are listed in the Team Members context; contacts/people records are NOT valid values for these fields. If a name matches both a team member and a contact, ask which one the user means.
+- A company's "account owner" is the TEAM MEMBER responsible for it -- set it with account_owner_id. Task assignees are also team members. Call the list team members tool to resolve a member name to their user id; contacts/people records are NOT valid values for these fields. If a name matches both a team member and a contact, ask which one the user means.
 - Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
 - If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
 - If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion -- either correct yourself with the real field, or explain concretely what IS available.
@@ -210,35 +194,7 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->teamMembersBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
-    }
-
-    /**
-     * Team-member fields (account owner, assignees) only accept workspace
-     * users. Enumerating them is what lets the model resolve "set the owner
-     * to Alex" into a user id instead of denying the field exists.
-     */
-    private function teamMembersBlock(): string
-    {
-        if ($this->teamMembers === []) {
-            return '';
-        }
-
-        $lines = [
-            '',
-            '## Team Members',
-            'Workspace members -- the ONLY valid values for team-member fields (company account_owner_id, task assignee_ids). These are users, not CRM contacts:',
-        ];
-
-        foreach ($this->teamMembers as $member) {
-            $name = $this->sanitizeLabel($member['name']);
-            $email = $this->sanitizeLabel($member['email']);
-            $lines[] = "- {$name} ({$email}) -- id: {$member['id']}";
-        }
-
-        $lines[] = 'Use these ids silently; never display them to the user.';
-
-        return "\n".implode("\n", $lines);
+        return $this->dateBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
     }
 
     /**
@@ -475,6 +431,7 @@ PROMPT;
             ChatGetNoteTool::class,
             SearchCrmTool::class,
             GetCrmSummaryTool::class,
+            ListTeamMembersTool::class,
 
             // Write tools
             ChatCreateCompanyTool::class,

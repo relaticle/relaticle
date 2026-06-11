@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Enumerates the workspace's members for the assistant's context. Team-member
@@ -14,10 +15,10 @@ use App\Models\User;
  */
 final readonly class TeamMembersContext
 {
-    private const int MAX_MEMBERS = 30;
+    private const int MAX_MEMBERS = 50;
 
     /** @return list<array{id: string, name: string, email: string}> */
-    public static function for(User $user): array
+    public static function for(User $user, ?string $search = null): array
     {
         $team = $user->currentTeam;
 
@@ -30,6 +31,12 @@ final readonly class TeamMembersContext
 
         return array_values(User::query()
             ->whereIn('id', array_unique(array_map(strval(...), $memberIds)))
+            ->when($search !== null, function (Builder $query) use ($search): void {
+                $pattern = '%'.LikePattern::escape((string) $search).'%';
+                $query->where(function (Builder $inner) use ($pattern): void {
+                    $inner->whereLike('name', $pattern)->orWhereLike('email', $pattern);
+                });
+            })
             ->orderBy('name')
             ->limit(self::MAX_MEMBERS)
             ->get(['id', 'name', 'email'])

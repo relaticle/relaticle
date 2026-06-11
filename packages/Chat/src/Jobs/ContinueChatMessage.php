@@ -31,7 +31,6 @@ use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
-use Relaticle\Chat\Support\TeamMembersContext;
 use Throwable;
 
 #[Timeout(120)]
@@ -107,7 +106,6 @@ final class ContinueChatMessage implements ShouldQueue
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
-            $agent->withTeamMembers(TeamMembersContext::for($this->user));
             $agent->withResolvedActions(
                 resolve(PendingActionService::class)
                     ->resolvedSinceLastAssistantMessage($this->conversationId),

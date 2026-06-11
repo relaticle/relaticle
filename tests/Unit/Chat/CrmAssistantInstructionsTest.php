@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Tools\ListTeamMembersTool;
 
 mutates(CrmAssistant::class);
 
@@ -106,32 +107,18 @@ it('keeps per-turn context out of the static (cacheable) instructions', function
         ->toContain('## Current Date');
 });
 
-it('enumerates team members with ids and warns they are not contacts', function (): void {
-    $agent = new CrmAssistant;
-    $agent->withTeamMembers([
-        ['id' => '01ABC', 'name' => 'Alex Owner', 'email' => 'alex@example.test'],
-    ]);
+it('points field truth at the list team members tool instead of injected context', function (): void {
+    $static = new CrmAssistant()->staticInstructions();
 
-    $instructions = $agent->instructions();
-
-    expect($instructions)->toContain('## Team Members')
-        ->toContain('Alex Owner (alex@example.test) -- id: 01ABC')
-        ->toContain('users, not CRM contacts');
+    expect($static)->toContain('Call the list team members tool')
+        ->not->toContain('Team Members context');
 });
 
-it('omits the team members block when no members are injected', function (): void {
-    $agent = new CrmAssistant;
+it('registers the list team members tool', function (): void {
+    $classes = new ReflectionMethod(CrmAssistant::class, 'toolClasses')
+        ->invoke(new CrmAssistant);
 
-    expect($agent->instructions())->not->toContain('## Team Members');
-});
-
-it('keeps team members out of the static cacheable instructions', function (): void {
-    $agent = new CrmAssistant;
-    $agent->withTeamMembers([
-        ['id' => '01ABC', 'name' => 'Alex Owner', 'email' => 'alex@example.test'],
-    ]);
-
-    expect($agent->staticInstructions())->not->toContain('Alex Owner');
+    expect($classes)->toContain(ListTeamMembersTool::class);
 });
 
 it('instructs batching every clarifying question into a single message', function (): void {
