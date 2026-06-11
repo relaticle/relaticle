@@ -16,9 +16,9 @@ final readonly class ApprovalContinuationService
 {
     private const int CHAIN_HARD_CAP = 5;
 
-    public function dispatchAfterApproval(PendingAction $pendingAction, string $status): void
+    public function dispatchAfterApproval(PendingAction $pendingAction, string $status, bool $bypassChainCap = false): void
     {
-        if ($this->chainCapReached($pendingAction->conversation_id)) {
+        if (! $bypassChainCap && $this->chainCapReached($pendingAction->conversation_id)) {
             if ($pendingAction->conversation_id !== null) {
                 broadcast(new ChatPaused(
                     conversationId: (string) $pendingAction->conversation_id,
@@ -29,15 +29,6 @@ final readonly class ApprovalContinuationService
             return;
         }
 
-        $this->dispatchContinuation($pendingAction, $status);
-    }
-
-    /**
-     * Resume is an explicit user action, so it bypasses the chain cap — it IS
-     * the cap's escape hatch.
-     */
-    public function dispatchContinuation(PendingAction $pendingAction, string $status): void
-    {
         $team = Team::query()->find($pendingAction->team_id);
         $user = User::query()->find($pendingAction->user_id);
 
@@ -52,6 +43,14 @@ final readonly class ApprovalContinuationService
             prompt: $this->buildPrompt($pendingAction, $status),
             turnId: (string) Str::ulid(),
         ));
+    }
+
+    /**
+     * Resume is an explicit user action — it bypasses the chain cap by design.
+     */
+    public function dispatchContinuation(PendingAction $pendingAction, string $status): void
+    {
+        $this->dispatchAfterApproval($pendingAction, $status, bypassChainCap: true);
     }
 
     private function chainCapReached(?string $conversationId): bool

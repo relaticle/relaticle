@@ -14,6 +14,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Support\PromptText;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteCreateTool implements Tool
@@ -172,16 +173,8 @@ abstract class BaseWriteCreateTool implements Tool
         ], JSON_PRETTY_PRINT);
     }
 
-    /**
-     * The plan text is user-authored and gets embedded into the privileged
-     * [approval] continuation prompt — strip control characters (newlines could
-     * fabricate prompt-level lines) and quotes (the prompt wraps it in quotes).
-     */
     private function sanitizePlanText(string $text): string
     {
-        $stripped = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $text) ?? '';
-        $collapsed = preg_replace('/\s+/u', ' ', trim($stripped)) ?? '';
-
-        return mb_substr(str_replace(['"', '\\'], '', $collapsed), 0, 300);
+        return PromptText::sanitize($text, 300);
     }
 }

@@ -186,16 +186,7 @@ final readonly class ListConversationMessages
                 $batchIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
 
                 if (is_array($batchIds) && $batchIds !== [] && is_string($entityType)) {
-                    $refs = [];
-                    foreach (array_slice($batchIds, 0, 10) as $batchId) {
-                        if (! is_string($batchId) && ! is_int($batchId)) {
-                            continue;
-                        }
-                        $ref = $this->resolver->resolve($entityType, (string) $batchId);
-                        if ($ref !== null) {
-                            $refs[] = $ref;
-                        }
-                    }
+                    $refs = $this->resolver->resolveMany($entityType, $batchIds);
                     if ($refs !== []) {
                         $inner['records'] = $refs;
                     }

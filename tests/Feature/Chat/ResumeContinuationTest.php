@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ function makeResolvedAction(string $convId, User $user): PendingAction
         'team_id' => $user->currentTeam->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
         'action_data' => ['title' => 'Follow up'],
@@ -51,7 +52,7 @@ it('re-dispatches a continuation for the latest unjournaled resolved action', fu
         ->postJson("/chat/conversations/{$this->convId}/resume")
         ->assertOk();
 
-    Bus::assertDispatched(ContinueChatMessage::class, fn (ContinueChatMessage $job): bool => $job->conversationId === $this->convId);
+    Bus::assertDispatched(fn (ContinueChatMessage $job): bool => $job->conversationId === $this->convId);
 });
 
 it('returns 409 when there is nothing to resume', function (): void {
@@ -85,7 +86,32 @@ it('dispatches only one continuation when resume is double-posted', function ():
 
     $this->actingAs($this->user)
         ->postJson("/chat/conversations/{$this->convId}/resume")
-        ->assertStatus(409);
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'resume_in_progress');
 
     Bus::assertDispatchedTimes(ContinueChatMessage::class, 1);
+});
+
+it('lock-collision 409 carries resume_in_progress code but nothing-to-resume 409 does not', function (): void {
+    Bus::fake();
+
+    // nothing-to-resume path — no unjournaled action exists
+    $nothingResponse = $this->actingAs($this->user)
+        ->postJson("/chat/conversations/{$this->convId}/resume")
+        ->assertStatus(409);
+
+    expect($nothingResponse->json('code'))->toBeNull();
+
+    // lock-collision path — action exists but cache slot is already taken
+    makeResolvedAction($this->convId, $this->user);
+
+    $this->actingAs($this->user)
+        ->postJson("/chat/conversations/{$this->convId}/resume")
+        ->assertOk();
+
+    $collisionResponse = $this->actingAs($this->user)
+        ->postJson("/chat/conversations/{$this->convId}/resume")
+        ->assertStatus(409);
+
+    expect($collisionResponse->json('code'))->toBe('resume_in_progress');
 });

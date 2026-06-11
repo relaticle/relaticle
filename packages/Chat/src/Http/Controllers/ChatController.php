@@ -249,7 +249,10 @@ final readonly class ChatController
         }
 
         if (! Cache::add("chat:resume:{$conversationId}", 1, 30)) {
-            return response()->json(['error' => 'A resume is already in progress.'], 409);
+            return response()->json([
+                'error' => 'A resume is already in progress — try again in a moment.',
+                'code' => 'resume_in_progress',
+            ], 409);
         }
 
         resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);

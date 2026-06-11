@@ -85,7 +85,7 @@ final class ContinueChatMessage implements ShouldQueue
 
         if ($this->attempts() === 1 && ! $creditService->reserveCredit($this->team)) {
             ChatTelemetry::breadcrumb('continuation.credits_exhausted', []);
-            broadcast(new ChatStreamFailed(
+            $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
                 message: "You're out of AI credits, so I can't continue here. Add credits to keep going — the change you approved was still saved.",
             ));
@@ -114,7 +114,7 @@ final class ContinueChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
             );
             ChatTelemetry::breadcrumb('continuation.pre_model_failed', ['exception' => $e->getMessage()]);
-            broadcast(new ChatStreamFailed(
+            $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
                 message: 'The assistant could not continue. Please try again.',
             ));
@@ -139,7 +139,7 @@ final class ContinueChatMessage implements ShouldQueue
             });
 
             $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService): void {
-                broadcast(new ConversationResolved(
+                $this->broadcastSafely(new ConversationResolved(
                     userId: (string) $this->user->getKey(),
                     conversationId: $streamedResponse->conversationId,
                 ));
@@ -162,7 +162,7 @@ final class ContinueChatMessage implements ShouldQueue
             if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('continuation.rate_limited_retry', ['attempt' => $this->attempts()]);
                 $delay = $this->retryDelaySeconds($this->attempts());
-                broadcast(new ChatStreamRetrying(
+                $this->broadcastSafely(new ChatStreamRetrying(
                     conversationId: $this->conversationId,
                     attempt: $this->attempts() + 1,
                     maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
@@ -217,10 +217,19 @@ final class ContinueChatMessage implements ShouldQueue
             ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
             : 'Could not continue the conversation. Please try again.';
 
-        broadcast(new ChatStreamFailed(
+        $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
             message: $message,
         ));
+    }
+
+    private function broadcastSafely(object $event): void
+    {
+        try {
+            broadcast($event);
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('broadcast.dropped', ['event' => $event::class, 'reason' => $e->getMessage()]);
+        }
     }
 
     private function bindAuth(): void

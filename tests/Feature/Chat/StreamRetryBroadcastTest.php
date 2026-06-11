@@ -3,7 +3,19 @@
 declare(strict_types=1);
 
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Relaticle\Chat\Events\ChatStreamRetrying;
+
+it('implements ShouldBroadcastNow so retry banners are not deferred to the queue', function (): void {
+    $event = new ChatStreamRetrying(
+        conversationId: '019df800-2222-7000-8000-000000000001',
+        attempt: 1,
+        maxAttempts: 5,
+        delaySeconds: 2,
+    );
+
+    expect($event)->toBeInstanceOf(ShouldBroadcastNow::class);
+});
 
 it('broadcasts retry progress on the conversation channel', function (): void {
     $event = new ChatStreamRetrying(

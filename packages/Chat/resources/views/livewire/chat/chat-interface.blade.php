@@ -1422,9 +1422,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     async retryTurn(msg) {
         if (this.isStreaming) return;
         if (msg._retrying) return;
-        msg._retrying = true;
 
         if (msg.isContinuation) {
+            // Async path — guard with _retrying and clear in finally.
+            msg._retrying = true;
             msg.streamError = null;
             msg.retryable = false;
             msg.rendered = false;
@@ -1441,8 +1442,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 if (!res.ok) {
                     const body = await res.json().catch(() => ({}));
                     msg.streamError = body.error || 'Could not resume. Please try again.';
-                    msg.retryable = res.status !== 409;
-                    msg._retrying = false;
+                    if (res.status === 409 && body.code === 'resume_in_progress') {
+                        msg.retryable = true;
+                    } else if (res.status === 409) {
+                        msg.retryable = false;
+                    } else {
+                        msg.retryable = true;
+                    }
                     msg.rendered = true;
                     this.isStreaming = false;
                     this.clearStreamTimeout();
@@ -1450,28 +1456,31 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             } catch {
                 msg.streamError = 'Network error. Please try again.';
                 msg.retryable = true;
-                msg._retrying = false;
                 msg.rendered = true;
                 this.isStreaming = false;
                 this.clearStreamTimeout();
+            } finally {
+                msg._retrying = false;
             }
-            msg._retrying = false;
             return;
         }
 
         // Failed user turn: the server never stored the message — re-send the
         // preceding user message from local state (same flow as edit-resend).
+        // Compute userIndex BEFORE committing to any state change so the no-op
+        // path never sets _retrying.
         const idx = this.messages.indexOf(msg);
         let userIndex = -1;
         for (let i = idx - 1; i >= 0; i--) {
             if (this.messages[i].role === 'user') { userIndex = i; break; }
         }
-        if (userIndex === -1) {
-            msg._retrying = false;
-            return;
-        }
+        if (userIndex === -1) return;
+
         const userText = this.messages[userIndex].content;
-        this.messages.splice(userIndex);
+        // Splice exactly the user message at userIndex plus the failed assistant
+        // bubble (msg) when it sits directly after — no further messages removed.
+        const removeCount = (this.messages[userIndex + 1] === msg) ? 2 : 1;
+        this.messages.splice(userIndex, removeCount);
         this.input = userText;
         this.localEditor()?.setText(userText);
         this.$nextTick(() => this.sendMessage());
@@ -1675,11 +1684,27 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // Ghost-guard: if there is no unrendered bubble and we are not streaming, this
     // event is a stale broadcast from a previous turn — ignore it entirely.
     handleStreamRetrying(event) {
-        const b = this.lastAssistantBubble();
+        // When an invocation_id is present, target the bubble for that specific
+        // invocation (handles approve-mid-stream where the last bubble may be a
+        // freshly-minted continuation stub, not the one that's retrying).
+        // Fall back to lastAssistantBubble() when no id is available.
+        let b = null;
+        if (event?.invocation_id) {
+            for (let i = this.messages.length - 1; i >= 0; i--) {
+                const m = this.messages[i];
+                if (m.role === 'assistant' && m.invocationId === event.invocation_id) {
+                    b = m;
+                    break;
+                }
+            }
+        }
+        if (!b) {
+            b = this.lastAssistantBubble();
+        }
         if ((!b || b.rendered) && !this.isStreaming) return;
         if (b && !b.rendered) {
             b.content = '';
-            b.invocationId = null;
+            // Do NOT null invocationId — the re-stream reuses the same invocation.
             b._needsSeparator = false;
         }
         this.isStreaming = true;

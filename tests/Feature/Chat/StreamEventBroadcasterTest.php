@@ -62,11 +62,38 @@ it('strips the heavy data echo from pending_action results', function (): void {
     expect($payload)->not->toBeNull();
     expect($payload['as'])->toBe('tool_result');
 
-    $result = json_decode($payload['with']['result'], true);
+    $result = json_decode((string) $payload['with']['result'], true);
 
     expect($result)->not->toHaveKey('data');
     expect($result['pending_action_id'])->toBe('pa-abc-123');
     expect($result['display']['summary'])->toBe('Create task "Write tests"');
+});
+
+it('does not misclassify a read-tool result whose value contains the literal string "pending_action"', function (): void {
+    $resultJson = json_encode([
+        'notes' => [
+            ['body' => 'see the "pending_action" card for details'],
+        ],
+    ]);
+
+    $dataToolResult = new DataToolResult(
+        id: 'tool-id-x',
+        name: 'ReadNotesTool',
+        arguments: [],
+        result: $resultJson,
+    );
+
+    $event = new ToolResult(
+        id: 'evt-x',
+        toolResult: $dataToolResult,
+        successful: true,
+        error: null,
+        timestamp: time(),
+    );
+
+    $payload = StreamEventBroadcaster::payloadFor($event);
+
+    expect($payload)->toBeNull();
 });
 
 it('slims tool_call events to name and invocation', function (): void {

@@ -17,6 +17,7 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
+use Relaticle\Chat\Support\PromptText;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
@@ -84,7 +85,7 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      * last assistant turn, injected so the model knows their outcome even if the
      * approval continuation never journaled them into the transcript.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>}>
      */
     public array $resolvedActions = [];
 
@@ -225,9 +226,16 @@ PROMPT;
                 ? '"'.$this->sanitizeLabel($action['label']).'"'
                 : '(unnamed)';
 
-            $idPart = ($action['status'] === 'approved' && isset($action['record_id']) && $action['record_id'] !== '')
-                ? " (id: {$action['record_id']})"
-                : '';
+            $recordIds = $action['record_ids'] ?? [];
+            $recordId = $action['record_id'] ?? null;
+
+            if ($action['status'] === 'approved' && $recordIds !== []) {
+                $idPart = ' (ids: '.implode(',', $recordIds).')';
+            } elseif ($action['status'] === 'approved' && is_string($recordId) && $recordId !== '') {
+                $idPart = " (id: {$recordId})";
+            } else {
+                $idPart = '';
+            }
 
             $lines[] = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$label}{$idPart}";
         }
@@ -260,7 +268,7 @@ PROMPT;
     }
 
     /**
-     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>  $resolved
+     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>}>  $resolved
      */
     public function withResolvedActions(array $resolved): self
     {
@@ -364,9 +372,6 @@ PROMPT;
 
     private function sanitizeLabel(string $label): string
     {
-        $stripped = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $label) ?? '';
-        $collapsed = preg_replace('/\s+/u', ' ', trim($stripped)) ?? '';
-
-        return mb_substr(str_replace(['"', '\\'], ['', ''], $collapsed), 0, 200);
+        return PromptText::sanitize($label, 200);
     }
 }

@@ -14,6 +14,29 @@ use Throwable;
 final readonly class RecordReferenceResolver
 {
     /**
+     * @param  array<int|string, mixed>  $ids
+     * @return list<array{id: string, type: string, url: string}>
+     */
+    public function resolveMany(string $entityType, array $ids, int $cap = 10): array
+    {
+        $refs = [];
+
+        foreach (array_slice($ids, 0, $cap) as $id) {
+            if (! is_string($id) && ! is_int($id)) {
+                continue;
+            }
+
+            $ref = $this->resolve($entityType, (string) $id);
+
+            if ($ref !== null) {
+                $refs[] = $ref;
+            }
+        }
+
+        return $refs;
+    }
+
+    /**
      * @return array{id: string, type: string, url: string}|null
      */
     public function resolve(string $entityType, string $recordId): ?array

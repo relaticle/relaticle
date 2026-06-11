@@ -291,16 +291,11 @@ final readonly class PendingActionService
      * a <resolved_actions> block so the model's knowledge of approvals does not
      * depend on the AI continuation having successfully journaled them.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>}>
      */
     public function resolvedSinceLastAssistantMessage(string $conversationId): array
     {
-        $lastAssistantAt = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'assistant')
-            ->latest('created_at')
-            ->orderByDesc('id')
-            ->value('created_at');
+        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
 
         $query = PendingAction::query()
             ->where('conversation_id', $conversationId)
@@ -324,6 +319,7 @@ final readonly class PendingActionService
             'status' => $action->status->value,
             'label' => $this->resolveActionLabel($action),
             'record_id' => $this->resolveResultRecordId($action),
+            'record_ids' => $this->resolveResultRecordIds($action),
         ], $actions->all()));
     }
 
@@ -334,12 +330,7 @@ final readonly class PendingActionService
      */
     public function latestUnjournaledResolvedAction(string $conversationId): ?PendingAction
     {
-        $lastAssistantAt = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'assistant')
-            ->latest('created_at')
-            ->orderByDesc('id')
-            ->value('created_at');
+        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
 
         $query = PendingAction::query()
             ->where('conversation_id', $conversationId)
@@ -373,12 +364,39 @@ final readonly class PendingActionService
         return null;
     }
 
+    private function lastAssistantMessageAt(string $conversationId): ?string
+    {
+        return DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'assistant')
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->value('created_at');
+    }
+
     private function resolveResultRecordId(PendingAction $action): ?string
     {
         $resultData = $action->result_data;
         $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
 
         return is_string($recordId) && $recordId !== '' ? $recordId : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveResultRecordIds(PendingAction $action): array
+    {
+        $resultData = $action->result_data;
+
+        if (! is_array($resultData) || ! isset($resultData['ids']) || ! is_array($resultData['ids'])) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(static fn (mixed $id): string => (string) $id, $resultData['ids']),
+            static fn (string $id): bool => $id !== '',
+        ));
     }
 
     private function validateResolvable(PendingAction $pendingAction): void

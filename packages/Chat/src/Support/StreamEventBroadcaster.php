@@ -81,18 +81,15 @@ final readonly class StreamEventBroadcaster
     private static function payloadForToolResult(ToolResult $event): ?array
     {
         $result = $event->toolResult->result;
-        $resultString = is_string($result) ? $result : json_encode($result);
+        $raw = is_string($result) ? $result : json_encode($result);
 
-        if (! str_contains((string) $resultString, '"pending_action"')) {
+        $decoded = json_decode((string) $raw, true);
+
+        if (! is_array($decoded) || ($decoded['type'] ?? null) !== 'pending_action') {
             return null;
         }
 
-        $decoded = json_decode((string) $resultString, true);
-
-        if (is_array($decoded)) {
-            unset($decoded['data']);
-            $resultString = json_encode($decoded);
-        }
+        unset($decoded['data']);
 
         return [
             'as' => 'tool_result',
@@ -102,7 +99,7 @@ final readonly class StreamEventBroadcaster
                 'type' => 'tool_result',
                 'tool_id' => $event->toolResult->id,
                 'tool_name' => $event->toolResult->name,
-                'result' => $resultString,
+                'result' => json_encode($decoded),
                 'successful' => $event->successful,
                 'error' => $event->error,
                 'timestamp' => $event->timestamp,

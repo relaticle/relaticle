@@ -96,13 +96,7 @@ final readonly class PendingActionController
             return null;
         }
 
-        $refs = [];
-        foreach (array_slice($ids, 0, 10) as $id) {
-            $ref = $this->resolver->resolve($pendingAction->entity_type, (string) $id);
-            if ($ref !== null) {
-                $refs[] = $ref;
-            }
-        }
+        $refs = $this->resolver->resolveMany($pendingAction->entity_type, $ids);
 
         return $refs === [] ? null : $refs;
     }
