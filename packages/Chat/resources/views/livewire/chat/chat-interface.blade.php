@@ -273,6 +273,10 @@
                                         <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="action.display?.summary"></span>
                                     </div>
 
+                                    <template x-if="action.display?.duplicate_warning">
+                                        <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" x-text="action.display.duplicate_warning"></div>
+                                    </template>
+
                                     <div class="mt-2 space-y-1">
                                         <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
                                             <div class="flex gap-2 text-sm">

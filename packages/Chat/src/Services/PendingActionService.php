@@ -107,6 +107,13 @@ final readonly class PendingActionService
             }
         }
 
+        if ($conversationId !== null && $operation === PendingActionOperation::Create) {
+            $warning = $this->duplicateCreateWarning($conversationId, $actionClass, $entityType, $actionData);
+            if ($warning !== null) {
+                $displayData['duplicate_warning'] = $warning;
+            }
+        }
+
         return PendingAction::query()->create([
             'team_id' => $user->currentTeam->getKey(),
             'user_id' => $user->getKey(),
@@ -554,6 +561,89 @@ final readonly class PendingActionService
             Note::class => Note::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
             default => null,
         };
+    }
+
+    /**
+     * A same-titled create was proposed/approved moments ago — usually a model
+     * regeneration after a transient failure. Approving both would write real
+     * duplicate records, so the card carries an explicit warning.
+     *
+     * @param  array<string, mixed>  $actionData
+     */
+    private function duplicateCreateWarning(string $conversationId, string $actionClass, string $entityType, array $actionData): ?string
+    {
+        $titleMap = $this->proposedTitleMap($actionData);
+
+        if ($titleMap === []) {
+            return null;
+        }
+
+        $recent = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->where('action_class', $actionClass)
+            ->where('entity_type', $entityType)
+            ->where('operation', PendingActionOperation::Create)
+            ->whereIn('status', [PendingActionStatus::Pending, PendingActionStatus::Approved])
+            ->where('created_at', '>=', now()->subMinutes(15))
+            ->get();
+
+        $incomingLower = array_keys($titleMap);
+
+        foreach ($recent as $existing) {
+            $existingLower = $this->proposedTitles($existing->action_data);
+            $overlap = array_intersect($incomingLower, $existingLower);
+            if ($overlap !== []) {
+                $matchedLower = (string) array_values($overlap)[0];
+                $label = $titleMap[$matchedLower];
+
+                return "Heads up: \"{$label}\" was already proposed or created a moment ago — approving this may create a duplicate.";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns a map of lowercased title => original-cased title for all records
+     * in the given action data (handles both single and batch shapes).
+     *
+     * @param  array<string, mixed>  $actionData
+     * @return array<string, string>
+     */
+    private function proposedTitleMap(array $actionData): array
+    {
+        $records = ($actionData['_batch'] ?? false) === true && is_array($actionData['records'] ?? null)
+            ? $actionData['records']
+            : [$actionData];
+
+        $map = [];
+
+        foreach ($records as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+            foreach (['name', 'title'] as $field) {
+                if (is_string($record[$field] ?? null) && $record[$field] !== '') {
+                    $lower = mb_strtolower(trim($record[$field]));
+                    $map[$lower] = trim($record[$field]);
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Returns lowercased titles for all records in the given action data.
+     * Used when checking existing proposals against incoming ones.
+     *
+     * @param  array<string, mixed>  $actionData
+     * @return list<string>
+     */
+    private function proposedTitles(array $actionData): array
+    {
+        return array_keys($this->proposedTitleMap($actionData));
     }
 
     private function restoreTrashedRecord(Model $record): void
