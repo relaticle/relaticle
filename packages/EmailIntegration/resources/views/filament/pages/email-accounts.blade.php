@@ -32,7 +32,8 @@
         <x-filament::section heading="Connect an Account">
             <div class="flex gap-3">
                 {{ $this->connectGmailAction }}
-                {{ $this->connectAzureAction }}
+                {{-- Outlook/Azure connection is hidden for now; re-enable when the provider is ready. --}}
+                {{-- {{ $this->connectAzureAction }} --}}
             </div>
         </x-filament::section>
     </div>
