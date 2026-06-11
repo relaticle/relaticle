@@ -51,7 +51,6 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                             ->options(
                                 collect(EmailPrivacyTier::cases())
                                     ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => $tier->getLabel()])
-                                    ->prepend(__('email/privacy-settings.sharing_preference.use_workspace_default'), '')
                                     ->all()
                             )
                             ->placeholder(__('email/privacy-settings.sharing_preference.use_workspace_default')),
