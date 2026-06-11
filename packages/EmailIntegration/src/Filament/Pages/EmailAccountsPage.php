@@ -80,6 +80,8 @@ final class EmailAccountsPage extends Page
             ->icon('heroicon-o-plus')
             ->color('info')
             ->size(Size::Small)
+            // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
+            ->hidden()
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
     }
 
@@ -255,6 +257,14 @@ final class EmailAccountsPage extends Page
                 $account = $this->findOwnedAccountOrFail($arguments);
 
                 resolve(DisconnectConnectedAccountAction::class)->execute($account);
+
+                $this->connectedAccounts = $this->getAccounts();
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-accounts.notifications.disconnected.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.disconnected.body'))
+                    ->send();
             });
     }
 

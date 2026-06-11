@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 
 mutates(EmailAccountsPage::class);
 
@@ -68,6 +69,21 @@ it('deletes the authenticated user\'s account on disconnect', function (): void 
     ]);
 });
 
+it('deletes dependent signatures and refreshes the listing on disconnect', function (): void {
+    $signature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $this->account->id])
+        ->assertSet('connectedAccounts', fn ($accounts): bool => $accounts->isEmpty());
+
+    $this->assertSoftDeleted(ConnectedAccount::class, ['id' => $this->account->id]);
+    $this->assertDatabaseMissing(EmailSignature::class, ['id' => $signature->id]);
+});
+
 it('does not delete another user\'s account on disconnect', function (): void {
     $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
     $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -100,9 +116,9 @@ it('only loads the authenticated user\'s accounts in the current team on mount',
         ->not->toContain($otherAccount->id);
 });
 
-it('renders both Connect Gmail and Connect Outlook actions', function (): void {
+it('renders Connect Gmail and hides Connect Outlook for now', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertActionExists('connectGmail')
-        ->assertActionExists('connectAzure')
-        ->assertActionVisible('connectAzure');
+        ->assertActionVisible('connectGmail')
+        ->assertActionHidden('connectAzure');
 });
