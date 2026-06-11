@@ -24,6 +24,8 @@ use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
+use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -34,8 +36,6 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
-use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 abstract class BaseRecordEmailsPage extends Page
@@ -96,7 +96,8 @@ abstract class BaseRecordEmailsPage extends Page
 
         $query = $record
             ->emails()
-            ->with(['from', 'labels'])
+            // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
+            ->with(['from', 'labels', 'participants', 'shares'])
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
@@ -215,9 +216,9 @@ abstract class BaseRecordEmailsPage extends Page
                     ]),
             ])
             ->fillForm(function (array $arguments): array {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return [];
                 }
 
@@ -232,28 +233,19 @@ abstract class BaseRecordEmailsPage extends Page
                         ->all(),
                 ];
             })
-            ->action(function (array $data, array $arguments, EmailSharingService $sharingService): void {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+            ->action(function (array $data, array $arguments): void {
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
 
-                if ($email === null) {
-                    return;
-                }
+                abort_if(! $email instanceof Email, 403);
 
-                $sharer = $this->authUser();
-
-                $sharingService->setEmailTier($email, $data['privacy_tier']);
-                $email->shares()->where('shared_by', $sharer->getKey())->delete();
-
-                foreach ($data['shares'] ?? [] as $share) {
-                    /** @var User $sharedWithUser */
-                    $sharedWithUser = User::query()->findOrFail($share['shared_with']);
-                    $sharingService->shareEmail(
-                        $email,
-                        $sharer,
-                        $sharedWithUser,
-                        EmailPrivacyTier::from($share['tier']),
-                    );
-                }
+                resolve(UpdateEmailSharingAction::class)->execute(
+                    $email,
+                    $this->authUser(),
+                    $data['privacy_tier'] instanceof EmailPrivacyTier
+                        ? $data['privacy_tier']
+                        : EmailPrivacyTier::from($data['privacy_tier']),
+                    $data['shares'] ?? [],
+                );
 
                 Notification::make()
                     ->success()
@@ -273,9 +265,9 @@ abstract class BaseRecordEmailsPage extends Page
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'viewBody');
 
-                if ($email === null) {
+                if (! $email instanceof Email) {
                     return view('filament.actions.ai-summary', ['summary' => null]);
                 }
 
@@ -298,21 +290,19 @@ abstract class BaseRecordEmailsPage extends Page
                     ->required(),
             ])
             ->action(function (array $data, array $arguments): void {
-                $email = Email::query()->whereKey($arguments['emailId'] ?? null)->first();
+                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'requestAccess');
 
-                if ($email === null) {
-                    return;
-                }
+                abort_if(! $email instanceof Email, 403);
 
-                $requester = $this->authUser();
+                $request = resolve(RequestEmailAccessAction::class)->execute(
+                    $email,
+                    $this->authUser(),
+                    $data['tier_requested'] instanceof EmailPrivacyTier
+                        ? $data['tier_requested']
+                        : EmailPrivacyTier::from($data['tier_requested']),
+                );
 
-                $existing = EmailAccessRequest::query()
-                    ->where('email_id', $email->getKey())
-                    ->where('requester_id', $requester->getKey())
-                    ->where('status', 'pending')
-                    ->exists();
-
-                if ($existing) {
+                if (! $request instanceof EmailAccessRequest) {
                     Notification::make()
                         ->warning()
                         ->title(__('filament/pages/record-emails.notifications.pending_request.title'))
@@ -320,16 +310,6 @@ abstract class BaseRecordEmailsPage extends Page
 
                     return;
                 }
-
-                $request = EmailAccessRequest::query()->create([
-                    'email_id' => $email->getKey(),
-                    'requester_id' => $requester->getKey(),
-                    'owner_id' => $email->user_id,
-                    'tier_requested' => $data['tier_requested'],
-                    'status' => 'pending',
-                ]);
-
-                $email->user?->notify(new EmailAccessRequestedNotification($request));
 
                 Notification::make()
                     ->success()
@@ -345,7 +325,7 @@ abstract class BaseRecordEmailsPage extends Page
             ->modalHeading(__('filament/pages/record-emails.actions.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
-                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ))
             ->modalSubmitActionLabel('Approve')
             ->color('success')
@@ -378,7 +358,7 @@ abstract class BaseRecordEmailsPage extends Page
             ->modalHeading(__('filament/pages/record-emails.actions.deny_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Deny %s\'s request for access to this email?',
-                EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? 'this user',
+                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ))
             ->modalSubmitActionLabel('Deny')
             ->color('danger')
@@ -419,6 +399,46 @@ abstract class BaseRecordEmailsPage extends Page
             ->getSummary($thread, $this->authUser());
 
         return view('filament.actions.ai-summary', ['summary' => $summary]);
+    }
+
+    /**
+     * Resolve an email by client-supplied id, scoped to the active team and gated by policy.
+     * Returns null when the email is outside the viewer's team or the ability is denied.
+     */
+    private function resolveTeamEmail(?string $emailId, string $ability): ?Email
+    {
+        if ($emailId === null) {
+            return null;
+        }
+
+        $user = $this->authUser();
+
+        $email = Email::query()
+            ->forTeam($user->current_team_id)
+            ->whereKey($emailId)
+            ->first();
+
+        if ($email === null) {
+            return null;
+        }
+
+        if (! $user->can($ability, $email)) {
+            return null;
+        }
+
+        return $email;
+    }
+
+    private function requesterNameForOwnedRequest(?string $requestId): string
+    {
+        if ($requestId === null) {
+            return 'this user';
+        }
+
+        return EmailAccessRequest::query()
+            ->whereKey($requestId)
+            ->where('owner_id', $this->authUser()->getKey())
+            ->first()?->requester->name ?? 'this user';
     }
 
     private function authUser(): User

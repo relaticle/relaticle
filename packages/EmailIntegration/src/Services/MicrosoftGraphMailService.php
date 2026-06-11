@@ -34,6 +34,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
         $messageIds = [];
         $readMessageIds = [];
+        $unreadMessageIds = [];
         $nextUrl = $cursor;
         $deltaLink = $cursor;
 
@@ -41,11 +42,21 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             $response = $http->get($nextUrl)->throw()->json();
 
             foreach ($response['value'] ?? [] as $message) {
+                // Graph delta includes tombstones for deleted messages; they carry no
+                // fetchable payload, so dispatching a StoreEmailJob would just 404.
+                if (isset($message['@removed'])) {
+                    continue;
+                }
+
                 $id = (string) $message['id'];
                 $messageIds[] = $id;
 
-                if (($message['isRead'] ?? false) === true) {
-                    $readMessageIds[] = $id;
+                if (array_key_exists('isRead', $message)) {
+                    if ($message['isRead'] === true) {
+                        $readMessageIds[] = $id;
+                    } else {
+                        $unreadMessageIds[] = $id;
+                    }
                 }
             }
 
@@ -56,6 +67,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         return new MailDeltaResult(
             messageIds: collect($messageIds)->unique()->values(),
             readMessageIds: collect($readMessageIds)->unique()->values(),
+            unreadMessageIds: collect($unreadMessageIds)->unique()->values(),
             newCursor: (string) $deltaLink,
         );
     }
@@ -98,6 +110,8 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             bodyText: $bodyText,
             bodyHtml: $bodyHtml,
             participants: $participants,
+            // NOTE: Azure attachment bytes are not fetched yet (would require a separate
+            // /messages/{id}/attachments call). hasAttachments is still surfaced for the UI.
             attachments: [],
         );
     }

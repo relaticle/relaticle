@@ -18,6 +18,9 @@ final readonly class UpdateEmailSharingAction
      */
     public function execute(Email $email, User $sharer, EmailPrivacyTier $tier, array $shares): void
     {
+        // Defense in depth: only the email owner may change its sharing, regardless of caller.
+        abort_unless($email->user_id === $sharer->getKey(), 403);
+
         $this->sharingService->setEmailTier($email, $tier);
 
         $email->shares()->where('shared_by', $sharer->getKey())->delete();

@@ -54,7 +54,11 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             }
 
             foreach ($response['value'] ?? [] as $event) {
-                $events[] = $this->normalize($event);
+                // Graph delta emits tombstones for deleted events; they have no payload to
+                // normalize, so surface them as cancelled to soft-delete the stored meeting.
+                $events[] = isset($event['@removed'])
+                    ? $this->tombstone((string) ($event['id'] ?? ''))
+                    : $this->normalize($event);
             }
 
             $url = $response['@odata.nextLink'] ?? null;
@@ -62,6 +66,29 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         } while ($url !== null);
 
         return new CalendarSyncResult(events: $events, nextSyncToken: $deltaLink);
+    }
+
+    private function tombstone(string $eventId): CalendarEventData
+    {
+        $now = Date::now();
+
+        return new CalendarEventData(
+            providerEventId: $eventId,
+            providerRecurringEventId: null,
+            iCalUid: null,
+            title: null,
+            description: null,
+            startsAt: $now,
+            endsAt: $now,
+            isAllDay: false,
+            location: null,
+            htmlLink: null,
+            status: 'cancelled',
+            visibility: null,
+            organizerEmail: null,
+            organizerName: null,
+            attendees: [],
+        );
     }
 
     /**

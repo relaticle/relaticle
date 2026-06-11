@@ -12,6 +12,7 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -20,9 +21,12 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
+    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
@@ -67,6 +71,17 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
                 ->update(['read_at' => now()]);
         }
 
+        // Mark emails unread again when the provider flipped them back to unread.
+        $unreadIds = $delta->unreadMessageIds?->all() ?? [];
+
+        if ($unreadIds !== []) {
+            Email::query()
+                ->where('connected_account_id', $account->getKey())
+                ->whereIn('provider_message_id', $unreadIds)
+                ->whereNotNull('read_at')
+                ->update(['read_at' => null]);
+        }
+
         $account->update([
             'sync_cursor' => $delta->newCursor,
             'last_synced_at' => now(),
@@ -77,11 +92,8 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        $isAuthError = str_contains($exception->getMessage(), 'invalid_grant')
-            || str_contains($exception->getMessage(), '401');
-
         $this->connectedAccount->update([
-            'status' => $isAuthError ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
+            'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
             'last_error' => $exception->getMessage(),
         ]);
     }

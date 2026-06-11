@@ -28,13 +28,15 @@ final readonly class GmailService implements MailServiceInterface
     {
         $history = $this->gmail->users_history->listUsersHistory('me', [
             'startHistoryId' => $cursor,
-            'historyTypes' => ['messageAdded', 'labelsRemoved'],
+            'historyTypes' => ['messageAdded', 'labelsRemoved', 'labelsAdded'],
         ]);
 
         /** @var array<int, string> $messageIds */
         $messageIds = [];
         /** @var array<int, string> $readMessageIds */
         $readMessageIds = [];
+        /** @var array<int, string> $unreadMessageIds */
+        $unreadMessageIds = [];
 
         foreach ($history->getHistory() ?? [] as $item) {
             foreach ($item->getMessagesAdded() ?? [] as $added) {
@@ -53,12 +55,23 @@ final readonly class GmailService implements MailServiceInterface
                     }
                 }
             }
+
+            // Track messages where the UNREAD label was re-added (marked unread again)
+            foreach ($item->getLabelsAdded() ?? [] as $change) {
+                if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
+                    $id = $change->getMessage()->getId();
+                    if (! in_array($id, $unreadMessageIds, strict: true)) {
+                        $unreadMessageIds[] = $id;
+                    }
+                }
+            }
         }
 
         return new MailDeltaResult(
             messageIds: collect($messageIds),
             readMessageIds: collect($readMessageIds),
             newCursor: (string) ($history->getHistoryId() ?? $cursor),
+            unreadMessageIds: collect($unreadMessageIds),
         );
     }
 
@@ -102,16 +115,30 @@ final readonly class GmailService implements MailServiceInterface
     {
         $after = now()->subDays($daysBack)->timestamp;
 
-        $response = $this->gmail
-            ->users_messages
-            ->listUsersMessages('me', [
+        // Capture the cursor before listing so no message that arrives mid-pagination is missed.
+        $profile = $this->gmail->users->getProfile('me');
+
+        $messageIds = collect();
+        $pageToken = null;
+
+        do {
+            $params = [
                 'q' => "after:$after",
                 'maxResults' => 500,
-            ]);
+            ];
 
-        $messageIds = $this->pluckMessageIds($response->getMessages());
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
 
-        $profile = $this->gmail->users->getProfile('me');
+            $response = $this->gmail->users_messages->listUsersMessages('me', $params);
+
+            $messageIds = $messageIds->merge($this->pluckMessageIds($response->getMessages()));
+
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null && $pageToken !== '');
+
+        $messageIds = $messageIds->unique()->values();
 
         return [
             'message_ids' => $messageIds,
