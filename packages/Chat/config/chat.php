@@ -32,4 +32,29 @@ return [
 
     'max_conversation_messages' => (int) env('CHAT_MAX_CONVERSATION_MESSAGES', 100),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Anthropic Prompt Caching
+    |--------------------------------------------------------------------------
+    |
+    | Marks the static system prompt with a cache_control breakpoint, which
+    | caches the whole request prefix (all tool schemas + instructions) on
+    | Anthropic's side. Cuts per-turn input tokens dramatically for multi-turn
+    | conversations. Disable if a model/provider combination misbehaves.
+    */
+
+    'anthropic_prompt_caching' => (bool) env('CHAT_ANTHROPIC_PROMPT_CACHING', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Provider Stream-Start Rate (per second, per provider)
+    |--------------------------------------------------------------------------
+    |
+    | Caps how many chat streams may START per second against one provider so
+    | a retry storm from one tenant cannot stampede the provider and drag every
+    | other conversation into 429 backoff with it.
+    */
+
+    'provider_starts_per_second' => (int) env('CHAT_PROVIDER_STARTS_PER_SECOND', 8),
+
 ];

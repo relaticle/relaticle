@@ -75,3 +75,33 @@ it('never tells the user the proposal card is above', function (): void {
     expect(resolve(CrmAssistant::class)->instructions())
         ->not->toContain('card above');
 });
+
+it('tells the model the current date so relative dates resolve without asking', function (): void {
+    $instructions = (new CrmAssistant)->instructions();
+
+    expect($instructions)
+        ->toContain('## Current Date')
+        ->toContain('Today is '.now(date_default_timezone_get())->toDateString())
+        ->toContain('instead of asking the user');
+});
+
+it('resolves the date in the injected user timezone', function (): void {
+    $instructions = (new CrmAssistant)->withUserTimezone('Pacific/Auckland')->instructions();
+
+    expect($instructions)
+        ->toContain('timezone Pacific/Auckland')
+        ->toContain('Today is '.now('Pacific/Auckland')->toDateString());
+});
+
+it('keeps per-turn context out of the static (cacheable) instructions', function (): void {
+    $assistant = (new CrmAssistant)->withSupersededProposals([
+        ['operation' => 'create', 'entity_type' => 'task', 'label' => 'Dynamic thing'],
+    ]);
+
+    expect($assistant->staticInstructions())
+        ->not->toContain('Dynamic thing')
+        ->not->toContain('## Current Date')
+        ->and($assistant->dynamicInstructions())
+        ->toContain('Dynamic thing')
+        ->toContain('## Current Date');
+});

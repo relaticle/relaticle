@@ -28,6 +28,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
@@ -83,7 +84,11 @@ final class ContinueChatMessage implements ShouldQueue
         );
         ChatTelemetry::breadcrumb('continuation.started', ['prompt_length' => strlen($this->prompt)]);
 
-        if ($this->attempts() === 1 && ! $creditService->reserveCredit($this->team)) {
+        // Idempotent by key: a lock-contention release before handle() ran
+        // increments attempts(), so an attempts()===1 gate would skip the
+        // reserve entirely and the turn would stream unreserved, then settle
+        // a reservation that never happened.
+        if (! $creditService->reserveCredit($this->team, reservationKey: $this->reservationKey(), conversationId: $this->conversationId, userId: (string) $this->user->getKey())) {
             ChatTelemetry::breadcrumb('continuation.credits_exhausted', []);
             $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
@@ -100,6 +105,7 @@ final class ContinueChatMessage implements ShouldQueue
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
+            $agent->withUserTimezone($this->user->timezone);
             $agent->withResolvedActions(
                 resolve(PendingActionService::class)
                     ->resolvedSinceLastAssistantMessage($this->conversationId),
@@ -119,6 +125,14 @@ final class ContinueChatMessage implements ShouldQueue
                 message: 'The assistant could not continue. Please try again.',
             ));
             $this->releaseAuth();
+
+            return;
+        }
+
+        if (! ProviderRateGate::tryAcquire($resolved['provider'])) {
+            ChatTelemetry::breadcrumb('continuation.provider_gate_release', ['attempt' => $this->attempts()]);
+            $this->releaseAuth();
+            $this->release(random_int(1, 4));
 
             return;
         }
@@ -161,7 +175,9 @@ final class ContinueChatMessage implements ShouldQueue
             // anything else rethrows and fails fast.
             if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('continuation.rate_limited_retry', ['attempt' => $this->attempts()]);
-                $delay = $this->retryDelaySeconds($this->attempts());
+                // Honor the provider's Retry-After when present; jitter spreads
+                // the re-dispatch so concurrent 429ed jobs don't stampede back.
+                $delay = $this->retryDelaySeconds($this->attempts(), $e) + random_int(0, 3);
                 $this->broadcastSafely(new ChatStreamRetrying(
                     conversationId: $this->conversationId,
                     attempt: $this->attempts() + 1,
@@ -179,9 +195,15 @@ final class ContinueChatMessage implements ShouldQueue
         }
     }
 
-    public function retryDelaySeconds(int $attempts): int
+    public function retryDelaySeconds(int $attempts, ?Throwable $e = null): int
     {
-        return (int) min(2 ** $attempts, 30);
+        $base = (int) min(2 ** $attempts, 30);
+
+        $retryAfter = $e instanceof RequestException
+            ? (int) ($e->response->header('Retry-After') ?: 0)
+            : 0;
+
+        return max($base, min($retryAfter, 60));
     }
 
     /**
@@ -245,5 +267,10 @@ final class ContinueChatMessage implements ShouldQueue
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function reservationKey(): string
+    {
+        return 'reserve-'.$this->turnId;
     }
 }

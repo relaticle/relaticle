@@ -98,7 +98,9 @@ final readonly class ChatController
             }
         }
 
-        if (! $this->creditService->reserveCredit($team)) {
+        $turnId = (string) Str::ulid();
+
+        if (! $this->creditService->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             $balance = AiCreditBalance::query()
                 ->where('team_id', $team->getKey())
                 ->first();
@@ -147,7 +149,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
-            turnId: (string) Str::ulid(),
+            turnId: $turnId,
         ));
 
         return response()->json([
@@ -258,6 +260,74 @@ final readonly class ChatController
         resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
 
         return response()->json(['status' => 'resuming']);
+    }
+
+    /**
+     * Mark a turn (and everything after it) superseded — the server-truth side
+     * of Regenerate/Edit. Without this the client splice is a lie: reload
+     * resurrects the replaced turns and the model keeps them in its history.
+     *
+     * anchor_id targets a persisted user message; when the client only has an
+     * optimistic (not yet persisted) message it sends anchor_content instead,
+     * which must match the latest user row — a mismatch means that row belongs
+     * to an OLDER turn (the optimistic one never persisted), and superseding it
+     * would hide a good turn, so we refuse and supersede nothing.
+     */
+    public function supersedeMessages(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'anchor_id' => ['nullable', 'string', 'max:36'],
+            'anchor_content' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if(
+            $conversation === null
+                || $conversation->user_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+            404,
+        );
+
+        $anchorId = $validated['anchor_id'] ?? null;
+
+        if ($anchorId !== null) {
+            $anchor = DB::table('agent_conversation_messages')
+                ->where('conversation_id', $conversationId)
+                ->where('id', $anchorId)
+                ->first();
+
+            abort_if($anchor === null, 404);
+            abort_if((string) $anchor->role !== 'user', 422, 'Only user messages can anchor a supersede.');
+        } else {
+            $anchor = DB::table('agent_conversation_messages')
+                ->where('conversation_id', $conversationId)
+                ->where('role', 'user')
+                ->whereNull('superseded_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($anchor === null) {
+                return response()->json(['superseded' => 0]);
+            }
+
+            $expected = trim((string) ($validated['anchor_content'] ?? ''));
+
+            if ($expected !== '' && trim((string) $anchor->content) !== $expected) {
+                return response()->json(['superseded' => 0]);
+            }
+        }
+
+        $superseded = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('id', '>=', (string) $anchor->id)
+            ->whereNull('superseded_at')
+            ->update(['superseded_at' => now(), 'updated_at' => now()]);
+
+        return response()->json(['superseded' => $superseded]);
     }
 
     public function mentions(Request $request): JsonResponse

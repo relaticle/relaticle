@@ -203,9 +203,12 @@ final class AppServiceProvider extends ServiceProvider
                         plan: $team->plan->value,
                     );
 
+                    $seconds = (int) ($headers['Retry-After'] ?? 0);
+
                     return response()->json([
                         'error' => 'rate_limited',
-                        'retry_after_seconds' => (int) ($headers['Retry-After'] ?? 0),
+                        'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
+                        'retry_after_seconds' => $seconds,
                         'plan' => $team->plan->value,
                     ], 429, $headers);
                 });

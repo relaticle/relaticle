@@ -19,7 +19,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, mentions: list<array{type: string, id: string, label: string}>}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string}>}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -27,7 +27,8 @@ final readonly class ListConversationMessages
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('m.conversation_id', $conversationId)
             ->where('m.user_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id);
+            ->where('c.team_id', $user->current_team_id)
+            ->whereNull('m.superseded_at');
 
         if ($beforeMessageId !== null) {
             $query->where('m.id', '<', $beforeMessageId);
@@ -46,6 +47,12 @@ final readonly class ListConversationMessages
             ->whereIn('message_id', $messages->pluck('id'))
             ->get(['message_id', 'type', 'record_id', 'label'])
             ->groupBy('message_id');
+
+        $feedbackByMessage = DB::table('chat_message_feedback')
+            ->where('user_id', $user->getKey())
+            ->whereIn('message_id', $messages->pluck('id'))
+            ->get(['message_id', 'rating', 'category'])
+            ->keyBy('message_id');
 
         $pendingIds = $this->collectPendingActionIds($messages);
 
@@ -88,6 +95,10 @@ final readonly class ListConversationMessages
                 $msg->tool_results === null ? null : (string) $msg->tool_results,
                 $records,
             ),
+            'feedback' => isset($feedbackByMessage[$msg->id]) ? [
+                'rating' => (string) $feedbackByMessage[$msg->id]->rating,
+                'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
+            ] : null,
             'mentions' => array_values(
                 ($mentionsByMessage[$msg->id] ?? collect())
                     ->map(fn (object $row): array => [

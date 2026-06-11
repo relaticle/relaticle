@@ -11,4 +11,5 @@ enum AiCreditType: string
     case Embedding = 'embedding';
     case Adjustment = 'adjustment';
     case Refund = 'refund';
+    case Reservation = 'reservation';
 }

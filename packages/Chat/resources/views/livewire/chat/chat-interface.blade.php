@@ -3,15 +3,18 @@
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     data-chat-context="{{ $context ?? 'conversation' }}"
-    class="flex h-full flex-col"
+    class="relative flex h-full flex-col"
 >
     {{-- Messages --}}
     <div
         x-ref="messages"
         role="log"
-        aria-live="polite"
+        {{-- Streaming mutates the DOM per token; announcing only once the turn
+             settles spares screen-reader users hundreds of partial readouts. --}}
+        :aria-live="isStreaming ? 'off' : 'polite'"
         aria-relevant="additions text"
         aria-atomic="false"
+        x-on:scroll.passive="trackScrollPosition()"
         class="flex-1 overflow-y-auto px-4 py-6"
     >
         <template x-if="messages.length === 0 && !isStreaming">
@@ -53,7 +56,10 @@
                 </div>
             </template>
 
-            <template x-for="(msg, index) in messages" :key="index">
+            {{-- Keyed by stable clientKey, NOT index: splices (regenerate/edit),
+                 prepends (load earlier) and pops (continuation revert) must not
+                 re-bind DOM nodes across different logical messages. --}}
+            <template x-for="(msg, index) in messages" :key="msg.clientKey || ('i-' + index)">
                 <div class="group/message">
                     {{-- User message --}}
                     <template x-if="msg.role === 'user'">
@@ -138,7 +144,7 @@
                         <div class="flex flex-col items-start">
                             <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                                 <div
-                                    :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
+                                    :title="msg.created_at ? 'Completed ' + new Date(msg.created_at).toLocaleString() : ''"
                                     class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-p:my-2 prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-gray-900 dark:prose-headings:text-white prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-1 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-1 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
                                 >
                                     <template x-if="msg.rendered && msg.prerendered">
@@ -232,6 +238,86 @@
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
                                         <span>Regenerate</span>
                                     </button>
+                                    <template x-if="msg.id">
+                                        <span class="flex items-center gap-0.5">
+                                            <button
+                                                type="button"
+                                                x-on:click="rateMessage(msg, 'up')"
+                                                :aria-pressed="msg.feedback?.rating === 'up'"
+                                                aria-label="Good response"
+                                                title="Good response"
+                                                class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                :class="msg.feedback?.rating === 'up' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                                            >
+                                                <template x-if="msg.feedback?.rating === 'up'">
+                                                    <x-heroicon-s-hand-thumb-up class="h-3.5 w-3.5" aria-hidden="true" />
+                                                </template>
+                                                <template x-if="msg.feedback?.rating !== 'up'">
+                                                    <x-heroicon-o-hand-thumb-up class="h-3.5 w-3.5" aria-hidden="true" />
+                                                </template>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                x-on:click="rateMessage(msg, 'down')"
+                                                :aria-pressed="msg.feedback?.rating === 'down'"
+                                                aria-label="Bad response"
+                                                title="Bad response"
+                                                class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                :class="msg.feedback?.rating === 'down' ? 'text-red-600 dark:text-red-400' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                                            >
+                                                <template x-if="msg.feedback?.rating === 'down'">
+                                                    <x-heroicon-s-hand-thumb-down class="h-3.5 w-3.5" aria-hidden="true" />
+                                                </template>
+                                                <template x-if="msg.feedback?.rating !== 'down'">
+                                                    <x-heroicon-o-hand-thumb-down class="h-3.5 w-3.5" aria-hidden="true" />
+                                                </template>
+                                            </button>
+                                        </span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Thumbs-down detail funnel: category chips + optional comment --}}
+                            <template x-if="msg.feedbackPanelOpen">
+                                <div class="mt-2 w-full max-w-[85%] rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+                                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300">What went wrong?</p>
+                                    <div class="mt-2 flex flex-wrap gap-1.5">
+                                        <template x-for="cat in feedbackCategories" :key="cat.value">
+                                            <button
+                                                type="button"
+                                                x-on:click="msg.feedbackCategory = (msg.feedbackCategory === cat.value ? null : cat.value)"
+                                                x-text="cat.label"
+                                                class="rounded-full border px-2.5 py-1 text-xs font-medium transition"
+                                                :class="msg.feedbackCategory === cat.value
+                                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'"
+                                            ></button>
+                                        </template>
+                                    </div>
+                                    <textarea
+                                        x-model="msg.feedbackComment"
+                                        rows="2"
+                                        maxlength="1000"
+                                        placeholder="Tell us more (optional)"
+                                        aria-label="Feedback details"
+                                        class="mt-2 block w-full resize-none rounded-md border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                    ></textarea>
+                                    <div class="mt-2 flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            x-on:click="msg.feedbackPanelOpen = false"
+                                            class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                        >
+                                            Skip
+                                        </button>
+                                        <button
+                                            type="button"
+                                            x-on:click="submitFeedbackDetail(msg)"
+                                            class="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700"
+                                        >
+                                            Submit
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
                         </div>
@@ -389,6 +475,23 @@
         </div>
     </div>
 
+    {{-- Jump-to-latest pill: new content arrived while reading older messages --}}
+    <template x-if="hasUnseenBelow">
+        <div class="pointer-events-none absolute inset-x-0 bottom-28 z-30 flex justify-center">
+            <button
+                type="button"
+                x-on:click="jumpToLatest()"
+                class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+            >
+                <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
+                New messages
+            </button>
+        </div>
+    </template>
+
     {{-- Undo toast --}}
     <template x-if="undoToast">
         <div class="pointer-events-auto fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
@@ -411,6 +514,26 @@
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
+            {{-- Send-throttle countdown: the message is kept and auto-sends --}}
+            <template x-if="rateLimit">
+                <div class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20" role="status" aria-live="polite">
+                    <span class="text-xs text-amber-800 dark:text-amber-200">
+                        {{-- Null-safe: this effect can re-evaluate during x-if
+                             teardown; throwing here aborts Alpine's flush queue
+                             and silently drops queued callbacks. --}}
+                        You're sending fast — sending again in <span class="font-semibold tabular-nums" x-text="(rateLimit?.secondsLeft ?? 0) + 's'"></span>
+                        <span class="text-amber-700/70 dark:text-amber-300/70" x-text="'· ' + currentPlanLabel + ' plan'"></span>
+                    </span>
+                    <button
+                        type="button"
+                        x-on:click="clearRateLimit()"
+                        class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </template>
+
             <form x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
@@ -455,7 +578,7 @@
                                 x-show="!isStreaming"
                                 type="submit"
                                 class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 disabled:bg-primary-200 disabled:text-white dark:disabled:bg-primary-900/40 dark:disabled:text-primary-300"
-                                :disabled="text.trim().length === 0 || text.length > 5000"
+                                :disabled="text.trim().length === 0 || text.length > 5000 || rateLimit !== null"
                                 aria-label="Send message"
                             >
                                 <x-heroicon-s-arrow-up class="h-4 w-4" />
@@ -509,6 +632,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // and auto-flush this on handleStreamEnd / cancel / failure.
     queuedSend: null,
 
+    // Active send-throttle window: {secondsLeft, timerId, document}. While set,
+    // the composer is soft-disabled with a countdown and the stashed message
+    // auto-sends the moment the window opens. Cancel keeps the text, drops the
+    // auto-send.
+    rateLimit: null,
+
+    // Scroll ownership (see scrollToBottom): streaming only autoscrolls while
+    // the user is pinned near the bottom; otherwise the jump pill shows.
+    pinnedToBottom: true,
+    hasUnseenBelow: false,
+
     // Scoped lookup of THIS chat-interface's TipTap editor. Avoids the
     // window.__chatEditor global that breaks when multiple chat-interface
     // instances render simultaneously (e.g. side panel + main page).
@@ -520,6 +654,29 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // that window — which is exactly when sendMessage() needs it most to
     // call clear() after a send. Both this.$root and the chatEditor wrapper
     // expose data-chat-context, so the selector is unambiguous.
+    // Documents stashed in Alpine state come back as reactive Proxies, and
+    // TipTap's setDocument structuredClones its input — Proxies cannot be
+    // structuredCloned, so the call throws and silently kills whatever line
+    // was next (this lost queued messages AND broke rate-limit auto-send
+    // before it was found). Always unwrap to plain JSON first.
+    plainDocument(doc) {
+        if (!doc) return null;
+        try {
+            return JSON.parse(JSON.stringify(doc));
+        } catch (_) {
+            return null;
+        }
+    },
+
+    // Stable identity for the x-for key: server id when persisted, otherwise a
+    // minted client uuid that survives reconciliation (never reassigned).
+    ensureClientKey(m) {
+        if (!m.clientKey) {
+            m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
+        }
+        return m;
+    },
+
     localEditor() {
         const ctx = (this.$root || this.$el)?.getAttribute?.('data-chat-context') ?? 'conversation';
         const wrapper = document.querySelector(`[data-chat-context="${ctx}"][x-data*="chatEditor"]`);
@@ -548,8 +705,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             retryable: false,
             isContinuation: false,
             _needsSeparator: false,
+            feedback: null,
+            feedbackPanelOpen: false,
+            feedbackCategory: null,
+            feedbackComment: '',
             ...extra,
         };
+        this.ensureClientKey(stub);
         this.messages.push(stub);
         return stub;
     },
@@ -706,12 +868,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.selectedModel = validModels.includes(candidate) ? candidate : 'auto';
 
         this.messages.forEach((m) => {
+            this.ensureClientKey(m);
             if (m.role === 'assistant') {
                 m.rendered = true;
                 m.prerendered = true;
                 if (!Array.isArray(m.follow_ups)) {
                     m.follow_ups = [];
                 }
+                m.feedback = m.feedback ?? null;
+                m.feedbackPanelOpen = false;
+                m.feedbackCategory = m.feedback?.category ?? null;
+                m.feedbackComment = '';
             }
             if (m.role === 'user') {
                 m.editing = false;
@@ -730,7 +897,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         // Without this, the messages container starts scrolled to the top
         // (oldest message), forcing the user to scroll down to see context.
         if (this.messages.length > 0) {
-            this.scrollToBottom();
+            this.scrollToBottom(true);
         }
 
         // Bootstrap payload from the dashboard: when the user submits their
@@ -803,12 +970,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             const hasMore = payload ? !!payload.hasMore : false;
             if (earlier.length > 0) {
                 earlier.forEach((m) => {
+                    this.ensureClientKey(m);
                     if (m.role === 'assistant') {
                         m.rendered = true;
                         m.prerendered = true;
                         if (!Array.isArray(m.follow_ups)) {
                             m.follow_ups = [];
                         }
+                        m.feedback = m.feedback ?? null;
+                        m.feedbackPanelOpen = false;
+                        m.feedbackCategory = m.feedback?.category ?? null;
+                        m.feedbackComment = '';
                     }
                     if (m.role === 'user') {
                         m.editing = false;
@@ -840,6 +1012,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     destroy() {
         this.clearStreamTimeout();
         this.stopCopyTicker();
+        this.clearRateLimit();
         this.unsubscribe();
         if (this.undoToast?.timeoutId) {
             clearTimeout(this.undoToast.timeoutId);
@@ -891,6 +1064,62 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         } catch (_) { /* clipboard blocked — silently ignore */ }
     },
 
+    feedbackCategories: [
+        { value: 'inaccurate', label: 'Inaccurate' },
+        { value: 'did_not_follow', label: "Didn't do what I asked" },
+        { value: 'too_slow', label: 'Too slow' },
+        { value: 'other', label: 'Other' },
+    ],
+
+    // Thumbs funnel: up = one tap; down = rating recorded immediately, then an
+    // optional category/comment panel. Tapping the active thumb retracts.
+    async rateMessage(msg, rating) {
+        if (!msg.id) return;
+
+        if (msg.feedback?.rating === rating) {
+            msg.feedback = null;
+            msg.feedbackPanelOpen = false;
+            await this.postFeedback(msg, null);
+            return;
+        }
+
+        msg.feedback = { rating, category: null };
+        msg.feedbackPanelOpen = rating === 'down';
+        msg.feedbackCategory = null;
+        msg.feedbackComment = '';
+        await this.postFeedback(msg, { rating });
+    },
+
+    async submitFeedbackDetail(msg) {
+        if (!msg.id || msg.feedback?.rating !== 'down') {
+            msg.feedbackPanelOpen = false;
+            return;
+        }
+        msg.feedback = { rating: 'down', category: msg.feedbackCategory ?? null };
+        msg.feedbackPanelOpen = false;
+        await this.postFeedback(msg, {
+            rating: 'down',
+            category: msg.feedbackCategory ?? null,
+            comment: (msg.feedbackComment || '').trim() || null,
+        });
+    },
+
+    async postFeedback(msg, payload) {
+        try {
+            const url = @js(url('/chat/messages')) + '/' + msg.id + '/feedback';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            };
+            if (payload === null) {
+                await fetch(url, { method: 'DELETE', headers });
+                return;
+            }
+            await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+        } catch (_) { /* fire-and-forget — never block the conversation on feedback */ }
+    },
+
     canRegenerate(index) {
         const msg = this.messages[index];
         if (msg?.pending_actions?.some((a) => a.status === 'pending')) {
@@ -904,7 +1133,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return false;
     },
 
-    regenerateMessage(index) {
+    async regenerateMessage(index) {
         if (this.isStreaming) return;
 
         let userIndex = -1;
@@ -916,12 +1145,41 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
         if (userIndex === -1) return;
 
-        const userText = this.messages[userIndex].content;
+        const userMsg = this.messages[userIndex];
+        if (!(await this.supersedeServerTurns(userMsg))) return;
+
+        const userText = userMsg.content;
         this.messages.splice(userIndex);
 
         this.input = userText;
         this.localEditor()?.setText(userText);
         this.$nextTick(() => this.sendMessage());
+    },
+
+    // Tell the server the turns from this user message onward are replaced.
+    // Without this, the local splice is cosmetic: reload resurrects the old
+    // turns (with the user row duplicated) and the model keeps them in its
+    // history. Persisted messages anchor by id; optimistic ones (no id yet)
+    // anchor by content against the latest user row server-side.
+    async supersedeServerTurns(userMsg) {
+        if (!this.conversationId) return true;
+        try {
+            const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/messages/supersede', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    anchor_id: userMsg.id ?? null,
+                    anchor_content: userMsg.id ? null : (userMsg.content || null),
+                }),
+            });
+            return res.ok;
+        } catch {
+            return false;
+        }
     },
 
     canEdit(index) {
@@ -962,11 +1220,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         msg.editText = '';
     },
 
-    saveEdit(msg, index) {
+    async saveEdit(msg, index) {
         if (this.isStreaming) return;
 
         const newText = (msg.editText || '').trim();
         if (!newText || newText.length > 5000) return;
+
+        if (!(await this.supersedeServerTurns(msg))) return;
 
         this.messages.splice(index);
 
@@ -1037,12 +1297,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     handleFollowUps(event) {
         const chips = Array.isArray(event?.chips) ? event.chips.slice(0, 3) : [];
+        // Chips belong to the turn that just COMPLETED. If a queued send
+        // already minted a fresh stub, the last assistant bubble is the wrong
+        // (unstarted) one — attach to the last rendered bubble instead.
         for (let i = this.messages.length - 1; i >= 0; i--) {
-            if (this.messages[i].role === 'assistant') {
-                this.messages[i].follow_ups = chips;
-                break;
+            const m = this.messages[i];
+            if (m.role === 'assistant' && m.rendered) {
+                m.follow_ups = chips;
+                return;
             }
         }
+        const last = this.lastAssistantBubble();
+        if (last) last.follow_ups = chips;
     },
 
     // Server marked pending actions as superseded (user sent a new message without
@@ -1140,6 +1406,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     async sendMessage() {
+        if (this.rateLimit) return;
+
         const editor = this.localEditor();
         const text = (editor?.getText() ?? this.input).trim();
         if (!text) return;
@@ -1173,7 +1441,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
-            this.messages.push({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso });
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
             this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
@@ -1200,6 +1468,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
                 if (!createRes.ok) {
                     const body = await createRes.json().catch(() => ({}));
+
+                    if (createRes.status === 429 && body?.error === 'rate_limited') {
+                        this.handleSendRateLimit(body, payload);
+                        return;
+                    }
+
                     const assistantMsg = this.messages[this.messages.length - 1];
 
                     if (createRes.status === 401 || createRes.status === 419) {
@@ -1238,7 +1512,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 // It reserves a credit, dispatches ProcessChatMessage, and the
                 // job's broadcasts arrive on our already-subscribed channel.
                 this.startStreamTimeout();
-                this.scrollToBottom();
+                this.scrollToBottom(true);
 
                 this.streamAbortController = new AbortController();
 
@@ -1259,6 +1533,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
                 if (!sendRes.ok) {
                     const body = await sendRes.json().catch(() => ({}));
+
+                    if (sendRes.status === 429 && body?.error === 'rate_limited') {
+                        this.handleSendRateLimit(body, payload);
+                        return;
+                    }
+
                     const assistantMsg = this.messages[this.messages.length - 1];
 
                     if (sendRes.status === 402 && body?.error === 'credits_exhausted') {
@@ -1300,7 +1580,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         const nowIso = new Date().toISOString();
-        this.messages.push({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso });
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
         this.localEditor()?.clear();
         this.input = '';
         this.currentToolStatus = null;
@@ -1333,6 +1613,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
             if (!response.ok) {
                 const body = await response.json().catch(() => ({}));
+
+                if (response.status === 429 && body?.error === 'rate_limited') {
+                    this.handleSendRateLimit(body, payload);
+                    return;
+                }
+
                 const assistantMsg = this.messages[this.messages.length - 1];
 
                 if (response.status === 401 || response.status === 419) {
@@ -1383,7 +1669,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.restoreInputFocus();
         }
 
-        this.scrollToBottom();
+        this.scrollToBottom(true);
     },
 
     async cancelStream() {
@@ -1523,7 +1809,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.currentToolStatus = null;
         this.isStreaming = true;
         this.startStreamTimeout();
-        this.scrollToBottom();
+        this.scrollToBottom(true);
 
         return () => {
             // Only revert if the stub is still untouched (no deltas arrived
@@ -1581,6 +1867,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         try {
             const authoritative = await this.$wire.latestAssistantMessage();
             if (!authoritative) return;
+            // Capture the persisted id even when the text already matches —
+            // feedback (thumbs) and supersede anchoring need it.
+            if (authoritative.id && !assistantMsg.id) {
+                assistantMsg.id = authoritative.id;
+            }
             const isUnstartedStub = assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered;
             if (authoritative.content && authoritative.content !== assistantMsg.content && !isUnstartedStub) {
                 assistantMsg.content = authoritative.content;
@@ -1644,6 +1935,55 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.flushQueuedSend();
     },
 
+    // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
+    // text back in the composer, and count down to an automatic re-send. The
+    // user keeps everything they typed; nothing fake lands in the transcript.
+    handleSendRateLimit(body, payload) {
+        const stub = this.messages[this.messages.length - 1];
+        if (stub?.role === 'assistant' && !stub.content && !stub.rendered && !(stub.pending_actions || []).length) {
+            this.messages.pop();
+        }
+        const userMsg = this.messages[this.messages.length - 1];
+        if (userMsg?.role === 'user' && !userMsg.editing) {
+            this.messages.pop();
+        }
+
+        this.localEditor()?.setDocument?.(payload);
+
+        this.isStreaming = false;
+        this.clearStreamTimeout();
+        // +1s margin: re-sending at the exact Retry-After boundary lands back
+        // in the closing window and 429s again (observed live).
+        this.startRateLimitCountdown(Math.max(2, (Number(body?.retry_after_seconds) || 30) + 1), payload);
+        this.restoreInputFocus();
+    },
+
+    startRateLimitCountdown(seconds, document = null) {
+        this.clearRateLimit();
+        this.rateLimit = { secondsLeft: seconds, timerId: null, document };
+        this.rateLimit.timerId = setInterval(() => {
+            if (!this.rateLimit) return;
+            this.rateLimit.secondsLeft -= 1;
+            if (this.rateLimit.secondsLeft > 0) return;
+            const doc = this.plainDocument(this.rateLimit.document);
+            this.clearRateLimit();
+            if (doc) {
+                this.localEditor()?.setDocument?.(doc);
+            }
+            // setTimeout, NOT $nextTick: an exception in any effect sharing
+            // Alpine's flush queue (e.g. the banner tearing down) would drop a
+            // queued nextTick callback — observed live. A macrotask is isolated.
+            setTimeout(() => this.sendMessage(), 50);
+        }, 1000);
+    },
+
+    clearRateLimit() {
+        if (this.rateLimit?.timerId) {
+            clearInterval(this.rateLimit.timerId);
+        }
+        this.rateLimit = null;
+    },
+
     flushQueuedSend() {
         if (!this.queuedSend) return;
         const queued = this.queuedSend;
@@ -1652,14 +1992,22 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.selectedModel = queued.model;
         }
         this.$nextTick(() => {
-            this.localEditor()?.setDocument?.(queued.document);
+            this.localEditor()?.setDocument?.(this.plainDocument(queued.document));
             this.sendMessage();
         });
     },
 
     handleStreamFailed(event) {
         this.currentToolStatus = null;
-        const b = this.lastAssistantBubble();
+        // Prefer the bubble that is actually mid-stream (unrendered). The last
+        // bubble can be a fresh continuation stub minted after the failing
+        // turn — painting the error there would mislabel a different turn.
+        let b = null;
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            const m = this.messages[i];
+            if (m.role === 'assistant' && !m.rendered) { b = m; break; }
+        }
+        if (!b) b = this.lastAssistantBubble();
         if (b && !b.rendered) {
             b.content = '';
             b.invocationId = null;
@@ -1672,7 +2020,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         const queued = this.queuedSend;
         this.queuedSend = null;
         if (queued) {
-            this.$nextTick(() => this.localEditor()?.setDocument?.(queued.document));
+            this.$nextTick(() => this.localEditor()?.setDocument?.(this.plainDocument(queued.document)));
         }
         this.clearStreamTimeout();
         this.restoreInputFocus();
@@ -1859,11 +2207,35 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    scrollToBottom() {
+    // The user owns the scroll position. Streaming autoscrolls ONLY while they
+    // are already pinned near the bottom; once they scroll up to read, new
+    // content raises the "Jump to latest" pill instead of yanking them down.
+    // force=true is for actions the user just took themselves (sending, the
+    // pill, initial load).
+    scrollToBottom(force = false) {
+        if (!force && !this.pinnedToBottom) {
+            this.hasUnseenBelow = true;
+            return;
+        }
         this.$nextTick(() => {
             const el = this.$refs.messages;
             if (el) el.scrollTop = el.scrollHeight;
+            this.pinnedToBottom = true;
+            this.hasUnseenBelow = false;
         });
+    },
+
+    trackScrollPosition() {
+        const el = this.$refs.messages;
+        if (!el) return;
+        this.pinnedToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        if (this.pinnedToBottom) {
+            this.hasUnseenBelow = false;
+        }
+    },
+
+    jumpToLatest() {
+        this.scrollToBottom(true);
     },
 
 }));

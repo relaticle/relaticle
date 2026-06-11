@@ -103,6 +103,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('queue:prune-batches --hours=24')->daily();
         $schedule->command('invitations:cleanup')->daily();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes();
+        $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->dailyAt('00:05')->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:sync-recency-tags')->dailyAt('02:00')
             ->withoutOverlapping()

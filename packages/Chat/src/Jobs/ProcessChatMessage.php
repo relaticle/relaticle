@@ -36,6 +36,7 @@ use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
@@ -120,6 +121,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
+            $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
@@ -140,6 +142,14 @@ final class ProcessChatMessage implements ShouldQueue
                 message: 'The assistant could not start. Please try again.',
             ));
             $this->releaseAuth();
+
+            return;
+        }
+
+        if (! ProviderRateGate::tryAcquire($this->resolved['provider'])) {
+            ChatTelemetry::breadcrumb('stream.provider_gate_release', ['attempt' => $this->attempts()]);
+            $this->releaseAuth();
+            $this->release(random_int(1, 4));
 
             return;
         }
@@ -224,7 +234,9 @@ final class ProcessChatMessage implements ShouldQueue
             // Anything else rethrows and fails fast, exactly as before.
             if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
                 ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
-                $delay = $this->retryDelaySeconds($this->attempts());
+                // Honor the provider's Retry-After when present; jitter spreads
+                // the re-dispatch so concurrent 429ed jobs don't stampede back.
+                $delay = $this->retryDelaySeconds($this->attempts(), $e) + random_int(0, 3);
                 $this->broadcastSafely(new ChatStreamRetrying(
                     conversationId: $this->conversationId,
                     attempt: $this->attempts() + 1,
@@ -242,9 +254,15 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
-    public function retryDelaySeconds(int $attempts): int
+    public function retryDelaySeconds(int $attempts, ?Throwable $e = null): int
     {
-        return (int) min(2 ** $attempts, 30);
+        $base = (int) min(2 ** $attempts, 30);
+
+        $retryAfter = $e instanceof RequestException
+            ? (int) ($e->response->header('Retry-After') ?: 0)
+            : 0;
+
+        return max($base, min($retryAfter, 60));
     }
 
     /**

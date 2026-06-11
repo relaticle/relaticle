@@ -44,9 +44,11 @@ it('rejects an 11th request from a Free user within a minute with a 429', functi
 
     $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", $payload);
     $response->assertStatus(429);
-    $response->assertJsonStructure(['error', 'retry_after_seconds', 'plan']);
+    $response->assertJsonStructure(['error', 'message', 'retry_after_seconds', 'plan']);
     expect($response->json('error'))->toBe('rate_limited');
     expect($response->json('plan'))->toBe('free');
+    expect($response->json('message'))->toContain('send again in');
+    expect($response->json('retry_after_seconds'))->toBeGreaterThan(0);
 });
 
 it('isolates rate limits per team — different teams do not share the bucket', function (): void {

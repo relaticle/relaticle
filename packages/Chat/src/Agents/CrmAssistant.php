@@ -89,6 +89,12 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public array $resolvedActions = [];
 
+    /**
+     * IANA timezone the current user thinks in; resolves "tomorrow" correctly
+     * for them. Null falls back to the PHP default (app timezone).
+     */
+    public ?string $userTimezone = null;
+
     public function withConversationId(?string $conversationId): self
     {
         $this->conversationId = $conversationId;
@@ -96,9 +102,28 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
         return $this;
     }
 
+    public function withUserTimezone(?string $timezone): self
+    {
+        $this->userTimezone = $timezone;
+
+        return $this;
+    }
+
     public function instructions(): string
     {
-        $base = <<<'PROMPT'
+        $suffix = $this->dynamicInstructions();
+
+        return $suffix === '' ? $this->staticInstructions() : $this->staticInstructions().$suffix;
+    }
+
+    /**
+     * The immutable part of the system prompt. Kept separate so the Anthropic
+     * request can mark it (and, by prefix, all 27 tool schemas) with a
+     * cache_control breakpoint — see providerOptions().
+     */
+    public function staticInstructions(): string
+    {
+        return <<<'PROMPT'
 You are the Relaticle CRM Assistant, a helpful AI that helps users manage their CRM data.
 
 ## Capabilities
@@ -152,10 +177,30 @@ since your last reply. They are final -- never re-propose them. When an item is
 started (e.g. propose the next item, or link to the just-created record). When an item
 is "rejected", do not retry it; ask what the user wants instead.
 PROMPT;
+    }
 
-        $suffix = $this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+    /**
+     * Per-turn context (date, mentions, superseded, resolved) — changes every
+     * turn, so it must stay OUT of the cached prefix block.
+     */
+    public function dynamicInstructions(): string
+    {
+        return $this->dateBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+    }
 
-        return $suffix === '' ? $base : $base.$suffix;
+    /**
+     * Without this the model has no idea what day it is and turns "due
+     * tomorrow" into a clarification round-trip (observed live). Kept
+     * container-free: the jobs inject the user's timezone explicitly.
+     */
+    private function dateBlock(): string
+    {
+        $timezone = $this->userTimezone ?? date_default_timezone_get();
+        $today = now($timezone);
+
+        return "\n\n## Current Date\n"
+            ."Today is {$today->toDateString()} ({$today->englishDayOfWeek}), timezone {$timezone}. "
+            .'Resolve relative dates ("tomorrow", "next week", "in 3 days") against this date instead of asking the user.';
     }
 
     private function mentionsBlock(): string
@@ -295,12 +340,47 @@ PROMPT;
                     'type' => 'auto',
                     'disable_parallel_tool_use' => true,
                 ],
+                ...$this->anthropicCachedSystemBlocks(),
             ],
             Lab::OpenAI->value => [
                 'parallel_tool_calls' => false,
             ],
             default => [],
         };
+    }
+
+    /**
+     * Anthropic merges providerOptions over the request body, so this replaces
+     * the plain-string `system` with content blocks. The cache_control marker
+     * on the static block caches the whole request prefix — all tool schemas
+     * (which precede `system` in Anthropic's cache prefix order) plus the
+     * static instructions (~10k+ tokens) — per-turn context rides in a second,
+     * uncached block. Measured pre-caching waste: 96:1 input:output tokens.
+     *
+     * @return array<string, mixed>
+     */
+    private function anthropicCachedSystemBlocks(): array
+    {
+        if (! (bool) config('chat.anthropic_prompt_caching', true)) {
+            return [];
+        }
+
+        $blocks = [[
+            'type' => 'text',
+            'text' => $this->staticInstructions(),
+            'cache_control' => ['type' => 'ephemeral'],
+        ]];
+
+        $dynamic = $this->dynamicInstructions();
+
+        if ($dynamic !== '') {
+            $blocks[] = [
+                'type' => 'text',
+                'text' => $dynamic,
+            ];
+        }
+
+        return ['system' => $blocks];
     }
 
     /**
