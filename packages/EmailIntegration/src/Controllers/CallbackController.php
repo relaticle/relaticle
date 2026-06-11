@@ -20,10 +20,21 @@ use Throwable;
 
 final readonly class CallbackController
 {
+    private const array SUPPORTED_PROVIDERS = ['gmail', 'azure'];
+
     public function __invoke(Request $request, string $provider): RedirectResponse
     {
         /** @var User $user */
         $user = auth()->user();
+
+        // Without an active team we cannot scope or redirect; bail to the dashboard.
+        if ($user->currentTeam === null) {
+            return redirect('/')->with('error', 'Select a team before connecting an account.');
+        }
+
+        if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            return $this->redirectWithError($user, 'That email provider is not supported.');
+        }
 
         $driver = Socialite::driver($this->resolveDriver($provider));
 

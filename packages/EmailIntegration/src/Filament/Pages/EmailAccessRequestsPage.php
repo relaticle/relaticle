@@ -150,10 +150,16 @@ final class EmailAccessRequestsPage extends Page
             return null;
         }
 
+        $user = $this->authUser();
+
         /** @var EmailAccessRequest|null */
         return EmailAccessRequest::query()
             ->with(['email.from', 'email.body', 'requester', 'owner'])
             ->whereKey($this->selectedRequestId)
+            ->where(fn (Builder $q): Builder => $q
+                ->where('owner_id', $user->getKey())
+                ->orWhere('requester_id', $user->getKey()))
+            ->whereHas('email', fn (Builder $q): Builder => $q->where('team_id', $user->current_team_id))
             ->first();
     }
 
@@ -222,7 +228,7 @@ final class EmailAccessRequestsPage extends Page
             ->requiresConfirmation()
             ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
             ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.approve.modal_description', [
-                'name' => EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user'),
+                'name' => $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.approve.modal_submit_label'))
             ->action(function (array $arguments): void {
@@ -259,7 +265,7 @@ final class EmailAccessRequestsPage extends Page
             ->requiresConfirmation()
             ->modalHeading(__('filament/pages/email-access-requests.actions.deny.modal_heading'))
             ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.deny.modal_description', [
-                'name' => EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user'),
+                'name' => $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
             ]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.deny.modal_submit_label'))
             ->action(function (array $arguments): void {
@@ -296,7 +302,7 @@ final class EmailAccessRequestsPage extends Page
             ->requiresConfirmation()
             ->modalHeading(__('filament/pages/email-access-requests.actions.cancel.modal_heading'))
             ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.cancel.modal_description', [
-                'name' => EmailAccessRequest::query()->whereKey($arguments['requestId'] ?? null)->first()?->owner->name ?? __('filament/pages/email-access-requests.actions.fallback_user'),
+                'name' => $this->ownerNameForOwnRequest($arguments['requestId'] ?? null),
             ]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.cancel.modal_submit_label'))
             ->action(function (array $arguments): void {
@@ -309,7 +315,7 @@ final class EmailAccessRequestsPage extends Page
                     return;
                 }
 
-                resolve(CancelEmailAccessRequestAction::class)->execute($accessRequest);
+                resolve(CancelEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
 
                 $this->selectedRequestId = null;
                 unset($this->selectedRequest, $this->requests, $this->statusCounts);
@@ -327,5 +333,35 @@ final class EmailAccessRequestsPage extends Page
         $user = auth()->user();
 
         return $user;
+    }
+
+    /** Requester name for a request the current user owns (incoming). */
+    private function requesterNameForOwnedRequest(?string $requestId): string
+    {
+        $fallback = __('filament/pages/email-access-requests.actions.fallback_user');
+
+        if ($requestId === null) {
+            return $fallback;
+        }
+
+        return EmailAccessRequest::query()
+            ->whereKey($requestId)
+            ->where('owner_id', $this->authUser()->getKey())
+            ->first()?->requester->name ?? $fallback;
+    }
+
+    /** Owner name for a request the current user made (outgoing). */
+    private function ownerNameForOwnRequest(?string $requestId): string
+    {
+        $fallback = __('filament/pages/email-access-requests.actions.fallback_user');
+
+        if ($requestId === null) {
+            return $fallback;
+        }
+
+        return EmailAccessRequest::query()
+            ->whereKey($requestId)
+            ->where('requester_id', $this->authUser()->getKey())
+            ->first()?->owner->name ?? $fallback;
     }
 }

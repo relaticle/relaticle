@@ -50,7 +50,9 @@ abstract class BaseEmailsRelationManager extends RelationManager
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
-                ->with(['from', 'labels'])
+                // participants + shares are read per row by the privacy policy; eager-load
+                // them to avoid an N+1 when rendering the subject column.
+                ->with(['from', 'labels', 'participants', 'shares'])
                 ->withGlobalScope('visible', new VisibleEmailScope($this->authUser())))
             ->recordTitleAttribute('subject')
             ->defaultSort('sent_at', 'desc')

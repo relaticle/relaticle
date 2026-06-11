@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
@@ -25,53 +26,55 @@ final readonly class StoreMeetingAction
             return null;
         }
 
-        $meeting = Meeting::withTrashed()
-            ->where('connected_account_id', $account->getKey())
-            ->where('provider_event_id', $payload->providerEventId)
-            ->first();
+        return DB::transaction(function () use ($payload, $account): Meeting {
+            $meeting = Meeting::withTrashed()
+                ->where('connected_account_id', $account->getKey())
+                ->where('provider_event_id', $payload->providerEventId)
+                ->first();
 
-        $attributes = [
-            'team_id' => $account->team_id,
-            'connected_account_id' => $account->getKey(),
-            'provider_event_id' => $payload->providerEventId,
-            'provider_recurring_event_id' => $payload->providerRecurringEventId,
-            'ical_uid' => $payload->icalUid,
-            'title' => $payload->title,
-            'description' => $payload->description,
-            'location' => $payload->location,
-            'starts_at' => $payload->startsAt,
-            'ends_at' => $payload->endsAt,
-            'all_day' => $payload->allDay,
-            'organizer_email' => $payload->organizerEmail,
-            'organizer_name' => $payload->organizerName,
-            'status' => $payload->status,
-            'visibility' => $payload->visibility,
-            'response_status' => $payload->selfResponseStatus,
-            'html_link' => $payload->htmlLink,
-            'deleted_at' => null,
-        ];
+            $attributes = [
+                'team_id' => $account->team_id,
+                'connected_account_id' => $account->getKey(),
+                'provider_event_id' => $payload->providerEventId,
+                'provider_recurring_event_id' => $payload->providerRecurringEventId,
+                'ical_uid' => $payload->icalUid,
+                'title' => $payload->title,
+                'description' => $payload->description,
+                'location' => $payload->location,
+                'starts_at' => $payload->startsAt,
+                'ends_at' => $payload->endsAt,
+                'all_day' => $payload->allDay,
+                'organizer_email' => $payload->organizerEmail,
+                'organizer_name' => $payload->organizerName,
+                'status' => $payload->status,
+                'visibility' => $payload->visibility,
+                'response_status' => $payload->selfResponseStatus,
+                'html_link' => $payload->htmlLink,
+                'deleted_at' => null,
+            ];
 
-        if ($meeting instanceof Meeting) {
-            $meeting->fill($attributes)->save();
-        } else {
-            $meeting = Meeting::query()->create($attributes);
-        }
+            if ($meeting instanceof Meeting) {
+                $meeting->fill($attributes)->save();
+            } else {
+                $meeting = Meeting::query()->create($attributes);
+            }
 
-        $meeting->attendees()->delete();
+            $meeting->attendees()->delete();
 
-        foreach ($payload->attendees as $attendee) {
-            $meeting->attendees()->create([
-                'email_address' => $attendee->emailAddress,
-                'name' => $attendee->name,
-                'response_status' => $attendee->responseStatus,
-                'is_organizer' => $attendee->isOrganizer,
-                'is_self' => $attendee->isSelf,
-            ]);
-        }
+            foreach ($payload->attendees as $attendee) {
+                $meeting->attendees()->create([
+                    'email_address' => $attendee->emailAddress,
+                    'name' => $attendee->name,
+                    'response_status' => $attendee->responseStatus,
+                    'is_organizer' => $attendee->isOrganizer,
+                    'is_self' => $attendee->isSelf,
+                ]);
+            }
 
-        $this->linkMeeting->execute($meeting);
+            $this->linkMeeting->execute($meeting);
 
-        return $meeting;
+            return $meeting;
+        });
     }
 
     private function shouldSkip(NormalizedMeetingPayload $payload): bool

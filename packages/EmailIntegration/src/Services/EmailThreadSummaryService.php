@@ -34,7 +34,7 @@ final readonly class EmailThreadSummaryService
     private function generateAndCache(EmailThread $thread, User $viewer): AiSummary
     {
         $emails = $thread->emails()
-            ->with(['participants', 'body', 'labels'])
+            ->with(['from', 'participants', 'body', 'labels'])
             ->oldest('sent_at')
             ->get();
 
@@ -46,6 +46,7 @@ final readonly class EmailThreadSummaryService
 
         foreach ($emails as $index => $email) {
             $n = $index + 1;
+            // `from` is eager-loaded above to avoid an N+1 across the thread's emails.
             $firstFrom = $email->from->first();
             $from = $firstFrom->name ?? $firstFrom->email_address ?? 'Unknown';
             $date = $email->sent_at?->toDateTimeString() ?? '—';
@@ -57,8 +58,8 @@ final readonly class EmailThreadSummaryService
             $isOwner = $email->user_id === $viewer->getKey();
 
             if ($isOwner || $email->privacy_tier === EmailPrivacyTier::FULL) {
-                $body = $email->body->body_text ?? $email->snippet ?? '(no body)';
-                $lines[] = 'Body: '.mb_substr($body, 0, 500);
+                $body = data_get($email, 'body.body_text', $email->snippet ?? '(no body)');
+                $lines[] = 'Body: '.mb_substr((string) $body, 0, 500);
             } elseif ($email->privacy_tier === EmailPrivacyTier::SUBJECT) {
                 $lines[] = "Subject: {$email->subject}  (body hidden)";
             } else {

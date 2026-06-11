@@ -12,6 +12,7 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Throwable;
@@ -19,9 +20,12 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
+    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
@@ -44,21 +48,25 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             dispatch(new StoreMeetingJob($account, $event));
         }
 
-        $account->update([
-            'calendar_sync_cursor' => $result->nextSyncToken,
+        $update = [
             'last_calendar_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,
-        ]);
+        ];
+
+        // Never overwrite a good cursor with null: a missing sync token (partial/empty
+        // page) would otherwise force a full re-sync of the whole window on every run.
+        if ($result->nextSyncToken !== null) {
+            $update['calendar_sync_cursor'] = $result->nextSyncToken;
+        }
+
+        $account->update($update);
     }
 
     public function failed(Throwable $exception): void
     {
-        $isAuthError = str_contains($exception->getMessage(), 'invalid_grant')
-            || str_contains($exception->getMessage(), '401');
-
         $this->connectedAccount->update([
-            'status' => $isAuthError ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
+            'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
             'last_error' => $exception->getMessage(),
         ]);
     }

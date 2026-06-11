@@ -38,6 +38,8 @@ abstract class BaseMeetingsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            // `team` is read per row by MeetingPolicy; eager-load it to avoid a lazy load.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('team'))
             ->columns([
                 TextColumn::make('title')
                     ->searchable()
