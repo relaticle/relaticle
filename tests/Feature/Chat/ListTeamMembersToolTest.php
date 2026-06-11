@@ -15,7 +15,7 @@ it('lists only the current workspace members with id, name, and email', function
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Owner One']);
     $teammate = User::factory()->create(['name' => 'Mate Two', 'email' => 'mate@example.test']);
     $owner->currentTeam->users()->attach($teammate, ['role' => 'editor']);
-    $outsider = User::factory()->withPersonalTeam()->create(['name' => 'Outsider Three']);
+    User::factory()->withPersonalTeam()->create(['name' => 'Outsider Three']);
 
     Auth::guard('web')->setUser($owner);
 
@@ -26,8 +26,6 @@ it('lists only the current workspace members with id, name, and email', function
     expect($names)->toContain('Owner One', 'Mate Two')
         ->not->toContain('Outsider Three')
         ->and($payload['members'][0])->toHaveKeys(['id', 'name', 'email']);
-
-    expect((string) $outsider->name)->toBe('Outsider Three');
 });
 
 it('filters members by name or email search', function (): void {

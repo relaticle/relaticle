@@ -119,7 +119,7 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
 
     /**
      * The immutable part of the system prompt. Kept separate so the Anthropic
-     * request can mark it (and, by prefix, all 27 tool schemas) with a
+     * request can mark it (and, by prefix, every tool schema) with a
      * cache_control breakpoint — see providerOptions().
      */
     public function staticInstructions(): string

@@ -8,10 +8,9 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Enumerates the workspace's members for the assistant's context. Team-member
- * fields (company account owner, task assignees) accept ONLY these users —
- * without this list the model cannot resolve a name to a user id and falls
- * back to denying the field exists (observed in production).
+ * Workspace member directory for the chat tools: backs ListTeamMembersTool and
+ * validates team-member fields (company account_owner_id, task assignee_ids),
+ * which accept ONLY workspace users — never CRM contacts.
  */
 final readonly class TeamMembersContext
 {
@@ -48,9 +47,50 @@ final readonly class TeamMembersContext
             ->all());
     }
 
-    public static function isMember(User $user, string $candidateId): bool
+    /**
+     * Validate a team-member field value at proposal time: null and '' pass
+     * (absent / unassign), a scalar id or list of ids must all be workspace
+     * members — checked with one exact query, never the display-capped list.
+     * Returns the model-facing error naming the valid members, or null.
+     */
+    public static function memberFieldError(User $user, string $field, mixed $value): ?string
     {
-        return array_any(self::for($user), fn (array $member): bool => $member['id'] === $candidateId);
+        $ids = match (true) {
+            $value === null, $value === '' => [],
+            is_array($value) => array_values(array_filter(
+                array_map(strval(...), $value),
+                fn (string $id): bool => $id !== '',
+            )),
+            default => [(string) $value],
+        };
+
+        if ($ids === []) {
+            return null;
+        }
+
+        $team = $user->currentTeam;
+
+        if ($team === null) {
+            return "{$field}: no active workspace.";
+        }
+
+        $known = $team->users()->whereKey($ids)->pluck('users.id')->map(strval(...))->all();
+        $known[] = (string) $team->user_id;
+
+        if (array_diff($ids, $known) === []) {
+            return null;
+        }
+
+        return "{$field} must be a workspace team member. Valid members: "
+            .self::describeList($user)
+            .'. Contacts/people records are not valid for this field.';
+    }
+
+    public static function nameOf(string $userId): ?string
+    {
+        $name = User::query()->whereKey($userId)->value('name');
+
+        return $name === null ? null : (string) $name;
     }
 
     public static function describeList(User $user): string

@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
+use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 
 mutates(UpdateCompanyTool::class);
 mutates(UpdateCompany::class);
@@ -307,4 +309,36 @@ it('UpdateCompany action rejects an account_owner_id outside the workspace', fun
     expect(fn () => resolve(UpdateCompany::class)->execute($this->user, $company, [
         'account_owner_id' => (string) $stranger->getKey(),
     ]))->toThrow(ValidationException::class);
+});
+
+it('UpdateTaskTool rejects a non-member assignee id before proposing', function (): void {
+    $stranger = User::factory()->withPersonalTeam()->create();
+    $task = Task::factory()->for($this->team)->create(['title' => 'Assignee Guard Task']);
+
+    $tool = resolve(UpdateTaskTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000099');
+
+    $response = $tool->handle(new Request([
+        'id' => (string) $task->id,
+        'assignee_ids' => [(string) $stranger->getKey()],
+    ]));
+
+    expect($response)->toContain('assignee_ids must be a workspace team member')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('UpdateTaskTool accepts a workspace member as assignee', function (): void {
+    $teammate = User::factory()->create(['name' => 'Assignable Amy']);
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+    $task = Task::factory()->for($this->team)->create(['title' => 'Assignable Task']);
+
+    $tool = resolve(UpdateTaskTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000099');
+
+    $response = $tool->handle(new Request([
+        'id' => (string) $task->id,
+        'assignee_ids' => [(string) $teammate->getKey()],
+    ]));
+
+    expect($response)->toContain('pending_action');
 });

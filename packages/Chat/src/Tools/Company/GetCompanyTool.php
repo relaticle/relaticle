@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools\Company;
 
 use App\Http\Resources\V1\CompanyResource;
 use App\Models\Company;
+use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Tools\BaseReadShowTool;
 
 final class GetCompanyTool extends BaseReadShowTool
@@ -33,5 +34,19 @@ final class GetCompanyTool extends BaseReadShowTool
     protected function eagerLoad(): array
     {
         return [...parent::eagerLoad(), 'accountOwner'];
+    }
+
+    protected function extraPayload(Model $model): array
+    {
+        /** @var Company $company */
+        $company = $model;
+        $owner = $company->accountOwner;
+
+        return [
+            'account_owner' => $owner === null ? null : [
+                'id' => (string) $owner->getKey(),
+                'name' => (string) $owner->name,
+            ],
+        ];
     }
 }

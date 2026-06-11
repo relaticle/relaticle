@@ -54,23 +54,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
 
     protected function validateRequest(Request $request, User $user): ?string
     {
-        $ownerId = $request['account_owner_id'] ?? null;
-
-        if ($ownerId === null) {
-            return null;
-        }
-
-        if ($ownerId === '') {
-            return null;
-        }
-
-        if (TeamMembersContext::isMember($user, (string) $ownerId)) {
-            return null;
-        }
-
-        return 'account_owner_id must be a workspace team member. Valid members: '
-            .TeamMembersContext::describeList($user)
-            .'. Contacts/people records cannot be account owners.';
+        return TeamMembersContext::memberFieldError($user, 'account_owner_id', $request['account_owner_id'] ?? null);
     }
 
     protected function extractActionData(Request $request): array
@@ -79,10 +63,10 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             'name' => $request['name'] ?? null,
         ], fn (mixed $v): bool => $v !== null);
 
-        $ownerId = $request['account_owner_id'] ?? null;
+        $owner = $this->requestedOwner($request['account_owner_id'] ?? null);
 
-        if ($ownerId !== null) {
-            $data['account_owner_id'] = $ownerId === '' ? null : (string) $ownerId;
+        if ($owner !== false) {
+            $data['account_owner_id'] = $owner;
         }
 
         return $data;
@@ -96,19 +80,16 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             $fields[] = ['label' => 'Name', 'old' => $model->getAttribute('name'), 'new' => $request['name']];
         }
 
-        $ownerId = $request['account_owner_id'] ?? null;
+        $owner = $this->requestedOwner($request['account_owner_id'] ?? null);
 
-        if ($ownerId !== null) {
+        if ($owner !== false) {
             /** @var Company $company */
             $company = $model;
-            $newOwnerName = $ownerId === ''
-                ? '—'
-                : (User::query()->find((string) $ownerId)->name ?? (string) $ownerId);
 
             $fields[] = [
                 'label' => 'Account Owner',
                 'old' => $company->accountOwner->name ?? '—',
-                'new' => $newOwnerName,
+                'new' => $owner === null ? '—' : (TeamMembersContext::nameOf($owner) ?? $owner),
             ];
         }
 
@@ -117,5 +98,18 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             'summary' => "Update company \"{$model->getAttribute('name')}\"",
             'fields' => $fields,
         ];
+    }
+
+    /**
+     * Tri-state owner param: false = not provided, null = unassign (empty
+     * string on the wire), string = the new owner's user id.
+     */
+    private function requestedOwner(mixed $raw): string|null|false
+    {
+        if ($raw === null) {
+            return false;
+        }
+
+        return $raw === '' ? null : (string) $raw;
     }
 }

@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
@@ -43,6 +44,11 @@ final class CreateTaskTool extends BaseWriteCreateTool
             'company_ids' => $schema->array()->description('Company ULIDs to link.'),
             'opportunity_ids' => $schema->array()->description('Opportunity ULIDs to link.'),
         ];
+    }
+
+    protected function validateRecord(array $record, User $user): ?string
+    {
+        return TeamMembersContext::memberFieldError($user, 'assignee_ids', $record['assignee_ids'] ?? null);
     }
 
     protected function extractRecordData(array $record): array

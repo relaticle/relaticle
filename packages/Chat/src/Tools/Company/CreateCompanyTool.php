@@ -40,23 +40,7 @@ final class CreateCompanyTool extends BaseWriteCreateTool
 
     protected function validateRecord(array $record, User $user): ?string
     {
-        $ownerId = $record['account_owner_id'] ?? null;
-
-        if ($ownerId === null) {
-            return null;
-        }
-
-        if ($ownerId === '') {
-            return null;
-        }
-
-        if (TeamMembersContext::isMember($user, (string) $ownerId)) {
-            return null;
-        }
-
-        return 'account_owner_id must be a workspace team member. Valid members: '
-            .TeamMembersContext::describeList($user)
-            .'. Contacts/people records cannot be account owners.';
+        return TeamMembersContext::memberFieldError($user, 'account_owner_id', $record['account_owner_id'] ?? null);
     }
 
     protected function extractRecordData(array $record): array
@@ -82,7 +66,7 @@ final class CreateCompanyTool extends BaseWriteCreateTool
         if (is_string($ownerId) && $ownerId !== '') {
             $fields[] = [
                 'label' => 'Account Owner',
-                'value' => User::query()->find($ownerId)->name ?? $ownerId,
+                'value' => TeamMembersContext::nameOf($ownerId) ?? $ownerId,
             ];
         }
 

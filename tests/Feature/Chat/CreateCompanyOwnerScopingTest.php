@@ -40,15 +40,13 @@ it('accepts a company whose account_owner_id is a member of the workspace', func
     expect($company->account_owner_id)->toBe((string) $teammate->getKey());
 });
 
-it('CreateCompanyTool accepts an explicit team-member owner and shows it on the card', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $teammate = User::factory()->create(['name' => 'Casey Closer']);
-    $owner->currentTeam->users()->attach($teammate, ['role' => 'editor']);
-    $this->actingAs($owner);
+function createToolConversationFor(User $owner, string $conversationId): CreateCompanyTool
+{
+    test()->actingAs($owner);
     Auth::guard('web')->setUser($owner);
 
     DB::table('agent_conversations')->insert([
-        'id' => '019df800-3333-7000-8000-000000000077',
+        'id' => $conversationId,
         'user_id' => (string) $owner->getKey(),
         'team_id' => $owner->currentTeam->getKey(),
         'title' => '',
@@ -57,7 +55,17 @@ it('CreateCompanyTool accepts an explicit team-member owner and shows it on the 
     ]);
 
     $tool = resolve(CreateCompanyTool::class);
-    $tool->setConversationId('019df800-3333-7000-8000-000000000077');
+    $tool->setConversationId($conversationId);
+
+    return $tool;
+}
+
+it('CreateCompanyTool accepts an explicit team-member owner and shows it on the card', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $teammate = User::factory()->create(['name' => 'Casey Closer']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'editor']);
+
+    $tool = createToolConversationFor($owner, '019df800-3333-7000-8000-000000000077');
 
     $response = $tool->handle(new Request([
         'records' => [['name' => 'Delegated Co', 'account_owner_id' => (string) $teammate->getKey()]],
@@ -79,20 +87,8 @@ it('CreateCompanyTool accepts an explicit team-member owner and shows it on the 
 it('CreateCompanyTool rejects a non-member owner id before proposing', function (): void {
     $owner = User::factory()->withPersonalTeam()->create();
     $stranger = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($owner);
-    Auth::guard('web')->setUser($owner);
 
-    DB::table('agent_conversations')->insert([
-        'id' => '019df800-3333-7000-8000-000000000078',
-        'user_id' => (string) $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
-        'title' => '',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    $tool = resolve(CreateCompanyTool::class);
-    $tool->setConversationId('019df800-3333-7000-8000-000000000078');
+    $tool = createToolConversationFor($owner, '019df800-3333-7000-8000-000000000078');
 
     $response = $tool->handle(new Request([
         'records' => [['name' => 'Blocked Co', 'account_owner_id' => (string) $stranger->getKey()]],
