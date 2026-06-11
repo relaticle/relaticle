@@ -131,6 +131,30 @@ final class Email extends Model
         return $query->where('team_id', $teamId);
     }
 
+    /**
+     * Scope to mail that has actually been sent (excludes queued/sending/failed outbound
+     * mail, which lives in the Outbox and has no sent_at yet).
+     *
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function sent(Builder $query): Builder
+    {
+        return $query->where('direction', EmailDirection::OUTBOUND)
+            ->whereNotNull('sent_at');
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function inbox(Builder $query): Builder
+    {
+        return $query->where('direction', EmailDirection::INBOUND);
+    }
+
     // Relations
 
     /**
