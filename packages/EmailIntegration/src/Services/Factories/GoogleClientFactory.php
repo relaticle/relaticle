@@ -42,7 +42,7 @@ final readonly class GoogleClientFactory
             // null access token, so fail loudly instead.
             if (isset($newToken['error'])) {
                 throw new RuntimeException(
-                    (string) $newToken['error'].': '.(string) ($newToken['error_description'] ?? 'token refresh failed')
+                    $newToken['error'].': '.($newToken['error_description'] ?? 'token refresh failed')
                 );
             }
 

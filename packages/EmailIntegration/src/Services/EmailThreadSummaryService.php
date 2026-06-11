@@ -58,8 +58,8 @@ final readonly class EmailThreadSummaryService
             $isOwner = $email->user_id === $viewer->getKey();
 
             if ($isOwner || $email->privacy_tier === EmailPrivacyTier::FULL) {
-                $body = data_get($email, 'body.body_text') ?? $email->snippet ?? '(no body)';
-                $lines[] = 'Body: '.mb_substr($body, 0, 500);
+                $body = data_get($email, 'body.body_text', $email->snippet ?? '(no body)');
+                $lines[] = 'Body: '.mb_substr((string) $body, 0, 500);
             } elseif ($email->privacy_tier === EmailPrivacyTier::SUBJECT) {
                 $lines[] = "Subject: {$email->subject}  (body hidden)";
             } else {

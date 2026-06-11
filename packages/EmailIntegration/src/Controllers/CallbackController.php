@@ -20,7 +20,7 @@ use Throwable;
 
 final readonly class CallbackController
 {
-    private const SUPPORTED_PROVIDERS = ['gmail', 'azure'];
+    private const array SUPPORTED_PROVIDERS = ['gmail', 'azure'];
 
     public function __invoke(Request $request, string $provider): RedirectResponse
     {
