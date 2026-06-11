@@ -12,6 +12,8 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 mutates(EmailsRelationManager::class);
 
@@ -90,6 +92,37 @@ it('requires at least one recipient in the to field', function (): void {
             'body_html' => '<p>Hi</p>',
         ])
         ->assertHasActionErrors(['to' => 'required']);
+});
+
+it('keeps the default signature in the body when a template is selected', function (): void {
+    $signature = EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>Best, Test Sender</p>',
+        'is_default' => true,
+    ]);
+
+    $template = EmailTemplate::factory()->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'subject' => 'Promo subject',
+        'body_html' => '<p>Template body here</p>',
+    ]);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->mountAction('composeEmail')
+        ->set('mountedActions.0.data.template_id', $template->id)
+        ->assertSet('mountedActions.0.data.subject', 'Promo subject')
+        ->assertSet('mountedActions.0.data.signature_id', $signature->id)
+        ->assertSet('mountedActions.0.data.body_html', function (mixed $body): bool {
+            // RichEditor holds state as a ProseMirror doc array; serialise to compare.
+            $json = json_encode($body);
+
+            return str_contains($json, 'Template body here')
+                && str_contains($json, 'Best, Test Sender');
+        });
 });
 
 it('is hidden when user has no active connected account', function (): void {
