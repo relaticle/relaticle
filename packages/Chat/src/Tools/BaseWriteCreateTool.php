@@ -138,13 +138,16 @@ abstract class BaseWriteCreateTool implements Tool
 
         $plan = $request['plan'] ?? null;
         if (is_array($plan)
-            && is_string($plan['original_request'] ?? null) && $plan['original_request'] !== ''
+            && is_string($plan['original_request'] ?? null)
             && is_numeric($plan['position'] ?? null) && is_numeric($plan['total'] ?? null)) {
-            $displayData['plan'] = [
-                'original_request' => mb_substr($plan['original_request'], 0, 300),
-                'position' => (int) $plan['position'],
-                'total' => (int) $plan['total'],
-            ];
+            $sanitized = $this->sanitizePlanText($plan['original_request']);
+            if ($sanitized !== '') {
+                $displayData['plan'] = [
+                    'original_request' => $sanitized,
+                    'position' => (int) $plan['position'],
+                    'total' => (int) $plan['total'],
+                ];
+            }
         }
 
         $pending = resolve(PendingActionService::class)->createProposal(
@@ -167,5 +170,18 @@ abstract class BaseWriteCreateTool implements Tool
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
         ], JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * The plan text is user-authored and gets embedded into the privileged
+     * [approval] continuation prompt — strip control characters (newlines could
+     * fabricate prompt-level lines) and quotes (the prompt wraps it in quotes).
+     */
+    private function sanitizePlanText(string $text): string
+    {
+        $stripped = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $text) ?? '';
+        $collapsed = preg_replace('/\s+/u', ' ', trim($stripped)) ?? '';
+
+        return mb_substr(str_replace(['"', '\\'], '', $collapsed), 0, 300);
     }
 }
