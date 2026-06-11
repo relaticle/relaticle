@@ -67,8 +67,8 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         return new MailDeltaResult(
             messageIds: collect($messageIds)->unique()->values(),
             readMessageIds: collect($readMessageIds)->unique()->values(),
-            unreadMessageIds: collect($unreadMessageIds)->unique()->values(),
             newCursor: (string) $deltaLink,
+            unreadMessageIds: collect($unreadMessageIds)->unique()->values(),
         );
     }
 

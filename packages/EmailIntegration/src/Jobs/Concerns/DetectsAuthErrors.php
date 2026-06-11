@@ -50,7 +50,7 @@ trait DetectsAuthErrors
             $message = $throwable->getMessage();
 
             foreach ($this->authErrorTokens as $token) {
-                if (stripos($message, $token) !== false) {
+                if (stripos((string) $message, (string) $token) !== false) {
                     return true;
                 }
             }
