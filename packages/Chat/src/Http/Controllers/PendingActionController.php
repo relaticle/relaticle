@@ -42,6 +42,7 @@ final readonly class PendingActionController
                 'status' => 'approved',
                 'result_data' => $result->result_data,
                 'record' => $this->resolveRecordReference($result),
+                'records' => $this->resolveBatchRecordReferences($result),
             ]);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -81,6 +82,29 @@ final readonly class PendingActionController
         }
 
         return $this->resolver->resolve($pendingAction->entity_type, (string) $recordId);
+    }
+
+    /**
+     * @return list<array{id: string, type: string, url: string}>|null
+     */
+    private function resolveBatchRecordReferences(PendingAction $pendingAction): ?array
+    {
+        $resultData = $pendingAction->result_data;
+        $ids = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
+
+        if (! is_array($ids) || $ids === []) {
+            return null;
+        }
+
+        $refs = [];
+        foreach (array_slice($ids, 0, 10) as $id) {
+            $ref = $this->resolver->resolve($pendingAction->entity_type, (string) $id);
+            if ($ref !== null) {
+                $refs[] = $ref;
+            }
+        }
+
+        return $refs === [] ? null : $refs;
     }
 
     public function reject(Request $request, PendingAction $pendingAction): JsonResponse

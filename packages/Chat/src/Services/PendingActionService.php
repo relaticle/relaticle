@@ -146,9 +146,15 @@ final readonly class PendingActionService
 
                 $result = $this->executeAction($pendingAction, $user);
 
-                $resultData = $result instanceof Model
-                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
-                    : ['success' => true];
+                $resultData = match (true) {
+                    $result instanceof Model => ['id' => $result->getKey(), 'type' => $result->getMorphClass()],
+                    is_array($result) && $result !== [] && $result[0] instanceof Model => [
+                        'ids' => array_values(array_map(static fn (Model $m) => $m->getKey(), $result)),
+                        'type' => $result[0]->getMorphClass(),
+                        'count' => count($result),
+                    ],
+                    default => ['success' => true],
+                };
 
                 $pendingAction->update([
                     'status' => PendingActionStatus::Approved,
@@ -406,10 +412,35 @@ final readonly class PendingActionService
         $data = $pendingAction->action_data;
 
         return match ($pendingAction->operation) {
-            PendingActionOperation::Create => $action->execute($user, $data, CreationSource::CHAT),
+            PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction),
             PendingActionOperation::Update => $this->executeUpdate($action, $user, $pendingAction),
             PendingActionOperation::Delete => $this->executeDelete($action, $user, $pendingAction),
         };
+    }
+
+    /**
+     * @return Model|list<Model>
+     */
+    private function executeCreate(object $action, User $user, PendingAction $pendingAction): mixed
+    {
+        if (! method_exists($action, 'execute')) {
+            throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        $data = $pendingAction->action_data;
+
+        if (($data['_batch'] ?? false) !== true) {
+            return $action->execute($user, $data, CreationSource::CHAT);
+        }
+
+        $records = $data['records'] ?? null;
+
+        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
+
+        return array_values(array_map(
+            fn (array $record): Model => $action->execute($user, $record, CreationSource::CHAT),
+            $records,
+        ));
     }
 
     private function executeUpdate(object $action, User $user, PendingAction $pendingAction): mixed
