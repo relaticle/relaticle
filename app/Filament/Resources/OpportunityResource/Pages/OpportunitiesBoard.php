@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
+use App\Filament\Concerns\HasBoardViewSwitcher;
+use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Team;
-use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -31,30 +32,21 @@ use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\BoardPage;
+use Relaticle\Flowforge\BoardResourcePage;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
 
-final class OpportunitiesBoard extends BoardPage
+final class OpportunitiesBoard extends BoardResourcePage
 {
-    protected static ?string $navigationLabel = null;
+    use HasBoardViewSwitcher;
 
-    protected static ?string $title = null;
-
-    protected static ?string $navigationParentItem = 'Opportunities';
-
-    public static function getNavigationLabel(): string
-    {
-        return __('filament/pages/boards.navigation_label');
-    }
+    protected static string $resource = OpportunityResource::class;
 
     public function getTitle(): string
     {
         return __('filament/pages/boards.opportunities.title');
     }
-
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
     public function board(Board $board): Board
     {
@@ -308,7 +300,10 @@ final class OpportunitiesBoard extends BoardPage
         ]);
     }
 
-    public static function canAccess(): bool
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    public static function canAccess(array $parameters = []): bool
     {
         return (new self)->stageCustomField() instanceof CustomField;
     }

@@ -40,6 +40,12 @@
 
 .fi-header-heading {
     @apply text-2xl font-bold;
+
+    /* Page headings that embed the list/board switcher render it inline,
+       right after the title text */
+    &:has(.fi-view-switcher) {
+        @apply flex items-center gap-x-3;
+    }
 }
 
 /* Sidebar Enhancements */

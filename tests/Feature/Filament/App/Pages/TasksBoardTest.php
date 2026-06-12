@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
-use App\Filament\Pages\TasksBoard;
+use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -78,6 +80,19 @@ it('renders the board when a task has multiple assignees', function (): void {
     $task->assignees()->attach([$this->user->id, $secondMember->id]);
 
     livewire(TasksBoard::class)->assertOk();
+});
+
+it('shows the view switcher linking list and board views', function (): void {
+    livewire(ManageTasks::class)
+        ->assertSeeHtml(TaskResource::getUrl('board'));
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml(TaskResource::getUrl('index'));
+});
+
+it('redirects the legacy board url to the resource board page', function (): void {
+    $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->team->slug]))
+        ->assertRedirect(TaskResource::getUrl('board'));
 });
 
 it('moves a card between columns via moveCard', function (): void {
