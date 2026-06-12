@@ -69,7 +69,7 @@ final readonly class EmailTemplateRenderService
     {
         $body = rtrim($this->stripSignatureBlock($bodyHtml));
 
-        if ($signature === null) {
+        if (! $signature instanceof EmailSignature) {
             return $body;
         }
 

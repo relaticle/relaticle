@@ -17,7 +17,7 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  */
 final class SignatureBlock extends RichContentCustomBlock
 {
-    public const ID = 'signature';
+    public const string ID = 'signature';
 
     public static function getId(): string
     {
