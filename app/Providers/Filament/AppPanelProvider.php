@@ -197,20 +197,15 @@ final class AppPanelProvider extends PanelProvider
                 fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
             )
             ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): View|Factory => view('filament.auth.passkey_verify'),
+                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                fn (): View|Factory => view('filament.auth.login_options'),
             );
 
         if (Feature::active(SocialAuth::class)) {
-            $panel
-                ->renderHook(
-                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                )
-                ->renderHook(
-                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                );
+            $panel->renderHook(
+                PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
+                fn (): View|Factory => view('filament.auth.social_login_buttons')
+            );
         }
 
         $panel
