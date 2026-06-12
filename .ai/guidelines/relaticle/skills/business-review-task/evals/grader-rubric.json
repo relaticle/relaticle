@@ -1,0 +1,29 @@
+{
+  "01-backend-bugfix": {
+    "criteria": [
+      "The plan.md correctly chose mode: pest-only (no browser cases needed)",
+      "The requirements summary references the AC by ID without copy-pasting from PR body",
+      "The Limitations section explicitly notes that browser behavior was not exercised",
+      "The verdict rationale follows from CI-green + no smoke failures",
+      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+    ]
+  },
+  "02-public-form-feature": {
+    "criteria": [
+      "Every AC in acceptance-criteria.json has at least one case in the AC coverage matrix",
+      "Case purposes reference the specific AC they cover",
+      "The Summary section's case counts match the case sections above",
+      "Evidence quotes are short and concrete, not paraphrased",
+      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+    ]
+  },
+  "03-broken-acceptance-criteria": {
+    "criteria": [
+      "The skill correctly identified the broken AC and produced verdict: ai-rejected",
+      "The failed case section includes the specific evidence that wasn't observed",
+      "The Blockers section names the broken AC and what needs fixing",
+      "The verdict rationale explains why this PR can't ship",
+      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+    ]
+  }
+}

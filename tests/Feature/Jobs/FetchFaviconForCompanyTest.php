@@ -10,6 +10,8 @@ use App\Models\CustomFieldValue;
 use App\Models\User;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 mutates(FetchFaviconForCompany::class);
 
@@ -80,4 +82,38 @@ test('job rejects favicon url that resolves to private address', function (): vo
     (new FetchFaviconForCompany($company->fresh()))->handle();
 
     expect($company->fresh()->getMedia('logo'))->toHaveCount(0);
+});
+
+test('downloads the favicon through the guarded client and stores it', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentTeam)->create();
+
+    $domainsField = CustomField::query()
+        ->where('code', CompanyField::DOMAINS->value)
+        ->forEntity(Company::class)
+        ->firstOrFail();
+
+    CustomFieldValue::forceCreate([
+        'tenant_id' => $this->user->currentTeam->getKey(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => $domainsField->getKey(),
+        'json_value' => ['example.com'],
+    ]);
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://1.1.1.1/favicon.png');
+    $favicon->shouldReceive('getIconSize')->andReturn(180);
+    $favicon->shouldReceive('getIconType')->andReturn('apple-touch-icon');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+
+    $pngBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    Http::fake(['https://1.1.1.1/favicon.png' => Http::response($pngBytes, 200)]);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://1.1.1.1/favicon.png');
+    expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
 });

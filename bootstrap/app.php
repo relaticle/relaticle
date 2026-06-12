@@ -15,6 +15,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
+use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
@@ -23,6 +24,7 @@ use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
         then: function (): void {
             $apiDomain = config('app.api_domain');
@@ -39,6 +41,14 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trimStrings(except: [
+            'document.*',
+        ]);
+
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request): bool => $request->is('chat') || $request->is('chat/*'),
+        ]);
+
         $middleware->trustProxies(at: [
             '127.0.0.0/8',
             '10.0.0.0/8',
@@ -80,12 +90,21 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
         $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson());
+
+        // Stale tabs and deploy boundaries produce checksum failures that
+        // Livewire already renders as 419 (page expired -> client refreshes).
+        // They are user-state noise, not actionable errors — keep them out of
+        // Sentry (issue #125406836).
+        $exceptions->dontReport(CorruptComponentPayloadException::class);
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('app:generate-sitemap')->daily();
         $schedule->command('import:cleanup')->hourly();
         $schedule->command('queue:prune-batches --hours=24')->daily();
         $schedule->command('invitations:cleanup')->daily();
+        $schedule->command('chat:expire-pending-actions')->everyFiveMinutes();
+        $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('chat:reset-credits')->dailyAt('00:05')->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:sync-recency-tags')->dailyAt('02:00')
             ->withoutOverlapping()
             ->onOneServer();

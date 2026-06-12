@@ -70,6 +70,12 @@ parameters:
             path: app/Http/Controllers/Auth/CallbackController.php
             reportUnmatched: false
 
+        # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: packages/Chat/src/Tools/*
+            reportUnmatched: false
+
 
     stubFiles:
         - stubs/Mailcoach.stub
@@ -87,6 +93,7 @@ parameters:
 
     configDirectories:
         - config
+        - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
 

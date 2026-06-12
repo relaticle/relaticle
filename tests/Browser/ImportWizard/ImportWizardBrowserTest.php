@@ -15,7 +15,7 @@ it('can navigate the import wizard and upload a CSV file', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies/import")
         ->assertSee('Import Companies')
         ->assertSee('Drop your .CSV file onto this area to upload');

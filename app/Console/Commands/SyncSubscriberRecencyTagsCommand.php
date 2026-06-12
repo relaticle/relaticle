@@ -7,15 +7,15 @@ namespace App\Console\Commands;
 use App\Enums\SubscriberTagEnum;
 use App\Jobs\Email\SyncRecencyBucketJob;
 use App\Models\User;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 
+#[Description('Sync time-decay recency tags to Mailcoach for users whose bucket changed')]
+#[Signature('subscribers:sync-recency-tags')]
 final class SyncSubscriberRecencyTagsCommand extends Command
 {
-    protected $signature = 'subscribers:sync-recency-tags';
-
-    protected $description = 'Sync time-decay recency tags to Mailcoach for users whose bucket changed';
-
     public function handle(): int
     {
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
