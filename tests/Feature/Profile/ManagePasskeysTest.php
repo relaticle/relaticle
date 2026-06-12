@@ -101,6 +101,37 @@ it('refreshes the list after loadPasskeys is called', function (): void {
         ->assertSee('Freshly Added');
 });
 
+it('confirms the password and dispatches the ceremony trigger on registration', function (): void {
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register-confirmed');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
+it('rejects registration when the password is wrong', function (): void {
+    session()->forget('auth.password_confirmed_at');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'wrong-password'])
+        ->assertHasActionErrors(['password'])
+        ->assertNotDispatched('passkey-register-confirmed');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('confirms registration without a password for passwordless users', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register-confirmed');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
 it('renders the add passkey button text', function (): void {
     livewire(ManagePasskeys::class)
         ->assertSee('Add passkey');
