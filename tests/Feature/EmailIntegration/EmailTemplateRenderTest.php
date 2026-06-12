@@ -67,6 +67,51 @@ it('renders {name} for a Company record', function (): void {
         ->and($result['body_html'])->toBe('<p>Hello Beta Ltd team.</p>');
 });
 
+it('appends the signature below the body via renderWithSignature', function (): void {
+    $account = Relaticle\EmailIntegration\Models\ConnectedAccount::withoutEvents(
+        fn () => Relaticle\EmailIntegration\Models\ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->user->id,
+        ])
+    );
+
+    $signature = Relaticle\EmailIntegration\Models\EmailSignature::withoutEvents(
+        fn () => Relaticle\EmailIntegration\Models\EmailSignature::factory()->create([
+            'connected_account_id' => $account->id,
+            'content_html' => '<p>Best, Jane</p>',
+        ])
+    );
+
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'Sig Template',
+        'subject' => 'Promo',
+        'body_html' => '<p>Template body</p>',
+    ]);
+
+    $result = app(EmailTemplateRenderService::class)->renderWithSignature($template, null, $signature);
+
+    expect($result['subject'])->toBe('Promo')
+        ->and($result['body_html'])->toContain('<p>Template body</p>')
+        ->and($result['body_html'])->toContain('data-id="signature"')
+        ->and($result['body_html'])->toContain((string) $signature->id);
+});
+
+it('returns the plain body when renderWithSignature gets no signature', function (): void {
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'No Sig Template',
+        'subject' => 'Promo',
+        'body_html' => '<p>Template body</p>',
+    ]);
+
+    $result = app(EmailTemplateRenderService::class)->renderWithSignature($template);
+
+    expect($result['body_html'])->toBe('<p>Template body</p>');
+});
+
 it('leaves placeholders unchanged when no record is passed', function (): void {
     $template = EmailTemplate::create([
         'team_id' => $this->team->id,
