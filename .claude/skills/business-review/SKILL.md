@@ -1,5 +1,5 @@
 ---
-name: business-review-task
+name: business-review
 description: "Use when the user asks to business-review their work (local mode default — 'business-review', 'review my branch'), a Relaticle pull request ('--pr <N>' or a bare PR number), or a described change (--describe). v3: panel-of-QAs engine — resolves the live environment first (URLs/creds/queue/Redis/Reverb are DISCOVERED from the running app, never assumed), runs a browser-capability preflight, auto-tiers by blast radius, synthesizes journeys from the diff plus Relaticle CRM priors, walks them happy AND sad through the real browser, sweeps the regression ledger, adversarially cold-reproduces every bug, and emits a substance-gated verdict (ai-approved / ai-rejected / ai-needs-human, or blocked on a degraded channel). Browser-truth only — never tinker/DB to fix or fake a result. On request ('fix all issues', --fix) enters fix mode: fix → re-verify each finding against its original repro → re-gate. Publishing to the PR is opt-in and hard-disabled on a degraded run. Does NOT do code/security/scope review — use /code-review, /review, /deep-review."
 ---
 
@@ -19,20 +19,17 @@ error is a *finding*, never something to engineer around. Coverage is a required
 attested output: journey map, per-journey value verdict, sad-path attestation, regression
 sweep, and an explicit frontier with `how_to_close`.
 
-The frozen gen-1 baseline lives at `.claude/skills/business-review-v1/` for A/B
-comparison — never modify it; invoke it only when explicitly asked.
-
 ## Invocation — natural language first, flags as internals
 
 ```
-business-review-task                          # local: current branch vs main, committed only
-business-review-task --working-tree           # local incl. uncommitted changes
-business-review-task --pr <N>                 # review a GitHub PR on relaticle/relaticle
-business-review-task --describe "<text>"      # AC from free text, no diff
-business-review-task --fix                    # after the verdict, enter fix mode automatically
-business-review-task --publish                # post to the PR when done (healthy runs only)
-business-review-task --no-prompt              # suppress the end-of-run prompt
-business-review-task --reverify REG-NNN       # replay one ledger entry's repro verbatim, report pass/fail
+business-review                          # local: current branch vs main, committed only
+business-review --working-tree           # local incl. uncommitted changes
+business-review --pr <N>                 # review a GitHub PR on relaticle/relaticle
+business-review --describe "<text>"      # AC from free text, no diff
+business-review --fix                    # after the verdict, enter fix mode automatically
+business-review --publish                # post to the PR when done (healthy runs only)
+business-review --no-prompt              # suppress the end-of-run prompt
+business-review --reverify REG-NNN       # replay one ledger entry's repro verbatim, report pass/fail
 ```
 
 **Parse the user's words, not just flags.** Real invocations are natural language; map them:
@@ -98,7 +95,7 @@ MODE=local|pr|describe            # from invocation parsing
 REVIEW_DIR=".context/reviews/${PR_NUM:-local}"     # same roots gen-1 used; LATEST.txt still maintained
 mkdir -p "$REVIEW_DIR"
 SHORT_SHA=$(git rev-parse --short=10 HEAD)         # PR mode: head SHA from gh pr view
-SKILL_DIR=".claude/skills/business-review-task"
+SKILL_DIR=".claude/skills/business-review"
 ```
 
 Stage 0 copies `$SKILL_DIR/relaticle-profile.json` → `$REVIEW_DIR/project-profile.json`
