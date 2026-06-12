@@ -240,6 +240,21 @@ it('deletes via the password fallback when the user opts into password confirmat
     expect(Passkey::find($passkey->id))->toBeNull();
 });
 
+it('rejects the delete password fallback when the password is wrong', function (): void {
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Wrong Password Delete',
+        'credential_id' => 'cred-wrong-pw-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', data: ['use_password' => true, 'password' => 'wrong-password'], arguments: ['passkeyId' => $passkey->id])
+        ->assertHasActionErrors(['password']);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
 it('deletes after a fresh passkey confirmation', function (): void {
     session()->put('auth.password_confirmed_at', time());
 
