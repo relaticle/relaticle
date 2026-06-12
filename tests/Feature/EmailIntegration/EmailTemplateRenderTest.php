@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
@@ -68,15 +70,15 @@ it('renders {name} for a Company record', function (): void {
 });
 
 it('appends the signature below the body via renderWithSignature', function (): void {
-    $account = Relaticle\EmailIntegration\Models\ConnectedAccount::withoutEvents(
-        fn () => Relaticle\EmailIntegration\Models\ConnectedAccount::factory()->create([
+    $account = ConnectedAccount::withoutEvents(
+        fn () => ConnectedAccount::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->user->id,
         ])
     );
 
-    $signature = Relaticle\EmailIntegration\Models\EmailSignature::withoutEvents(
-        fn () => Relaticle\EmailIntegration\Models\EmailSignature::factory()->create([
+    $signature = EmailSignature::withoutEvents(
+        fn () => EmailSignature::factory()->create([
             'connected_account_id' => $account->id,
             'content_html' => '<p>Best, Jane</p>',
         ])
