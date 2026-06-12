@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Actions\Billing\CancelTeamSubscription;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\TeamDeletionScheduledNotification;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class ScheduleTeamDeletion
 {
+    public function __construct(private CancelTeamSubscription $cancelSubscription) {}
+
     public function schedule(User $user, Team $team): void
     {
         throw_unless($user->ownsTeam($team), AuthorizationException::class);
@@ -28,6 +31,8 @@ final readonly class ScheduleTeamDeletion
 
             $team->teamInvitations()->delete();
         });
+
+        $this->cancelSubscription->handle($team);
 
         /** @var User $owner */
         $owner = $team->owner;
