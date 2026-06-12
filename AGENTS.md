@@ -29,6 +29,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   only reach back into `App\Models`, `App\Enums`, `App\Rules`
 - Never use the custom-fields package models directly — use the `App\Models\CustomField*`
   subclasses (runtime model swapping is configured in `AppServiceProvider`)
+- `packages/SystemAdmin` is excluded from PHPStan — when adding or removing enum
+  cases, manually sweep SystemAdmin for `match` expressions over that enum (this
+  exclusion already caused a production `UnhandledMatchError`)
 
 ## Actions (the write path)
 
@@ -64,6 +67,8 @@ final readonly class CreateOpportunity
 - When reviewing or refactoring code, extract inline business logic into action classes
 - Use `App\Data` (spatie/laravel-data) objects for structured payloads where they
   already exist; don't introduce new patterns
+- Name domain concepts plainly (`Plan`, not `AiPlan`) — context comes from the
+  namespace. Never store the same fact in two places; pick one source of truth
 
 ## i18n enforcement
 
@@ -76,7 +81,36 @@ ignores without approval.
 
 === .ai/chat rules ===
 
-# Chat tools + custom fields
+# Chat
+
+## Verifying chat changes
+
+Chat features MUST be verified against the production-shaped stack before being
+reported done: Horizon running, `QUEUE_CONNECTION=redis` (not sync), Reverb up,
+and the full loop walked in a real browser (send → stream → proposal card →
+approve/reject). Sync-queue testing masks exactly the bug class that reaches
+production: message ordering, approval races, duplicate proposals.
+
+- When a production chat transcript is given as a bug report, enumerate every
+  defective turn as a separate defect (ordering, duplicate/stale proposal cards,
+  rate-limit UX, wrong success messages), reproduce each locally, and track them
+  as a checklist — never fix only the most visible one.
+- When one chat tool has a bug, sweep its sibling Create/Update/Delete tools for
+  the same class of bug before closing.
+
+## Tool design
+
+- Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
+  tenant data into the system prompt — add prompt-context injection only when a
+  tool round-trip is demonstrably too costly.
+- New write tools must support batch input like the delete path (`ids[]` /
+  multi-record proposals → one `PendingAction`, all-or-nothing) — do not add new
+  scalar-only tools.
+- A field reachable in the Filament form must be settable from chat; the
+  assistant answering "that field isn't supported" is a bug, not a limitation
+  to document.
+
+## Chat tools + custom fields
 
 Chat tools (`packages/Chat/src/Tools/*/Create*Tool.php` and `Update*Tool.php`) automatically support **every** active custom field for their entity. Adding a new field to `app/Enums/CustomFields/*Field.php` (or via the Custom Fields admin UI) is enough — do NOT add per-field schema slots, value coercion, or display rows to the chat tool. The bridge services in `packages/Chat/src/Services/Tools/` handle:
 
@@ -116,6 +150,35 @@ Before committing any changes, always run these checks in order:
 
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
 
+## Fixing & Verification
+
+- Never change production code solely to make a test or CI pass. A failing check
+  means one of: production bug, wrong assertion, or test-state leak — diagnose
+  which first, then fix at that layer. A production behavior change must be
+  justified on its own merits and covered by its own dedicated test.
+- After any fix, re-run the original failing repro (test, browser flow, query)
+  and show the new output before claiming it is fixed. "Should work now" is not done.
+- Before reporting an investigation or cleanup complete, do a second independent
+  verification pass: re-grep all references, re-run the checks, re-walk the repro.
+- Debug production errors by reproducing them locally first (failing test, seeded
+  data, or browser repro with the real queue). Production access (Tinkerwell/SSH)
+  is for short read-only queries that capture the failing payload or state —
+  never the iteration loop.
+- When a failing operation has a working sibling (approve vs reject, one entity
+  type vs another), diff the two code paths first — it is the fastest localizer.
+
+## Minimal Change
+
+- Default to the smallest change that satisfies the requirement. Every new file,
+  script, DB column, or abstraction must be justified by an explicit need — when
+  in doubt, leave it out and propose it instead.
+- Internal contracts (chat tool schemas, action signatures, internal APIs) have
+  no external consumers — when extending one, migrate all callers in the same
+  change. Never leave deprecated parameters, fallbacks, or dual old/new paths.
+- Environment-specific developer data belongs in `database/seeders/LocalSeeder.php` —
+  never as `app()->environment()` branches inside `app/Actions/` or other
+  production code.
+
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()` — not in `routes/console.php`
@@ -129,6 +192,8 @@ Do not add new PHPStan ignores without approval. All parameters and return types
 - Tenant context for the custom-fields package is set in `SetApiTeamContext` middleware via `TenantContextService::setTenantId()` — actions don't need `withTenant()` wrappers
 - In Filament, the package's own `SetTenantContextMiddleware` handles tenant context — no action-level code needed there either
 - `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()` — this is defensive and correct, don't change it to rely on ambient state
+- Every write path that is NOT a Filament panel request or behind `SetApiTeamContext` (chat action approval, queued jobs, webhooks, commands) must set `TenantContextService::setTenantId()` before saving custom fields — otherwise `saveCustomFields` iterates every tenant (gateway timeouts + cross-tenant writes). Wrap manual calls in try/finally restoring the previous tenant id (mirror `SetApiTeamContext`)
+- Writing null/empty for a custom field is how a value is cleared — never skip or filter out "empty" values on save; only keys absent from the payload are left untouched. Verify any persistence change in both directions (set a value AND clear it), through both the panel form and the chat/API path
 
 === .ai/testing rules ===
 
@@ -157,6 +222,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   internal code — test them through their real entry points (API endpoints,
   Filament resources, Livewire components). Isolated unit tests of internals
   create maintenance burden without catching real bugs.
+- Never weaken an assertion, delete a test, or special-case production code just
+  to turn the suite green. If a test asserts a stale value, fix the assertion;
+  if state leaks between tests, fix isolation in the test layer — don't push
+  compensation into production code.
 - Never write tests that assert on source code as text (reading a Blade/PHP file
   and checking it contains a string). They break on refactors and pass on broken
   behavior — test the rendered/runtime behavior instead.
@@ -175,12 +244,64 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 # UI
 
+## Verifying visual work
+
+- Verify every visual change with an agent-browser screenshot (light + dark, and
+  mobile viewport where relevant) before reporting it done — never make the user
+  act as the renderer.
+- Any change to a Blade view, Livewire component, or Filament page must be
+  clicked through with agent-browser (including empty-state data) before being
+  reported done — tests passing is not sufficient for UI work.
+
+## Marketing & demo surfaces
+
+- Mockups of the product (hero tabs, demos) mirror the real app UI 1:1 —
+  screenshot the actual app first and match sidebar, spacing, and component
+  placement. External sites (e.g. attio.com) are inspiration for concept only,
+  never for visual specifics.
+- Use design tokens from `resources/css/theme.css`; don't introduce ad-hoc pixel
+  values or colors without a semantic token.
+- Demo/example content (names, companies, conversations) must read like real CRM
+  data for the buyer persona — no placeholder-looking values.
+
 ## Icons (Remix Icon)
 
 - **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
 - **UI/functional icons** (arrows, chevrons, checks, close) → always `line` variant
 - **Feature/section icons** → `line` variant, stay consistent within a section
 - **Status/emphasis icons** (success checkmarks, alerts) → `fill` variant
+
+=== .ai/workflow rules ===
+
+# Workflow
+
+## Decisions
+
+- For design decisions, present numbered/lettered options with a comparison
+  matrix and one clear recommendation. Batch independent questions so they can
+  all be answered in a single message; expect one-character answers.
+
+## Guidelines pipeline
+
+- `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` are compiled artifacts — edit the
+  sources in `.ai/guidelines/relaticle/`, then run `php artisan boost:update`
+  and copy `AGENTS.md` to `GEMINI.md` (boost does not write it). Never edit the
+  compiled files directly; `tests/Arch/ConventionsTest.php` fails when they drift.
+
+## Releases
+
+- Merge to main and tag only on explicit instruction — never on your own.
+- Procedure: merge → `git checkout main && git pull` → confirm local and remote
+  parity (`git log origin/main..main` and the reverse are both empty) → tag
+  `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.
+
+## External communication
+
+- PR/issue comments, Discord replies, and any other outbound text: show the
+  draft and wait for an explicit "post" before publishing.
+- Never claim a product capability (in PR bodies, replies, docs) without
+  verifying it works in the current codebase — feature claims must be backed by
+  code or a browser repro.
 
 === foundation rules ===
 

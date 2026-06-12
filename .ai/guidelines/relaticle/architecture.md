@@ -26,6 +26,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   only reach back into `App\Models`, `App\Enums`, `App\Rules`
 - Never use the custom-fields package models directly — use the `App\Models\CustomField*`
   subclasses (runtime model swapping is configured in `AppServiceProvider`)
+- `packages/SystemAdmin` is excluded from PHPStan — when adding or removing enum
+  cases, manually sweep SystemAdmin for `match` expressions over that enum (this
+  exclusion already caused a production `UnhandledMatchError`)
 
 ## Actions (the write path)
 
@@ -61,6 +64,8 @@ final readonly class CreateOpportunity
 - When reviewing or refactoring code, extract inline business logic into action classes
 - Use `App\Data` (spatie/laravel-data) objects for structured payloads where they
   already exist; don't introduce new patterns
+- Name domain concepts plainly (`Plan`, not `AiPlan`) — context comes from the
+  namespace. Never store the same fact in two places; pick one source of truth
 
 ## i18n enforcement
 
