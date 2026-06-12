@@ -12,18 +12,30 @@
                 this.supported = Boolean(window.Passkeys?.isSupported?.());
             }, { once: true });
 
+            const isUserCancellation = (e) => e?.constructor?.name === 'UserCancelledError';
+
             $wire.on('passkey-register-confirmed', async ({ name }) => {
+                this.startProcessing('{{ __('profile.sections.passkeys.registering') }}');
+
                 try {
                     await window.Passkeys.register({ name });
                     $wire.loadPasskeys();
+                    $wire.call('unmountAction');
                 } catch (e) {
-                    if (e?.constructor?.name !== 'UserCancelledError') {
-                        $wire.call('notifyRegistrationFailed');
+                    this.stopProcessing();
+
+                    if (isUserCancellation(e)) {
+                        return;
                     }
+
+                    $wire.call('notifyRegistrationFailed');
+                    $wire.call('unmountAction');
                 }
             });
 
             $wire.on('passkey-confirm-then-register', async ({ name }) => {
+                this.startProcessing('{{ __('profile.sections.passkeys.waiting') }}');
+
                 try {
                     await window.Passkeys.verify({
                         routes: {
@@ -31,16 +43,25 @@
                             submit: '{{ route('passkey.confirm') }}',
                         },
                     });
+                    this.startProcessing('{{ __('profile.sections.passkeys.registering') }}');
                     await window.Passkeys.register({ name });
                     $wire.loadPasskeys();
+                    $wire.call('unmountAction');
                 } catch (e) {
-                    if (e?.constructor?.name !== 'UserCancelledError') {
-                        $wire.call('notifyRegistrationFailed');
+                    this.stopProcessing();
+
+                    if (isUserCancellation(e)) {
+                        return;
                     }
+
+                    $wire.call('notifyRegistrationFailed');
+                    $wire.call('unmountAction');
                 }
             });
 
             $wire.on('passkey-confirm-then-delete', async ({ passkeyId }) => {
+                this.startProcessing('{{ __('profile.sections.passkeys.waiting') }}');
+
                 try {
                     await window.Passkeys.verify({
                         routes: {
@@ -48,13 +69,34 @@
                             submit: '{{ route('passkey.confirm') }}',
                         },
                     });
+                    this.startProcessing('{{ __('profile.sections.passkeys.removing') }}');
                     await $wire.call('deletePasskeyAfterPasskeyConfirmation', passkeyId);
+                    $wire.call('unmountAction');
                 } catch (e) {
-                    if (e?.constructor?.name !== 'UserCancelledError') {
-                        $wire.call('notifyPasskeyConfirmationFailed');
+                    this.stopProcessing();
+
+                    if (isUserCancellation(e)) {
+                        return;
                     }
+
+                    $wire.call('notifyPasskeyConfirmationFailed');
+                    $wire.call('unmountAction');
                 }
             });
+        },
+
+        startProcessing(message) {
+            this.modalSubmitForm()?.dispatchEvent(
+                new CustomEvent('form-processing-started', { detail: { message } }),
+            );
+        },
+
+        stopProcessing() {
+            this.modalSubmitForm()?.dispatchEvent(new CustomEvent('form-processing-finished'));
+        },
+
+        modalSubmitForm() {
+            return document.querySelector('.fi-modal-window [type=submit]')?.closest('form') ?? null;
         },
     }"
     class="space-y-4"

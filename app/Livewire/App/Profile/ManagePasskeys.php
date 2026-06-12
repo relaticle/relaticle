@@ -177,16 +177,18 @@ final class ManagePasskeys extends BaseLivewireComponent
                         ->validationMessages(['current_password' => __('auth.password')])
                     : null,
             ]))
-            ->action(function (array $data) use ($canConfirmWithPasskey): void {
+            ->action(function (array $data, Action $action) use ($canConfirmWithPasskey): void {
                 if ($canConfirmWithPasskey && blank($data['password'] ?? null)) {
                     $this->dispatch('passkey-confirm-then-register', name: $data['name']);
 
-                    return;
+                    $action->halt();
                 }
 
                 session()->put('auth.password_confirmed_at', time());
 
                 $this->dispatch('passkey-register-confirmed', name: $data['name']);
+
+                $action->halt();
             });
     }
 
@@ -221,7 +223,7 @@ final class ManagePasskeys extends BaseLivewireComponent
                     ->rule('current_password')
                     ->validationMessages(['current_password' => __('auth.password')]),
             ] : [])
-            ->action(function (array $arguments, array $data, DeletePasskey $deletePasskey) use ($hasPassword): void {
+            ->action(function (array $arguments, array $data, DeletePasskey $deletePasskey, Action $action) use ($hasPassword): void {
                 $passkeyId = (int) ($arguments['passkeyId'] ?? 0);
 
                 if (! $hasPassword) {
@@ -237,6 +239,8 @@ final class ManagePasskeys extends BaseLivewireComponent
                 }
 
                 $this->dispatch('passkey-confirm-then-delete', passkeyId: $passkeyId);
+
+                $action->halt();
             });
     }
 
