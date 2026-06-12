@@ -16,8 +16,7 @@
     :title="config('app.name') . ' - ' . __('CRM Built for People and AI-Powered Work')"
     description="Open-source, self-hosted CRM with built-in AI chat and 30 MCP tools for external agents. @-mention records, safe approvals, voice input, persistent history, REST API, and team isolation."
     :ogTitle="config('app.name') . ' - Human-First CRM with Agent-Native Infrastructure'"
-    ogDescription="Open-source CRM for teams and AI-powered work. Use the app, ask the built-in chat, or connect external agents through 30 MCP tools. Self-hosted, you own your data."
-    :ogImage="url('/images/open-graph.jpg')">
+    ogDescription="Open-source CRM for teams and AI-powered work. Use the app, ask the built-in chat, or connect external agents through 30 MCP tools. Self-hosted, you own your data.">
     @push('header')
         @vite('resources/js/motion.js')
     @endpush
