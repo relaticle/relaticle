@@ -387,20 +387,26 @@
 
                                     {{-- Action buttons --}}
                                     <template x-if="action.status === 'pending'">
-                                        <div class="mt-3 flex gap-2">
+                                        <div class="mt-3 flex items-center gap-2">
                                             <button
                                                 x-on:click="approveAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                                                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition"
+                                                :class="action.operation === 'delete'
+                                                    ? 'bg-red-600 hover:bg-red-700'
+                                                    : 'bg-primary-600 hover:bg-primary-700'"
                                             >
                                                 <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                                Approve
+                                                <span x-text="primaryActionLabel(action)"></span>
+                                                <kbd
+                                                    x-show="visiblePendingActions().length === 1"
+                                                    class="hidden rounded bg-white/20 px-1 font-sans text-[10px] sm:inline"
+                                                >&#8984;&#9166;</kbd>
                                             </button>
                                             <button
                                                 x-on:click="rejectAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                                                class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                                             >
-                                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                                                Reject
+                                                Discard
                                             </button>
                                         </div>
                                     </template>
@@ -941,6 +947,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         };
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
 
+        this.approvalKeyHandler = (e) => {
+            if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
+
+            const pending = this.visiblePendingActions();
+            if (pending.length !== 1 || this.isStreaming) return;
+            if (this.input.trim().length > 0) return; // composer draft wins
+
+            e.preventDefault();
+            this.approveAction(pending[0]);
+        };
+        window.addEventListener('keydown', this.approvalKeyHandler);
+
         this.renamedHandler = (e) => {
             const detail = e.detail || {};
             if (!detail.conversationId || detail.conversationId !== this.conversationId) return;
@@ -1000,6 +1018,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.$wire.loadEarlierMessages();
     },
 
+    primaryActionLabel(action) {
+        return ({ create: 'Create', update: 'Save changes', delete: 'Delete' })[action.operation] ?? 'Approve';
+    },
+
+    visiblePendingActions() {
+        return this.messages
+            .flatMap((m) => m.pending_actions || [])
+            .filter((a) => a.status === 'pending');
+    },
+
     destroy() {
         this.clearStreamTimeout();
         this.stopCopyTicker();
@@ -1011,6 +1039,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.undoToast = null;
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
+        window.removeEventListener('keydown', this.approvalKeyHandler);
     },
 
     startCopyTicker() {
