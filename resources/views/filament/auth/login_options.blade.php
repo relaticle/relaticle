@@ -68,27 +68,30 @@
     x-cloak
 >
     <div class="flex flex-col gap-3">
-        <template x-if="supported">
-            <div class="space-y-2">
-                <button
-                    type="button"
-                    x-on:click="verify()"
-                    x-bind:disabled="loading"
-                    class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                >
-                    <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-                    </svg>
-                    <span x-show="!loading">{{ __('Sign in with a passkey') }}</span>
-                    <span x-show="loading" x-cloak>{{ __('Authenticating...') }}</span>
-                </button>
-                <p x-show="error" x-text="error" x-cloak class="text-center text-sm text-red-600 dark:text-red-400"></p>
-            </div>
-        </template>
-
         @feature(App\Features\SocialAuth::class)
             <x-auth.social-buttons />
         @endfeature
+
+        <template x-if="supported">
+            <div class="space-y-2">
+                <x-filament::button
+                    type="button"
+                    color="gray"
+                    class="w-full justify-center"
+                    x-on:click="verify()"
+                    x-bind:disabled="loading"
+                >
+                    <span class="flex">
+                        <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+                            <path d="M120-160v-112q0-34 17.5-62.5T184-378q62-31 126-46.5T440-440q20 0 40 1.5t40 4.5q-4 58 21 109.5t73 84.5v80H120ZM760-40l-60-60v-186q-44-13-72-49.5T600-420q0-58 41-99t99-41q58 0 99 41t41 99q0 45-25.5 80T790-290l50 50-60 60 60 60-80 80ZM440-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm300 80q17 0 28.5-11.5T780-440q0-17-11.5-28.5T740-480q-17 0-28.5 11.5T700-440q0 17 11.5 28.5T740-400Z" />
+                        </svg>
+                        <span x-show="!loading">{{ __('Sign in with a passkey') }}</span>
+                        <span x-show="loading" x-cloak>{{ __('Authenticating...') }}</span>
+                    </span>
+                </x-filament::button>
+                <p x-show="error" x-text="error" x-cloak class="text-center text-sm text-red-600 dark:text-red-400"></p>
+            </div>
+        </template>
     </div>
 
     @if ($socialAuthActive)
