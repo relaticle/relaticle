@@ -6,9 +6,11 @@ namespace App\Livewire\App\Profile;
 
 use App\Livewire\BaseLivewireComponent;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
@@ -89,15 +91,18 @@ final class ManagePasskeys extends BaseLivewireComponent
     }
 
     /**
-     * Collect a passkey name (and, for password accounts, a password confirmation)
-     * in a Filament modal, confirm it server-side so the RequirePassword middleware on
-     * the registration routes is satisfied, then hand off to the browser WebAuthn
-     * ceremony via a dispatched event. Passwordless (social) accounts are confirmed by
-     * their active session alone, mirroring deletePasskeyAction().
+     * Collect a passkey name in a Filament modal, then satisfy the RequirePassword
+     * middleware on the registration routes before the browser WebAuthn ceremony.
+     * Strongest-available confirmation is offered first: users who already own a
+     * passkey confirm with a passkey assertion (the vendor confirm endpoint sets
+     * auth.password_confirmed_at), with an opt-in password fallback. First-passkey
+     * registration keeps the password gate (there is no passkey to confirm with yet),
+     * and passwordless (social) accounts are confirmed by their active session alone.
      */
     public function registerPasskeyAction(): Action
     {
         $hasPassword = $this->authUser()->hasPassword();
+        $canConfirmWithPasskey = $hasPassword && $this->authUser()->passkeys()->exists();
 
         return Action::make('registerPasskey')
             ->label(__('profile.sections.passkeys.add_passkey'))
@@ -110,18 +115,30 @@ final class ManagePasskeys extends BaseLivewireComponent
                     ->placeholder(__('profile.sections.passkeys.name_placeholder'))
                     ->required()
                     ->maxLength(255),
+                $canConfirmWithPasskey
+                    ? Checkbox::make('use_password')
+                        ->label(__('profile.sections.passkeys.confirm_with_password'))
+                        ->live()
+                    : null,
                 $hasPassword
                     ? TextInput::make('password')
                         ->label(__('profile.form.current_password.label'))
                         ->helperText(__('profile.sections.passkeys.password_help'))
                         ->password()
                         ->revealable()
-                        ->required()
+                        ->visible(fn (Get $get): bool => ! $canConfirmWithPasskey || (bool) $get('use_password'))
+                        ->required(fn (Get $get): bool => ! $canConfirmWithPasskey || (bool) $get('use_password'))
                         ->rule('current_password')
                         ->validationMessages(['current_password' => __('auth.password')])
                     : null,
             ]))
-            ->action(function (array $data): void {
+            ->action(function (array $data) use ($canConfirmWithPasskey): void {
+                if ($canConfirmWithPasskey && blank($data['password'] ?? null)) {
+                    $this->dispatch('passkey-confirm-then-register', name: $data['name']);
+
+                    return;
+                }
+
                 session()->put('auth.password_confirmed_at', time());
 
                 $this->dispatch('passkey-register-confirmed', name: $data['name']);
