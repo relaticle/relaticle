@@ -12,6 +12,7 @@ use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
 use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\SeedTeamCreditBalanceListener;
+use App\Livewire\FilamentNotifications;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -31,6 +32,7 @@ use App\Policies\MeetingPolicy;
 use App\Services\GitHubService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Livewire\Notifications;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -51,6 +53,7 @@ use Laravel\Ai\AiManager;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
+use Livewire\Livewire;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -172,7 +175,13 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureLivewire(): void
     {
-        // Custom Livewire components can be registered here
+        // Route the panel's notifications component to the subclass that
+        // tolerates junk in stale client payloads (Sentry #120218486). Both
+        // keys are needed: the raw FQCN entry canonicalizes class-based
+        // renders (and old snapshots naming the FQCN) onto the dotted name,
+        // and the dotted entry carries the mapping the resolver reads.
+        Livewire::component('filament.livewire.notifications', FilamentNotifications::class);
+        Livewire::component(Notifications::class, FilamentNotifications::class);
     }
 
     private function configureRateLimiting(): void
@@ -216,9 +225,12 @@ final class AppServiceProvider extends ServiceProvider
                         plan: $team->plan->value,
                     );
 
+                    $seconds = (int) ($headers['Retry-After'] ?? 0);
+
                     return response()->json([
                         'error' => 'rate_limited',
-                        'retry_after_seconds' => (int) ($headers['Retry-After'] ?? 0),
+                        'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
+                        'retry_after_seconds' => $seconds,
                         'plan' => $team->plan->value,
                     ], 429, $headers);
                 });

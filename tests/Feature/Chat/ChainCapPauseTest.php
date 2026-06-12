@@ -49,5 +49,5 @@ it('broadcasts ChatPaused and dispatches no continuation when the chain cap is h
     resolve(ApprovalContinuationService::class)->dispatchAfterApproval($action, 'approved');
 
     Bus::assertNotDispatched(ContinueChatMessage::class);
-    Event::assertDispatched(ChatPaused::class, fn (ChatPaused $e): bool => $e->conversationId === 'conv-cap');
+    Event::assertDispatched(ChatPaused::class, fn (ChatPaused $e): bool => $e->conversationId === 'conv-cap' && $e->message === 'Paused after several approvals — press Continue to keep going.');
 });

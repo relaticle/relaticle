@@ -121,6 +121,12 @@ final readonly class TenantFkValidator
      */
     public static function assertUserInWorkspace(User $user, array $data, array $fields): void
     {
+        $supplied = array_filter($fields, fn (string $field): bool => ($data[$field] ?? null) !== null && ($data[$field] ?? null) !== '');
+
+        if ($supplied === []) {
+            return;
+        }
+
         $team = $user->currentTeam;
 
         if ($team === null) {

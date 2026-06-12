@@ -39,7 +39,7 @@ function proposeTask(string $convId, array $input): PendingAction
 {
     $tool = resolve(CreateTaskTool::class);
     $tool->setConversationId($convId);
-    $tool->handle(new Request($input));
+    $tool->handle(new Request(['records' => [$input]]));
 
     return PendingAction::query()
         ->where('conversation_id', $convId)
