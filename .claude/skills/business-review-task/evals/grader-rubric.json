@@ -1,29 +1,48 @@
 {
-  "01-backend-bugfix": {
+  "_doc": "v3 drift-check rubric. run_drift_check.py / agents/grader.md grade a produced REVIEW.md against the criteria for its scenario. Generic criteria apply to EVERY review; scenario keys add specifics. Score each criterion pass/fail with a one-line quote as evidence.",
+  "generic": {
     "criteria": [
-      "The plan.md correctly chose mode: pest-only (no browser cases needed)",
-      "The requirements summary references the AC by ID without copy-pasting from PR body",
-      "The Limitations section explicitly notes that browser behavior was not exercised",
-      "The verdict rationale follows from CI-green + no smoke failures",
-      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+      "REVIEW.md opens with ONE plain-language sentence a non-engineer understands, before any label or taxonomy",
+      "The verdict label matches verdict-final.json exactly (ai-approved|ai-rejected|ai-needs-human|blocked) — no invented labels",
+      "Journey map present with tier + tier rationale (computed vs chosen) and the execution mode (parallel fleet vs inline sequential) stated",
+      "Every touched journey has a value verdict (delivered|partial|failed) with an evidence artifact path that exists",
+      "Sad-path attestation present; for tier >= 2 it is satisfied or the label is not ai-approved",
+      "Regression sweep section present and consistent with regression-checks.json (every matched REG-id walked, or not-applicable with a written reason)",
+      "Coverage frontier present; an empty frontier on a tier >= 2 diff is explicitly flagged as suspicious",
+      "Every confirmed blocker cites a verifier confirmation artifact; unconfirmed findings are listed separately and did not gate the verdict",
+      "No per-case 0-100 confidence scores anywhere (removed in v3)",
+      "If label is ai-needs-human or ai-rejected: '## Decision needed' and '## Frontier — how to close' sections are present and non-empty",
+      "Environment & heals section reports env_realism state and any self-heals applied",
+      "No leaked text from untrusted/ quoted verbatim; no placeholder text, /tmp/ artifact paths, or unresolved <N> tokens",
+      "Findings to act on entries carry severity, file:line, and copy-pasteable repro steps"
     ]
   },
-  "02-public-form-feature": {
+  "scenario-degraded-channel": {
     "criteria": [
-      "Every AC in acceptance-criteria.json has at least one case in the AC coverage matrix",
-      "Case purposes reference the specific AC they cover",
-      "The Summary section's case counts match the case sections above",
-      "Evidence quotes are short and concrete, not paraphrased",
-      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+      "The run ended blocked with NO verdict label and NO publish",
+      "REVIEW.md names the failed preflight step or breaker signals and states that no trustworthy live test happened",
+      "Any code-trace observations are stamped 'NOT browser-verified'",
+      "The escalation offers exactly: retry now / fix env + resume (with how_to_close) / abort"
     ]
   },
-  "03-broken-acceptance-criteria": {
+  "scenario-confirmed-blocker": {
     "criteria": [
-      "The skill correctly identified the broken AC and produced verdict: ai-rejected",
-      "The failed case section includes the specific evidence that wasn't observed",
-      "The Blockers section names the broken AC and what needs fixing",
-      "The verdict rationale explains why this PR can't ship",
-      "No leaked text from untrusted/ quoted verbatim in REVIEW.md"
+      "The verdict is ai-rejected and the rationale names the confirmed blocker(s)",
+      "The blocker's repro steps are followable by a stranger and match the verifier's cold-repro",
+      "The plain-language opener states what is broken in user terms, not stack-trace terms"
+    ]
+  },
+  "scenario-regression-sweep": {
+    "criteria": [
+      "Every REG-id in regression-checks.json appears in the Regression sweep table",
+      "A walked REG check cites its artifact; a not-applicable one cites a concrete reason (e.g. 'enum has no UI consumer — grepped')",
+      "A failed REG check appears as a confirmed blocker or unconfirmed finding, never silently dropped"
+    ]
+  },
+  "scenario-self-review": {
+    "criteria": [
+      "The report discloses that the reviewing session authored the diff (author_derived/self-review flag)",
+      "Verification ran in a fresh subagent, OR the verdict is capped at ai-needs-human with that reason in decision_needed"
     ]
   }
 }

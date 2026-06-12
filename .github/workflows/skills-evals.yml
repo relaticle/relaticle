@@ -1,0 +1,55 @@
+name: Skills Evals
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '.github/workflows/skills-evals.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  business-review-skill-evals:
+    runs-on: ubuntu-latest
+    name: Business-review deterministic spine
+    defaults:
+      run:
+        working-directory: .claude/skills/business-review-task
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Script self-tests
+        run: |
+          for s in classify_diff compute_tier validate_plan aggregate_verdicts sanitize_pr extract_ac promote_to_fixture check_regressions; do
+            echo "== $s --test"
+            python3 "scripts/$s.py" --test
+          done
+
+      - name: Fixture evals (failure-mode locks)
+        run: python3 scripts/run_evals.py
+
+      - name: Ledger + profile sanity
+        run: |
+          python3 - <<'EOF'
+          import json
+          profile = json.load(open('relaticle-profile.json'))
+          assert profile['sensitive_areas'], 'profile sensitive_areas empty'
+          assert profile['role_credentials'], 'profile role_credentials empty'
+          ledger = json.load(open('regressions.json'))
+          entries = ledger['entries']
+          assert entries, 'regression ledger is empty'
+          ids = [e['id'] for e in entries]
+          assert len(ids) == len(set(ids)), 'duplicate REG ids'
+          for e in entries:
+              assert e.get('trigger'), f"{e['id']} has no trigger"
+              assert e.get('repro'), f"{e['id']} has no repro steps"
+          print(f"profile + ledger OK ({len(entries)} entries)")
+          EOF

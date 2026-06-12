@@ -6,7 +6,7 @@ Usage:
     python3 promote_to_fixture.py --test
 
 Reads from .context/reviews/<PR_NUM>/, writes to
-.claude/skills/business-review-v1/evals/fixtures/<NN>-<fixture-name>/.
+.claude/skills/business-review-task/evals/fixtures/<NN>-<fixture-name>/.
 
 Pure stdlib.
 """
@@ -19,7 +19,7 @@ import shutil
 import sys
 from pathlib import Path
 
-SKILL_DIR = Path(".claude/skills/business-review-v1")
+SKILL_DIR = Path(".claude/skills/business-review-task")
 FIXTURES_DIR = SKILL_DIR / "evals" / "fixtures"
 
 # Fixture names go straight into a filesystem path — restrict to a safe alphabet

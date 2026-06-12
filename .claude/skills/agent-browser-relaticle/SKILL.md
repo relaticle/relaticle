@@ -66,17 +66,40 @@ present.
 
 ## 4. Login flow (both panels — Filament stock login)
 
+**The recipe that works (verified: 2026-06-12, both panels):** native `fill` + native
+`click "Sign in"`. Do NOT dispatch synthetic MouseEvents on the submit button and do NOT
+`$wire.set` the fields — both were tried live and left the form on `/login` (Livewire's
+`wire:submit` didn't fire). `agent-browser fill` does register the value with
+`wire:model`; `agent-browser click "Sign in"` (by visible text) submits cleanly.
+
 ```bash
-agent-browser open "$APP_PANEL_URL/login"
-agent-browser fill 'input[name="email"]' "$LOGIN"
-agent-browser fill 'input[name="password"]' "password"
-agent-browser eval '(async () => { const b = document.querySelector("form button[type=submit]");
-  ["mousedown","mouseup","click"].forEach(t => b.dispatchEvent(new MouseEvent(t, {bubbles:true}))); })()'
-agent-browser wait --load networkidle
+agent-browser --session "$AB" open "$PANEL_URL/login"
+agent-browser --session "$AB" fill 'input[name="email"]' "$LOGIN"
+agent-browser --session "$AB" fill 'input[name="password"]' "password"
+sleep 1
+agent-browser --session "$AB" click "Sign in"
+agent-browser --session "$AB" wait --load networkidle
+agent-browser --session "$AB" eval 'location.pathname'   # confirm you left /login
 ```
 
-After app-panel login you land on the default team's path `…/<team-slug>/…` — re-derive
-the slug from `location.pathname` before further navigation (verified: 2026-05).
+- **`click` / `fill` take the element's VISIBLE TEXT or a CSS selector, NOT
+  `find role button "<name>"`** — that subcommand syntax errors on this binary
+  (verified: 2026-06-12). Use `agent-browser click "Sign in"`.
+- After **app-panel** login you land on the default team path `…/<team-slug>/…`
+  (e.g. `/tapix`) — re-derive the slug from `location.pathname` before navigating further
+  (verified: 2026-06-12).
+- After **sysadmin** login you land on `/` (Dashboard) on `sysadmin.relaticle.test`
+  (verified: 2026-06-12).
+- A **"Developer Login"** button is present on the login page but clicking it alone did
+  not establish a session in testing — prefer the fill+click recipe above
+  (verified: 2026-06-12).
+
+## 4b. Screenshot paths — ALWAYS absolute
+
+`agent-browser screenshot` parses a RELATIVE path containing `/` as a CSS selector and
+fails (`Unexpected token "/" while parsing css selector`). Always pass an absolute path:
+`agent-browser --session "$AB" screenshot "$(pwd)/.context/reviews/<dir>/case-X/shot.png"`
+(verified: 2026-06-12).
 
 ## 5. The gold patterns (Filament v5 + Livewire v4)
 
