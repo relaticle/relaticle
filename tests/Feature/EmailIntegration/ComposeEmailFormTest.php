@@ -116,12 +116,13 @@ it('keeps the default signature in the body when a template is selected', functi
         ->set('mountedActions.0.data.template_id', $template->id)
         ->assertSet('mountedActions.0.data.subject', 'Promo subject')
         ->assertSet('mountedActions.0.data.signature_id', $signature->id)
-        ->assertSet('mountedActions.0.data.body_html', function (mixed $body): bool {
-            // RichEditor holds state as a ProseMirror doc array; serialise to compare.
+        ->assertSet('mountedActions.0.data.body_html', function (mixed $body) use ($signature): bool {
+            // The signature is a dedicated customBlock node carrying its id.
             $json = json_encode($body);
 
             return str_contains($json, 'Template body here')
-                && str_contains($json, 'Best, Test Sender');
+                && str_contains($json, 'customBlock')
+                && str_contains($json, $signature->id);
         });
 });
 
