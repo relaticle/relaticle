@@ -22,6 +22,39 @@
                     }
                 }
             });
+
+            $wire.on('passkey-confirm-then-register', async ({ name }) => {
+                try {
+                    await window.Passkeys.verify({
+                        routes: {
+                            options: '{{ route('passkey.confirm-options') }}',
+                            submit: '{{ route('passkey.confirm') }}',
+                        },
+                    });
+                    await window.Passkeys.register({ name });
+                    $wire.loadPasskeys();
+                } catch (e) {
+                    if (e?.constructor?.name !== 'UserCancelledError') {
+                        $wire.call('notifyRegistrationFailed');
+                    }
+                }
+            });
+
+            $wire.on('passkey-confirm-then-delete', async ({ passkeyId }) => {
+                try {
+                    await window.Passkeys.verify({
+                        routes: {
+                            options: '{{ route('passkey.confirm-options') }}',
+                            submit: '{{ route('passkey.confirm') }}',
+                        },
+                    });
+                    await $wire.call('deletePasskeyAfterPasskeyConfirmation', passkeyId);
+                } catch (e) {
+                    if (e?.constructor?.name !== 'UserCancelledError') {
+                        $wire.call('notifyPasskeyConfirmationFailed');
+                    }
+                }
+            });
         },
     }"
     class="space-y-4"
