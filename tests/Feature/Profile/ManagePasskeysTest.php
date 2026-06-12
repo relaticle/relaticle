@@ -273,12 +273,28 @@ it('refuses to delete after passkey confirmation when no confirmation happened',
 });
 
 it('refuses to delete after passkey confirmation when the confirmation is stale', function (): void {
-    session()->put('auth.password_confirmed_at', time() - 10900);
+    session()->put('auth.password_confirmed_at', time() - (config('auth.password_timeout') + 100));
 
     $passkey = Passkey::create([
         'user_id' => $this->user->id,
         'name' => 'Stale Delete',
         'credential_id' => 'cred-stale-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('refuses to delete after passkey confirmation at exactly the timeout boundary', function (): void {
+    session()->put('auth.password_confirmed_at', time() - config('auth.password_timeout'));
+
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Boundary Delete',
+        'credential_id' => 'cred-boundary-del-'.uniqid(),
         'credential' => [],
     ]);
 

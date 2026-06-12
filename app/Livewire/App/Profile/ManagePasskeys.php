@@ -82,10 +82,13 @@ final class ManagePasskeys extends BaseLivewireComponent
     }
 
     /**
-     * Complete a deletion that was confirmed by a passkey assertion. The browser
-     * ceremony POSTs to the vendor passkey.confirm endpoint, which sets
-     * auth.password_confirmed_at only after verifying the assertion — so freshness
-     * of that timestamp is the server-side proof that the ceremony really happened.
+     * Complete a deletion confirmed by a passkey assertion. The browser ceremony POSTs
+     * to the vendor passkey.confirm endpoint, which sets auth.password_confirmed_at after
+     * verifying the assertion. We re-check that timestamp's freshness server-side because
+     * this method is directly callable; like Laravel's RequirePassword gate it proves a
+     * recent password/passkey confirmation within the auth.password_timeout window, not
+     * that this specific delete ceremony ran — the same shared-confirmation model the
+     * registration flow relies on.
      */
     public function deletePasskeyAfterPasskeyConfirmation(int $passkeyId, DeletePasskey $deletePasskey): void
     {
