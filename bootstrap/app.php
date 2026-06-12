@@ -45,6 +45,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'document.*',
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'stripe/*',
+        ]);
+
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request): bool => $request->is('chat') || $request->is('chat/*'),
         ]);

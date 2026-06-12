@@ -8,7 +8,6 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Services\AvatarService;
-use Danestves\LaravelPolar\Billable;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -21,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -57,6 +57,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
+
     use HasSlug;
     use HasUlids;
 

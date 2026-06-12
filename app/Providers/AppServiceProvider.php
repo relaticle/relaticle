@@ -7,7 +7,7 @@ namespace App\Providers;
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
 use App\Http\Responses\LoginResponse;
-use App\Listeners\Billing\SyncPlanOnPolarSubscriptionChange;
+use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
@@ -28,11 +28,6 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\GitHubService;
-use Danestves\LaravelPolar\Events\SubscriptionActive;
-use Danestves\LaravelPolar\Events\SubscriptionCanceled;
-use Danestves\LaravelPolar\Events\SubscriptionCreated;
-use Danestves\LaravelPolar\Events\SubscriptionRevoked;
-use Danestves\LaravelPolar\Events\SubscriptionUpdated;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -52,6 +47,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Ai\AiManager;
+use Laravel\Cashier\Cashier;
+use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
@@ -71,6 +68,9 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
+
+        Cashier::useCustomerModel(Team::class);
+        Cashier::keepPastDueSubscriptionsActive();
     }
 
     /**
@@ -90,11 +90,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
-        Event::listen(SubscriptionCreated::class, SyncPlanOnPolarSubscriptionChange::class);
-        Event::listen(SubscriptionActive::class, SyncPlanOnPolarSubscriptionChange::class);
-        Event::listen(SubscriptionUpdated::class, SyncPlanOnPolarSubscriptionChange::class);
-        Event::listen(SubscriptionCanceled::class, SyncPlanOnPolarSubscriptionChange::class);
-        Event::listen(SubscriptionRevoked::class, SyncPlanOnPolarSubscriptionChange::class);
+        Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 

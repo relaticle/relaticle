@@ -6,9 +6,9 @@ namespace App\Actions\Billing;
 
 use App\Enums\Plan;
 use App\Models\Team;
-use Danestves\LaravelPolar\Subscription;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Services\CreditService;
 
 final readonly class SyncTeamPlanFromSubscription
@@ -17,13 +17,13 @@ final readonly class SyncTeamPlanFromSubscription
 
     public function handle(Team $team, Subscription $subscription): void
     {
-        $subscriptionPlan = $this->planForProduct($subscription->product_id);
+        $subscriptionPlan = $this->planForPrice($subscription->stripe_price);
 
         if (! $subscriptionPlan instanceof Plan) {
-            Log::warning('Polar subscription product is not mapped to a plan', [
+            Log::warning('Stripe subscription price is not mapped to a plan', [
                 'team_id' => $team->getKey(),
-                'subscription_id' => $subscription->polar_id,
-                'product_id' => $subscription->product_id,
+                'subscription_id' => $subscription->stripe_id,
+                'stripe_price' => $subscription->stripe_price,
             ]);
 
             return;
@@ -39,11 +39,17 @@ final readonly class SyncTeamPlanFromSubscription
             return;
         }
 
-        DB::transaction(function () use ($team, $target): void {
+        DB::transaction(function () use ($team, $target, $subscription): void {
             $team->plan = $target;
             $team->save();
 
             $this->credits->resetPeriod($team);
+
+            Log::info('Team plan synced from Stripe subscription', [
+                'team_id' => $team->getKey(),
+                'plan' => $target->value,
+                'subscription_id' => $subscription->stripe_id,
+            ]);
         });
     }
 
@@ -62,14 +68,18 @@ final readonly class SyncTeamPlanFromSubscription
         return null;
     }
 
-    private function planForProduct(string $productId): ?Plan
+    private function planForPrice(?string $priceId): ?Plan
     {
-        /** @var array<string, string|null> $products */
-        $products = config('services.polar.products', []);
+        if ($priceId === null) {
+            return null;
+        }
 
-        foreach ($products as $plan => $mappedProductId) {
-            if ($mappedProductId !== null && $mappedProductId === $productId) {
-                return Plan::tryFrom($plan);
+        /** @var array<string, string|null> $prices */
+        $prices = config('services.stripe.prices', []);
+
+        foreach ($prices as $key => $mappedPriceId) {
+            if ($mappedPriceId !== null && $mappedPriceId === $priceId) {
+                return Plan::tryFrom(explode('_', $key)[0]);
             }
         }
 
