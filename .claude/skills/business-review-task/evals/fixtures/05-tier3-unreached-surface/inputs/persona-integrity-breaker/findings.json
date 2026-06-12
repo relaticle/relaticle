@@ -1,0 +1,33 @@
+{
+  "persona": "integrity-breaker",
+  "journeys": [
+    {
+      "id": "S4",
+      "value_verdict": "partial",
+      "evidence": "case-S4/app-user-blocked-from-sysadmin.png",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "S4a: unauthenticated guest deep-links /ai/conversations on sysadmin host",
+          "result": "redirected to sysadmin /login, no data leak (browser-confirmed)",
+          "bug_ref": null
+        },
+        {
+          "path": "S4b: app-panel-authenticated user deep-links sysadmin /ai/messages (cross-guard)",
+          "result": "UNREACHED \u2014 agent-browser daemon resource contention (os error 35) from parallel-agent sessions blocked the app-login step on this session after 3 attempts; app channel itself healthy for S1-S3",
+          "bug_ref": null
+        }
+      ]
+    }
+  ],
+  "bugs": [],
+  "ux_friction": [],
+  "coverage": {
+    "seams_hit": [
+      "unauthenticated -> sysadmin guard redirect"
+    ],
+    "frontier_not_reached": [
+      "S4b cross-guard (app-authenticated user -> sysadmin pages) not browser-confirmed; code-trace: sysadmin panel uses authGuard('sysadmin') + authPasswordBroker('system_administrators'), a separate guard from app users (NOT browser-verified)"
+    ]
+  }
+}
