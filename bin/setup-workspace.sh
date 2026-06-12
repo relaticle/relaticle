@@ -6,8 +6,9 @@
 # (vendor/, node_modules/, and .env are copied). The database stays shared
 # across workspaces. We rewrite APP_URL and SESSION_DOMAIN so absolute URLs
 # and session cookies match `<workspace>.test`, and blank APP_PANEL_DOMAIN
-# so the app panel serves path-based at `<workspace>.test/app` — the copied
-# `app.relaticle.test` value would route to the base checkout, not the clone.
+# and SYSADMIN_DOMAIN so both panels serve path-based at `<workspace>.test/app`
+# and `<workspace>.test/sysadmin` — the copied `*.relaticle.test` values would
+# route to the base checkout, not the clone.
 #
 # Mac-only: uses BSD sed (`sed -i ''`). Polyscope itself is macOS-only.
 
@@ -31,6 +32,7 @@ echo "→ Pointing .env at ${WORKSPACE_HOST}"
 sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
 sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${WORKSPACE_HOST}|" .env
 sed -i '' "s|^APP_PANEL_DOMAIN=.*|APP_PANEL_DOMAIN=|" .env
+sed -i '' "s|^SYSADMIN_DOMAIN=.*|SYSADMIN_DOMAIN=|" .env
 
 php artisan config:clear --no-interaction
 php artisan route:clear --no-interaction
@@ -38,4 +40,4 @@ php artisan route:clear --no-interaction
 echo "→ Building frontend assets"
 npm run build
 
-echo "✓ Workspace ready: https://${WORKSPACE_HOST} (app panel at /app)"
+echo "✓ Workspace ready: https://${WORKSPACE_HOST} (app panel at /app, sysadmin at /sysadmin)"
