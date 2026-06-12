@@ -61,6 +61,10 @@ list is what lets a clean run reach `ai-approved`, so **only emit `[]` when ever
 reachable surface was genuinely walked and delivered.** Listing a surface here is not a
 soft suggestion; it caps the verdict.
 
+When a gap you name should reach the human as a frontier item, phrase it so the
+orchestrator can lift it into the structured shape — name the cause and the concrete
+closing step (the `how_to_close`), not just the gap.
+
 `recommend_extra_round` is the signal `references/fleet.md`'s stage-6 loop reads: if
 `true` AND tier ≥ 2 AND budget remains, the orchestrator spawns ONE more targeted
 persona round.

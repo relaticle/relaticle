@@ -116,10 +116,19 @@ Write **`persona-<name>/findings.json`** in the EXACT schema below:
   ],
   "coverage": {
     "seams_hit": ["<seam description>"],
-    "frontier_not_reached": ["<what was not reached>"]
+    "frontier_not_reached": [
+      {"item": "<what was not reached>", "why_unreached": "<concrete cause>", "how_to_close": "<the exact step a human/next run takes to close it>"}
+    ]
   }
 }
 ```
+
+**Frontier entries MUST be structured objects** (`item` / `why_unreached` /
+`how_to_close`) — they flow verbatim into `verdict-final.json.frontier[]` and the
+report's "Frontier — how to close" section, which is hard-gated for
+needs-human/rejected runs. A bare string is accepted for back-compat but produces a
+frontier item with empty why/how fields, which the report gate then flags. Gated
+states (no credential for a role/plan/tenant) use the same shape (`fleet.md`).
 
 ## Value verdict rule
 
