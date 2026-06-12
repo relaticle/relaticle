@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Passkeys\Actions\DeletePasskey;
@@ -77,6 +78,38 @@ final class ManagePasskeys extends BaseLivewireComponent
             ]);
         }
 
+        $this->performDelete($passkeyId, $deletePasskey);
+    }
+
+    /**
+     * Complete a deletion that was confirmed by a passkey assertion. The browser
+     * ceremony POSTs to the vendor passkey.confirm endpoint, which sets
+     * auth.password_confirmed_at only after verifying the assertion — so freshness
+     * of that timestamp is the server-side proof that the ceremony really happened.
+     */
+    public function deletePasskeyAfterPasskeyConfirmation(int $passkeyId, DeletePasskey $deletePasskey): void
+    {
+        if (! $this->hasFreshPasswordConfirmation()) {
+            $this->notifyPasskeyConfirmationFailed();
+
+            return;
+        }
+
+        $this->performDelete($passkeyId, $deletePasskey);
+    }
+
+    public function notifyPasskeyConfirmationFailed(): void
+    {
+        $this->sendNotification(
+            __('profile.notifications.passkey_confirmation_failed.title'),
+            type: 'danger',
+        );
+    }
+
+    private function performDelete(int $passkeyId, DeletePasskey $deletePasskey): void
+    {
+        $user = $this->authUser();
+
         $passkey = $user->passkeys()->whereKey($passkeyId)->first();
 
         if (! $passkey instanceof Passkey) {
@@ -88,6 +121,13 @@ final class ManagePasskeys extends BaseLivewireComponent
         $this->loadPasskeys();
 
         $this->sendNotification(__('profile.notifications.passkey_removed.success'));
+    }
+
+    private function hasFreshPasswordConfirmation(): bool
+    {
+        $confirmedAt = (int) session('auth.password_confirmed_at', 0);
+
+        return (time() - $confirmedAt) < Config::integer('auth.password_timeout', 10800);
     }
 
     /**
@@ -166,18 +206,32 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalSubmitActionLabel(__('profile.sections.passkeys.remove'))
             ->color('danger')
             ->schema($hasPassword ? [
+                Checkbox::make('use_password')
+                    ->label(__('profile.sections.passkeys.confirm_with_password'))
+                    ->live(),
                 TextInput::make('password')
                     ->password()
                     ->revealable()
                     ->label(__('profile.form.password.label'))
-                    ->required(),
+                    ->visible(fn (Get $get): bool => (bool) $get('use_password'))
+                    ->required(fn (Get $get): bool => (bool) $get('use_password')),
             ] : [])
-            ->action(function (array $arguments, array $data, DeletePasskey $deletePasskey): void {
-                $this->deletePasskey(
-                    (int) ($arguments['passkeyId'] ?? 0),
-                    $data['password'] ?? null,
-                    $deletePasskey,
-                );
+            ->action(function (array $arguments, array $data, DeletePasskey $deletePasskey) use ($hasPassword): void {
+                $passkeyId = (int) ($arguments['passkeyId'] ?? 0);
+
+                if (! $hasPassword) {
+                    $this->deletePasskey($passkeyId, null, $deletePasskey);
+
+                    return;
+                }
+
+                if (filled($data['password'] ?? null)) {
+                    $this->deletePasskey($passkeyId, $data['password'], $deletePasskey);
+
+                    return;
+                }
+
+                $this->dispatch('passkey-confirm-then-delete', passkeyId: $passkeyId);
             });
     }
 
