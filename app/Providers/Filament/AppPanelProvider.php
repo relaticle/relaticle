@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Features\Billing as BillingFeature;
 use App\Features\SocialAuth;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
@@ -239,6 +241,11 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
                     ->url(fn (): string => ImportHistory::getUrl()),
+                Action::make('billing')
+                    ->label(__('billing.title'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->url(fn (): string => Billing::getUrl())
+                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
 
         return $panel;
