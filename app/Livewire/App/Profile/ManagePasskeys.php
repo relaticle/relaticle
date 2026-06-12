@@ -217,7 +217,9 @@ final class ManagePasskeys extends BaseLivewireComponent
                     ->revealable()
                     ->label(__('profile.form.password.label'))
                     ->visible(fn (Get $get): bool => (bool) $get('use_password'))
-                    ->required(fn (Get $get): bool => (bool) $get('use_password')),
+                    ->required(fn (Get $get): bool => (bool) $get('use_password'))
+                    ->rule('current_password')
+                    ->validationMessages(['current_password' => __('auth.password')]),
             ] : [])
             ->action(function (array $arguments, array $data, DeletePasskey $deletePasskey) use ($hasPassword): void {
                 $passkeyId = (int) ($arguments['passkeyId'] ?? 0);
