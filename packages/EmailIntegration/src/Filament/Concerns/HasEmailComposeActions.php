@@ -250,7 +250,7 @@ trait HasEmailComposeActions
                         ->placeholder(__('filament/concerns/email-compose.fields.template.placeholder'))
                         ->options(fn (): array => $this->templateOptions())
                         ->live()
-                        ->afterStateUpdated(function (?string $state, Set $set): void {
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
                             if ($state === null) {
                                 return;
                             }
@@ -266,7 +266,22 @@ trait HasEmailComposeActions
                                 ->render($template, $this->getCrmRecord());
 
                             $set('subject', $rendered['subject']);
-                            $set('body_html', $rendered['body_html']);
+
+                            $body = $rendered['body_html'];
+
+                            // Preserve the signature below the template body so picking a
+                            // template never wipes the user's signature.
+                            $sig = $this->resolveComposeSignature(
+                                $get('connected_account_id'),
+                                $get('signature_id'),
+                            );
+
+                            if ($sig !== null) {
+                                $set('signature_id', $sig->getKey());
+                                $body .= '<hr>'.$sig->content_html;
+                            }
+
+                            $set('body_html', $body);
                         }),
                 ]),
 
@@ -544,6 +559,34 @@ trait HasEmailComposeActions
             ->pluck('email_address')
             ->values()
             ->all();
+    }
+
+    /**
+     * Resolve the signature to attach when composing: the explicitly selected
+     * one, else the chosen account's default, else the active account's default.
+     */
+    private function resolveComposeSignature(?string $accountId, ?string $signatureId): ?EmailSignature
+    {
+        if (filled($signatureId)) {
+            return EmailSignature::query()->whereKey($signatureId)->first();
+        }
+
+        if (blank($accountId)) {
+            $accountId = ConnectedAccount::query()
+                ->where('user_id', $this->getAuthenticatedUser()->getKey())
+                ->where('team_id', filament()->getTenant()?->getKey())
+                ->where('status', 'active')
+                ->value('id');
+        }
+
+        if (blank($accountId)) {
+            return null;
+        }
+
+        return EmailSignature::query()
+            ->where('connected_account_id', $accountId)
+            ->where('is_default', true)
+            ->first();
     }
 
     /**
