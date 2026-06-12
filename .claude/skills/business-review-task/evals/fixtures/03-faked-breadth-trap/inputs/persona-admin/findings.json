@@ -1,0 +1,23 @@
+{
+  "persona": "admin",
+  "journeys": [
+    {
+      "id": "S4",
+      "value_verdict": "delivered",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "export with no results",
+          "result": "empty CSV downloaded with header row only — no error",
+          "bug_ref": null
+        }
+      ]
+    }
+  ],
+  "bugs": [],
+  "ux_friction": [],
+  "coverage": {
+    "seams_hit": ["order list -> filter", "filter -> export", "CSV generation"],
+    "frontier_not_reached": []
+  }
+}

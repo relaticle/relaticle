@@ -1,0 +1,93 @@
+{
+  "persona": "sysadmin",
+  "journeys": [
+    {
+      "id": "S1",
+      "value_verdict": "delivered",
+      "evidence": "case-S1/credit-transactions-renders.png",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "render page containing reservation-type rows (the production crash class)",
+          "result": "200, Reservation + Chat badges render, 334 results, no UnhandledMatchError",
+          "bug_ref": null
+        },
+        {
+          "path": "mixed enum types in one page (chat/reservation/adjustment/refund all present in DB)",
+          "result": "all render labeled badges",
+          "bug_ref": null
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "value_verdict": "delivered",
+      "evidence": "case-S2/conversations-with-data.png",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "empty state (0 conversations)",
+          "result": "renders 'no records' cleanly, no error",
+          "bug_ref": null
+        },
+        {
+          "path": "list with data + messages_count relation",
+          "result": "2 rows, counts 3 and 2 correct (matches seeded)",
+          "bug_ref": null
+        },
+        {
+          "path": "no create/edit/delete affordance (read-only AC4)",
+          "result": "only View action present",
+          "bug_ref": null
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "value_verdict": "delivered",
+      "evidence": "case-S3/messages-with-data.png",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "non user/assistant role (tool) -> badge fallback",
+          "result": "tool renders 'info' fallback badge, no crash",
+          "bug_ref": null
+        },
+        {
+          "path": "superseded message indicator",
+          "result": "superseded row shows green check, others red X",
+          "bug_ref": null
+        },
+        {
+          "path": "long content truncation + short content",
+          "result": "long reply truncated with ellipsis, 'x' renders",
+          "bug_ref": null
+        },
+        {
+          "path": "read-only (AC4)",
+          "result": "only View action present",
+          "bug_ref": null
+        }
+      ]
+    }
+  ],
+  "bugs": [],
+  "ux_friction": [
+    {
+      "journey": "S1",
+      "note": "Type badges render as plain uncolored text in the transactions table (HasColor defined on the enum, but the column may not apply ->badge()/->color()); cosmetic, page is functional",
+      "severity": "low"
+    }
+  ],
+  "coverage": {
+    "seams_hit": [
+      "enum value -> badge match",
+      "conversation -> messages_count",
+      "role -> badge fallback",
+      "superseded_at -> indicator"
+    ],
+    "frontier_not_reached": [
+      "nullable-title placeholder path: agent_conversations.title is NOT NULL at the DB level, so the resource's 'Untitled' placeholder for null title is unreachable via normal data (defensive-only)"
+    ]
+  }
+}

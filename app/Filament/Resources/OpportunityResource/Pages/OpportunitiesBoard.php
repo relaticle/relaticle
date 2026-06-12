@@ -50,7 +50,7 @@ final class OpportunitiesBoard extends BoardResourcePage
 
     public function board(Board $board): Board
     {
-        $stageField = $this->stageCustomField();
+        $stageField = self::stageCustomField();
         $valueColumn = $stageField->getValueColumn();
 
         $customFields = CustomFields::infolist()
@@ -151,7 +151,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                         $columnId = $action->getArguments()['column'] ?? null;
 
                         if (filled($columnId)) {
-                            $opportunity->saveCustomFieldValue($this->stageCustomField(), $columnId);
+                            $opportunity->saveCustomFieldValue(self::stageCustomField(), $columnId);
                             $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
                             $opportunity->saveQuietly();
                         }
@@ -229,7 +229,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             $card->update([$positionIdentifier => $newPosition]);
 
             /** @var Opportunity $card */
-            $card->saveCustomFieldValue($this->stageCustomField(), $columnValue);
+            $card->saveCustomFieldValue(self::stageCustomField(), $columnValue);
         });
 
         $this->dispatch('kanban-card-moved', [
@@ -270,7 +270,7 @@ final class OpportunitiesBoard extends BoardResourcePage
         };
     }
 
-    private function stageCustomField(): ?CustomField
+    private static function stageCustomField(): ?CustomField
     {
         /** @var CustomField|null */
         return once(fn () => CustomField::query()
@@ -284,7 +284,7 @@ final class OpportunitiesBoard extends BoardResourcePage
      */
     private function stages(): Collection
     {
-        $field = $this->stageCustomField();
+        $field = self::stageCustomField();
 
         if (! $field instanceof CustomField) {
             return collect();
@@ -305,6 +305,6 @@ final class OpportunitiesBoard extends BoardResourcePage
      */
     public static function canAccess(array $parameters = []): bool
     {
-        return (new self)->stageCustomField() instanceof CustomField;
+        return self::stageCustomField() instanceof CustomField;
     }
 }

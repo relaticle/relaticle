@@ -1,0 +1,29 @@
+{
+  "criteria": [
+    {
+      "id": 1,
+      "text": "Sysadmin AI Credit Transactions page renders rows of EVERY credit type including 'reservation' without UnhandledMatchError (the production-crash fix), and the type filter includes Reservation",
+      "source": "pr-body-explicit"
+    },
+    {
+      "id": 2,
+      "text": "New sysadmin Conversations resource: list page renders under the AI nav group; a conversation can be opened in a view page showing its details and message count",
+      "source": "pr-body-explicit"
+    },
+    {
+      "id": 3,
+      "text": "New sysadmin Messages resource: list page renders; a message view shows role, content and its parent conversation; nullable fields render placeholders, never errors",
+      "source": "pr-body-explicit"
+    },
+    {
+      "id": 4,
+      "text": "Both new resources are strictly view-only: no create/edit/delete affordances anywhere (policies allow viewAny/view only)",
+      "source": "inferred-from-diff"
+    },
+    {
+      "id": 5,
+      "text": "Non-sysadmin users cannot reach the new sysadmin pages (guard + strictAuthorization): app-panel session gets login redirect or 403, never data",
+      "source": "inferred-from-diff"
+    }
+  ]
+}

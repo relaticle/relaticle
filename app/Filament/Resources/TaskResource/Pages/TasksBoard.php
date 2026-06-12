@@ -49,7 +49,7 @@ final class TasksBoard extends BoardResourcePage
      */
     public function board(Board $board): Board
     {
-        $statusField = $this->statusCustomField();
+        $statusField = self::statusCustomField();
         $valueColumn = $statusField->getValueColumn();
 
         $customFields = CustomFields::infolist()
@@ -136,7 +136,7 @@ final class TasksBoard extends BoardResourcePage
                         $columnId = $action->getArguments()['column'] ?? null;
 
                         if (filled($columnId)) {
-                            $task->saveCustomFieldValue($this->statusCustomField(), $columnId);
+                            $task->saveCustomFieldValue(self::statusCustomField(), $columnId);
                             $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
                             $task->saveQuietly();
                         }
@@ -210,7 +210,7 @@ final class TasksBoard extends BoardResourcePage
 
             $card->update([$positionIdentifier => $newPosition]);
 
-            $card->saveCustomFieldValue($this->statusCustomField(), $columnValue);
+            $card->saveCustomFieldValue(self::statusCustomField(), $columnValue);
         });
 
         // Emit success event after successful transaction
@@ -258,7 +258,7 @@ final class TasksBoard extends BoardResourcePage
         };
     }
 
-    private function statusCustomField(): ?CustomField
+    private static function statusCustomField(): ?CustomField
     {
         /** @var CustomField|null */
         return once(fn () => CustomField::query()
@@ -272,7 +272,7 @@ final class TasksBoard extends BoardResourcePage
      */
     private function statuses(): Collection
     {
-        $field = $this->statusCustomField();
+        $field = self::statusCustomField();
 
         if (! $field instanceof CustomField) {
             return collect();
@@ -294,6 +294,6 @@ final class TasksBoard extends BoardResourcePage
      */
     public static function canAccess(array $parameters = []): bool
     {
-        return (new self)->statusCustomField() instanceof CustomField;
+        return self::statusCustomField() instanceof CustomField;
     }
 }

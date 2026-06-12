@@ -1,0 +1,7 @@
+{
+  "label": "ai-approved",
+  "channel": "healthy",
+  "frontier_flagged": false,
+  "frontier_items_have_how_to_close": true,
+  "must_not_contain": ["<placeholder>", "TBD"]
+}
