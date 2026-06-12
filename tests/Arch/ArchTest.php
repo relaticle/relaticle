@@ -31,6 +31,7 @@ arch()->preset()
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
+        'App\Http\Controllers\Mcp',
         'Relaticle\Chat',
     ]);
 
@@ -87,6 +88,7 @@ arch('avoid mutation')
         'App\Filament',
         'App\Health',
         'App\Http\Controllers\Chat',
+        'App\Http\Controllers\Mcp',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -114,6 +116,7 @@ arch('avoid inheritance')
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
+        'App\Http\Controllers\Mcp',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',

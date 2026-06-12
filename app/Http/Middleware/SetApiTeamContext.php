@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Passport\AccessToken as PassportAccessToken;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -91,6 +92,22 @@ final readonly class SetApiTeamContext
     {
         $token = $user->currentAccessToken();
 
+        // Passport OAuth tokens are issued by our consent flow and ALWAYS carry a
+        // team_id. The token's team_id is authoritative — X-Team-Id and currentTeam
+        // are ignored. A Passport token without team_id is malformed (created outside
+        // the MCP consent flow) and the request is rejected by returning null here.
+        // @phpstan-ignore-next-line instanceof.alwaysFalse (User::currentAccessToken() is typed as Sanctum token but Passport replaces it at runtime via the api guard)
+        if ($token instanceof PassportAccessToken) {
+            if (! is_string($token->team_id) || $token->team_id === '') {
+                return null;
+            }
+
+            return Team::query()->find($token->team_id);
+        }
+
+        // Sanctum personal access tokens (created from the Access Tokens UI in the
+        // user's profile) can optionally pin a team at creation time. If unpinned,
+        // X-Team-Id header or currentTeam applies — unchanged behavior.
         if ($token instanceof PersonalAccessToken && is_string($token->team_id)) {
             return Team::query()->find($token->team_id);
         }

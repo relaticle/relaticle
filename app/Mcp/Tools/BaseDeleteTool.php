@@ -40,7 +40,9 @@ abstract class BaseDeleteTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $this->ensureTokenCan('delete');
+        if (($denied = $this->denyIfTokenCannot('delete')) instanceof Response) {
+            return $denied;
+        }
 
         /** @var User $user */
         $user = auth()->user();

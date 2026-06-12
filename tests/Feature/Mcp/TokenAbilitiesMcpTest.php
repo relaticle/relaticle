@@ -9,6 +9,7 @@ use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Models\Company;
 use App\Models\User;
+use Laravel\Passport\Passport;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -133,5 +134,33 @@ describe('no token (session auth)', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(CreateCompanyTool::class, ['name' => 'Session Corp'])
             ->assertOk();
+    });
+});
+
+describe('passport read-only scope', function (): void {
+    beforeEach(function (): void {
+        Passport::actingAs($this->user, scopes: ['read']);
+    });
+
+    it('can list companies', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class)
+            ->assertOk();
+    });
+
+    it('cannot create a company', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateCompanyTool::class, ['name' => 'Blocked'])
+            ->assertHasErrors(['Invalid ability provided.']);
+    });
+
+    it('cannot delete a company', function (): void {
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(DeleteCompanyTool::class, [
+                'id' => $company->id,
+            ])
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 });

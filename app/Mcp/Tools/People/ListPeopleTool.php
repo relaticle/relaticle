@@ -11,11 +11,13 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Description('List people (contacts) in the CRM with optional search and pagination.')]
 #[IsReadOnly]
 #[IsIdempotent]
+#[IsOpenWorld(false)]
 final class ListPeopleTool extends BaseListTool
 {
     protected function actionClass(): string

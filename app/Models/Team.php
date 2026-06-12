@@ -68,7 +68,7 @@ final class Team extends JetstreamTeam implements HasAvatar
     public const array RESERVED_SLUGS = [
         // Authentication & authorization
         'login', 'logout', 'register', 'signin', 'signout', 'signup',
-        'auth', 'oauth', 'sso', 'callback',
+        'auth', 'oauth', 'sso', 'callback', '.well-known',
         'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
         'confirm-password', 'two-factor-challenge',
 

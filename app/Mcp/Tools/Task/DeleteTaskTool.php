@@ -9,9 +9,11 @@ use App\Mcp\Tools\BaseDeleteTool;
 use App\Models\Task;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Description('Delete a task from the CRM (soft delete).')]
 #[IsDestructive]
+#[IsOpenWorld(false)]
 final class DeleteTaskTool extends BaseDeleteTool
 {
     protected function modelClass(): string

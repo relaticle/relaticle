@@ -12,9 +12,11 @@ use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Description('Update an existing company in the CRM. Use the crm-schema resource to discover available custom fields.')]
 #[IsIdempotent]
+#[IsOpenWorld(false)]
 final class UpdateCompanyTool extends BaseUpdateTool
 {
     protected function modelClass(): string

@@ -11,6 +11,7 @@ use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
 use App\Listeners\Email\TeamMemberAddedListener;
+use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
 use App\Models\Company;
@@ -21,6 +22,7 @@ use App\Models\CustomFieldValue;
 use App\Models\Export;
 use App\Models\Note;
 use App\Models\Opportunity;
+use App\Models\Passport\AuthCode as McpAuthCode;
 use App\Models\People;
 use App\Models\PersonalAccessToken;
 use App\Models\Task;
@@ -48,6 +50,8 @@ use Knuckles\Scribe\Scribe;
 use Laravel\Ai\AiManager;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
+use Laravel\Passport\Events\AccessTokenCreated;
+use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Relaticle\Chat\Support\ChatTelemetry;
@@ -85,6 +89,21 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        Passport::useAuthCodeModel(McpAuthCode::class);
+        Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
+
+        Passport::authorizationView(function (array $parameters) {
+            $user = $parameters['user'] ?? null;
+
+            $parameters['teams'] = $user instanceof User
+                ? $user->allTeams()
+                : collect();
+
+            $parameters['selectedTeamId'] = $user?->currentTeam?->getKey();
+
+            return response()->view('mcp.authorize', $parameters);
+        });
 
         $this->configurePolicies();
         $this->configureModels();
@@ -185,6 +204,11 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('mcp', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
+
+        RateLimiter::for(
+            'mcp-oauth',
+            fn (Request $request) => Limit::perMinute(20)->by($request->ip()),
+        );
 
         RateLimiter::for('chat-send', function (Request $request) {
             /** @var User|null $user */

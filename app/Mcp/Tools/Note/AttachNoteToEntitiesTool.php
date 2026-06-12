@@ -12,8 +12,12 @@ use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Description('Attach a note to companies, people, or opportunities. Adds links without removing existing ones.')]
+#[IsIdempotent]
+#[IsOpenWorld(false)]
 final class AttachNoteToEntitiesTool extends BaseAttachTool
 {
     protected function modelClass(): string

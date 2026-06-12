@@ -13,8 +13,10 @@ use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Description('Create a new task in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[IsOpenWorld(false)]
 final class CreateTaskTool extends BaseCreateTool
 {
     protected function actionClass(): string

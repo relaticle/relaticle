@@ -35,6 +35,7 @@ jobs:
         run: |
           cp .env.ci .env
           php artisan key:generate
+          php artisan passport:keys --force --no-interaction
 
       - name: Run Lint
         run: composer test:lint
@@ -136,6 +137,7 @@ jobs:
         run: |
           cp .env.ci .env
           php artisan key:generate
+          php artisan passport:keys --force --no-interaction
 
       - name: Tests
         run: composer test:pest:ci
@@ -209,6 +211,7 @@ jobs:
         run: |
           cp .env.ci .env
           php artisan key:generate
+          php artisan passport:keys --force --no-interaction
 
       - name: Install NPM dependencies
         run: npm ci

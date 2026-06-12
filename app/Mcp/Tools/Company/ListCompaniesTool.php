@@ -9,11 +9,13 @@ use App\Http\Resources\V1\CompanyResource;
 use App\Mcp\Tools\BaseListTool;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Description('List companies in the CRM with optional search and pagination.')]
 #[IsReadOnly]
 #[IsIdempotent]
+#[IsOpenWorld(false)]
 final class ListCompaniesTool extends BaseListTool
 {
     protected function actionClass(): string
