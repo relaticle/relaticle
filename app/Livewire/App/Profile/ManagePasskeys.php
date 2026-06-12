@@ -10,6 +10,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -101,6 +102,7 @@ final class ManagePasskeys extends BaseLivewireComponent
         return Action::make('registerPasskey')
             ->label(__('profile.sections.passkeys.add_passkey'))
             ->modalHeading(__('profile.sections.passkeys.add_passkey'))
+            ->modalWidth(Width::Medium)
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
             ->schema(array_filter([
                 TextInput::make('name')
