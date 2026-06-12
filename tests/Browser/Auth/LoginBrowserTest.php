@@ -15,5 +15,5 @@ it('user can log in and reach the dashboard', function (): void {
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}/companies");
+        ->assertPathIs("/app/{$team->slug}");
 });

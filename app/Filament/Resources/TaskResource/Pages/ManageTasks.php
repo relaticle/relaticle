@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Actions\Task\NotifyTaskAssignees;
+use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
@@ -15,12 +16,14 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
+use Livewire\Attributes\On;
 use Override;
 use Relaticle\CustomFields\Concerns\InteractsWithCustomFields;
 use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class ManageTasks extends ManageRecords
 {
+    use HasBoardViewSwitcher;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 
@@ -50,5 +53,11 @@ final class ManageTasks extends ManageRecords
                     resolve(NotifyTaskAssignees::class)->execute($record);
                 }),
         ];
+    }
+
+    #[On('ai-write-completed')]
+    public function refreshOnAiWrite(): void
+    {
+        // Filament table auto-refreshes on Livewire re-render
     }
 }

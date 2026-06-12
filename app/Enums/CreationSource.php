@@ -45,6 +45,11 @@ enum CreationSource: string implements HasColor, HasLabel
      */
     case MCP = 'mcp';
 
+    /**
+     * Created through the dashboard AI chat assistant.
+     */
+    case CHAT = 'chat';
+
     public function getColor(): string
     {
         return match ($this) {
@@ -53,6 +58,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::IMPORT => 'success',
             self::API => 'purple',
             self::MCP => 'gray',
+            self::CHAT => 'indigo',
         };
     }
 
@@ -64,6 +70,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::IMPORT => 'Data Import',
             self::API => 'API',
             self::MCP => 'MCP Agent',
+            self::CHAT => 'AI Chat',
         };
     }
 }

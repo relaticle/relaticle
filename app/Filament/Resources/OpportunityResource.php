@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
@@ -44,8 +45,6 @@ final class OpportunityResource extends Resource
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trophy';
 
     protected static ?int $navigationSort = 3;
-
-    protected static string|\UnitEnum|null $navigationGroup = null;
 
     public static function form(Schema $schema): Schema
     {
@@ -118,6 +117,7 @@ final class OpportunityResource extends Resource
     {
         return [
             'index' => ListOpportunities::route('/'),
+            'board' => OpportunitiesBoard::route('/board'),
             'view' => ViewOpportunity::route('/{record}'),
         ];
     }
@@ -135,11 +135,6 @@ final class OpportunityResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/opportunity.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.workspace');
     }
 
     public static function getEloquentQuery(): Builder

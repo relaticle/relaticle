@@ -29,7 +29,7 @@ test('users can authenticate using the login screen', function () {
             'password' => 'password',
         ])
         ->call('authenticate')
-        ->assertRedirect(url()->getAppUrl("{$team->slug}/companies"));
+        ->assertRedirect(url()->getAppUrl((string) $team->slug));
 
     $this->assertAuthenticated();
 });

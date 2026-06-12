@@ -35,7 +35,10 @@ final readonly class ListTasks
         $request ??= new Request(['filter' => $filters]);
         $filterSchema = new CustomFieldFilterSchema;
 
-        $query = QueryBuilder::for(Task::query()->withCustomFieldValues(), $request)
+        $query = QueryBuilder::for(
+            Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            $request,
+        )
             ->allowedFilters(
                 AllowedFilter::partial('title'),
                 AllowedFilter::callback('assigned_to_me', function (Builder $query, mixed $value) use ($user): void {
