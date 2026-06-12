@@ -142,3 +142,58 @@ it('renders the Passkeys section heading and description', function (): void {
         ->assertSee('Passkeys')
         ->assertSee('Manage your passkeys for passwordless sign-in.');
 });
+
+it('dispatches the passkey confirmation ceremony when a password user with a passkey adds another', function (): void {
+    session()->forget('auth.password_confirmed_at');
+
+    Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Existing Key',
+        'credential_id' => 'cred-existing-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'New MacBook'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-confirm-then-register')
+        ->assertNotDispatched('passkey-register-confirmed');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('registers via the password fallback when the user opts into password confirmation', function (): void {
+    Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Existing Key',
+        'credential_id' => 'cred-existing2-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register-confirmed')
+        ->assertNotDispatched('passkey-confirm-then-register');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
+it('rejects the password fallback when the password is wrong', function (): void {
+    session()->forget('auth.password_confirmed_at');
+
+    Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Existing Key',
+        'credential_id' => 'cred-existing3-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'wrong-password'])
+        ->assertHasActionErrors(['password'])
+        ->assertNotDispatched('passkey-register-confirmed')
+        ->assertNotDispatched('passkey-confirm-then-register');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
