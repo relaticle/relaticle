@@ -209,3 +209,116 @@ it('requires a password and never reaches the ceremony for a password user regis
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
+
+it('dispatches the passkey confirmation ceremony when deleting without a password', function (): void {
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Ceremony Delete',
+        'credential_id' => 'cred-cer-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertDispatched('passkey-confirm-then-delete', passkeyId: $passkey->id);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('deletes via the password fallback when the user opts into password confirmation', function (): void {
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Password Delete',
+        'credential_id' => 'cred-pw-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', data: ['use_password' => true, 'password' => 'password'], arguments: ['passkeyId' => $passkey->id])
+        ->assertHasNoActionErrors();
+
+    expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+it('deletes after a fresh passkey confirmation', function (): void {
+    session()->put('auth.password_confirmed_at', time());
+
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Confirmed Delete',
+        'credential_id' => 'cred-conf-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
+
+    expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+it('refuses to delete after passkey confirmation when no confirmation happened', function (): void {
+    session()->forget('auth.password_confirmed_at');
+
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Unconfirmed Delete',
+        'credential_id' => 'cred-unconf-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('refuses to delete after passkey confirmation when the confirmation is stale', function (): void {
+    session()->put('auth.password_confirmed_at', time() - 10900);
+
+    $passkey = Passkey::create([
+        'user_id' => $this->user->id,
+        'name' => 'Stale Delete',
+        'credential_id' => 'cred-stale-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('does not delete another user passkey after passkey confirmation', function (): void {
+    session()->put('auth.password_confirmed_at', time());
+
+    $other = User::factory()->create();
+    $passkey = Passkey::create([
+        'user_id' => $other->id,
+        'name' => 'Foreign Key',
+        'credential_id' => 'cred-foreign-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('deletes directly for passwordless users without a ceremony', function (): void {
+    $passwordless = User::factory()->create(['password' => null]);
+    $this->actingAs($passwordless);
+
+    $passkey = Passkey::create([
+        'user_id' => $passwordless->id,
+        'name' => 'Social Delete',
+        'credential_id' => 'cred-social-del-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertNotDispatched('passkey-confirm-then-delete');
+
+    expect(Passkey::find($passkey->id))->toBeNull();
+});

@@ -72,7 +72,7 @@ return [
             'cancel' => 'Cancel',
             'remove' => 'Remove',
             'remove_confirm_title' => 'Remove passkey',
-            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in. Enter your password to confirm.',
+            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
         ],
     ],
 
@@ -100,6 +100,9 @@ return [
         ],
         'passkey_registration_failed' => [
             'title' => 'Could not add passkey. Please try again.',
+        ],
+        'passkey_confirmation_failed' => [
+            'title' => 'Passkey verification failed. Please try again.',
         ],
     ],
 
