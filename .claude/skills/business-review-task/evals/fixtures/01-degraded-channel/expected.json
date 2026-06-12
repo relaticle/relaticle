@@ -1,0 +1,1 @@
+{"label": "blocked", "channel": "degraded", "must_not_contain": ["ai-approved", "ai-rejected"]}

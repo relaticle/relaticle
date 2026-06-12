@@ -1,0 +1,80 @@
+{
+  "persona": "team-owner (tapix)",
+  "channel_degraded": false,
+  "journeys": [
+    {
+      "id": "tasks-view-switching",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Direct deep-link open /tapix/tasks/board -> Board active, 3 columns render, no error",
+        "Dark mode + 390px viewport: switcher legible (computed style) and fits without overflow"
+      ],
+      "evidence": "shots/j1-tasks-list.png (switcher inline, List active), shots/j1-tasks-board.png (Board active, To do/In progress/Done)"
+    },
+    {
+      "id": "opportunities-view-switching",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Direct deep-link open /tapix/opportunities/board -> board renders (Prospecting/Qualification/Needs Analysis), NOT swallowed by /{record}, no error"
+      ],
+      "evidence": "shots/j2-opp-board-deeplink.png; opp list switcher confirmed List-active"
+    },
+    {
+      "id": "board-functionality-preserved",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Empty 'Done' column renders 'No records in this column' without error",
+        "Zero-options state: covered by new unit test (board + list heading render OK with all status options deleted); state UI-unreachable (options Repeater requires >=1, system fields protected)",
+        "x-sortable Alpine init verified on all 3 columns AFTER an SPA wire:navigate switcher transition",
+        "LIVE moveCard: br-rel-336-drag created via board UI, moved To do -> In progress through the board component's moveCard wire method; DOM + DB + j3-movecard-live.png"
+      ],
+      "evidence": "board columns render from status/stage options; cards in correct columns with priority/amount/due date; j3-movecard-live.png (live move), j4-dark-board.png (dark mode), j5-mobile-390.png (390px fits)"
+    },
+    {
+      "id": "sidebar-nav-consolidation",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Re-inspected sidebar after navigation -> still single Tasks/Opportunities entries, boardOrphan=false"
+      ],
+      "evidence": "sidebar = Home, People, Companies, Opportunities, Tasks, Notes (no Board sub-entries)"
+    },
+    {
+      "id": "legacy-url-redirect",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Logged-out hit of /tapix/tasks/board -> 302 to /login (auth-gated, no leak)",
+        "Full logged-out chain: legacy -> 301 -> /tasks/board -> 302 -> /login -> 200, no 5xx (curl -sIL)"
+      ],
+      "evidence": "legacy /tapix/tasks-board -> 301 -> /tapix/tasks/board; /tapix/opportunities-board -> 301 -> /tapix/opportunities/board (browser + curl)"
+    },
+    {
+      "id": "board-gate-and-tenant-isolation",
+      "value_verdict": "delivered",
+      "sad_paths_walked": [
+        "Cross-tenant probe: authenticated tapix owner requested /abcd/tasks/board (non-member team) -> 404 Not Found, no cross-team data"
+      ],
+      "evidence": "positive gate confirmed (switcher shows because tapix has status/stage field); tenant isolation holds on new board route"
+    }
+  ],
+  "bugs": [],
+  "ux_friction": [],
+  "coverage": {
+    "frontier_not_reached": [
+      {
+        "item": "bin/setup-workspace.sh provisioning change (blank APP_PANEL_DOMAIN + config/route clear)",
+        "why_unreached": "Dev-tooling for Polyscope workspace clones; not reachable through the product browser and provisioning a fresh clone is outside this run",
+        "how_to_close": "Provision one fresh Polyscope workspace with the script; confirm the app panel serves at <workspace>.test/app and login works"
+      },
+      {
+        "item": "Physical pointer drag gesture (pointerdown/move/up) on a board card",
+        "why_unreached": "agent-browser lacks a reliable drag primitive; the moveCard wire endpoint (what the gesture dispatches) was live-verified and x-sortable Alpine init confirmed post-SPA-transition \u2014 only the raw pointer binding is unobserved (unchanged vendor code)",
+        "how_to_close": "Manual 5-second drag of the br-rel-336-drag card, or dispatch synthetic pointer events across columns"
+      },
+      {
+        "item": "Keyboard-only walk of the switcher (Tab focus ring + Enter activation)",
+        "why_unreached": "Synthetic focus() does not trigger :focus-visible; native <a> elements with aria-current/aria-label make the risk low",
+        "how_to_close": "5-second manual check: Tab to the switcher, confirm focus ring, Enter navigates to Board"
+      }
+    ]
+  }
+}

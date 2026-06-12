@@ -1,0 +1,11 @@
+{
+  "source": "pr-body-explicit-curated",
+  "criteria": [
+    {"id": 1, "text": "Tasks and Opportunities each have a SINGLE sidebar link (no nested Board sub-entries)", "source_files": ["app/Filament/Resources/TaskResource.php", "app/Filament/Resources/OpportunityResource.php"]},
+    {"id": 2, "text": "An in-page List/Board view switcher renders right after the page title on BOTH list and board views, keeping a stable position when toggling", "source_files": ["app/Filament/Concerns/HasBoardViewSwitcher.php", "resources/views/filament/app/view-switcher.blade.php"]},
+    {"id": 3, "text": "Board pages route at /tasks/board and /opportunities/board; the /{record} route does not swallow /board", "source_files": ["app/Filament/Resources/TaskResource.php", "app/Filament/Resources/OpportunityResource.php"]},
+    {"id": 4, "text": "The Board segment hides entirely when the status/stage custom field is missing (preserves prior canAccess behavior)", "source_files": ["app/Filament/Resources/TaskResource/Pages/TasksBoard.php", "app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php"]},
+    {"id": 5, "text": "Legacy /{tenant}/tasks-board and /{tenant}/opportunities-board URLs 301-redirect to the new resource board routes", "source_files": ["app/Providers/Filament/AppPanelProvider.php"]},
+    {"id": 6, "text": "Board functionality (drag/drop card between columns) still works after the move to resource pages", "source_files": ["app/Filament/Resources/TaskResource/Pages/TasksBoard.php", "app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php"]}
+  ]
+}
