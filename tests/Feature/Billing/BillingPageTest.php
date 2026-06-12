@@ -64,6 +64,20 @@ it('starts a trial via the page action', function (): void {
         ->and($team->onGenericTrial())->toBeTrue();
 });
 
+it('shows a graceful error instead of 500 when checkout cannot start', function (): void {
+    // No Stripe secret configured in tests → the checkout call throws; the page must
+    // catch it, notify, and stay put rather than surfacing a 500.
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Free])->save();
+
+    livewire(Billing::class)
+        ->call('upgrade', 'monthly')
+        ->assertNotified()
+        ->assertOk();
+
+    expect($team->refresh()->plan)->toBe(Plan::Free);
+});
+
 it('blocks the trial action for non-owners', function (): void {
     [, $team] = billingPageOwner();
     $member = User::factory()->create();

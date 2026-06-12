@@ -44,5 +44,8 @@ return [
     'member' => [
         'ask_owner' => 'Billing is managed by :owner, the workspace owner.',
     ],
+    'errors' => [
+        'checkout_failed' => "We couldn't start checkout just now. Please try again in a moment.",
+    ],
     'deletion_notice' => 'Any active Pro subscription is canceled — Pro stays until the end of the paid period.',
 ];

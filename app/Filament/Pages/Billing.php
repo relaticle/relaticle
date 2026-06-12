@@ -19,6 +19,7 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Throwable;
 
 final class Billing extends Page
 {
@@ -68,7 +69,14 @@ final class Billing extends Page
             return null;
         }
 
-        return redirect()->away($createCheckout->handle($team, $interval));
+        try {
+            return redirect()->away($createCheckout->handle($team, $interval));
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->notifyCheckoutFailed();
+
+            return null;
+        }
     }
 
     public function managePortal(): ?RedirectResponse
@@ -79,7 +87,22 @@ final class Billing extends Page
             return null;
         }
 
-        return $team->redirectToBillingPortal(url("/app/{$team->slug}/billing"));
+        try {
+            return $team->redirectToBillingPortal(url("/app/{$team->slug}/billing"));
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->notifyCheckoutFailed();
+
+            return null;
+        }
+    }
+
+    private function notifyCheckoutFailed(): void
+    {
+        Notification::make()
+            ->title(__('billing.errors.checkout_failed'))
+            ->danger()
+            ->send();
     }
 
     /** @return array<string, mixed> */
