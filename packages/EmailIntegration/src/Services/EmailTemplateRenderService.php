@@ -7,8 +7,11 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 final readonly class EmailTemplateRenderService
@@ -38,6 +41,85 @@ final readonly class EmailTemplateRenderService
             'subject' => $this->substitute($template->subject ?? '', $variables),
             'body_html' => $this->substitute($template->body_html ?? '', $variables),
         ];
+    }
+
+    /**
+     * Render a template and keep the signature attached below its body as a
+     * dedicated signature block, so applying a template never discards it.
+     *
+     * @return array{subject: string, body_html: string}
+     */
+    public function renderWithSignature(EmailTemplate $template, ?Model $record = null, ?EmailSignature $signature = null): array
+    {
+        $rendered = $this->render($template, $record);
+        $rendered['body_html'] = $this->applySignatureBlock($rendered['body_html'], $signature);
+
+        return $rendered;
+    }
+
+    /**
+     * Replace the body's signature block: strip any existing signature block,
+     * then append a fresh one for the given signature (or none when null).
+     *
+     * Used by every compose mutation (default load, account change, template
+     * select, signature dropdown) so the signature is added and removed in one
+     * deterministic place.
+     */
+    public function applySignatureBlock(string $bodyHtml, ?EmailSignature $signature): string
+    {
+        $body = rtrim($this->stripSignatureBlock($bodyHtml));
+
+        if (! $signature instanceof EmailSignature) {
+            return $body;
+        }
+
+        return $body.$this->signatureBlockHtml($signature);
+    }
+
+    /**
+     * Remove any signature block node(s) from a body, leaving the rest intact.
+     */
+    public function stripSignatureBlock(string $bodyHtml): string
+    {
+        $pattern = '#<div\b[^>]*\bdata-id="'.preg_quote(SignatureBlock::ID, '#').'"[^>]*>\s*</div>#i';
+
+        return preg_replace($pattern, '', $bodyHtml) ?? $bodyHtml;
+    }
+
+    /**
+     * Render the editor body to final email HTML, expanding the signature block
+     * into the signature's content and substituting any leftover merge tags.
+     */
+    public function renderForSending(string $bodyHtml, ?Model $record = null): string
+    {
+        $html = RichContentRenderer::make($bodyHtml)
+            ->customBlocks([SignatureBlock::class])
+            ->toHtml();
+
+        return $this->renderContent($html, $record);
+    }
+
+    /**
+     * Build the HTML for a signature block node the RichEditor can parse.
+     */
+    private function signatureBlockHtml(EmailSignature $signature): string
+    {
+        $config = ['signature_id' => $signature->getKey()];
+
+        $configAttr = htmlspecialchars(
+            (string) json_encode($config),
+            ENT_QUOTES,
+            'UTF-8',
+        );
+
+        $previewAttr = base64_encode((string) SignatureBlock::toPreviewHtml($config));
+        $labelAttr = htmlspecialchars(SignatureBlock::getPreviewLabel($config), ENT_QUOTES, 'UTF-8');
+
+        return '<div data-type="customBlock"'
+            .' data-id="'.SignatureBlock::ID.'"'
+            .' data-config="'.$configAttr.'"'
+            .' data-label="'.$labelAttr.'"'
+            .' data-preview="'.$previewAttr.'"></div>';
     }
 
     /**

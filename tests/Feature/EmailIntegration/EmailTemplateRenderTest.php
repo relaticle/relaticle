@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
@@ -65,6 +67,51 @@ it('renders {name} for a Company record', function (): void {
 
     expect($result['subject'])->toBe('About Beta Ltd')
         ->and($result['body_html'])->toBe('<p>Hello Beta Ltd team.</p>');
+});
+
+it('appends the signature below the body via renderWithSignature', function (): void {
+    $account = ConnectedAccount::withoutEvents(
+        fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->user->id,
+        ])
+    );
+
+    $signature = EmailSignature::withoutEvents(
+        fn () => EmailSignature::factory()->create([
+            'connected_account_id' => $account->id,
+            'content_html' => '<p>Best, Jane</p>',
+        ])
+    );
+
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'Sig Template',
+        'subject' => 'Promo',
+        'body_html' => '<p>Template body</p>',
+    ]);
+
+    $result = app(EmailTemplateRenderService::class)->renderWithSignature($template, null, $signature);
+
+    expect($result['subject'])->toBe('Promo')
+        ->and($result['body_html'])->toContain('<p>Template body</p>')
+        ->and($result['body_html'])->toContain('data-id="signature"')
+        ->and($result['body_html'])->toContain((string) $signature->id);
+});
+
+it('returns the plain body when renderWithSignature gets no signature', function (): void {
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'No Sig Template',
+        'subject' => 'Promo',
+        'body_html' => '<p>Template body</p>',
+    ]);
+
+    $result = app(EmailTemplateRenderService::class)->renderWithSignature($template);
+
+    expect($result['body_html'])->toBe('<p>Template body</p>');
 });
 
 it('leaves placeholders unchanged when no record is passed', function (): void {

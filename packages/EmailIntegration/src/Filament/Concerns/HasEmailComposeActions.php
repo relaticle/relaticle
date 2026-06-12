@@ -29,6 +29,7 @@ use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -82,7 +83,8 @@ trait HasEmailComposeActions
                 return [
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
-                    'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
+                    'body_html' => resolve(EmailTemplateRenderService::class)
+                        ->applySignatureBlock('<p></p>', $signature),
                     'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
@@ -228,7 +230,7 @@ trait HasEmailComposeActions
                         ->options(fn (): array => $this->activeAccountOptions())
                         ->required()
                         ->live()
-                        ->afterStateUpdated(function (?string $state, Set $set): void {
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
                             if ($state === null) {
                                 return;
                             }
@@ -240,9 +242,11 @@ trait HasEmailComposeActions
 
                             $set('signature_id', $sig?->getKey());
 
-                            if ($sig !== null) {
-                                $set('body_html', '<p></p><hr>'.$sig->content_html);
-                            }
+                            // Swap the signature block for the new account's default,
+                            // keeping whatever the user has already typed.
+                            $body = (string) ($get('body_html') ?? '<p></p>');
+                            $set('body_html', resolve(EmailTemplateRenderService::class)
+                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
                         }),
 
                     Select::make('template_id')
@@ -262,26 +266,22 @@ trait HasEmailComposeActions
                                 return;
                             }
 
-                            $rendered = resolve(EmailTemplateRenderService::class)
-                                ->render($template, $this->getCrmRecord());
-
-                            $set('subject', $rendered['subject']);
-
-                            $body = $rendered['body_html'];
-
-                            // Preserve the signature below the template body so picking a
+                            // Keep the signature below the template body so picking a
                             // template never wipes the user's signature.
                             $sig = $this->resolveComposeSignature(
                                 $get('connected_account_id'),
                                 $get('signature_id'),
                             );
 
+                            $rendered = resolve(EmailTemplateRenderService::class)
+                                ->renderWithSignature($template, $this->getCrmRecord(), $sig);
+
                             if ($sig !== null) {
                                 $set('signature_id', $sig->getKey());
-                                $body .= '<hr>'.$sig->content_html;
                             }
 
-                            $set('body_html', $body);
+                            $set('subject', $rendered['subject']);
+                            $set('body_html', $rendered['body_html']);
                         }),
                 ]),
 
@@ -315,6 +315,7 @@ trait HasEmailComposeActions
                 ->label(__('filament/concerns/email-compose.fields.body.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                ->customBlocks([SignatureBlock::class])
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -363,19 +364,14 @@ trait HasEmailComposeActions
                         )
                         ->live()
                         ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
+                            // A null state means "no signature" — strip the block.
+                            $sig = filled($state)
+                                ? EmailSignature::query()->whereKey($state)->first()
+                                : null;
 
-                            /** @var EmailSignature|null $sig */
-                            $sig = EmailSignature::query()->whereKey($state)->first();
-
-                            if ($sig === null) {
-                                return;
-                            }
-
-                            $body = $get('body_html') ?? '';
-                            $set('body_html', ($body !== '' ? $body : '<p></p>').'<hr>'.$sig->content_html);
+                            $body = (string) ($get('body_html') ?? '<p></p>');
+                            $set('body_html', resolve(EmailTemplateRenderService::class)
+                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
                         }),
                 ]),
         ];
@@ -422,6 +418,7 @@ trait HasEmailComposeActions
                 ->label(__('filament/concerns/email-compose.fields.message.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                ->customBlocks([SignatureBlock::class])
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -499,7 +496,7 @@ trait HasEmailComposeActions
         return [
             'connected_account_id' => $data['connected_account_id'],
             'subject' => $renderer->renderContent((string) $data['subject'], $record),
-            'body_html' => $renderer->renderContent((string) $data['body_html'], $record),
+            'body_html' => $renderer->renderForSending((string) $data['body_html'], $record),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),

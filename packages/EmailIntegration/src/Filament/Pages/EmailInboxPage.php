@@ -39,6 +39,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -250,7 +251,8 @@ final class EmailInboxPage extends Page
                 return [
                     'connected_account_id' => $account->getKey(),
                     'signature_id' => $signature?->getKey(),
-                    'body_html' => $signature !== null ? '<p></p><hr>'.$signature->content_html : '',
+                    'body_html' => resolve(EmailTemplateRenderService::class)
+                        ->applySignatureBlock('<p></p>', $signature),
                     'privacy_tier' => $this->defaultPrivacyTier()->value,
                 ];
             })
@@ -608,7 +610,7 @@ final class EmailInboxPage extends Page
                         ->options(fn (): array => $this->activeAccountOptions())
                         ->required()
                         ->live()
-                        ->afterStateUpdated(function (?string $state, Set $set): void {
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
                             if ($state === null) {
                                 return;
                             }
@@ -620,9 +622,11 @@ final class EmailInboxPage extends Page
 
                             $set('signature_id', $sig?->getKey());
 
-                            if ($sig !== null) {
-                                $set('body_html', '<p></p><hr>'.$sig->content_html);
-                            }
+                            // Swap the signature block for the new account's default,
+                            // keeping whatever the user has already typed.
+                            $body = (string) ($get('body_html') ?? '<p></p>');
+                            $set('body_html', resolve(EmailTemplateRenderService::class)
+                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
                         }),
 
                     Select::make('template_id')
@@ -630,7 +634,7 @@ final class EmailInboxPage extends Page
                         ->placeholder(__('filament/pages/email-inbox.compose_form.template.placeholder'))
                         ->options(fn (): array => $this->templateOptions())
                         ->live()
-                        ->afterStateUpdated(function (?string $state, Set $set): void {
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
                             if ($state === null) {
                                 return;
                             }
@@ -642,8 +646,19 @@ final class EmailInboxPage extends Page
                                 return;
                             }
 
+                            // Keep the signature below the template body so picking a
+                            // template never wipes the user's signature.
+                            $sig = $this->resolveComposeSignature(
+                                $get('connected_account_id'),
+                                $get('signature_id'),
+                            );
+
                             $rendered = resolve(EmailTemplateRenderService::class)
-                                ->render($template);
+                                ->renderWithSignature($template, null, $sig);
+
+                            if ($sig instanceof EmailSignature) {
+                                $set('signature_id', $sig->getKey());
+                            }
 
                             $set('subject', $rendered['subject']);
                             $set('body_html', $rendered['body_html']);
@@ -680,6 +695,7 @@ final class EmailInboxPage extends Page
                 ->label(__('filament/pages/email-inbox.compose_form.body.label'))
                 ->required()
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                ->customBlocks([SignatureBlock::class])
                 ->toolbarButtons([
                     'bold', 'italic', 'underline', 'strike',
                     'link', 'bulletList', 'orderedList',
@@ -721,19 +737,14 @@ final class EmailInboxPage extends Page
                         )
                         ->live()
                         ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
+                            // A null state means "no signature" — strip the block.
+                            $sig = filled($state)
+                                ? EmailSignature::query()->whereKey($state)->first()
+                                : null;
 
-                            /** @var EmailSignature|null $sig */
-                            $sig = EmailSignature::query()->whereKey($state)->first();
-
-                            if ($sig === null) {
-                                return;
-                            }
-
-                            $body = $get('body_html') ?? '';
-                            $set('body_html', ($body !== '' ? $body : '<p></p>').'<hr>'.$sig->content_html);
+                            $body = (string) ($get('body_html') ?? '<p></p>');
+                            $set('body_html', resolve(EmailTemplateRenderService::class)
+                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
                         }),
                 ]),
         ];
@@ -849,7 +860,7 @@ final class EmailInboxPage extends Page
         return [
             'connected_account_id' => $data['connected_account_id'],
             'subject' => $renderer->renderContent((string) $data['subject']),
-            'body_html' => $renderer->renderContent((string) $data['body_html']),
+            'body_html' => $renderer->renderForSending((string) $data['body_html']),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),
@@ -906,6 +917,34 @@ final class EmailInboxPage extends Page
             ->pluck('email_address')
             ->values()
             ->all();
+    }
+
+    /**
+     * Resolve the signature to attach when composing: the explicitly selected
+     * one, else the chosen account's default, else the active account's default.
+     */
+    private function resolveComposeSignature(?string $accountId, ?string $signatureId): ?EmailSignature
+    {
+        if (filled($signatureId)) {
+            return EmailSignature::query()->whereKey($signatureId)->first();
+        }
+
+        if (blank($accountId)) {
+            $accountId = ConnectedAccount::query()
+                ->where('user_id', $this->authUser()->getKey())
+                ->where('team_id', filament()->getTenant()?->getKey())
+                ->where('status', 'active')
+                ->value('id');
+        }
+
+        if (blank($accountId)) {
+            return null;
+        }
+
+        return EmailSignature::query()
+            ->where('connected_account_id', $accountId)
+            ->where('is_default', true)
+            ->first();
     }
 
     /**
