@@ -9,7 +9,6 @@ use App\Actions\Jetstream\InviteTeamMember;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\TeamRole;
-use App\Filament\Resources\CompanyResource;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ValidTeamSlug;
@@ -57,7 +56,7 @@ final class CreateTeam extends RegisterTenant
     #[Override]
     public static function getLabel(): string
     {
-        return 'Create Team';
+        return __('filament/pages/teams.create_team.label');
     }
 
     #[Override]
@@ -88,13 +87,13 @@ final class CreateTeam extends RegisterTenant
                     ->contained(false)
                     ->nextAction(
                         fn (Action $action): Action => $action
-                            ->label('Continue')
+                            ->label(__('filament/pages/teams.create_team.actions.continue'))
                             ->size(Size::Large)
                             ->extraAttributes(['class' => 'w-full'])
                     )
                     ->submitAction(
                         Action::make('register')
-                            ->label('Send invites')
+                            ->label(__('filament/pages/teams.create_team.actions.send_invites'))
                             ->size(Size::Large)
                             ->submit('register')
                             ->extraAttributes(['class' => 'w-full'])
@@ -104,7 +103,7 @@ final class CreateTeam extends RegisterTenant
 
     private function getWorkspaceStep(): Step
     {
-        return Step::make('Workspace')
+        return Step::make(__('filament/pages/teams.create_team.steps.workspace'))
             ->schema([
                 Placeholder::make('workspace_heading')
                     ->hiddenLabel()
@@ -118,7 +117,7 @@ final class CreateTeam extends RegisterTenant
 
     private function getAttributionStep(): Step
     {
-        return Step::make('Attribution')
+        return Step::make(__('filament/pages/teams.create_team.steps.attribution'))
             ->schema([
                 Placeholder::make('attribution_heading')
                     ->hiddenLabel()
@@ -150,7 +149,7 @@ final class CreateTeam extends RegisterTenant
 
     private function getUseCaseStep(): Step
     {
-        return Step::make('Use case')
+        return Step::make(__('filament/pages/teams.create_team.steps.use_case'))
             ->key('onboarding-use-case')
             ->schema([
                 Placeholder::make('use_case_heading')
@@ -163,7 +162,7 @@ final class CreateTeam extends RegisterTenant
                     ->dehydrated(false),
 
                 ToggleButtons::make('onboarding_use_case')
-                    ->label('What will you be using Relaticle for?')
+                    ->label(__('filament/pages/teams.create_team.form.use_case_label'))
                     ->required()
                     ->options(
                         collect(OnboardingUseCase::cases())
@@ -183,7 +182,7 @@ final class CreateTeam extends RegisterTenant
                     ->live(),
 
                 ToggleButtons::make('onboarding_context')
-                    ->label('Please tell us more about your use case.')
+                    ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
                     ->required()
                     ->options(function (Get $get): array {
                         $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
@@ -206,7 +205,7 @@ final class CreateTeam extends RegisterTenant
 
     private function getInviteStep(): Step
     {
-        return Step::make('Invite')
+        return Step::make(__('filament/pages/teams.create_team.steps.invite'))
             ->schema([
                 Placeholder::make('invite_heading')
                     ->hiddenLabel()
@@ -226,19 +225,19 @@ final class CreateTeam extends RegisterTenant
                 Repeater::make('invites')
                     ->hiddenLabel()
                     ->table([
-                        TableColumn::make('Email'),
-                        TableColumn::make('Role')
+                        TableColumn::make(__('filament/pages/teams.create_team.form.invite_table_column_email')),
+                        TableColumn::make(__('filament/pages/teams.create_team.form.invite_table_column_role'))
                             ->width('140px'),
                     ])
                     ->schema([
                         TextInput::make('email')
                             ->email()
-                            ->placeholder('colleague@company.com'),
+                            ->placeholder(__('filament/pages/teams.create_team.form.invite_email_placeholder')),
 
                         Select::make('role')
                             ->options([
-                                TeamRole::Editor->value => 'Member',
-                                TeamRole::Admin->value => 'Admin',
+                                TeamRole::Editor->value => __('filament/pages/teams.create_team.form.invite_role_member'),
+                                TeamRole::Admin->value => __('filament/pages/teams.create_team.form.invite_role_admin'),
                             ])
                             ->default(TeamRole::Editor->value)
                             ->selectablePlaceholder(false),
@@ -247,11 +246,11 @@ final class CreateTeam extends RegisterTenant
                     ->maxItems(5)
                     ->reorderable(false)
                     ->compact()
-                    ->addActionLabel('Add more'),
+                    ->addActionLabel(__('filament/pages/teams.create_team.actions.add_more')),
 
                 Actions::make([
                     Action::make('copyInviteLink')
-                        ->label('Copy invite link')
+                        ->label(__('filament/pages/teams.create_team.actions.copy_invite_link'))
                         ->icon(Heroicon::OutlinedLink)
                         ->color('gray')
                         ->link()
@@ -261,8 +260,8 @@ final class CreateTeam extends RegisterTenant
                                     $data = $this->form->getState();
                                 } catch (ValidationException) {
                                     Notification::make()
-                                        ->title('Complete the previous steps first')
-                                        ->body('Fill in your workspace details and use case before generating an invite link.')
+                                        ->title(__('filament/pages/teams.create_team.notifications.complete_previous_steps.title'))
+                                        ->body(__('filament/pages/teams.create_team.notifications.complete_previous_steps.body'))
                                         ->warning()
                                         ->send();
 
@@ -285,8 +284,8 @@ final class CreateTeam extends RegisterTenant
                             $this->js('navigator.clipboard.writeText('.json_encode($url, JSON_THROW_ON_ERROR).')');
 
                             Notification::make()
-                                ->title('Invite link copied')
-                                ->body('Share this link with your teammates. Anyone with the link can join this team.')
+                                ->title(__('filament/pages/teams.create_team.notifications.invite_link_copied.title'))
+                                ->body(__('filament/pages/teams.create_team.notifications.invite_link_copied.body'))
                                 ->success()
                                 ->send();
                         }),
@@ -303,10 +302,10 @@ final class CreateTeam extends RegisterTenant
 
         return [
             TextInput::make('name')
-                ->label('Company name')
+                ->label(__('filament/pages/teams.create_team.form.company_name.label'))
                 ->required()
                 ->maxLength(255)
-                ->placeholder('Acme Corp')
+                ->placeholder(__('filament/pages/teams.create_team.form.company_name.placeholder'))
                 ->autofocus()
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
@@ -317,7 +316,7 @@ final class CreateTeam extends RegisterTenant
                 }),
 
             TextInput::make('slug')
-                ->label('Workspace handle')
+                ->label(__('filament/pages/teams.create_team.form.workspace_handle.label'))
                 ->required()
                 ->maxLength(255)
                 ->rules([new ValidTeamSlug])
@@ -327,7 +326,7 @@ final class CreateTeam extends RegisterTenant
                     ignorable: fn (): ?Team => $this->tenant instanceof Team ? $this->tenant : null,
                 )
                 ->prefix("{$appHost}/")
-                ->helperText('Only lowercase letters, numbers, and hyphens are allowed.')
+                ->helperText(__('filament/pages/teams.create_team.form.workspace_handle.helper_text'))
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set): void {
                     $set('slug_auto_generated', false);
@@ -345,8 +344,8 @@ final class CreateTeam extends RegisterTenant
         $tenant = $this->tenant;
 
         Notification::make()
-            ->title('Workspace created')
-            ->body("Your workspace \"{$tenant->name}\" is ready to go.")
+            ->title(__('filament/pages/teams.create_team.notifications.workspace_created.title'))
+            ->body(__('filament/pages/teams.create_team.notifications.workspace_created.body', ['name' => $tenant->name]))
             ->success()
             ->send();
     }
@@ -354,7 +353,7 @@ final class CreateTeam extends RegisterTenant
     #[Override]
     protected function getRedirectUrl(): string
     {
-        return CompanyResource::getUrl('index', ['tenant' => $this->tenant]);
+        return Dashboard::getUrl(['tenant' => $this->tenant]);
     }
 
     #[Override]
@@ -433,7 +432,7 @@ final class CreateTeam extends RegisterTenant
                 ->implode("\n");
 
             Notification::make()
-                ->title('Some invites could not be sent')
+                ->title(__('filament/pages/teams.create_team.notifications.some_invites_failed.title'))
                 ->body($body)
                 ->warning()
                 ->send();
@@ -454,7 +453,7 @@ final class CreateTeam extends RegisterTenant
     {
         return Action::make('register')
             ->size(Size::Large)
-            ->label('Get started')
+            ->label(__('filament/pages/teams.create_team.actions.get_started'))
             ->submit('register')
             ->extraAttributes(['class' => 'w-full']);
     }

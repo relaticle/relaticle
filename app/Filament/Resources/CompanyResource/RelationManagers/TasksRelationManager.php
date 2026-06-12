@@ -37,17 +37,17 @@ final class TasksRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('title'),
                 TextColumn::make('assignees.name')
-                    ->label('Assignee')
+                    ->label(__('filament/resources/company.relation_managers.tasks.fields.assignees.label'))
                     ->badge()
                     ->color('primary')
                     ->searchable(),
                 TextColumn::make('people.name')
-                    ->label('People')
+                    ->label(__('filament/resources/company.relation_managers.tasks.fields.people.label'))
                     ->badge()
                     ->color('primary')
                     ->searchable(),
                 TextColumn::make('created_at')
-                    ->label('Created At')
+                    ->label(__('filament/resources/company.relation_managers.tasks.fields.created_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(),

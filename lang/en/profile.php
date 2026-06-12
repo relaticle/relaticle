@@ -59,6 +59,7 @@ return [
 
     'actions' => [
         'save' => 'Save',
+        'remove_photo' => 'Remove photo',
         'delete_account' => 'Delete Account',
         'log_out_other_browsers' => 'Log Out Other Browser Sessions',
     ],
@@ -67,6 +68,8 @@ return [
         'save' => [
             'success' => 'Saved.',
         ],
+        'photo_removed' => 'Profile photo removed.',
+        'photo_remove_failed' => 'Could not remove your profile photo. Please try again.',
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',
         ],
@@ -88,4 +91,18 @@ return [
     ],
 
     'edit_profile' => 'Edit Profile',
+
+    'scheduled_deletion_interstitial' => [
+        'actions' => [
+            'cancel_deletion' => [
+                'label' => 'Keep my account',
+                'modal_heading' => 'Keep your account?',
+                'modal_description' => 'Your scheduled deletion will be cancelled and all your data will be preserved.',
+                'modal_submit_label' => 'Yes, keep my account',
+            ],
+            'logout' => [
+                'label' => 'Sign out',
+            ],
+        ],
+    ],
 ];

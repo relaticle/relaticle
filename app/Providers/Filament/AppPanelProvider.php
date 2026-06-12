@@ -9,9 +9,11 @@ use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\CreateTeam;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
-use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Listeners\SwitchTeam;
@@ -51,6 +53,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
+use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -69,7 +72,7 @@ final class AppPanelProvider extends PanelProvider
         );
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
-        DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label('Delete record'));
+        DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
         Table::configureUsing(fn (Table $table): Table => $table);
     }
@@ -92,7 +95,7 @@ final class AppPanelProvider extends PanelProvider
         }
 
         $panel
-            ->homeUrl(fn (): string => CompanyResource::getUrl())
+            ->homeUrl(fn (): string => Dashboard::getUrl())
             ->brandName('Relaticle')
             ->brandLogo(fn (): View|Factory => Auth::user()?->hasVerifiedEmail()
                 ? view('filament.app.logo-empty')
@@ -103,7 +106,7 @@ final class AppPanelProvider extends PanelProvider
             ->authGuard('web')
             ->authPasswordBroker('users')
             ->passwordReset()
-            ->emailVerification()
+            ->emailVerification(isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
             ->databaseNotifications()
@@ -126,7 +129,7 @@ final class AppPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/app/theme.css')
             ->userMenuItems([
                 Action::make('profile')
-                    ->label('Profile')
+                    ->label(__('filament/panel.user_menu.profile'))
                     ->icon('heroicon-m-user-circle')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EditProfile::getUrl())
@@ -135,6 +138,7 @@ final class AppPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
+            ->discoverPages(in: base_path('packages/Chat/src/Filament/Pages'), for: 'Relaticle\\Chat\\Filament\\Pages')
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
@@ -147,12 +151,17 @@ final class AppPanelProvider extends PanelProvider
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
+
+                Route::get('/{tenant}/tasks-board', fn (string $tenant) => redirect()->to(TaskResource::getUrl('board', ['tenant' => $tenant]), status: 301))
+                    ->name('tasks-board.redirect');
+                Route::get('/{tenant}/opportunities-board', fn (string $tenant) => redirect()->to(OpportunityResource::getUrl('board', ['tenant' => $tenant]), status: 301))
+                    ->name('opportunities-board.redirect');
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label('Tasks')
+                    ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('heroicon-o-shopping-cart'),
             ])
             ->middleware([
@@ -222,8 +231,12 @@ final class AppPanelProvider extends PanelProvider
             ->tenantRegistration(CreateTeam::class)
             ->tenantProfile(EditTeam::class)
             ->tenantMenuItems([
+                Action::make('custom_fields')
+                    ->label(__('filament/panel.tenant_menu.custom_fields'))
+                    ->icon(Heroicon::OutlinedCube)
+                    ->url(fn (): string => CustomFieldsManagementPage::getUrl()),
                 Action::make('import_history')
-                    ->label('Import History')
+                    ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
                     ->url(fn (): string => ImportHistory::getUrl()),
             ]);

@@ -42,8 +42,6 @@ final class CompanyResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Workspace';
-
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -52,7 +50,7 @@ final class CompanyResource extends Resource
                     ->required(),
                 Select::make('account_owner_id')
                     ->relationship('accountOwner', 'name')
-                    ->label('Account Owner')
+                    ->label(__('filament/resources/company.fields.account_owner_id.label'))
                     ->nullable()
                     ->preload()
                     ->searchable(),
@@ -66,17 +64,17 @@ final class CompanyResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Company')
+                    ->label(__('filament/resources/company.fields.name.label'))
                     ->searchable()
                     ->sortable()
                     ->view('filament.tables.columns.logo-name-column'),
                 TextColumn::make('accountOwner.name')
-                    ->label('Account Owner')
+                    ->label(__('filament/resources/company.fields.account_owner.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('creator.name')
-                    ->label('Created By')
+                    ->label(__('filament/resources/company.fields.created_by.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable()
@@ -87,13 +85,13 @@ final class CompanyResource extends Resource
                     ->toggleable()
                     ->toggledHiddenByDefault(),
                 TextColumn::make('created_at')
-                    ->label('Creation Date')
+                    ->label(__('filament/resources/company.fields.created_at.label'))
                     ->dateTime()
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('updated_at')
-                    ->label('Last Update')
+                    ->label(__('filament/resources/company.fields.updated_at.label'))
                     ->since()
                     ->searchable()
                     ->sortable()
@@ -102,7 +100,7 @@ final class CompanyResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label(__('filament/resources/company.fields.creation_source.label'))
                     ->options(CreationSource::class)
                     ->multiple(),
                 TrashedFilter::make(),
@@ -133,6 +131,21 @@ final class CompanyResource extends Resource
             'index' => ListCompanies::route('/'),
             'view' => ViewCompany::route('/{record}'),
         ];
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/company.label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('filament/resources/company.plural_label');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/resources/company.navigation_label');
     }
 
     public static function getGloballySearchableAttributes(): array

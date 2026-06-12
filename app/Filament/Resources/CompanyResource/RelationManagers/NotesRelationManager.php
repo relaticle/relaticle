@@ -38,7 +38,7 @@ final class NotesRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('title'),
                 TextColumn::make('people.name')
-                    ->label('People')
+                    ->label(__('filament/resources/company.relation_managers.notes.fields.people.label'))
                     ->badge()
                     ->color('primary')
                     ->searchable(),

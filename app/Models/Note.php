@@ -11,6 +11,7 @@ use App\Models\Concerns\HasTeam;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,6 +34,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property CreationSource $creation_source
  */
 #[ObservedBy(NoteObserver::class)]
+#[Fillable([
+    'creation_source',
+])]
 final class Note extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
@@ -48,15 +52,6 @@ final class Note extends Model implements HasCustomFields, HasTimeline
     use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'creation_source',
-    ];
 
     /**
      * @var array<string, mixed>

@@ -8,6 +8,7 @@ use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -37,7 +38,7 @@ final class TaskResource extends Resource
 {
     protected static ?string $model = Task::class;
 
-    protected static ?string $navigationLabel = 'Tasks';
+    protected static ?string $navigationLabel = null;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-check-circle';
 
@@ -45,7 +46,20 @@ final class TaskResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Workspace';
+    public static function getModelLabel(): string
+    {
+        return __('filament/resources/task.label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('filament/resources/task.plural_label');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/resources/task.navigation_label');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -66,13 +80,13 @@ final class TaskResource extends Resource
                     ->limit(50)
                     ->weight('medium'),
                 TextColumn::make('assignees.name')
-                    ->label('Assignee')
+                    ->label(__('filament/resources/task.fields.assignees.label'))
                     ->badge()
                     ->color('primary')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('creator.name')
-                    ->label('Created By')
+                    ->label(__('filament/resources/task.fields.creator.label'))
                     ->searchable()
                     ->sortable()
                     ->toggleable()
@@ -96,7 +110,7 @@ final class TaskResource extends Resource
             ->paginated([10, 25, 50])
             ->filters([
                 Filter::make('assigned_to_me')
-                    ->label('Assigned to me')
+                    ->label(__('filament/resources/task.filters.assigned_to_me.label'))
                     ->query(fn (Builder $query): Builder => $query->whereHas('assignees', function (Builder $query): void {
                         $query->where('users.id', auth()->id());
                     }))
@@ -107,7 +121,7 @@ final class TaskResource extends Resource
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('creation_source')
-                    ->label('Creation Source')
+                    ->label(__('filament/resources/task.filters.creation_source.label'))
                     ->options(CreationSource::class)
                     ->multiple(),
                 TrashedFilter::make(),
@@ -143,6 +157,7 @@ final class TaskResource extends Resource
     {
         return [
             'index' => ManageTasks::route('/'),
+            'board' => TasksBoard::route('/board'),
         ];
     }
 
@@ -162,7 +177,7 @@ final class TaskResource extends Resource
                     ->whereColumn('custom_field_values.entity_id', 'tasks.id')
                     ->limit(1)
                     ->getQuery(),
-                $direction
+                strtolower($direction) === 'desc' ? 'desc' : 'asc',
             ))
             ->getTitleFromRecordUsing(function (Task $record) use ($valueResolver, $field, $label): string {
                 $value = $valueResolver->resolve($record, $field);

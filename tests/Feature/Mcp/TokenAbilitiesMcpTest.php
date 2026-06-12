@@ -30,7 +30,7 @@ describe('read-only token', function (): void {
     it('cannot create a company', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(CreateCompanyTool::class, ['name' => 'Blocked'])
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 
     it('cannot update a company', function (): void {
@@ -41,7 +41,7 @@ describe('read-only token', function (): void {
                 'id' => $company->id,
                 'name' => 'Blocked',
             ])
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 
     it('cannot delete a company', function (): void {
@@ -51,7 +51,7 @@ describe('read-only token', function (): void {
             ->tool(DeleteCompanyTool::class, [
                 'id' => $company->id,
             ])
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 });
 
@@ -64,7 +64,7 @@ describe('create-only token', function (): void {
     it('cannot list companies', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 
     it('can create a company', function (): void {
@@ -80,7 +80,7 @@ describe('create-only token', function (): void {
             ->tool(DeleteCompanyTool::class, [
                 'id' => $company->id,
             ])
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 });
 

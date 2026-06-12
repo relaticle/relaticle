@@ -32,11 +32,11 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
-            EditAction::make()->icon('heroicon-o-pencil-square')->label('Edit'),
+            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
-                        ->label('Copy page URL')
+                        ->label(__('filament/resources/company.pages.view.actions.copy_page_url.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Company $record): void {
                             $jsUrl = Js::from(CompanyResource::getUrl('view', [$record]));
@@ -50,7 +50,7 @@ final class ViewCompany extends ViewRecord
                         ");
                         }),
                     Action::make('copyRecordId')
-                        ->label('Copy record ID')
+                        ->label(__('filament/resources/company.pages.view.actions.copy_record_id.label'))
                         ->icon('heroicon-o-clipboard-document')
                         ->action(function (Company $record): void {
                             $jsId = Js::from((string) $record->getKey());
@@ -82,31 +82,31 @@ final class ViewCompany extends ViewRecord
                                 ->avatarSize('lg')
                                 ->textSize('xl')
                                 ->square()
-                                ->label(''),
+                                ->label(__('filament/resources/company.pages.view.infolist.fields.logo.label')),
                             AvatarName::make('creator')
                                 ->avatar('creator.avatar')
                                 ->name('creator.name')
                                 ->avatarSize('sm')
-                                ->textSize('sm')  // Default text size for creator
+                                ->textSize('sm')
                                 ->circular()
-                                ->label('Created By'),
+                                ->label(__('filament/resources/company.pages.view.infolist.fields.creator.label')),
                             AvatarName::make('accountOwner')
                                 ->avatar('accountOwner.avatar')
                                 ->name('accountOwner.name')
                                 ->avatarSize('sm')
-                                ->textSize('sm')  // Default text size for account owner
+                                ->textSize('sm')
                                 ->circular()
-                                ->label('Account Owner'),
+                                ->label(__('filament/resources/company.pages.view.infolist.fields.account_owner.label')),
                         ]),
                         CustomFields::infolist()->forSchema($schema)->build(),
                     ]),
                     Section::make([
                         TextEntry::make('created_at')
-                            ->label('Created Date')
+                            ->label(__('filament/resources/company.pages.view.infolist.fields.created_at.label'))
                             ->icon('heroicon-o-clock')
                             ->dateTime(),
                         TextEntry::make('updated_at')
-                            ->label('Last Updated')
+                            ->label(__('filament/resources/company.pages.view.infolist.fields.updated_at.label'))
                             ->icon('heroicon-o-clock')
                             ->dateTime(),
                     ])->grow(false),

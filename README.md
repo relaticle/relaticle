@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center">The Open-Source CRM Built for AI Agents</h1>
+<h1 align="center">The Open-Source CRM Built for People and AI-Powered Work</h1>
 
 <p align="center">
   <a href="https://github.com/Relaticle/relaticle/actions"><img src="https://img.shields.io/github/actions/workflow/status/Relaticle/relaticle/deploy.yml?style=for-the-badge&label=tests" alt="Tests"></a>
@@ -74,6 +74,10 @@ composer lint
 # Self-Hosting
 
 See the [Self-Hosting Guide](https://relaticle.com/docs/self-hosting) for Docker and manual deployment instructions.
+
+# Internationalization
+
+Relaticle ships English-only in the main repository, but the codebase is fully i18n-ready. Self-host forks can drop a `lang/<locale>/` directory in place to translate the entire app. See [`docs/i18n.md`](docs/i18n.md) for the override workflow and CI guardrails.
 
 # Documentation
 

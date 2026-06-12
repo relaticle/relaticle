@@ -75,7 +75,7 @@ final class DeleteTeam extends BaseLivewireComponent
         try {
             resolve(ScheduleTeamDeletion::class)->schedule($this->authUser(), $team);
 
-            $this->sendNotification("Team scheduled for deletion on {$team->refresh()->scheduled_deletion_at->format('F j, Y')}");
+            $this->sendNotification("Workspace scheduled for deletion on {$team->refresh()->scheduled_deletion_at->format('F j, Y')}");
         } catch (AuthorizationException) {
             $this->sendNotification(
                 __('teams.notifications.permission_denied.cannot_delete_team'),
@@ -91,7 +91,7 @@ final class DeleteTeam extends BaseLivewireComponent
         try {
             resolve(CancelTeamDeletion::class)->cancel($this->authUser(), $team);
 
-            $this->sendNotification('Team deletion cancelled');
+            $this->sendNotification('Workspace deletion cancelled');
         } catch (AuthorizationException) {
             $this->sendNotification(
                 __('teams.notifications.permission_denied.cannot_cancel_team_deletion'),

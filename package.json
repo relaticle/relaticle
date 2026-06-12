@@ -14,18 +14,31 @@
         "@tailwindcss/typography": "^0.5.19",
         "autoprefixer": "^10.5.0",
         "chokidar": "^5.0.0",
-        "laravel-vite-plugin": "^3.0",
-        "playwright": "^1.59.1",
-        "postcss": "^8.5.10",
+        "laravel-vite-plugin": "^3.1.0",
+        "playwright": "^1.60.0",
+        "postcss": "^8.5.15",
         "postcss-nesting": "^14.0.0",
-        "tailwindcss": "^4.2.2",
-        "vite": "^8.0"
+        "tailwindcss": "^4.2.4",
+        "vite": "^8.0.13"
     },
     "dependencies": {
-        "@alpinejs/collapse": "^3.15.11",
-        "@tailwindcss/vite": "^4.2.2",
-        "alpinejs": "^3.15.11",
-        "motion": "^12.38.0",
-        "shiki": "^4.0.2"
+        "@alpinejs/collapse": "^3.15.12",
+        "@tailwindcss/vite": "^4.3.0",
+        "@tiptap/core": "^3.22.5",
+        "@tiptap/extension-document": "^3.22.5",
+        "@tiptap/extension-hard-break": "^3.22.5",
+        "@tiptap/extension-mention": "^3.22.5",
+        "@tiptap/extension-paragraph": "^3.22.5",
+        "@tiptap/extension-placeholder": "^3.22.5",
+        "@tiptap/extension-text": "^3.22.5",
+        "@tiptap/pm": "^3.22.5",
+        "@tiptap/suggestion": "^3.22.5",
+        "alpinejs": "^3.15.12",
+        "dompurify": "^3.4.1",
+        "laravel-echo": "^2.3.4",
+        "marked": "^18.0.2",
+        "motion": "^12.39.0",
+        "pusher-js": "^8.5.0",
+        "shiki": "^4.1.0"
     }
 }

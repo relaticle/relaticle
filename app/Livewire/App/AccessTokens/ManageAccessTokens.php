@@ -40,31 +40,31 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
                     ->where('tokenable_id', $user->getKey()),
             )
             ->columns([
-                TextColumn::make('name')->label('Name')->searchable(),
+                TextColumn::make('name')->label(__('access-tokens.table.columns.name'))->searchable(),
                 TextColumn::make('team.name')
-                    ->label('Team')
-                    ->placeholder('—'),
+                    ->label(__('access-tokens.table.columns.team'))
+                    ->placeholder(__('access-tokens.table.placeholders.no_team')),
                 TextColumn::make('abilities')
-                    ->label('Permissions')
+                    ->label(__('access-tokens.table.columns.abilities'))
                     ->badge()
                     ->formatStateUsing(
                         fn (string $state): string => $state === '*'
-                            ? 'All'
+                            ? __('access-tokens.permissions.all')
                             : ucfirst($state),
                     ),
                 TextColumn::make('expires_at')
-                    ->label('Expires')
+                    ->label(__('access-tokens.table.columns.expires_at'))
                     ->date()
-                    ->placeholder('Never'),
+                    ->placeholder(__('access-tokens.table.placeholders.never')),
                 TextColumn::make('last_used_at')
-                    ->label('Last Used')
+                    ->label(__('access-tokens.table.columns.last_used_at'))
                     ->since()
-                    ->placeholder('Never'),
-                TextColumn::make('created_at')->label('Created')->since(),
+                    ->placeholder(__('access-tokens.table.placeholders.never')),
+                TextColumn::make('created_at')->label(__('access-tokens.table.columns.created_at'))->since(),
             ])
             ->actions([
                 Action::make('permissions')
-                    ->label('Permissions')
+                    ->label(__('access-tokens.modals.permissions.action_label'))
                     ->icon('heroicon-o-lock-closed')
                     ->iconButton()
                     ->tooltip('Edit Permissions')

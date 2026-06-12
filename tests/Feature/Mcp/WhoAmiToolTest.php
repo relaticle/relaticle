@@ -52,7 +52,7 @@ describe('token abilities', function (): void {
 
         RelaticleServer::actingAs($this->user)
             ->tool(WhoAmiTool::class)
-            ->assertHasErrors();
+            ->assertHasErrors(['Invalid ability provided.']);
     });
 
     it('allows read-only token', function (): void {

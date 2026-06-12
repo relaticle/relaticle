@@ -18,22 +18,47 @@ return [
 
     'form' => [
         'name' => 'Token Name',
-        'team' => 'Team',
+        'team' => 'Workspace',
         'expiration' => 'Expiration',
+        'expiration_placeholder' => 'Select expiration...',
         'permissions' => 'Permissions',
+        'token' => 'Token',
+    ],
+
+    'table' => [
+        'columns' => [
+            'name' => 'Name',
+            'team' => 'Workspace',
+            'abilities' => 'Permissions',
+            'expires_at' => 'Expires',
+            'last_used_at' => 'Last Used',
+            'created_at' => 'Created',
+        ],
+        'placeholders' => [
+            'no_team' => '—',
+            'never' => 'Never',
+        ],
     ],
 
     'actions' => [
         'create' => 'Create',
     ],
 
+    'permissions' => [
+        'all' => 'All',
+    ],
+
     'modals' => [
         'show_token' => [
             'title' => 'Access Token',
             'description' => 'Please copy your new access token. For your security, it won\'t be shown again.',
+            'cancel_label' => 'Close',
+            'copy_to_clipboard_tooltip' => 'Copy to clipboard',
+            'copied_tooltip' => 'Copied!',
         ],
         'permissions' => [
             'title' => 'Access Token Permissions',
+            'action_label' => 'Permissions',
         ],
         'delete' => [
             'title' => 'Delete Access Token',

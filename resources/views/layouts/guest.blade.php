@@ -1,4 +1,4 @@
-@props(['title', 'description' => 'Relaticle - The open-source CRM built for AI agents. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
+@props(['title', 'description' => 'Relaticle - The open-source CRM built for people and AI-powered work. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -10,10 +10,19 @@
     <meta name="description" content="{{ $description }}">
     <link rel="canonical" href="{{ url()->current() }}" />
 
+    @php
+        // Bump the version whenever public/images/open-graph.jpg is regenerated
+        // so social caches re-scrape it.
+        $defaultOgImage = url('/images/open-graph.jpg').'?v=2';
+    @endphp
+
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
     <meta property="og:description" content="{{ $ogDescription ?? $description }}"/>
-    <meta property="og:image" content="{{ $ogImage ?? url('/images/open-graph.jpg') }}"/>
+    <meta property="og:image" content="{{ $ogImage ?? $defaultOgImage }}"/>
+    <meta property="og:image:width" content="1200"/>
+    <meta property="og:image:height" content="630"/>
+    <meta property="og:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
     <meta property="og:url" content="{{ request()->getUri() }}"/>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="{{ config('app.name', 'Relaticle') }}" />
@@ -23,9 +32,10 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}" />
     <meta name="twitter:description" content="{{ $ogDescription ?? $description }}" />
-    <meta name="twitter:image" content="{{ $ogImage ?? url('/images/open-graph.jpg') }}" />
+    <meta name="twitter:image" content="{{ $ogImage ?? $defaultOgImage }}" />
+    <meta name="twitter:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}" />
 
-    <title>{{ $title ?? config('app.name', 'Relaticle - The Open-Source CRM Built for AI Agents') }}</title>
+    <title>{{ $title ?? config('app.name', 'Relaticle - CRM Built for People and AI-Powered Work') }}</title>
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />

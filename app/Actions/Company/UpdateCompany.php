@@ -7,6 +7,7 @@ namespace App\Actions\Company;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\CustomFieldMerger;
+use App\Support\TenantFkValidator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,9 @@ final readonly class UpdateCompany
     {
         abort_unless($user->can('update', $company), 403);
 
-        $attributes = Arr::only($data, ['name', 'custom_fields']);
+        TenantFkValidator::assertUserInWorkspace($user, $data, ['account_owner_id']);
+
+        $attributes = Arr::only($data, ['name', 'account_owner_id', 'custom_fields']);
 
         $attributes = CustomFieldMerger::merge($company, $attributes);
 

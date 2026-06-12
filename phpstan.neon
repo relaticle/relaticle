@@ -16,6 +16,66 @@ parameters:
             identifier: argument.type
             path: app/Http/Middleware/ValidateSignature.php
 
+        # i18n: Console output is dev/internal-facing — not user-facing UI strings
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Console/*
+            reportUnmatched: false
+
+        # i18n: MCP tool definitions are server-driven tool surfaces, deferred to Phase 4
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Mcp/*
+            reportUnmatched: false
+
+        # i18n: MCP tool static properties, deferred to Phase 4
+        -
+            identifier: app.i18n.hardcodedStaticProperty
+            path: app/Mcp/*
+            reportUnmatched: false
+
+        # i18n: ImportWizard package, deferred to Phase 4
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: packages/ImportWizard/*
+            reportUnmatched: false
+
+        # i18n: ImportWizard static properties, deferred to Phase 4
+        -
+            identifier: app.i18n.hardcodedStaticProperty
+            path: packages/ImportWizard/*
+            reportUnmatched: false
+
+        # i18n: Notifications + mail templates, deferred to Phase 2
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Notifications/*
+            reportUnmatched: false
+
+        # i18n: notification ->label() inside the NotifyTaskAssignees action
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Actions/Task/NotifyTaskAssignees.php
+            reportUnmatched: false
+
+        # i18n: notification ->title() emitted by the shared Livewire base class
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Livewire/BaseLivewireComponent.php
+            reportUnmatched: false
+
+        # i18n: notification ->title() on OAuth callback failure
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: app/Http/Controllers/Auth/CallbackController.php
+            reportUnmatched: false
+
+        # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: packages/Chat/src/Tools/*
+            reportUnmatched: false
+
 
     stubFiles:
         - stubs/Mailcoach.stub
@@ -33,6 +93,35 @@ parameters:
 
     configDirectories:
         - config
-        - packages/ActivityLog/config
+        - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
+
+services:
+    -
+        class: App\PHPStan\Rules\HardcodedUserFacingStringRule
+        arguments:
+            guardedMethods:
+                - label
+                - placeholder
+                - helperText
+                - heading
+                - description
+                - modalHeading
+                - emptyStateHeading
+                - emptyStateDescription
+                - subject
+                - title
+        tags:
+            - phpstan.rules.rule
+    -
+        class: App\PHPStan\Rules\HardcodedStaticPropertyRule
+        arguments:
+            guardedProperties:
+                - navigationLabel
+                - navigationGroup
+                - modelLabel
+                - pluralModelLabel
+                - breadcrumb
+        tags:
+            - phpstan.rules.rule

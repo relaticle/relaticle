@@ -24,10 +24,10 @@ final class GenerateRecordSummaryAction extends Action
     {
         parent::setUp();
 
-        $this->label('AI Summary')
+        $this->label(__('filament/actions/generate-record-summary.label'))
             ->icon(Heroicon::Sparkles)
             ->color('gray')
-            ->modalHeading('AI Summary')
+            ->modalHeading(__('filament/actions/generate-record-summary.modal.heading'))
             ->modalDescription(fn (Model $record): string => 'AI-generated summary for this '.class_basename($record))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
@@ -41,7 +41,7 @@ final class GenerateRecordSummaryAction extends Action
     private function makeRegenerateAction(): Action
     {
         return Action::make('regenerate')
-            ->label('Regenerate')
+            ->label(__('filament/actions/generate-record-summary.regenerate.label'))
             ->icon(Heroicon::ArrowPath)
             ->color('gray')
             ->action(fn (Model $record) => $this->regenerateSummary($record));
@@ -50,7 +50,7 @@ final class GenerateRecordSummaryAction extends Action
     private function makeCopyAction(): Action
     {
         return Action::make('copy')
-            ->label('Copy')
+            ->label(__('filament/actions/generate-record-summary.copy.label'))
             ->icon(Heroicon::Clipboard)
             ->color('gray')
             ->extraAttributes(function (Model $record): array {
@@ -85,12 +85,12 @@ final class GenerateRecordSummaryAction extends Action
             $this->summaryService()->getSummary($record, regenerate: true);
 
             Notification::make()
-                ->title('Summary regenerated')
+                ->title(__('filament/actions/generate-record-summary.notifications.regenerated'))
                 ->success()
                 ->send();
         } catch (Throwable $e) {
             Notification::make()
-                ->title('Failed to regenerate summary')
+                ->title(__('filament/actions/generate-record-summary.notifications.regenerate_failed'))
                 ->body($e->getMessage())
                 ->danger()
                 ->send();

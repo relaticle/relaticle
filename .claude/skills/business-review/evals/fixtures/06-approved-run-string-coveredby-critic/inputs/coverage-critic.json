@@ -1,0 +1,18 @@
+{
+  "untested_sad_paths": [
+    "Status/stage field present but with ZERO options: canAccess() stays true, switcher advertises Board, board renders column-less. Verified UI-unreachable (FieldForm options Repeater requires >=1 option for choice fields via requiredUnless, and system_defined fields hide deactivate/delete), so it is API/DB-only and defensive-grade like the field-missing gate — but unlike that gate it has NO unit test. Close: one Pest test that deletes the status field's options in-test, then asserts livewire(TasksBoard::class)->assertOk() and the list page still renders its heading.",
+    "Legacy-redirect logged-out chain end-to-end: findings tested the NEW url logged out (/tapix/tasks/board -> 302 /login), but the legacy 301 route is registered WITHOUT auth middleware, so the full unauthenticated chain legacy -> 301 -> new url -> 302 -> /login was never walked as one sequence. Close: curl -sIL https://relaticle.test/app/tapix/tasks-board with no cookies and assert 301 -> 302 -> login with no 5xx."
+  ],
+  "uncovered_subsystems": [
+    "bin/setup-workspace.sh (Polyscope workspace provisioning: blanks APP_PANEL_DOMAIN, adds config:clear/route:clear) — infra change in the diff that was never executed during the review and is not reachable through the product browser at all. Blast radius is dev-tooling only (workspace clones), zero production/user exposure. Close: provision one fresh Polyscope workspace with the script and confirm the app panel serves at <workspace>.test/app and login works."
+  ],
+  "uncrossed_seams": [
+    "Dark mode x the new switcher CSS: every evidence shot (j1/j2/j3) is light mode; the component hand-rolls dark: classes (active segment dark:bg-white/10 on a dark:bg-white/5 track — subtle contrast) and the :has() heading flex was never observed dark. Close: toggle theme to Dark in the user menu, re-screenshot tasks list + board headings, check active-segment legibility.",
+    "Mobile/narrow viewport: .fi-header-heading:has(.fi-view-switcher) forces a non-wrapping flex row (flex items-center gap-x-3); heading + switcher could clip or overflow at phone widths. Close: agent-browser set viewport 390 844, load tasks list and opportunities list, screenshot for overflow.",
+    "Physical drag gesture vs moveCard endpoint: the live verification called $wire.moveCard directly, which proves the server wiring but bypasses the pointer-event -> x-sortable binding (vendor flowforge column.blade.php:79); the gesture layer is inferred from unchanged vendor code + panel-wide pre-existing ->spa(), not observed. Close: after clicking the switcher (SPA transition), agent-browser eval that document.querySelector('[x-sortable]') has an initialized Alpine sortable instance, or dispatch pointerdown/move/up across a br-rel- namespaced card.",
+    "Keyboard accessibility of the switcher: Tab focus order, Enter activation, and the focus-visible:outline-primary-600 ring were never walked. Native <a> elements with aria-current/aria-label, so risk is low. Close: keyboard-only walk — Tab to the switcher, Enter on Board, confirm navigation and a visible focus ring."
+  ],
+  "unreached_changed_surfaces": [],
+  "recommend_extra_round": false,
+  "highest_risk_gap": "The OS-level drag gesture was never physically performed — only its server endpoint (moveCard) was live-verified — so the pointer-to-x-sortable binding after an SPA switcher transition rests on unchanged vendor code plus the pre-existing panel-wide ->spa() rather than direct observation; everything else unreached is cosmetic (dark mode, 390px wrap, focus ring) or UI-unreachable defensive state."
+}
