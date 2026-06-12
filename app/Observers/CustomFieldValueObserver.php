@@ -29,6 +29,6 @@ final readonly class CustomFieldValueObserver
             return;
         }
 
-        $this->ensureTagOptionsExist->handle($field, $value->json_value);
+        $this->ensureTagOptionsExist->execute($field, $value->json_value);
     }
 }

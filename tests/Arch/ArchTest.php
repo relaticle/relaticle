@@ -134,6 +134,55 @@ arch('avoid inheritance')
         'App\View',
     ]);
 
+// Packages are kept final by pint (final_class, repo-wide) and strict-typed by
+// the rule above. Readonly/no-inheritance is enforced only on their plain-PHP
+// service layers — the rest of each package is framework-shaped (Filament,
+// Livewire, Models, Tools, Jobs) and would be ignored wholesale anyway, exactly
+// as the App rules above ignore those namespaces.
+// (tests/Arch/ConventionsTest.php forces this list to be revisited when a
+// package is added.)
+$packageServiceLayers = [
+    'Relaticle\Chat\Actions',
+    'Relaticle\Chat\Agents',
+    'Relaticle\Chat\Services',
+    'Relaticle\Chat\Support',
+    'Relaticle\Documentation\Services',
+    'Relaticle\ImportWizard\Support',
+    'Relaticle\OnboardSeed\Support',
+];
+
+arch('package service layers avoid mutation')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toBeReadonly()
+    ->ignoring([
+        // Grandfathered (2026-06-12) — make each readonly, then unlist:
+        'Relaticle\Chat\Agents\CrmAssistant',
+        'Relaticle\Chat\Services\TipTapDocumentParser',
+        'Relaticle\Chat\Support\ChatTelemetry',
+        'Relaticle\Chat\Support\LikePattern',
+        'Relaticle\Chat\Support\PromptText',
+        'Relaticle\Chat\Support\ProviderRateGate',
+        'Relaticle\Chat\Support\TitleSanitizer',
+        'Relaticle\Documentation\Services\DocumentationService',
+        'Relaticle\ImportWizard\Support\DataTypeInferencer',
+        'Relaticle\ImportWizard\Support\EntityLinkResolver',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\ForeignKeyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\MorphToManyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkValidator',
+        'Relaticle\ImportWizard\Support\Validation\ColumnValidator',
+        'Relaticle\OnboardSeed\Support\BaseModelSeeder',
+        'Relaticle\OnboardSeed\Support\BulkCustomFieldValueWriter',
+        'Relaticle\OnboardSeed\Support\FixtureLoader',
+        'Relaticle\OnboardSeed\Support\FixtureRegistry',
+    ]);
+
+arch('package service layers avoid inheritance')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toExtendNothing();
+
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
     ->not

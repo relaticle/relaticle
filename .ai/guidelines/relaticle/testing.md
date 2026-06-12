@@ -23,6 +23,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   internal code — test them through their real entry points (API endpoints,
   Filament resources, Livewire components). Isolated unit tests of internals
   create maintenance burden without catching real bugs.
+- Never weaken an assertion, delete a test, or special-case production code just
+  to turn the suite green. If a test asserts a stale value, fix the assertion;
+  if state leaks between tests, fix isolation in the test layer — don't push
+  compensation into production code.
 - Never write tests that assert on source code as text (reading a Blade/PHP file
   and checking it contains a string). They break on refactors and pass on broken
   behavior — test the rendered/runtime behavior instead.
