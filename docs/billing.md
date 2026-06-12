@@ -15,54 +15,96 @@ nothing in the billing pipeline reads or multiplies by member count.
 
 ## Provider
 
-Payments run through [Polar.sh](https://polar.sh) as the merchant of record, which handles
-global VAT/sales-tax collection and remittance. Integration is via
-[`danestves/laravel-polar`](https://github.com/danestves/laravel-polar) with `Team` as the
-billable model.
+Payments run through **Stripe** via [Laravel Cashier](https://laravel.com/docs/billing) under a
+US entity (Stripe Atlas LLC), with **Stripe Managed Payments** (merchant of record, GA April
+2026) enabled per checkout. Managed Payments handles global VAT/sales-tax registration, filing,
+and remittance. `Team` is the Cashier billable model.
+
+Because Managed Payments is enabled per transaction on our own Stripe account, the customers,
+payment methods, and subscriptions are ours. Disabling it later (own tax ops, lower fees) is a
+config flip — `services.stripe.managed_payments` — with no other code change.
 
 ```text
-Polar checkout (Team-scoped metadata)
-        │  webhooks (standard-webhooks signature)
-        ▼
-POST /polar/webhook ─► spatie/laravel-webhook-client ─► ProcessWebhook job
-        │  subscription.created / .active / .updated / .canceled / .revoked
-        ▼
-SyncPlanOnPolarSubscriptionChange (listener)
-        ▼
-SyncTeamPlanFromSubscription (action)
-   ├─ maps Polar product id → Plan  (config/services.php → services.polar.products)
-   ├─ subscription valid    → team.plan = mapped plan
-   ├─ subscription ended    → team.plan = free  (only if the plan came from this subscription)
-   └─ on any plan change    → CreditService::resetPeriod() grants the new allowance
+Billing page (/app/{team}/billing, flag-gated)
+  ├─ Start trial ──────────► StartProTrial (app-side Cashier generic trial, no Stripe objects)
+  ├─ Upgrade ──────────────► CreateProCheckout → hosted Stripe Checkout
+  │                            └ managed_payments[enabled] = config('services.stripe.managed_payments')
+  └─ Manage subscription ──► Stripe Billing Portal (redirectToBillingPortal)
+
+Stripe webhooks ─► Cashier POST /stripe/webhook (stock controller, maintains subscriptions tables)
+                     └ WebhookHandled listener (SyncPlanOnStripeSubscriptionChange)
+                         └ SyncTeamPlanFromSubscription
+                             ├ price id → Plan   (config services.stripe.prices)
+                             ├ subscription valid → team.plan = mapped plan
+                             ├ subscription ended → team.plan = free (only if the plan came from this subscription)
+                             └ on any plan change → CreditService::resetPeriod() grants the new allowance
 ```
 
-Plan changes are idempotent: a replayed webhook that produces no plan transition does not
-touch the credit ledger. Monthly renewals are handled by the existing
-`chat:reset-credits` scheduled command (daily at 00:05), not by webhooks.
+Plan changes are idempotent: a replayed webhook that produces no plan transition does not touch
+the credit ledger. Monthly renewals are handled by the existing `chat:reset-credits` scheduled
+command, not by webhooks. A sysadmin-granted plan survives subscription end unless it is the
+same plan the subscription itself granted.
 
-A sysadmin-granted plan survives subscription revocation unless it is the same plan the
-subscription itself granted — manual Enterprise grants are never clobbered by a lapsed
-self-serve subscription.
+## Trials
+
+14-day Pro trial, no card, one per user (`users.pro_trial_used_at`). `StartProTrial` sets
+`team.plan = pro` and `teams.trial_ends_at` (Cashier generic trial — no Stripe objects until
+conversion). The daily `billing:process-trials` command emails a "3 days left" reminder and
+downgrades expired trials that never converted. Converting mid-trial is a normal checkout; the
+`customer.subscription.*` webhook takes over and clears the trial marker.
 
 ## Configuration
 
 | Env var | Purpose |
 |---|---|
-| `POLAR_ACCESS_TOKEN` | Organization access token (Polar dashboard → Settings → Developers) |
-| `POLAR_ORGANIZATION_ID` | Optional; needed for license-key endpoints only |
-| `POLAR_SERVER` | `sandbox` (default) or `production` |
-| `POLAR_WEBHOOK_SECRET` | Secret for the `/polar/webhook` endpoint (Polar dashboard → Webhooks) |
-| `POLAR_PRODUCT_PRO` | Polar product id that maps to the `pro` plan |
-| `POLAR_PRODUCT_ENTERPRISE` | Polar product id that maps to the `enterprise` plan |
+| `STRIPE_KEY` / `STRIPE_SECRET` | Stripe API keys (test mode for local/staging) |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for `POST /stripe/webhook` |
+| `STRIPE_MANAGED_PAYMENTS` | `true` enables the MoR layer per checkout (the off-ramp switch) |
+| `STRIPE_PRICE_PRO_MONTHLY` | Stripe price id mapped to the `pro` plan (monthly) |
+| `STRIPE_PRICE_PRO_YEARLY` | Stripe price id mapped to the `pro` plan (yearly) |
+| `RELATICLE_FEATURE_BILLING` | Pennant flag — gates every billing surface; keep `false` in prod until Stripe is live |
 
-Local development runs against the [Polar sandbox](https://sandbox.polar.sh). Point a
-webhook at `https://relaticle.test/polar/webhook` (or use a tunnel) with the events:
-`subscription.created`, `subscription.updated`, `subscription.active`,
-`subscription.canceled`, `subscription.revoked`, `order.created`, `order.updated`.
+Stripe products must carry an eligible Managed Payments tax code (AIaaS — Business Use,
+`txcd_10105002`), and the Managed Payments Terms of Service must be accepted in the Stripe
+dashboard before activation.
+
+## Rollout runbook
+
+Engineering never blocks on paperwork — Stripe **test mode works before activation**.
+
+1. Code merges to `main` dark behind `RELATICLE_FEATURE_BILLING` (off in prod).
+2. Human track (parallel): Atlas LLC → Stripe activation + Managed Payments ToS + banking
+   (Stripe financial account or Mercury) → EIN (no-SSN: 15–25 business days; payments work
+   before it) → Armenian accountant consult (LLC repatriation/declarations) → production
+   products + prices with AIaaS tax codes → webhook endpoint + `STRIPE_WEBHOOK_SECRET`.
+3. Staging E2E with test-mode keys (see checklist).
+4. Flip `RELATICLE_FEATURE_BILLING` in prod.
+
+### Staging E2E checklist (test-mode keys)
+
+- [ ] Upgrade → Checkout (monthly) → webhook flips plan to Pro, allowance granted
+- [ ] Upgrade → Checkout (yearly) → same, yearly price recorded
+- [ ] Start trial (no card) → Pro for 14 days; convert mid-trial → subscription takes over
+- [ ] Billing Portal → cancel at period end → page shows "Pro until {date}" → resume
+- [ ] Past-due simulation → page shows payment-issue state
+- [ ] Schedule team deletion → subscription set to cancel at period end
+- [ ] Replay a `customer.subscription.updated` webhook → no usage reset
+
+### Compliance calendar
+
+- Delaware franchise tax — June 1 annually
+- Form 5472 + pro-forma 1120 — ~April 15 annually (filing service; $25k penalty if missed)
+- Registered agent renewal — annually
+
+## Observability
+
+Sentry (prod) and Horizon catch webhook-job and plan-sync failures; the Stripe dashboard
+monitors webhook delivery. Each plan transition emits one structured log line (team, from→to,
+subscription id). No bespoke alerting. Future hardening (not built): a nightly Stripe↔`team.plan`
+reconciliation command.
 
 ## Roadmap
 
-1. ✅ Foundation: billable `Team`, webhook → plan + credit lifecycle (this document)
-2. `/app/billing` page: current plan, credit usage, upgrade checkout, customer portal
-3. Pricing page: Pro tier, keeping the no-per-seat promise
-4. Later: annual billing, AI-credit top-ups / usage overage via Polar meters
+1. ✅ Foundation: billable `Team`, webhook → plan + credit lifecycle, trial, billing page,
+   pricing page, sysadmin visibility (this document)
+2. Later: annual-billing UX polish, AI-credit top-ups / usage overage via Stripe Billing meters

@@ -6,6 +6,7 @@ namespace App\Actions\Billing;
 
 use App\Models\Team;
 use Illuminate\Support\Facades\Log;
+use Laravel\Cashier\Subscription;
 use Throwable;
 
 final readonly class CancelTeamSubscription
@@ -14,7 +15,7 @@ final readonly class CancelTeamSubscription
     {
         $subscription = $team->subscription();
 
-        if ($subscription === null || $subscription->ended()) {
+        if (! $subscription instanceof Subscription || $subscription->ended()) {
             return;
         }
 

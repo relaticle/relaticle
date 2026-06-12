@@ -20,21 +20,13 @@ final readonly class StartProTrial
     /** @throws AuthorizationException */
     public function handle(User $user, Team $team): void
     {
-        if (! $user->ownsTeam($team)) {
-            throw new AuthorizationException('Only the workspace owner can start a trial.');
-        }
+        throw_unless($user->ownsTeam($team), AuthorizationException::class, 'Only the workspace owner can start a trial.');
 
-        if ($user->pro_trial_used_at !== null) {
-            throw new AuthorizationException('This account has already used its Pro trial.');
-        }
+        throw_if($user->pro_trial_used_at !== null, AuthorizationException::class, 'This account has already used its Pro trial.');
 
-        if ($team->plan !== Plan::Free) {
-            throw new AuthorizationException('Trials are only available on the Free plan.');
-        }
+        throw_if($team->plan !== Plan::Free, AuthorizationException::class, 'Trials are only available on the Free plan.');
 
-        if ($team->subscriptions()->exists()) {
-            throw new AuthorizationException('This workspace has already had a subscription.');
-        }
+        throw_if($team->subscriptions()->exists(), AuthorizationException::class, 'This workspace has already had a subscription.');
 
         DB::transaction(function () use ($user, $team): void {
             $team->forceFill([

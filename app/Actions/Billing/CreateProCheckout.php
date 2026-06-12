@@ -29,9 +29,7 @@ final readonly class CreateProCheckout
     {
         $priceId = config("services.stripe.prices.pro_{$interval}");
 
-        if (! is_string($priceId) || $priceId === '') {
-            throw new InvalidArgumentException("No Stripe price configured for interval [{$interval}].");
-        }
+        throw_if(! is_string($priceId) || $priceId === '', InvalidArgumentException::class, "No Stripe price configured for interval [{$interval}].");
 
         return $priceId;
     }
