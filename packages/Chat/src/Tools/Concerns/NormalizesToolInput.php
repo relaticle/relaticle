@@ -59,4 +59,24 @@ trait NormalizesToolInput
 
         return $this->coerceIdList($request[$key]);
     }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @return list<string>|null
+     */
+    protected function idListFromArray(array $record, string $key): ?array
+    {
+        $value = $record[$key] ?? null;
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $ids = array_values(array_filter(array_map(
+            static fn (mixed $id): string => is_scalar($id) ? trim((string) $id) : '',
+            $value,
+        ), static fn (string $id): bool => $id !== ''));
+
+        return $ids === [] ? null : $ids;
+    }
 }

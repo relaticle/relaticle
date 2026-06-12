@@ -110,6 +110,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->where('m.user_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
             ->where('m.role', 'assistant')
+            ->whereNull('m.superseded_at')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
             ->first(['m.id', 'm.content']);

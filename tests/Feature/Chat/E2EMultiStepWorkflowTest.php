@@ -34,7 +34,7 @@ it('multi-step workflow: create person -> approve -> continuation creates linked
 
     $personTool = resolve(CreatePersonTool::class);
     $personTool->setConversationId($convId);
-    $personTool->handle(new Request(['name' => 'Angel']));
+    $personTool->handle(new Request(['records' => [['name' => 'Angel']]]));
 
     $personPending = PendingAction::query()
         ->where('conversation_id', $convId)
@@ -55,8 +55,7 @@ it('multi-step workflow: create person -> approve -> continuation creates linked
     $taskTool = resolve(CreateTaskTool::class);
     $taskTool->setConversationId($convId);
     $taskTool->handle(new Request([
-        'title' => 'Follow up call for tomorrow',
-        'people_ids' => [(string) $angelId],
+        'records' => [['title' => 'Follow up call for tomorrow', 'people_ids' => [(string) $angelId]]],
     ]));
 
     $taskPending = PendingAction::query()

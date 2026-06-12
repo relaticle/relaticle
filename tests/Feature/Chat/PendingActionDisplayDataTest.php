@@ -67,8 +67,7 @@ it('CreatePersonTool shows company name (not company ID) in action card display'
     $tool = app(CreatePersonTool::class);
 
     $tool->handle(new Request([
-        'name' => 'Jane Doe',
-        'company_id' => $company->getKey(),
+        'records' => [['name' => 'Jane Doe', 'company_id' => $company->getKey()]],
     ]));
 
     $pending = PendingAction::query()

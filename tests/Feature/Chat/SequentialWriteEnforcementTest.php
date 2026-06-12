@@ -73,7 +73,7 @@ it('write tool result includes agent_should_stop=true in meta', function (): voi
     $tool = resolve(CreateCompanyTool::class);
     $tool->setConversationId('019df800-0000-7000-8000-000000000010');
 
-    $resultJson = $tool->handle(new Request(['name' => 'Acme']));
+    $resultJson = $tool->handle(new Request(['records' => [['name' => 'Acme']]]));
     $result = json_decode($resultJson, true);
 
     expect($result)->toHaveKey('meta')

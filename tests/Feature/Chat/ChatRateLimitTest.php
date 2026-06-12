@@ -45,6 +45,31 @@ it('computes capped exponential backoff', function (): void {
         ->and($job->retryDelaySeconds(10))->toBe(30);
 });
 
+it('honors the provider Retry-After header when it exceeds the backoff', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $job = new ProcessChatMessage(
+        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNAAAAAAAAAAAAAAAAAAAAA',
+    );
+
+    $exception = new RequestException(new ClientResponse(new Psr7Response(429, ['Retry-After' => '45'])));
+
+    expect($job->retryDelaySeconds(1, $exception))->toBe(45)
+        ->and($job->retryDelaySeconds(10, $exception))->toBe(45);
+});
+
+it('caps an absurd Retry-After at 60 seconds', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $job = new ContinueChatMessage(
+        user: $user, team: $user->currentTeam, conversationId: 'c-1',
+        prompt: '[approval] ok', turnId: '01TURNAAAAAAAAAAAAAAAAAAAAA',
+    );
+
+    $exception = new RequestException(new ClientResponse(new Psr7Response(429, ['Retry-After' => '600'])));
+
+    expect($job->retryDelaySeconds(1, $exception))->toBe(60);
+});
+
 it('broadcasts a rate-limit-specific message when a rate-limited job ultimately fails', function (): void {
     Event::fake([ChatStreamFailed::class]);
 
