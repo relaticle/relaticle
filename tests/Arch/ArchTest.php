@@ -18,7 +18,10 @@ use App\Rules\ArrayExistsForTeam;
 
 arch()->preset()->php();
 
-// arch()->preset()->strict();
+// The strict preset is deliberately NOT enabled (evaluated 2026-06-12): its
+// no-protected-methods rule fights core Laravel idioms (Model::casts(),
+// provider hooks, base-tool templates), and pint already enforces final
+// classes + strict types repo-wide.
 
 arch()->preset()->security()->ignoring('assert');
 
@@ -31,11 +34,13 @@ arch()->preset()
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
+        // Chat tools intentionally reuse App\Http\Resources (consistent
+        // LLM-facing payloads); the preset forbids resources outside Http.
         'Relaticle\Chat',
     ]);
 
 arch('strict types')
-    ->expect('App')
+    ->expect(['App', 'Relaticle'])
     ->toUseStrictTypes();
 
 arch('avoid open for extension')
@@ -175,6 +180,28 @@ arch('MCP tools must not use DB facade directly')
     ->not
     ->toUse([
         'Illuminate\Support\Facades\DB',
+    ]);
+
+arch('UI surfaces must not use the DB facade directly')
+    ->expect([
+        'App\Filament',
+        'App\Livewire',
+        'Relaticle\Chat\Livewire',
+        'Relaticle\Chat\Tools',
+    ])
+    ->not
+    ->toUse([
+        'Illuminate\Support\Facades\DB',
+    ])
+    ->ignoring([
+        // Grandfathered (2026-06-12) — move these writes into actions, then unlist:
+        'App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard',
+        'App\Filament\Resources\TaskResource\Pages\TasksBoard',
+        'App\Livewire\App\AccessTokens\CreateAccessToken',
+        // Session-table infrastructure (no Eloquent model) — legitimate DB facade use:
+        'App\Livewire\App\Profile\LogoutOtherBrowserSessions',
+        // Read-only aggregate join for stream recovery:
+        'Relaticle\Chat\Livewire\Chat\ChatInterface',
     ]);
 
 arch('must not use custom-fields package models directly')
