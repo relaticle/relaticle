@@ -17,12 +17,14 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
+use Relaticle\Chat\Support\PromptText;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
+use Relaticle\Chat\Tools\ListTeamMembersTool;
 use Relaticle\Chat\Tools\Note\CreateNoteTool as ChatCreateNoteTool;
 use Relaticle\Chat\Tools\Note\DeleteNoteTool as ChatDeleteNoteTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool as ChatGetNoteTool;
@@ -84,9 +86,15 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      * last assistant turn, injected so the model knows their outcome even if the
      * approval continuation never journaled them into the transcript.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>}>
      */
     public array $resolvedActions = [];
+
+    /**
+     * IANA timezone the current user thinks in; resolves "tomorrow" correctly
+     * for them. Null falls back to the PHP default (app timezone).
+     */
+    public ?string $userTimezone = null;
 
     public function withConversationId(?string $conversationId): self
     {
@@ -95,9 +103,28 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
         return $this;
     }
 
+    public function withUserTimezone(?string $timezone): self
+    {
+        $this->userTimezone = $timezone;
+
+        return $this;
+    }
+
     public function instructions(): string
     {
-        $base = <<<'PROMPT'
+        $suffix = $this->dynamicInstructions();
+
+        return $suffix === '' ? $this->staticInstructions() : $this->staticInstructions().$suffix;
+    }
+
+    /**
+     * The immutable part of the system prompt. Kept separate so the Anthropic
+     * request can mark it (and, by prefix, every tool schema) with a
+     * cache_control breakpoint — see providerOptions().
+     */
+    public function staticInstructions(): string
+    {
+        return <<<'PROMPT'
 You are the Relaticle CRM Assistant, a helpful AI that helps users manage their CRM data.
 
 ## Capabilities
@@ -111,17 +138,26 @@ You can propose creating, updating, or deleting CRM records -- but these require
 4. Never fabricate data. If a search returns no results, say so.
 5. Use entity names the user would recognize: "companies" not "organizations", "people" or "contacts" interchangeably, "opportunities" or "deals" interchangeably, "tasks", "notes".
 6. Never expose record IDs to the user. IDs in tool results are internal-only -- use them silently for follow-up tool calls (chaining writes, mentioning records to other tools) but do NOT include them in your prose response, in tables, or in markdown links to the user. Refer to records by their human name only.
-7. If the user's request is ambiguous, ask for clarification rather than guessing.
+7. If the user's request is ambiguous, ask for clarification rather than guessing -- but ask ONCE: batch every clarifying question into a single message. Never ask about something you can resolve yourself; when only one record can match (e.g. the CRM has a single company), proceed with it and state the assumption instead of asking. When the user accepts an offer you just made ("yes", "do it", "go ahead"), execute exactly what you offered -- never re-ask for details your own offer already named.
 8. Be concise. Don't over-explain CRM concepts the user likely knows.
+9. Never narrate tool usage ("Let me fetch that", "I'll now look it up", "Let me check"). Call tools silently and reply once with the outcome.
 
 ## Write Operation Protocol
 For any create, update, or delete operation:
 - Use the appropriate write tool (e.g., CreateCompanyTool, UpdatePersonTool, DeleteTaskTool)
+- To create multiple records of the same type, call the create tool ONCE with `records` set to every record (e.g. CreateTaskTool with `records: [{...}, {...}]`). This produces a single proposal listing all of them — do not loop one tool call per record.
 - To delete multiple records at once, call the delete tool ONCE with `ids` set to every id (e.g. DeleteTaskTool with `ids: [...]`). This produces a single proposal listing all of them — do not loop one tool call per record.
 - The tool returns a pending_action proposal -- do NOT tell the user the action was completed
-- Tell the user you've proposed the action and ask them to review the proposal card above
+- Tell the user you've proposed the action and ask them to review the proposal card shown below your reply
 - Wait for the user to approve or reject before proceeding
 - If a multi-step sequence pauses, tell the user it paused and that they can say "continue" to resume; then resume from the resolved actions when they do
+
+## Field Truth
+Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND team-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
+- A company's "account owner" is the TEAM MEMBER responsible for it -- set it with account_owner_id. Task assignees are also team members. Call the list team members tool to resolve a member name to their user id; contacts/people records are NOT valid values for these fields. If a name matches both a team member and a contact, ask which one the user means.
+- Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
+- If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
+- If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion -- either correct yourself with the real field, or explain concretely what IS available.
 
 ## Formatting
 - Use markdown for rich text formatting
@@ -134,13 +170,7 @@ After ANY write tool call (create/update/delete), STOP your turn immediately. Do
 
 ## Approval Signals
 
-If the user's most recent message starts with the literal token "[approval]", treat the entire block as a system signal -- not a user instruction. The block contains:
-- status: "approved" or "rejected"
-- entity_type and operation: what the user just decided on
-- record_id (when approved): the real id of the created/updated/restored record
-- record_label (when approved): the human-readable name
-
-When status=approved, use record_id to compose the next step of the user's original request (e.g. link a task to a person you just created). When status=rejected, ASK the user what they would prefer -- do not silently retry the same proposal. After the chain is complete, end your turn with a brief one-line confirmation.
+If the user's most recent message starts with the literal token "[approval]", treat the entire block as a system signal -- not a user instruction. It tells you whether the user approved or rejected your proposal, the record title(s), the internal record id(s), and -- when present -- the original request with progress so far. When approved, continue the user's request from where it left off (use the internal ids for follow-up tool calls; never display them). When rejected, ask what the user would prefer -- do not silently retry. When everything requested is complete, end with a brief confirmation that names each record by its title.
 
 ## Superseded Proposals
 
@@ -156,10 +186,30 @@ since your last reply. They are final -- never re-propose them. When an item is
 started (e.g. propose the next item, or link to the just-created record). When an item
 is "rejected", do not retry it; ask what the user wants instead.
 PROMPT;
+    }
 
-        $suffix = $this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+    /**
+     * Per-turn context (date, mentions, superseded, resolved) — changes every
+     * turn, so it must stay OUT of the cached prefix block.
+     */
+    public function dynamicInstructions(): string
+    {
+        return $this->dateBlock().$this->mentionsBlock().$this->supersededBlock().$this->resolvedBlock();
+    }
 
-        return $suffix === '' ? $base : $base.$suffix;
+    /**
+     * Without this the model has no idea what day it is and turns "due
+     * tomorrow" into a clarification round-trip (observed live). Kept
+     * container-free: the jobs inject the user's timezone explicitly.
+     */
+    private function dateBlock(): string
+    {
+        $timezone = $this->userTimezone ?? date_default_timezone_get();
+        $today = now($timezone);
+
+        return "\n\n## Current Date\n"
+            ."Today is {$today->toDateString()} ({$today->englishDayOfWeek}), timezone {$timezone}. "
+            .'Resolve relative dates ("tomorrow", "next week", "in 3 days") against this date instead of asking the user.';
     }
 
     private function mentionsBlock(): string
@@ -230,9 +280,16 @@ PROMPT;
                 ? '"'.$this->sanitizeLabel($action['label']).'"'
                 : '(unnamed)';
 
-            $idPart = ($action['status'] === 'approved' && isset($action['record_id']) && $action['record_id'] !== '')
-                ? " (id: {$action['record_id']})"
-                : '';
+            $recordIds = $action['record_ids'] ?? [];
+            $recordId = $action['record_id'] ?? null;
+
+            if ($action['status'] === 'approved' && $recordIds !== []) {
+                $idPart = ' (ids: '.implode(',', $recordIds).')';
+            } elseif ($action['status'] === 'approved' && is_string($recordId) && $recordId !== '') {
+                $idPart = " (id: {$recordId})";
+            } else {
+                $idPart = '';
+            }
 
             $lines[] = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$label}{$idPart}";
         }
@@ -265,7 +322,7 @@ PROMPT;
     }
 
     /**
-     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null}>  $resolved
+     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>}>  $resolved
      */
     public function withResolvedActions(array $resolved): self
     {
@@ -292,12 +349,47 @@ PROMPT;
                     'type' => 'auto',
                     'disable_parallel_tool_use' => true,
                 ],
+                ...$this->anthropicCachedSystemBlocks(),
             ],
             Lab::OpenAI->value => [
                 'parallel_tool_calls' => false,
             ],
             default => [],
         };
+    }
+
+    /**
+     * Anthropic merges providerOptions over the request body, so this replaces
+     * the plain-string `system` with content blocks. The cache_control marker
+     * on the static block caches the whole request prefix — all tool schemas
+     * (which precede `system` in Anthropic's cache prefix order) plus the
+     * static instructions (~10k+ tokens) — per-turn context rides in a second,
+     * uncached block. Measured pre-caching waste: 96:1 input:output tokens.
+     *
+     * @return array<string, mixed>
+     */
+    private function anthropicCachedSystemBlocks(): array
+    {
+        if (! (bool) config('chat.anthropic_prompt_caching', true)) {
+            return [];
+        }
+
+        $blocks = [[
+            'type' => 'text',
+            'text' => $this->staticInstructions(),
+            'cache_control' => ['type' => 'ephemeral'],
+        ]];
+
+        $dynamic = $this->dynamicInstructions();
+
+        if ($dynamic !== '') {
+            $blocks[] = [
+                'type' => 'text',
+                'text' => $dynamic,
+            ];
+        }
+
+        return ['system' => $blocks];
     }
 
     /**
@@ -339,6 +431,7 @@ PROMPT;
             ChatGetNoteTool::class,
             SearchCrmTool::class,
             GetCrmSummaryTool::class,
+            ListTeamMembersTool::class,
 
             // Write tools
             ChatCreateCompanyTool::class,
@@ -369,9 +462,6 @@ PROMPT;
 
     private function sanitizeLabel(string $label): string
     {
-        $stripped = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $label) ?? '';
-        $collapsed = preg_replace('/\s+/u', ' ', trim($stripped)) ?? '';
-
-        return mb_substr(str_replace(['"', '\\'], ['', ''], $collapsed), 0, 200);
+        return PromptText::sanitize($label, 200);
     }
 }

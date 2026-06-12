@@ -43,7 +43,7 @@ it('CreateCompanyTool persists authenticated user id as account_owner_id in pend
     /** @var CreateCompanyTool $tool */
     $tool = app(CreateCompanyTool::class);
 
-    $tool->handle(new Request(['name' => 'AI Co']));
+    $tool->handle(new Request(['records' => [['name' => 'AI Co']]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->user->currentTeam->getKey())
