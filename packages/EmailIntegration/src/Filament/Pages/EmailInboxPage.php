@@ -656,7 +656,7 @@ final class EmailInboxPage extends Page
                             $rendered = resolve(EmailTemplateRenderService::class)
                                 ->renderWithSignature($template, null, $sig);
 
-                            if ($sig !== null) {
+                            if ($sig instanceof EmailSignature) {
                                 $set('signature_id', $sig->getKey());
                             }
 
