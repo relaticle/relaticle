@@ -104,6 +104,8 @@ final class ManagePasskeys extends BaseLivewireComponent
         $hasPassword = $this->authUser()->hasPassword();
         $canConfirmWithPasskey = $hasPassword && $this->authUser()->passkeys()->exists();
 
+        $confirmsWithPassword = fn (Get $get): bool => ! $canConfirmWithPasskey || (bool) $get('use_password');
+
         return Action::make('registerPasskey')
             ->label(__('profile.sections.passkeys.add_passkey'))
             ->modalHeading(__('profile.sections.passkeys.add_passkey'))
@@ -126,8 +128,8 @@ final class ManagePasskeys extends BaseLivewireComponent
                         ->helperText(__('profile.sections.passkeys.password_help'))
                         ->password()
                         ->revealable()
-                        ->visible(fn (Get $get): bool => ! $canConfirmWithPasskey || (bool) $get('use_password'))
-                        ->required(fn (Get $get): bool => ! $canConfirmWithPasskey || (bool) $get('use_password'))
+                        ->visible($confirmsWithPassword)
+                        ->required($confirmsWithPassword)
                         ->rule('current_password')
                         ->validationMessages(['current_password' => __('auth.password')])
                     : null,

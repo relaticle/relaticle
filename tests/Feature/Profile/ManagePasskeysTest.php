@@ -197,3 +197,15 @@ it('rejects the password fallback when the password is wrong', function (): void
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
+
+it('requires a password and never reaches the ceremony for a password user registering their first passkey', function (): void {
+    session()->forget('auth.password_confirmed_at');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'First Key'])
+        ->assertHasActionErrors(['password'])
+        ->assertNotDispatched('passkey-confirm-then-register')
+        ->assertNotDispatched('passkey-register-confirmed');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
