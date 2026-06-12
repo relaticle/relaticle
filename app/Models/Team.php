@@ -39,6 +39,10 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property Carbon|null $scheduled_deletion_at
+ * @property ?string $stripe_id
+ * @property ?string $pm_type
+ * @property ?string $pm_last_four
+ * @property Carbon|null $trial_ends_at
  */
 #[Fillable([
     'name',
@@ -152,6 +156,7 @@ final class Team extends JetstreamTeam implements HasAvatar
             'onboarding_referral_source' => OnboardingReferralSource::class,
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
         ];
     }
 
