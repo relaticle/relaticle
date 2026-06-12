@@ -1953,6 +1953,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.scrollToBottom();
         this.restoreInputFocus();
         this.flushQueuedSend();
+        this.maybeSyncTitle();
+    },
+
+    // A brand-new chat is auto-titled server-side after its first turn, but the
+    // Filament page header (H1 + tab title) was rendered at mount and still reads
+    // "New chat". Pull the freshly generated title and reuse the existing
+    // chat:renamed handler to update the header without a reload.
+    async maybeSyncTitle() {
+        if (!this.conversationId) return;
+        if (!document.title.startsWith('New chat')) return;
+        try {
+            const title = await this.$wire.conversationTitle(this.conversationId);
+            if (title) {
+                window.dispatchEvent(new CustomEvent('chat:renamed', {
+                    detail: { conversationId: this.conversationId, title },
+                }));
+            }
+        } catch (_) { /* non-fatal: header just stays generic until reload */ }
     },
 
     // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
