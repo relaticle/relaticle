@@ -365,13 +365,7 @@
 
                                     <div class="mt-2 space-y-1">
                                         <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                                            <div class="flex gap-2 text-sm">
-                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                <span class="text-gray-900 dark:text-white" x-text="field.new || field.value"></span>
-                                                <template x-if="field.old">
-                                                    <span class="text-gray-400 line-through" x-text="field.old"></span>
-                                                </template>
-                                            </div>
+                                            @include('chat::livewire.chat.partials._proposal-field')
                                         </template>
                                     </div>
 
@@ -383,10 +377,7 @@
                                                     <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
                                                     <div class="mt-1 space-y-0.5">
                                                         <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                                            <div class="flex gap-2 text-xs">
-                                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                                <span class="text-gray-700 dark:text-gray-300" x-text="field.new || field.value"></span>
-                                                            </div>
+                                                            @include('chat::livewire.chat.partials._proposal-field')
                                                         </template>
                                                     </div>
                                                 </div>

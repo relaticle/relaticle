@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use DateTimeInterface;
@@ -22,7 +23,7 @@ final readonly class CustomFieldsDisplayFormatter
      * choice fields, ISO strings for dates).
      *
      * @param  array<string, mixed>  $cleanFields
-     * @return list<array{label: string, old?: string|null, new: string|null}>
+     * @return list<array{label: string, old?: string|null, new: string|null, type: string, values?: list<string>}>
      */
     public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel): array
     {
@@ -47,10 +48,22 @@ final readonly class CustomFieldsDisplayFormatter
                 continue;
             }
 
+            $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+
             $row = [
                 'label' => $field->name,
                 'new' => $this->renderValue($field, $newValue),
+                'type' => $this->displayType($field, $dataType),
             ];
+
+            if ($dataType === FieldDataType::MULTI_CHOICE && $field->type !== CustomFieldType::LINK->value && is_array($newValue)) {
+                $row['values'] = $this->optionNames($field, $newValue);
+            }
+
+            if ($dataType === FieldDataType::SINGLE_CHOICE) {
+                $name = $this->renderSingleChoice($field, $newValue);
+                $row['values'] = $name === null || $name === '' ? [] : [$name];
+            }
 
             if ($oldModel instanceof Model) {
                 $oldValue = $this->lookupCurrentValue($field, $oldModel);
@@ -94,15 +107,35 @@ final readonly class CustomFieldsDisplayFormatter
             return (string) $value;
         }
 
+        return implode(', ', $this->optionNames($field, $value));
+    }
+
+    private function displayType(CustomField $field, ?FieldDataType $dataType): string
+    {
+        if ($field->type === CustomFieldType::LINK->value) {
+            return 'link';
+        }
+
+        return match ($dataType) {
+            FieldDataType::SINGLE_CHOICE, FieldDataType::MULTI_CHOICE => 'badges',
+            FieldDataType::BOOLEAN => 'boolean',
+            default => 'text',
+        };
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $ids
+     * @return list<string>
+     */
+    private function optionNames(CustomField $field, array $ids): array
+    {
         $byId = $field->options->keyBy('id');
 
-        return collect($value)
-            ->map(function (mixed $id) use ($byId): string {
-                $option = $byId->get((string) $id);
+        return array_values(array_map(function (mixed $id) use ($byId): string {
+            $option = $byId->get((string) $id);
 
-                return $option instanceof CustomFieldOption ? $option->name : (string) $id;
-            })
-            ->implode(', ');
+            return $option instanceof CustomFieldOption ? $option->name : (string) $id;
+        }, $ids));
     }
 
     private function renderDate(mixed $value): string

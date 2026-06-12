@@ -7,6 +7,7 @@ use App\Models\User;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\BaseWriteDeleteTool;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 
@@ -83,4 +84,29 @@ it('CreatePersonTool shows company name (not company ID) in action card display'
 
     $companyField = $fields->firstWhere('label', 'Company');
     expect($companyField['value'])->toBe('Acme');
+});
+
+it('emits type hints on custom field display rows', function (): void {
+    /** @var CreateCompanyTool $tool */
+    $tool = app(CreateCompanyTool::class);
+
+    $tool->handle(new Request([
+        'records' => [[
+            'name' => 'Typed Display Co',
+            'custom_fields' => [
+                'linkedin' => ['linkedin.com/company/typed-display'],
+                'icp' => true,
+            ],
+        ]],
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('user_id', $this->user->getKey())
+        ->latest('created_at')
+        ->firstOrFail();
+
+    $rows = collect($pending->display_data['fields']);
+
+    expect($rows->firstWhere('label', 'LinkedIn')['type'])->toBe('link')
+        ->and($rows->firstWhere('label', 'ICP')['type'])->toBe('boolean');
 });
