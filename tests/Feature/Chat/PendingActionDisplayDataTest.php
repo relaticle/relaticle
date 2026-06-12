@@ -110,3 +110,27 @@ it('emits type hints on custom field display rows', function (): void {
     expect($rows->firstWhere('label', 'LinkedIn')['type'])->toBe('link')
         ->and($rows->firstWhere('label', 'ICP')['type'])->toBe('boolean');
 });
+
+it('emits a per-url values list for multi-value link fields', function (): void {
+    /** @var CreateCompanyTool $tool */
+    $tool = app(CreateCompanyTool::class);
+
+    $tool->handle(new Request([
+        'records' => [[
+            'name' => 'Multi Link Co',
+            'custom_fields' => [
+                'domains' => ['acme.com', 'acme.io'],
+            ],
+        ]],
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('user_id', $this->user->getKey())
+        ->latest('created_at')
+        ->firstOrFail();
+
+    $row = collect($pending->display_data['fields'])->firstWhere('type', 'link');
+
+    expect($row)->not->toBeNull()
+        ->and($row['values'])->toBe(['acme.com', 'acme.io']);
+});

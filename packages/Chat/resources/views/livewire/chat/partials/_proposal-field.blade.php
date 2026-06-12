@@ -28,7 +28,21 @@
         ></span>
     </template>
 
-    <template x-if="field.type === 'link' && (field.new ?? field.value)">
+    <template x-if="field.type === 'link' && Array.isArray(field.values) && field.values.length > 0">
+        <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <template x-for="(url, urlIdx) in field.values" :key="urlIdx">
+                <a
+                    :href="(String(url).startsWith('http') ? '' : 'https://') + url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="truncate text-primary-600 hover:underline dark:text-primary-400"
+                    x-text="url"
+                ></a>
+            </template>
+        </span>
+    </template>
+
+    <template x-if="field.type === 'link' && !(Array.isArray(field.values) && field.values.length > 0) && (field.new ?? field.value)">
         <a
             :href="(String(field.new ?? field.value).startsWith('http') ? '' : 'https://') + (field.new ?? field.value)"
             target="_blank"

@@ -60,6 +60,10 @@ final readonly class CustomFieldsDisplayFormatter
                 $row['values'] = $this->optionNames($field, $newValue);
             }
 
+            if ($field->type === CustomFieldType::LINK->value && is_array($newValue)) {
+                $row['values'] = $this->optionNames($field, $newValue);
+            }
+
             if ($dataType === FieldDataType::SINGLE_CHOICE) {
                 $name = $this->renderSingleChoice($field, $newValue);
                 $row['values'] = $name === null || $name === '' ? [] : [$name];
