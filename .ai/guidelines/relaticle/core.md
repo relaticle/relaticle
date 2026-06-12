@@ -21,51 +21,11 @@ Before committing any changes, always run these checks in order:
 1. `vendor/bin/pint --dirty --format agent` — fix code style
 2. `vendor/bin/rector --dry-run` — if rector suggests changes, apply them with `vendor/bin/rector`
 3. `vendor/bin/phpstan analyse` — ensure no new static analysis errors
-4. `composer test:type-coverage` — ensure type coverage stays at or above 99.9%
+4. `composer test:type-coverage` — type coverage must stay at 100%
 5. `php artisan test --compact` — run relevant tests (use `--filter` for targeted runs)
 
-Do not add new PHPStan errors to the baseline without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
-
-## Icons (Remix Icon)
-
-- **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
-- **UI/functional icons** (arrows, chevrons, checks, close) → always `line` variant
-- **Feature/section icons** → `line` variant, stay consistent within a section
-- **Status/emphasis icons** (success checkmarks, alerts) → `fill` variant
+Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
 
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()` — not in `routes/console.php`
-
-## Actions
-
-- All write operations (create, update, delete) must go through action classes in `app/Actions/` -- never inline business logic in controllers, MCP tools, Livewire components, or Filament resources
-- Actions are the single source of truth for business logic and side effects (notifications, syncs, etc.)
-- Filament CRUD may use native `CreateAction`/`EditAction` when the action only does `Model::create()`/`->update()` with no extra logic -- but side effects (e.g., notifications) must still be triggered via `->after()` hooks calling the appropriate action
-- When reviewing or refactoring code, extract inline business logic into action classes
-
-## Testing
-
-- Do not write isolated unit tests for action classes, services, or similar internal code -- test them through their real entry points (API endpoints, Filament resources, Livewire components). Unit tests for internal classes create maintenance burden without catching real bugs.
-- Use `mutates(ClassName::class)` in test files to declare which source classes each test covers
-- Run mutation testing per-class: `php -d xdebug.mode=coverage vendor/bin/pest --mutate --class='App\MyClass' tests/path/`
-- No enforced `--min` threshold — use mutation testing as a code review tool, not a CI gate
-- Use `$this->travelTo()` in tests that depend on day-of-week or weekly intervals to avoid flaky boundary failures
-
-## Custom Fields
-
-- Models using the `UsesCustomFields` trait handle `custom_fields` automatically — do NOT manually extract, strip, or call `saveCustomFields()` in actions
-- The trait merges `'custom_fields'` into `$fillable`, intercepts it during `saving`, and persists values during `saved` — just pass `custom_fields` through in the `$data` array to `create()`/`update()`
-- Tenant context for the custom-fields package is set in `SetApiTeamContext` middleware via `TenantContextService::setTenantId()` — actions don't need `withTenant()` wrappers
-- In Filament, the package's own `SetTenantContextMiddleware` handles tenant context — no action-level code needed there either
-- `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()` — this is defensive and correct, don't change it to rely on ambient state
-
-## Chat tools + custom fields
-
-Chat tools (`packages/Chat/src/Tools/*/Create*Tool.php` and `Update*Tool.php`) automatically support **every** active custom field for their entity. Adding a new field to `app/Enums/CustomFields/*Field.php` (or via the Custom Fields admin UI) is enough — do NOT add per-field schema slots, value coercion, or display rows to the chat tool. The bridge services in `packages/Chat/src/Services/Tools/` handle:
-
-- Inlining a per-tenant `custom_fields` schema description so the LLM knows the valid codes and option labels.
-- Translating option labels back to option IDs at validation time.
-- Formatting the proposal-card "old → new" diff per field type.
-
-If you need a custom field to be **un-settable** from chat, mark it `active=false` on the `custom_fields` row, or add a tool-side allowlist filter inside `CustomFieldsSchemaDescriber`. Don't reach for hand-rolled per-field code.

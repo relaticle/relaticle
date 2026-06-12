@@ -3,11 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
-use Tests\TestCase;
-
-uses(TestCase::class, LazilyRefreshDatabase::class);
 
 it('derives a stable resolution key from the turn id', function (): void {
     $user = User::factory()->withPersonalTeam()->create();

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Relaticle\Chat\Models\AiCreditBalance;
-use Tests\TestCase;
-
-uses(TestCase::class, LazilyRefreshDatabase::class);
 
 mutates(AiCreditBalance::class);
 

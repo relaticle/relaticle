@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Local test configuration. phpunit.ci.xml is the CI overlay: identical
+    testsuites and base env plus CI-only overrides. When adding a testsuite or
+    an env key here, mirror it there — enforced by
+    tests/Arch/TestSuiteIntegrityTest.php.
+-->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
