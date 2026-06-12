@@ -15,7 +15,7 @@ jobs:
     name: Business-review deterministic spine
     defaults:
       run:
-        working-directory: .claude/skills/business-review-task
+        working-directory: .claude/skills/business-review
 
     steps:
       - name: Checkout

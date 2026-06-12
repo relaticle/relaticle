@@ -7,8 +7,7 @@ one-line description rides in session context.
 
 | Skill | Role |
 |---|---|
-| `business-review-task` | **The active reviewer (v3)** — panel-of-QAs engine: environment discovery, capability preflight, blast-radius tiering, journey synthesis, persona walks, regression-ledger sweep, adversarial verification, substance-gated verdict, fix mode. Invoked via `/business-review`. |
-| `business-review-v1` | Frozen gen-1 baseline for A/B comparison only. Never modify; invoke only by explicit request. |
+| `business-review` | **The active reviewer (v3)** — panel-of-QAs engine: environment discovery, capability preflight, blast-radius tiering, journey synthesis, persona walks, regression-ledger sweep, adversarial verification, substance-gated verdict, fix mode. Invoked via `/business-review`. |
 | `agent-browser-relaticle` | Browser cookbook for this app (panel URL derivation, login flows, Filament/Livewire `$wire` patterns, env hazards). All facts are dated cached hints that self-heal. |
 | `screenshot-with-callout` | Evidence-quality screenshot discipline (annotate → verify-crop → shoot → read-back). Vendored from the maintainer's dotfiles so every contributor has it; keep in sync when the upstream copy improves. |
 
@@ -23,7 +22,7 @@ one-line description rides in session context.
 ### Quality loop (run after ANY skill edit)
 
 ```bash
-cd .claude/skills/business-review-task
+cd .claude/skills/business-review
 python3 scripts/run_evals.py                  # failure-mode fixture locks
 python3 scripts/check_regressions.py --test   # ledger matcher + plan-gate locks
 for s in classify_diff compute_tier validate_plan aggregate_verdicts sanitize_pr extract_ac promote_to_fixture; do

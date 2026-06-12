@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression-ledger matcher + plan gate for business-review-task (Relaticle v3).
+"""Regression-ledger matcher + plan gate for business-review (Relaticle v3).
 
 Usage:
     python3 check_regressions.py <REVIEW_DIR>            # match ledger vs diff -> regression-checks.json
