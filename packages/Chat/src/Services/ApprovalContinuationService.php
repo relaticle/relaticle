@@ -121,7 +121,7 @@ final readonly class ApprovalContinuationService
             );
         }
 
-        $lines[] = 'Confirm to the user by the record title(s) above. Never echo operation or entity_type tokens as if they were names.';
+        $lines[] = 'Confirm to the user by the record title(s) above in ONE short sentence. Never echo operation or entity_type tokens as if they were names, never re-list the field values, and never render a table of the data that was just approved.';
 
         return implode("\n", $lines);
     }

@@ -365,3 +365,29 @@ it('rejects restore for cross-team users', function (): void {
 
     expect($company->fresh()->trashed())->toBeTrue();
 });
+
+it('approval continuation prompt demands a one-sentence confirmation without tables', function (): void {
+    insertConversation('conv-prompt-test', $this->user, $this->team);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => 'conv-prompt-test',
+        'message_id' => null,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Prompt Test Co'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $this->postJson(route('chat.actions.approve', $pending))->assertOk();
+
+    Bus::assertDispatched(
+        ContinueChatMessage::class,
+        fn (ContinueChatMessage $job): bool => str_contains($job->prompt, 'ONE short sentence')
+            && str_contains($job->prompt, 'never re-list the field values'),
+    );
+});
