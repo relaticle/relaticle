@@ -188,6 +188,34 @@ def _detect_critical_signals(path: str, hunk_text: str) -> set[str]:
     return matched
 
 
+_EVIDENCE_CAP_PER_SIGNAL = 3
+
+
+def _collect_signal_evidence(path: str, hunk_text: str,
+                             patterns: list[tuple[str, re.Pattern]],
+                             evidence: dict[str, list[str]]) -> None:
+    """Record WHERE each signal matched (file + first matching added line, capped).
+
+    Field evidence (PR 336, 2026-06-12): the word "session" inside ONE
+    shell-script comment escalated a pure nav refactor to Tier 3. The tiering
+    doc mandates sanity-checking the classifier; this output makes that check a
+    one-glance read of diff-classification.json instead of a manual re-grep.
+    """
+    if path.endswith(".md"):
+        return
+    for signal_name, pattern in patterns:
+        bucket = evidence.setdefault(signal_name, [])
+        if len(bucket) >= _EVIDENCE_CAP_PER_SIGNAL:
+            continue
+        if pattern.search(path):
+            bucket.append(f"{path} (path match)")
+            continue
+        for line in hunk_text.splitlines():
+            if pattern.search(line):
+                bucket.append(f"{path}: + {line.strip()[:100]}")
+                break
+
+
 def _compile_profile_patterns(profile: dict) -> list[tuple[str, re.Pattern]]:
     """Build (area_name, compiled_pattern) list from profile.sensitive_areas[].
 
@@ -267,6 +295,7 @@ def classify_diff(diff_text: str, profile: dict | None = None) -> dict:
     all_file_infra = True if files else False
     critical_signals_all: set[str] = set()
     project_subsystems_all: set[str] = set()
+    signal_evidence: dict[str, list[str]] = {}
 
     for path, hunk in files:
         is_infra = _is_infra_only_path(path)
@@ -281,11 +310,13 @@ def classify_diff(diff_text: str, profile: dict | None = None) -> dict:
             touched.setdefault(t, []).append(path)
 
         critical_signals_all.update(_detect_critical_signals(path, hunk))
+        _collect_signal_evidence(path, hunk, list(_CRITICAL_SIGNALS.items()), signal_evidence)
 
         if profile_patterns:
             project_subsystems_all.update(
                 _detect_project_subsystems(path, hunk, profile_patterns)
             )
+            _collect_signal_evidence(path, hunk, profile_patterns, signal_evidence)
 
     change_types = sorted(touched.keys())
 
@@ -305,6 +336,7 @@ def classify_diff(diff_text: str, profile: dict | None = None) -> dict:
         "critical_signals": sorted(critical_signals_all),
         "subsystems": change_types,
         "critical_subsystems": critical_subsystems,
+        "signal_evidence": {k: v for k, v in sorted(signal_evidence.items()) if v},
     }
 
     if profile is not None:
@@ -377,6 +409,25 @@ def _run_tests() -> int:
     r = classify_diff(diff)
     assert_in("T3 auth path: auth signal", "auth", r["critical_signals"])
     assert_in("T3 auth path: auth in critical_subsystems (compat)", "auth", r["critical_subsystems"])
+    assert_in("T3 auth path: signal_evidence has auth", "auth", r["signal_evidence"])
+    assert_in("T3 auth path: evidence is the path match",
+              "app/Http/Controllers/Auth/LoginController.php (path match)",
+              r["signal_evidence"]["auth"])
+
+    # T3b: signal fired by CONTENT names the file + the offending added line
+    diff = (
+        "diff --git a/bin/setup.sh b/bin/setup.sh\n"
+        "index a..b 100644\n"
+        "--- a/bin/setup.sh\n"
+        "+++ b/bin/setup.sh\n"
+        "@@ -1,2 +1,3 @@\n"
+        "+# and session cookies match the workspace host\n"
+    )
+    r = classify_diff(diff)
+    assert_in("T3b content evidence: auth fired", "auth", r["critical_signals"])
+    assert_in("T3b content evidence: line recorded",
+              "bin/setup.sh: + # and session cookies match the workspace host",
+              r["signal_evidence"]["auth"])
 
     # T4: PaymentController with charge method -> critical payment signal
     diff = (
@@ -539,27 +590,30 @@ def _run_tests() -> int:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    argv = sys.argv
-    if len(argv) < 2:
-        print("Usage: classify_diff.py <patch> [--profile <profile.json>] | --test",
-              file=sys.stderr)
-        return 2
+    import argparse
 
-    if argv[1] == "--test":
+    parser = argparse.ArgumentParser(
+        description="Classify a unified diff for business-review planning.")
+    parser.add_argument("patch", nargs="?", help="path to the unified diff")
+    parser.add_argument("--profile", help="path to project-profile.json")
+    parser.add_argument("--test", action="store_true", help="run self-tests")
+    args = parser.parse_args()
+
+    if args.test:
         return _run_tests()
 
-    patch_path = Path(argv[1])
+    if not args.patch:
+        parser.print_usage(sys.stderr)
+        return 2
+
+    patch_path = Path(args.patch)
     if not patch_path.exists():
         print(f"Patch not found: {patch_path}", file=sys.stderr)
         return 2
 
     profile: dict | None = None
-    if "--profile" in argv:
-        idx = argv.index("--profile")
-        if idx + 1 >= len(argv):
-            print("--profile requires a path argument", file=sys.stderr)
-            return 2
-        profile_path = Path(argv[idx + 1])
+    if args.profile:
+        profile_path = Path(args.profile)
         if profile_path.exists():
             try:
                 profile = json.loads(profile_path.read_text(encoding="utf-8"))

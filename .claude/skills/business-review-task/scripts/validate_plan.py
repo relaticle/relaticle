@@ -193,8 +193,20 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                 continue
             if not reachable:
                 continue  # consumption/internal surface, explicitly non-reachable — waived
+            # covered_by accepts a single journey id OR a list of them — a bare
+            # string must not iterate into characters (latent bug found
+            # 2026-06-12, PR 336 run: it silently contributed nothing and the
+            # "no journey covers it" error misdirected the plan author).
+            covered_by = s.get("covered_by", [])
+            if isinstance(covered_by, str):
+                covered_by = [covered_by]
+            for c in covered_by:
+                if isinstance(c, str) and c not in ids_seen:
+                    warnings.append(
+                        f"changed surface '{sid}' covered_by references unknown journey '{c}'"
+                    )
             covered = sid in covered_surface_ids or any(
-                c in ids_seen for c in s.get("covered_by", []) if isinstance(c, str)
+                c in ids_seen for c in covered_by if isinstance(c, str)
             )
             if not covered:
                 errors.append(
@@ -224,6 +236,23 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                 f"but the plan declares no reachable authoring surface "
                 f"(kind:\"authoring\", reachable:true) — the author->persist->consume arc is "
                 f"unwaivable when the diff adds something a creator configures"
+            )
+
+    # Persona-breadth check (tiering table: tier 2 -> 3 personas, tier 3 -> 3-5).
+    # A single-persona plan at tier >= 2 is sometimes legitimate (single-role
+    # surface), but it must SAY so via persona_rationale — silent
+    # under-provisioning is how breadth quietly evaporates (gap found
+    # 2026-06-12: a tier-2 run walked one persona and no gate noticed).
+    if tier_for_gate >= 2:
+        distinct_personas = {
+            p for j in journeys if isinstance(j, dict)
+            for p in (j.get("personas") or []) if isinstance(p, str)
+        }
+        if len(distinct_personas) < 2 and not plan.get("persona_rationale"):
+            warnings.append(
+                f"tier {tier_for_gate} plan uses {len(distinct_personas)} distinct persona(s) "
+                f"but the tiering table calls for 3+ — add top-level 'persona_rationale' "
+                f"explaining why fewer archetypes genuinely cover this diff, or add personas"
             )
 
     return errors, warnings

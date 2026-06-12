@@ -66,11 +66,38 @@ present.
 
 ## 4. Login flow (both panels — Filament stock login)
 
-**The recipe that works (verified: 2026-06-12, both panels):** native `fill` + native
-`click "Sign in"`. Do NOT dispatch synthetic MouseEvents on the submit button and do NOT
-`$wire.set` the fields — both were tried live and left the form on `/login` (Livewire's
-`wire:submit` didn't fire). `agent-browser fill` does register the value with
-`wire:model`; `agent-browser click "Sign in"` (by visible text) submits cleanly.
+**CORRECTION (verified: 2026-06-12, review PR 336):** the `input[name="email"]` selector
+is WRONG — it matches a **hidden** input belonging to the `laravel-login-link` dev package
+(the page has hidden `_token`/`email`/`key`/`guard`/`user_model` inputs from that form).
+`agent-browser fill` against that hidden field **hung the daemon** (`os error 35`,
+"daemon may be busy or unresponsive") and never submitted. The REAL Filament inputs have
+NO `name` attribute — they are `id="form.email"` / `id="form.password"` with
+`wire:model="data.email"` / `data.password`, inside the `<form wire:submit="authenticate">`.
+
+The recipe that works when `fill`/`type` hang (eval-driven, daemon-safe):
+
+```bash
+export AGENT_BROWSER_SESSION="<unique>"
+agent-browser open "$PANEL_URL/login"
+agent-browser eval '(() => {
+  const e=document.getElementById("form.email"), p=document.getElementById("form.password");
+  e.value="'"$LOGIN"'"; e.dispatchEvent(new Event("input",{bubbles:true}));
+  p.value="password";  p.dispatchEvent(new Event("input",{bubbles:true}));
+  const f=[...document.querySelectorAll("form")].find(x=>x.getAttribute("wire:submit")==="authenticate");
+  f.requestSubmit(); return "submitted";
+})()'
+sleep 4
+agent-browser eval 'location.pathname'   # confirm you left /login (lands on /<team-slug>)
+```
+
+- **Daemon hangs on `fill`/`type`** in this environment (verified: 2026-06-12). When a
+  command returns `os error 35` / no output, `pkill -9 -f agent-browser; sleep 3` and
+  re-open. `open`/`eval`/`snapshot`/`screenshot` are reliable; `click` is flaky — prefer
+  `eval` with `el.click()` for `<a wire:navigate>` links.
+- Many stale `--session` entries overload the daemon; keep ONE session per run and chain
+  commands with `&&` in a single shell call (the daemon persists the browser).
+
+<details><summary>Older recipe (fill+click) — left here for reference, did NOT work on 2026-06-12</summary>
 
 ```bash
 agent-browser --session "$AB" open "$PANEL_URL/login"
@@ -81,6 +108,7 @@ agent-browser --session "$AB" click "Sign in"
 agent-browser --session "$AB" wait --load networkidle
 agent-browser --session "$AB" eval 'location.pathname'   # confirm you left /login
 ```
+</details>
 
 - **`click` / `fill` take the element's VISIBLE TEXT or a CSS selector, NOT
   `find role button "<name>"`** — that subcommand syntax errors on this binary
@@ -103,23 +131,39 @@ fails (`Unexpected token "/" while parsing css selector`). Always pass an absolu
 
 ## 5. The gold patterns (Filament v5 + Livewire v4)
 
-Prefer **semantics over CSS selectors** — a11y-role finds and `$wire` state survive
-Blade/Tailwind refactors:
+Prefer **semantics over CSS selectors** — a11y-role finds and Livewire state survive
+Blade/Tailwind refactors.
 
+**`$wire` is NOT in scope inside `agent-browser eval`** (it's an Alpine magic; eval runs
+in plain page context — verified: 2026-06-12, cost a run 4 round-trips + one
+self-inflicted 500 where the server was asked to call a method literally named
+`$wire`). Resolve the component first, then use `.set(...)` / `.call(...)`:
+
+```js
+// by name (page components):
+const meta = window.Livewire.all().find(c => /TasksBoard/.test(c.name)); // metadata ONLY: {id, name}
+const comp = window.Livewire.find(meta.id);                              // the real component
+await comp.call("moveCard", "<recordId>", "<columnId>");
+// or from a DOM element (modals, nested components):
+const comp2 = window.Livewire.find(el.closest("[wire\\:id]").getAttribute("wire:id"));
+await comp2.set("mountedActions.0.data.title", "value", true);
+await comp2.call("callMountedAction");
+```
+
+- **`Livewire.all()` entries have NO `.call`/`.set`** — they are metadata; always pass
+  the id through `Livewire.find()` (verified: 2026-06-12).
 - **Select dropdowns** (plain click is unreliable):
   `agent-browser find role combobox "<label>" click` then
-  `agent-browser find role option "<option>" click` — or set state directly:
-  `agent-browser eval 'await $wire.set("data.company_id", 42, true)'`
-- **Date pickers** (plain type does nothing):
-  `agent-browser eval 'await $wire.set("data.closes_at", "2026-06-15", true)'`
+  `agent-browser find role option "<option>" click` — or `comp.set("data.company_id", 42, true)`.
+- **Date pickers** (plain type does nothing): `comp.set("data.closes_at", "2026-06-15", true)`.
 - **Action modals (Delete, custom row actions) — the single most useful pattern:**
   ```js
-  await $wire.mountAction('delete', { recordKey: 42 });
-  await $wire.set('mountedActions.0.data.reason', 'why', true);
-  await $wire.callMountedAction();
+  await comp.call("mountAction", "delete", { recordKey: 42 });
+  await comp.set("mountedActions.0.data.reason", "why", true);
+  await comp.call("callMountedAction");
   ```
-  Every `$wire` call must be `await`-ed. (verified: 2026-05, stable)
-- **Read Livewire state**: `agent-browser eval 'JSON.stringify($wire.get("data"))'`
+  Every call must be `await`-ed. (verified: 2026-06-12 via the create-task modal)
+- **Read Livewire state**: `agent-browser eval '... JSON.stringify(comp.get("data"))'`
 - **Snapshots**: `agent-browser snapshot -i -c -d 8` (focused), never bare `snapshot`.
   Refs (`@eXX`) shift between snapshots — keep snapshot→interaction adjacent or use
   `find role/text … click`.
@@ -138,6 +182,12 @@ Blade/Tailwind refactors:
   stale built bundle — looks like a dead page, is an env defect. `npm run build`, check
   `agent-browser console` for websocket errors (verified: 2026-06-10).
 - **419 CSRF after idle** → `agent-browser reload` and retry once (verified: 2026-05).
+- **A failed Livewire request leaves a full-screen error overlay in the DOM** (Laravel
+  error page in a modal) that silently photobombs every later screenshot — the page
+  underneath still works, so nothing looks wrong until you read the PNG back. After ANY
+  errored `comp.call`, `agent-browser open` the page fresh (or remove the overlay)
+  before shooting (verified: 2026-06-12 — a stale overlay replaced the board in an
+  evidence shot).
 - **Stale session after branch switches** → first action of a batch is a fresh login.
 - **AI credits drain during chat testing** → re-seed `LocalSeeder` to top up before
   chat-heavy flows.

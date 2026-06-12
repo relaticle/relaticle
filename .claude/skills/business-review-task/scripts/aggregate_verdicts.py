@@ -191,7 +191,14 @@ def aggregate(review_dir: Path) -> dict:
         if surface.get("reachable", True) is False or not sid:
             continue
         covering = {j.get("id") for j in plan_journeys if sid in j.get("covers_surfaces", [])}
-        covering |= {c for c in surface.get("covered_by", []) if isinstance(c, str)}
+        # covered_by accepts a single journey id OR a list of them. Without the
+        # normalization, iterating a bare string yields its CHARACTERS as
+        # "journey ids" and the surface silently lands in unreached_surfaces
+        # (latent bug found 2026-06-12, PR 336 run).
+        covered_by = surface.get("covered_by", [])
+        if isinstance(covered_by, str):
+            covered_by = [covered_by]
+        covering |= {c for c in covered_by if isinstance(c, str)}
         if not any(journey_verdicts.get(jid) == "delivered" for jid in covering):
             unreached_surfaces.add(sid)
     unreached_sorted = sorted(unreached_surfaces)
@@ -236,6 +243,13 @@ def aggregate(review_dir: Path) -> dict:
     # is a faked-breadth signal (SPEC §14 faked-breadth-trap).
     frontier_suspicious = tier >= 2 and bool(planned_journeys) and len(frontier_structured) == 0
 
+    # The coverage-critic is part of stage 4 at tier >= 2; the aggregator can't
+    # force it to run, but it CAN attest whether it did. Report gate 6b reads
+    # this: a tier>=2 run with critic_ran=false must justify the skip in
+    # REVIEW.md or it's a faked-breadth smell (gap found 2026-06-12: the critic
+    # was silently skipped and nothing flagged it).
+    critic_ran = critic_path.exists()
+
     return {
         "label": label,
         "tier": tier,
@@ -248,6 +262,8 @@ def aggregate(review_dir: Path) -> dict:
         "frontier": frontier_structured,
         "decision_needed": _derive_decision_needed(label, journey_verdicts, frontier_structured, confirmed_blockers),
         "frontier_suspicious": frontier_suspicious,
+        "critic_ran": critic_ran,
+        "critic_missing_at_tier2plus": tier >= 2 and not critic_ran,
         "unreached_changed_surfaces": unreached_sorted,
         "unreached_primary_surfaces": unreached_primary,
         "blocked_reason": blocked_reason,
@@ -297,6 +313,31 @@ def run_tests() -> int:
         check("T-decision-needed-present",
               isinstance(v.get("decision_needed"), str) and bool(v["decision_needed"]),
               f"got {v.get('decision_needed')!r}")
+
+    # covered_by as a bare string must behave exactly like a one-element list —
+    # not iterate into characters (PR 336 latent bug, 2026-06-12)
+    with tempfile.TemporaryDirectory() as td:
+        work = Path(td)
+        (work / "plan.md").write_text(
+            '<!--json\n{"pr_number":1,"sha":"x","tier":2,"channel":"healthy",'
+            '"changed_surfaces":[{"id":"surf-A","covered_by":"S1"}],'
+            '"journeys":[{"id":"S1","synthesized":true,"name":"n","personas":["p"],'
+            '"happy_path":["h"],"sad_paths":["s"],"acs":[1]}]}\n-->\n', encoding="utf-8")
+        pdir = work / "persona-p"
+        pdir.mkdir()
+        (pdir / "findings.json").write_text(json.dumps({
+            "persona": "p",
+            "journeys": [{"id": "S1", "value_verdict": "delivered", "sad_paths_walked": ["s"]}],
+            "bugs": [], "ux_friction": [],
+            "coverage": {"frontier_not_reached": ["left over"]},
+        }), encoding="utf-8")
+        v = aggregate(work)
+        check("T-covered-by-string-normalized",
+              v["unreached_changed_surfaces"] == [] and v["label"] == "ai-approved",
+              f"got unreached={v['unreached_changed_surfaces']!r} label={v['label']}")
+        check("T-critic-attested-missing",
+              v["critic_ran"] is False and v["critic_missing_at_tier2plus"] is True,
+              f"got critic_ran={v['critic_ran']} missing={v['critic_missing_at_tier2plus']}")
 
     # worst_verdict
     check("T-worst-failed", worst_verdict(["delivered", "failed", "partial"]) == "failed")

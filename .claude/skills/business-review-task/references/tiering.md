@@ -14,9 +14,15 @@ Union of two sources; any hit forces Tier 3 regardless of breadth:
    `billing`, `subscription`, `tenant`, `custom_field`, `import`, `chat`, `policy`.
 
 **Sanity-check the classifier, don't worship it** (field evidence: importer paths went
-undetected twice; incidental `auth()` tokens over-fired once). If the computed tier
-contradicts your read of the diff, re-tier manually and record both the computed and
-chosen tier + one-line rationale in the plan frontmatter.
+undetected twice; incidental `auth()` tokens over-fired once; on PR 336 the word
+"session" in ONE shell-script comment escalated a pure nav refactor to Tier 3).
+`classify_diff.py` emits **`signal_evidence`** — the exact file + added line each
+signal fired on — so the sanity check is a one-glance read of
+`diff-classification.json`, not a manual re-grep. Read it EVERY run before accepting a
+critical bump. If the computed tier contradicts your read of the diff, re-tier manually
+and record `computed_tier`, the chosen `tier`, and a one-line `tier_rationale` in the
+plan frontmatter (the false-positive lines from `signal_evidence` belong in that
+rationale).
 
 ## User emphasis (the override that only raises)
 

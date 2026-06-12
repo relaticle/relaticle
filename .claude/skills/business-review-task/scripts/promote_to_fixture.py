@@ -55,7 +55,20 @@ def promote(pr_num: str, fixture_name: str) -> Path:
     inputs = dst / "inputs"
     inputs.mkdir()
 
+    # The v3 artifact set run_evals.py's aggregator consumes (plan + findings +
+    # critic + confirmations), plus the diff/AC for context. Legacy v1 names kept
+    # for back-compat. (Bug found 2026-06-12: the list held ONLY v1 names —
+    # pr-diff.patch, pr-context.json — so promoting a v3 run produced an empty
+    # inputs/ and a fixture that failed run_evals with "no verdict-final.json".)
     candidates = [
+        ("plan.md", False),
+        ("acceptance-criteria.json", False),
+        ("coverage-critic.json", False),
+        ("regression-checks.json", False),
+        ("diff-classification.json", False),
+        ("tier.json", False),
+        ("pr.diff", False),
+        ("verifier", True),
         ("untrusted", True),
         ("pr-diff.patch", False),
         ("pr-files.txt", False),
@@ -69,6 +82,10 @@ def promote(pr_num: str, fixture_name: str) -> Path:
                 shutil.copytree(src_path, dst_path)
             else:
                 shutil.copy2(src_path, dst_path)
+
+    for persona_dir in sorted(src.glob("persona-*")):
+        if persona_dir.is_dir():
+            shutil.copytree(persona_dir, inputs / persona_dir.name)
 
     verdict_path = src / "verdict-final.json"
     ac_path = src / "acceptance-criteria.json"

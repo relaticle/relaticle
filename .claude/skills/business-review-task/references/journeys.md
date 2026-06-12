@@ -56,3 +56,43 @@ double-submit · abandon-and-return mid-flow · the unhappy branch of every new 
 
 Output: `$REVIEW_DIR/journey-map.json`, folded into plan frontmatter, validated by
 `scripts/validate_plan.py` before the fleet launches.
+
+## Plan-frontmatter schema (canonical — write it right the first time)
+
+The exact field names `validate_plan.py` + `aggregate_verdicts.py` consume (guessing
+them cost the 2026-06-12 run three validation round-trips):
+
+```json
+{
+  "pr_number": 336, "sha": "<full-sha>", "tier": 2, "channel": "healthy",
+  "computed_tier": 3,
+  "tier_rationale": "required when tier != computed_tier (quote signal_evidence lines)",
+  "persona_rationale": "required when tier >= 2 and distinct personas < 2",
+  "changed_surfaces": [
+    {"id": "Tasks board (/tasks/board)",
+     "covered_by": ["tasks-view-switching"],
+     "kind": "authoring",
+     "reachable": true,
+     "primary": true,
+     "gated_by": "pennant:new-boards"}
+  ],
+  "preconditions_activated": [{"gate": "pennant:new-boards", "attested": true}],
+  "journeys": [
+    {"id": "tasks-view-switching", "name": "Tasks list/board switching",
+     "synthesized": true,
+     "personas": ["team-owner"],
+     "happy_path": ["step 1", "step 2"],
+     "sad_paths": ["deep-link /tasks/board directly"],
+     "acs": [2, 3],
+     "covers_surfaces": ["Tasks board (/tasks/board)"]}
+  ],
+  "regression_checks": [{"id": "REG-001", "journey": "tasks-view-switching", "status": "planned"}]
+}
+```
+
+Field notes: surface key is `id` (not `surface`); `covered_by` takes a list (bare string
+accepted, normalized); `happy_path` is a LIST of steps, never a prose string; every
+journey needs `name`; `acs` are ints from acceptance-criteria.json (or `"implicit"`);
+`kind: "authoring"` surfaces can never be `reachable: false`; an unreached
+`primary: true` surface blocks the verdict; `gated_by` pairs with a
+`preconditions_activated` entry `{gate, attested: true}`.

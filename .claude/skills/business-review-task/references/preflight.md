@@ -23,8 +23,18 @@ Against `$APP_PANEL_URL` from `$REVIEW_DIR/project-profile.json`:
 4. **Read the screenshot back** (Read tool on the PNG) and actually look at it.
    PASS: a real image showing the login page. FAIL: 0-byte/blank — the agent cannot
    see its own output.
-5. **Type into the email field and confirm it registered** — `fill` then `get value`.
-   PASS: read-back equals typed. FAIL: empty/unchanged.
+5. **Type into the email field and confirm it registered** — `fill` then `get value`,
+   targeting the ref the step-2 snapshot gave you (`@eNN`) or the snapshot-derived
+   visible input — NEVER a guessed CSS selector. PASS: read-back **equals the exact
+   string typed**. FAIL: empty, unchanged, or ANY OTHER VALUE.
+   A read-back that differs from what you typed is a fail to investigate, not a pass to
+   rationalize (incident 2026-06-12: `input[name="email"]` matched a HIDDEN
+   `laravel-login-link` field; the fill hung the daemon, `get value` returned that
+   field's pre-existing default, and the mismatched read-back was waved through as
+   "autofill" — the same wrong selector then cost the login flow 15 minutes later).
+   Hidden-field shadowing is the specific trap: confirm the element is visible
+   (`agent-browser eval` on `offsetParent !== null`) before trusting name-attribute
+   selectors on login pages.
 
 The smoke tests the channel, **not authentication** — it stops at "the field accepts
 input". Establishing a session is setup (`environment.md` §2, `browser-truth.md` §3b).

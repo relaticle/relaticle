@@ -40,6 +40,7 @@ business-review-task --reverify REG-NNN       # replay one ledger entry's repro 
 | User says (any phrasing like…) | Effect |
 |---|---|
 | a bare number, `#332`, or a PR URL | `--pr <N>` |
+| a PR URL + "inside this branch" / the PR is already MERGED into the current branch | `--pr <N>` reviewed against the LOCAL live app: diff = `git diff <merge>^1 <merge>` (or `gh pr diff`), walks run on this checkout, comment posts to the merged PR with both the merge and head SHA in the br-sha footer (verified: 2026-06-12, PR 336) |
 | "deploy to prod for 100,000 customers", "stress testing", "every single detail/angle", "deeply", "end-2-end" | **Tier 3 override** (production-gate depth, §Tiers) — never tier below the user's stated stakes |
 | "20+ scenarios", "as many scenarios as possible" | depth override: plan at least that breadth on the touched arcs |
 | "quick check", "smoke", "just sanity" | cap at Tier 1 |
