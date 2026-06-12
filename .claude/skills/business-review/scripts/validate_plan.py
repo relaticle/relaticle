@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a business-review-task plan.md's journey-based JSON frontmatter.
+"""Validate a business-review plan.md's journey-based JSON frontmatter.
 
 Usage:
     python3 validate_plan.py <path-to-plan.md>
