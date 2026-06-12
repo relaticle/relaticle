@@ -53,3 +53,17 @@ it('shows the transaction detail page with metadata', function (): void {
     livewire(ViewAiCreditTransaction::class, ['record' => $transaction->getKey()])
         ->assertSuccessful();
 });
+
+it('renders a reservation-type transaction without crashing (regression: unhandled match)', function (): void {
+    $reservation = AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Reservation,
+    ]);
+
+    livewire(ListAiCreditTransactions::class)
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$reservation])
+        ->assertCanRenderTableColumn('type');
+
+    livewire(ViewAiCreditTransaction::class, ['record' => $reservation->getKey()])
+        ->assertSuccessful();
+});

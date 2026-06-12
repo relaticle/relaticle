@@ -13,3 +13,8 @@ it('keeps the existing transactional cases unchanged', function (): void {
         ->and(AiCreditType::Summary->value)->toBe('summary')
         ->and(AiCreditType::Embedding->value)->toBe('embedding');
 });
+
+it('returns a color and label for every case so Filament badges never hit an unhandled match', function (AiCreditType $type): void {
+    expect($type->getColor())->toBeString()->not->toBeEmpty()
+        ->and($type->getLabel())->toBeString()->not->toBeEmpty();
+})->with(AiCreditType::cases());
