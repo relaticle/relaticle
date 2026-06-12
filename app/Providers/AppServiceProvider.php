@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
 use App\Http\Responses\LoginResponse;
+use App\Listeners\Billing\SyncPlanOnPolarSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
@@ -27,6 +28,11 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\GitHubService;
+use Danestves\LaravelPolar\Events\SubscriptionActive;
+use Danestves\LaravelPolar\Events\SubscriptionCanceled;
+use Danestves\LaravelPolar\Events\SubscriptionCreated;
+use Danestves\LaravelPolar\Events\SubscriptionRevoked;
+use Danestves\LaravelPolar\Events\SubscriptionUpdated;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -83,6 +89,12 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
+
+        Event::listen(SubscriptionCreated::class, SyncPlanOnPolarSubscriptionChange::class);
+        Event::listen(SubscriptionActive::class, SyncPlanOnPolarSubscriptionChange::class);
+        Event::listen(SubscriptionUpdated::class, SyncPlanOnPolarSubscriptionChange::class);
+        Event::listen(SubscriptionCanceled::class, SyncPlanOnPolarSubscriptionChange::class);
+        Event::listen(SubscriptionRevoked::class, SyncPlanOnPolarSubscriptionChange::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 

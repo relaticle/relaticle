@@ -8,6 +8,7 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Services\AvatarService;
+use Danestves\LaravelPolar\Billable;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -52,9 +53,10 @@ use Spatie\Sluggable\SlugOptions;
 ])]
 final class Team extends JetstreamTeam implements HasAvatar
 {
+    use Billable;
+
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
-
     use HasSlug;
     use HasUlids;
 

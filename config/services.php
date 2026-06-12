@@ -65,4 +65,11 @@ return [
     'anthropic' => [
         'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
     ],
+
+    'polar' => [
+        'products' => [
+            'pro' => env('POLAR_PRODUCT_PRO'),
+            'enterprise' => env('POLAR_PRODUCT_ENTERPRISE'),
+        ],
+    ],
 ];
