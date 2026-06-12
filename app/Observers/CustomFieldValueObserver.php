@@ -90,7 +90,7 @@ final readonly class CustomFieldValueObserver
         $dataType = CustomFieldsType::getFieldType($field->type)->dataType;
 
         $label = match ($dataType) {
-            FieldDataType::SINGLE_CHOICE => self::optionLabel($field, $value) ?? (string) $value,
+            FieldDataType::SINGLE_CHOICE => $this->optionLabel($field, $value) ?? (string) $value,
             FieldDataType::MULTI_CHOICE => $this->multiOptionLabels($field, $value),
             FieldDataType::BOOLEAN => $value ? 'Yes' : 'No',
             FieldDataType::DATE => $value instanceof Carbon ? $value->toDateString() : (string) $value,
@@ -101,7 +101,7 @@ final readonly class CustomFieldValueObserver
         return ['value' => $value, 'label' => $label];
     }
 
-    private static function optionLabel(CustomField $field, mixed $value): ?string
+    private function optionLabel(CustomField $field, mixed $value): ?string
     {
         return $field->options->first(fn (CustomFieldOption $option): bool => (string) $option->getKey() === (string) $value)?->name;
     }
@@ -111,7 +111,7 @@ final readonly class CustomFieldValueObserver
         $ids = is_iterable($value) ? collect($value) : collect();
 
         $labels = $ids
-            ->map(fn (mixed $id): ?string => self::optionLabel($field, $id))
+            ->map(fn (mixed $id): ?string => $this->optionLabel($field, $id))
             ->filter()
             ->all();
 
