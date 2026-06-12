@@ -1,0 +1,471 @@
+diff --git a/app/Filament/Concerns/HasBoardViewSwitcher.php b/app/Filament/Concerns/HasBoardViewSwitcher.php
+new file mode 100644
+index 00000000..c82f6b6f
+--- /dev/null
++++ b/app/Filament/Concerns/HasBoardViewSwitcher.php
+@@ -0,0 +1,43 @@
++<?php
++
++declare(strict_types=1);
++
++namespace App\Filament\Concerns;
++
++use Illuminate\Contracts\Support\Htmlable;
++use Illuminate\Support\HtmlString;
++use Relaticle\Flowforge\BoardResourcePage;
++
++/**
++ * Appends the list/board view switcher directly after the page heading,
++ * so it keeps a stable position when toggling between the two layouts.
++ */
++trait HasBoardViewSwitcher
++{
++    public function getHeading(): string|Htmlable|null
++    {
++        $heading = parent::getHeading();
++
++        $resource = static::getResource();
++        $pages = $resource::getPages();
++
++        if (! isset($pages['board'])) {
++            return $heading;
++        }
++
++        /** @var class-string<BoardResourcePage> $boardPage */
++        $boardPage = $pages['board']->getPage();
++
++        if (! $boardPage::canAccess()) {
++            return $heading;
++        }
++
++        $switcher = view('filament.app.view-switcher', [
++            'active' => $this instanceof BoardResourcePage ? 'board' : 'list',
++            'listUrl' => $resource::getUrl('index'),
++            'boardUrl' => $resource::getUrl('board'),
++        ])->render();
++
++        return new HtmlString('<span>'.e($heading).'</span>'.$switcher);
++    }
++}
+diff --git a/app/Filament/Resources/OpportunityResource.php b/app/Filament/Resources/OpportunityResource.php
+index 0f7b6840..56e9b140 100644
+--- a/app/Filament/Resources/OpportunityResource.php
++++ b/app/Filament/Resources/OpportunityResource.php
+@@ -8,6 +8,7 @@
+ use App\Filament\Exports\OpportunityExporter;
+ use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+ use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
++use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+ use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+ use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
+ use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
+@@ -116,6 +117,7 @@ public static function getPages(): array
+     {
+         return [
+             'index' => ListOpportunities::route('/'),
++            'board' => OpportunitiesBoard::route('/board'),
+             'view' => ViewOpportunity::route('/{record}'),
+         ];
+     }
+diff --git a/app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php b/app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php
+index 91ab16de..67d0d1a2 100644
+--- a/app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php
++++ b/app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php
+@@ -4,6 +4,7 @@
+ 
+ namespace App\Filament\Resources\OpportunityResource\Pages;
+ 
++use App\Filament\Concerns\HasBoardViewSwitcher;
+ use App\Filament\Exports\OpportunityExporter;
+ use App\Filament\Resources\OpportunityResource;
+ use Asmit\ResizedColumn\HasResizableColumn;
+@@ -20,6 +21,7 @@
+ 
+ final class ListOpportunities extends ListRecords
+ {
++    use HasBoardViewSwitcher;
+     use HasResizableColumn;
+     use InteractsWithCustomFields;
+ 
+diff --git a/app/Filament/Pages/OpportunitiesBoard.php b/app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php
+similarity index 95%
+rename from app/Filament/Pages/OpportunitiesBoard.php
+rename to app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php
+index 3d944542..f736c21e 100644
+--- a/app/Filament/Pages/OpportunitiesBoard.php
++++ b/app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php
+@@ -2,15 +2,16 @@
+ 
+ declare(strict_types=1);
+ 
+-namespace App\Filament\Pages;
++namespace App\Filament\Resources\OpportunityResource\Pages;
+ 
+ use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
++use App\Filament\Concerns\HasBoardViewSwitcher;
++use App\Filament\Resources\OpportunityResource;
+ use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+ use App\Models\CustomField;
+ use App\Models\CustomFieldOption;
+ use App\Models\Opportunity;
+ use App\Models\Team;
+-use BackedEnum;
+ use Exception;
+ use Filament\Actions\Action;
+ use Filament\Actions\CreateAction;
+@@ -31,31 +32,22 @@
+ use League\CommonMark\Exception\InvalidArgumentException;
+ use Relaticle\CustomFields\Facades\CustomFields;
+ use Relaticle\Flowforge\Board;
+-use Relaticle\Flowforge\BoardPage;
++use Relaticle\Flowforge\BoardResourcePage;
+ use Relaticle\Flowforge\Column;
+ use Relaticle\Flowforge\Components\CardFlex;
+ use Throwable;
+ 
+-final class OpportunitiesBoard extends BoardPage
++final class OpportunitiesBoard extends BoardResourcePage
+ {
+-    protected static ?string $navigationLabel = null;
++    use HasBoardViewSwitcher;
+ 
+-    protected static ?string $title = null;
+-
+-    protected static ?string $navigationParentItem = 'Opportunities';
+-
+-    public static function getNavigationLabel(): string
+-    {
+-        return __('filament/pages/boards.navigation_label');
+-    }
++    protected static string $resource = OpportunityResource::class;
+ 
+     public function getTitle(): string
+     {
+         return __('filament/pages/boards.opportunities.title');
+     }
+ 
+-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
+-
+     public function board(Board $board): Board
+     {
+         $stageField = $this->stageCustomField();
+@@ -308,7 +300,10 @@ private function stages(): Collection
+         ]);
+     }
+ 
+-    public static function canAccess(): bool
++    /**
++     * @param  array<string, mixed>  $parameters
++     */
++    public static function canAccess(array $parameters = []): bool
+     {
+         return (new self)->stageCustomField() instanceof CustomField;
+     }
+diff --git a/app/Filament/Resources/TaskResource.php b/app/Filament/Resources/TaskResource.php
+index af2d7a61..3f420d0c 100644
+--- a/app/Filament/Resources/TaskResource.php
++++ b/app/Filament/Resources/TaskResource.php
+@@ -8,6 +8,7 @@
+ use App\Enums\CreationSource;
+ use App\Filament\Resources\TaskResource\Forms\TaskForm;
+ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
++use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+ use App\Models\CustomField;
+ use App\Models\Task;
+ use App\Models\User;
+@@ -156,6 +157,7 @@ public static function getPages(): array
+     {
+         return [
+             'index' => ManageTasks::route('/'),
++            'board' => TasksBoard::route('/board'),
+         ];
+     }
+ 
+diff --git a/app/Filament/Resources/TaskResource/Pages/ManageTasks.php b/app/Filament/Resources/TaskResource/Pages/ManageTasks.php
+index 5eb77196..c42af0fd 100644
+--- a/app/Filament/Resources/TaskResource/Pages/ManageTasks.php
++++ b/app/Filament/Resources/TaskResource/Pages/ManageTasks.php
+@@ -5,6 +5,7 @@
+ namespace App\Filament\Resources\TaskResource\Pages;
+ 
+ use App\Actions\Task\NotifyTaskAssignees;
++use App\Filament\Concerns\HasBoardViewSwitcher;
+ use App\Filament\Exports\TaskExporter;
+ use App\Filament\Resources\TaskResource;
+ use App\Models\Task;
+@@ -22,6 +23,7 @@
+ 
+ final class ManageTasks extends ManageRecords
+ {
++    use HasBoardViewSwitcher;
+     use HasResizableColumn;
+     use InteractsWithCustomFields;
+ 
+diff --git a/app/Filament/Pages/TasksBoard.php b/app/Filament/Resources/TaskResource/Pages/TasksBoard.php
+similarity index 95%
+rename from app/Filament/Pages/TasksBoard.php
+rename to app/Filament/Resources/TaskResource/Pages/TasksBoard.php
+index cb10f8cb..248ed755 100644
+--- a/app/Filament/Pages/TasksBoard.php
++++ b/app/Filament/Resources/TaskResource/Pages/TasksBoard.php
+@@ -2,15 +2,16 @@
+ 
+ declare(strict_types=1);
+ 
+-namespace App\Filament\Pages;
++namespace App\Filament\Resources\TaskResource\Pages;
+ 
+ use App\Enums\CustomFields\TaskField as TaskCustomField;
++use App\Filament\Concerns\HasBoardViewSwitcher;
++use App\Filament\Resources\TaskResource;
+ use App\Filament\Resources\TaskResource\Forms\TaskForm;
+ use App\Models\CustomField;
+ use App\Models\CustomFieldOption;
+ use App\Models\Task;
+ use App\Models\Team;
+-use BackedEnum;
+ use Exception;
+ use Filament\Actions\Action;
+ use Filament\Actions\CreateAction;
+@@ -27,31 +28,22 @@
+ use League\CommonMark\Exception\InvalidArgumentException;
+ use Relaticle\CustomFields\Facades\CustomFields;
+ use Relaticle\Flowforge\Board;
+-use Relaticle\Flowforge\BoardPage;
++use Relaticle\Flowforge\BoardResourcePage;
+ use Relaticle\Flowforge\Column;
+ use Relaticle\Flowforge\Components\CardFlex;
+ use Throwable;
+ 
+-final class TasksBoard extends BoardPage
++final class TasksBoard extends BoardResourcePage
+ {
+-    protected static ?string $navigationLabel = null;
++    use HasBoardViewSwitcher;
+ 
+-    protected static ?string $title = null;
+-
+-    protected static ?string $navigationParentItem = 'Tasks';
+-
+-    public static function getNavigationLabel(): string
+-    {
+-        return __('filament/pages/boards.navigation_label');
+-    }
++    protected static string $resource = TaskResource::class;
+ 
+     public function getTitle(): string
+     {
+         return __('filament/pages/boards.tasks.title');
+     }
+ 
+-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
+-
+     /**
+      * Configure the board using the new Filament V4 architecture.
+      */
+@@ -297,7 +289,10 @@ private function statuses(): Collection
+         ]);
+     }
+ 
+-    public static function canAccess(): bool
++    /**
++     * @param  array<string, mixed>  $parameters
++     */
++    public static function canAccess(array $parameters = []): bool
+     {
+         return (new self)->statusCustomField() instanceof CustomField;
+     }
+diff --git a/app/Providers/Filament/AppPanelProvider.php b/app/Providers/Filament/AppPanelProvider.php
+index b6106577..fa1d9f7e 100644
+--- a/app/Providers/Filament/AppPanelProvider.php
++++ b/app/Providers/Filament/AppPanelProvider.php
+@@ -12,6 +12,8 @@
+ use App\Filament\Pages\Dashboard;
+ use App\Filament\Pages\EditProfile;
+ use App\Filament\Pages\EditTeam;
++use App\Filament\Resources\OpportunityResource;
++use App\Filament\Resources\TaskResource;
+ use App\Http\Middleware\ApplyTenantScopes;
+ use App\Http\Middleware\CheckScheduledDeletion;
+ use App\Listeners\SwitchTeam;
+@@ -149,6 +151,11 @@ public function panel(Panel $panel): Panel
+                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
+                     ->middleware('auth')
+                     ->name('scheduled-deletion');
++
++                Route::get('/{tenant}/tasks-board', fn (string $tenant) => redirect()->to(TaskResource::getUrl('board', ['tenant' => $tenant]), status: 301))
++                    ->name('tasks-board.redirect');
++                Route::get('/{tenant}/opportunities-board', fn (string $tenant) => redirect()->to(OpportunityResource::getUrl('board', ['tenant' => $tenant]), status: 301))
++                    ->name('opportunities-board.redirect');
+             })
+             ->breadcrumbs(false)
+             ->sidebarCollapsibleOnDesktop()
+diff --git a/bin/setup-workspace.sh b/bin/setup-workspace.sh
+index 34696151..ed29a7c9 100755
+--- a/bin/setup-workspace.sh
++++ b/bin/setup-workspace.sh
+@@ -5,7 +5,9 @@
+ # Polyscope creates each workspace as a copy-on-write clone of the base repo
+ # (vendor/, node_modules/, and .env are copied). The database stays shared
+ # across workspaces. We rewrite APP_URL and SESSION_DOMAIN so absolute URLs
+-# and session cookies match `<workspace>.test`.
++# and session cookies match `<workspace>.test`, and blank APP_PANEL_DOMAIN
++# so the app panel serves path-based at `<workspace>.test/app` — the copied
++# `app.relaticle.test` value would route to the base checkout, not the clone.
+ #
+ # Mac-only: uses BSD sed (`sed -i ''`). Polyscope itself is macOS-only.
+ 
+@@ -28,8 +30,12 @@ npm ci
+ echo "→ Pointing .env at ${WORKSPACE_HOST}"
+ sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
+ sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${WORKSPACE_HOST}|" .env
++sed -i '' "s|^APP_PANEL_DOMAIN=.*|APP_PANEL_DOMAIN=|" .env
++
++php artisan config:clear --no-interaction
++php artisan route:clear --no-interaction
+ 
+ echo "→ Building frontend assets"
+ npm run build
+ 
+-echo "✓ Workspace ready: https://${WORKSPACE_HOST}"
++echo "✓ Workspace ready: https://${WORKSPACE_HOST} (app panel at /app)"
+diff --git a/lang/en/filament/pages/boards.php b/lang/en/filament/pages/boards.php
+index 6efadce5..a99e44e4 100644
+--- a/lang/en/filament/pages/boards.php
++++ b/lang/en/filament/pages/boards.php
+@@ -3,7 +3,11 @@
+ declare(strict_types=1);
+ 
+ return [
+-    'navigation_label' => 'Board',
++    'view_switcher' => [
++        'label' => 'Switch view',
++        'list' => 'List',
++        'board' => 'Board',
++    ],
+ 
+     'opportunities' => [
+         'title' => 'Opportunities',
+diff --git a/resources/css/filament/app/theme.css b/resources/css/filament/app/theme.css
+index a5c31ee7..7819cac3 100644
+--- a/resources/css/filament/app/theme.css
++++ b/resources/css/filament/app/theme.css
+@@ -40,6 +40,12 @@ .fi-app-main-wrapper {
+ 
+ .fi-header-heading {
+     @apply text-2xl font-bold;
++
++    /* Page headings that embed the list/board switcher render it inline,
++       right after the title text */
++    &:has(.fi-view-switcher) {
++        @apply flex items-center gap-x-3;
++    }
+ }
+ 
+ /* Sidebar Enhancements */
+diff --git a/resources/views/filament/app/view-switcher.blade.php b/resources/views/filament/app/view-switcher.blade.php
+new file mode 100644
+index 00000000..0c33267b
+--- /dev/null
++++ b/resources/views/filament/app/view-switcher.blade.php
+@@ -0,0 +1,30 @@
++@php
++    $segmentClasses = 'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600';
++    $activeClasses = 'bg-white text-primary-600 shadow-sm ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-primary-400 dark:ring-white/10';
++    $inactiveClasses = 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200';
++@endphp
++
++<nav
++    class="fi-view-switcher inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 font-normal dark:bg-white/5"
++    aria-label="{{ __('filament/pages/boards.view_switcher.label') }}"
++>
++    <a
++        href="{{ $listUrl }}"
++        wire:navigate
++        @class([$segmentClasses, $activeClasses => $active === 'list', $inactiveClasses => $active !== 'list'])
++        @if ($active === 'list') aria-current="page" @endif
++    >
++        <x-filament::icon icon="heroicon-m-list-bullet" class="h-4 w-4" />
++        {{ __('filament/pages/boards.view_switcher.list') }}
++    </a>
++
++    <a
++        href="{{ $boardUrl }}"
++        wire:navigate
++        @class([$segmentClasses, $activeClasses => $active === 'board', $inactiveClasses => $active !== 'board'])
++        @if ($active === 'board') aria-current="page" @endif
++    >
++        <x-filament::icon icon="heroicon-m-view-columns" class="h-4 w-4" />
++        {{ __('filament/pages/boards.view_switcher.board') }}
++    </a>
++</nav>
+diff --git a/tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php b/tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php
+index b35ccb9e..acdec8b1 100644
+--- a/tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php
++++ b/tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php
+@@ -3,7 +3,9 @@
+ declare(strict_types=1);
+ 
+ use App\Enums\CustomFields\OpportunityField;
+-use App\Filament\Pages\OpportunitiesBoard;
++use App\Filament\Resources\OpportunityResource;
++use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
++use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+ use App\Models\CustomField;
+ use App\Models\Opportunity;
+ use App\Models\User;
+@@ -67,6 +69,19 @@ function getOpportunityBoard(): Board
+     expect($allRecordIds)->not->toContain($otherOpportunity->id);
+ });
+ 
++it('shows the view switcher linking list and board views', function (): void {
++    livewire(ListOpportunities::class)
++        ->assertSeeHtml(OpportunityResource::getUrl('board'));
++
++    livewire(OpportunitiesBoard::class)
++        ->assertSeeHtml(OpportunityResource::getUrl('index'));
++});
++
++it('redirects the legacy board url to the resource board page', function (): void {
++    $this->get(route('filament.app.opportunities-board.redirect', ['tenant' => $this->team->slug]))
++        ->assertRedirect(OpportunityResource::getUrl('board'));
++});
++
+ it('moves a card between columns via moveCard', function (): void {
+     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+     $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+diff --git a/tests/Feature/Filament/App/Pages/TasksBoardTest.php b/tests/Feature/Filament/App/Pages/TasksBoardTest.php
+index a4afe0c6..545fd750 100644
+--- a/tests/Feature/Filament/App/Pages/TasksBoardTest.php
++++ b/tests/Feature/Filament/App/Pages/TasksBoardTest.php
+@@ -3,7 +3,9 @@
+ declare(strict_types=1);
+ 
+ use App\Enums\CustomFields\TaskField;
+-use App\Filament\Pages\TasksBoard;
++use App\Filament\Resources\TaskResource;
++use App\Filament\Resources\TaskResource\Pages\ManageTasks;
++use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+ use App\Models\CustomField;
+ use App\Models\Task;
+ use App\Models\User;
+@@ -80,6 +82,19 @@ function getTaskBoard(): Board
+     livewire(TasksBoard::class)->assertOk();
+ });
+ 
++it('shows the view switcher linking list and board views', function (): void {
++    livewire(ManageTasks::class)
++        ->assertSeeHtml(TaskResource::getUrl('board'));
++
++    livewire(TasksBoard::class)
++        ->assertSeeHtml(TaskResource::getUrl('index'));
++});
++
++it('redirects the legacy board url to the resource board page', function (): void {
++    $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->team->slug]))
++        ->assertRedirect(TaskResource::getUrl('board'));
++});
++
+ it('moves a card between columns via moveCard', function (): void {
+     $todo = $this->statusField->options->firstWhere('name', 'To do');
+     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');

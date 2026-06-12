@@ -3,16 +3,20 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
-use App\Filament\Pages\TasksBoard;
+use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Board;
 
 mutates(TasksBoard::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
 
@@ -61,7 +65,7 @@ it('does not show tasks from other teams', function (): void {
 
     $board = getTaskBoard();
     $allRecordIds = collect($this->statusField->options)
-        ->flatMap(fn ($opt) => $board->getBoardRecords((string) $opt->getKey()))
+        ->flatMap(fn ($opt): Collection => $board->getBoardRecords((string) $opt->getKey()))
         ->pluck('id');
 
     expect($allRecordIds)->not->toContain($otherTask->id);
@@ -78,6 +82,43 @@ it('renders the board when a task has multiple assignees', function (): void {
     $task->assignees()->attach([$this->user->id, $secondMember->id]);
 
     livewire(TasksBoard::class)->assertOk();
+});
+
+it('shows the view switcher linking list and board views', function (): void {
+    livewire(ManageTasks::class)
+        ->assertSeeHtml(TaskResource::getUrl('board'));
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml(TaskResource::getUrl('index'));
+});
+
+it('redirects the legacy board url to the resource board page', function (): void {
+    $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->team->slug]))
+        ->assertRedirect(TaskResource::getUrl('board'));
+});
+
+it('renders the board and the list heading when the status field has no options', function (): void {
+    $this->statusField->options()->delete();
+
+    livewire(TasksBoard::class)->assertOk();
+
+    livewire(ManageTasks::class)
+        ->assertOk()
+        ->assertSeeHtml(TaskResource::getUrl('board'));
+});
+
+it('resolves the status custom field once per request across access check and board render', function (): void {
+    DB::enableQueryLog();
+
+    livewire(TasksBoard::class)->assertOk();
+
+    $statusFieldLookups = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'custom_fields')
+            && in_array(TaskField::STATUS->value, $query['bindings'], true));
+
+    DB::disableQueryLog();
+
+    expect($statusFieldLookups)->toHaveCount(1);
 });
 
 it('moves a card between columns via moveCard', function (): void {
