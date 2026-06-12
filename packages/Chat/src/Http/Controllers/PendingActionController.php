@@ -70,7 +70,7 @@ final readonly class PendingActionController
     }
 
     /**
-     * @return array{id: string, type: string, url: string}|null
+     * @return array{id: string, type: string, url: string, label: string|null}|null
      */
     private function resolveRecordReference(PendingAction $pendingAction): ?array
     {
@@ -85,7 +85,7 @@ final readonly class PendingActionController
     }
 
     /**
-     * @return list<array{id: string, type: string, url: string}>|null
+     * @return list<array{id: string, type: string, url: string, label: string|null}>|null
      */
     private function resolveBatchRecordReferences(PendingAction $pendingAction): ?array
     {
@@ -155,7 +155,7 @@ final readonly class PendingActionController
     }
 
     /**
-     * @return array{id: string, type: string, url: string}|null
+     * @return array{id: string, type: string, url: string, label: string|null}|null
      */
     private function resolveDeletedRecordReference(PendingAction $pendingAction): ?array
     {

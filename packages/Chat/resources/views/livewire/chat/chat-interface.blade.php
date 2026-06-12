@@ -429,7 +429,7 @@
                                                     wire:navigate
                                                     class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
                                                 >
-                                                    View
+                                                    <span x-text="action.record.label ? 'View ' + action.record.label : 'View'"></span>
                                                     <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                                 </a>
                                             </template>
@@ -437,7 +437,7 @@
                                                 <span class="flex flex-wrap gap-2">
                                                     <template x-for="ref in action.records" :key="ref.id">
                                                         <a :href="ref.url" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                                            View
+                                                            <span x-text="ref.label ? ref.label : 'View'"></span>
                                                             <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                                         </a>
                                                     </template>

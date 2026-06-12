@@ -46,3 +46,27 @@ it('approve endpoint returns a record.url for a created company', function (): v
         ->and($url)->toContain('/companies/')
         ->and($url)->toContain($response->json('record.id'));
 });
+
+it('approve endpoint returns a record label for the view link', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => null,
+        'message_id' => null,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Labeled Link Co', 'account_owner_id' => (string) $user->getKey()],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $response = $this->postJson("/chat/actions/{$pending->id}/approve");
+
+    $response->assertOk();
+    expect($response->json('record.label'))->toBe('Labeled Link Co');
+});
