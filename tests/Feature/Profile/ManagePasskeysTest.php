@@ -105,6 +105,7 @@ it('confirms the password and dispatches the ceremony trigger on registration', 
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'password'])
         ->assertHasNoActionErrors()
+        ->assertActionHalted()
         ->assertDispatched('passkey-register-confirmed');
 
     expect(session('auth.password_confirmed_at'))->not->toBeNull();
@@ -127,6 +128,7 @@ it('confirms registration without a password for passwordless users', function (
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'My MacBook'])
         ->assertHasNoActionErrors()
+        ->assertActionHalted()
         ->assertDispatched('passkey-register-confirmed');
 
     expect(session('auth.password_confirmed_at'))->not->toBeNull();
@@ -156,6 +158,7 @@ it('dispatches the passkey confirmation ceremony when a password user with a pas
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'New MacBook'])
         ->assertHasNoActionErrors()
+        ->assertActionHalted()
         ->assertDispatched('passkey-confirm-then-register')
         ->assertNotDispatched('passkey-register-confirmed');
 
@@ -173,6 +176,7 @@ it('registers via the password fallback when the user opts into password confirm
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'password'])
         ->assertHasNoActionErrors()
+        ->assertActionHalted()
         ->assertDispatched('passkey-register-confirmed')
         ->assertNotDispatched('passkey-confirm-then-register');
 
@@ -220,6 +224,7 @@ it('dispatches the passkey confirmation ceremony when deleting without a passwor
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
         ->assertDispatched('passkey-confirm-then-delete', passkeyId: $passkey->id);
 
     expect(Passkey::find($passkey->id))->not->toBeNull();
