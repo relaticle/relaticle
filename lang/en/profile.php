@@ -70,6 +70,7 @@ return [
             'add_passkey' => 'Add passkey',
             'name_label' => 'Passkey name',
             'name_placeholder' => 'e.g., MacBook Pro, iPhone',
+            'password_help' => 'For your security, confirm your account password before adding a passkey.',
             'register' => 'Register passkey',
             'registering' => 'Registering...',
             'cancel' => 'Cancel',
@@ -100,6 +101,9 @@ return [
         ],
         'passkey_removed' => [
             'success' => 'Passkey removed.',
+        ],
+        'passkey_registration_failed' => [
+            'title' => 'Could not add passkey. Please try again.',
         ],
     ],
 

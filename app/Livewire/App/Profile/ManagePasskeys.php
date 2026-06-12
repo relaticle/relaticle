@@ -87,6 +87,53 @@ final class ManagePasskeys extends BaseLivewireComponent
         $this->sendNotification(__('profile.notifications.passkey_removed.success'));
     }
 
+    /**
+     * Collect a passkey name (and, for password accounts, a password confirmation)
+     * in a Filament modal, confirm it server-side so the RequirePassword middleware on
+     * the registration routes is satisfied, then hand off to the browser WebAuthn
+     * ceremony via a dispatched event. Passwordless (social) accounts are confirmed by
+     * their active session alone, mirroring deletePasskeyAction().
+     */
+    public function registerPasskeyAction(): Action
+    {
+        $hasPassword = $this->authUser()->hasPassword();
+
+        return Action::make('registerPasskey')
+            ->label(__('profile.sections.passkeys.add_passkey'))
+            ->modalHeading(__('profile.sections.passkeys.add_passkey'))
+            ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
+            ->schema(array_filter([
+                TextInput::make('name')
+                    ->label(__('profile.sections.passkeys.name_label'))
+                    ->placeholder(__('profile.sections.passkeys.name_placeholder'))
+                    ->required()
+                    ->maxLength(255),
+                $hasPassword
+                    ? TextInput::make('password')
+                        ->label(__('profile.form.current_password.label'))
+                        ->helperText(__('profile.sections.passkeys.password_help'))
+                        ->password()
+                        ->revealable()
+                        ->required()
+                        ->rule('current_password')
+                        ->validationMessages(['current_password' => __('auth.password')])
+                    : null,
+            ]))
+            ->action(function (array $data): void {
+                session()->put('auth.password_confirmed_at', time());
+
+                $this->dispatch('passkey-register-confirmed', name: $data['name']);
+            });
+    }
+
+    public function notifyRegistrationFailed(): void
+    {
+        $this->sendNotification(
+            __('profile.notifications.passkey_registration_failed.title'),
+            type: 'danger',
+        );
+    }
+
     public function deletePasskeyAction(): Action
     {
         $hasPassword = $this->authUser()->hasPassword();
