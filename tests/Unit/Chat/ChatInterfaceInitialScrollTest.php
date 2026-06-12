@@ -8,7 +8,7 @@ it('scrolls to bottom on init when initial messages are present', function (): v
     // The fix lives inside init() right after subscribeToConversation.
     // Look for the guard + scroll call as a single contiguous block so a
     // future refactor that moves either piece independently fails this test.
-    $needle = "if (this.messages.length > 0) {\n            this.scrollToBottom();\n        }";
+    $needle = "if (this.messages.length > 0) {\n            this.scrollToBottom(true);\n        }";
 
     expect($contents)->toContain($needle);
 });

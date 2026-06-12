@@ -26,12 +26,29 @@ final readonly class CreditService
     /**
      * Atomically reserve one credit up-front. Prevents concurrent requests from
      * bypassing a non-atomic credit gate when the team has a small balance.
+     *
+     * With a $reservationKey ("reserve-{turnId}") the reservation is journaled
+     * as a ledger row and becomes idempotent: a retried job (e.g. released by
+     * WithoutOverlapping before handle() ran) re-calls this and gets `true`
+     * without decrementing twice. The row also lets the orphan sweeper refund
+     * reservations whose turn crashed between reserve and settle (R2).
      */
-    public function reserveCredit(Team $team): bool
+    public function reserveCredit(Team $team, ?string $reservationKey = null, ?string $conversationId = null, ?string $userId = null): bool
     {
         $this->ensureBalance($team);
 
-        return DB::transaction(function () use ($team): bool {
+        return DB::transaction(function () use ($team, $reservationKey, $conversationId, $userId): bool {
+            if ($reservationKey !== null) {
+                $alreadyReserved = AiCreditTransaction::query()
+                    ->where('team_id', $team->getKey())
+                    ->where('idempotency_key', $reservationKey)
+                    ->exists();
+
+                if ($alreadyReserved) {
+                    return true;
+                }
+            }
+
             $balance = AiCreditBalance::query()
                 ->where('team_id', $team->getKey())
                 ->lockForUpdate()
@@ -45,6 +62,23 @@ final readonly class CreditService
                 'credits_remaining' => $balance->credits_remaining - 1,
                 'credits_used' => $balance->credits_used + 1,
             ]);
+
+            if ($reservationKey !== null) {
+                AiCreditTransaction::query()->insertOrIgnore([
+                    'id' => (string) Str::ulid(),
+                    'team_id' => $team->getKey(),
+                    'user_id' => $userId,
+                    'conversation_id' => $conversationId,
+                    'idempotency_key' => $reservationKey,
+                    'type' => AiCreditType::Reservation->value,
+                    'model' => 'system',
+                    'input_tokens' => 0,
+                    'output_tokens' => 0,
+                    'credits_charged' => 1,
+                    'metadata' => json_encode(['reason' => 'upfront_reservation'], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
+            }
 
             return true;
         });

@@ -63,6 +63,23 @@ abstract class BaseReadShowTool implements Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        return new $resourceClass($model)->toJson(JSON_PRETTY_PRINT);
+        $payload = new $resourceClass($model)->resolve();
+
+        return (string) json_encode(
+            array_merge($payload, $this->extraPayload($model)),
+            JSON_PRETTY_PRINT,
+        );
+    }
+
+    /**
+     * Fields the JSON:API resource omits on this non-HTTP path (it only
+     * renders relationships requested via an `include` query param, which the
+     * chat tools never send). Merged on top of the resource payload.
+     *
+     * @return array<string, mixed>
+     */
+    protected function extraPayload(Model $model): array
+    {
+        return [];
     }
 }
