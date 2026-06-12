@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Filament\Concerns\HasBoardViewSwitcher;
+use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\Team;
-use BackedEnum;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -27,30 +28,21 @@ use Illuminate\Support\Facades\DB;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\BoardPage;
+use Relaticle\Flowforge\BoardResourcePage;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
 use Throwable;
 
-final class TasksBoard extends BoardPage
+final class TasksBoard extends BoardResourcePage
 {
-    protected static ?string $navigationLabel = null;
+    use HasBoardViewSwitcher;
 
-    protected static ?string $title = null;
-
-    protected static ?string $navigationParentItem = 'Tasks';
-
-    public static function getNavigationLabel(): string
-    {
-        return __('filament/pages/boards.navigation_label');
-    }
+    protected static string $resource = TaskResource::class;
 
     public function getTitle(): string
     {
         return __('filament/pages/boards.tasks.title');
     }
-
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-view-columns';
 
     /**
      * Configure the board using the new Filament V4 architecture.
@@ -297,7 +289,10 @@ final class TasksBoard extends BoardPage
         ]);
     }
 
-    public static function canAccess(): bool
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    public static function canAccess(array $parameters = []): bool
     {
         return (new self)->statusCustomField() instanceof CustomField;
     }
