@@ -35,14 +35,7 @@ final class AiCreditTransactionsTable
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('type')
-                    ->badge()
-                    ->color(fn (AiCreditType $state): string => match ($state) {
-                        AiCreditType::Chat => 'primary',
-                        AiCreditType::Summary => 'info',
-                        AiCreditType::Embedding => 'gray',
-                        AiCreditType::Adjustment => 'warning',
-                        AiCreditType::Refund => 'success',
-                    }),
+                    ->badge(),
                 TextColumn::make('model')
                     ->searchable(),
                 TextColumn::make('credits_charged')
@@ -71,7 +64,7 @@ final class AiCreditTransactionsTable
                     ->options(
                         collect(AiCreditType::cases())
                             ->mapWithKeys(fn (AiCreditType $case): array => [
-                                $case->value => ucfirst($case->value),
+                                $case->value => $case->getLabel(),
                             ])
                     ),
                 SelectFilter::make('model')
