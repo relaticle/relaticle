@@ -74,6 +74,7 @@ final class ManagePasskeys extends BaseLivewireComponent
         return ConfirmIdentityAction::make('registerPasskey')
             ->label(__('profile.sections.passkeys.add_passkey'))
             ->modalHeading(__('profile.sections.passkeys.add_passkey'))
+            ->modalDescription(__('profile.sections.passkeys.add_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))

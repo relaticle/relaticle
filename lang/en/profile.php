@@ -66,6 +66,7 @@ return [
             'added' => 'Added :time',
             'last_used' => 'Last used :time',
             'add_passkey' => 'Add passkey',
+            'add_description' => 'Register a new passkey for this device to sign in without a password.',
             'name_label' => 'Passkey name',
             'name_placeholder' => 'e.g., MacBook Pro, iPhone',
             'password_help' => 'For your security, confirm your account password before adding a passkey.',
@@ -122,8 +123,7 @@ return [
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
-            'description' => 'Enter your password to confirm you would like to log out of your other browser sessions across all of your devices.',
-            'description_no_password' => 'Are you sure you would like to log out of your other browser sessions across all of your devices?',
+            'description' => 'Confirm it\'s you to log out of your other browser sessions across all of your devices.',
         ],
     ],
 
