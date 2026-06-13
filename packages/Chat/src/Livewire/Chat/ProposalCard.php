@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
+use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\On;
@@ -12,6 +13,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use RuntimeException;
 
 final class ProposalCard extends BaseLivewireComponent
 {
@@ -144,8 +146,25 @@ final class ProposalCard extends BaseLivewireComponent
         return $count - 1;
     }
 
+    /**
+     * @param  array{context?: string}  $payload
+     */
+    #[On('proposal:create-current')]
+    public function createCurrentFromShortcut(array $payload = []): void
+    {
+        if (($payload['context'] ?? 'conversation') !== $this->context) {
+            return;
+        }
+
+        $this->createCurrent(resolve(PendingActionService::class));
+    }
+
     public function createCurrent(PendingActionService $service): void
     {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
         $pendingAction = $this->loadPending($this->pendingActionId ?? '');
 
         if (! $pendingAction instanceof PendingAction) {
@@ -157,16 +176,29 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
 
-        if ($isBatch) {
-            $result = $service->approveItem($pendingAction, $this->authUser(), $this->cursor);
-            $finalized = $result['finalized'];
-            $record = $result['record'] instanceof Model
-                ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
-                : null;
-        } else {
-            $resolved = $service->approve($pendingAction, $this->authUser());
-            $finalized = true;
-            $record = $this->recordReferenceFor($resolved);
+        $this->ensureTenantContext();
+
+        try {
+            if ($isBatch) {
+                $result = $service->approveItem($pendingAction, $this->authUser(), $this->cursor);
+                $finalized = $result['finalized'];
+                $record = $result['record'] instanceof Model
+                    ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
+                    : null;
+            } else {
+                $resolved = $service->approve($pendingAction, $this->authUser());
+                $finalized = true;
+                $record = $this->recordReferenceFor($resolved);
+            }
+        } catch (RuntimeException $exception) {
+            $this->dispatch(
+                'proposal:resolve-failed',
+                pendingActionId: $pendingAction->getKey(),
+                message: $exception->getMessage(),
+                context: $this->context,
+            );
+
+            return;
         }
 
         $this->dispatch(
@@ -190,6 +222,10 @@ final class ProposalCard extends BaseLivewireComponent
 
     public function discardCurrent(PendingActionService $service): void
     {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
         $pendingAction = $this->loadPending($this->pendingActionId ?? '');
 
         if (! $pendingAction instanceof PendingAction) {
@@ -201,12 +237,23 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
 
-        if ($isBatch) {
-            $result = $service->rejectItem($pendingAction, $this->cursor);
-            $finalized = $result['finalized'];
-        } else {
-            $service->reject($pendingAction);
-            $finalized = true;
+        try {
+            if ($isBatch) {
+                $result = $service->rejectItem($pendingAction, $this->cursor);
+                $finalized = $result['finalized'];
+            } else {
+                $service->reject($pendingAction);
+                $finalized = true;
+            }
+        } catch (RuntimeException $exception) {
+            $this->dispatch(
+                'proposal:resolve-failed',
+                pendingActionId: $pendingAction->getKey(),
+                message: $exception->getMessage(),
+                context: $this->context,
+            );
+
+            return;
         }
 
         $this->dispatch(
@@ -249,6 +296,21 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         return true;
+    }
+
+    private function ensureTenantContext(): void
+    {
+        if (Filament::getTenant() !== null) {
+            return;
+        }
+
+        $team = $this->authUser()->currentTeam;
+
+        if ($team === null) {
+            return;
+        }
+
+        Filament::setTenant($team, isQuiet: true);
     }
 
     /**

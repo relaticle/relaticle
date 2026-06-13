@@ -232,3 +232,56 @@ it('marks a fully-discarded batch as rejected', function (): void {
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
+
+it('emits proposal:resolve-failed and does not advance when the service rejects the resolution', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->set('cursor', 99) // out-of-range -> approveItem's index guard throws RuntimeException
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved')
+        ->assertSet('pendingActionId', $action->getKey()); // not cleared
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('does nothing when createCurrent is called while a field edit is open', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->set('editingFieldCode', 'name')
+        ->call('createCurrent')
+        ->assertNotDispatched('proposal:will-resolve');
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('routes the create-current shortcut to the current record for the matching context', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrentFromShortcut', ['context' => 'conversation'])
+        ->assertSet('cursor', 1);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toContain('Alpha');
+});
+
+it('ignores the create-current shortcut for a different context', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrentFromShortcut', ['context' => 'side-panel'])
+        ->assertSet('cursor', 0);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
