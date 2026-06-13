@@ -17,7 +17,7 @@ final readonly class DeleteTeam implements DeletesTeams
      */
     public function delete(Team $team): void
     {
-        $this->cancelSubscription->handle($team, immediately: true);
+        $this->cancelSubscription->execute($team, immediately: true);
 
         $team->purge();
     }

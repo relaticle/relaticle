@@ -33,12 +33,12 @@ final readonly class SyncPlanOnStripeSubscriptionChange
             return;
         }
 
-        $team = $subscription->owner;
+        $team = $subscription->owner()->first();
 
         if (! $team instanceof Team) {
             return;
         }
 
-        $this->syncTeamPlan->handle($team, $subscription);
+        $this->syncTeamPlan->execute($team, $subscription);
     }
 }

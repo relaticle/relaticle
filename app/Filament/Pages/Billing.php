@@ -51,7 +51,7 @@ final class Billing extends Page
     public function startTrial(StartProTrial $startProTrial): void
     {
         try {
-            $startProTrial->handle($this->user(), $this->team());
+            $startProTrial->execute($this->user(), $this->team());
         } catch (AuthorizationException $exception) {
             Notification::make()->title($exception->getMessage())->danger()->send();
 
@@ -70,7 +70,7 @@ final class Billing extends Page
         }
 
         try {
-            return redirect()->away($createCheckout->handle($team, $interval));
+            return redirect()->away($createCheckout->execute($team, $interval));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();

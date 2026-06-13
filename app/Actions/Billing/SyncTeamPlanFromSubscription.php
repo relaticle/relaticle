@@ -15,7 +15,7 @@ final readonly class SyncTeamPlanFromSubscription
 {
     public function __construct(private CreditService $credits) {}
 
-    public function handle(Team $team, Subscription $subscription): void
+    public function execute(Team $team, Subscription $subscription): void
     {
         $subscriptionPlan = $this->planForPrice($subscription->stripe_price);
 

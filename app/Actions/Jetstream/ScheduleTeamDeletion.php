@@ -32,7 +32,7 @@ final readonly class ScheduleTeamDeletion
             $team->teamInvitations()->delete();
         });
 
-        $this->cancelSubscription->handle($team);
+        $this->cancelSubscription->execute($team);
 
         /** @var User $owner */
         $owner = $team->owner;

@@ -84,7 +84,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Account & billing
         'account', 'billing', 'checkout', 'invoices', 'plan', 'plans',
-        'pricing', 'settings', 'subscription', 'subscriptions',
+        'pricing', 'settings', 'subscription', 'subscriptions', 'stripe',
 
         // Teams & orgs
         'teams', 'team', 'org', 'organization', 'workspace', 'invitations', 'invite',

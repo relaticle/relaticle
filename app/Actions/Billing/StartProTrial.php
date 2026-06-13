@@ -18,7 +18,7 @@ final readonly class StartProTrial
     public function __construct(private CreditService $credits) {}
 
     /** @throws AuthorizationException */
-    public function handle(User $user, Team $team): void
+    public function execute(User $user, Team $team): void
     {
         throw_unless($user->ownsTeam($team), AuthorizationException::class, 'Only the workspace owner can start a trial.');
 

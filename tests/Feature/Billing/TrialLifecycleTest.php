@@ -29,7 +29,7 @@ function trialOwnerAndTeam(): array
 it('starts a pro trial for an eligible owner', function (): void {
     [$user, $team] = trialOwnerAndTeam();
 
-    app(StartProTrial::class)->handle($user, $team);
+    app(StartProTrial::class)->execute($user, $team);
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
 
@@ -41,18 +41,18 @@ it('starts a pro trial for an eligible owner', function (): void {
 
 it('refuses a second trial for the same user even on another team', function (): void {
     [$user, $team] = trialOwnerAndTeam();
-    app(StartProTrial::class)->handle($user, $team);
+    app(StartProTrial::class)->execute($user, $team);
 
     $otherTeam = Team::factory()->create(['user_id' => $user->getKey(), 'personal_team' => false]);
 
-    app(StartProTrial::class)->handle($user, $otherTeam->refresh());
+    app(StartProTrial::class)->execute($user, $otherTeam->refresh());
 })->throws(AuthorizationException::class);
 
 it('refuses a trial to a non-owner', function (): void {
     [, $team] = trialOwnerAndTeam();
     $member = User::factory()->create();
 
-    app(StartProTrial::class)->handle($member, $team);
+    app(StartProTrial::class)->execute($member, $team);
 })->throws(AuthorizationException::class);
 
 it('refuses a trial when the team is not on Free', function (): void {
@@ -60,7 +60,7 @@ it('refuses a trial when the team is not on Free', function (): void {
     $team->plan = Plan::Pro;
     $team->save();
 
-    app(StartProTrial::class)->handle($user, $team->refresh());
+    app(StartProTrial::class)->execute($user, $team->refresh());
 })->throws(AuthorizationException::class);
 
 it('refuses a trial when the team ever had a subscription', function (): void {
@@ -74,7 +74,7 @@ it('refuses a trial when the team ever had a subscription', function (): void {
         'ends_at' => now()->subMonth(),
     ]);
 
-    app(StartProTrial::class)->handle($user, $team);
+    app(StartProTrial::class)->execute($user, $team);
 })->throws(AuthorizationException::class);
 
 it('downgrades expired trials and resets the allowance', function (): void {

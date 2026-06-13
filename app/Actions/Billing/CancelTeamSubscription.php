@@ -11,7 +11,7 @@ use Throwable;
 
 final readonly class CancelTeamSubscription
 {
-    public function handle(Team $team, bool $immediately = false): void
+    public function execute(Team $team, bool $immediately = false): void
     {
         $subscription = $team->subscription();
 

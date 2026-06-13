@@ -6,7 +6,6 @@ namespace App\Actions\Billing;
 
 use App\Models\Team;
 use InvalidArgumentException;
-use Laravel\Cashier\Checkout;
 
 final readonly class CreateProCheckout
 {
@@ -14,18 +13,17 @@ final readonly class CreateProCheckout
      * Create the hosted Stripe Checkout session and return its redirect URL.
      * Stripe round-trip — covered by the staging E2E checklist, not unit tests.
      */
-    public function handle(Team $team, string $interval): string
+    public function execute(Team $team, string $interval): string
     {
         $checkout = $team
             ->newSubscription('default', $this->priceId($interval))
             ->allowPromotionCodes()
             ->checkout($this->sessionOptions($team));
 
-        /** @var Checkout $checkout */
-        return (string) $checkout->url;
+        return (string) $checkout->asStripeCheckoutSession()->url;
     }
 
-    public function priceId(string $interval): string
+    private function priceId(string $interval): string
     {
         $priceId = config("services.stripe.prices.pro_{$interval}");
 
@@ -35,7 +33,7 @@ final readonly class CreateProCheckout
     }
 
     /** @return array<string, mixed> */
-    public function sessionOptions(Team $team): array
+    private function sessionOptions(Team $team): array
     {
         $billingUrl = url("/app/{$team->slug}/billing");
 

@@ -12,7 +12,7 @@ it('does nothing when the team has no subscription', function (): void {
     /** @var Team $team */
     $team = User::factory()->withPersonalTeam()->create()->currentTeam;
 
-    app(CancelTeamSubscription::class)->handle($team);
+    app(CancelTeamSubscription::class)->execute($team);
 })->throwsNoExceptions();
 
 it('does nothing when the subscription already ended', function (): void {
@@ -27,7 +27,7 @@ it('does nothing when the subscription already ended', function (): void {
         'ends_at' => now()->subDay(),
     ]);
 
-    app(CancelTeamSubscription::class)->handle($team, immediately: true);
+    app(CancelTeamSubscription::class)->execute($team, immediately: true);
 })->throwsNoExceptions();
 
 it('logs instead of throwing when stripe is unreachable for a live subscription', function (): void {
@@ -43,7 +43,7 @@ it('logs instead of throwing when stripe is unreachable for a live subscription'
     ]);
 
     // No real STRIPE_SECRET in tests → the Cashier cancel call throws → action logs and returns.
-    app(CancelTeamSubscription::class)->handle($team);
+    app(CancelTeamSubscription::class)->execute($team);
 
     expect($team->fresh()->subscription()->stripe_status)->toBe('active');
 })->throwsNoExceptions();
