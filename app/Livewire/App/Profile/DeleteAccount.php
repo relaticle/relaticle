@@ -40,14 +40,12 @@ final class DeleteAccount extends BaseLivewireComponent
 
     public function deleteAccountAction(): ConfirmIdentityAction
     {
-        $hasPassword = $this->authUser()->hasPassword();
-
         return ConfirmIdentityAction::make('deleteAccount')
             ->label(__('profile.actions.delete_account'))
             ->color('danger')
             ->alwaysConfirm()
             ->modalHeading(__('profile.sections.delete_account.title'))
-            ->modalDescription($hasPassword ? __('profile.modals.delete_account.notice') : __('profile.modals.delete_account.notice_no_password'))
+            ->modalDescription(__('profile.modals.delete_account.notice'))
             ->modalSubmitActionLabel(__('profile.actions.delete_account'))
             ->modalCancelAction(false)
             ->confirmedUsing(fn (): Redirector|RedirectResponse|null => $this->deleteAccount());
