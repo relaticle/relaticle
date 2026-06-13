@@ -137,6 +137,8 @@ final class ConfirmIdentityAction extends Action
             return ! IdentityConfirmation::confirmedRecently($this->within);
         }
 
+        // alwaysConfirm ignores the freshness window (and any within() override): proof is
+        // scoped to this attempt's own start time so the passkey ceremony re-entry terminates.
         $attemptStartedAt = (int) ($data['confirm_started_at'] ?? 0);
         $confirmedAt = (int) session('auth.password_confirmed_at', 0);
 
