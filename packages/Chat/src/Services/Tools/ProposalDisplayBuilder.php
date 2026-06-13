@@ -71,12 +71,12 @@ final readonly class ProposalDisplayBuilder
     /**
      * @param  array{title: string, nameKey: string, label: string, summaryPrefix: string}  $meta
      * @param  array<string, mixed>  $record
-     * @return list<array{label: string, value: string}>
+     * @return list<array{label: string, code: string, value: string}>
      */
     private function buildCoreRows(array $meta, string $nameValue, string $entityType, array $record): array
     {
         $rows = [
-            ['label' => $meta['label'], 'value' => $nameValue],
+            ['label' => $meta['label'], 'code' => $meta['nameKey'], 'value' => $nameValue],
         ];
 
         if ($entityType === 'company') {
@@ -85,6 +85,7 @@ final readonly class ProposalDisplayBuilder
             if (is_string($ownerId) && $ownerId !== '') {
                 $rows[] = [
                     'label' => 'Account Owner',
+                    'code' => 'account_owner_id',
                     'value' => TeamMembersContext::nameOf($ownerId) ?? $ownerId,
                 ];
             }

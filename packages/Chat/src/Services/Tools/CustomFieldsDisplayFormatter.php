@@ -23,7 +23,7 @@ final readonly class CustomFieldsDisplayFormatter
      * choice fields, ISO strings for dates).
      *
      * @param  array<string, mixed>  $cleanFields
-     * @return list<array{label: string, old?: string|null, new: string|null, type: string, values?: list<string>}>
+     * @return list<array{label: string, code: string, old?: string|null, new: string|null, type: string, values?: list<string>}>
      */
     public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel): array
     {
@@ -52,6 +52,7 @@ final readonly class CustomFieldsDisplayFormatter
 
             $row = [
                 'label' => $field->name,
+                'code' => (string) $code,
                 'new' => $this->renderValue($field, $newValue),
                 'type' => $this->displayType($field, $dataType),
             ];

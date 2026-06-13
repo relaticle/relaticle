@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -17,6 +18,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Data\VisibilityConditionData;
 use Relaticle\CustomFields\Data\VisibilityData;
@@ -485,4 +487,66 @@ it('edits a core text field (title) in place and persists it via applyEdit witho
         ->and($fresh->action_data['title'])->toBe('New Title');
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
     Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('exposes editable codes for the entity (core keys + non-deferred custom fields)', function (): void {
+    [$field] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => null]]);
+
+    $codes = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->instance()->editableCodes();
+
+    expect($codes)->toContain('title')
+        ->and($codes)->toContain($field->code);
+});
+
+it('omits deferred custom fields (file upload, record lookup) from the editable codes', function (): void {
+    $fileField = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'attachment',
+        'name' => 'Attachment',
+        'type' => 'file_upload',
+        'sort_order' => 90,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => []]);
+
+    $codes = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->instance()->editableCodes();
+
+    expect($codes)->toContain('title')
+        ->and($codes)->not->toContain($fileField->code);
+});
+
+it('rebuilds the current record fields with codes on editable rows and no divergence from stored display', function (): void {
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $optionLabel = (string) $field->options->firstWhere('id', $optionIds[0])->name;
+
+    $tool = resolve(CreateTaskTool::class);
+    $tool->setConversationId(null);
+    $tool->handle(new Request(['records' => [['title' => 'My Task', 'custom_fields' => [$field->code => $optionLabel]]]]));
+
+    $action = PendingAction::query()->latest()->firstOrFail();
+
+    $fields = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->instance()->currentRecordFields();
+
+    $titleRow = collect($fields)->firstWhere('label', 'Title');
+    expect($titleRow['code'] ?? null)->toBe('title');
+
+    $customRow = collect($fields)->firstWhere('code', $field->code);
+    expect($customRow)->not->toBeNull();
+
+    $stored = $action->display_data['fields'] ?? ($action->display_data['items'][0]['fields'] ?? []);
+
+    expect(collect($fields)->pluck('label')->all())->toBe(collect($stored)->pluck('label')->all())
+        ->and(collect($fields)->pluck('value')->all())->toBe(collect($stored)->pluck('value')->all())
+        ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
 });

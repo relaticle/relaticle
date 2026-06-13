@@ -19,6 +19,8 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
+use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
+use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
@@ -527,6 +529,69 @@ final class ProposalCard extends BaseLivewireComponent
         return is_array($current) ? $current : [];
     }
 
+    /**
+     * The current record's display rows, rebuilt through ProposalDisplayBuilder
+     * from the record's clean action_data so each owned/editable row carries a
+     * `code`. Carried-forward relationship rows stay code-less (read-only). The
+     * rebuild is byte-for-byte the stored display because applyEdit re-renders
+     * with the same builder — see ProposalCardComponentTest's no-divergence test.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function currentRecordFields(): array
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction) {
+            return [];
+        }
+
+        $this->ensureTenantContext();
+
+        $record = $this->currentRecord($pendingAction);
+        $existingFields = $this->currentDisplayFields($pendingAction);
+
+        return resolve(ProposalDisplayBuilder::class)
+            ->build($this->authUser(), $pendingAction->entity_type, $record, $existingFields)['fields'];
+    }
+
+    /**
+     * The set of field codes the dock allows inline editing for the current
+     * entity: core keys plus the active, non-deferred custom field codes. Derived
+     * from ProposalFieldSchemaDescriber so the deferred-field exclusion (FILE_UPLOAD,
+     * RECORD/lookup, unsupported kinds) stays single-sourced with the editor.
+     *
+     * @return list<string>
+     */
+    public function editableCodes(): array
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction) {
+            return [];
+        }
+
+        $this->ensureTenantContext();
+
+        $schema = resolve(ProposalFieldSchemaDescriber::class)
+            ->describe($this->authUser(), $pendingAction->entity_type, $this->currentRecord($pendingAction));
+
+        return array_map(static fn (array $field): string => (string) $field['code'], $schema);
+    }
+
+    /**
+     * The stored display fields for the current record, used to carry forward
+     * read-only relationship rows when rebuilding via ProposalDisplayBuilder.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function currentDisplayFields(PendingAction $pendingAction): array
+    {
+        $display = $this->currentRecordDisplay($pendingAction);
+
+        return is_array($display['fields'] ?? null) ? array_values($display['fields']) : [];
+    }
+
     public function render(): View
     {
         $proposal = $this->pendingActionId !== null ? $this->loadPending($this->pendingActionId) : null;
@@ -534,6 +599,8 @@ final class ProposalCard extends BaseLivewireComponent
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
             'record' => $proposal instanceof PendingAction ? $this->currentRecordDisplay($proposal) : [],
+            'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields() : [],
+            'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes() : [],
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCount() : 0,
         ]);
     }
