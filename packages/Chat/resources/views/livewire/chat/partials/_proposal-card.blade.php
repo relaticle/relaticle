@@ -16,11 +16,20 @@
                                         <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" x-text="action.display.duplicate_warning"></div>
                                     </template>
 
-                                    <div class="mt-2 space-y-1">
-                                        <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                                            @include('chat::livewire.chat.partials._proposal-field')
-                                        </template>
-                                    </div>
+                                    <template x-if="!(action.edit && action.edit.index === null)">
+                                        <div class="mt-2 space-y-1">
+                                            <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
+                                                @include('chat::livewire.chat.partials._proposal-field')
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    {{-- Single-proposal inline edit form --}}
+                                    <template x-if="action.edit && action.edit.index === null">
+                                        <div class="mt-3 space-y-3 rounded-lg border border-primary-200 bg-primary-50/40 p-3 dark:border-primary-900/40 dark:bg-primary-900/10">
+                                            @include('chat::livewire.chat.partials._proposal-edit-form')
+                                        </div>
+                                    </template>
 
                                     {{-- Batch items (records[] proposals) --}}
                                     <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
@@ -28,15 +37,24 @@
                                             <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
                                                 <div class="py-2 first:pt-0 last:pb-0">
                                                     <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
-                                                    <div class="mt-1 space-y-0.5">
-                                                        <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                                            @include('chat::livewire.chat.partials._proposal-field')
-                                                        </template>
-                                                    </div>
+                                                    <template x-if="!(action.edit && action.edit.index === itemIdx)">
+                                                        <div class="mt-1 space-y-0.5">
+                                                            <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
+                                                                @include('chat::livewire.chat.partials._proposal-field')
+                                                            </template>
+                                                        </div>
+                                                    </template>
+
+                                                    {{-- Per-item inline edit form --}}
+                                                    <template x-if="action.edit && action.edit.index === itemIdx">
+                                                        <div class="mt-2 space-y-3 rounded-lg border border-primary-200 bg-primary-50/40 p-3 dark:border-primary-900/40 dark:bg-primary-900/10">
+                                                            @include('chat::livewire.chat.partials._proposal-edit-form')
+                                                        </div>
+                                                    </template>
 
                                                     {{-- Per-item resolution (batch only) --}}
                                                     <div class="mt-1.5">
-                                                        <template x-if="action.status === 'pending' && !itemResult(action, itemIdx)">
+                                                        <template x-if="action.status === 'pending' && !itemResult(action, itemIdx) && !(action.edit && action.edit.index === itemIdx)">
                                                             <div class="flex items-center gap-2">
                                                                 <button
                                                                     x-on:click="resolveItem(action, itemIdx, 'approve')"
@@ -45,6 +63,16 @@
                                                                     <x-heroicon-o-check class="h-3 w-3" />
                                                                     <span x-text="action.operation === 'delete' ? 'Delete' : 'Create'"></span>
                                                                 </button>
+                                                                <template x-if="action.operation === 'create'">
+                                                                    <button
+                                                                        type="button"
+                                                                        x-on:click="enterFieldEdit(action, itemIdx)"
+                                                                        class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                                                                    >
+                                                                        <x-heroicon-o-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                                                        <span>Edit</span>
+                                                                    </button>
+                                                                </template>
                                                                 <button
                                                                     x-on:click="resolveItem(action, itemIdx, 'reject')"
                                                                     class="inline-flex items-center rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -80,7 +108,7 @@
                                     </template>
 
                                     {{-- Action buttons --}}
-                                    <template x-if="action.status === 'pending'">
+                                    <template x-if="action.status === 'pending' && !(action.edit && action.edit.index === null)">
                                         <div class="mt-3 flex items-center gap-2">
                                             <template x-if="!isBatchAction(action) && action.operation === 'create' && !action.edit">
                                                 <button
