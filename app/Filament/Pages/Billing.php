@@ -43,6 +43,11 @@ final class Billing extends Page
         return __('billing.title');
     }
 
+    public function getSubheading(): string
+    {
+        return __('billing.subtitle');
+    }
+
     public function mount(): void
     {
         abort_unless(Feature::active(BillingFeature::class), 403);

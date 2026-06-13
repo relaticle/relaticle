@@ -83,7 +83,7 @@
                     <button type="button" @click="yearly = false" :class="!yearly ? 'bg-primary text-white' : 'text-gray-500'" class="px-3 py-1 rounded-full font-medium transition">Monthly</button>
                     <button type="button" @click="yearly = true" :class="yearly ? 'bg-primary text-white' : 'text-gray-500'" class="px-3 py-1 rounded-full font-medium transition">
                         Yearly
-                        <span class="ml-1 text-[10px] text-primary-600 dark:text-primary-300" x-show="!yearly">2 months free</span>
+                        <span class="ml-1 text-[10px]" :class="yearly ? 'text-white/80' : 'text-primary-600 dark:text-primary-300'">2 months free</span>
                     </button>
                 </div>
             </div>
