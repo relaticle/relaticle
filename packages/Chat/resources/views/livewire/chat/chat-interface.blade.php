@@ -341,11 +341,14 @@
                         </div>
                     </template>
 
-                    {{-- Pending action cards --}}
+                    {{-- Action cards: resolved cards stay inline as the audit trail;
+                         pending cards are docked at the composer (see input area). --}}
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
-                                @include('chat::livewire.chat.partials._proposal-card')
+                                <template x-if="action.status !== 'pending'">
+                                    @include('chat::livewire.chat.partials._proposal-card')
+                                </template>
                             </template>
                         </div>
                     </template>
@@ -405,6 +408,21 @@
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
+            {{-- Docked pending proposal(s): the card lives at the composer while it awaits a decision. --}}
+            <template x-if="hasPendingProposal">
+                <div class="mb-3">
+                    <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Review before continuing</span>
+                    </div>
+                    <div class="max-h-[55vh] space-y-3 overflow-y-auto">
+                        <template x-for="action in visiblePendingActions()" :key="action.pending_action_id">
+                            @include('chat::livewire.chat.partials._proposal-card')
+                        </template>
+                    </div>
+                </div>
+            </template>
+
             {{-- Send-throttle countdown: the message is kept and auto-sends --}}
             <template x-if="rateLimit">
                 <div class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20" role="status" aria-live="polite">
@@ -425,7 +443,7 @@
                 </div>
             </template>
 
-            <form x-on:submit.prevent="sendMessage()">
+            <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
                         initialDocument: { type: 'doc', content: [] },
@@ -489,6 +507,14 @@
                     </div>
                 </div>
             </form>
+
+            {{-- While a proposal is docked above, the composer is hidden (x-show keeps
+                 the wire:ignore TipTap node mounted) and this hint takes its place. --}}
+            <template x-if="hasPendingProposal">
+                <div class="flex items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
+                    Resolve the proposal above to continue.
+                </div>
+            </template>
         </div>
     </div>
 </div>
@@ -922,6 +948,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .filter((a) => a.status === 'pending');
     },
 
+    get hasPendingProposal() {
+        return this.visiblePendingActions().length > 0;
+    },
+
     destroy() {
         this.clearStreamTimeout();
         this.stopCopyTicker();
@@ -1320,6 +1350,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     async sendMessage() {
+        if (this.hasPendingProposal) return;
         if (this.rateLimit) return;
 
         const editor = this.localEditor();
