@@ -132,4 +132,6 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'confirmation_window' => (int) env('AUTH_CONFIRMATION_WINDOW', 900),
+
 ];

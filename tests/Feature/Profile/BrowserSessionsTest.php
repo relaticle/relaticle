@@ -122,3 +122,22 @@ test('browser sessions component renders correctly', function (): void {
         ->assertSuccessful()
         ->assertSee('Browser Sessions');
 });
+
+test('a confirmation older than the confirmation window no longer satisfies the gate', function (): void {
+    $this->actingAs(User::factory()->withTeam()->create());
+    session()->put('auth.password_confirmed_at', time() - 1000); // ~16.6 min > 900s window
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->call('logoutOtherBrowserSessions')
+        ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
+});
+
+test('a confirmation inside the confirmation window still satisfies the gate', function (): void {
+    config(['session.driver' => 'database']);
+    $this->actingAs(User::factory()->withTeam()->create());
+    session()->put('auth.password_confirmed_at', time() - 60);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->call('logoutOtherBrowserSessions')
+        ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
+});

@@ -27,11 +27,12 @@ final class IdentityConfirmation
         return self::confirmedRecently();
     }
 
-    public static function confirmedRecently(): bool
+    public static function confirmedRecently(?int $maxAge = null): bool
     {
+        $maxAge ??= Config::integer('auth.confirmation_window', 900);
         $confirmedAt = (int) session('auth.password_confirmed_at', 0);
 
-        return (time() - $confirmedAt) < Config::integer('auth.password_timeout', 10800);
+        return (time() - $confirmedAt) < $maxAge;
     }
 
     public static function markConfirmed(): void
