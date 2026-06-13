@@ -66,7 +66,7 @@ return [
             'name_label' => 'Passkey name',
             'name_placeholder' => 'e.g., MacBook Pro, iPhone',
             'password_help' => 'For your security, confirm your account password before adding a passkey.',
-            'confirm_with_password' => 'Confirm with your password instead',
+            'use_password' => 'Use your password instead',
             'register' => 'Register passkey',
             'registering' => 'Registering...',
             'waiting' => 'Waiting for passkey…',
