@@ -257,3 +257,120 @@ it('returns 422 when the fields payload is not an object', function (): void {
         ->assertUnprocessable()
         ->assertJsonPath('error', 'fields must be an object.');
 });
+
+it('edits one batch item without touching sibling records or status', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        [
+            '_batch' => true,
+            'records' => [
+                ['title' => 'A'],
+                ['title' => 'B'],
+            ],
+        ],
+    );
+
+    $pending->update([
+        'display_data' => [
+            'title' => 'Create Tasks',
+            'summary' => 'Create 2 tasks',
+            'items' => [
+                ['title' => 'Create Task', 'summary' => 'Create task "A"', 'fields' => [['label' => 'Title', 'value' => 'A']]],
+                ['title' => 'Create Task', 'summary' => 'Create task "B"', 'fields' => [['label' => 'Title', 'value' => 'B']]],
+            ],
+        ],
+    ]);
+
+    $this->patchJson(route('chat.actions.items.edit', ['pendingAction' => $pending, 'index' => 0]), [
+        'fields' => ['title' => 'A-edited'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited')
+        ->assertJsonPath('index', 0)
+        ->assertJsonPath('display.items.0.fields.0.value', 'A-edited');
+
+    $pending->refresh();
+
+    expect($pending->action_data['records'][0]['title'])->toBe('A-edited')
+        ->and($pending->action_data['records'][1]['title'])->toBe('B')
+        ->and($pending->status)->toBe(PendingActionStatus::Pending)
+        ->and($pending->display_data['items'][1]['fields'][0]['value'])->toBe('B')
+        ->and($pending->display_data['title'])->toBe('Create Tasks')
+        ->and($pending->display_data['summary'])->toBe('Create 2 tasks');
+
+    $this->assertDatabaseMissing('tasks', ['title' => 'A-edited']);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('422s an out-of-range batch item edit index', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        [
+            '_batch' => true,
+            'records' => [
+                ['title' => 'Only'],
+            ],
+        ],
+    );
+
+    $this->patchJson(route('chat.actions.items.edit', ['pendingAction' => $pending, 'index' => 9]), [
+        'fields' => ['title' => 'X'],
+    ])
+        ->assertUnprocessable();
+});
+
+it('404s a batch item edit for another team', function (): void {
+    $other = User::factory()->withPersonalTeam()->create();
+
+    $pending = makeCreateProposal(
+        $other,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        [
+            '_batch' => true,
+            'records' => [
+                ['title' => 'Other Task'],
+            ],
+        ],
+    );
+
+    $this->patchJson(route('chat.actions.items.edit', ['pendingAction' => $pending, 'index' => 0]), [
+        'fields' => ['title' => 'Hacked'],
+    ])
+        ->assertNotFound();
+});
+
+it('editing only the name leaves existing custom_fields intact', function (): void {
+    $icpField = CustomField::query()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'icp')
+        ->first();
+
+    expect($icpField)->not->toBeNull('seeded company icp field is required for this test');
+
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        [
+            'name' => 'Acme Corp',
+            'account_owner_id' => (string) $this->user->getKey(),
+            'custom_fields' => ['icp' => true],
+        ],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'Renamed']])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited');
+
+    $pending->refresh();
+
+    expect($pending->action_data['name'])->toBe('Renamed')
+        ->and($pending->action_data['custom_fields'])->toHaveKey('icp')
+        ->and($pending->action_data['custom_fields']['icp'])->toBeTrue();
+});
