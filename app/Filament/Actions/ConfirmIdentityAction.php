@@ -39,6 +39,8 @@ final class ConfirmIdentityAction extends Action
 
     private bool $alwaysConfirm = false;
 
+    private ?int $within = null;
+
     /** @var array<int, Component> */
     private array $prependedSchema = [];
 
@@ -57,6 +59,13 @@ final class ConfirmIdentityAction extends Action
     public function alwaysConfirm(bool $condition = true): static
     {
         $this->alwaysConfirm = $condition;
+
+        return $this;
+    }
+
+    public function within(int $seconds): static
+    {
+        $this->within = $seconds;
 
         return $this;
     }
@@ -125,7 +134,7 @@ final class ConfirmIdentityAction extends Action
         }
 
         if (! $this->alwaysConfirm) {
-            return ! IdentityConfirmation::confirmedRecently();
+            return ! IdentityConfirmation::confirmedRecently($this->within);
         }
 
         $attemptStartedAt = (int) ($data['confirm_started_at'] ?? 0);
