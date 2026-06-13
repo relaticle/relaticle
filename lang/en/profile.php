@@ -54,6 +54,8 @@ return [
             'title' => 'Delete Account',
             'description' => 'Schedule your account for deletion.',
             'notice' => 'Deleting your account will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion by logging back in at any time before that. After the grace period, all your data will be permanently deleted.',
+            'confirm_email_label' => 'Type your account email to confirm',
+            'confirm_email_mismatch' => 'That does not match your account email.',
         ],
         'passkeys' => [
             'title' => 'Passkeys',
