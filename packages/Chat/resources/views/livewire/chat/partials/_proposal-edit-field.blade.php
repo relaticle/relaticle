@@ -51,6 +51,7 @@
         <select
             :id="'pf-' + action.pending_action_id + '-' + (action.edit?.index ?? 's') + '-' + editField.code"
             x-model="action.edit.values[editField.code]"
+            x-effect="editField.options; $nextTick(() => { $el.value = action.edit.values[editField.code] ?? '' })"
             class="block w-full rounded-md border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
             <option value="">—</option>
             <template x-for="opt in (editField.options || [])" :key="opt.id">
