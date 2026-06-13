@@ -13,6 +13,10 @@
 
                 try {
                     await window.Passkeys.register({ name });
+
+                    this.startProcessing('{{ __('profile.sections.passkeys.confirmed') }}');
+                    await new Promise((resolve) => setTimeout(resolve, 600));
+
                     $wire.loadPasskeys();
                     $wire.call('unmountAction');
                 } catch (e) {

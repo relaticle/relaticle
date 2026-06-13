@@ -68,6 +68,7 @@ return [
             'password_help' => 'For your security, confirm your account password before adding a passkey.',
             'use_password' => 'Use your password instead',
             'method_hint' => "You'll confirm with Face ID, Touch ID, or your passkey.",
+            'confirmed' => 'Confirmed',
             'register' => 'Register passkey',
             'registering' => 'Registering...',
             'waiting' => 'Waiting for passkey…',
