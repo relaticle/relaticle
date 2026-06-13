@@ -18,6 +18,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
@@ -66,6 +67,55 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->editingFieldCode = $code;
         $this->form->fill($this->formStateFor($pendingAction, $code));
+    }
+
+    public function saveField(): void
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction || $this->editingFieldCode === null) {
+            return;
+        }
+
+        $input = $this->flattenFormState($this->form->getState());
+        $index = ($pendingAction->action_data['_batch'] ?? false) === true ? $this->cursor : null;
+
+        try {
+            resolve(ProposalEditor::class)->applyEdit($pendingAction, $this->authUser(), $input, $index);
+        } catch (RuntimeException $exception) {
+            $this->addError('field', $exception->getMessage());
+
+            return;
+        }
+
+        $this->editingFieldCode = null;
+    }
+
+    /**
+     * Flatten the scoped edit form state to `{code => value}` for ProposalEditor.
+     * A custom field is nested under `custom_fields.<code>`; lift those to the
+     * top level keyed by code. Core fields are already top-level — keep them.
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function flattenFormState(array $state): array
+    {
+        $flattened = [];
+
+        foreach ($state as $key => $value) {
+            if ($key === 'custom_fields' && is_array($value)) {
+                foreach ($value as $code => $customValue) {
+                    $flattened[$code] = $customValue;
+                }
+
+                continue;
+            }
+
+            $flattened[$key] = $value;
+        }
+
+        return $flattened;
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
@@ -429,4 +430,24 @@ it('does not throw building a field with a cross-field visibility condition (fai
         && $c->getName() === "custom_fields.{$dependent->code}");
 
     expect($built)->not->toBeNull('the field with a sibling visibility condition should still build under ->only()');
+});
+
+it('saves an edited custom field through ProposalEditor without executing', function (): void {
+    Bus::fake([ContinueChatMessage::class]);
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $field->code)
+        ->set("data.custom_fields.{$field->code}", $optionIds[1])
+        ->call('saveField')
+        ->assertSet('editingFieldCode', null)
+        ->assertHasNoErrors();
+
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Pending)
+        ->and($fresh->action_data['custom_fields'][$field->code])->toBe($optionIds[1]);
+    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
