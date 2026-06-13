@@ -9,11 +9,12 @@ use App\Support\Auth\IdentityConfirmation;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
 use LogicException;
@@ -177,10 +178,16 @@ final class ConfirmIdentityAction extends Action
         $usesPasswordField = fn (Get $get): bool => ! $hasPasskey || (bool) $get('use_password');
 
         return array_values(array_filter([
+            $hasPasskey ? Hidden::make('use_password')->default(false) : null,
             $hasPasskey
-                ? Checkbox::make('use_password')
-                    ->label(__('profile.sections.passkeys.confirm_with_password'))
-                    ->live()
+                ? Actions::make([
+                    Action::make('usePassword')
+                        ->label(__('profile.sections.passkeys.use_password'))
+                        ->link()
+                        ->action(function (Set $set): void {
+                            $set('use_password', true);
+                        }),
+                ])->visible(fn (Get $get): bool => ! (bool) $get('use_password'))
                 : null,
             TextInput::make('password')
                 ->password()
