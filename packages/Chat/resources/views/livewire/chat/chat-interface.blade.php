@@ -2310,13 +2310,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 return;
             }
 
-            if (index === null || index === undefined) {
-                action.display = body.display;
-            } else if (action.display && Array.isArray(action.display.items)) {
-                const items = [...action.display.items];
-                items[index] = body.display;
-                action.display = { ...action.display, items };
-            }
+            // The PATCH endpoint returns the fully rebuilt display for both
+            // shapes: the single proposal, or the whole batch (with the edited
+            // item already merged at its index). Assign it wholesale — splicing
+            // body.display into items[index] would nest the batch inside itself.
+            action.display = body.display;
 
             action.edit = null;
         } catch {
