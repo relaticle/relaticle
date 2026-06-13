@@ -61,6 +61,50 @@ final readonly class PendingActionController
         }
     }
 
+    public function edit(Request $request, PendingAction $pendingAction): JsonResponse
+    {
+        return $this->respondWithEditedProposal($request, $pendingAction, null);
+    }
+
+    public function editItem(Request $request, PendingAction $pendingAction, int $index): JsonResponse
+    {
+        return $this->respondWithEditedProposal($request, $pendingAction, $index);
+    }
+
+    private function respondWithEditedProposal(Request $request, PendingAction $pendingAction, ?int $index): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($pendingAction->team_id !== $user->currentTeam->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        if ($pendingAction->user_id !== $user->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        $fields = $request->input('fields');
+
+        if (! is_array($fields)) {
+            return response()->json(['error' => 'fields must be an object.'], 422);
+        }
+
+        try {
+            $updated = $this->editor->applyEdit($pendingAction, $user, $fields, $index);
+
+            $this->ensureFilamentTenantContext($user);
+
+            return response()->json([
+                'status' => 'edited',
+                'index' => $index,
+                'display' => $updated->display_data,
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
     public function approve(Request $request, PendingAction $pendingAction): JsonResponse
     {
         /** @var User $user */

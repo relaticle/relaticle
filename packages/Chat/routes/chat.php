@@ -44,6 +44,14 @@ Route::middleware(['auth:web'])->group(function (): void {
         ->middleware('throttle:60,1')
         ->name('chat.actions.items.editable');
 
+    Route::patch('/chat/actions/{pendingAction}', [PendingActionController::class, 'edit'])
+        ->middleware('throttle:60,1')
+        ->name('chat.actions.edit');
+    Route::patch('/chat/actions/{pendingAction}/items/{index}', [PendingActionController::class, 'editItem'])
+        ->whereNumber('index')
+        ->middleware('throttle:60,1')
+        ->name('chat.actions.items.edit');
+
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1')
         ->name('chat.cancel');

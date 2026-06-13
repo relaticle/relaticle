@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
@@ -46,6 +47,20 @@ function makeCreateProposal(
         'status' => PendingActionStatus::Pending,
         'expires_at' => now()->addMinutes(15),
     ]);
+}
+
+function seededTaskStatusField(string $teamId): CustomField
+{
+    $status = CustomField::query()
+        ->where('tenant_id', $teamId)
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->with('options')
+        ->first();
+
+    expect($status)->not->toBeNull('seeded task status field is required for this test');
+
+    return $status;
 }
 
 it('returns the editable schema for a single company create proposal', function (): void {
@@ -110,4 +125,135 @@ it('returns 422 for a non-create proposal', function (): void {
     $this->getJson(route('chat.actions.editable', $pending))
         ->assertUnprocessable()
         ->assertJsonPath('error', 'Only pending create proposals can be edited');
+});
+
+it('edits a single company name, re-renders display, and does not create the company', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'New Name']])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited')
+        ->assertJsonPath('index', null)
+        ->assertJsonPath('display.fields.0.value', 'New Name');
+
+    $pending->refresh();
+
+    expect($pending->action_data['name'])->toBe('New Name')
+        ->and($pending->status)->toBe(PendingActionStatus::Pending);
+
+    $this->assertDatabaseMissing('companies', ['name' => 'New Name']);
+    $this->assertDatabaseMissing('companies', ['name' => 'Acme Corp']);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('edits a task custom select by option label and stores the option id in action_data', function (): void {
+    $status = seededTaskStatusField($this->team->getKey());
+    $done = $status->options->firstWhere('name', 'Done');
+    expect($done)->not->toBeNull();
+
+    $pending = makeCreateProposal(
+        $this->user,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        ['title' => 'Ship it'],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['title' => 'Ship it', 'status' => 'Done']])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited');
+
+    $pending->refresh();
+
+    expect($pending->action_data['custom_fields']['status'])->toBe((string) $done->id)
+        ->and($pending->status)->toBe(PendingActionStatus::Pending);
+
+    $this->assertDatabaseMissing('tasks', ['title' => 'Ship it']);
+});
+
+it('edits a task custom select by option id and stores the same id (locks the id->label->id contract)', function (): void {
+    $status = seededTaskStatusField($this->team->getKey());
+    $done = $status->options->firstWhere('name', 'Done');
+    expect($done)->not->toBeNull();
+
+    $pending = makeCreateProposal(
+        $this->user,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        ['title' => 'Ship it'],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['title' => 'Ship it', 'status' => (string) $done->id]])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited');
+
+    $pending->refresh();
+
+    expect($pending->action_data['custom_fields']['status'])->toBe((string) $done->id);
+});
+
+it('rejects an empty required name and leaves action_data unchanged', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => '   ']])
+        ->assertUnprocessable()
+        ->assertJsonPath('error', 'Name is required.');
+
+    $pending->refresh();
+
+    expect($pending->action_data['name'])->toBe('Acme Corp');
+});
+
+it('rejects an unknown option label on a choice field without mutating custom_fields', function (): void {
+    seededTaskStatusField($this->team->getKey());
+
+    $pending = makeCreateProposal(
+        $this->user,
+        'task',
+        'App\\Actions\\Task\\CreateTask',
+        ['title' => 'Ship it'],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['title' => 'Ship it', 'status' => 'Nope']])
+        ->assertUnprocessable();
+
+    $pending->refresh();
+
+    expect($pending->action_data)->not->toHaveKey('custom_fields');
+});
+
+it('returns 422 when editing a non-pending proposal', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp'],
+    );
+    $pending->update(['status' => PendingActionStatus::Approved, 'resolved_at' => now()]);
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'New Name']])
+        ->assertUnprocessable()
+        ->assertJsonPath('error', 'This action has already been resolved');
+});
+
+it('returns 422 when the fields payload is not an object', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp'],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => 'nope'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error', 'fields must be an object.');
 });
