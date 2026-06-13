@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Bus;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 
@@ -125,4 +128,65 @@ it('does not surface an expired pending action', function (): void {
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
         ->assertSet('pendingActionId', null);
+});
+
+it('creates the current batch record and advances to the next unresolved', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolved')
+        ->assertSet('cursor', 1);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())
+        ->toContain('Alpha')->not->toContain('Beta');
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('emits will-resolve with willFinalize false when the first of many items is created', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrent')
+        ->assertDispatched('proposal:will-resolve', willFinalize: false, context: 'conversation');
+});
+
+it('creates the single proposal record and collapses the dock', function (): void {
+    Bus::fake();
+    $action = proposalCardPa($this->user,
+        ['name' => 'Acme Corp'],
+        ['title' => 'Create Company', 'summary' => 'Create company "Acme Corp"', 'fields' => [['label' => 'Name', 'value' => 'Acme Corp']]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrent')
+        ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
+        ->assertDispatched('proposal:resolved')
+        ->assertSet('pendingActionId', null);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->where('name', 'Acme Corp')->exists())->toBeTrue();
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
+});
+
+it('finalizes the batch on the last item and collapses the dock', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+    $action->update(['result_data' => ['items' => ['0' => ['status' => 'approved', 'id' => 'x']], 'ids' => ['x']]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->assertSet('cursor', 1)
+        ->call('createCurrent')
+        ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
+        ->assertDispatched('proposal:resolved')
+        ->assertSet('pendingActionId', null);
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
+    Bus::assertDispatched(ContinueChatMessage::class, 1);
 });

@@ -6,9 +6,12 @@ namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 
 final class ProposalCard extends BaseLivewireComponent
 {
@@ -130,6 +133,89 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         return $count - 1;
+    }
+
+    public function createCurrent(PendingActionService $service): void
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+        $willFinalize = $this->willFinalize($pendingAction, $this->cursor);
+
+        $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
+
+        if ($isBatch) {
+            $result = $service->approveItem($pendingAction, $this->authUser(), $this->cursor);
+            $finalized = $result['finalized'];
+            $record = $result['record'] instanceof Model
+                ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
+                : null;
+        } else {
+            $resolved = $service->approve($pendingAction, $this->authUser());
+            $finalized = true;
+            $record = $this->recordReferenceFor($resolved);
+        }
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $pendingAction->getKey(),
+            index: $isBatch ? $this->cursor : null,
+            decision: 'approved',
+            finalized: $finalized,
+            record: $record,
+            context: $this->context,
+        );
+
+        if ($finalized) {
+            $this->pendingActionId = null;
+
+            return;
+        }
+
+        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh());
+    }
+
+    private function willFinalize(PendingAction $pendingAction, int $index): bool
+    {
+        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
+            return true;
+        }
+
+        $count = $this->resolveRecordCount($pendingAction);
+
+        $resultData = $pendingAction->result_data;
+        $items = is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+
+        for ($other = 0; $other < $count; $other++) {
+            if ($other === $index) {
+                continue;
+            }
+
+            if (! isset($items[(string) $other])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array{id: string, type: string, url: string, label: string|null}|null
+     */
+    private function recordReferenceFor(PendingAction $pendingAction): ?array
+    {
+        $resultData = $pendingAction->result_data;
+        $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
+
+        if (! is_string($recordId) && ! is_int($recordId)) {
+            return null;
+        }
+
+        return resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $recordId);
     }
 
     public function render(): View
