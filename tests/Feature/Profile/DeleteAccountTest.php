@@ -185,3 +185,20 @@ test('typed email confirmation is case-insensitive and trimmed', function (): vo
 
     expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });
+
+test('the password fallback is rate limited after repeated failures', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->forget('auth.password_confirmed_at');
+
+    foreach (range(1, 5) as $ignored) {
+        Livewire::test(DeleteAccount::class)
+            ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'wrong-password'])
+            ->assertHasActionErrors(['password']);
+    }
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])
+        ->assertHasActionErrors(['password']); // throttled even though the password is now correct
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
