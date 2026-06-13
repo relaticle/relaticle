@@ -98,6 +98,39 @@ function makeTaskProposal(User $user, array $actionData): PendingAction
 }
 
 /**
+ * Batch variant of makeTaskProposal: an `_batch` action_data carrying one
+ * `records` entry per task (each may include a `custom_fields` map) with a
+ * matching `display_data['items']` list, mirroring makeBatchCompanyProposal.
+ *
+ * @param  list<array<string, mixed>>  $records
+ */
+function makeBatchTaskProposal(User $user, array $records): PendingAction
+{
+    $items = array_map(static function (array $record): array {
+        $title = (string) ($record['title'] ?? '');
+
+        return [
+            'title' => 'Create Task',
+            'summary' => "Create task \"{$title}\"",
+            'fields' => [['label' => 'Title', 'code' => 'title', 'value' => $title]],
+        ];
+    }, $records);
+
+    return PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => $records],
+        'display_data' => ['title' => 'Create Tasks', 'summary' => 'Create '.count($records).' tasks', 'items' => $items],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+/**
  * The seeded task `status` field is a SINGLE_CHOICE with To do / In progress /
  * Done options, created for every team by the CreateTeamCustomFields listener.
  *
@@ -609,6 +642,33 @@ it('rebuilds the current record fields with codes on editable rows and no diverg
     expect(collect($fields)->pluck('label')->all())->toBe(collect($stored)->pluck('label')->all())
         ->and(collect($fields)->pluck('value')->all())->toBe(collect($stored)->pluck('value')->all())
         ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
+});
+
+it('edits a custom field on a batch item without touching sibling records', function (): void {
+    Bus::fake([ContinueChatMessage::class]);
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeBatchTaskProposal($this->user, [
+        ['title' => 'Task A', 'custom_fields' => [$field->code => $optionIds[0]]],
+        ['title' => 'Task B', 'custom_fields' => [$field->code => $optionIds[0]]],
+    ]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('stepNext')
+        ->assertSet('cursor', 1)
+        ->call('editField', $field->code)
+        ->assertSet("data.custom_fields.{$field->code}", $optionIds[0])
+        ->set("data.custom_fields.{$field->code}", $optionIds[1])
+        ->call('saveField')
+        ->assertSet('editingFieldCode', null)
+        ->assertHasNoErrors();
+
+    $records = array_values($action->fresh()->action_data['records']);
+    expect($records[1]['custom_fields'][$field->code])->toBe($optionIds[1])
+        ->and($records[0]['custom_fields'][$field->code])->toBe($optionIds[0]);
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('shows an edit affordance for an editable field and renders the inline editor when editing', function (): void {
