@@ -150,3 +150,21 @@ test('delete account component renders correctly', function (): void {
         ->assertSuccessful()
         ->assertSee('Delete Account');
 });
+
+test('the delete modal copy does not instruct users to enter a password', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'My MacBook',
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    $description = Livewire::test(DeleteAccount::class)
+        ->instance()
+        ->deleteAccountAction()
+        ->getModalDescription();
+
+    expect(mb_strtolower((string) $description))->not->toContain('password');
+});

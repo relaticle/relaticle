@@ -10,11 +10,13 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
 use LogicException;
@@ -92,6 +94,14 @@ final class ConfirmIdentityAction extends Action
             ...$this->attemptMarker(),
             ...$this->identityFields(),
         ]);
+
+        $this->modalSubmitAction(function (Action $action): Action {
+            if ($this->confirmingUser()->hasPasskey()) {
+                $action->icon(Heroicon::FingerPrint);
+            }
+
+            return $action;
+        });
 
         $this->action(function (array $data, Action $action): mixed {
             $user = $this->confirmingUser();
@@ -179,6 +189,12 @@ final class ConfirmIdentityAction extends Action
 
         return array_values(array_filter([
             $hasPasskey ? Hidden::make('use_password')->default(false) : null,
+            $hasPasskey
+                ? Placeholder::make('passkeyHint')
+                    ->hiddenLabel()
+                    ->content(__('profile.sections.passkeys.method_hint'))
+                    ->visible(fn (Get $get): bool => ! (bool) $get('use_password'))
+                : null,
             $hasPasskey
                 ? Actions::make([
                     Action::make('usePassword')
