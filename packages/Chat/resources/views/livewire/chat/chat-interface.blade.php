@@ -380,6 +380,47 @@
                                                             @include('chat::livewire.chat.partials._proposal-field')
                                                         </template>
                                                     </div>
+
+                                                    {{-- Per-item resolution (batch only) --}}
+                                                    <div class="mt-1.5">
+                                                        <template x-if="action.status === 'pending' && !itemResult(action, itemIdx)">
+                                                            <div class="flex items-center gap-2">
+                                                                <button
+                                                                    x-on:click="resolveItem(action, itemIdx, 'approve')"
+                                                                    class="inline-flex items-center gap-1 rounded-md bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700"
+                                                                >
+                                                                    <x-heroicon-o-check class="h-3 w-3" />
+                                                                    <span x-text="action.operation === 'delete' ? 'Delete' : 'Create'"></span>
+                                                                </button>
+                                                                <button
+                                                                    x-on:click="resolveItem(action, itemIdx, 'reject')"
+                                                                    class="inline-flex items-center rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                                                                >
+                                                                    Skip
+                                                                </button>
+                                                            </div>
+                                                        </template>
+                                                        <template x-if="itemResult(action, itemIdx)">
+                                                            <div class="flex items-center gap-2 text-xs">
+                                                                <template x-if="itemResult(action, itemIdx).status === 'approved'">
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                                                                        <x-heroicon-o-check class="h-3 w-3" /> Created
+                                                                    </span>
+                                                                </template>
+                                                                <template x-if="itemResult(action, itemIdx).status === 'skipped'">
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                                                                        Skipped
+                                                                    </span>
+                                                                </template>
+                                                                <template x-if="itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
+                                                                    <a :href="itemResult(action, itemIdx).record.url" wire:navigate class="inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400">
+                                                                        <span x-text="itemResult(action, itemIdx).record.label ? 'View ' + itemResult(action, itemIdx).record.label : 'View'"></span>
+                                                                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                                                                    </a>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </template>
                                         </div>
@@ -389,24 +430,24 @@
                                     <template x-if="action.status === 'pending'">
                                         <div class="mt-3 flex items-center gap-2">
                                             <button
-                                                x-on:click="approveAction(action)"
+                                                x-on:click="isBatchAction(action) ? (anyItemResolved(action) ? resolveRemaining(action, 'approve') : approveAction(action)) : approveAction(action)"
                                                 class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition"
-                                                :class="action.operation === 'delete'
+                                                :class="(!isBatchAction(action) && action.operation === 'delete')
                                                     ? 'bg-red-600 hover:bg-red-700'
                                                     : 'bg-primary-600 hover:bg-primary-700'"
                                             >
                                                 <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                                <span x-text="primaryActionLabel(action)"></span>
+                                                <span x-text="isBatchAction(action) ? (anyItemResolved(action) ? 'Create remaining' : 'Create all') : primaryActionLabel(action)"></span>
                                                 <kbd
-                                                    x-show="visiblePendingActions().length === 1"
+                                                    x-show="!isBatchAction(action) && visiblePendingActions().length === 1"
                                                     class="hidden rounded bg-white/20 px-1 font-sans text-[10px] sm:inline"
                                                 >&#8984;&#9166;</kbd>
                                             </button>
                                             <button
-                                                x-on:click="rejectAction(action)"
+                                                x-on:click="isBatchAction(action) ? (anyItemResolved(action) ? resolveRemaining(action, 'reject') : rejectAction(action)) : rejectAction(action)"
                                                 class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                                             >
-                                                Discard
+                                                <span x-text="isBatchAction(action) ? (anyItemResolved(action) ? 'Discard remaining' : 'Discard all') : 'Discard'"></span>
                                             </button>
                                         </div>
                                     </template>
@@ -2167,6 +2208,102 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             revertContinuation();
             action.status = previousStatus;
             action.error = 'Network error';
+        }
+    },
+
+    isBatchAction(action) {
+        return Array.isArray(action.display?.items) && action.display.items.length > 1;
+    },
+
+    itemResult(action, index) {
+        return (action.itemResults && action.itemResults[index]) || null;
+    },
+
+    anyItemResolved(action) {
+        return !!(action.itemResults && Object.keys(action.itemResults).length > 0);
+    },
+
+    pendingItemIndexes(action) {
+        if (!this.isBatchAction(action)) return [];
+        const out = [];
+        action.display.items.forEach((_, i) => {
+            if (!this.itemResult(action, i)) out.push(i);
+        });
+        return out;
+    },
+
+    willFinalize(action, index) {
+        // True when resolving `index` leaves zero unresolved items.
+        const pend = this.pendingItemIndexes(action);
+        return pend.length === 1 && pend[0] === index;
+    },
+
+    async resolveItem(action, index, decision) {
+        if (this.itemResult(action, index)) return; // already resolved
+        if (action.status !== 'pending') return;
+
+        action.error = null; // clear any stale error from a prior failed item resolve
+
+        const finalizing = this.willFinalize(action, index);
+        const revertContinuation = finalizing ? this.beginContinuationTurn() : null;
+
+        // Optimistic: replace the whole object so Alpine tracks the new key.
+        action.itemResults = {
+            ...action.itemResults,
+            [index]: { status: decision === 'approve' ? 'approved' : 'skipped', record: null },
+        };
+
+        try {
+            const verb = decision === 'approve' ? 'approve' : 'reject';
+            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/items/' + index + '/' + verb, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+            });
+
+            if (res.ok) {
+                const body = await res.json().catch(() => ({}));
+                if (body.record) {
+                    action.itemResults = {
+                        ...action.itemResults,
+                        [index]: { ...action.itemResults[index], record: body.record },
+                    };
+                }
+                if (body.finalized) {
+                    action.status = 'approved'; // resolved-state UI; the per-item chips carry the detail
+                    if (decision === 'approve' && window.Livewire?.dispatch) {
+                        window.Livewire.dispatch('ai-write-completed', {
+                            entityType: action.entity_type ?? null,
+                            operation: 'create',
+                        });
+                    }
+                }
+            } else {
+                if (revertContinuation) revertContinuation();
+                const body = await res.json().catch(() => ({}));
+                const next = { ...action.itemResults };
+                delete next[index];
+                action.itemResults = next;
+                action.error = body.error || 'Failed to resolve item';
+            }
+        } catch {
+            if (revertContinuation) revertContinuation();
+            const next = { ...action.itemResults };
+            delete next[index];
+            action.itemResults = next;
+            action.error = 'Network error';
+        }
+    },
+
+    async resolveRemaining(action, decision) {
+        // "Create/Discard remaining" after a partial resolution: resolve each
+        // still-pending item; the last one finalizes (mints the continuation).
+        const indexes = this.pendingItemIndexes(action);
+        for (const i of indexes) {
+            // Sequential so willFinalize() sees prior items resolved.
+            await this.resolveItem(action, i, decision);
         }
     },
 
