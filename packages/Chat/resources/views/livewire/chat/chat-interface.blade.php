@@ -3,6 +3,7 @@
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     data-chat-context="{{ $context ?? 'conversation' }}"
+    data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
 >
     {{-- Messages --}}
@@ -408,20 +409,18 @@
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
-            {{-- Docked pending proposal(s): the card lives at the composer while it awaits a decision. --}}
-            <template x-if="hasPendingProposal">
-                <div class="mb-3">
-                    <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Review before continuing</span>
-                    </div>
-                    <div class="max-h-[55vh] space-y-3 overflow-y-auto">
-                        <template x-for="action in visiblePendingActions()" :key="action.pending_action_id">
-                            @include('chat::livewire.chat.partials._proposal-card')
-                        </template>
-                    </div>
+            {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
+                 render real Filament field editors in place (Phase C). Alpine stays the source of truth for
+                 whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
+            <div x-show="hasPendingProposal" x-effect="syncActiveProposal()" class="mb-3">
+                <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Review before continuing</span>
                 </div>
-            </template>
+                <div class="max-h-[55vh] overflow-y-auto">
+                    <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />
+                </div>
+            </div>
 
             {{-- Send-throttle countdown: the message is kept and auto-sends --}}
             <template x-if="rateLimit">
@@ -515,6 +514,7 @@
 <script>
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
     conversationId: initialConversationId,
+    context: 'conversation',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     input: '',
@@ -536,6 +536,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     ),
     selectedModel: 'auto',
     undoToast: null,
+
+    // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
+    // dedupes proposal:set-active dispatches; _continuationRevert holds the
+    // revert handle from beginContinuationTurn() between will-resolve and the
+    // resolved/resolve-failed outcome.
+    _lastActiveProposalId: null,
+    _continuationRevert: null,
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
     // and auto-flush this on handleStreamEnd / cancel / failure.
@@ -768,6 +775,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     init() {
+        this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
+
         const validModels = this.modelOptions
             .map((o) => o.value)
             .filter((v) => this.allowedModels.includes(v));
@@ -868,7 +877,9 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             if (this.isEditing) return;               // an inline edit form is open
 
             e.preventDefault();
-            this.approveAction(pending[0]);
+            if (window.Livewire?.dispatch) {
+                window.Livewire.dispatch('proposal:create-current', { context: this.context });
+            }
         };
         window.addEventListener('keydown', this.approvalKeyHandler);
 
@@ -923,6 +934,29 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.prependScrollAnchor = null;
             });
         });
+
+        // Bridge the docked livewire proposal-card's resolution lifecycle back
+        // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
+        // named-arg dispatches arrive as a single params object (e.detail).
+        this._proposalListeners = [
+            window.Livewire.on('proposal:will-resolve', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                if (payload?.willFinalize) {
+                    this._continuationRevert = this.beginContinuationTurn();
+                }
+            }),
+            window.Livewire.on('proposal:resolved', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                this.applyProposalResolution(payload);
+                this._continuationRevert = null; // committed: keep the stub for the streaming continuation
+            }),
+            window.Livewire.on('proposal:resolve-failed', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                if (this._continuationRevert) { this._continuationRevert(); this._continuationRevert = null; }
+                const action = this.findPendingAction(payload?.pendingActionId);
+                if (action) action.error = 'Could not complete the action. Please try again.';
+            }),
+        ];
     },
 
     loadEarlier() {
@@ -941,12 +975,66 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .filter((a) => a.status === 'pending');
     },
 
+    activePendingActionId() {
+        const pending = this.visiblePendingActions();
+        return pending.length > 0 ? pending[0].pending_action_id : null;
+    },
+
+    syncActiveProposal() {
+        const id = this.activePendingActionId();
+        if (id === this._lastActiveProposalId) return;
+        this._lastActiveProposalId = id;
+        if (window.Livewire?.dispatch) {
+            window.Livewire.dispatch('proposal:set-active', { id, context: this.context });
+        }
+    },
+
     get hasPendingProposal() {
         return this.visiblePendingActions().length > 0;
     },
 
     get isEditing() {
         return this.visiblePendingActions().some((a) => a.edit);
+    },
+
+    findPendingAction(id) {
+        for (const m of this.messages) {
+            const found = (m.pending_actions || []).find((a) => a.pending_action_id === id);
+            if (found) return found;
+        }
+        return null;
+    },
+
+    applyProposalResolution(payload) {
+        const action = this.findPendingAction(payload.pendingActionId);
+        if (!action) return;
+        action.error = null;
+
+        if (payload.index === null || payload.index === undefined) {
+            // Single proposal.
+            action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
+            if (payload.record) action.record = payload.record;
+            if (action.operation === 'delete' && payload.decision === 'approved') {
+                this.showUndoToast(action);
+            }
+        } else {
+            // Batch item: the transcript renders per-item status 'approved'/'skipped'.
+            action.itemResults = {
+                ...action.itemResults,
+                [payload.index]: {
+                    status: payload.decision === 'approved' ? 'approved' : 'skipped',
+                    record: payload.record || null,
+                },
+            };
+            if (payload.finalized) action.status = 'approved';
+        }
+
+        if (payload.decision === 'approved' && window.Livewire?.dispatch) {
+            window.Livewire.dispatch('ai-write-completed', {
+                entityType: action.entity_type ?? null,
+                operation: action.operation ?? null,
+            });
+        }
     },
 
     destroy() {
@@ -961,6 +1049,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
         window.removeEventListener('keydown', this.approvalKeyHandler);
+        (this._proposalListeners || []).forEach((off) => typeof off === 'function' && off());
     },
 
     startCopyTicker() {
