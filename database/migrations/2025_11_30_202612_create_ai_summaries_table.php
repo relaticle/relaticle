@@ -26,12 +26,4 @@ return new class extends Migration
             $table->unique(['summarizable_type', 'summarizable_id', 'team_id']);
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('ai_summaries');
-    }
 };
