@@ -67,6 +67,7 @@ return [
             'name_placeholder' => 'e.g., MacBook Pro, iPhone',
             'password_help' => 'For your security, confirm your account password before adding a passkey.',
             'use_password' => 'Use your password instead',
+            'method_hint' => "You'll confirm with Face ID, Touch ID, or your passkey.",
             'register' => 'Register passkey',
             'registering' => 'Registering...',
             'waiting' => 'Waiting for passkey…',
@@ -113,7 +114,7 @@ return [
 
     'modals' => [
         'delete_account' => [
-            'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed. Please enter your password to confirm.',
+            'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
             'notice_no_password' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
         ],
         'log_out_other_browsers' => [
