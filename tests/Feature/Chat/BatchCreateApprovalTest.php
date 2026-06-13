@@ -199,3 +199,23 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
 
     Bus::assertDispatched(ContinueChatMessage::class, 1);
 });
+
+it('builds a per-item summary continuation prompt naming created and skipped records', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['title' => 'Created One'], ['title' => 'Skipped Two'],
+    ]);
+    $action->update(['display_data' => ['title' => 'Create Tasks', 'summary' => 'Create 2 tasks', 'items' => [
+        ['summary' => 'Created One'], ['summary' => 'Skipped Two'],
+    ]]]);
+
+    $service = resolve(PendingActionService::class);
+    $service->approveItem($action, $this->user, 0);
+    $service->rejectItem($action, 1);
+
+    Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
+        return str_contains($job->prompt, 'Created One')
+            && str_contains($job->prompt, 'Skipped Two')
+            && str_contains($job->prompt, 'skipped')
+            && str_contains($job->prompt, 'ONE short sentence');
+    });
+});

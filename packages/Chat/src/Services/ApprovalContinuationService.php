@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Relaticle\Chat\Events\ChatPaused;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\PromptText;
 
 final readonly class ApprovalContinuationService
 {
@@ -75,6 +76,12 @@ final readonly class ApprovalContinuationService
 
     private function buildPrompt(PendingAction $pendingAction, string $status): string
     {
+        $resultData = $pendingAction->result_data;
+
+        if (is_array($resultData) && is_array($resultData['items'] ?? null) && $resultData['items'] !== []) {
+            return $this->buildBatchItemsPrompt($pendingAction);
+        }
+
         $label = $this->resolveLabel($pendingAction) ?? "the {$pendingAction->entity_type} record(s)";
 
         if ($status !== 'approved') {
@@ -90,7 +97,6 @@ final readonly class ApprovalContinuationService
             "The user APPROVED — and the system has already EXECUTED — this action: {$pendingAction->operation->value} {$label}.",
         ];
 
-        $resultData = $pendingAction->result_data;
         $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
         $recordIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
 
@@ -124,6 +130,84 @@ final readonly class ApprovalContinuationService
         $lines[] = 'Confirm to the user by the record title(s) above in ONE short sentence. Never echo operation or entity_type tokens as if they were names, never re-list the field values, and never render a table of the data that was just approved.';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Summarize a batch that was resolved item-by-item: which records were
+     * created (with internal ids for follow-up) and which were skipped (by name),
+     * so the assistant's confirmation reflects the real per-item outcome.
+     */
+    private function buildBatchItemsPrompt(PendingAction $pendingAction): string
+    {
+        $resultData = is_array($pendingAction->result_data) ? $pendingAction->result_data : [];
+        $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+        $displayItems = is_array($pendingAction->display_data['items'] ?? null) ? $pendingAction->display_data['items'] : [];
+        $records = is_array($pendingAction->action_data['records'] ?? null) ? $pendingAction->action_data['records'] : [];
+
+        $created = [];
+        $createdIds = [];
+        $skipped = [];
+
+        foreach ($items as $index => $outcome) {
+            $name = $this->itemName($displayItems, $records, (int) $index);
+
+            if (is_array($outcome) && ($outcome['status'] ?? null) === 'approved') {
+                $created[] = $name;
+
+                if (is_string($outcome['id'] ?? null) || is_int($outcome['id'] ?? null)) {
+                    $createdIds[] = (string) $outcome['id'];
+                }
+
+                continue;
+            }
+
+            $skipped[] = $name;
+        }
+
+        $lines = ['[approval]'];
+
+        if ($created !== []) {
+            $lines[] = 'The user APPROVED — and the system EXECUTED — creating: '.implode(', ', $created).'.';
+
+            if ($createdIds !== []) {
+                $lines[] = 'Record ids: '.implode(',', $createdIds).' (internal — use for follow-up tool calls, never show them to the user).';
+            }
+        }
+
+        if ($skipped !== []) {
+            $lines[] = 'The user SKIPPED (did not create): '.implode(', ', $skipped).'. Do not silently retry these.';
+        }
+
+        $lines[] = $created === []
+            ? 'Nothing was created. In ONE short sentence, acknowledge that and ask what they would like to change.'
+            : 'Confirm in ONE short sentence naming each created record by its title; if any were skipped, briefly acknowledge that. Never re-list the field values, never render a table, never echo entity_type tokens as names.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, mixed>  $displayItems
+     * @param  array<int, mixed>  $records
+     */
+    private function itemName(array $displayItems, array $records, int $index): string
+    {
+        $summary = is_array($displayItems[$index] ?? null) ? ($displayItems[$index]['summary'] ?? null) : null;
+
+        if (is_string($summary) && $summary !== '') {
+            return PromptText::sanitize($summary, 200);
+        }
+
+        $record = $records[$index] ?? null;
+
+        if (is_array($record)) {
+            foreach (['name', 'title'] as $field) {
+                if (is_string($record[$field] ?? null) && $record[$field] !== '') {
+                    return PromptText::sanitize($record[$field], 200);
+                }
+            }
+        }
+
+        return 'record #'.($index + 1);
     }
 
     private function resolveLabel(PendingAction $pendingAction): ?string
