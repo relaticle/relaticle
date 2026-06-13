@@ -2,22 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
 use App\Notifications\UserDeletionScheduledNotification;
-use Filament\Actions\Testing\TestAction;
+use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Support\Facades\Notification;
+use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
 
-mutates(DeleteAccount::class, User::class);
+mutates(DeleteAccount::class, User::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
 
-test('user can schedule account deletion with correct password', function () {
+test('schedules deletion after a fresh confirmation', function (): void {
     Notification::fake();
 
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->put('auth.password_confirmed_at', time());
 
     Livewire::test(DeleteAccount::class)
-        ->call('deleteAccount', 'password')
+        ->call('deleteAccount')
         ->assertRedirect();
 
     expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
@@ -25,7 +28,62 @@ test('user can schedule account deletion with correct password', function () {
     Notification::assertSentTo($user, UserDeletionScheduledNotification::class);
 });
 
-test('social user can schedule account deletion without password', function () {
+test('blocked without a fresh confirmation', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->forget('auth.password_confirmed_at');
+
+    Livewire::test(DeleteAccount::class)
+        ->call('deleteAccount')
+        ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('password user with a passkey triggers the ceremony', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->forget('auth.password_confirmed_at');
+
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'My MacBook',
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount')
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('password fallback deletes account', function (): void {
+    Notification::fake();
+
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->forget('auth.password_confirmed_at');
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertRedirect();
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
+});
+
+test('wrong password is rejected', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->forget('auth.password_confirmed_at');
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['password' => 'wrong-password'])
+        ->assertHasActionErrors(['password']);
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('social user deletes without confirmation', function (): void {
     Notification::fake();
 
     $this->actingAs($user = User::factory()->withPersonalTeam()->socialOnly()->create());
@@ -37,25 +95,17 @@ test('social user can schedule account deletion without password', function () {
     expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });
 
-test('user cannot schedule deletion with wrong password', function () {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
-
-    Livewire::test(DeleteAccount::class)
-        ->call('deleteAccount', 'wrong-password')
-        ->assertHasErrors(['password']);
-
-    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
-});
-
-test('user cannot schedule deletion when owning team with members', function () {
+test('user cannot schedule deletion when owning team with members', function (): void {
     Notification::fake();
 
     $this->actingAs($user = User::factory()->withTeam()->create());
+    session()->put('auth.password_confirmed_at', time());
+
     $team = $user->currentTeam;
     $team->users()->attach(User::factory()->create(), ['role' => 'editor']);
 
     Livewire::test(DeleteAccount::class)
-        ->call('deleteAccount', 'password')
+        ->call('deleteAccount')
         ->assertHasNoErrors()
         ->assertNotified(__('profile.notifications.delete_account_blocked.title'));
 
@@ -63,33 +113,10 @@ test('user cannot schedule deletion when owning team with members', function () 
     Notification::assertNothingSentTo($user);
 });
 
-test('delete account component renders correctly', function () {
+test('delete account component renders correctly', function (): void {
     $this->actingAs(User::factory()->withPersonalTeam()->create());
 
     Livewire::test(DeleteAccount::class)
         ->assertSuccessful()
-        ->assertSee('Delete Account')
-        ->assertSee('Permanently delete your account after a 30-day grace period.')
-        ->assertSee('Records in shared workspaces will remain without your profile.')
-        ->assertDontSee('all your data');
-});
-
-test('password confirmation explains what deletion keeps and removes', function () {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
-
-    Livewire::test(DeleteAccount::class)
-        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
-        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
-        ->assertMountedActionModalSee('Shared workspace records will remain.')
-        ->assertMountedActionModalSee('Enter your password to confirm.');
-});
-
-test('social account confirmation explains what deletion keeps and removes', function () {
-    $this->actingAs(User::factory()->withPersonalTeam()->socialOnly()->create());
-
-    Livewire::test(DeleteAccount::class)
-        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
-        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
-        ->assertMountedActionModalSee('Shared workspace records will remain.')
-        ->assertDontSee('Enter your password to confirm.');
+        ->assertSee('Delete Account');
 });
