@@ -13,7 +13,6 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
-use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
@@ -22,38 +21,17 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 /**
- * Orchestrates editing a chat create-proposal before approval. Task 3 exposes
- * the structured editable schema (single, or one item of a batch); Task 4 adds
- * the edit path: re-validate the edited core + custom fields, rewrite the clean
- * action_data, and re-render display_data — never executing the action and
- * never dispatching a continuation.
+ * Orchestrates editing a chat create-proposal before approval: re-validate the
+ * edited core + custom fields, rewrite the clean action_data, and re-render
+ * display_data — never executing the action and never dispatching a
+ * continuation. Driven by the docked ProposalCard's saveField flow.
  */
 final readonly class ProposalEditor
 {
     public function __construct(
-        private ProposalFieldSchemaDescriber $describer,
         private ProposalDisplayBuilder $displayBuilder,
         private CustomFieldsRequestValidator $customFieldsValidator,
     ) {}
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function editableSchema(PendingAction $pendingAction, User $user, ?int $index = null): array
-    {
-        $this->assertEditable($pendingAction);
-
-        $record = $this->resolveRecord($pendingAction, $index);
-
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->team_id);
-
-        try {
-            return $this->describer->describe($user, $pendingAction->entity_type, $record);
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
-    }
 
     /**
      * Re-validate the edited fields, rewrite action_data, and re-render

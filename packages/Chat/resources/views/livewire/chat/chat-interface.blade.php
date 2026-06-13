@@ -874,7 +874,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             const pending = this.visiblePendingActions();
             if (pending.length !== 1 || this.isStreaming) return;
             if (this.input.trim().length > 0) return; // composer draft wins
-            if (this.isEditing) return;               // an inline edit form is open
 
             e.preventDefault();
             if (window.Livewire?.dispatch) {
@@ -965,10 +964,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.$wire.loadEarlierMessages();
     },
 
-    primaryActionLabel(action) {
-        return ({ create: 'Create', update: 'Save changes', delete: 'Delete' })[action.operation] ?? 'Approve';
-    },
-
     visiblePendingActions() {
         return this.messages
             .flatMap((m) => m.pending_actions || [])
@@ -991,10 +986,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     get hasPendingProposal() {
         return this.visiblePendingActions().length > 0;
-    },
-
-    get isEditing() {
-        return this.visiblePendingActions().some((a) => a.edit);
     },
 
     findPendingAction(id) {
@@ -2133,275 +2124,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    async approveAction(action) {
-        const previousStatus = action.status;
-        action.status = 'approved';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST so text_delta events that
-        // arrive during the fetch land in a fresh bubble, not the proposal.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/approve', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                if (body.record) {
-                    action.record = body.record;
-                }
-                if (body.records) {
-                    action.records = body.records;
-                }
-                if (action.operation === 'delete') {
-                    this.showUndoToast(action);
-                }
-                if (window.Livewire?.dispatch) {
-                    window.Livewire.dispatch('ai-write-completed', {
-                        entityType: action.entity_type ?? null,
-                        operation: action.operation ?? null,
-                    });
-                }
-            } else {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to approve';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
-            action.error = 'Network error';
-        }
-    },
-
-    isBatchAction(action) {
-        return Array.isArray(action.display?.items) && action.display.items.length > 1;
-    },
-
+    // The transcript renders resolved batch cards with per-item Created/Skipped
+    // chips. applyProposalResolution() (the docked card's resolution bridge)
+    // writes action.itemResults; the resolved-only _proposal-card partial reads
+    // them through this getter.
     itemResult(action, index) {
         return (action.itemResults && action.itemResults[index]) || null;
-    },
-
-    anyItemResolved(action) {
-        return !!(action.itemResults && Object.keys(action.itemResults).length > 0);
-    },
-
-    pendingItemIndexes(action) {
-        if (!this.isBatchAction(action)) return [];
-        const out = [];
-        action.display.items.forEach((_, i) => {
-            if (!this.itemResult(action, i)) out.push(i);
-        });
-        return out;
-    },
-
-    willFinalize(action, index) {
-        // True when resolving `index` leaves zero unresolved items.
-        const pend = this.pendingItemIndexes(action);
-        return pend.length === 1 && pend[0] === index;
-    },
-
-    async resolveItem(action, index, decision) {
-        if (this.itemResult(action, index)) return; // already resolved
-        if (action.status !== 'pending') return;
-
-        action.error = null; // clear any stale error from a prior failed item resolve
-
-        const finalizing = this.willFinalize(action, index);
-        const revertContinuation = finalizing ? this.beginContinuationTurn() : null;
-
-        // Optimistic: replace the whole object so Alpine tracks the new key.
-        action.itemResults = {
-            ...action.itemResults,
-            [index]: { status: decision === 'approve' ? 'approved' : 'skipped', record: null },
-        };
-
-        try {
-            const verb = decision === 'approve' ? 'approve' : 'reject';
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/items/' + index + '/' + verb, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                if (body.record) {
-                    action.itemResults = {
-                        ...action.itemResults,
-                        [index]: { ...action.itemResults[index], record: body.record },
-                    };
-                }
-                if (body.finalized) {
-                    action.status = 'approved'; // resolved-state UI; the per-item chips carry the detail
-                    if (decision === 'approve' && window.Livewire?.dispatch) {
-                        window.Livewire.dispatch('ai-write-completed', {
-                            entityType: action.entity_type ?? null,
-                            operation: 'create',
-                        });
-                    }
-                }
-            } else {
-                if (revertContinuation) revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                const next = { ...action.itemResults };
-                delete next[index];
-                action.itemResults = next;
-                action.error = body.error || 'Failed to resolve item';
-            }
-        } catch {
-            if (revertContinuation) revertContinuation();
-            const next = { ...action.itemResults };
-            delete next[index];
-            action.itemResults = next;
-            action.error = 'Network error';
-        }
-    },
-
-    async resolveRemaining(action, decision) {
-        // "Create/Discard remaining" after a partial resolution: resolve each
-        // still-pending item; the last one finalizes (mints the continuation).
-        const indexes = this.pendingItemIndexes(action);
-        for (const i of indexes) {
-            // Sequential so willFinalize() sees prior items resolved.
-            await this.resolveItem(action, i, decision);
-        }
-    },
-
-    // Inline proposal editing (Create proposals only). Editing revalidates and
-    // re-renders the card via the 3a PATCH endpoints; it NEVER approves. One
-    // edit at a time per action: `action.edit.index` is null for a single
-    // proposal or the batch item index.
-    proposalActionUrl(action, index, suffix) {
-        const base = @js(url('/chat/actions')) + '/' + action.pending_action_id;
-        if (index === null || index === undefined) {
-            return suffix ? base + '/' + suffix : base;
-        }
-        const itemBase = base + '/items/' + index;
-        return suffix ? itemBase + '/' + suffix : itemBase;
-    },
-
-    async enterFieldEdit(action, index = null) {
-        if (action.status !== 'pending' || action.operation !== 'create') return;
-
-        action.edit = { index, loading: true, saving: false, error: null, fields: [], values: {}, linkText: {} };
-
-        try {
-            const res = await fetch(this.proposalActionUrl(action, index, 'editable'), {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                action.edit = null;
-                action.error = body.error || 'Could not load fields for editing';
-                return;
-            }
-
-            const body = await res.json();
-            const fields = Array.isArray(body.fields) ? body.fields : [];
-
-            const values = {};
-            const linkText = {};
-            for (const f of fields) {
-                values[f.code] = this.seedEditValue(f);
-                if (f.kind === 'link') {
-                    linkText[f.code] = (Array.isArray(f.value) ? f.value : []).join('\n');
-                }
-            }
-
-            action.edit = { index, loading: false, saving: false, error: null, fields, values, linkText };
-        } catch {
-            action.edit = null;
-            action.error = 'Network error loading fields';
-        }
-    },
-
-    seedEditValue(field) {
-        const v = field.value;
-        switch (field.kind) {
-            case 'toggle': return v === true;
-            case 'multiselect': return Array.isArray(v) ? v.map(String) : [];
-            case 'select': return (v === null || v === undefined) ? '' : String(v);
-            case 'number': return (v === null || v === undefined) ? '' : String(v);
-            case 'link': return Array.isArray(v) ? [...v] : [];
-            case 'date': return (v === null || v === undefined) ? '' : String(v);
-            default: return (v === null || v === undefined) ? '' : String(v);
-        }
-    },
-
-    exitFieldEdit(action) {
-        action.edit = null;
-    },
-
-    setMultiselect(action, code, optionId, checked) {
-        const current = Array.isArray(action.edit.values[code]) ? action.edit.values[code] : [];
-        const id = String(optionId);
-        const next = checked ? [...new Set([...current, id])] : current.filter((x) => x !== id);
-        action.edit.values[code] = next;
-    },
-
-    async saveProposalEdit(action) {
-        const edit = action.edit;
-        if (!edit || edit.loading || edit.saving) return;
-
-        const index = edit.index;
-        const fields = {};
-        for (const f of edit.fields) {
-            if (f.kind === 'link') {
-                fields[f.code] = (edit.linkText[f.code] || '')
-                    .split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
-            } else {
-                fields[f.code] = edit.values[f.code];
-            }
-        }
-
-        edit.saving = true;
-        edit.error = null;
-
-        try {
-            const res = await fetch(this.proposalActionUrl(action, index, null), {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: JSON.stringify({ fields }),
-            });
-
-            const body = await res.json().catch(() => ({}));
-
-            if (!res.ok) {
-                edit.saving = false;
-                edit.error = body.error || `Could not save (error ${res.status})`;
-                return;
-            }
-
-            // The PATCH endpoint returns the fully rebuilt display for both
-            // shapes: the single proposal, or the whole batch (with the edited
-            // item already merged at its index). Assign it wholesale — splicing
-            // body.display into items[index] would nest the batch inside itself.
-            action.display = body.display;
-
-            action.edit = null;
-        } catch {
-            edit.saving = false;
-            edit.error = 'Network error — your edits were not saved';
-        }
     },
 
     showUndoToast(action) {
@@ -2445,36 +2173,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 action.error = body.error || 'Failed to restore';
             }
         } catch {
-            action.error = 'Network error';
-        }
-    },
-
-    async rejectAction(action) {
-        const previousStatus = action.status;
-        action.status = 'rejected';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST — see approveAction for why.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/reject', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (! res.ok) {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to reject';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
             action.error = 'Network error';
         }
     },

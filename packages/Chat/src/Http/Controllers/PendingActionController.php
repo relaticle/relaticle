@@ -11,7 +11,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
-use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use RuntimeException;
 
@@ -20,90 +19,7 @@ final readonly class PendingActionController
     public function __construct(
         private PendingActionService $service,
         private RecordReferenceResolver $resolver,
-        private ProposalEditor $editor,
     ) {}
-
-    public function editable(Request $request, PendingAction $pendingAction): JsonResponse
-    {
-        return $this->respondWithEditableSchema($request, $pendingAction, null);
-    }
-
-    public function editableItem(Request $request, PendingAction $pendingAction, int $index): JsonResponse
-    {
-        return $this->respondWithEditableSchema($request, $pendingAction, $index);
-    }
-
-    private function respondWithEditableSchema(Request $request, PendingAction $pendingAction, ?int $index): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if ($pendingAction->team_id !== $user->currentTeam->getKey()) {
-            return response()->json(['error' => 'Not found'], 404);
-        }
-
-        if ($pendingAction->user_id !== $user->getKey()) {
-            return response()->json(['error' => 'Not found'], 404);
-        }
-
-        try {
-            $fields = $this->editor->editableSchema($pendingAction, $user, $index);
-
-            return response()->json([
-                'pending_action_id' => $pendingAction->id,
-                'entity_type' => $pendingAction->entity_type,
-                'is_batch' => ($pendingAction->action_data['_batch'] ?? false) === true,
-                'index' => $index,
-                'fields' => $fields,
-            ]);
-        } catch (RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
-    }
-
-    public function edit(Request $request, PendingAction $pendingAction): JsonResponse
-    {
-        return $this->respondWithEditedProposal($request, $pendingAction, null);
-    }
-
-    public function editItem(Request $request, PendingAction $pendingAction, int $index): JsonResponse
-    {
-        return $this->respondWithEditedProposal($request, $pendingAction, $index);
-    }
-
-    private function respondWithEditedProposal(Request $request, PendingAction $pendingAction, ?int $index): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if ($pendingAction->team_id !== $user->currentTeam->getKey()) {
-            return response()->json(['error' => 'Not found'], 404);
-        }
-
-        if ($pendingAction->user_id !== $user->getKey()) {
-            return response()->json(['error' => 'Not found'], 404);
-        }
-
-        $fields = $request->input('fields');
-
-        if (! is_array($fields)) {
-            return response()->json(['error' => 'fields must be an object.'], 422);
-        }
-
-        try {
-            $updated = $this->editor->applyEdit($pendingAction, $user, $fields, $index);
-
-            $this->ensureFilamentTenantContext($user);
-
-            return response()->json([
-                'status' => 'edited',
-                'index' => $index,
-                'display' => $updated->display_data,
-            ]);
-        } catch (RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
-    }
 
     public function approve(Request $request, PendingAction $pendingAction): JsonResponse
     {

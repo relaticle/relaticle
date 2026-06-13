@@ -491,6 +491,45 @@ it('edits a core text field (title) in place and persists it via applyEdit witho
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
+it('rejects an out-of-options choice value at the form layer without persisting', function (): void {
+    Bus::fake([ContinueChatMessage::class]);
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $field->code)
+        ->set("data.custom_fields.{$field->code}", 'not-an-option-id')
+        ->call('saveField')
+        ->assertSet('editingFieldCode', $field->code)
+        ->assertHasErrors("data.custom_fields.{$field->code}");
+
+    expect($action->fresh()->action_data['custom_fields'][$field->code])->toBe($optionIds[0]);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('rejects an empty required core name at the form layer and keeps the proposal pending', function (): void {
+    Bus::fake([ContinueChatMessage::class]);
+    $action = proposalCardPa(
+        $this->user,
+        ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
+        ['title' => 'Create Company', 'summary' => 'Acme Corp', 'fields' => [['label' => 'Name', 'value' => 'Acme Corp']]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', 'name')
+        ->set('data.name', '   ')
+        ->call('saveField')
+        ->assertSet('editingFieldCode', 'name')
+        ->assertHasErrors('data.name');
+
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Pending)
+        ->and($fresh->action_data['name'])->toBe('Acme Corp');
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
 it('exposes editable codes for the entity (core keys + non-deferred custom fields)', function (): void {
     [$field] = seedTaskSingleChoiceField($this->team);
     $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => null]]);
