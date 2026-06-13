@@ -31,6 +31,10 @@
 
             try {
                 await window.Passkeys.verify({ routes });
+
+                startProcessing(@js(__('profile.sections.passkeys.confirmed')));
+                await new Promise((resolve) => setTimeout(resolve, 600));
+
                 await component.call('callMountedAction');
             } catch (e) {
                 stopProcessing();
