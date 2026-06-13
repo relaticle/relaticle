@@ -374,3 +374,61 @@ it('editing only the name leaves existing custom_fields intact', function (): vo
         ->and($pending->action_data['custom_fields'])->toHaveKey('icp')
         ->and($pending->action_data['custom_fields']['icp'])->toBeTrue();
 });
+
+it('rejects an edit when unauthenticated', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp'],
+    );
+
+    auth()->logout();
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'New Name']])
+        ->assertUnauthorized();
+
+    $pending->refresh();
+
+    expect($pending->action_data['name'])->toBe('Acme Corp');
+});
+
+it('404s an edit for another user on the same team', function (): void {
+    $other = User::factory()->create();
+    $this->team->users()->attach($other, ['role' => 'member']);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $other->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Company\\CreateCompany',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Not My Proposal'],
+        'display_data' => ['title' => 'Create', 'summary' => 'Create', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'Hacked']])
+        ->assertNotFound();
+
+    $pending->refresh();
+
+    expect($pending->action_data['name'])->toBe('Not My Proposal');
+});
+
+it('does not dispatch a continuation job on edit', function (): void {
+    $pending = makeCreateProposal(
+        $this->user,
+        'company',
+        'App\\Actions\\Company\\CreateCompany',
+        ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
+    );
+
+    $this->patchJson(route('chat.actions.edit', $pending), ['fields' => ['name' => 'New Name']])
+        ->assertOk()
+        ->assertJsonPath('status', 'edited');
+
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
