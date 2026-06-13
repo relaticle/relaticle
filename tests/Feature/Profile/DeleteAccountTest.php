@@ -152,14 +152,7 @@ test('delete account component renders correctly', function (): void {
 });
 
 test('the delete modal copy does not instruct users to enter a password', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
-
-    Passkey::create([
-        'user_id' => $user->id,
-        'name' => 'My MacBook',
-        'credential_id' => 'cred-'.uniqid(),
-        'credential' => [],
-    ]);
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
 
     $description = Livewire::test(DeleteAccount::class)
         ->instance()

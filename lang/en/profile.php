@@ -116,7 +116,6 @@ return [
     'modals' => [
         'delete_account' => [
             'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
-            'notice_no_password' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
