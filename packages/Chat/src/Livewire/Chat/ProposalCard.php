@@ -18,6 +18,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -79,7 +80,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $entityType = $pendingAction->entity_type;
-        $titleKey = in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+        $titleKey = ProposalCoreFields::titleKey($entityType);
 
         if ($code === $titleKey) {
             return [
@@ -115,11 +116,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $record = $this->currentRecord($pendingAction);
 
-        $entityType = $pendingAction->entity_type;
-        $titleKey = in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
-        $coreKeys = $entityType === 'company' ? [$titleKey, 'account_owner_id'] : [$titleKey];
-
-        if (in_array($code, $coreKeys, true)) {
+        if (ProposalCoreFields::isCore($pendingAction->entity_type, $code)) {
             return [$code => $record[$code] ?? null];
         }
 

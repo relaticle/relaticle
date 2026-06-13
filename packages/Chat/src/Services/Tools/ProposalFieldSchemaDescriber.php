@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
+use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -38,7 +39,7 @@ final readonly class ProposalFieldSchemaDescriber
      */
     private function coreFields(User $user, string $entityType, array $record): array
     {
-        $nameKey = in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+        $nameKey = ProposalCoreFields::titleKey($entityType);
         $nameLabel = $nameKey === 'title' ? 'Title' : 'Name';
 
         $fields = [

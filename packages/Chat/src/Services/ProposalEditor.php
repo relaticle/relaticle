@@ -14,6 +14,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
+use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -109,13 +110,11 @@ final readonly class ProposalEditor
      */
     private function splitInput(string $entityType, array $input): array
     {
-        $coreKeys = $this->coreKeys($entityType);
-
         $core = [];
         $custom = [];
 
         foreach ($input as $code => $value) {
-            if (in_array($code, $coreKeys, true)) {
+            if (ProposalCoreFields::isCore($entityType, $code)) {
                 $core[$code] = $value;
 
                 continue;
@@ -128,30 +127,11 @@ final readonly class ProposalEditor
     }
 
     /**
-     * @return list<string>
-     */
-    private function coreKeys(string $entityType): array
-    {
-        $titleKey = $this->titleKey($entityType);
-
-        if ($entityType === 'company') {
-            return [$titleKey, 'account_owner_id'];
-        }
-
-        return [$titleKey];
-    }
-
-    private function titleKey(string $entityType): string
-    {
-        return in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
-    }
-
-    /**
      * @param  array<string, mixed>  $editedCore
      */
     private function validateCore(User $user, string $entityType, array $editedCore): void
     {
-        $titleKey = $this->titleKey($entityType);
+        $titleKey = ProposalCoreFields::titleKey($entityType);
 
         if (array_key_exists($titleKey, $editedCore)) {
             $value = trim((string) $editedCore[$titleKey]);
@@ -298,7 +278,7 @@ final readonly class ProposalEditor
         array $editedCustomFields,
         array $cleanFields,
     ): array {
-        $titleKey = $this->titleKey($entityType);
+        $titleKey = ProposalCoreFields::titleKey($entityType);
 
         if (array_key_exists($titleKey, $editedCore)) {
             $record[$titleKey] = trim((string) $editedCore[$titleKey]);
