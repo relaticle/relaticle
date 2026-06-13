@@ -572,6 +572,18 @@ it('rebuilds the current record fields with codes on editable rows and no diverg
         ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
 });
 
+it('shows an edit affordance for an editable field and renders the inline editor when editing', function (): void {
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSeeHtml('editField')
+        ->call('editField', 'title')
+        ->assertSeeHtml('wire:click="saveField"')
+        ->assertSeeHtml('wire:click="cancelField"');
+});
+
 it('rebuilds a company record (with account owner + custom field) without diverging from stored display', function (): void {
     $linkedin = CustomField::query()
         ->where('tenant_id', $this->team->getKey())
