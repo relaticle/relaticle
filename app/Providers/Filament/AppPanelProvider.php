@@ -214,6 +214,12 @@ final class AppPanelProvider extends PanelProvider
                 fn (): View|Factory => view('filament.app.analytics')
             );
 
+        $panel
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory => view('filament.scripts.identity-confirmation'),
+            );
+
         if (Features::hasApiFeatures()) {
             $panel->userMenuItems([
                 Action::make('api_tokens')

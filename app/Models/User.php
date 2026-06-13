@@ -112,6 +112,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->password !== null;
     }
 
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
+    }
+
     public function isScheduledForDeletion(): bool
     {
         return $this->scheduled_deletion_at !== null;

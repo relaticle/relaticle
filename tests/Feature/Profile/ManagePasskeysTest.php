@@ -2,16 +2,29 @@
 
 declare(strict_types=1);
 
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\ManagePasskeys;
 use App\Models\User;
+use App\Support\Auth\IdentityConfirmation;
 use Laravel\Passkeys\Passkey;
 
-mutates(ManagePasskeys::class);
+mutates(ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+    session()->forget('auth.password_confirmed_at');
 });
+
+function createPasskey(User $user, string $name = 'Key'): Passkey
+{
+    return Passkey::create([
+        'user_id' => $user->id,
+        'name' => $name,
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+}
 
 it('shows empty state when user has no passkeys', function (): void {
     livewire(ManagePasskeys::class)
@@ -19,119 +32,25 @@ it('shows empty state when user has no passkeys', function (): void {
 });
 
 it('lists user passkeys with name', function (): void {
-    Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'My MacBook',
-        'credential_id' => 'cred-list-'.uniqid(),
-        'credential' => [],
-    ]);
+    createPasskey($this->user, 'My MacBook');
 
     livewire(ManagePasskeys::class)
         ->assertSee('My MacBook');
 });
 
 it('does not show passkeys belonging to other users', function (): void {
-    $other = User::factory()->create();
-    Passkey::create([
-        'user_id' => $other->id,
-        'name' => 'Other Device',
-        'credential_id' => 'cred-other-'.uniqid(),
-        'credential' => [],
-    ]);
+    createPasskey(User::factory()->create(), 'Other Device');
 
     livewire(ManagePasskeys::class)
         ->assertDontSee('Other Device');
 });
 
-it('deletes a passkey owned by the user when password is correct', function (): void {
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Delete Me',
-        'credential_id' => 'cred-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskey', $passkey->id, 'password')
-        ->assertHasNoErrors();
-
-    expect(Passkey::find($passkey->id))->toBeNull();
-});
-
-it('rejects delete when password is wrong', function (): void {
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Keep Me',
-        'credential_id' => 'cred-keep-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskey', $passkey->id, 'wrong-password')
-        ->assertHasErrors(['password']);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('does not delete a passkey belonging to another user', function (): void {
-    $other = User::factory()->create();
-    $passkey = Passkey::create([
-        'user_id' => $other->id,
-        'name' => 'Not Yours',
-        'credential_id' => 'cred-not-yours-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskey', $passkey->id, 'password');
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
 it('refreshes the list after loadPasskeys is called', function (): void {
     livewire(ManagePasskeys::class)
         ->assertDontSee('Freshly Added')
-        ->tap(fn () => Passkey::create([
-            'user_id' => $this->user->id,
-            'name' => 'Freshly Added',
-            'credential_id' => 'cred-fresh-'.uniqid(),
-            'credential' => [],
-        ]))
+        ->tap(fn () => createPasskey($this->user, 'Freshly Added'))
         ->call('loadPasskeys')
         ->assertSee('Freshly Added');
-});
-
-it('confirms the password and dispatches the ceremony trigger on registration', function (): void {
-    livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'password'])
-        ->assertHasNoActionErrors()
-        ->assertActionHalted()
-        ->assertDispatched('passkey-register-confirmed');
-
-    expect(session('auth.password_confirmed_at'))->not->toBeNull();
-});
-
-it('rejects registration when the password is wrong', function (): void {
-    session()->forget('auth.password_confirmed_at');
-
-    livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'wrong-password'])
-        ->assertHasActionErrors(['password'])
-        ->assertNotDispatched('passkey-register-confirmed');
-
-    expect(session('auth.password_confirmed_at'))->toBeNull();
-});
-
-it('confirms registration without a password for passwordless users', function (): void {
-    $this->actingAs(User::factory()->create(['password' => null]));
-
-    livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook'])
-        ->assertHasNoActionErrors()
-        ->assertActionHalted()
-        ->assertDispatched('passkey-register-confirmed');
-
-    expect(session('auth.password_confirmed_at'))->not->toBeNull();
 });
 
 it('renders the add passkey button text', function (): void {
@@ -145,98 +64,100 @@ it('renders the Passkeys section heading and description', function (): void {
         ->assertSee('Manage your passkeys for passwordless sign-in.');
 });
 
-it('dispatches the passkey confirmation ceremony when a password user with a passkey adds another', function (): void {
-    session()->forget('auth.password_confirmed_at');
+it('reports passkey ownership via hasPasskey', function (): void {
+    expect($this->user->hasPasskey())->toBeFalse();
 
-    Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Existing Key',
-        'credential_id' => 'cred-existing-'.uniqid(),
-        'credential' => [],
-    ]);
+    createPasskey($this->user);
+
+    expect($this->user->refresh()->hasPasskey())->toBeTrue();
+});
+
+// --- Registration ---------------------------------------------------------
+
+it('confirms with a password and triggers the register ceremony for a password user', function (): void {
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertActionHalted()
+        ->assertDispatched('passkey-register')
+        ->assertNotDispatched('confirm-identity-ceremony');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
+it('rejects registration when the password is wrong', function (): void {
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'wrong-password'])
+        ->assertHasActionErrors(['password'])
+        ->assertNotDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('requires a password for a password user registering their first passkey', function (): void {
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'First Key'])
+        ->assertHasActionErrors(['password'])
+        ->assertNotDispatched('confirm-identity-ceremony')
+        ->assertNotDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('confirms registration without a password for passwordless users', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'My MacBook'])
+        ->assertHasNoActionErrors()
+        ->assertActionHalted()
+        ->assertDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
+it('runs the confirmation ceremony when a password user with a passkey adds another', function (): void {
+    createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'New MacBook'])
         ->assertHasNoActionErrors()
         ->assertActionHalted()
-        ->assertDispatched('passkey-confirm-then-register')
-        ->assertNotDispatched('passkey-register-confirmed');
+        ->assertDispatched('confirm-identity-ceremony')
+        ->assertNotDispatched('passkey-register');
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
 
 it('registers via the password fallback when the user opts into password confirmation', function (): void {
-    Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Existing Key',
-        'credential_id' => 'cred-existing2-'.uniqid(),
-        'credential' => [],
-    ]);
+    createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'password'])
         ->assertHasNoActionErrors()
         ->assertActionHalted()
-        ->assertDispatched('passkey-register-confirmed')
-        ->assertNotDispatched('passkey-confirm-then-register');
+        ->assertDispatched('passkey-register')
+        ->assertNotDispatched('confirm-identity-ceremony');
 
     expect(session('auth.password_confirmed_at'))->not->toBeNull();
 });
 
-it('rejects the password fallback when the password is wrong', function (): void {
-    session()->forget('auth.password_confirmed_at');
-
-    Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Existing Key',
-        'credential_id' => 'cred-existing3-'.uniqid(),
-        'credential' => [],
-    ]);
+it('rejects the registration password fallback when the password is wrong', function (): void {
+    createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'wrong-password'])
         ->assertHasActionErrors(['password'])
-        ->assertNotDispatched('passkey-register-confirmed')
-        ->assertNotDispatched('passkey-confirm-then-register');
+        ->assertNotDispatched('passkey-register')
+        ->assertNotDispatched('confirm-identity-ceremony');
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
 
-it('requires a password and never reaches the ceremony for a password user registering their first passkey', function (): void {
-    session()->forget('auth.password_confirmed_at');
+// --- Deletion -------------------------------------------------------------
 
-    livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'First Key'])
-        ->assertHasActionErrors(['password'])
-        ->assertNotDispatched('passkey-confirm-then-register')
-        ->assertNotDispatched('passkey-register-confirmed');
-
-    expect(session('auth.password_confirmed_at'))->toBeNull();
-});
-
-it('dispatches the passkey confirmation ceremony when deleting without a password', function (): void {
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Ceremony Delete',
-        'credential_id' => 'cred-cer-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
-        ->assertActionHalted()
-        ->assertDispatched('passkey-confirm-then-delete', passkeyId: $passkey->id);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('deletes via the password fallback when the user opts into password confirmation', function (): void {
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Password Delete',
-        'credential_id' => 'cred-pw-del-'.uniqid(),
-        'credential' => [],
-    ]);
+it('deletes a passkey via the password fallback when the password is correct', function (): void {
+    $passkey = createPasskey($this->user, 'Delete Me');
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', data: ['use_password' => true, 'password' => 'password'], arguments: ['passkeyId' => $passkey->id])
@@ -246,12 +167,7 @@ it('deletes via the password fallback when the user opts into password confirmat
 });
 
 it('rejects the delete password fallback when the password is wrong', function (): void {
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Wrong Password Delete',
-        'credential_id' => 'cred-wrong-pw-del-'.uniqid(),
-        'credential' => [],
-    ]);
+    $passkey = createPasskey($this->user, 'Keep Me');
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', data: ['use_password' => true, 'password' => 'wrong-password'], arguments: ['passkeyId' => $passkey->id])
@@ -260,101 +176,61 @@ it('rejects the delete password fallback when the password is wrong', function (
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
-it('deletes after a fresh passkey confirmation', function (): void {
-    session()->put('auth.password_confirmed_at', time());
-
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Confirmed Delete',
-        'credential_id' => 'cred-conf-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
-
-    expect(Passkey::find($passkey->id))->toBeNull();
-});
-
-it('refuses to delete after passkey confirmation when no confirmation happened', function (): void {
-    session()->forget('auth.password_confirmed_at');
-
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Unconfirmed Delete',
-        'credential_id' => 'cred-unconf-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('refuses to delete after passkey confirmation when the confirmation is stale', function (): void {
-    session()->put('auth.password_confirmed_at', time() - (config('auth.password_timeout') + 100));
-
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Stale Delete',
-        'credential_id' => 'cred-stale-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('refuses to delete after passkey confirmation at exactly the timeout boundary', function (): void {
-    session()->put('auth.password_confirmed_at', time() - config('auth.password_timeout'));
-
-    $passkey = Passkey::create([
-        'user_id' => $this->user->id,
-        'name' => 'Boundary Delete',
-        'credential_id' => 'cred-boundary-del-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('does not delete another user passkey after passkey confirmation', function (): void {
-    session()->put('auth.password_confirmed_at', time());
-
-    $other = User::factory()->create();
-    $passkey = Passkey::create([
-        'user_id' => $other->id,
-        'name' => 'Foreign Key',
-        'credential_id' => 'cred-foreign-'.uniqid(),
-        'credential' => [],
-    ]);
-
-    livewire(ManagePasskeys::class)
-        ->call('deletePasskeyAfterPasskeyConfirmation', $passkey->id);
-
-    expect(Passkey::find($passkey->id))->not->toBeNull();
-});
-
-it('deletes directly for passwordless users without a ceremony', function (): void {
-    $passwordless = User::factory()->create(['password' => null]);
-    $this->actingAs($passwordless);
-
-    $passkey = Passkey::create([
-        'user_id' => $passwordless->id,
-        'name' => 'Social Delete',
-        'credential_id' => 'cred-social-del-'.uniqid(),
-        'credential' => [],
-    ]);
+it('runs the confirmation ceremony when deleting without a password', function (): void {
+    $passkey = createPasskey($this->user, 'Ceremony Delete');
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
-        ->assertNotDispatched('passkey-confirm-then-delete');
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('deletes after a fresh identity confirmation', function (): void {
+    session()->put('auth.password_confirmed_at', time());
+    $passkey = createPasskey($this->user, 'Confirmed Delete');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertHasNoActionErrors();
 
     expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+it('does not delete when the confirmation is exactly at the timeout boundary', function (): void {
+    session()->put('auth.password_confirmed_at', time() - (int) config('auth.password_timeout'));
+    $passkey = createPasskey($this->user, 'Boundary Delete');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('does not delete a passkey belonging to another user even with a fresh confirmation', function (): void {
+    session()->put('auth.password_confirmed_at', time());
+    createPasskey($this->user, 'My Own Key');
+    $foreign = createPasskey(User::factory()->create(), 'Not Yours');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $foreign->id])
+        ->assertHasNoActionErrors();
+
+    expect(Passkey::find($foreign->id))->not->toBeNull();
+});
+
+it('requires a ceremony for a passwordless user deleting a passkey', function (): void {
+    $passwordless = User::factory()->create(['password' => null]);
+    $this->actingAs($passwordless);
+    $passkey = createPasskey($passwordless, 'Social Delete');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
 });

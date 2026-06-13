@@ -50,4 +50,12 @@ abstract class BaseLivewireComponent extends Component implements HasActions, Ha
             ->{$type}()
             ->send();
     }
+
+    public function notifyIdentityConfirmationFailed(): void
+    {
+        $this->sendNotification(
+            __('profile.notifications.identity_confirmation_failed.title'),
+            type: 'danger',
+        );
+    }
 }

@@ -106,6 +106,9 @@ return [
         'passkey_confirmation_failed' => [
             'title' => 'Passkey verification failed. Please try again.',
         ],
+        'identity_confirmation_failed' => [
+            'title' => 'Identity confirmation failed. Please try again.',
+        ],
     ],
 
     'modals' => [
