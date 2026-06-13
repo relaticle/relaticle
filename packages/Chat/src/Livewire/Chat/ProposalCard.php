@@ -321,12 +321,36 @@ final class ProposalCard extends BaseLivewireComponent
         return resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $recordId);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function currentRecordDisplay(PendingAction $pendingAction): array
+    {
+        $display = $pendingAction->display_data;
+
+        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
+            return $display;
+        }
+
+        $items = is_array($display['items'] ?? null) ? $display['items'] : [];
+
+        if ($items === []) {
+            return [];
+        }
+
+        $current = $items[$this->cursor] ?? reset($items);
+
+        return is_array($current) ? $current : [];
+    }
+
     public function render(): View
     {
         $proposal = $this->pendingActionId !== null ? $this->loadPending($this->pendingActionId) : null;
 
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
+            'record' => $proposal instanceof PendingAction ? $this->currentRecordDisplay($proposal) : [],
+            'recordCount' => $proposal instanceof PendingAction ? $this->recordCount() : 0,
         ]);
     }
 }

@@ -285,3 +285,25 @@ it('ignores the create-current shortcut for a different context', function (): v
 
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
+
+it('renders the current record and advances the shown record with the stepper', function (): void {
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta', 'Gamma']);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSee('Alpha')
+        ->assertDontSee('Beta');
+
+    $component->call('stepNext')
+        ->assertSee('Beta')
+        ->assertDontSee('Alpha');
+});
+
+it('renders a single (non-batch) proposal without a stepper', function (): void {
+    $action = proposalCardPa($this->user, ['name' => 'Solo Inc'], ['title' => 'Create Company', 'summary' => 'Solo Inc', 'fields' => [['label' => 'Name', 'value' => 'Solo Inc']]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSee('Solo Inc')
+        ->assertSee('Create');
+});
