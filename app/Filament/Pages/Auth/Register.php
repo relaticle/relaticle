@@ -65,6 +65,8 @@ final class Register extends BaseRegister
             event(new Verified($user));
         }
 
+        session()->put('fathom.track_signup', true);
+
         return $user;
     }
 }
