@@ -52,7 +52,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         $pendingAction = $this->loadPending($id);
 
-        if ($pendingAction === null) {
+        if (! $pendingAction instanceof PendingAction) {
             $this->pendingActionId = null;
 
             return;
@@ -88,7 +88,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         $pendingAction = $this->loadPending($this->pendingActionId);
 
-        if ($pendingAction === null) {
+        if (! $pendingAction instanceof PendingAction) {
             return 1;
         }
 
@@ -119,12 +119,21 @@ final class ProposalCard extends BaseLivewireComponent
             ->first();
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function resolvedItems(PendingAction $pendingAction): array
+    {
+        $resultData = $pendingAction->result_data;
+
+        return is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+    }
+
     private function firstUnresolvedIndex(PendingAction $pendingAction): int
     {
         $count = $this->resolveRecordCount($pendingAction);
 
-        $resultData = $pendingAction->result_data;
-        $items = is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+        $items = $this->resolvedItems($pendingAction);
 
         for ($index = 0; $index < $count; $index++) {
             if (! isset($items[(string) $index])) {
@@ -179,6 +188,46 @@ final class ProposalCard extends BaseLivewireComponent
         $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh());
     }
 
+    public function discardCurrent(PendingActionService $service): void
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+        $willFinalize = $this->willFinalize($pendingAction, $this->cursor);
+
+        $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
+
+        if ($isBatch) {
+            $result = $service->rejectItem($pendingAction, $this->cursor);
+            $finalized = $result['finalized'];
+        } else {
+            $service->reject($pendingAction);
+            $finalized = true;
+        }
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $pendingAction->getKey(),
+            index: $isBatch ? $this->cursor : null,
+            decision: 'rejected',
+            finalized: $finalized,
+            record: null,
+            context: $this->context,
+        );
+
+        if ($finalized) {
+            $this->pendingActionId = null;
+
+            return;
+        }
+
+        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh());
+    }
+
     private function willFinalize(PendingAction $pendingAction, int $index): bool
     {
         if (($pendingAction->action_data['_batch'] ?? false) !== true) {
@@ -187,8 +236,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         $count = $this->resolveRecordCount($pendingAction);
 
-        $resultData = $pendingAction->result_data;
-        $items = is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+        $items = $this->resolvedItems($pendingAction);
 
         for ($other = 0; $other < $count; $other++) {
             if ($other === $index) {

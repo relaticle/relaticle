@@ -190,3 +190,45 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
     Bus::assertDispatched(ContinueChatMessage::class, 1);
 });
+
+it('discards the current batch record and advances to the next unresolved', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('discardCurrent')
+        ->assertDispatched('proposal:resolved')
+        ->assertSet('cursor', 1);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('finalizes after the last record is resolved and dispatches one continuation', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('createCurrent')
+        ->call('discardCurrent')
+        ->assertSet('pendingActionId', null);
+
+    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    expect($action->fresh()->status)->not->toBe(PendingActionStatus::Pending);
+});
+
+it('marks a fully-discarded batch as rejected', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->call('discardCurrent')
+        ->call('discardCurrent');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
