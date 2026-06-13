@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
@@ -82,4 +83,119 @@ it('creates nothing when one record in the batch fails (all-or-nothing)', functi
 
     expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0)
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('approves one batch item without creating the others and stays pending', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['title' => 'Item A'], ['title' => 'Item B'], ['title' => 'Item C'],
+    ]);
+
+    $result = resolve(PendingActionService::class)->approveItem($action, $this->user, 0);
+
+    expect($result['finalized'])->toBeFalse()
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->all())->toBe(['Item A']);
+
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Pending)
+        ->and($fresh->result_data['items']['0']['status'])->toBe('approved')
+        ->and($fresh->result_data['ids'])->toHaveCount(1);
+
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('finalizes the batch and dispatches one continuation after the last item resolves', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['title' => 'Keep 1'], ['title' => 'Skip me'], ['title' => 'Keep 2'],
+    ]);
+    $service = resolve(PendingActionService::class);
+
+    $service->approveItem($action, $this->user, 0);
+    $service->rejectItem($action, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+
+    $last = $service->approveItem($action, $this->user, 2);
+
+    expect($last['finalized'])->toBeTrue();
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Approved)
+        ->and($fresh->result_data['count'])->toBe(2)
+        ->and($fresh->result_data['ids'])->toHaveCount(2)
+        ->and($fresh->result_data['type'])->toBe('task')
+        ->and($fresh->result_data['items']['1']['status'])->toBe('rejected')
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
+        ->toBe(['Keep 1', 'Keep 2']);
+
+    Bus::assertDispatched(ContinueChatMessage::class, 1);
+});
+
+it('marks the batch rejected when every item is skipped', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'X'], ['title' => 'Y']]);
+    $service = resolve(PendingActionService::class);
+
+    $service->rejectItem($action, 0);
+    $service->rejectItem($action, 1);
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+    Bus::assertDispatched(ContinueChatMessage::class, 1);
+});
+
+it('is idempotent — re-approving the same item does not double-create', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Once'], ['title' => 'Two']]);
+    $service = resolve(PendingActionService::class);
+
+    $service->approveItem($action, $this->user, 0);
+    $service->approveItem($action, $this->user, 0);
+
+    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Once')->count())->toBe(1)
+        ->and($action->fresh()->result_data['ids'])->toHaveCount(1);
+});
+
+it('throws when approving an out-of-range item index on a batch', function (): void {
+    $batch = makeBatchProposal($this->convId, $this->user, [['title' => 'A']]);
+
+    expect(fn () => resolve(PendingActionService::class)->approveItem($batch, $this->user, 5))
+        ->toThrow(RuntimeException::class);
+});
+
+it('throws when calling approveItem on a non-batch proposal', function (): void {
+    $flat = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Flat'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    expect(fn () => resolve(PendingActionService::class)->approveItem($flat, $this->user, 0))
+        ->toThrow(RuntimeException::class);
+});
+
+it('finalizes to Approved when the last resolution is a skip but earlier items were created', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['title' => 'Made A'], ['title' => 'Made B'], ['title' => 'Skipped C'],
+    ]);
+    $service = resolve(PendingActionService::class);
+
+    $service->approveItem($action, $this->user, 0);
+    $service->approveItem($action, $this->user, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+
+    $last = $service->rejectItem($action, 2);
+
+    expect($last['finalized'])->toBeTrue();
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Approved)
+        ->and($fresh->result_data['count'])->toBe(2)
+        ->and($fresh->result_data['ids'])->toHaveCount(2)
+        ->and($fresh->result_data['items']['2']['status'])->toBe('rejected')
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
+        ->toBe(['Made A', 'Made B']);
+
+    Bus::assertDispatched(ContinueChatMessage::class, 1);
 });

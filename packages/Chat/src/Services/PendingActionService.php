@@ -203,6 +203,189 @@ final readonly class PendingActionService
         return $resolved;
     }
 
+    /**
+     * Resolve a single item of a Create batch proposal. Each item is executed in
+     * its own transaction so partial progress survives a later item's failure —
+     * unlike approve(), which is atomic for the whole batch. The proposal stays
+     * Pending until every item is resolved, then finalizes and dispatches exactly
+     * one continuation.
+     *
+     * @return array{finalized: bool, record: Model|null}
+     */
+    public function approveItem(PendingAction $pendingAction, User $user, int $index): array
+    {
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($pendingAction->team_id);
+
+        try {
+            [$resolved, $finalized, $record] = DB::transaction(function () use ($pendingAction, $user, $index): array {
+                /** @var PendingAction $locked */
+                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+
+                $this->validateResolvable($locked);
+                $records = $this->batchRecords($locked);
+                $this->assertItemIndex($records, $index);
+
+                $resultData = is_array($locked->result_data) ? $locked->result_data : [];
+                $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+
+                // Idempotent: an already-resolved item is a no-op (no re-execute).
+                if (isset($items[(string) $index])) {
+                    return [$locked, $this->isComplete($items, $records), null];
+                }
+
+                $action = $this->makeCreateAction($locked);
+
+                if (! method_exists($action, 'execute')) {
+                    throw new RuntimeException("Action class {$locked->action_class} does not have an execute method");
+                }
+
+                /** @var Model $model */
+                $model = $action->execute($user, $records[$index], CreationSource::CHAT);
+
+                $items[(string) $index] = ['status' => 'approved', 'id' => $model->getKey()];
+                $resultData['items'] = $items;
+                $resultData['type'] ??= $model->getMorphClass();
+                $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
+                $ids[] = $model->getKey();
+                $resultData['ids'] = array_values($ids);
+
+                $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
+
+                return [$locked->refresh(), $finalized, $model];
+            });
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+        }
+
+        if ($finalized) {
+            $this->continuation->dispatchAfterApproval($resolved, $this->batchDecisionLabel($resolved));
+        }
+
+        return ['finalized' => $finalized, 'record' => $record];
+    }
+
+    /**
+     * Skip a single item of a Create batch proposal. Executes nothing.
+     *
+     * @return array{finalized: bool}
+     */
+    public function rejectItem(PendingAction $pendingAction, int $index): array
+    {
+        [$resolved, $finalized] = DB::transaction(function () use ($pendingAction, $index): array {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+
+            $this->validateResolvable($locked);
+            $records = $this->batchRecords($locked);
+            $this->assertItemIndex($records, $index);
+
+            $resultData = is_array($locked->result_data) ? $locked->result_data : [];
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+
+            if (isset($items[(string) $index])) {
+                return [$locked, $this->isComplete($items, $records)];
+            }
+
+            $items[(string) $index] = ['status' => 'rejected'];
+            $resultData['items'] = $items;
+
+            $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
+
+            return [$locked->refresh(), $finalized];
+        });
+
+        if ($finalized) {
+            $this->continuation->dispatchAfterApproval($resolved, $this->batchDecisionLabel($resolved));
+        }
+
+        return ['finalized' => $finalized];
+    }
+
+    /**
+     * @param  array<string, mixed>  $items
+     * @param  array<int, array<string, mixed>>  $records
+     * @param  array<string, mixed>  $resultData
+     */
+    private function finalizeBatchIfComplete(PendingAction $pendingAction, array $items, array $records, array $resultData): bool
+    {
+        if (! $this->isComplete($items, $records)) {
+            $pendingAction->update(['result_data' => $resultData]);
+
+            return false;
+        }
+
+        $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
+        $resultData['count'] = count($ids);
+
+        $pendingAction->update([
+            'status' => $ids === [] ? PendingActionStatus::Rejected : PendingActionStatus::Approved,
+            'resolved_at' => now(),
+            'result_data' => $resultData,
+        ]);
+
+        return true;
+    }
+
+    private function batchDecisionLabel(PendingAction $pendingAction): string
+    {
+        return $pendingAction->status === PendingActionStatus::Approved ? 'approved' : 'rejected';
+    }
+
+    /**
+     * @param  array<string, mixed>  $items
+     * @param  array<int, mixed>  $records
+     */
+    private function isComplete(array $items, array $records): bool
+    {
+        return count($items) >= count($records);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function batchRecords(PendingAction $pendingAction): array
+    {
+        $data = $pendingAction->action_data;
+
+        throw_if(($data['_batch'] ?? false) !== true, RuntimeException::class, 'Per-item resolution applies only to batch proposals');
+
+        $records = $data['records'] ?? null;
+
+        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
+
+        throw_if(
+            array_filter($records, static fn (mixed $r): bool => ! is_array($r)) !== [],
+            RuntimeException::class,
+            'Batch record data is malformed',
+        );
+
+        return array_values($records);
+    }
+
+    /**
+     * @param  array<int, mixed>  $records
+     */
+    private function assertItemIndex(array $records, int $index): void
+    {
+        throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
+    }
+
+    private function makeCreateAction(PendingAction $pendingAction): object
+    {
+        $actionClass = $pendingAction->action_class;
+
+        throw_unless(
+            in_array($actionClass, self::ALLOWED_ACTION_CLASSES, true),
+            RuntimeException::class,
+            'Action class not allowlisted',
+        );
+
+        throw_if($pendingAction->operation !== PendingActionOperation::Create, RuntimeException::class, 'Per-item resolution applies only to create proposals');
+
+        return app()->make($actionClass);
+    }
+
     public function restore(PendingAction $pendingAction, User $user): PendingAction
     {
         return DB::transaction(function () use ($pendingAction, $user): PendingAction {
