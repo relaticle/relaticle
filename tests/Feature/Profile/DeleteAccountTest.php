@@ -164,7 +164,6 @@ test('the delete modal copy does not instruct users to enter a password', functi
 
 test('deletion is blocked until the account email is typed', function (): void {
     $this->actingAs($user = User::factory()->withPersonalTeam()->create());
-    session()->put('auth.password_confirmed_at', time());
 
     Livewire::test(DeleteAccount::class)
         ->callAction('deleteAccount', ['confirm_email' => 'wrong@example.com'])
