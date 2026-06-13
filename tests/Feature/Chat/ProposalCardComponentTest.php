@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFieldType;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -18,6 +19,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Data\VisibilityConditionData;
@@ -507,8 +509,26 @@ it('omits deferred custom fields (file upload, record lookup) from the editable 
         'entity_type' => 'task',
         'code' => 'attachment',
         'name' => 'Attachment',
-        'type' => 'file_upload',
+        'type' => CustomFieldType::FILE_UPLOAD->value,
         'sort_order' => 90,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    // A record-lookup field resolves to a MULTI_CHOICE data type, so kindFor()
+    // would otherwise admit it as a 'multiselect' — only isDeferred()'s RECORD /
+    // lookup_type branch keeps it out. This is the row that makes the deferral
+    // load-bearing (the file-upload type is disabled in config, so it is excluded
+    // by the kindFor() fallback regardless).
+    $recordField = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => CustomFieldType::RECORD->value,
+        'lookup_type' => 'company',
+        'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
@@ -521,7 +541,8 @@ it('omits deferred custom fields (file upload, record lookup) from the editable 
         ->instance()->editableCodes();
 
     expect($codes)->toContain('title')
-        ->and($codes)->not->toContain($fileField->code);
+        ->and($codes)->not->toContain($fileField->code)
+        ->and($codes)->not->toContain($recordField->code);
 });
 
 it('rebuilds the current record fields with codes on editable rows and no divergence from stored display', function (): void {
@@ -542,6 +563,47 @@ it('rebuilds the current record fields with codes on editable rows and no diverg
     expect($titleRow['code'] ?? null)->toBe('title');
 
     $customRow = collect($fields)->firstWhere('code', $field->code);
+    expect($customRow)->not->toBeNull();
+
+    $stored = $action->display_data['fields'] ?? ($action->display_data['items'][0]['fields'] ?? []);
+
+    expect(collect($fields)->pluck('label')->all())->toBe(collect($stored)->pluck('label')->all())
+        ->and(collect($fields)->pluck('value')->all())->toBe(collect($stored)->pluck('value')->all())
+        ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
+});
+
+it('rebuilds a company record (with account owner + custom field) without diverging from stored display', function (): void {
+    $linkedin = CustomField::query()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'linkedin')
+        ->first();
+
+    expect($linkedin)->not->toBeNull('seeded company linkedin field is required for this test');
+
+    $tool = resolve(CreateCompanyTool::class);
+    $tool->setConversationId(null);
+    $tool->handle(new Request(['records' => [[
+        'name' => 'Acme Corp',
+        'account_owner_id' => (string) $this->user->getKey(),
+        'custom_fields' => ['linkedin' => ['https://linkedin.com/company/acme']],
+    ]]]));
+
+    $action = PendingAction::query()->latest()->firstOrFail();
+
+    $fields = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->instance()->currentRecordFields();
+
+    $nameRow = collect($fields)->firstWhere('label', 'Name');
+    expect($nameRow['code'] ?? null)->toBe('name');
+
+    $ownerRow = collect($fields)->firstWhere('label', 'Account Owner');
+    expect($ownerRow)->not->toBeNull()
+        ->and($ownerRow['code'] ?? null)->toBe('account_owner_id')
+        ->and($ownerRow['value'] ?? null)->toBe($this->user->name);
+
+    $customRow = collect($fields)->firstWhere('code', 'linkedin');
     expect($customRow)->not->toBeNull();
 
     $stored = $action->display_data['fields'] ?? ($action->display_data['items'][0]['fields'] ?? []);

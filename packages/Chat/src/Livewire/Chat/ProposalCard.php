@@ -264,13 +264,13 @@ final class ProposalCard extends BaseLivewireComponent
         $this->editingFieldCode = null;
     }
 
-    public function recordCount(): int
+    public function recordCount(?PendingAction $pendingAction = null): int
     {
         if ($this->pendingActionId === null) {
             return 1;
         }
 
-        $pendingAction = $this->loadPending($this->pendingActionId);
+        $pendingAction ??= $this->loadPending($this->pendingActionId);
 
         if (! $pendingAction instanceof PendingAction) {
             return 1;
@@ -538,9 +538,9 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<array<string, mixed>>
      */
-    public function currentRecordFields(): array
+    public function currentRecordFields(?PendingAction $pendingAction = null): array
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction ??= $this->loadPending($this->pendingActionId ?? '');
 
         if (! $pendingAction instanceof PendingAction) {
             return [];
@@ -563,9 +563,9 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<string>
      */
-    public function editableCodes(): array
+    public function editableCodes(?PendingAction $pendingAction = null): array
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction ??= $this->loadPending($this->pendingActionId ?? '');
 
         if (! $pendingAction instanceof PendingAction) {
             return [];
@@ -599,9 +599,9 @@ final class ProposalCard extends BaseLivewireComponent
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
             'record' => $proposal instanceof PendingAction ? $this->currentRecordDisplay($proposal) : [],
-            'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields() : [],
-            'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes() : [],
-            'recordCount' => $proposal instanceof PendingAction ? $this->recordCount() : 0,
+            'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields($proposal) : [],
+            'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes($proposal) : [],
+            'recordCount' => $proposal instanceof PendingAction ? $this->recordCount($proposal) : 0,
         ]);
     }
 }
