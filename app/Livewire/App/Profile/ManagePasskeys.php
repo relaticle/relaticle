@@ -75,6 +75,7 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->label(__('profile.sections.passkeys.add_passkey'))
             ->modalHeading(__('profile.sections.passkeys.add_passkey'))
             ->modalWidth(Width::Medium)
+            ->alwaysConfirm()
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
             ->prependSchema([
                 TextInput::make('name')
@@ -107,6 +108,7 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.passkeys.remove_confirm'))
             ->modalSubmitActionLabel(__('profile.sections.passkeys.remove'))
             ->color('danger')
+            ->alwaysConfirm()
             ->confirmedUsing(function (array $arguments, DeletePasskey $deletePasskey): void {
                 $this->performDelete((int) ($arguments['passkeyId'] ?? 0), $deletePasskey);
             });
