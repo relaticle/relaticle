@@ -58,6 +58,36 @@ test('password user with a passkey triggers the ceremony', function (): void {
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
+test('a stale freshness window does not bypass the deletion ceremony', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->put('auth.password_confirmed_at', time() - 60);
+
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'My MacBook',
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount')
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('a stale freshness window still demands the password fallback', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->put('auth.password_confirmed_at', time() - 60);
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['password' => 'wrong-password'])
+        ->assertHasActionErrors(['password']);
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
 test('password fallback deletes account', function (): void {
     Notification::fake();
 
