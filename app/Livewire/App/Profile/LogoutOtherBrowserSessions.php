@@ -43,12 +43,10 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
 
     public function deleteBrowserSessionsAction(): ConfirmIdentityAction
     {
-        $hasPassword = $this->authUser()->hasPassword();
-
         return ConfirmIdentityAction::make('deleteBrowserSessions')
             ->label(__('profile.actions.log_out_other_browsers'))
             ->modalHeading(__('profile.modals.log_out_other_browsers.title'))
-            ->modalDescription($hasPassword ? __('profile.modals.log_out_other_browsers.description') : __('profile.modals.log_out_other_browsers.description_no_password'))
+            ->modalDescription(__('profile.modals.log_out_other_browsers.description'))
             ->modalSubmitActionLabel(__('profile.actions.log_out_other_browsers'))
             ->modalCancelAction(false)
             ->confirmedUsing(fn () => $this->logoutOtherBrowserSessions());
