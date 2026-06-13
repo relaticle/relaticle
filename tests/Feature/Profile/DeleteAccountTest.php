@@ -51,7 +51,7 @@ test('password user with a passkey triggers the ceremony', function (): void {
     ]);
 
     Livewire::test(DeleteAccount::class)
-        ->callAction('deleteAccount')
+        ->callAction('deleteAccount', ['confirm_email' => $user->email])
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony');
 
@@ -70,7 +70,7 @@ test('a stale freshness window does not bypass the deletion ceremony', function 
     ]);
 
     Livewire::test(DeleteAccount::class)
-        ->callAction('deleteAccount')
+        ->callAction('deleteAccount', ['confirm_email' => $user->email])
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony');
 
@@ -82,7 +82,7 @@ test('a stale freshness window still demands the password fallback', function ()
     session()->put('auth.password_confirmed_at', time() - 60);
 
     Livewire::test(DeleteAccount::class)
-        ->callAction('deleteAccount', ['password' => 'wrong-password'])
+        ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'wrong-password'])
         ->assertHasActionErrors(['password']);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
@@ -95,7 +95,7 @@ test('password fallback deletes account', function (): void {
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
-        ->callAction('deleteAccount', ['password' => 'password'])
+        ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])
         ->assertHasNoActionErrors()
         ->assertRedirect();
 
@@ -107,7 +107,7 @@ test('wrong password is rejected', function (): void {
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
-        ->callAction('deleteAccount', ['password' => 'wrong-password'])
+        ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'wrong-password'])
         ->assertHasActionErrors(['password']);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
@@ -160,4 +160,28 @@ test('the delete modal copy does not instruct users to enter a password', functi
         ->getModalDescription();
 
     expect(mb_strtolower((string) $description))->not->toContain('password');
+});
+
+test('deletion is blocked until the account email is typed', function (): void {
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->put('auth.password_confirmed_at', time());
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['confirm_email' => 'wrong@example.com'])
+        ->assertHasActionErrors(['confirm_email']);
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('typed email confirmation is case-insensitive and trimmed', function (): void {
+    Notification::fake();
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create(['email' => 'owner@example.com']));
+    session()->forget('auth.password_confirmed_at');
+
+    Livewire::test(DeleteAccount::class)
+        ->callAction('deleteAccount', ['confirm_email' => '  OWNER@Example.com  ', 'password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertRedirect();
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });

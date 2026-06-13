@@ -8,6 +8,8 @@ use App\Actions\Jetstream\ScheduleUserDeletion;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\IdentityConfirmation;
+use Closure;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
@@ -40,10 +42,23 @@ final class DeleteAccount extends BaseLivewireComponent
 
     public function deleteAccountAction(): ConfirmIdentityAction
     {
+        $email = $this->authUser()->email;
+
         return ConfirmIdentityAction::make('deleteAccount')
             ->label(__('profile.actions.delete_account'))
             ->color('danger')
             ->alwaysConfirm()
+            ->prependSchema([
+                TextInput::make('confirm_email')
+                    ->label(__('profile.sections.delete_account.confirm_email_label'))
+                    ->placeholder($email)
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail) use ($email): void {
+                        if (mb_strtolower(trim((string) $value)) !== mb_strtolower((string) $email)) {
+                            $fail(__('profile.sections.delete_account.confirm_email_mismatch'));
+                        }
+                    }),
+            ])
             ->modalHeading(__('profile.sections.delete_account.title'))
             ->modalDescription(__('profile.modals.delete_account.notice'))
             ->modalSubmitActionLabel(__('profile.actions.delete_account'))
