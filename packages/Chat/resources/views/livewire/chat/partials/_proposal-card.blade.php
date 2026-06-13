@@ -82,6 +82,16 @@
                                     {{-- Action buttons --}}
                                     <template x-if="action.status === 'pending'">
                                         <div class="mt-3 flex items-center gap-2">
+                                            <template x-if="!isBatchAction(action) && action.operation === 'create' && !action.edit">
+                                                <button
+                                                    type="button"
+                                                    x-on:click="enterFieldEdit(action, null)"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <span>Edit</span>
+                                                </button>
+                                            </template>
                                             <button
                                                 x-on:click="isBatchAction(action) ? (anyItemResolved(action) ? resolveRemaining(action, 'approve') : approveAction(action)) : approveAction(action)"
                                                 class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition"
