@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Http\Controllers;
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Relaticle\Chat\Models\PendingAction;
@@ -99,6 +100,65 @@ final readonly class PendingActionController
         $refs = $this->resolver->resolveMany($pendingAction->entity_type, $ids);
 
         return $refs === [] ? null : $refs;
+    }
+
+    public function approveItem(Request $request, PendingAction $pendingAction, int $index): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($pendingAction->team_id !== $user->currentTeam->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        if ($pendingAction->user_id !== $user->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        try {
+            $result = $this->service->approveItem($pendingAction, $user, $index);
+
+            $this->ensureFilamentTenantContext($user);
+
+            $record = $result['record'] instanceof Model
+                ? $this->resolver->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
+                : null;
+
+            return response()->json([
+                'status' => 'approved',
+                'index' => $index,
+                'finalized' => $result['finalized'],
+                'record' => $record,
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function rejectItem(Request $request, PendingAction $pendingAction, int $index): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($pendingAction->team_id !== $user->currentTeam->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        if ($pendingAction->user_id !== $user->getKey()) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        try {
+            $result = $this->service->rejectItem($pendingAction, $index);
+
+            return response()->json([
+                'status' => 'rejected',
+                'index' => $index,
+                'finalized' => $result['finalized'],
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
     }
 
     public function reject(Request $request, PendingAction $pendingAction): JsonResponse

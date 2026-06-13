@@ -366,6 +366,78 @@ it('rejects restore for cross-team users', function (): void {
     expect($company->fresh()->trashed())->toBeTrue();
 });
 
+it('approves a single batch item via the endpoint and reports not finalized', function (): void {
+    $pending = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [['title' => 'Endpoint A'], ['title' => 'Endpoint B']]],
+        'display_data' => ['items' => [['summary' => 'Endpoint A'], ['summary' => 'Endpoint B']]],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $res = $this->postJson("/chat/actions/{$pending->id}/items/0/approve");
+
+    $res->assertOk()->assertJson(['status' => 'approved', 'index' => 0, 'finalized' => false]);
+    expect($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('finalizes when the last item is resolved via the endpoint', function (): void {
+    $pending = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [['title' => 'Only A'], ['title' => 'Only B']]],
+        'display_data' => ['items' => [['summary' => 'Only A'], ['summary' => 'Only B']]],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $this->postJson("/chat/actions/{$pending->id}/items/0/approve")->assertOk();
+    $res = $this->postJson("/chat/actions/{$pending->id}/items/1/reject");
+
+    $res->assertOk()->assertJson(['status' => 'rejected', 'index' => 1, 'finalized' => true]);
+    expect($pending->fresh()->status)->toBe(PendingActionStatus::Approved); // one was created
+});
+
+it('404s an item endpoint for another tenant and 422s an out-of-range index', function (): void {
+    $other = User::factory()->withPersonalTeam()->create();
+    $foreign = PendingAction::query()->create([
+        'team_id' => $other->currentTeam->getKey(),
+        'user_id' => $other->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [['title' => 'X']]],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+    $this->postJson("/chat/actions/{$foreign->id}/items/0/approve")->assertNotFound();
+
+    $mine = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [['title' => 'A']]],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+    $this->postJson("/chat/actions/{$mine->id}/items/9/approve")->assertStatus(422);
+});
+
 it('approval continuation prompt demands a one-sentence confirmation without tables', function (): void {
     insertConversation('conv-prompt-test', $this->user, $this->team);
 

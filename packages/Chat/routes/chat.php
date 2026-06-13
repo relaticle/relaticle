@@ -27,6 +27,15 @@ Route::middleware(['auth:web'])->group(function (): void {
         ->middleware('throttle:60,1')
         ->name('chat.actions.restore');
 
+    Route::post('/chat/actions/{pendingAction}/items/{index}/approve', [PendingActionController::class, 'approveItem'])
+        ->whereNumber('index')
+        ->middleware('throttle:60,1')
+        ->name('chat.actions.items.approve');
+    Route::post('/chat/actions/{pendingAction}/items/{index}/reject', [PendingActionController::class, 'rejectItem'])
+        ->whereNumber('index')
+        ->middleware('throttle:60,1')
+        ->name('chat.actions.items.reject');
+
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1')
         ->name('chat.cancel');
