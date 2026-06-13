@@ -11,7 +11,7 @@
         @endif
 
         {{-- Current plan + usage --}}
-        <x-filament::section :heading="__('billing.title')">
+        <x-filament::section :heading="__('billing.plan_section')">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div class="text-2xl font-bold">{{ $team->plan->label() }}</div>
@@ -30,7 +30,7 @@
                         <div class="text-sm text-gray-500 dark:text-gray-400">
                             {{ __('billing.usage.of', ['used' => number_format($balance->credits_used), 'allowance' => number_format($team->plan->credits())]) }}
                         </div>
-                        <div class="text-xs text-gray-400">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at?->toFormattedDateString()]) }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at?->toFormattedDateString()]) }}</div>
                     </div>
                 @endif
             </div>

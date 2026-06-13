@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Billing',
+    'plan_section' => 'Current plan',
     'plans' => [
         'free' => 'Free',
         'pro' => 'Pro',
