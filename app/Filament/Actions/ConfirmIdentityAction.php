@@ -17,7 +17,8 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component as LivewireComponent;
 use LogicException;
 
@@ -120,12 +121,6 @@ final class ConfirmIdentityAction extends Action
                     $action->halt();
                 }
 
-                if (! IdentityConfirmation::verifyPassword($user, (string) ($data['password'] ?? ''))) {
-                    throw ValidationException::withMessages([
-                        'password' => __('auth.password'),
-                    ]);
-                }
-
                 IdentityConfirmation::markConfirmed();
             }
 
@@ -186,6 +181,33 @@ final class ConfirmIdentityAction extends Action
 
         $hasPasskey = $user->hasPasskey();
         $usesPasswordField = fn (Get $get): bool => ! $hasPasskey || (bool) $get('use_password');
+        $throttleKey = 'confirm-identity:'.$user->getAuthIdentifier();
+
+        $passwordRule = new class($user, $throttleKey) implements ValidationRule
+        {
+            public function __construct(
+                private readonly User $user,
+                private readonly string $throttleKey,
+            ) {}
+
+            public function validate(string $attribute, mixed $value, Closure $fail): void
+            {
+                if (RateLimiter::tooManyAttempts($this->throttleKey, maxAttempts: 5)) {
+                    $fail(__('auth.throttle', ['seconds' => RateLimiter::availableIn($this->throttleKey)]));
+
+                    return;
+                }
+
+                if (! IdentityConfirmation::verifyPassword($this->user, (string) $value)) {
+                    RateLimiter::hit($this->throttleKey, decaySeconds: 60);
+                    $fail(__('auth.password'));
+
+                    return;
+                }
+
+                RateLimiter::clear($this->throttleKey);
+            }
+        };
 
         return array_values(array_filter([
             $hasPasskey ? Hidden::make('use_password')->default(false) : null,
@@ -211,8 +233,7 @@ final class ConfirmIdentityAction extends Action
                 ->label(__('profile.form.password.label'))
                 ->visible($usesPasswordField)
                 ->required($usesPasswordField)
-                ->rule('current_password')
-                ->validationMessages(['current_password' => __('auth.password')]),
+                ->rule($passwordRule),
         ]));
     }
 
