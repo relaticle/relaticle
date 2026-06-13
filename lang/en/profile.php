@@ -24,6 +24,7 @@ return [
         ],
         'password' => [
             'label' => 'Password',
+            'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
         ],
     ],
 

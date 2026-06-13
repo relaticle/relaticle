@@ -67,6 +67,9 @@ final class ConfirmIdentityAction extends Action
         return $this;
     }
 
+    /**
+     * Override the freshness window for this action. Has no effect when alwaysConfirm() is set.
+     */
     public function within(int $seconds): static
     {
         $this->within = $seconds;
@@ -193,7 +196,7 @@ final class ConfirmIdentityAction extends Action
             public function validate(string $attribute, mixed $value, Closure $fail): void
             {
                 if (RateLimiter::tooManyAttempts($this->throttleKey, maxAttempts: 5)) {
-                    $fail(__('auth.throttle', ['seconds' => RateLimiter::availableIn($this->throttleKey)]));
+                    $fail(__('profile.form.password.throttled', ['seconds' => RateLimiter::availableIn($this->throttleKey)]));
 
                     return;
                 }
