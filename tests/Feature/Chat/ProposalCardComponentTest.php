@@ -209,6 +209,22 @@ it('loads and renders the active pending action summary', function (): void {
         ->assertSee('Acme Corp');
 });
 
+it('renders the duplicate-creation warning in the docked card', function (): void {
+    $action = proposalCardPa($this->user,
+        ['name' => 'Acme'],
+        [
+            'title' => 'Create Company',
+            'summary' => 'Create company "Acme"',
+            'fields' => [['label' => 'Name', 'value' => 'Acme']],
+            'duplicate_warning' => 'A company named "Acme" may already exist.',
+        ],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSee('may already exist');
+});
+
 it('refuses a pending action from another tenant', function (): void {
     $other = User::factory()->withPersonalTeam()->create();
     $foreign = proposalCardPa($other, ['name' => 'Foreign'], ['title' => 'x', 'summary' => 'x', 'fields' => []]);

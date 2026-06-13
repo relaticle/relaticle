@@ -22,6 +22,10 @@
                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $record['summary'] ?? '' }}</span>
             </div>
 
+            @if (! empty($proposal->display_data['duplicate_warning']))
+                <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">{{ $proposal->display_data['duplicate_warning'] }}</div>
+            @endif
+
             <div class="mt-2 space-y-1">
                 @foreach ($recordFields as $row)
                     @php

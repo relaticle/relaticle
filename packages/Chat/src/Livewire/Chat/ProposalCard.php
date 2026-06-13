@@ -84,8 +84,8 @@ final class ProposalCard extends BaseLivewireComponent
 
         try {
             resolve(ProposalEditor::class)->applyEdit($pendingAction, $this->authUser(), $input, $index);
-        } catch (RuntimeException $exception) {
-            $this->addError('field', $exception->getMessage());
+        } catch (RuntimeException) {
+            $this->addError('field', __('This change could not be saved. Please review the value and try again.'));
 
             return;
         }
@@ -396,7 +396,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh());
+        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
     }
 
     public function discardCurrent(PendingActionService $service): void
@@ -451,7 +451,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh());
+        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
     }
 
     private function willFinalize(PendingAction $pendingAction, int $index): bool
