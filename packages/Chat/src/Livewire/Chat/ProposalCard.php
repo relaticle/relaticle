@@ -59,6 +59,50 @@ final class ProposalCard extends BaseLivewireComponent
         $this->cursor = $this->firstUnresolvedIndex($pendingAction);
     }
 
+    public function stepNext(): void
+    {
+        $this->stepTo($this->cursor + 1);
+    }
+
+    public function stepPrev(): void
+    {
+        $this->stepTo($this->cursor - 1);
+    }
+
+    private function stepTo(int $index): void
+    {
+        $lastIndex = $this->recordCount() - 1;
+
+        $this->cursor = max(0, min($index, $lastIndex));
+        $this->editingFieldCode = null;
+    }
+
+    public function recordCount(): int
+    {
+        if ($this->pendingActionId === null) {
+            return 1;
+        }
+
+        $pendingAction = $this->loadPending($this->pendingActionId);
+
+        if ($pendingAction === null) {
+            return 1;
+        }
+
+        return $this->resolveRecordCount($pendingAction);
+    }
+
+    private function resolveRecordCount(PendingAction $pendingAction): int
+    {
+        $data = $pendingAction->action_data;
+
+        if (($data['_batch'] ?? false) !== true || ! is_array($data['records'] ?? null)) {
+            return 1;
+        }
+
+        return max(1, count($data['records']));
+    }
+
     private function loadPending(string $id): ?PendingAction
     {
         $user = $this->authUser();
@@ -68,12 +112,24 @@ final class ProposalCard extends BaseLivewireComponent
             ->where('team_id', $user->currentTeam->getKey())
             ->where('user_id', $user->getKey())
             ->where('status', PendingActionStatus::Pending)
+            ->where('expires_at', '>', now())
             ->first();
     }
 
     private function firstUnresolvedIndex(PendingAction $pendingAction): int
     {
-        return 0;
+        $count = $this->resolveRecordCount($pendingAction);
+
+        $resultData = $pendingAction->result_data;
+        $items = is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+
+        for ($index = 0; $index < $count; $index++) {
+            if (! isset($items[(string) $index])) {
+                return $index;
+            }
+        }
+
+        return $count - 1;
     }
 
     public function render(): View
