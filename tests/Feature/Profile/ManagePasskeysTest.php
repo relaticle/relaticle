@@ -187,20 +187,9 @@ it('runs the confirmation ceremony when deleting without a password', function (
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
-it('deletes after a fresh identity confirmation', function (): void {
-    session()->put('auth.password_confirmed_at', time());
+it('re-confirms a deletion despite a prior fresh confirmation', function (): void {
+    session()->put('auth.password_confirmed_at', time() - 60);
     $passkey = createPasskey($this->user, 'Confirmed Delete');
-
-    livewire(ManagePasskeys::class)
-        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
-        ->assertHasNoActionErrors();
-
-    expect(Passkey::find($passkey->id))->toBeNull();
-});
-
-it('does not delete when the confirmation is exactly at the timeout boundary', function (): void {
-    session()->put('auth.password_confirmed_at', time() - (int) config('auth.password_timeout'));
-    $passkey = createPasskey($this->user, 'Boundary Delete');
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
@@ -226,6 +215,29 @@ it('requires a ceremony for a passwordless user deleting a passkey', function ()
     $passwordless = User::factory()->create(['password' => null]);
     $this->actingAs($passwordless);
     $passkey = createPasskey($passwordless, 'Social Delete');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('re-confirms when adding a passkey even inside the freshness window', function (): void {
+    session()->put('auth.password_confirmed_at', time() - 60);
+    createPasskey($this->user, 'Existing Key');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['name' => 'New Key'])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony')
+        ->assertNotDispatched('passkey-register');
+});
+
+it('re-confirms when removing a passkey even inside the freshness window', function (): void {
+    session()->put('auth.password_confirmed_at', time() - 60);
+    $passkey = createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
         ->callAction('deletePasskey', arguments: ['passkeyId' => $passkey->id])
