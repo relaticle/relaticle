@@ -507,14 +507,6 @@
                     </div>
                 </div>
             </form>
-
-            {{-- While a proposal is docked above, the composer is hidden (x-show keeps
-                 the wire:ignore TipTap node mounted) and this hint takes its place. --}}
-            <template x-if="hasPendingProposal">
-                <div class="flex items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
-                    Resolve the proposal above to continue.
-                </div>
-            </template>
         </div>
     </div>
 </div>
