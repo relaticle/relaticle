@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\Plan;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Services\AiModelResolver;
-use Tests\TestCase;
-
-uses(TestCase::class, LazilyRefreshDatabase::class);
 
 mutates(AiModelResolver::class);
 

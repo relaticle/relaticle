@@ -14,7 +14,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 
 final readonly class SeedTeamCreditBalance
 {
-    public function handle(Team $team): AiCreditBalance
+    public function execute(Team $team): AiCreditBalance
     {
         return DB::transaction(function () use ($team): AiCreditBalance {
             $existing = AiCreditBalance::query()
