@@ -33,18 +33,14 @@ final class ProposalCard extends BaseLivewireComponent
         $this->context = $context;
     }
 
-    /**
-     * @param  array{id?: string|null, context?: string}  $payload
-     */
     #[On('proposal:set-active')]
-    public function setActive(array $payload): void
+    public function setActive(?string $id = null, string $context = 'conversation'): void
     {
-        if (($payload['context'] ?? 'conversation') !== $this->context) {
+        if ($context !== $this->context) {
             return;
         }
 
         $this->editingFieldCode = null;
-        $id = $payload['id'] ?? null;
 
         if ($id === null) {
             $this->pendingActionId = null;
@@ -146,13 +142,10 @@ final class ProposalCard extends BaseLivewireComponent
         return $count - 1;
     }
 
-    /**
-     * @param  array{context?: string}  $payload
-     */
     #[On('proposal:create-current')]
-    public function createCurrentFromShortcut(array $payload = []): void
+    public function createCurrentFromShortcut(string $context = 'conversation'): void
     {
-        if (($payload['context'] ?? 'conversation') !== $this->context) {
+        if ($context !== $this->context) {
             return;
         }
 

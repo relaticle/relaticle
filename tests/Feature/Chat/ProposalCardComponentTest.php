@@ -77,7 +77,7 @@ it('loads and renders the active pending action summary', function (): void {
     );
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('pendingActionId', $action->getKey())
         ->assertSee('Create company "Acme Corp"')
         ->assertSee('Acme Corp');
@@ -88,7 +88,7 @@ it('refuses a pending action from another tenant', function (): void {
     $foreign = proposalCardPa($other, ['name' => 'Foreign'], ['title' => 'x', 'summary' => 'x', 'fields' => []]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $foreign->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $foreign->getKey(), context: 'conversation')
         ->assertSet('pendingActionId', null);
 });
 
@@ -96,7 +96,7 @@ it('ignores set-active events targeted at a different chat context', function ()
     $action = proposalCardPa($this->user, ['name' => 'Acme'], ['title' => 't', 'summary' => 's', 'fields' => []]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'side-panel'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'side-panel')
         ->assertSet('pendingActionId', null);
 });
 
@@ -104,7 +104,7 @@ it('steps between batch records and clamps at the ends', function (): void {
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta', 'Gamma']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('cursor', 0)
         ->call('stepNext')->assertSet('cursor', 1)
         ->call('stepNext')->assertSet('cursor', 2)
@@ -117,7 +117,7 @@ it('starts the cursor at the first unresolved record', function (): void {
     $action->update(['result_data' => ['items' => ['0' => ['status' => 'approved']]]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('cursor', 1);
 });
 
@@ -126,7 +126,7 @@ it('does not surface an expired pending action', function (): void {
     $action->update(['expires_at' => now()->subMinute()]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('pendingActionId', null);
 });
 
@@ -135,7 +135,7 @@ it('creates the current batch record and advances to the next unresolved', funct
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->assertDispatched('proposal:resolved')
         ->assertSet('cursor', 1);
@@ -151,7 +151,7 @@ it('emits will-resolve with willFinalize false when the first of many items is c
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->assertDispatched('proposal:will-resolve', willFinalize: false, context: 'conversation');
 });
@@ -164,7 +164,7 @@ it('creates the single proposal record and collapses the dock', function (): voi
     );
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
         ->assertDispatched('proposal:resolved')
@@ -180,7 +180,7 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
     $action->update(['result_data' => ['items' => ['0' => ['status' => 'approved', 'id' => 'x']], 'ids' => ['x']]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('cursor', 1)
         ->call('createCurrent')
         ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
@@ -196,7 +196,7 @@ it('discards the current batch record and advances to the next unresolved', func
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('discardCurrent')
         ->assertDispatched('proposal:resolved')
         ->assertSet('cursor', 1);
@@ -211,7 +211,7 @@ it('finalizes after the last record is resolved and dispatches one continuation'
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->call('discardCurrent')
         ->assertSet('pendingActionId', null);
@@ -225,7 +225,7 @@ it('marks a fully-discarded batch as rejected', function (): void {
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('discardCurrent')
         ->call('discardCurrent');
 
@@ -238,7 +238,7 @@ it('emits proposal:resolve-failed and does not advance when the service rejects 
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->set('cursor', 99) // out-of-range -> approveItem's index guard throws RuntimeException
         ->call('createCurrent')
         ->assertDispatched('proposal:resolve-failed')
@@ -254,7 +254,7 @@ it('does nothing when createCurrent is called while a field edit is open', funct
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->set('editingFieldCode', 'name')
         ->call('createCurrent')
         ->assertNotDispatched('proposal:will-resolve');
@@ -267,8 +267,8 @@ it('routes the create-current shortcut to the current record for the matching co
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
-        ->call('createCurrentFromShortcut', ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->dispatch('proposal:create-current', context: 'conversation')
         ->assertSet('cursor', 1);
 
     expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toContain('Alpha');
@@ -279,8 +279,8 @@ it('ignores the create-current shortcut for a different context', function (): v
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->call('setActive', ['id' => $action->getKey(), 'context' => 'conversation'])
-        ->call('createCurrentFromShortcut', ['context' => 'side-panel'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->dispatch('proposal:create-current', context: 'side-panel')
         ->assertSet('cursor', 0);
 
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
