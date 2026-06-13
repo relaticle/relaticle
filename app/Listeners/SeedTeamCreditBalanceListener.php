@@ -13,6 +13,6 @@ final readonly class SeedTeamCreditBalanceListener
 
     public function handle(TeamCreated $event): void
     {
-        $this->action->handle($event->team);
+        $this->action->execute($event->team);
     }
 }

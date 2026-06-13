@@ -5,12 +5,8 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Services\TipTapDocumentParser;
-use Tests\TestCase;
-
-uses(TestCase::class, LazilyRefreshDatabase::class);
 
 mutates(TipTapDocumentParser::class);
 
