@@ -451,3 +451,38 @@ it('saves an edited custom field through ProposalEditor without executing', func
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
+
+it('cancels an inline edit without persisting and leaves action_data untouched', function (): void {
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'Keep me', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $field->code)
+        ->set("data.custom_fields.{$field->code}", $optionIds[1]) // change the working value...
+        ->call('cancelField')                                     // ...then cancel
+        ->assertSet('editingFieldCode', null);
+
+    expect($action->fresh()->action_data['custom_fields'][$field->code])->toBe($optionIds[0]);
+});
+
+it('edits a core text field (title) in place and persists it via applyEdit without executing', function (): void {
+    Bus::fake([ContinueChatMessage::class]);
+    $action = makeTaskProposal($this->user, ['title' => 'Old Title']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', 'title')
+        ->assertSet('editingFieldCode', 'title')
+        ->assertSet('data.title', 'Old Title')
+        ->set('data.title', 'New Title')
+        ->call('saveField')
+        ->assertSet('editingFieldCode', null)
+        ->assertHasNoErrors();
+
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Pending)
+        ->and($fresh->action_data['title'])->toBe('New Title');
+    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});

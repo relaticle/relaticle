@@ -91,6 +91,11 @@ final class ProposalCard extends BaseLivewireComponent
         $this->editingFieldCode = null;
     }
 
+    public function cancelField(): void
+    {
+        $this->editingFieldCode = null;
+    }
+
     /**
      * Flatten the scoped edit form state to `{code => value}` for ProposalEditor.
      * A custom field is nested under `custom_fields.<code>`; lift those to the
