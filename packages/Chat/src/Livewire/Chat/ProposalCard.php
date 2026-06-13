@@ -6,13 +6,21 @@ namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Livewire\Attributes\On;
+use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
 
 final class ProposalCard extends BaseLivewireComponent
@@ -31,6 +39,130 @@ final class ProposalCard extends BaseLivewireComponent
     public function mount(string $context = 'conversation'): void
     {
         $this->context = $context;
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        if ($this->editingFieldCode === null) {
+            return $schema->components([])->statePath('data');
+        }
+
+        return $schema
+            ->components($this->componentsForField($this->editingFieldCode))
+            ->statePath('data')
+            ->model($this->modelClass());
+    }
+
+    public function editField(string $code): void
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction || $pendingAction->operation !== PendingActionOperation::Create) {
+            return;
+        }
+
+        $this->ensureTenantContext();
+
+        $this->editingFieldCode = $code;
+        $this->form->fill($this->formStateFor($pendingAction, $code));
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    private function componentsForField(string $code): array
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        if (! $pendingAction instanceof PendingAction) {
+            return [];
+        }
+
+        $entityType = $pendingAction->entity_type;
+        $titleKey = in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+
+        if ($code === $titleKey) {
+            return [
+                TextInput::make($titleKey)
+                    ->label($titleKey === 'title' ? __('Title') : __('Name'))
+                    ->required(),
+            ];
+        }
+
+        if ($entityType === 'company' && $code === 'account_owner_id') {
+            return [
+                Select::make('account_owner_id')
+                    ->label(__('Account Owner'))
+                    ->options(collect(TeamMembersContext::for($this->authUser()))
+                        ->pluck('name', 'id')
+                        ->all())
+                    ->searchable(),
+            ];
+        }
+
+        return [
+            CustomFields::form()
+                ->forModel($this->modelClass())
+                ->only([$code])
+                ->build(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formStateFor(PendingAction $pendingAction, string $code): array
+    {
+        $record = $this->currentRecord($pendingAction);
+
+        $entityType = $pendingAction->entity_type;
+        $titleKey = in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+        $coreKeys = $entityType === 'company' ? [$titleKey, 'account_owner_id'] : [$titleKey];
+
+        if (in_array($code, $coreKeys, true)) {
+            return [$code => $record[$code] ?? null];
+        }
+
+        $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
+
+        return ['custom_fields' => [$code => $customFields[$code] ?? null]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function currentRecord(PendingAction $pendingAction): array
+    {
+        $data = $pendingAction->action_data;
+
+        if (($data['_batch'] ?? false) !== true) {
+            return $data;
+        }
+
+        $records = is_array($data['records'] ?? null) ? array_values($data['records']) : [];
+        $record = $records[$this->cursor] ?? [];
+
+        return is_array($record) ? $record : [];
+    }
+
+    /**
+     * @return class-string<Model>
+     */
+    private function modelClass(): string
+    {
+        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+
+        $entityType = $pendingAction instanceof PendingAction ? $pendingAction->entity_type : '';
+
+        $modelClass = Relation::getMorphedModel($entityType);
+
+        throw_unless(
+            is_string($modelClass),
+            RuntimeException::class,
+            "Unresolvable entity type for proposal editing: {$entityType}",
+        );
+
+        return $modelClass;
     }
 
     #[On('proposal:set-active')]

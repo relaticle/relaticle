@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Features\OnboardSeed;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -14,6 +16,13 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Data\VisibilityConditionData;
+use Relaticle\CustomFields\Data\VisibilityData;
+use Relaticle\CustomFields\Enums\ConditionSource;
+use Relaticle\CustomFields\Enums\VisibilityMode;
+use Relaticle\CustomFields\Enums\VisibilityOperator;
+use Spatie\LaravelData\DataCollection;
 
 mutates(ProposalCard::class);
 
@@ -62,6 +71,85 @@ function makeBatchCompanyProposal(User $user, array $names): PendingAction
         ['_batch' => true, 'records' => $records],
         ['title' => 'Create Companies', 'summary' => 'Create '.count($names).' companies', 'items' => $items],
     );
+}
+
+/**
+ * @param  array<string, mixed>  $actionData
+ */
+function makeTaskProposal(User $user, array $actionData): PendingAction
+{
+    return PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => $actionData,
+        'display_data' => ['title' => 'Create Task', 'summary' => 'Create task', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+/**
+ * The seeded task `status` field is a SINGLE_CHOICE with To do / In progress /
+ * Done options, created for every team by the CreateTeamCustomFields listener.
+ *
+ * @return array{0: CustomField, 1: list<string>}
+ */
+function seedTaskSingleChoiceField(mixed $team): array
+{
+    $status = CustomField::query()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->with('options')
+        ->first();
+
+    expect($status)->not->toBeNull('seeded task status field is required for this test');
+
+    $optionIds = $status->options->map(fn (mixed $option): string => (string) $option->id)->values()->all();
+
+    expect($optionIds)->not->toBeEmpty();
+
+    return [$status, $optionIds];
+}
+
+/**
+ * Build a task custom field that is only visible when the seeded `status`
+ * field equals "Done" — a cross-field (sibling) visibility condition. Under
+ * `->only([$code])` the sibling is absent from the scoped form, so the
+ * condition must fail open rather than throw.
+ */
+function seedTaskFieldWithVisibilityCondition(mixed $team): CustomField
+{
+    [$status] = seedTaskSingleChoiceField($team);
+
+    return CustomField::query()->create([
+        'tenant_id' => $team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'completion_note',
+        'name' => 'Completion note',
+        'type' => 'text',
+        'sort_order' => 99,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+        'settings' => new CustomFieldSettingsData(
+            visibility: new VisibilityData(
+                mode: VisibilityMode::SHOW_WHEN,
+                conditions: new DataCollection(VisibilityConditionData::class, [
+                    new VisibilityConditionData(
+                        field_code: $status->code,
+                        operator: VisibilityOperator::EQUALS,
+                        value: 'Done',
+                        source: ConditionSource::CustomField,
+                    ),
+                ]),
+            ),
+        ),
+    ]);
 }
 
 it('renders nothing when no active proposal id is set', function (): void {
@@ -306,4 +394,39 @@ it('renders a single (non-batch) proposal without a stepper', function (): void 
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSee('Solo Inc')
         ->assertSee('Create');
+});
+
+it('builds the real custom-field component for the edited field, prefilled from action_data', function (): void {
+    [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'Edit me', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $field->code)
+        ->assertSet('editingFieldCode', $field->code)
+        ->assertSet("data.custom_fields.{$field->code}", $optionIds[0])
+        ->assertHasNoErrors();
+
+    $expectedName = "custom_fields.{$field->code}";
+    $flat = $component->instance()->form->getFlatComponents();
+    $built = collect($flat)->first(fn (mixed $c): bool => $c instanceof Field && $c->getName() === $expectedName);
+
+    expect($built)->not->toBeNull('the scoped Filament custom-field component should be built into the form');
+});
+
+it('does not throw building a field with a cross-field visibility condition (fails open under ->only())', function (): void {
+    $dependent = seedTaskFieldWithVisibilityCondition($this->team);
+    $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => []]);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $dependent->code)
+        ->assertSet('editingFieldCode', $dependent->code)
+        ->assertHasNoErrors();
+
+    $flat = $component->instance()->form->getFlatComponents();
+    $built = collect($flat)->first(fn (mixed $c): bool => $c instanceof Field
+        && $c->getName() === "custom_fields.{$dependent->code}");
+
+    expect($built)->not->toBeNull('the field with a sibling visibility condition should still build under ->only()');
 });
