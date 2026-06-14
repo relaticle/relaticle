@@ -5,14 +5,9 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use Relaticle\Chat\Events\ChatStreamFailed;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
-use Relaticle\Chat\Services\AiModelResolver;
-use Relaticle\Chat\Services\CreditService;
 
 beforeEach(function (): void {
     Queue::fake();
@@ -163,44 +158,4 @@ it('mentions the plan name in the message', function (): void {
     $response->assertStatus(402);
     expect($response->json('message'))->toContain('Free');
     expect($response->json('message'))->toContain((string) Plan::Free->credits());
-});
-
-it('broadcasts a stream.failed terminal event when a continuation is out of credits', function (): void {
-    Event::fake([ChatStreamFailed::class]);
-
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
-        'credits_remaining' => 0,
-        'credits_used' => 0,
-        'period_starts_at' => now()->startOfMonth(),
-        'period_ends_at' => now()->endOfMonth(),
-    ]);
-
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'T',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    (new ContinueChatMessage(
-        user: $user,
-        team: $team,
-        conversationId: $conversationId,
-        prompt: '[approval]',
-        turnId: '01T',
-    ))->handle(
-        resolve(CreditService::class),
-        resolve(AiModelResolver::class),
-    );
-
-    Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $e): bool => $e->conversationId === $conversationId
-        && str_contains(strtolower($e->message), 'credit')
-        && str_contains(strtolower($e->message), 'saved'));
 });

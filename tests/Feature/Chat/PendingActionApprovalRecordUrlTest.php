@@ -7,11 +7,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 
 beforeEach(function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 });
 
 it('approve endpoint returns a record.url for a created company', function (): void {

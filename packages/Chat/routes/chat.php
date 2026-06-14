@@ -40,10 +40,6 @@ Route::middleware(['auth:web'])->group(function (): void {
         ->middleware('throttle:30,1')
         ->name('chat.cancel');
 
-    Route::post('/chat/conversations/{conversationId}/resume', [ChatController::class, 'resume'])
-        ->middleware('throttle:10,1')
-        ->name('chat.resume');
-
     Route::post('/chat/conversations/{conversationId}/rename', [ChatController::class, 'rename'])
         ->middleware('throttle:30,1')
         ->name('chat.rename');

@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
@@ -99,8 +98,6 @@ it('approves one batch item without creating the others and stays pending', func
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->result_data['items']['0']['status'])->toBe('approved')
         ->and($fresh->result_data['ids'])->toHaveCount(1);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('finalizes the batch without dispatching a continuation after the last item resolves', function (): void {
@@ -111,7 +108,6 @@ it('finalizes the batch without dispatching a continuation after the last item r
 
     $service->approveItem($action, $this->user, 0);
     $service->rejectItem($action, 1);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 
     $last = $service->approveItem($action, $this->user, 2);
 
@@ -124,8 +120,6 @@ it('finalizes the batch without dispatching a continuation after the last item r
         ->and($fresh->result_data['items']['1']['status'])->toBe('rejected')
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Keep 1', 'Keep 2']);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('marks the batch rejected when every item is skipped', function (): void {
@@ -137,7 +131,6 @@ it('marks the batch rejected when every item is skipped', function (): void {
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('is idempotent — re-approving the same item does not double-create', function (): void {
@@ -184,7 +177,6 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
 
     $service->approveItem($action, $this->user, 0);
     $service->approveItem($action, $this->user, 1);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 
     $last = $service->rejectItem($action, 2);
 
@@ -196,8 +188,6 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
         ->and($fresh->result_data['items']['2']['status'])->toBe('rejected')
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Made A', 'Made B']);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('dispatches no continuation on a single approve and persists the record', function (): void {
@@ -219,8 +209,6 @@ it('dispatches no continuation on a single approve and persists the record', fun
     expect($resolved->status)->toBe(PendingActionStatus::Approved)
         ->and($resolved->result_data['type'])->toBe('task')
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Approve')->count())->toBe(1);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('dispatches no continuation on a single reject and creates nothing', function (): void {
@@ -241,6 +229,4 @@ it('dispatches no continuation on a single reject and creates nothing', function
 
     expect($resolved->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Reject')->count())->toBe(0);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });

@@ -11,14 +11,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Http\Controllers\PendingActionController;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Services\PendingActionService;
 
 mutates(PendingActionService::class);
 mutates(PendingActionController::class);
 
 beforeEach(function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->currentTeam;

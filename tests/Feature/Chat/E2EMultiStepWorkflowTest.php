@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
@@ -46,7 +45,6 @@ it('multi-step workflow: create person -> approve -> create linked task -> appro
 
     Bus::fake();
     $approved = resolve(PendingActionService::class)->approve($personPending, $user);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 
     expect($approved->status)->toBe(PendingActionStatus::Approved);
     $angelId = $approved->result_data['id'] ?? null;

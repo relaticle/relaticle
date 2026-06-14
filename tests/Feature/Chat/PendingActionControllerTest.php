@@ -13,18 +13,13 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Http\Controllers\PendingActionController;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
 mutates(PendingActionController::class);
 
 beforeEach(function () {
-    // Approval/rejection dispatches a ContinueChatMessage job that streams the
-    // model's follow-up. Production routes this through Redis; the test queue
-    // is sync so without faking, the job would hit the real Anthropic API and
-    // be killed by Http::preventStrayRequests().
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->currentTeam;
@@ -460,5 +455,4 @@ it('dispatches no continuation when approving a pending action via the endpoint'
         ->assertJsonPath('status', 'approved');
 
     $this->assertDatabaseHas('companies', ['name' => 'No Continuation Co']);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });

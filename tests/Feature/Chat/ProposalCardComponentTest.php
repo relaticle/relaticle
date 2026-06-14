@@ -16,7 +16,6 @@ use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
@@ -285,7 +284,6 @@ it('creates the current batch record and advances to the next unresolved', funct
     expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())
         ->toContain('Alpha')->not->toContain('Beta');
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('creates the single proposal record and collapses the dock', function (): void {
@@ -318,7 +316,6 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
         ->assertSet('pendingActionId', null);
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('discards the current batch record and advances to the next unresolved', function (): void {
@@ -333,7 +330,6 @@ it('discards the current batch record and advances to the next unresolved', func
 
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('finalizes after the last record is resolved without dispatching a continuation', function (): void {
@@ -345,8 +341,6 @@ it('finalizes after the last record is resolved without dispatching a continuati
         ->call('createCurrent')
         ->call('discardCurrent')
         ->assertSet('pendingActionId', null);
-
-    Bus::assertNotDispatched(ContinueChatMessage::class);
     expect($action->fresh()->status)->not->toBe(PendingActionStatus::Pending);
 });
 
@@ -474,7 +468,7 @@ it('does not throw building a field with a cross-field visibility condition (fai
 });
 
 it('saves an edited custom field through ProposalEditor without executing', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
     $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
@@ -490,7 +484,6 @@ it('saves an edited custom field through ProposalEditor without executing', func
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['custom_fields'][$field->code])->toBe($optionIds[1]);
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('cancels an inline edit without persisting and leaves action_data untouched', function (): void {
@@ -508,7 +501,7 @@ it('cancels an inline edit without persisting and leaves action_data untouched',
 });
 
 it('edits a core text field (title) in place and persists it via applyEdit without executing', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     $action = makeTaskProposal($this->user, ['title' => 'Old Title']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -525,11 +518,10 @@ it('edits a core text field (title) in place and persists it via applyEdit witho
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['title'])->toBe('New Title');
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('rejects an out-of-options choice value at the form layer without persisting', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
     $action = makeTaskProposal($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
@@ -542,11 +534,10 @@ it('rejects an out-of-options choice value at the form layer without persisting'
         ->assertHasErrors("data.custom_fields.{$field->code}");
 
     expect($action->fresh()->action_data['custom_fields'][$field->code])->toBe($optionIds[0]);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('rejects an empty required core name at the form layer and keeps the proposal pending', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     $action = proposalCardPa(
         $this->user,
         ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
@@ -564,7 +555,6 @@ it('rejects an empty required core name at the form layer and keeps the proposal
     $fresh = $action->fresh();
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['name'])->toBe('Acme Corp');
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('exposes editable codes for the entity (core keys + non-deferred custom fields)', function (): void {
@@ -649,7 +639,7 @@ it('rebuilds the current record fields with codes on editable rows and no diverg
 });
 
 it('edits a custom field on a batch item without touching sibling records', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
     $action = makeBatchTaskProposal($this->user, [
         ['title' => 'Task A', 'custom_fields' => [$field->code => $optionIds[0]]],
@@ -672,7 +662,6 @@ it('edits a custom field on a batch item without touching sibling records', func
         ->and($records[0]['custom_fields'][$field->code])->toBe($optionIds[0]);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
-    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('shows an edit affordance for an editable field and renders the inline editor when editing', function (): void {

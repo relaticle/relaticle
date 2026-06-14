@@ -11,14 +11,12 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 beforeEach(function (): void {
-    // The post-approval AI continuation is irrelevant to this scoping concern.
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 });
 
 /**

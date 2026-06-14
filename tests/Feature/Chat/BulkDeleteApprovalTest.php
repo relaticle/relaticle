@@ -6,7 +6,6 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Ai\Tools\Request;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
@@ -14,7 +13,7 @@ use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 mutates(PendingActionService::class);
 
 beforeEach(function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->user->switchTeam($this->user->ownedTeams()->first());
     $this->actingAs($this->user);
