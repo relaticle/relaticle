@@ -486,6 +486,40 @@ it('saves an edited custom field through ProposalEditor without executing', func
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
 
+it('preserves other custom fields when only one is edited', function (): void {
+    Bus::fake();
+    [$status, $statusOptionIds] = seedTaskSingleChoiceField($this->team);
+
+    $priority = CustomField::query()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->with('options')
+        ->first();
+    expect($priority)->not->toBeNull('seeded task priority field is required for this test');
+    $priorityOptionId = (string) $priority->options->first()->id;
+
+    $action = makeTaskProposal($this->user, [
+        'title' => 'T',
+        'custom_fields' => [
+            $status->code => $statusOptionIds[0],
+            $priority->code => $priorityOptionId,
+        ],
+    ]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $status->code)
+        ->set("data.custom_fields.{$status->code}", $statusOptionIds[1])
+        ->call('saveField')
+        ->assertSet('editingFieldCode', null)
+        ->assertHasNoErrors();
+
+    $fresh = $action->fresh();
+    expect($fresh->action_data['custom_fields'][$status->code])->toBe($statusOptionIds[1])
+        ->and($fresh->action_data['custom_fields'][$priority->code])->toBe($priorityOptionId);
+});
+
 it('cancels an inline edit without persisting and leaves action_data untouched', function (): void {
     [$field, $optionIds] = seedTaskSingleChoiceField($this->team);
     $action = makeTaskProposal($this->user, ['title' => 'Keep me', 'custom_fields' => [$field->code => $optionIds[0]]]);

@@ -55,11 +55,16 @@ final readonly class ProposalDisplayBuilder
         $coreRows = $this->buildCoreRows($meta, $nameValue, $entityType, $record);
         $ownedLabels = array_map(fn (array $row): string => $row['label'], $coreRows);
 
-        $carried = $this->carryForwardRows($existingFields, $ownedLabels);
-
         $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
         /** @var array<string, mixed> $customFields */
         $customRows = $this->formatter->format($user, $entityType, $customFields, null);
+        $customLabels = array_map(fn (array $row): string => (string) $row['label'], $customRows);
+
+        // The builder owns core rows AND re-derives every custom-field row fresh, so a
+        // carried row whose label matches either would duplicate it. Stored display rows
+        // built by Create*Tool::buildRecordDisplay carry no `type` key, so label matching
+        // (not the `type` heuristic) is what prevents the double-render.
+        $carried = $this->carryForwardRows($existingFields, array_merge($ownedLabels, $customLabels));
 
         return [
             'title' => $title,
@@ -97,14 +102,15 @@ final readonly class ProposalDisplayBuilder
     /**
      * Keep rows from existingFields that:
      * - have a 'label' key
-     * - whose label is not already produced by the builder (not in $ownedLabels)
-     * - do NOT have a 'type' key (custom-field rows carry type; they're re-derived fresh)
+     * - whose label is not already produced by the builder — i.e. not a core row and not
+     *   a re-derived custom-field row (not in $reservedLabels)
+     * - do NOT have a 'type' key (defensive: a custom-field row always carries type)
      *
      * @param  list<array<string, mixed>>  $existingFields
-     * @param  list<string>  $ownedLabels
+     * @param  list<string>  $reservedLabels
      * @return list<array<string, mixed>>
      */
-    private function carryForwardRows(array $existingFields, array $ownedLabels): array
+    private function carryForwardRows(array $existingFields, array $reservedLabels): array
     {
         $carried = [];
 
@@ -113,7 +119,7 @@ final readonly class ProposalDisplayBuilder
                 continue;
             }
 
-            if (in_array($row['label'], $ownedLabels, true)) {
+            if (in_array($row['label'], $reservedLabels, true)) {
                 continue;
             }
 

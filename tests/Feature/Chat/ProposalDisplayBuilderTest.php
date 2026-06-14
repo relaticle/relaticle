@@ -88,3 +88,37 @@ it('does not duplicate custom rows when existingFields already has a type-bearin
 
     expect($linkedinRows)->toHaveCount(0);
 });
+
+it('does not duplicate a custom row when the stored display row carries no type key', function (): void {
+    $linkedinField = CustomField::query()
+        ->where('tenant_id', $this->user->currentTeam->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'linkedin')
+        ->first();
+
+    if ($linkedinField === null) {
+        $this->markTestSkipped('linkedin custom field not seeded for this tenant');
+    }
+
+    $record = [
+        'name' => 'Acme Corp',
+        'custom_fields' => ['linkedin' => ['https://linkedin.com/company/acme']],
+    ];
+
+    // Mirrors what Create*Tool::buildRecordDisplay persists: a custom-field row keyed by
+    // {label, new} with NO `type` key. The rebuild re-derives the same field, so without
+    // label-based dedup the card renders LinkedIn twice.
+    $existingFields = [
+        ['label' => 'LinkedIn', 'new' => 'https://linkedin.com/company/acme'],
+    ];
+
+    /** @var ProposalDisplayBuilder $builder */
+    $builder = resolve(ProposalDisplayBuilder::class);
+    $display = $builder->build($this->user, 'company', $record, $existingFields);
+
+    $linkedinRows = collect($display['fields'])->filter(fn (array $r): bool => ($r['label'] ?? '') === 'LinkedIn')->values()->all();
+
+    expect($linkedinRows)->toHaveCount(1)
+        ->and($linkedinRows[0])->toHaveKey('type')
+        ->and($linkedinRows[0]['type'])->toBe('link');
+});

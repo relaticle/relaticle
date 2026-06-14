@@ -268,10 +268,26 @@ final readonly class ProposalEditor
         }
 
         if ($editedCustomFields !== []) {
-            if ($cleanFields === []) {
+            $merged = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
+
+            // Only the edited codes change; every other custom field on the record is
+            // preserved. A code edited to an empty/invalid value (dropped by the
+            // validator, so absent from $cleanFields) is removed individually — never
+            // the whole map.
+            foreach (array_keys($editedCustomFields) as $code) {
+                if (array_key_exists($code, $cleanFields)) {
+                    $merged[$code] = $cleanFields[$code];
+
+                    continue;
+                }
+
+                unset($merged[$code]);
+            }
+
+            if ($merged === []) {
                 unset($record['custom_fields']);
             } else {
-                $record['custom_fields'] = $cleanFields;
+                $record['custom_fields'] = $merged;
             }
         }
 
