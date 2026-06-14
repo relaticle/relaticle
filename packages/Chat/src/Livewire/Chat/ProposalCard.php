@@ -351,9 +351,6 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
-        $willFinalize = $this->willFinalize($pendingAction, $this->cursor);
-
-        $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
 
         $this->ensureTenantContext();
 
@@ -412,9 +409,6 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
-        $willFinalize = $this->willFinalize($pendingAction, $this->cursor);
-
-        $this->dispatch('proposal:will-resolve', willFinalize: $willFinalize, context: $this->context);
 
         try {
             if ($isBatch) {
@@ -452,29 +446,6 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
-    }
-
-    private function willFinalize(PendingAction $pendingAction, int $index): bool
-    {
-        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
-            return true;
-        }
-
-        $count = $this->resolveRecordCount($pendingAction);
-
-        $items = $this->resolvedItems($pendingAction);
-
-        for ($other = 0; $other < $count; $other++) {
-            if ($other === $index) {
-                continue;
-            }
-
-            if (! isset($items[(string) $other])) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private function ensureTenantContext(): void

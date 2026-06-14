@@ -288,16 +288,6 @@ it('creates the current batch record and advances to the next unresolved', funct
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('emits will-resolve with willFinalize false when the first of many items is created', function (): void {
-    Bus::fake();
-    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
-
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('createCurrent')
-        ->assertDispatched('proposal:will-resolve', willFinalize: false, context: 'conversation');
-});
-
 it('creates the single proposal record and collapses the dock', function (): void {
     Bus::fake();
     $action = proposalCardPa($this->user,
@@ -308,7 +298,6 @@ it('creates the single proposal record and collapses the dock', function (): voi
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
-        ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
         ->assertDispatched('proposal:resolved')
         ->assertSet('pendingActionId', null);
 
@@ -325,7 +314,6 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('cursor', 1)
         ->call('createCurrent')
-        ->assertDispatched('proposal:will-resolve', willFinalize: true, context: 'conversation')
         ->assertDispatched('proposal:resolved')
         ->assertSet('pendingActionId', null);
 
@@ -399,7 +387,7 @@ it('does nothing when createCurrent is called while a field edit is open', funct
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->set('editingFieldCode', 'name')
         ->call('createCurrent')
-        ->assertNotDispatched('proposal:will-resolve');
+        ->assertNotDispatched('proposal:resolved');
 
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });

@@ -538,11 +538,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     undoToast: null,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
-    // dedupes proposal:set-active dispatches; _continuationRevert holds the
-    // revert handle from beginContinuationTurn() between will-resolve and the
-    // resolved/resolve-failed outcome.
+    // dedupes proposal:set-active dispatches.
     _lastActiveProposalId: null,
-    _continuationRevert: null,
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
     // and auto-flush this on handleStreamEnd / cancel / failure.
@@ -938,20 +935,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
         // named-arg dispatches arrive as a single params object (e.detail).
         this._proposalListeners = [
-            window.Livewire.on('proposal:will-resolve', (payload) => {
-                if ((payload?.context ?? 'conversation') !== this.context) return;
-                if (payload?.willFinalize) {
-                    this._continuationRevert = this.beginContinuationTurn();
-                }
-            }),
             window.Livewire.on('proposal:resolved', (payload) => {
                 if ((payload?.context ?? 'conversation') !== this.context) return;
                 this.applyProposalResolution(payload);
-                this._continuationRevert = null; // committed: keep the stub for the streaming continuation
             }),
             window.Livewire.on('proposal:resolve-failed', (payload) => {
                 if ((payload?.context ?? 'conversation') !== this.context) return;
-                if (this._continuationRevert) { this._continuationRevert(); this._continuationRevert = null; }
                 const action = this.findPendingAction(payload?.pendingActionId);
                 if (action) action.error = 'Could not complete the action. Please try again.';
             }),
@@ -1812,39 +1801,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         assistantMsg.content += delta;
         this.scrollToBottom();
-    },
-
-    // Approve/reject triggers a backend continuation that streams a fresh
-    // assistant turn on the same channel. We mint an empty assistant stub so
-    // the incoming text_delta/tool_result events land in a new bubble instead
-    // of being appended to the message that originally proposed the action.
-    //
-    // Call this BEFORE the /approve|/reject POST resolves — the backend
-    // dispatches ContinueChatMessage as part of the request handler, so
-    // text_delta events can start arriving on the broadcast channel before
-    // the HTTP response returns. If we wait, the first deltas land in the
-    // proposal bubble and a short continuation can finish before we even
-    // mint the stub (leaving isStreaming permanently true on an empty bubble).
-    // Returns a revert handle for use when the POST fails.
-    beginContinuationTurn() {
-        const stub = this.mintAssistantStub({ isContinuation: true });
-        this.currentToolStatus = null;
-        this.isStreaming = true;
-        this.startStreamTimeout();
-        this.scrollToBottom(true);
-
-        return () => {
-            // Only revert if the stub is still untouched (no deltas arrived
-            // before the POST's failure path ran). If the backend already
-            // streamed into it, the user's better off seeing whatever did
-            // land than a flicker that erases it.
-            const last = this.messages[this.messages.length - 1];
-            if (last === stub && stub.content === '' && stub.pending_actions.length === 0) {
-                this.messages.pop();
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            }
-        };
     },
 
     handleToolCall(event) {
