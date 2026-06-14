@@ -95,6 +95,94 @@ it('approved actions expose record.url after conversation reload', function (): 
     ]);
 });
 
+it('reconstructs per-item batch chips so resolved items survive reload', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    $angel = People::factory()->for($user->currentTeam)->create(['name' => 'Angel']);
+
+    $convId = '019df800-4444-7000-8000-000000000003';
+    DB::table('agent_conversations')->insert([
+        'id' => $convId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $convId,
+        'action_class' => 'App\\Actions\\People\\CreatePeople',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['_batch' => true, 'records' => [['name' => 'Angel'], ['name' => 'Beth'], ['name' => 'Cara']]],
+        'display_data' => ['title' => 'Create People', 'summary' => 'Create 3 people', 'items' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+        'result_data' => ['items' => [
+            '0' => ['status' => 'approved', 'id' => (string) $angel->id],
+            '1' => ['status' => 'rejected'],
+        ]],
+    ]);
+
+    $toolResults = [[
+        'id' => 'toolu_'.uniqid(),
+        'name' => 'CreatePersonTool',
+        'result' => json_encode([
+            'type' => 'pending_action',
+            'pending_action_id' => $pending->id,
+            'entity_type' => 'people',
+            'operation' => 'create',
+            'data' => ['_batch' => true],
+            'display' => ['title' => 'Create People'],
+        ]),
+    ]];
+
+    $base = [
+        'conversation_id' => $convId,
+        'user_id' => (string) $user->getKey(),
+        'agent' => 'crm',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+    ];
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => '019df800-4444-7000-8000-000000000030',
+        'role' => 'assistant',
+        'content' => 'I have proposed creating people.',
+        'tool_results' => json_encode($toolResults),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ] + $base);
+
+    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0] ?? null;
+
+    expect($action)->not->toBeNull();
+    expect($action['status'])->toBe('pending');
+
+    $itemResults = $action['itemResults'] ?? null;
+    expect($itemResults)->not->toBeNull();
+
+    expect($itemResults['0']['status'])->toBe('approved');
+    expect($itemResults['0']['record'])->toMatchArray([
+        'id' => (string) $angel->id,
+        'type' => 'people',
+        'url' => PeopleResource::getUrl('view', ['record' => (string) $angel->id]),
+        'label' => 'Angel',
+    ]);
+
+    expect($itemResults['1']['status'])->toBe('skipped');
+    expect($itemResults['1']['record'])->toBeNull();
+});
+
 it('does not expose record on pending or rejected actions', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);

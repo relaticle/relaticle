@@ -261,3 +261,63 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
 
     expect($component->instance()->latestAssistantMessage())->toBeNull();
 });
+
+it('exposes the conversation title for header sync', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => 'Create 3 random companies',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->call('conversationTitle')
+        ->assertReturned('Create 3 random companies');
+});
+
+it('resolves the title from a client-supplied id when the server property is unset (first turn)', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => 'What companies do I have?',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Livewire::test(ChatInterface::class)
+        ->assertSet('conversationId', null)
+        ->call('conversationTitle', $conversationId)
+        ->assertReturned('What companies do I have?');
+});
+
+it('does not leak another tenant conversation title via a client-supplied id', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $attacker = User::factory()->withPersonalTeam()->create();
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $owner->getKey(),
+        'team_id' => $owner->currentTeam->getKey(),
+        'title' => 'Secret title',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($attacker);
+
+    Livewire::test(ChatInterface::class)
+        ->call('conversationTitle', $conversationId)
+        ->assertReturned(null);
+});

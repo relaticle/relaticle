@@ -7,9 +7,11 @@ namespace Relaticle\Chat\Livewire\Chat;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\TitleSanitizer;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -152,6 +154,33 @@ final class ChatInterface extends BaseLivewireComponent
             'display' => $action->display_data,
             'status' => 'pending',
         ], $actions->all()));
+    }
+
+    /**
+     * The conversation's current (possibly auto-generated) title, used by the
+     * client to sync the Filament page header and tab title after a turn ends
+     * without requiring a full page reload.
+     *
+     * On a brand-new chat the conversation is created client-side via a fetch,
+     * so the server-side $conversationId stays null until a reload — the client
+     * therefore passes its own id, scoped to the authed user and team by
+     * FindConversation.
+     */
+    public function conversationTitle(?string $conversationId = null): ?string
+    {
+        $conversationId ??= $this->conversationId;
+
+        if ($conversationId === null) {
+            return null;
+        }
+
+        $title = resolve(FindConversation::class)->execute($this->authUser(), $conversationId)?->title;
+
+        if (! is_string($title) || trim($title) === '') {
+            return null;
+        }
+
+        return TitleSanitizer::clean($title);
     }
 
     public function render(): View
