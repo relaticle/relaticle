@@ -8,7 +8,7 @@ use App\Models\User;
 
 final readonly class RemoveUserProfilePhoto
 {
-    public function remove(User $user): void
+    public function execute(User $user): void
     {
         $user->deleteProfilePhoto();
     }

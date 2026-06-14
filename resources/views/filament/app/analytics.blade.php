@@ -7,6 +7,15 @@
 <script>
 window.addEventListener('load', function() {
     function normalizeUrl(pathname) {
+        // Panel-level pages carry no tenant slug — track them as-is so the
+        // auth funnel (/login, /register, …) doesn't collapse into /dashboard.
+        var tenantless = ['/login', '/register', '/forgot-password', '/password-reset', '/email-verification', '/two-factor-authentication', '/new', '/logout'];
+        for (var i = 0; i < tenantless.length; i++) {
+            if (pathname === tenantless[i] || pathname.indexOf(tenantless[i] + '/') === 0) {
+                return pathname;
+            }
+        }
+
         // Remove tenant slug: /my-team/people → /people
         pathname = pathname.replace(/^\/[^\/]+/, '');
 
@@ -29,6 +38,15 @@ window.addEventListener('load', function() {
 
     // Initial track
     setTimeout(track, 100);
+
+    @if(session()->pull('fathom.track_signup'))
+    // One-time conversion event, flagged during registration
+    setTimeout(function () {
+        if (typeof fathom !== 'undefined') {
+            fathom.trackEvent('signup');
+        }
+    }, 150);
+    @endif
 
     // SPA navigation
     document.addEventListener('livewire:navigated', track);

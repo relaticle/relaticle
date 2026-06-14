@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  */
 final readonly class EnsureTagOptionsExist
 {
-    public function handle(CustomField $field, mixed $values): void
+    public function execute(CustomField $field, mixed $values): void
     {
         if (! $field->promotesValuesToOptions()) {
             return;

@@ -25,14 +25,4 @@ return new class extends Migration
     {
         return Schema::hasTable('custom_field_options') && ! Schema::hasColumn('custom_field_options', 'settings');
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('custom_field_options', function (Blueprint $table): void {
-            $table->dropColumn('settings');
-        });
-    }
 };
