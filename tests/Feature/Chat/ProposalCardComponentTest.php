@@ -361,16 +361,44 @@ it('emits proposal:resolve-failed and does not advance when the service rejects 
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
+    // A non-allowlisted action_class makes the service reject the approve for a valid
+    // (in-range, unresolved) item — exercising the catch -> resolve-failed path rather
+    // than the stale-cursor guard.
+    $action->update(['action_class' => 'stdClass']);
+
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->set('cursor', 99) // out-of-range -> approveItem's index guard throws RuntimeException
-        ->call('createCurrent')
+        ->call('createCurrent') // cursor 0 is a valid unresolved item; the service throws
         ->assertDispatched('proposal:resolve-failed')
         ->assertNotDispatched('proposal:resolved')
         ->assertSet('pendingActionId', $action->getKey()); // not cleared
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('drops a decided item from the dock queue and cannot re-decide it', function (): void {
+    Bus::fake();
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta', 'Gamma']);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent'); // approve item 0 (Alpha); cursor advances to first unresolved (1)
+
+    // Alpha left the queue: two records remain, stepper shows position 1 of 2.
+    $component->assertViewHas('remainingCount', 2)
+        ->assertViewHas('position', 1)
+        ->assertSet('cursor', 1);
+
+    // The stepper cannot navigate back onto the decided item 0.
+    $component->call('stepPrev')->assertSet('cursor', 1);
+
+    // Even a forced stale cursor onto the resolved index is a no-op snap, not a re-run.
+    $component->set('cursor', 0)
+        ->call('createCurrent')
+        ->assertSet('cursor', 1);
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->where('name', 'Alpha')->count())->toBe(1);
 });
 
 it('does nothing when createCurrent is called while a field edit is open', function (): void {

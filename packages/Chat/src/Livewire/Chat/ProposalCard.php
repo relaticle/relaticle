@@ -248,20 +248,55 @@ final class ProposalCard extends BaseLivewireComponent
 
     public function stepNext(): void
     {
-        $this->stepTo($this->cursor + 1);
+        $this->stepWithin(1);
     }
 
     public function stepPrev(): void
     {
-        $this->stepTo($this->cursor - 1);
+        $this->stepWithin(-1);
     }
 
-    private function stepTo(int $index): void
+    /**
+     * Move the cursor to the adjacent UNRESOLVED record in the given direction.
+     * Decided items are dropped from the dock queue entirely (Attio behavior), so
+     * they can never be navigated back to and re-decided — their outcome lives in
+     * the transcript audit card above.
+     */
+    private function stepWithin(int $direction): void
     {
-        $lastIndex = $this->recordCount() - 1;
-
-        $this->cursor = max(0, min($index, $lastIndex));
         $this->editingFieldCode = null;
+
+        if ($this->pendingActionId === null) {
+            return;
+        }
+
+        $pendingAction = $this->loadPending($this->pendingActionId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $unresolved = $this->unresolvedIndices($pendingAction);
+
+        if ($unresolved === []) {
+            return;
+        }
+
+        $position = array_search($this->cursor, $unresolved, true);
+
+        if ($position === false) {
+            $this->cursor = $unresolved[0];
+
+            return;
+        }
+
+        $target = $position + $direction;
+
+        if ($target < 0 || $target >= count($unresolved)) {
+            return;
+        }
+
+        $this->cursor = $unresolved[$target];
     }
 
     public function recordCount(?PendingAction $pendingAction = null): int
@@ -277,6 +312,41 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         return $this->resolveRecordCount($pendingAction);
+    }
+
+    /**
+     * How many records still await a decision — the dock stepper's denominator.
+     * Resolved items have left the queue, so this shrinks as the user decides.
+     */
+    public function remainingCount(?PendingAction $pendingAction = null): int
+    {
+        if ($this->pendingActionId === null) {
+            return 0;
+        }
+
+        $pendingAction ??= $this->loadPending($this->pendingActionId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return 0;
+        }
+
+        return max(1, count($this->unresolvedIndices($pendingAction)));
+    }
+
+    /**
+     * 1-based position of the current record within the unresolved queue.
+     */
+    public function currentPosition(?PendingAction $pendingAction = null): int
+    {
+        $pendingAction ??= ($this->pendingActionId !== null ? $this->loadPending($this->pendingActionId) : null);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return 1;
+        }
+
+        $position = array_search($this->cursor, $this->unresolvedIndices($pendingAction), true);
+
+        return $position === false ? 1 : $position + 1;
     }
 
     private function resolveRecordCount(PendingAction $pendingAction): int
@@ -328,6 +398,28 @@ final class ProposalCard extends BaseLivewireComponent
         return $count - 1;
     }
 
+    /**
+     * Record indices not yet resolved — the only items the dock presents. A decided
+     * item leaves this list, so the stepper can never land back on it.
+     *
+     * @return list<int>
+     */
+    private function unresolvedIndices(PendingAction $pendingAction): array
+    {
+        $count = $this->resolveRecordCount($pendingAction);
+        $items = $this->resolvedItems($pendingAction);
+
+        $indices = [];
+
+        for ($index = 0; $index < $count; $index++) {
+            if (! isset($items[(string) $index])) {
+                $indices[] = $index;
+            }
+        }
+
+        return $indices;
+    }
+
     #[On('proposal:create-current')]
     public function createCurrentFromShortcut(string $context = 'conversation'): void
     {
@@ -351,6 +443,14 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+
+        // A decided item is no longer in the dock queue — snap to the next undecided
+        // one rather than re-running an already-resolved index.
+        if ($isBatch && ! in_array($this->cursor, $this->unresolvedIndices($pendingAction), true)) {
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
+
+            return;
+        }
 
         $this->ensureTenantContext();
 
@@ -409,6 +509,14 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+
+        // A decided item is no longer in the dock queue — snap to the next undecided
+        // one rather than re-running an already-resolved index.
+        if ($isBatch && ! in_array($this->cursor, $this->unresolvedIndices($pendingAction), true)) {
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
+
+            return;
+        }
 
         try {
             if ($isBatch) {
@@ -582,6 +690,8 @@ final class ProposalCard extends BaseLivewireComponent
             'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields($proposal) : [],
             'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes($proposal) : [],
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCount($proposal) : 0,
+            'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCount($proposal) : 0,
+            'position' => $proposal instanceof PendingAction ? $this->currentPosition($proposal) : 1,
         ]);
     }
 }

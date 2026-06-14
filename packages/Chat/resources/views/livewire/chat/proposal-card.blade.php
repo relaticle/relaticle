@@ -111,23 +111,23 @@
 
             <div class="mt-3 flex items-center justify-between gap-2">
                 <div class="flex items-center gap-1">
-                    @if ($recordCount > 1)
+                    @if ($remainingCount > 1)
                         <button
                             type="button"
                             wire:click="stepPrev"
-                            @disabled($cursor === 0)
+                            @disabled($position <= 1)
                             class="inline-flex items-center justify-center rounded-md p-1 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
                             aria-label="{{ __('Previous record') }}"
                         >
                             <x-heroicon-o-chevron-left class="h-4 w-4" aria-hidden="true" />
                         </button>
 
-                        <span class="select-none text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">{{ $cursor + 1 }} / {{ $recordCount }}</span>
+                        <span class="select-none text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">{{ $position }} / {{ $remainingCount }}</span>
 
                         <button
                             type="button"
                             wire:click="stepNext"
-                            @disabled($cursor === $recordCount - 1)
+                            @disabled($position >= $remainingCount)
                             class="inline-flex items-center justify-center rounded-md p-1 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
                             aria-label="{{ __('Next record') }}"
                         >
