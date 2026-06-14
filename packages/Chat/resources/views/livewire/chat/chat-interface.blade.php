@@ -347,7 +347,7 @@
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
-                                <template x-if="action.status !== 'pending'">
+                                <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
                                     @include('chat::livewire.chat.partials._proposal-card')
                                 </template>
                             </template>
