@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
-final class AssistantText
+final readonly class AssistantText
 {
     /**
      * Collapse an assistant message that the multi-step agent loop emitted as the
