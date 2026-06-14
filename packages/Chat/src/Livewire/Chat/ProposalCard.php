@@ -519,8 +519,17 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
-        $record = $this->currentRecord($pendingAction);
         $existingFields = $this->currentDisplayFields($pendingAction);
+
+        // Only Create proposals are inline-editable, so only they need the rebuild that
+        // re-derives each owned row from action_data to attach an editable `code`. For
+        // update/delete, action_data holds diffs/record ids — not display values — so the
+        // stored display rows are authoritative; rebuilding would blank them out.
+        if ($pendingAction->operation !== PendingActionOperation::Create) {
+            return $existingFields;
+        }
+
+        $record = $this->currentRecord($pendingAction);
 
         return resolve(ProposalDisplayBuilder::class)
             ->build($this->authUser(), $pendingAction->entity_type, $record, $existingFields)['fields'];
