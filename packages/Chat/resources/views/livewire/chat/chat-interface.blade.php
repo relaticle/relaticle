@@ -185,19 +185,6 @@
                                 </div>
                             </template>
 
-                            <template x-if="msg.pausedResume">
-                                <div class="mt-2">
-                                    <button
-                                        type="button"
-                                        x-show="!isStreaming"
-                                        x-on:click="msg.pausedResume = false; retryTurn(Object.assign(msg, { isContinuation: true, rendered: false, prerendered: false, content: '' }))"
-                                        class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-                                    >
-                                        Continue
-                                    </button>
-                                </div>
-                            </template>
-
                             <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <template x-for="chip in msg.follow_ups" :key="chip.prompt">
@@ -342,8 +329,11 @@
                         </div>
                     </template>
 
-                    {{-- Action cards: resolved cards stay inline as the audit trail;
-                         pending cards are docked at the composer (see input area). --}}
+                    {{-- Action cards: resolved cards stay inline as the audit trail.
+                         A still-pending batch that already has some resolved items
+                         ALSO renders inline as a compact progress card (the editor
+                         for the unresolved items lives docked at the composer; see
+                         input area). A fully-unresolved proposal is dock-only. --}}
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
@@ -616,7 +606,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             invocationId: null,
             streamError: null,
             retryable: false,
-            isContinuation: false,
             _needsSeparator: false,
             feedback: null,
             feedbackPanelOpen: false,
@@ -1299,8 +1288,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
-            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
-            .listen('.chat.paused', (e) => this.handleChatPaused(e));
+            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
 
         return readyPromise;
     },
@@ -1720,48 +1708,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (this.isStreaming) return;
         if (msg._retrying) return;
 
-        if (msg.isContinuation) {
-            // Async path — guard with _retrying and clear in finally.
-            msg._retrying = true;
-            msg.streamError = null;
-            msg.retryable = false;
-            msg.rendered = false;
-            this.isStreaming = true;
-            this.startStreamTimeout();
-            this.restoreInputFocus();
-            try {
-                const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/resume', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    msg.streamError = body.error || 'Could not resume. Please try again.';
-                    if (res.status === 409 && body.code === 'resume_in_progress') {
-                        msg.retryable = true;
-                    } else if (res.status === 409) {
-                        msg.retryable = false;
-                    } else {
-                        msg.retryable = true;
-                    }
-                    msg.rendered = true;
-                    this.isStreaming = false;
-                    this.clearStreamTimeout();
-                }
-            } catch {
-                msg.streamError = 'Network error. Please try again.';
-                msg.retryable = true;
-                msg.rendered = true;
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            } finally {
-                msg._retrying = false;
-            }
-            return;
-        }
-
         // Failed user turn: the server never stored the message — re-send the
         // preceding user message from local state (same flow as edit-resend).
         // Compute userIndex BEFORE committing to any state change so the no-op
@@ -2056,16 +2002,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.startStreamTimeout(((event?.delaySeconds ?? 0) * 1000) + this.streamTimeoutMs);
     },
 
-    handleChatPaused(event) {
-        this.mintAssistantStub({
-            content: event?.message || 'Paused. Press Continue to keep going.',
-            rendered: true,
-            pausedResume: true,
-        });
-        this.isStreaming = false;
-        this.$nextTick(() => this.restoreInputFocus());
-    },
-
     restoreInputFocus() {
         this.$nextTick(() => {
             if (this.messages.some((m) => m.editing)) return;
@@ -2080,10 +2016,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    // The transcript renders resolved batch cards with per-item Created/Skipped
-    // chips. applyProposalResolution() (the docked card's resolution bridge)
-    // writes action.itemResults; the resolved-only _proposal-card partial reads
-    // them through this getter.
+    // The transcript renders batch cards with per-item Created/Skipped chips.
+    // applyProposalResolution() (the docked card's resolution bridge) writes
+    // action.itemResults; the _proposal-card partial reads them through this
+    // getter in both its compact-while-pending and full resolved modes.
     itemResult(action, index) {
         return (action.itemResults && action.itemResults[index]) || null;
     },
