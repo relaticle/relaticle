@@ -127,13 +127,14 @@ final readonly class PendingActionService
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
         // The action executes the underlying CRM write, which may persist custom-field
-        // values. Approvals arrive via the /chat/actions/* routes, which bypass the
-        // Filament panel middleware and therefore leave no tenant context. Without one,
-        // the custom-fields TenantScope no-ops and saveCustomFields() iterates EVERY
-        // tenant's field definitions — writing value rows across all tenants (cross-tenant
-        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team,
-        // and restore the prior value afterward so the override never outlives this call
-        // (TenantContextService resolves its context before the Filament tenant).
+        // values. When approve() runs there may be no resolvable custom-fields tenant
+        // context (the Livewire dock sets the Filament tenant but not necessarily the
+        // custom-fields one). Without it the custom-fields TenantScope no-ops and
+        // saveCustomFields() iterates EVERY tenant's field definitions — writing value rows
+        // across all tenants (cross-tenant leak) and, at scale, exceeding the request
+        // timeout. Scope it to the action's team, and restore the prior value afterward so
+        // the override never outlives this call (TenantContextService resolves its context
+        // before the Filament tenant).
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 
@@ -146,17 +147,20 @@ final readonly class PendingActionService
 
                 $this->validateResolvable($pendingAction);
 
+                // Batches resolve one record at a time through approveItem()/rejectItem() —
+                // the dock has no whole-batch control. Refuse a whole-batch approve so no
+                // caller can bypass the per-item review and commit every record at once.
+                throw_if(
+                    ($pendingAction->action_data['_batch'] ?? false) === true,
+                    RuntimeException::class,
+                    'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
+                );
+
                 $result = $this->executeAction($pendingAction, $user);
 
-                $resultData = match (true) {
-                    $result instanceof Model => ['id' => $result->getKey(), 'type' => $result->getMorphClass()],
-                    is_array($result) && $result !== [] && $result[0] instanceof Model => [
-                        'ids' => array_values(array_map(static fn (Model $m) => $m->getKey(), $result)),
-                        'type' => $result[0]->getMorphClass(),
-                        'count' => count($result),
-                    ],
-                    default => ['success' => true],
-                };
+                $resultData = $result instanceof Model
+                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
+                    : ['success' => true];
 
                 $pendingAction->update([
                     'status' => PendingActionStatus::Approved,
@@ -571,35 +575,14 @@ final readonly class PendingActionService
         };
     }
 
-    /**
-     * @return Model|list<Model>
-     */
-    private function executeCreate(object $action, User $user, PendingAction $pendingAction): mixed
+    private function executeCreate(object $action, User $user, PendingAction $pendingAction): Model
     {
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
         }
 
-        $data = $pendingAction->action_data;
-
-        if (($data['_batch'] ?? false) !== true) {
-            return $action->execute($user, $data, CreationSource::CHAT);
-        }
-
-        $records = $data['records'] ?? null;
-
-        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
-
-        throw_if(
-            array_filter($records, static fn (mixed $record): bool => ! is_array($record)) !== [],
-            RuntimeException::class,
-            'Batch record data is malformed',
-        );
-
-        return array_values(array_map(
-            fn (array $record): Model => $action->execute($user, $record, CreationSource::CHAT),
-            $records,
-        ));
+        /** @var Model */
+        return $action->execute($user, $pendingAction->action_data, CreationSource::CHAT);
     }
 
     private function executeUpdate(object $action, User $user, PendingAction $pendingAction): mixed

@@ -6,7 +6,6 @@ use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -54,31 +53,13 @@ function makeBatchProposal(string $convId, User $user, array $records): PendingA
     ]);
 }
 
-it('creates every record in the batch on a single approval', function (): void {
+it('refuses a whole-batch approval — a batch resolves only per item', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [
         ['title' => 'Batch A'], ['title' => 'Batch B'], ['title' => 'Batch C'],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->approve($action, $this->user);
-
-    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
-        ->toBe(['Batch A', 'Batch B', 'Batch C'])
-        ->and($resolved->status)->toBe(PendingActionStatus::Approved)
-        ->and($resolved->result_data['count'])->toBe(3)
-        ->and($resolved->result_data['ids'])->toHaveCount(3)
-        ->and($resolved->result_data['type'])->toBe('task');
-});
-
-it('creates nothing when one record in the batch fails (all-or-nothing)', function (): void {
-    // title is a NOT NULL column with no default; passing null throws a DB QueryException,
-    // which rolls back the outer DB::transaction in approve() leaving zero tasks created.
-    $action = makeBatchProposal($this->convId, $this->user, [
-        ['title' => 'Good one'],
-        ['title' => null],
-    ]);
-
     expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
-        ->toThrow(QueryException::class);
+        ->toThrow(RuntimeException::class);
 
     expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0)
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
@@ -229,4 +210,63 @@ it('dispatches no continuation on a single reject and creates nothing', function
 
     expect($resolved->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Reject')->count())->toBe(0);
+});
+
+it('rejecting an already-resolved action throws', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Reject Once'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+    $service = resolve(PendingActionService::class);
+
+    $service->reject($action);
+
+    expect(fn () => $service->reject($action->refresh()))->toThrow(RuntimeException::class);
+});
+
+it('approving an expired action throws and creates nothing', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Expired'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
+        ->toThrow(RuntimeException::class, 'This action has expired');
+
+    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+});
+
+it('approving an already-resolved action throws', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Done'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Approved,
+        'resolved_at' => now(),
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
+        ->toThrow(RuntimeException::class, 'This action has already been resolved');
 });

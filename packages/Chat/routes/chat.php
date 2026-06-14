@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
-use Relaticle\Chat\Http\Controllers\PendingActionController;
 
 Route::middleware(['auth:web'])->group(function (): void {
     Route::get('/chat/mentions', [ChatController::class, 'mentions'])
@@ -16,21 +15,6 @@ Route::middleware(['auth:web'])->group(function (): void {
         ->name('chat.conversations.create');
     Route::get('/chat/conversations', [ChatController::class, 'conversations'])->name('chat.conversations');
     Route::delete('/chat/conversations/{conversation}', [ChatController::class, 'destroyConversation'])->name('chat.conversations.destroy');
-
-    Route::post('/chat/actions/{pendingAction}/approve', [PendingActionController::class, 'approve'])
-        ->middleware('throttle:60,1')
-        ->name('chat.actions.approve');
-    Route::post('/chat/actions/{pendingAction}/reject', [PendingActionController::class, 'reject'])
-        ->middleware('throttle:60,1')
-        ->name('chat.actions.reject');
-    Route::post('/chat/actions/{pendingAction}/items/{index}/approve', [PendingActionController::class, 'approveItem'])
-        ->whereNumber('index')
-        ->middleware('throttle:60,1')
-        ->name('chat.actions.items.approve');
-    Route::post('/chat/actions/{pendingAction}/items/{index}/reject', [PendingActionController::class, 'rejectItem'])
-        ->whereNumber('index')
-        ->middleware('throttle:60,1')
-        ->name('chat.actions.items.reject');
 
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1')
