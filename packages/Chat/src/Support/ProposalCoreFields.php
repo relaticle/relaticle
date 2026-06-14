@@ -11,7 +11,7 @@ namespace Relaticle\Chat\Support;
  * core from custom fields the same way — keep that knowledge here so the two
  * sites can never drift.
  */
-final class ProposalCoreFields
+final readonly class ProposalCoreFields
 {
     /**
      * The entity's primary title column: `title` for task/note, `name` otherwise.
