@@ -390,25 +390,6 @@
         </div>
     </template>
 
-    {{-- Undo toast --}}
-    <template x-if="undoToast">
-        <div class="pointer-events-auto fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-             role="status"
-             aria-live="polite"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 translate-y-2"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Deleted. Undo?</span>
-            <button type="button" x-on:click="undoLastAction()"
-                    class="rounded-md bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700">
-                Undo
-            </button>
-        </div>
-    </template>
-
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
@@ -538,7 +519,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ->all()
     ),
     selectedModel: 'auto',
-    undoToast: null,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -996,9 +976,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             // Single proposal.
             action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
             if (payload.record) action.record = payload.record;
-            if (action.operation === 'delete' && payload.decision === 'approved') {
-                this.showUndoToast(action);
-            }
         } else {
             // Batch item: the transcript renders per-item status 'approved'/'skipped'.
             action.itemResults = {
@@ -1024,10 +1001,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.stopCopyTicker();
         this.clearRateLimit();
         this.unsubscribe();
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = null;
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
         window.removeEventListener('keydown', this.approvalKeyHandler);
@@ -2037,6 +2010,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return (action.itemResults && action.itemResults[index]) || null;
     },
 
+    // Past-tense verb for a resolved item's chip, by operation.
+    itemVerb(action) {
+        const op = action?.operation;
+        return op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+    },
+
     // Reload-safe agent outcome summary for a finalized proposal. Built purely from
     // the persisted action (status, itemResults, record refs, display) so it survives
     // a conversation reload exactly like the audit card — no stored message and no AI
@@ -2058,17 +2037,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 if (res.status === 'approved') created.push(name);
                 else if (res.status === 'skipped') skipped.push(name);
             });
+            const skippedVerb = op === 'delete' ? 'kept' : 'skipped';
             const parts = [];
             if (created.length) parts.push(`${verb} ${this.joinNames(created)}`);
-            if (skipped.length) parts.push(`skipped ${this.joinNames(skipped)}`);
+            if (skipped.length) parts.push(`${skippedVerb} ${this.joinNames(skipped)}`);
             if (parts.length === 0) return null;
             const sentence = parts.join('; ') + '.';
             return sentence.charAt(0).toUpperCase() + sentence.slice(1);
         }
 
-        if (action.status === 'approved' || action.status === 'restored') {
+        if (action.status === 'approved') {
             const label = action.record?.label || this.extractQuotedName(action.display?.summary) || 'the record';
-            return `${action.status === 'restored' ? 'Restored' : verb} ${label}.`;
+            return `${verb} ${label}.`;
         }
         if (action.status === 'rejected') {
             const label = this.extractQuotedName(action.display?.summary);
@@ -2100,51 +2080,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (list.length === 1) return list[0];
         if (list.length === 2) return `${list[0]} and ${list[1]}`;
         return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
-    },
-
-    showUndoToast(action) {
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = {
-            action,
-            startedAt: Date.now(),
-            timeoutId: null,
-        };
-        this.undoToast.timeoutId = setTimeout(() => {
-            this.undoToast = null;
-        }, 5000);
-    },
-
-    async undoLastAction() {
-        if (!this.undoToast) return;
-        const action = this.undoToast.action;
-        clearTimeout(this.undoToast.timeoutId);
-        this.undoToast = null;
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/restore', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                action.status = 'restored';
-                action.error = null;
-                if (body.record) {
-                    action.record = body.record;
-                }
-            } else {
-                const body = await res.json().catch(() => ({}));
-                action.error = body.error || 'Failed to restore';
-            }
-        } catch {
-            action.error = 'Network error';
-        }
     },
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they

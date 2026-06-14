@@ -28,7 +28,6 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -223,14 +222,7 @@ final readonly class PendingActionService
                     return [$this->isComplete($items, $records), null];
                 }
 
-                $action = $this->makeCreateAction($locked);
-
-                if (! method_exists($action, 'execute')) {
-                    throw new RuntimeException("Action class {$locked->action_class} does not have an execute method");
-                }
-
-                /** @var Model $model */
-                $model = $action->execute($user, $records[$index], CreationSource::CHAT);
+                $model = $this->executeBatchItem($locked, $user, $records[$index]);
 
                 $items[(string) $index] = ['status' => 'approved', 'id' => $model->getKey()];
                 $resultData['items'] = $items;
@@ -345,55 +337,70 @@ final readonly class PendingActionService
         throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
     }
 
-    private function makeCreateAction(PendingAction $pendingAction): object
+    /**
+     * Execute one batch item by the proposal's operation and return the affected model.
+     * Create runs the create action on the record payload; Delete resolves the record's
+     * own `_record_id`/`_model_class` within the tenant and runs the delete action.
+     * Update is never batched (one record per Update proposal), so it is rejected here.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function executeBatchItem(PendingAction $pendingAction, User $user, array $record): Model
     {
-        $actionClass = $pendingAction->action_class;
+        $action = $this->makeBatchItemAction($pendingAction);
 
+        if (! method_exists($action, 'execute')) {
+            throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        if ($pendingAction->operation === PendingActionOperation::Delete) {
+            $model = $this->resolveBatchDeleteModel($pendingAction, $record);
+            $action->execute($user, $model);
+
+            return $model;
+        }
+
+        /** @var Model */
+        return $action->execute($user, $record, CreationSource::CHAT);
+    }
+
+    private function makeBatchItemAction(PendingAction $pendingAction): object
+    {
         throw_unless(
-            in_array($actionClass, self::ALLOWED_ACTION_CLASSES, true),
+            in_array($pendingAction->action_class, self::ALLOWED_ACTION_CLASSES, true),
             RuntimeException::class,
             'Action class not allowlisted',
         );
 
-        throw_if($pendingAction->operation !== PendingActionOperation::Create, RuntimeException::class, 'Per-item resolution applies only to create proposals');
+        throw_if(
+            $pendingAction->operation === PendingActionOperation::Update,
+            RuntimeException::class,
+            'Per-item resolution applies to create and delete proposals',
+        );
 
-        return app()->make($actionClass);
+        return app()->make($pendingAction->action_class);
     }
 
-    public function restore(PendingAction $pendingAction, User $user): PendingAction
+    /**
+     * @param  array<string, mixed>  $record
+     */
+    private function resolveBatchDeleteModel(PendingAction $pendingAction, array $record): Model
     {
-        return DB::transaction(function () use ($pendingAction, $user): PendingAction {
-            /** @var PendingAction $locked */
-            $locked = PendingAction::query()
-                ->lockForUpdate()
-                ->findOrFail($pendingAction->getKey());
+        $modelClass = $this->resolveModelClass($record);
+        $recordId = $record['_record_id'] ?? null;
 
-            $this->validateRestorable($locked);
+        throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in delete batch item');
 
-            $modelClass = $this->resolveModelClass($locked->action_data);
+        $model = $modelClass::query()
+            ->with($this->deleteEagerLoads($modelClass))
+            ->where('team_id', $pendingAction->team_id)
+            ->find($recordId);
 
-            throw_unless(in_array(SoftDeletes::class, class_uses_recursive($modelClass), true), RuntimeException::class, 'This record cannot be restored');
+        // A vanished record fails only this item (RuntimeException -> resolve-failed),
+        // never the sibling items — per-item resolution is independent, not atomic.
+        throw_if(! $model instanceof Model, RuntimeException::class, 'Record not found');
 
-            $ids = $locked->action_data['_record_ids'] ?? null;
-
-            throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
-
-            foreach ($ids as $recordId) {
-                $record = $this->findTrashedRecord($modelClass, $locked->team_id, $recordId);
-
-                throw_if(! $record instanceof Model, RuntimeException::class, 'Record not found');
-
-                abort_unless($user->can('restore', $record), 403);
-
-                $this->restoreTrashedRecord($record);
-            }
-
-            $locked->update([
-                'status' => PendingActionStatus::Restored,
-            ]);
-
-            return $locked->refresh();
-        });
+        return $model;
     }
 
     public function expireStale(): int
@@ -545,17 +552,6 @@ final readonly class PendingActionService
         throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
     }
 
-    private function validateRestorable(PendingAction $pendingAction): void
-    {
-        throw_if($pendingAction->operation !== PendingActionOperation::Delete, RuntimeException::class, 'Only deleted records can be restored');
-
-        throw_if($pendingAction->status !== PendingActionStatus::Approved, RuntimeException::class, 'Only approved deletions can be restored');
-
-        $resolvedAt = $pendingAction->resolved_at;
-
-        throw_if($resolvedAt === null || $resolvedAt->lt(now()->subMinutes(5)), RuntimeException::class, 'undo_window_expired');
-    }
-
     private function executeAction(PendingAction $pendingAction, User $user): mixed
     {
         $actionClass = $pendingAction->action_class;
@@ -700,21 +696,6 @@ final readonly class PendingActionService
     }
 
     /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function findTrashedRecord(string $modelClass, string $teamId, string|int $recordId): ?Model
-    {
-        return match ($modelClass) {
-            Company::class => Company::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            People::class => People::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Opportunity::class => Opportunity::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Task::class => Task::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Note::class => Note::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            default => null,
-        };
-    }
-
-    /**
      * A same-titled create was proposed/approved moments ago — usually a model
      * regeneration after a transient failure. Approving both would write real
      * duplicate records, so the card carries an explicit warning.
@@ -795,17 +776,5 @@ final readonly class PendingActionService
     private function proposedTitles(array $actionData): array
     {
         return array_keys($this->proposedTitleMap($actionData));
-    }
-
-    private function restoreTrashedRecord(Model $record): void
-    {
-        match (true) {
-            $record instanceof Company => $record->restore(),
-            $record instanceof People => $record->restore(),
-            $record instanceof Opportunity => $record->restore(),
-            $record instanceof Task => $record->restore(),
-            $record instanceof Note => $record->restore(),
-            default => throw new RuntimeException('This record cannot be restored'),
-        };
     }
 }

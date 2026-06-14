@@ -23,10 +23,6 @@ Route::middleware(['auth:web'])->group(function (): void {
     Route::post('/chat/actions/{pendingAction}/reject', [PendingActionController::class, 'reject'])
         ->middleware('throttle:60,1')
         ->name('chat.actions.reject');
-    Route::post('/chat/actions/{pendingAction}/restore', [PendingActionController::class, 'restore'])
-        ->middleware('throttle:60,1')
-        ->name('chat.actions.restore');
-
     Route::post('/chat/actions/{pendingAction}/items/{index}/approve', [PendingActionController::class, 'approveItem'])
         ->whereNumber('index')
         ->middleware('throttle:60,1')

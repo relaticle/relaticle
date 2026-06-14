@@ -19,7 +19,7 @@
                             <span class="text-gray-600 dark:text-gray-300" x-text="item.summary"></span>
                             <template x-if="itemResult(action, itemIdx).status === 'approved'">
                                 <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                                    <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> Created
+                                    <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
                                 </span>
                             </template>
                             <template x-if="itemResult(action, itemIdx).status === 'skipped'">
@@ -86,7 +86,7 @@
                                 <div class="mt-1.5 flex items-center gap-2 text-xs">
                                     <template x-if="itemResult(action, itemIdx).status === 'approved'">
                                         <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                                            <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> Created
+                                            <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
                                         </span>
                                     </template>
                                     <template x-if="itemResult(action, itemIdx).status === 'skipped'">
@@ -119,11 +119,10 @@
                             'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400': action.status === 'approved',
                             'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.status === 'rejected',
                             'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                            'bg-gradient-to-r from-green-50 to-blue-50 text-blue-700 dark:from-green-900/20 dark:to-blue-900/20 dark:text-blue-300': action.status === 'restored',
                         }"
                         x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
                     ></span>
-                    <template x-if="(action.status === 'approved' || action.status === 'restored') && action.record && action.record.url">
+                    <template x-if="action.status === 'approved' && action.record && action.record.url">
                         <a
                             :href="action.record.url"
                             wire:navigate

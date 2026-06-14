@@ -778,3 +778,68 @@ it('rebuilds a company record (with account owner + custom field) without diverg
         ->and(collect($fields)->pluck('value')->all())->toBe(collect($stored)->pluck('value')->all())
         ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
 });
+
+it('resolves a delete batch per item through the component, deleting only approved records', function (): void {
+    Bus::fake();
+    $tasks = Task::factory()->count(2)->for($this->team)->create();
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\DeleteTask',
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'task',
+        'action_data' => [
+            '_batch' => true,
+            'records' => $tasks->map(fn (Task $t): array => ['_record_id' => $t->getKey(), '_model_class' => Task::class])->all(),
+        ],
+        'display_data' => [
+            'title' => 'Delete 2 Tasks',
+            'summary' => 'Delete 2 tasks',
+            'items' => $tasks->map(fn (Task $t): array => [
+                'summary' => "Delete Task \"{$t->title}\"",
+                'fields' => [['label' => 'Name', 'value' => $t->title]],
+            ])->all(),
+        ],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent'); // delete item 0
+
+    // The batch is not yet finalized — item 0 is deleted, item 1 still pending.
+    expect(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeFalse()
+        ->and(Task::query()->whereKey($tasks[1]->getKey())->exists())->toBeTrue()
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+    $component->call('discardCurrent'); // skip item 1 -> finalize
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and(Task::query()->whereKey($tasks[1]->getKey())->exists())->toBeTrue();
+});
+
+it('offers no inline-edit codes for a delete proposal', function (): void {
+    $task = Task::factory()->for($this->team)->create();
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\DeleteTask',
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'task',
+        'action_data' => ['_record_ids' => [$task->getKey()], '_model_class' => Task::class],
+        'display_data' => ['title' => 'Delete Task', 'summary' => "Delete Task \"{$task->title}\"", 'fields' => [['label' => 'Name', 'value' => $task->title]]],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $codes = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->instance()->editableCodes();
+
+    expect($codes)->toBe([]);
+});

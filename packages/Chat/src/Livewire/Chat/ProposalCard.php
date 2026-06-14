@@ -458,7 +458,8 @@ final class ProposalCard extends BaseLivewireComponent
             if ($isBatch) {
                 $result = $service->approveItem($pendingAction, $this->authUser(), $this->cursor);
                 $finalized = $result['finalized'];
-                $record = $result['record'] instanceof Model
+                // A deleted record has no page to link to, so only Create items carry a ref.
+                $record = ($pendingAction->operation === PendingActionOperation::Create && $result['record'] instanceof Model)
                     ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
                     : null;
             } else {
@@ -656,6 +657,11 @@ final class ProposalCard extends BaseLivewireComponent
         $pendingAction ??= $this->loadPending($this->pendingActionId ?? '');
 
         if (! $pendingAction instanceof PendingAction) {
+            return [];
+        }
+
+        // Only Create proposals are editable — never offer edit pencils on delete/update.
+        if ($pendingAction->operation !== PendingActionOperation::Create) {
             return [];
         }
 
