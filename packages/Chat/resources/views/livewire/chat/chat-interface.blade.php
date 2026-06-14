@@ -337,9 +337,22 @@
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
-                                <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
-                                    @include('chat::livewire.chat.partials._proposal-card')
-                                </template>
+                                <div class="space-y-2">
+                                    <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                        @include('chat::livewire.chat.partials._proposal-card')
+                                    </template>
+
+                                    {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
+                                         derived from the persisted action by proposalOutcome(), not a stored message. --}}
+                                    <template x-if="action.status !== 'pending' && proposalOutcome(action)">
+                                        <div class="flex justify-start">
+                                            <div class="inline-flex max-w-[85%] items-start gap-1.5 rounded-2xl rounded-bl-md bg-white px-3 py-2 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700">
+                                                <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
+                                                <span x-text="proposalOutcome(action)"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
                             </template>
                         </div>
                     </template>
@@ -2022,6 +2035,71 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // getter in both its compact-while-pending and full resolved modes.
     itemResult(action, index) {
         return (action.itemResults && action.itemResults[index]) || null;
+    },
+
+    // Reload-safe agent outcome summary for a finalized proposal. Built purely from
+    // the persisted action (status, itemResults, record refs, display) so it survives
+    // a conversation reload exactly like the audit card — no stored message and no AI
+    // continuation (both intentionally removed). Returns null while still pending.
+    proposalOutcome(action) {
+        if (!action || action.status === 'pending') return null;
+
+        const op = action.operation;
+        const verb = op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+        const items = action.display?.items;
+
+        if (Array.isArray(items) && items.length > 0) {
+            const created = [];
+            const skipped = [];
+            items.forEach((item, i) => {
+                const res = this.itemResult(action, i) || this.itemResult(action, String(i));
+                if (!res) return;
+                const name = res.record?.label || this.proposalItemName(item) || 'record';
+                if (res.status === 'approved') created.push(name);
+                else if (res.status === 'skipped') skipped.push(name);
+            });
+            const parts = [];
+            if (created.length) parts.push(`${verb} ${this.joinNames(created)}`);
+            if (skipped.length) parts.push(`skipped ${this.joinNames(skipped)}`);
+            if (parts.length === 0) return null;
+            const sentence = parts.join('; ') + '.';
+            return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+        }
+
+        if (action.status === 'approved' || action.status === 'restored') {
+            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || 'the record';
+            return `${action.status === 'restored' ? 'Restored' : verb} ${label}.`;
+        }
+        if (action.status === 'rejected') {
+            const label = this.extractQuotedName(action.display?.summary);
+            if (op === 'delete') return label ? `Kept ${label} — deletion discarded.` : 'Deletion discarded.';
+            return label ? `Discarded ${label}.` : 'Proposal discarded.';
+        }
+        return null;
+    },
+
+    proposalItemName(item) {
+        if (!item) return null;
+        const fields = item.fields;
+        if (Array.isArray(fields) && fields.length > 0) {
+            const value = fields[0].value ?? fields[0].new;
+            if (typeof value === 'string' && value !== '') return value;
+        }
+        return this.extractQuotedName(item.summary);
+    },
+
+    extractQuotedName(text) {
+        if (typeof text !== 'string') return null;
+        const match = text.match(/"([^"]+)"/);
+        return match ? match[1] : null;
+    },
+
+    joinNames(names) {
+        const list = names.filter(Boolean);
+        if (list.length === 0) return '';
+        if (list.length === 1) return list[0];
+        if (list.length === 2) return `${list[0]} and ${list[1]}`;
+        return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
     },
 
     showUndoToast(action) {
