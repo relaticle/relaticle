@@ -107,39 +107,34 @@
                 </div>
             </template>
 
-            {{-- Resolved status badge + record links --}}
-            <div class="mt-3 flex items-center gap-2">
-                <span
-                    class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
-                    :class="{
-                        'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400': action.status === 'approved',
-                        'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.status === 'rejected',
-                        'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                        'bg-gradient-to-r from-green-50 to-blue-50 text-blue-700 dark:from-green-900/20 dark:to-blue-900/20 dark:text-blue-300': action.status === 'restored',
-                    }"
-                    x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
-                ></span>
-                <template x-if="(action.status === 'approved' || action.status === 'restored') && action.record && action.record.url">
-                    <a
-                        :href="action.record.url"
-                        wire:navigate
-                        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                    >
-                        <span x-text="action.record.label ? 'View ' + action.record.label : 'View'"></span>
-                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                    </a>
-                </template>
-                <template x-if="(action.status === 'approved' || action.status === 'restored') && Array.isArray(action.records) && action.records.length > 0">
-                    <span class="flex flex-wrap gap-2">
-                        <template x-for="ref in action.records" :key="ref.id">
-                            <a :href="ref.url" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                <span x-text="ref.label ? ref.label : 'View'"></span>
-                                <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                            </a>
-                        </template>
-                    </span>
-                </template>
-            </div>
+            {{-- Resolved status badge + record link — SINGLE proposals only. Batch items
+                 each carry their own Created/Skipped chip and View link above, and the
+                 outcome summary sits below the card, so a batch-level status row here
+                 would just repeat the same links a third time. --}}
+            <template x-if="!(Array.isArray(action.display?.items) && action.display.items.length > 0)">
+                <div class="mt-3 flex items-center gap-2">
+                    <span
+                        class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
+                        :class="{
+                            'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400': action.status === 'approved',
+                            'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.status === 'rejected',
+                            'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
+                            'bg-gradient-to-r from-green-50 to-blue-50 text-blue-700 dark:from-green-900/20 dark:to-blue-900/20 dark:text-blue-300': action.status === 'restored',
+                        }"
+                        x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
+                    ></span>
+                    <template x-if="(action.status === 'approved' || action.status === 'restored') && action.record && action.record.url">
+                        <a
+                            :href="action.record.url"
+                            wire:navigate
+                            class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                        >
+                            <span x-text="action.record.label ? 'View ' + action.record.label : 'View'"></span>
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                        </a>
+                    </template>
+                </div>
+            </template>
         </div>
     </template>
 </div>
