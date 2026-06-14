@@ -16,7 +16,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 
-it('multi-step workflow: create person -> approve -> continuation creates linked task', function (): void {
+it('multi-step workflow: create person -> approve -> create linked task -> approve', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     Auth::guard('web')->setUser($user);
@@ -46,7 +46,7 @@ it('multi-step workflow: create person -> approve -> continuation creates linked
 
     Bus::fake();
     $approved = resolve(PendingActionService::class)->approve($personPending, $user);
-    Bus::assertDispatched(ContinueChatMessage::class);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 
     expect($approved->status)->toBe(PendingActionStatus::Approved);
     $angelId = $approved->result_data['id'] ?? null;

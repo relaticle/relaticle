@@ -38,10 +38,6 @@ use RuntimeException;
 
 final readonly class PendingActionService
 {
-    public function __construct(
-        private ApprovalContinuationService $continuation,
-    ) {}
-
     /** @var list<class-string<Model>> */
     private const array ALLOWED_MODEL_CLASSES = [
         Company::class,
@@ -175,14 +171,12 @@ final readonly class PendingActionService
             TenantContextService::setTenantId($previousTenantId);
         }
 
-        $this->continuation->dispatchAfterApproval($resolved, 'approved');
-
         return $resolved;
     }
 
     public function reject(PendingAction $pendingAction): PendingAction
     {
-        $resolved = DB::transaction(function () use ($pendingAction): PendingAction {
+        return DB::transaction(function () use ($pendingAction): PendingAction {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()
                 ->lockForUpdate()
@@ -197,18 +191,13 @@ final readonly class PendingActionService
 
             return $locked->refresh();
         });
-
-        $this->continuation->dispatchAfterApproval($resolved, 'rejected');
-
-        return $resolved;
     }
 
     /**
      * Resolve a single item of a Create batch proposal. Each item is executed in
      * its own transaction so partial progress survives a later item's failure —
      * unlike approve(), which is atomic for the whole batch. The proposal stays
-     * Pending until every item is resolved, then finalizes and dispatches exactly
-     * one continuation.
+     * Pending until every item is resolved, then finalizes.
      *
      * @return array{finalized: bool, record: Model|null}
      */
@@ -218,7 +207,7 @@ final readonly class PendingActionService
         TenantContextService::setTenantId($pendingAction->team_id);
 
         try {
-            [$resolved, $finalized, $record] = DB::transaction(function () use ($pendingAction, $user, $index): array {
+            [$finalized, $record] = DB::transaction(function () use ($pendingAction, $user, $index): array {
                 /** @var PendingAction $locked */
                 $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -231,7 +220,7 @@ final readonly class PendingActionService
 
                 // Idempotent: an already-resolved item is a no-op (no re-execute).
                 if (isset($items[(string) $index])) {
-                    return [$locked, $this->isComplete($items, $records), null];
+                    return [$this->isComplete($items, $records), null];
                 }
 
                 $action = $this->makeCreateAction($locked);
@@ -252,14 +241,10 @@ final readonly class PendingActionService
 
                 $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
 
-                return [$locked->refresh(), $finalized, $model];
+                return [$finalized, $model];
             });
         } finally {
             TenantContextService::setTenantId($previousTenantId);
-        }
-
-        if ($finalized) {
-            $this->continuation->dispatchAfterApproval($resolved, $this->batchDecisionLabel($resolved));
         }
 
         return ['finalized' => $finalized, 'record' => $record];
@@ -272,7 +257,7 @@ final readonly class PendingActionService
      */
     public function rejectItem(PendingAction $pendingAction, int $index): array
     {
-        [$resolved, $finalized] = DB::transaction(function () use ($pendingAction, $index): array {
+        $finalized = DB::transaction(function () use ($pendingAction, $index): bool {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -284,20 +269,14 @@ final readonly class PendingActionService
             $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
 
             if (isset($items[(string) $index])) {
-                return [$locked, $this->isComplete($items, $records)];
+                return $this->isComplete($items, $records);
             }
 
             $items[(string) $index] = ['status' => 'rejected'];
             $resultData['items'] = $items;
 
-            $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
-
-            return [$locked->refresh(), $finalized];
+            return $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
         });
-
-        if ($finalized) {
-            $this->continuation->dispatchAfterApproval($resolved, $this->batchDecisionLabel($resolved));
-        }
 
         return ['finalized' => $finalized];
     }
@@ -325,11 +304,6 @@ final readonly class PendingActionService
         ]);
 
         return true;
-    }
-
-    private function batchDecisionLabel(PendingAction $pendingAction): string
-    {
-        return $pendingAction->status === PendingActionStatus::Approved ? 'approved' : 'rejected';
     }
 
     /**

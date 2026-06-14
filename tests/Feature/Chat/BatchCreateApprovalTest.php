@@ -103,7 +103,7 @@ it('approves one batch item without creating the others and stays pending', func
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('finalizes the batch and dispatches one continuation after the last item resolves', function (): void {
+it('finalizes the batch without dispatching a continuation after the last item resolves', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [
         ['title' => 'Keep 1'], ['title' => 'Skip me'], ['title' => 'Keep 2'],
     ]);
@@ -125,7 +125,7 @@ it('finalizes the batch and dispatches one continuation after the last item reso
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Keep 1', 'Keep 2']);
 
-    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('marks the batch rejected when every item is skipped', function (): void {
@@ -137,7 +137,7 @@ it('marks the batch rejected when every item is skipped', function (): void {
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
-    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('is idempotent — re-approving the same item does not double-create', function (): void {
@@ -197,25 +197,50 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Made A', 'Made B']);
 
-    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('builds a per-item summary continuation prompt naming created and skipped records', function (): void {
-    $action = makeBatchProposal($this->convId, $this->user, [
-        ['title' => 'Created One'], ['title' => 'Skipped Two'],
+it('dispatches no continuation on a single approve and persists the record', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Single Approve'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
     ]);
-    $action->update(['display_data' => ['title' => 'Create Tasks', 'summary' => 'Create 2 tasks', 'items' => [
-        ['summary' => 'Created One'], ['summary' => 'Skipped Two'],
-    ]]]);
 
-    $service = resolve(PendingActionService::class);
-    $service->approveItem($action, $this->user, 0);
-    $service->rejectItem($action, 1);
+    $resolved = resolve(PendingActionService::class)->approve($action, $this->user);
 
-    Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
-        return str_contains($job->prompt, 'Created One')
-            && str_contains($job->prompt, 'Skipped Two')
-            && str_contains($job->prompt, 'skipped')
-            && str_contains($job->prompt, 'ONE short sentence');
-    });
+    expect($resolved->status)->toBe(PendingActionStatus::Approved)
+        ->and($resolved->result_data['type'])->toBe('task')
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Approve')->count())->toBe(1);
+
+    Bus::assertNotDispatched(ContinueChatMessage::class);
+});
+
+it('dispatches no continuation on a single reject and creates nothing', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Single Reject'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->reject($action);
+
+    expect($resolved->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Reject')->count())->toBe(0);
+
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });

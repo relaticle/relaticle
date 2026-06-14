@@ -330,7 +330,7 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
         ->assertSet('pendingActionId', null);
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
-    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('discards the current batch record and advances to the next unresolved', function (): void {
@@ -348,7 +348,7 @@ it('discards the current batch record and advances to the next unresolved', func
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('finalizes after the last record is resolved and dispatches one continuation', function (): void {
+it('finalizes after the last record is resolved without dispatching a continuation', function (): void {
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
@@ -358,7 +358,7 @@ it('finalizes after the last record is resolved and dispatches one continuation'
         ->call('discardCurrent')
         ->assertSet('pendingActionId', null);
 
-    Bus::assertDispatched(ContinueChatMessage::class, 1);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
     expect($action->fresh()->status)->not->toBe(PendingActionStatus::Pending);
 });
 

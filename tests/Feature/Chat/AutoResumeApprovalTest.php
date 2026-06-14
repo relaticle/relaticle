@@ -130,7 +130,7 @@ it('skips dispatch after 5 consecutive [approval] continuations without real use
     Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
-it('approving a pending action via the service dispatches a continuation job', function (): void {
+it('approving a pending action via the service dispatches no continuation job', function (): void {
     Bus::fake();
     $this->actingAs($this->user);
 
@@ -149,7 +149,7 @@ it('approving a pending action via the service dispatches a continuation job', f
 
     resolve(PendingActionService::class)->approve($action, $this->user);
 
-    Bus::assertDispatched(ContinueChatMessage::class);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('includes all record ids and a batch label for an approved batch', function (): void {
@@ -206,7 +206,7 @@ it('carries plan progress into the continuation prompt when the proposal has one
         && str_contains($job->prompt, '2 of 5'));
 });
 
-it('rejecting a pending action also dispatches a continuation', function (): void {
+it('rejecting a pending action via the service dispatches no continuation', function (): void {
     Bus::fake();
 
     $action = PendingAction::query()->create([
@@ -224,10 +224,7 @@ it('rejecting a pending action also dispatches a continuation', function (): voi
 
     resolve(PendingActionService::class)->reject($action);
 
-    Bus::assertDispatched(ContinueChatMessage::class, function (ContinueChatMessage $job): bool {
-        return str_starts_with($job->prompt, '[approval]')
-            && str_contains($job->prompt, 'REJECTED');
-    });
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
 
 it('sanitizes control characters and quotes out of stored plan text', function (): void {

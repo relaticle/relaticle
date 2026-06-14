@@ -438,28 +438,27 @@ it('404s an item endpoint for another tenant and 422s an out-of-range index', fu
     $this->postJson("/chat/actions/{$mine->id}/items/9/approve")->assertStatus(422);
 });
 
-it('approval continuation prompt demands a one-sentence confirmation without tables', function (): void {
-    insertConversation('conv-prompt-test', $this->user, $this->team);
+it('dispatches no continuation when approving a pending action via the endpoint', function (): void {
+    insertConversation('conv-no-continuation', $this->user, $this->team);
 
     $pending = PendingAction::query()->create([
         'team_id' => $this->team->getKey(),
         'user_id' => $this->user->getKey(),
-        'conversation_id' => 'conv-prompt-test',
+        'conversation_id' => 'conv-no-continuation',
         'message_id' => null,
         'action_class' => CreateCompany::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'company',
-        'action_data' => ['name' => 'Prompt Test Co'],
+        'action_data' => ['name' => 'No Continuation Co'],
         'display_data' => [],
         'status' => PendingActionStatus::Pending,
         'expires_at' => now()->addMinutes(15),
     ]);
 
-    $this->postJson(route('chat.actions.approve', $pending))->assertOk();
+    $this->postJson(route('chat.actions.approve', $pending))
+        ->assertOk()
+        ->assertJsonPath('status', 'approved');
 
-    Bus::assertDispatched(
-        ContinueChatMessage::class,
-        fn (ContinueChatMessage $job): bool => str_contains($job->prompt, 'ONE short sentence')
-            && str_contains($job->prompt, 'never re-list the field values'),
-    );
+    $this->assertDatabaseHas('companies', ['name' => 'No Continuation Co']);
+    Bus::assertNotDispatched(ContinueChatMessage::class);
 });
