@@ -24,3 +24,13 @@ it('omits the resolved_actions block when empty', function (): void {
     expect((new CrmAssistant)->instructions())
         ->not->toContain('These proposals were already decided by the user.');
 });
+
+it('static instructions forbid enumerating proposal data in prose', function (): void {
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('NEVER repeat the proposed records or their field values in prose')
+        ->toContain('Use tables ONLY for read/search results')
+        ->toContain('No celebratory emoji')
+        ->toContain('never re-list field values or render a table of data the user just approved');
+});

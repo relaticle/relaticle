@@ -29,12 +29,4 @@ return new class extends Migration
             $table->index('email');
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('system_administrators');
-    }
 };

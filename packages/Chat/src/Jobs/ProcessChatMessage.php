@@ -35,6 +35,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
@@ -400,7 +401,10 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
     {
-        $assistantContent = $streamedResponse->text;
+        // Collapse here too so the `document` column owns its own correctness — the
+        // store fixes `content`, but the document is built independently. Idempotent
+        // if the store already collapsed the shared response instance.
+        $assistantContent = AssistantText::collapseRepeated($streamedResponse->text);
 
         if ($assistantContent === '') {
             return;

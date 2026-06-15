@@ -11,25 +11,22 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 beforeEach(function (): void {
-    // The post-approval AI continuation is irrelevant to this scoping concern.
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 });
 
 /**
  * Regression for the chat-approve cross-tenant custom-field write (and the 504 it
  * caused at scale).
  *
- * Approvals run via the /chat/actions/* routes, which bypass Filament's panel
- * middleware — so no tenant is resolvable when the action executes. Without an
- * explicit tenant the custom-fields TenantScope no-ops and saveCustomFields()
- * iterates EVERY tenant's field definitions. PendingActionService::approve() now
- * sets the tenant context from the action's team before executing.
+ * When approve() runs there may be no resolvable tenant context — so the custom-fields
+ * TenantScope no-ops and saveCustomFields() iterates EVERY tenant's field definitions.
+ * PendingActionService::approve() sets the tenant context from the action's team before
+ * executing.
  *
  * The test invokes the service directly with the tenant context torn down, which
  * faithfully reproduces the no-tenant request (an HTTP feature test cannot — the
