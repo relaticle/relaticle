@@ -1,0 +1,42 @@
+{
+  "persona": "end-user",
+  "journeys": [
+    {
+      "id": "S2",
+      "value_verdict": "failed",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "signup with duplicate email",
+          "result": "HTTP 500 — unhandled duplicate key exception, no user-visible error message",
+          "bug_ref": "BUG-1"
+        }
+      ]
+    }
+  ],
+  "bugs": [
+    {
+      "id": "BUG-1",
+      "journey": "S2",
+      "repro": [
+        "Open the signup page",
+        "Enter an email address that already exists in the system",
+        "Submit the signup form"
+      ],
+      "expected": "A clear 'Email already registered' validation message is shown inline",
+      "actual": "HTTP 500 — unhandled duplicate key exception, no user-visible error message",
+      "artifact": "case-S2/duplicate-email-500.png"
+    }
+  ],
+  "ux_friction": [
+    {
+      "journey": "S2",
+      "note": "Signup submit button gives no feedback while the request is in-flight — user may double-submit",
+      "severity": "high"
+    }
+  ],
+  "coverage": {
+    "seams_hit": ["form submission -> server validation", "email uniqueness check"],
+    "frontier_not_reached": ["social OAuth signup path", "email verification resend flow"]
+  }
+}

@@ -3,7 +3,11 @@
 declare(strict_types=1);
 
 return [
-    'navigation_label' => 'Board',
+    'view_switcher' => [
+        'label' => 'Switch view',
+        'list' => 'List',
+        'board' => 'Board',
+    ],
 
     'opportunities' => [
         'title' => 'Opportunities',

@@ -1,0 +1,4 @@
+{"persona": "owner",
+ "journeys": [{"id": "S1", "value_verdict": "partial", "sad_paths_walked": ["free >7d locked"]}],
+ "bugs": [], "ux_friction": [],
+ "coverage": {"frontier_not_reached": [{"item": "pro-unlock", "why_unreached": "no paid workspace reachable", "how_to_close": "seed a paid workspace with a form"}]}}

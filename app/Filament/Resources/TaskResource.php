@@ -8,6 +8,7 @@ use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -156,6 +157,7 @@ final class TaskResource extends Resource
     {
         return [
             'index' => ManageTasks::route('/'),
+            'board' => TasksBoard::route('/board'),
         ];
     }
 

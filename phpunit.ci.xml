@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    CI overlay of phpunit.xml: same testsuites and base env, plus CI-only
+    overrides (GitHub Actions postgres service credentials, fake Pusher keys,
+    log broadcaster). Contract: testsuites must match phpunit.xml exactly, and
+    every env key in phpunit.xml must exist here. Both rules are enforced by
+    tests/Arch/TestSuiteIntegrityTest.php.
+-->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
@@ -36,6 +43,7 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_DEBUG" value="false"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
@@ -50,6 +58,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="PENNANT_STORE" value="array"/>
         <env name="BROADCAST_CONNECTION" value="log"/>
         <env name="PUSHER_APP_KEY" value="test-key"/>
         <env name="PUSHER_APP_SECRET" value="test-secret"/>

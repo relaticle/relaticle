@@ -155,12 +155,4 @@ return new class extends Migration
             $table->index(['entity_id', 'custom_field_id'], 'custom_field_values_entity_id_custom_field_id_index');
         });
     }
-
-    public function down(): void
-    {
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_field_values'));
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_field_options'));
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_fields'));
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_field_sections'));
-    }
 };

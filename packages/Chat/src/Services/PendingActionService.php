@@ -28,7 +28,6 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -38,10 +37,6 @@ use RuntimeException;
 
 final readonly class PendingActionService
 {
-    public function __construct(
-        private ApprovalContinuationService $continuation,
-    ) {}
-
     /** @var list<class-string<Model>> */
     private const array ALLOWED_MODEL_CLASSES = [
         Company::class,
@@ -132,13 +127,14 @@ final readonly class PendingActionService
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
         // The action executes the underlying CRM write, which may persist custom-field
-        // values. Approvals arrive via the /chat/actions/* routes, which bypass the
-        // Filament panel middleware and therefore leave no tenant context. Without one,
-        // the custom-fields TenantScope no-ops and saveCustomFields() iterates EVERY
-        // tenant's field definitions — writing value rows across all tenants (cross-tenant
-        // leak) and, at scale, exceeding the request timeout. Scope it to the action's team,
-        // and restore the prior value afterward so the override never outlives this call
-        // (TenantContextService resolves its context before the Filament tenant).
+        // values. When approve() runs there may be no resolvable custom-fields tenant
+        // context (the Livewire dock sets the Filament tenant but not necessarily the
+        // custom-fields one). Without it the custom-fields TenantScope no-ops and
+        // saveCustomFields() iterates EVERY tenant's field definitions — writing value rows
+        // across all tenants (cross-tenant leak) and, at scale, exceeding the request
+        // timeout. Scope it to the action's team, and restore the prior value afterward so
+        // the override never outlives this call (TenantContextService resolves its context
+        // before the Filament tenant).
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 
@@ -151,17 +147,20 @@ final readonly class PendingActionService
 
                 $this->validateResolvable($pendingAction);
 
+                // Batches resolve one record at a time through approveItem()/rejectItem() —
+                // the dock has no whole-batch control. Refuse a whole-batch approve so no
+                // caller can bypass the per-item review and commit every record at once.
+                throw_if(
+                    ($pendingAction->action_data['_batch'] ?? false) === true,
+                    RuntimeException::class,
+                    'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
+                );
+
                 $result = $this->executeAction($pendingAction, $user);
 
-                $resultData = match (true) {
-                    $result instanceof Model => ['id' => $result->getKey(), 'type' => $result->getMorphClass()],
-                    is_array($result) && $result !== [] && $result[0] instanceof Model => [
-                        'ids' => array_values(array_map(static fn (Model $m) => $m->getKey(), $result)),
-                        'type' => $result[0]->getMorphClass(),
-                        'count' => count($result),
-                    ],
-                    default => ['success' => true],
-                };
+                $resultData = $result instanceof Model
+                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
+                    : ['success' => true];
 
                 $pendingAction->update([
                     'status' => PendingActionStatus::Approved,
@@ -175,14 +174,12 @@ final readonly class PendingActionService
             TenantContextService::setTenantId($previousTenantId);
         }
 
-        $this->continuation->dispatchAfterApproval($resolved, 'approved');
-
         return $resolved;
     }
 
     public function reject(PendingAction $pendingAction): PendingAction
     {
-        $resolved = DB::transaction(function () use ($pendingAction): PendingAction {
+        return DB::transaction(function () use ($pendingAction): PendingAction {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()
                 ->lockForUpdate()
@@ -197,46 +194,217 @@ final readonly class PendingActionService
 
             return $locked->refresh();
         });
-
-        $this->continuation->dispatchAfterApproval($resolved, 'rejected');
-
-        return $resolved;
     }
 
-    public function restore(PendingAction $pendingAction, User $user): PendingAction
+    /**
+     * Resolve a single item of a Create batch proposal. Each item is executed in
+     * its own transaction so partial progress survives a later item's failure —
+     * unlike approve(), which is atomic for the whole batch. The proposal stays
+     * Pending until every item is resolved, then finalizes.
+     *
+     * @return array{finalized: bool, record: Model|null}
+     */
+    public function approveItem(PendingAction $pendingAction, User $user, int $index): array
     {
-        return DB::transaction(function () use ($pendingAction, $user): PendingAction {
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($pendingAction->team_id);
+
+        try {
+            [$finalized, $record] = DB::transaction(function () use ($pendingAction, $user, $index): array {
+                /** @var PendingAction $locked */
+                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+
+                $this->validateResolvable($locked);
+                $records = $this->batchRecords($locked);
+                $this->assertItemIndex($records, $index);
+
+                $resultData = is_array($locked->result_data) ? $locked->result_data : [];
+                $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+
+                // Idempotent: an already-resolved item is a no-op (no re-execute).
+                if (isset($items[(string) $index])) {
+                    return [$this->isComplete($items, $records), null];
+                }
+
+                $model = $this->executeBatchItem($locked, $user, $records[$index]);
+
+                $items[(string) $index] = ['status' => 'approved', 'id' => $model->getKey()];
+                $resultData['items'] = $items;
+                $resultData['type'] ??= $model->getMorphClass();
+                $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
+                $ids[] = $model->getKey();
+                $resultData['ids'] = array_values($ids);
+
+                $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
+
+                return [$finalized, $model];
+            });
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+        }
+
+        return ['finalized' => $finalized, 'record' => $record];
+    }
+
+    /**
+     * Skip a single item of a Create batch proposal. Executes nothing.
+     *
+     * @return array{finalized: bool}
+     */
+    public function rejectItem(PendingAction $pendingAction, int $index): array
+    {
+        $finalized = DB::transaction(function () use ($pendingAction, $index): bool {
             /** @var PendingAction $locked */
-            $locked = PendingAction::query()
-                ->lockForUpdate()
-                ->findOrFail($pendingAction->getKey());
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
-            $this->validateRestorable($locked);
+            $this->validateResolvable($locked);
+            $records = $this->batchRecords($locked);
+            $this->assertItemIndex($records, $index);
 
-            $modelClass = $this->resolveModelClass($locked->action_data);
+            $resultData = is_array($locked->result_data) ? $locked->result_data : [];
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
 
-            throw_unless(in_array(SoftDeletes::class, class_uses_recursive($modelClass), true), RuntimeException::class, 'This record cannot be restored');
-
-            $ids = $locked->action_data['_record_ids'] ?? null;
-
-            throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
-
-            foreach ($ids as $recordId) {
-                $record = $this->findTrashedRecord($modelClass, $locked->team_id, $recordId);
-
-                throw_if(! $record instanceof Model, RuntimeException::class, 'Record not found');
-
-                abort_unless($user->can('restore', $record), 403);
-
-                $this->restoreTrashedRecord($record);
+            if (isset($items[(string) $index])) {
+                return $this->isComplete($items, $records);
             }
 
-            $locked->update([
-                'status' => PendingActionStatus::Restored,
-            ]);
+            $items[(string) $index] = ['status' => 'rejected'];
+            $resultData['items'] = $items;
 
-            return $locked->refresh();
+            return $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
         });
+
+        return ['finalized' => $finalized];
+    }
+
+    /**
+     * @param  array<string, mixed>  $items
+     * @param  array<int, array<string, mixed>>  $records
+     * @param  array<string, mixed>  $resultData
+     */
+    private function finalizeBatchIfComplete(PendingAction $pendingAction, array $items, array $records, array $resultData): bool
+    {
+        if (! $this->isComplete($items, $records)) {
+            $pendingAction->update(['result_data' => $resultData]);
+
+            return false;
+        }
+
+        $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
+        $resultData['count'] = count($ids);
+
+        $pendingAction->update([
+            'status' => $ids === [] ? PendingActionStatus::Rejected : PendingActionStatus::Approved,
+            'resolved_at' => now(),
+            'result_data' => $resultData,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $items
+     * @param  array<int, mixed>  $records
+     */
+    private function isComplete(array $items, array $records): bool
+    {
+        return count($items) >= count($records);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function batchRecords(PendingAction $pendingAction): array
+    {
+        $data = $pendingAction->action_data;
+
+        throw_if(($data['_batch'] ?? false) !== true, RuntimeException::class, 'Per-item resolution applies only to batch proposals');
+
+        $records = $data['records'] ?? null;
+
+        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
+
+        throw_if(
+            array_filter($records, static fn (mixed $r): bool => ! is_array($r)) !== [],
+            RuntimeException::class,
+            'Batch record data is malformed',
+        );
+
+        return array_values($records);
+    }
+
+    /**
+     * @param  array<int, mixed>  $records
+     */
+    private function assertItemIndex(array $records, int $index): void
+    {
+        throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
+    }
+
+    /**
+     * Execute one batch item by the proposal's operation and return the affected model.
+     * Create runs the create action on the record payload; Delete resolves the record's
+     * own `_record_id`/`_model_class` within the tenant and runs the delete action.
+     * Update is never batched (one record per Update proposal), so it is rejected here.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function executeBatchItem(PendingAction $pendingAction, User $user, array $record): Model
+    {
+        $action = $this->makeBatchItemAction($pendingAction);
+
+        if (! method_exists($action, 'execute')) {
+            throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        if ($pendingAction->operation === PendingActionOperation::Delete) {
+            $model = $this->resolveBatchDeleteModel($pendingAction, $record);
+            $action->execute($user, $model);
+
+            return $model;
+        }
+
+        /** @var Model */
+        return $action->execute($user, $record, CreationSource::CHAT);
+    }
+
+    private function makeBatchItemAction(PendingAction $pendingAction): object
+    {
+        throw_unless(
+            in_array($pendingAction->action_class, self::ALLOWED_ACTION_CLASSES, true),
+            RuntimeException::class,
+            'Action class not allowlisted',
+        );
+
+        throw_if(
+            $pendingAction->operation === PendingActionOperation::Update,
+            RuntimeException::class,
+            'Per-item resolution applies to create and delete proposals',
+        );
+
+        return app()->make($pendingAction->action_class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     */
+    private function resolveBatchDeleteModel(PendingAction $pendingAction, array $record): Model
+    {
+        $modelClass = $this->resolveModelClass($record);
+        $recordId = $record['_record_id'] ?? null;
+
+        throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in delete batch item');
+
+        $model = $modelClass::query()
+            ->with($this->deleteEagerLoads($modelClass))
+            ->where('team_id', $pendingAction->team_id)
+            ->find($recordId);
+
+        // A vanished record fails only this item (RuntimeException -> resolve-failed),
+        // never the sibling items — per-item resolution is independent, not atomic.
+        throw_if(! $model instanceof Model, RuntimeException::class, 'Record not found');
+
+        return $model;
     }
 
     public function expireStale(): int
@@ -323,30 +491,6 @@ final readonly class PendingActionService
         ], $actions->all()));
     }
 
-    /**
-     * The most recently resolved (approved/rejected) action that no assistant
-     * turn has journaled yet — i.e. the action whose continuation was lost.
-     * Used by the resume endpoint to re-drive the chain.
-     */
-    public function latestUnjournaledResolvedAction(string $conversationId): ?PendingAction
-    {
-        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
-
-        $query = PendingAction::query()
-            ->where('conversation_id', $conversationId)
-            ->whereIn('status', [
-                PendingActionStatus::Approved->value,
-                PendingActionStatus::Rejected->value,
-            ])
-            ->whereNotNull('resolved_at');
-
-        if ($lastAssistantAt !== null) {
-            $query->where('resolved_at', '>', $lastAssistantAt);
-        }
-
-        return $query->latest('resolved_at')->orderByDesc('id')->first();
-    }
-
     private function resolveActionLabel(PendingAction $action): ?string
     {
         $display = $action->display_data;
@@ -412,17 +556,6 @@ final readonly class PendingActionService
         throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
     }
 
-    private function validateRestorable(PendingAction $pendingAction): void
-    {
-        throw_if($pendingAction->operation !== PendingActionOperation::Delete, RuntimeException::class, 'Only deleted records can be restored');
-
-        throw_if($pendingAction->status !== PendingActionStatus::Approved, RuntimeException::class, 'Only approved deletions can be restored');
-
-        $resolvedAt = $pendingAction->resolved_at;
-
-        throw_if($resolvedAt === null || $resolvedAt->lt(now()->subMinutes(5)), RuntimeException::class, 'undo_window_expired');
-    }
-
     private function executeAction(PendingAction $pendingAction, User $user): mixed
     {
         $actionClass = $pendingAction->action_class;
@@ -442,35 +575,14 @@ final readonly class PendingActionService
         };
     }
 
-    /**
-     * @return Model|list<Model>
-     */
-    private function executeCreate(object $action, User $user, PendingAction $pendingAction): mixed
+    private function executeCreate(object $action, User $user, PendingAction $pendingAction): Model
     {
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
         }
 
-        $data = $pendingAction->action_data;
-
-        if (($data['_batch'] ?? false) !== true) {
-            return $action->execute($user, $data, CreationSource::CHAT);
-        }
-
-        $records = $data['records'] ?? null;
-
-        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
-
-        throw_if(
-            array_filter($records, static fn (mixed $record): bool => ! is_array($record)) !== [],
-            RuntimeException::class,
-            'Batch record data is malformed',
-        );
-
-        return array_values(array_map(
-            fn (array $record): Model => $action->execute($user, $record, CreationSource::CHAT),
-            $records,
-        ));
+        /** @var Model */
+        return $action->execute($user, $pendingAction->action_data, CreationSource::CHAT);
     }
 
     private function executeUpdate(object $action, User $user, PendingAction $pendingAction): mixed
@@ -567,21 +679,6 @@ final readonly class PendingActionService
     }
 
     /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function findTrashedRecord(string $modelClass, string $teamId, string|int $recordId): ?Model
-    {
-        return match ($modelClass) {
-            Company::class => Company::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            People::class => People::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Opportunity::class => Opportunity::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Task::class => Task::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            Note::class => Note::withTrashed()->where('team_id', $teamId)->whereKey($recordId)->first(),
-            default => null,
-        };
-    }
-
-    /**
      * A same-titled create was proposed/approved moments ago — usually a model
      * regeneration after a transient failure. Approving both would write real
      * duplicate records, so the card carries an explicit warning.
@@ -662,17 +759,5 @@ final readonly class PendingActionService
     private function proposedTitles(array $actionData): array
     {
         return array_keys($this->proposedTitleMap($actionData));
-    }
-
-    private function restoreTrashedRecord(Model $record): void
-    {
-        match (true) {
-            $record instanceof Company => $record->restore(),
-            $record instanceof People => $record->restore(),
-            $record instanceof Opportunity => $record->restore(),
-            $record instanceof Task => $record->restore(),
-            $record instanceof Note => $record->restore(),
-            default => throw new RuntimeException('This record cannot be restored'),
-        };
     }
 }

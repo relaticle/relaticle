@@ -23,7 +23,7 @@ it('backfills credit balances for teams that have none', function (): void {
         ->whereDoesntHave('aiCreditBalance')
         ->chunkById(200, function ($teams) use ($action): void {
             foreach ($teams as $team) {
-                $action->handle($team);
+                $action->execute($team);
             }
         });
 
@@ -40,10 +40,10 @@ it('falls back to Plan::default() when the team plan attribute is null at runtim
 
     // forceFill sets the in-memory attribute to null without touching the persisted
     // row (which still holds the NOT NULL default). This exercises the defensive
-    // `?? Plan::default()` fallback in SeedTeamCreditBalance::handle().
+    // `?? Plan::default()` fallback in SeedTeamCreditBalance::execute().
     $team->forceFill(['plan' => null]);
 
-    $balance = resolve(SeedTeamCreditBalance::class)->handle($team);
+    $balance = resolve(SeedTeamCreditBalance::class)->execute($team);
 
     expect($balance->credits_remaining)->toBe(Plan::default()->credits());
 });

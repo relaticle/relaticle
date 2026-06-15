@@ -1,0 +1,14 @@
+{
+  "untested_sad_paths": [
+    "S4: app-authenticated cross-guard probe to sysadmin pages (S4b)"
+  ],
+  "uncovered_subsystems": [],
+  "uncrossed_seams": [
+    "app-panel session vs sysadmin guard (the cross-guard case)"
+  ],
+  "unreached_changed_surfaces": [
+    "sysadmin:policy-guard (S4b cross-guard half only; S4a guest-block confirmed)"
+  ],
+  "recommend_extra_round": false,
+  "highest_risk_gap": "S4b cross-guard could not be browser-confirmed due to local agent-browser daemon contention from other workspaces' sessions \u2014 not an app defect; close by retiring stale sessions and replaying S4b. Code-trace shows a separate sysadmin auth guard."
+}

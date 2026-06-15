@@ -1,0 +1,1 @@
+{"source": "task-description", "criteria": [{"id": 1, "text": "Checkout flow completes and order confirmation is shown to the user"}, {"id": 2, "text": "Admin can filter and export order history as a CSV"}]}

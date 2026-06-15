@@ -1,0 +1,31 @@
+{
+  "what_it_does": "Relaticle is an open-source Laravel CRM (Filament v5 + Livewire v4): companies, people, opportunities, tasks and notes with team-based multi-tenancy, per-tenant custom fields, a CSV import wizard, a Sanctum REST API, an AI chat assistant with credit billing and tool-call approvals, and an internal sysadmin panel.",
+  "domain": "CRM SaaS",
+  "user_roles": ["team-owner", "team-member", "sysadmin", "api-consumer", "guest"],
+  "sensitive_areas": ["auth", "billing", "credit", "subscription", "tenant", "custom_field", "import", "chat", "policy", "data-deletion"],
+  "stack": { "language": "php", "framework": "laravel", "ui_layer": "filament+livewire" },
+  "serve_url": "https://relaticle.test",
+  "panel_urls": {
+    "app": "https://app.relaticle.test",
+    "sysadmin": "https://sysadmin.relaticle.test"
+  },
+  "commands": {
+    "install": "composer install --no-interaction",
+    "build": "npm run build",
+    "migrate": "php artisan migrate --force",
+    "serve": "(herd, always-on)"
+  },
+  "is_multi_tenant": true,
+  "has_financial_ops": true,
+  "credentials_hint": "manuk.minasyan1@gmail.com / password (LocalSeeder)",
+  "role_credentials": [
+    { "role": "team-owner", "login": "manuk.minasyan1@gmail.com", "password": "password", "source": "database/seeders/LocalSeeder.php" },
+    { "role": "sysadmin", "login": "sysadmin@relaticle.com", "password": "password", "source": "database/seeders/SystemAdministratorSeeder.php" },
+    { "role": "team-member", "login": null, "source": "create via factory + team invite when a member-scope journey needs it" },
+    { "role": "api-consumer", "login": null, "source": "create a Sanctum token via the app UI or factory during setup" }
+  ],
+  "doc_sources": ["CLAUDE.md", ".ai/guidelines/relaticle/core.md", "README.md"],
+  "volatile_fields": ["serve_url", "panel_urls", "role_credentials", "commands"],
+  "cached_at": "2026-06-12",
+  "volatile_note": "Fields in volatile_fields are CACHED HINTS, not truth. Stage 0 (references/environment.md) MUST re-derive them from the running app (config(), route:list, seeders, herd) every run and overwrite this run's project-profile.json copy with the derived values. If a derived value contradicts this file, update THIS file too (self-heal) and bump cached_at."
+}

@@ -182,10 +182,11 @@ final readonly class ListConversationMessages
             $info = $records[$pendingId] ?? null;
             $inner['status'] = $info['status'] ?? 'expired';
 
-            if (in_array($inner['status'], ['approved', 'restored'], true) && $info !== null) {
-                $resultData = $info['result_data'];
-                $recordId = is_array($resultData) ? ($resultData['id'] ?? null) : null;
-                $entityType = $info['entity_type'] ?? (isset($inner['entity_type']) ? (string) $inner['entity_type'] : null);
+            $resultData = is_array($info['result_data'] ?? null) ? $info['result_data'] : null;
+            $entityType = $info['entity_type'] ?? (isset($inner['entity_type']) ? (string) $inner['entity_type'] : null);
+
+            if ($inner['status'] === 'approved' && $info !== null) {
+                $recordId = $resultData['id'] ?? null;
 
                 if ((is_string($recordId) || is_int($recordId)) && is_string($entityType)) {
                     $ref = $this->resolver->resolve($entityType, (string) $recordId);
@@ -194,7 +195,7 @@ final readonly class ListConversationMessages
                     }
                 }
 
-                $batchIds = is_array($resultData) ? ($resultData['ids'] ?? null) : null;
+                $batchIds = $resultData['ids'] ?? null;
 
                 if (is_array($batchIds) && $batchIds !== [] && is_string($entityType)) {
                     $refs = $this->resolver->resolveMany($entityType, $batchIds);
@@ -204,9 +205,65 @@ final readonly class ListConversationMessages
                 }
             }
 
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : null;
+
+            if ($items !== null) {
+                $operation = isset($inner['operation']) ? (string) $inner['operation'] : null;
+                $itemResults = $this->reconstructItemResults($items, $entityType, $operation);
+
+                if ($itemResults !== []) {
+                    $inner['itemResults'] = $itemResults;
+                }
+            }
+
             $actions[] = $inner;
         }
 
         return $actions;
+    }
+
+    /**
+     * Mirror the live frontend `applyProposalResolution` mapping so per-item batch
+     * chips survive a conversation reload: stored 'approved' stays 'approved' (with
+     * a resolved record ref), stored 'rejected' becomes the 'skipped' chip. A deleted
+     * record has no page to link to, so delete items carry no ref.
+     *
+     * @param  array<array-key, mixed>  $items  the persisted result_data['items'], keyed by item index
+     * @return array<string, array{status: string, record: array{id: string, type: string, url: string, label: ?string}|null}>
+     */
+    private function reconstructItemResults(array $items, ?string $entityType, ?string $operation = null): array
+    {
+        $itemResults = [];
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $storedStatus = $item['status'] ?? null;
+            $chipStatus = match ($storedStatus) {
+                'approved' => 'approved',
+                'rejected' => 'skipped',
+                default => null,
+            };
+
+            if ($chipStatus === null) {
+                continue;
+            }
+
+            $record = null;
+            $recordId = $item['id'] ?? null;
+
+            if ($chipStatus === 'approved' && $operation !== 'delete' && (is_string($recordId) || is_int($recordId)) && is_string($entityType)) {
+                $record = $this->resolver->resolve($entityType, (string) $recordId);
+            }
+
+            $itemResults[(string) $index] = [
+                'status' => $chipStatus,
+                'record' => $record,
+            ];
+        }
+
+        return $itemResults;
     }
 }

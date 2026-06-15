@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
@@ -100,7 +99,7 @@ it('returns an empty list for another conversation', function (): void {
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);

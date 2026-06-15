@@ -1,0 +1,20 @@
+{
+  "tier": 2,
+  "rationale": "critical: subsystem(s) auth, tenant touched",
+  "change_types": [
+    "infra",
+    "template"
+  ],
+  "subsystems": [
+    "infra",
+    "template"
+  ],
+  "critical_subsystems": [
+    "auth",
+    "tenant"
+  ],
+  "ac_count": 0,
+  "computed_tier": 3,
+  "chosen_tier": 2,
+  "retier_rationale": "Classifier false-positives: 'auth' fired on incidental ->middleware('auth') string; 'tenant' fired on existing {tenant} route-param plumbing. No auth/login/session logic and no tenant-isolation logic changed. Real blast radius = nav/UI refactor across Tasks+Opportunities list/board surfaces. Re-tiered to 2; carrying forward a tenant-isolation cross-team probe on the new board routes + board drag/drop functional check as due-diligence."
+}

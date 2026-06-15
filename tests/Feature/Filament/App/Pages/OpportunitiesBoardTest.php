@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\OpportunityField;
-use App\Filament\Pages\OpportunitiesBoard;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
@@ -65,6 +67,19 @@ it('does not show opportunities from other teams', function (): void {
         ->pluck('id');
 
     expect($allRecordIds)->not->toContain($otherOpportunity->id);
+});
+
+it('shows the view switcher linking list and board views', function (): void {
+    livewire(ListOpportunities::class)
+        ->assertSeeHtml(OpportunityResource::getUrl('board'));
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml(OpportunityResource::getUrl('index'));
+});
+
+it('redirects the legacy board url to the resource board page', function (): void {
+    $this->get(route('filament.app.opportunities-board.redirect', ['tenant' => $this->team->slug]))
+        ->assertRedirect(OpportunityResource::getUrl('board'));
 });
 
 it('moves a card between columns via moveCard', function (): void {

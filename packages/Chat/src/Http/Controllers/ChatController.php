@@ -24,11 +24,8 @@ use Relaticle\Chat\Actions\RenameConversation;
 use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
-use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
-use Relaticle\Chat\Services\ApprovalContinuationService;
 use Relaticle\Chat\Services\CreditService;
-use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\TitleSanitizer;
@@ -221,45 +218,6 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
-    }
-
-    public function resume(Request $request, string $conversationId): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
-
-        // 404 (not 403) for a missing OR foreign conversation so the endpoint
-        // never confirms a conversation id exists to a different tenant — same
-        // hide-existence posture as the /chat/actions/* endpoints.
-        abort_if(
-            $conversation === null
-                || $conversation->user_id !== (string) $user->getKey()
-                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
-            404,
-        );
-
-        $action = resolve(PendingActionService::class)->latestUnjournaledResolvedAction($conversationId);
-
-        if (! $action instanceof PendingAction) {
-            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
-        }
-
-        if ($action->user_id !== $user->getKey()) {
-            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
-        }
-
-        if (! Cache::add("chat:resume:{$conversationId}", 1, 30)) {
-            return response()->json([
-                'error' => 'A resume is already in progress — try again in a moment.',
-                'code' => 'resume_in_progress',
-            ], 409);
-        }
-
-        resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
-
-        return response()->json(['status' => 'resuming']);
     }
 
     /**

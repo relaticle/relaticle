@@ -16,7 +16,7 @@ return new class extends Migration
             ->whereDoesntHave('aiCreditBalance')
             ->chunkById(200, function ($teams) use ($action): void {
                 foreach ($teams as $team) {
-                    $action->handle($team);
+                    $action->execute($team);
                 }
             });
     }
