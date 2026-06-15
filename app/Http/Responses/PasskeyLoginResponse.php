@@ -13,7 +13,7 @@ final readonly class PasskeyLoginResponse implements PasskeyLoginResponseContrac
     public function toResponse(mixed $request): JsonResponse
     {
         return new JsonResponse([
-            'redirect' => Filament::getPanel('app')->getUrl(),
+            'redirect' => redirect()->intended(Filament::getPanel('app')->getUrl())->getTargetUrl(),
         ]);
     }
 }
