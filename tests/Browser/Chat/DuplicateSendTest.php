@@ -11,7 +11,7 @@ it('does not push two user messages when sendMessage is called twice in the same
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');

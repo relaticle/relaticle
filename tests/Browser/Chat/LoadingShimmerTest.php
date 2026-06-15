@@ -11,7 +11,7 @@ it('renders a single shimmer indicator with default label when streaming starts 
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -51,7 +51,7 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -93,7 +93,7 @@ it('removes the shimmer once content arrives in the latest assistant message', f
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');

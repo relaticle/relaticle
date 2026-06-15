@@ -18,7 +18,7 @@ it('summarizes a finalized proposal for each operation and branch', function ():
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
