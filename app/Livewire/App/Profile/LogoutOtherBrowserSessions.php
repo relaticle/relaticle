@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Profile;
 
+use App\Actions\Profile\DestroyOtherBrowserSessions;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\IdentityConfirmation;
@@ -17,7 +18,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 use Laravel\Jetstream\Agent;
 
 final class LogoutOtherBrowserSessions extends BaseLivewireComponent
@@ -66,14 +66,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
             return;
         }
 
-        DB::connection(config('session.connection'))
-            ->table(config('session.table', 'sessions'))
-            ->where('user_id', $user->getAuthIdentifier())
-            ->where('id', '!=', Session::getId())
-            ->delete();
-
-        $user->setRememberToken(Str::random(60));
-        $user->save();
+        resolve(DestroyOtherBrowserSessions::class)->execute($user, Session::getId());
 
         Session::put([
             'password_hash_'.Auth::getDefaultDriver() => $user->getAuthPassword(),
