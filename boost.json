@@ -1,0 +1,42 @@
+{
+    "agents": [
+        "junie",
+        "claude_code",
+        "copilot",
+        "opencode",
+        "gemini",
+        "amp",
+        "cursor",
+        "codex"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "filament/filament",
+        "spatie/laravel-medialibrary",
+        "spatie/guidelines-skills",
+        "spatie/laravel-query-builder"
+    ],
+    "sail": false,
+    "skills": [
+        "ai-sdk-development",
+        "fortify-development",
+        "laravel-best-practices",
+        "configuring-horizon",
+        "mcp-development",
+        "pennant-development",
+        "socialite-development",
+        "livewire-development",
+        "pest-testing",
+        "echo-development",
+        "tailwindcss-development",
+        "medialibrary-development",
+        "laravel-query-builder",
+        "spatie-javascript",
+        "spatie-laravel-php",
+        "spatie-security",
+        "spatie-version-control"
+    ]
+}

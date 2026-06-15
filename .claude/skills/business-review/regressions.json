@@ -1,0 +1,85 @@
+{
+  "_doc": "Regression ledger — confirmed findings converted into standing checks. Loaded in Stage 1 by scripts/check_regressions.py: every entry whose trigger matches the diff MUST appear in the plan (status planned + journey, or not-applicable with a reason). Fix mode appends a new entry for every confirmed-then-fixed finding. See references/regression-ledger.md.",
+  "entries": [
+    {
+      "id": "REG-001",
+      "class": "enum-case-added-without-consumer-update",
+      "found": "2026-05-27 review 209 (AiCreditType::Refund match-arm 500); RECURRED 2026-06-12 in production (PR 326 added Reservation, Sentry 127436080, hotfix v3.3.7)",
+      "severity": "critical",
+      "trigger": {
+        "paths": ["app/Enums/", "packages/*/src/Enums/"],
+        "added_line_pattern": "^\\+\\s*case\\s+\\w+"
+      },
+      "check": "For every enum that gained a case, grep all match()/match-arm consumers (tables, badges, labels, colors) and open EVERY UI surface that renders that enum. Start with sysadmin AI Credit Transactions; render rows that include the new case value.",
+      "repro": [
+        "login to the sysadmin panel",
+        "create/locate a record using the new enum case (e.g. a credit transaction of the new type)",
+        "open the listing page that renders the enum (e.g. AI Credit Transactions)",
+        "expect: 200 + badge/label renders; fail: UnhandledMatchError 500"
+      ]
+    },
+    {
+      "id": "REG-002",
+      "class": "double-submit-not-idempotent",
+      "found": "2026-05-21..06-12 cross-project (Journey customer-reported double-click Continue bug alive 3 weeks; checks-matrix double-submit row routinely skipped)",
+      "severity": "high",
+      "trigger": {
+        "change_types": ["form", "mutation", "controller", "component"],
+        "added_line_pattern": "wire:click|type=\"submit\"|->action\\(|public function store|public function update"
+      },
+      "check": "Double-click / double-fire the primary submit or money-moving action on every touched form. Exactly one side effect may persist.",
+      "repro": [
+        "open the touched create/submit surface",
+        "click the primary action twice within ~300ms (or dispatch the Livewire action twice)",
+        "expect: one persisted record / one transaction; fail: duplicates or 500"
+      ]
+    },
+    {
+      "id": "REG-003",
+      "class": "import-accepts-empty-required-field",
+      "found": "2026-05 manual testing (CSV row with empty name imported as company name='')",
+      "severity": "high",
+      "trigger": {
+        "paths": ["app-modules/ImportWizard/", "packages/ImportWizard/"]
+      },
+      "check": "Import a CSV containing a row with the required name column empty; the row must be rejected with a visible error, never silently created blank.",
+      "repro": [
+        "open Import wizard for Companies",
+        "upload a CSV with one valid row and one row with empty name",
+        "run the import (commit, not dry-run)",
+        "expect: valid row imported, empty-name row surfaced as an error; fail: company with empty name exists"
+      ]
+    },
+    {
+      "id": "REG-004",
+      "class": "custom-fields-write-outside-tenant-context",
+      "found": "2026-06 (non-panel routes writing custom_fields without TenantContextService iterated ALL tenants — 504 + cross-tenant leak)",
+      "severity": "critical",
+      "trigger": {
+        "paths": ["routes/api.php", "app/Http/Controllers/Api/", "packages/Chat/src/Tools/", "app/Actions/"],
+        "added_line_pattern": "custom_fields|saveCustomFields|CustomFieldValue"
+      },
+      "check": "Any non-panel write path touching custom_fields must run inside an explicit tenant context. Verify the write lands scoped to the acting team only and responds promptly (no full-tenant iteration).",
+      "repro": [
+        "as Team A, perform the touched write with custom_fields populated (API call or chat tool approval)",
+        "expect: values visible on the record in Team A only, response < 5s",
+        "switch to Team B (in-app switcher) and confirm no leaked values; fail: timeout/504 or Team B sees data"
+      ]
+    },
+    {
+      "id": "REG-005",
+      "class": "chat-composer-dies-after-livewire-rerender",
+      "found": "2026-06 (TipTap composer x-ref=editor mount wiped by Livewire morph after first answer when wire:ignore missing)",
+      "severity": "high",
+      "trigger": {
+        "paths": ["packages/Chat/resources/views/", "packages/Chat/src/Livewire/"]
+      },
+      "check": "After any chat-surface change, send TWO consecutive messages in one conversation; the composer must stay mounted and editable after each assistant response.",
+      "repro": [
+        "open AI chat, send a message, wait for the full streamed response",
+        "type and send a second message",
+        "expect: composer accepts input and second send succeeds; fail: message box unresponsive/unmounted"
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     data-chat-context="{{ $context ?? 'conversation' }}"
+    data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
 >
     {{-- Messages --}}
@@ -184,19 +185,6 @@
                                 </div>
                             </template>
 
-                            <template x-if="msg.pausedResume">
-                                <div class="mt-2">
-                                    <button
-                                        type="button"
-                                        x-show="!isStreaming"
-                                        x-on:click="msg.pausedResume = false; retryTurn(Object.assign(msg, { isContinuation: true, rendered: false, prerendered: false, content: '' }))"
-                                        class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-                                    >
-                                        Continue
-                                    </button>
-                                </div>
-                            </template>
-
                             <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <template x-for="chip in msg.follow_ups" :key="chip.prompt">
@@ -341,117 +329,27 @@
                         </div>
                     </template>
 
-                    {{-- Pending action cards --}}
+                    {{-- Action cards: resolved cards stay inline as the audit trail.
+                         A still-pending batch that already has some resolved items
+                         ALSO renders inline as a compact progress card (the editor
+                         for the unresolved items lives docked at the composer; see
+                         input area). A fully-unresolved proposal is dock-only. --}}
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
-                                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                                    <div class="flex items-center gap-2">
-                                        <span
-                                            class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
-                                            :class="{
-                                                'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400': action.operation === 'create',
-                                                'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400': action.operation === 'update',
-                                                'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.operation === 'delete',
-                                            }"
-                                            x-text="action.operation.charAt(0).toUpperCase() + action.operation.slice(1)"
-                                        ></span>
-                                        <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="action.display?.summary"></span>
-                                    </div>
-
-                                    <template x-if="action.display?.duplicate_warning">
-                                        <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" x-text="action.display.duplicate_warning"></div>
+                                <div class="space-y-2">
+                                    <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                        @include('chat::livewire.chat.partials._proposal-card')
                                     </template>
 
-                                    <div class="mt-2 space-y-1">
-                                        <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                                            <div class="flex gap-2 text-sm">
-                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                <span class="text-gray-900 dark:text-white" x-text="field.new || field.value"></span>
-                                                <template x-if="field.old">
-                                                    <span class="text-gray-400 line-through" x-text="field.old"></span>
-                                                </template>
+                                    {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
+                                         derived from the persisted action by proposalOutcome(), not a stored message. --}}
+                                    <template x-if="action.status !== 'pending' && proposalOutcome(action)">
+                                        <div class="flex justify-start">
+                                            <div class="inline-flex max-w-[85%] items-start gap-1.5 rounded-2xl rounded-bl-md bg-white px-3 py-2 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700">
+                                                <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
+                                                <span x-text="proposalOutcome(action)"></span>
                                             </div>
-                                        </template>
-                                    </div>
-
-                                    {{-- Batch items (records[] proposals) --}}
-                                    <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-                                        <div class="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
-                                            <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
-                                                <div class="py-2 first:pt-0 last:pb-0">
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
-                                                    <div class="mt-1 space-y-0.5">
-                                                        <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                                            <div class="flex gap-2 text-xs">
-                                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                                <span class="text-gray-700 dark:text-gray-300" x-text="field.new || field.value"></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </template>
-
-                                    {{-- Action buttons --}}
-                                    <template x-if="action.status === 'pending'">
-                                        <div class="mt-3 flex gap-2">
-                                            <button
-                                                x-on:click="approveAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                                            >
-                                                <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                                Approve
-                                            </button>
-                                            <button
-                                                x-on:click="rejectAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                                            >
-                                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </template>
-
-                                    {{-- Error state --}}
-                                    <template x-if="action.error">
-                                        <div class="mt-2 text-xs text-red-600 dark:text-red-400" x-text="action.error"></div>
-                                    </template>
-
-                                    {{-- Resolved state --}}
-                                    <template x-if="action.status !== 'pending' && !action.error">
-                                        <div class="mt-3 flex items-center gap-2">
-                                            <span
-                                                class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
-                                                :class="{
-                                                    'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400': action.status === 'approved',
-                                                    'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.status === 'rejected',
-                                                    'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                                                    'bg-gradient-to-r from-green-50 to-blue-50 text-blue-700 dark:from-green-900/20 dark:to-blue-900/20 dark:text-blue-300': action.status === 'restored',
-                                                }"
-                                                x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
-                                            ></span>
-                                            <template x-if="(action.status === 'approved' || action.status === 'restored') && action.record && action.record.url">
-                                                <a
-                                                    :href="action.record.url"
-                                                    wire:navigate
-                                                    class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                                                >
-                                                    View
-                                                    <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                                </a>
-                                            </template>
-                                            <template x-if="(action.status === 'approved' || action.status === 'restored') && Array.isArray(action.records) && action.records.length > 0">
-                                                <span class="flex flex-wrap gap-2">
-                                                    <template x-for="ref in action.records" :key="ref.id">
-                                                        <a :href="ref.url" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                                            View
-                                                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                                        </a>
-                                                    </template>
-                                                </span>
-                                            </template>
                                         </div>
                                     </template>
                                 </div>
@@ -492,28 +390,22 @@
         </div>
     </template>
 
-    {{-- Undo toast --}}
-    <template x-if="undoToast">
-        <div class="pointer-events-auto fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-             role="status"
-             aria-live="polite"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 translate-y-2"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Deleted. Undo?</span>
-            <button type="button" x-on:click="undoLastAction()"
-                    class="rounded-md bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700">
-                Undo
-            </button>
-        </div>
-    </template>
-
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
+            {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
+                 render real Filament field editors in place (Phase C). Alpine stays the source of truth for
+                 whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
+            <div x-show="hasPendingProposal" x-effect="syncActiveProposal()" class="mb-3">
+                <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Review before continuing</span>
+                </div>
+                <div class="max-h-[55vh] overflow-y-auto">
+                    <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />
+                </div>
+            </div>
+
             {{-- Send-throttle countdown: the message is kept and auto-sends --}}
             <template x-if="rateLimit">
                 <div class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20" role="status" aria-live="polite">
@@ -534,7 +426,7 @@
                 </div>
             </template>
 
-            <form x-on:submit.prevent="sendMessage()">
+            <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
                         initialDocument: { type: 'doc', content: [] },
@@ -606,6 +498,7 @@
 <script>
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
     conversationId: initialConversationId,
+    context: 'conversation',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     input: '',
@@ -626,7 +519,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ->all()
     ),
     selectedModel: 'auto',
-    undoToast: null,
+
+    // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
+    // dedupes proposal:set-active dispatches.
+    _lastActiveProposalId: null,
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
     // and auto-flush this on handleStreamEnd / cancel / failure.
@@ -703,7 +599,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             invocationId: null,
             streamError: null,
             retryable: false,
-            isContinuation: false,
             _needsSeparator: false,
             feedback: null,
             feedbackPanelOpen: false,
@@ -859,6 +754,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     init() {
+        this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
+
         const validModels = this.modelOptions
             .map((o) => o.value)
             .filter((v) => this.allowedModels.includes(v));
@@ -950,6 +847,20 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         };
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
 
+        this.approvalKeyHandler = (e) => {
+            if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
+
+            const pending = this.visiblePendingActions();
+            if (pending.length !== 1 || this.isStreaming) return;
+            if (this.input.trim().length > 0) return; // composer draft wins
+
+            e.preventDefault();
+            if (window.Livewire?.dispatch) {
+                window.Livewire.dispatch('proposal:create-current', { context: this.context });
+            }
+        };
+        window.addEventListener('keydown', this.approvalKeyHandler);
+
         this.renamedHandler = (e) => {
             const detail = e.detail || {};
             if (!detail.conversationId || detail.conversationId !== this.conversationId) return;
@@ -1001,6 +912,21 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.prependScrollAnchor = null;
             });
         });
+
+        // Bridge the docked livewire proposal-card's resolution lifecycle back
+        // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
+        // named-arg dispatches arrive as a single params object (e.detail).
+        this._proposalListeners = [
+            window.Livewire.on('proposal:resolved', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                this.applyProposalResolution(payload);
+            }),
+            window.Livewire.on('proposal:resolve-failed', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                const action = this.findPendingAction(payload?.pendingActionId);
+                if (action) action.error = 'Could not complete the action. Please try again.';
+            }),
+        ];
     },
 
     loadEarlier() {
@@ -1009,17 +935,76 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.$wire.loadEarlierMessages();
     },
 
+    visiblePendingActions() {
+        return this.messages
+            .flatMap((m) => m.pending_actions || [])
+            .filter((a) => a.status === 'pending');
+    },
+
+    activePendingActionId() {
+        const pending = this.visiblePendingActions();
+        return pending.length > 0 ? pending[0].pending_action_id : null;
+    },
+
+    syncActiveProposal() {
+        const id = this.activePendingActionId();
+        if (id === this._lastActiveProposalId) return;
+        this._lastActiveProposalId = id;
+        if (window.Livewire?.dispatch) {
+            window.Livewire.dispatch('proposal:set-active', { id, context: this.context });
+        }
+    },
+
+    get hasPendingProposal() {
+        return this.visiblePendingActions().length > 0;
+    },
+
+    findPendingAction(id) {
+        for (const m of this.messages) {
+            const found = (m.pending_actions || []).find((a) => a.pending_action_id === id);
+            if (found) return found;
+        }
+        return null;
+    },
+
+    applyProposalResolution(payload) {
+        const action = this.findPendingAction(payload.pendingActionId);
+        if (!action) return;
+        action.error = null;
+
+        if (payload.index === null || payload.index === undefined) {
+            // Single proposal.
+            action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
+            if (payload.record) action.record = payload.record;
+        } else {
+            // Batch item: the transcript renders per-item status 'approved'/'skipped'.
+            action.itemResults = {
+                ...action.itemResults,
+                [payload.index]: {
+                    status: payload.decision === 'approved' ? 'approved' : 'skipped',
+                    record: payload.record || null,
+                },
+            };
+            if (payload.finalized) action.status = 'approved';
+        }
+
+        if (payload.decision === 'approved' && window.Livewire?.dispatch) {
+            window.Livewire.dispatch('ai-write-completed', {
+                entityType: action.entity_type ?? null,
+                operation: action.operation ?? null,
+            });
+        }
+    },
+
     destroy() {
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();
         this.unsubscribe();
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = null;
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
+        window.removeEventListener('keydown', this.approvalKeyHandler);
+        (this._proposalListeners || []).forEach((off) => typeof off === 'function' && off());
     },
 
     startCopyTicker() {
@@ -1289,8 +1274,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
-            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
-            .listen('.chat.paused', (e) => this.handleChatPaused(e));
+            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
 
         return readyPromise;
     },
@@ -1406,6 +1390,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     async sendMessage() {
+        if (this.hasPendingProposal) return;
         if (this.rateLimit) return;
 
         const editor = this.localEditor();
@@ -1709,48 +1694,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (this.isStreaming) return;
         if (msg._retrying) return;
 
-        if (msg.isContinuation) {
-            // Async path — guard with _retrying and clear in finally.
-            msg._retrying = true;
-            msg.streamError = null;
-            msg.retryable = false;
-            msg.rendered = false;
-            this.isStreaming = true;
-            this.startStreamTimeout();
-            this.restoreInputFocus();
-            try {
-                const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/resume', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    msg.streamError = body.error || 'Could not resume. Please try again.';
-                    if (res.status === 409 && body.code === 'resume_in_progress') {
-                        msg.retryable = true;
-                    } else if (res.status === 409) {
-                        msg.retryable = false;
-                    } else {
-                        msg.retryable = true;
-                    }
-                    msg.rendered = true;
-                    this.isStreaming = false;
-                    this.clearStreamTimeout();
-                }
-            } catch {
-                msg.streamError = 'Network error. Please try again.';
-                msg.retryable = true;
-                msg.rendered = true;
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            } finally {
-                msg._retrying = false;
-            }
-            return;
-        }
-
         // Failed user turn: the server never stored the message — re-send the
         // preceding user message from local state (same flow as edit-resend).
         // Compute userIndex BEFORE committing to any state change so the no-op
@@ -1790,39 +1733,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         assistantMsg.content += delta;
         this.scrollToBottom();
-    },
-
-    // Approve/reject triggers a backend continuation that streams a fresh
-    // assistant turn on the same channel. We mint an empty assistant stub so
-    // the incoming text_delta/tool_result events land in a new bubble instead
-    // of being appended to the message that originally proposed the action.
-    //
-    // Call this BEFORE the /approve|/reject POST resolves — the backend
-    // dispatches ContinueChatMessage as part of the request handler, so
-    // text_delta events can start arriving on the broadcast channel before
-    // the HTTP response returns. If we wait, the first deltas land in the
-    // proposal bubble and a short continuation can finish before we even
-    // mint the stub (leaving isStreaming permanently true on an empty bubble).
-    // Returns a revert handle for use when the POST fails.
-    beginContinuationTurn() {
-        const stub = this.mintAssistantStub({ isContinuation: true });
-        this.currentToolStatus = null;
-        this.isStreaming = true;
-        this.startStreamTimeout();
-        this.scrollToBottom(true);
-
-        return () => {
-            // Only revert if the stub is still untouched (no deltas arrived
-            // before the POST's failure path ran). If the backend already
-            // streamed into it, the user's better off seeing whatever did
-            // land than a flicker that erases it.
-            const last = this.messages[this.messages.length - 1];
-            if (last === stub && stub.content === '' && stub.pending_actions.length === 0) {
-                this.messages.pop();
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            }
-        };
     },
 
     handleToolCall(event) {
@@ -1933,6 +1843,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.scrollToBottom();
         this.restoreInputFocus();
         this.flushQueuedSend();
+        this.maybeSyncTitle();
+    },
+
+    // A brand-new chat is auto-titled server-side after its first turn, but the
+    // Filament page header (H1 + tab title) was rendered at mount and still reads
+    // "New chat". Pull the freshly generated title and reuse the existing
+    // chat:renamed handler to update the header without a reload.
+    async maybeSyncTitle() {
+        if (!this.conversationId) return;
+        if (!document.title.startsWith('New chat')) return;
+        try {
+            const title = await this.$wire.conversationTitle(this.conversationId);
+            if (title) {
+                window.dispatchEvent(new CustomEvent('chat:renamed', {
+                    detail: { conversationId: this.conversationId, title },
+                }));
+            }
+        } catch (_) { /* non-fatal: header just stays generic until reload */ }
     },
 
     // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
@@ -2060,16 +1988,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.startStreamTimeout(((event?.delaySeconds ?? 0) * 1000) + this.streamTimeoutMs);
     },
 
-    handleChatPaused(event) {
-        this.mintAssistantStub({
-            content: event?.message || 'Paused. Press Continue to keep going.',
-            rendered: true,
-            pausedResume: true,
-        });
-        this.isStreaming = false;
-        this.$nextTick(() => this.restoreInputFocus());
-    },
-
     restoreInputFocus() {
         this.$nextTick(() => {
             if (this.messages.some((m) => m.editing)) return;
@@ -2084,127 +2002,84 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    async approveAction(action) {
-        const previousStatus = action.status;
-        action.status = 'approved';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST so text_delta events that
-        // arrive during the fetch land in a fresh bubble, not the proposal.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/approve', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                if (body.record) {
-                    action.record = body.record;
-                }
-                if (body.records) {
-                    action.records = body.records;
-                }
-                if (action.operation === 'delete') {
-                    this.showUndoToast(action);
-                }
-                if (window.Livewire?.dispatch) {
-                    window.Livewire.dispatch('ai-write-completed', {
-                        entityType: action.entity_type ?? null,
-                        operation: action.operation ?? null,
-                    });
-                }
-            } else {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to approve';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
-            action.error = 'Network error';
-        }
+    // The transcript renders batch cards with per-item Created/Skipped chips.
+    // applyProposalResolution() (the docked card's resolution bridge) writes
+    // action.itemResults; the _proposal-card partial reads them through this
+    // getter in both its compact-while-pending and full resolved modes.
+    itemResult(action, index) {
+        return (action.itemResults && action.itemResults[index]) || null;
     },
 
-    showUndoToast(action) {
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = {
-            action,
-            startedAt: Date.now(),
-            timeoutId: null,
-        };
-        this.undoToast.timeoutId = setTimeout(() => {
-            this.undoToast = null;
-        }, 5000);
+    // Past-tense verb for a resolved item's chip, by operation.
+    itemVerb(action) {
+        const op = action?.operation;
+        return op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
     },
 
-    async undoLastAction() {
-        if (!this.undoToast) return;
-        const action = this.undoToast.action;
-        clearTimeout(this.undoToast.timeoutId);
-        this.undoToast = null;
+    // Reload-safe agent outcome summary for a finalized proposal. Built purely from
+    // the persisted action (status, itemResults, record refs, display) so it survives
+    // a conversation reload exactly like the audit card — no stored message and no AI
+    // continuation (both intentionally removed). Returns null while still pending.
+    proposalOutcome(action) {
+        if (!action || action.status === 'pending') return null;
 
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/restore', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
+        const op = action.operation;
+        const verb = op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+        const items = action.display?.items;
+
+        if (Array.isArray(items) && items.length > 0) {
+            const created = [];
+            const skipped = [];
+            items.forEach((item, i) => {
+                const res = this.itemResult(action, i) || this.itemResult(action, String(i));
+                if (!res) return;
+                const name = res.record?.label || this.proposalItemName(item) || 'record';
+                if (res.status === 'approved') created.push(name);
+                else if (res.status === 'skipped') skipped.push(name);
             });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                action.status = 'restored';
-                action.error = null;
-                if (body.record) {
-                    action.record = body.record;
-                }
-            } else {
-                const body = await res.json().catch(() => ({}));
-                action.error = body.error || 'Failed to restore';
-            }
-        } catch {
-            action.error = 'Network error';
+            const skippedVerb = op === 'delete' ? 'kept' : 'skipped';
+            const parts = [];
+            if (created.length) parts.push(`${verb} ${this.joinNames(created)}`);
+            if (skipped.length) parts.push(`${skippedVerb} ${this.joinNames(skipped)}`);
+            if (parts.length === 0) return null;
+            const sentence = parts.join('; ') + '.';
+            return sentence.charAt(0).toUpperCase() + sentence.slice(1);
         }
+
+        if (action.status === 'approved') {
+            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || 'the record';
+            return `${verb} ${label}.`;
+        }
+        if (action.status === 'rejected') {
+            const label = this.extractQuotedName(action.display?.summary);
+            if (op === 'delete') return label ? `Kept ${label} — deletion discarded.` : 'Deletion discarded.';
+            return label ? `Discarded ${label}.` : 'Proposal discarded.';
+        }
+        return null;
     },
 
-    async rejectAction(action) {
-        const previousStatus = action.status;
-        action.status = 'rejected';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST — see approveAction for why.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/reject', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (! res.ok) {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to reject';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
-            action.error = 'Network error';
+    proposalItemName(item) {
+        if (!item) return null;
+        const fields = item.fields;
+        if (Array.isArray(fields) && fields.length > 0) {
+            const value = fields[0].value ?? fields[0].new;
+            if (typeof value === 'string' && value !== '') return value;
         }
+        return this.extractQuotedName(item.summary);
+    },
+
+    extractQuotedName(text) {
+        if (typeof text !== 'string') return null;
+        const match = text.match(/"([^"]+)"/);
+        return match ? match[1] : null;
+    },
+
+    joinNames(names) {
+        const list = names.filter(Boolean);
+        if (list.length === 0) return '';
+        if (list.length === 1) return list[0];
+        if (list.length === 2) return `${list[0]} and ${list[1]}`;
+        return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
     },
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they

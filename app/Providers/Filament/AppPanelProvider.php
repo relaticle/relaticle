@@ -17,6 +17,8 @@ use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Listeners\SwitchTeam;
@@ -159,6 +161,11 @@ final class AppPanelProvider extends PanelProvider
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
+
+                Route::get('/{tenant}/tasks-board', fn (string $tenant) => redirect()->to(TaskResource::getUrl('board', ['tenant' => $tenant]), status: 301))
+                    ->name('tasks-board.redirect');
+                Route::get('/{tenant}/opportunities-board', fn (string $tenant) => redirect()->to(OpportunityResource::getUrl('board', ['tenant' => $tenant]), status: 301))
+                    ->name('opportunities-board.redirect');
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()

@@ -1,0 +1,47 @@
+{
+  "change_types": [
+    "infra",
+    "template"
+  ],
+  "critical_signals": [
+    "auth"
+  ],
+  "critical_subsystems": [
+    "auth",
+    "tenant"
+  ],
+  "infra_only": false,
+  "project_subsystems": [
+    "tenant"
+  ],
+  "subsystems": [
+    "infra",
+    "template"
+  ],
+  "surfaces": [
+    "app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php",
+    "app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php",
+    "app/Filament/Resources/TaskResource/Pages/ManageTasks.php",
+    "app/Filament/Resources/TaskResource/Pages/TasksBoard.php",
+    "lang/en/filament/pages/boards.php",
+    "resources/views/filament/app/view-switcher.blade.php",
+    "tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php",
+    "tests/Feature/Filament/App/Pages/TasksBoardTest.php"
+  ],
+  "touched_files": {
+    "infra": [
+      "tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php",
+      "tests/Feature/Filament/App/Pages/TasksBoardTest.php"
+    ],
+    "template": [
+      "app/Filament/Resources/OpportunityResource/Pages/ListOpportunities.php",
+      "app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php",
+      "app/Filament/Resources/TaskResource/Pages/ManageTasks.php",
+      "app/Filament/Resources/TaskResource/Pages/TasksBoard.php",
+      "lang/en/filament/pages/boards.php",
+      "resources/views/filament/app/view-switcher.blade.php",
+      "tests/Feature/Filament/App/Pages/OpportunitiesBoardTest.php",
+      "tests/Feature/Filament/App/Pages/TasksBoardTest.php"
+    ]
+  }
+}

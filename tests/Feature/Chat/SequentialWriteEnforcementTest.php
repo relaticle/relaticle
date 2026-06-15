@@ -89,5 +89,5 @@ it('system prompt instructs the agent to stop after writes and handle approvals'
         ->toContain('After ANY write tool call')
         ->toContain('STOP your turn immediately')
         ->toContain('[approval]')
-        ->toContain('automatically be prompted to continue');
+        ->not->toContain('automatically be prompted to continue');
 });

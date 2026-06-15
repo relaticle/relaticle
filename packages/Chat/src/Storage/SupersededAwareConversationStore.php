@@ -8,9 +8,12 @@ use Illuminate\Support\Collection;
 use Laravel\Ai\Messages\AssistantMessage;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Messages\ToolResultMessage;
+use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Storage\DatabaseConversationStore;
+use Relaticle\Chat\Support\AssistantText;
 use stdClass;
 
 /**
@@ -23,6 +26,21 @@ use stdClass;
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
+    /**
+     * Collapse a fully-repeated combined assistant text before persisting.
+     *
+     * laravel/ai concatenates the model's text deltas across every agent step,
+     * so a model that echoes the same acknowledgment in both the tool-call step
+     * and the post-tool-result step yields that text repeated back-to-back. We
+     * store the single copy instead of the duplicate.
+     */
+    public function storeAssistantMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt, AgentResponse $response): string
+    {
+        $response->text = AssistantText::collapseRepeated($response->text);
+
+        return parent::storeAssistantMessage($conversationId, $userId, $prompt, $response);
+    }
+
     /**
      * @return Collection<int, Message>
      */
