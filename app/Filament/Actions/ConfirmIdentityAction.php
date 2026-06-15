@@ -186,11 +186,11 @@ final class ConfirmIdentityAction extends Action
         $usesPasswordField = fn (Get $get): bool => ! $hasPasskey || (bool) $get('use_password');
         $throttleKey = 'confirm-identity:'.$user->getAuthIdentifier();
 
-        $passwordRule = new class($user, $throttleKey) implements ValidationRule
+        $passwordRule = new readonly class($user, $throttleKey) implements ValidationRule
         {
             public function __construct(
-                private readonly User $user,
-                private readonly string $throttleKey,
+                private User $user,
+                private string $throttleKey,
             ) {}
 
             public function validate(string $attribute, mixed $value, Closure $fail): void

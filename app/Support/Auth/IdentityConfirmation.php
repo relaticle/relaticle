@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Hash;
  * neither a password nor a passkey cannot prove more than their active session,
  * so the gate treats them as already satisfied.
  */
-final class IdentityConfirmation
+final readonly class IdentityConfirmation
 {
     public static function satisfied(User $user): bool
     {
