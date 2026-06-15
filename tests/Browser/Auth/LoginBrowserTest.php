@@ -14,6 +14,6 @@ it('user can log in and reach the dashboard', function (): void {
     $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}");
 });
