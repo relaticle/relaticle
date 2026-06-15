@@ -76,7 +76,10 @@ test('passkey login is allowed for active users', function (): void {
     expect(Passkeys::allowsLogin(Request::create('/passkeys/login', 'POST'), $passkey))->toBeTrue();
 });
 
-test('passkey login is refused for users scheduled for deletion', function (): void {
+test('passkey login is allowed for users scheduled for deletion so they reach the cancellation interstitial', function (): void {
+    // Consistent with password and social login: a scheduled-for-deletion user authenticates and
+    // the CheckScheduledDeletion middleware routes them to the interstitial where they can cancel.
+    // Blocking only the passkey path left passwordless users with a confusing dead-end.
     $user = User::factory()->create([
         'scheduled_deletion_at' => now()->subDay(),
     ]);
@@ -87,5 +90,5 @@ test('passkey login is refused for users scheduled for deletion', function (): v
         'credential' => [],
     ]);
 
-    expect(Passkeys::allowsLogin(Request::create('/passkeys/login', 'POST'), $passkey))->toBeFalse();
+    expect(Passkeys::allowsLogin(Request::create('/passkeys/login', 'POST'), $passkey))->toBeTrue();
 });
