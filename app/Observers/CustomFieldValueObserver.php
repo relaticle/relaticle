@@ -111,11 +111,14 @@ final readonly class CustomFieldValueObserver
         $ids = is_iterable($value) ? collect($value) : collect();
 
         $labels = $ids
-            ->map(fn (mixed $id): ?string => $this->optionLabel($field, $id))
-            ->filter()
+            // Arbitrary-value fields (link, tags-input) store raw strings rather than
+            // option IDs, so no option matches — fall back to the value itself instead
+            // of leaking escaped JSON.
+            ->map(fn (mixed $id): string => $this->optionLabel($field, $id) ?? (string) $id)
+            ->filter(fn (string $label): bool => $label !== '')
             ->all();
 
-        return $labels === [] ? (string) json_encode($value) : implode(', ', $labels);
+        return implode(', ', $labels);
     }
 
     private function isEmpty(mixed $value): bool

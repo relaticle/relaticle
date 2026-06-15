@@ -68,6 +68,33 @@ it('logs a custom_field_changes activity when a value is updated', function (): 
         ->and($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('linkedin');
 });
 
+it('renders link-field values as plain URLs, not escaped JSON', function (): void {
+    $linkField = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'website',
+        'name' => 'Website',
+        'type' => 'link',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $company = Company::factory()->for($this->team)->create();
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFields(['website' => ['https://www.linkedin.com/company/airbnb']]);
+
+    $activity = Activity::query()->latest('id')->first();
+    $change = $activity->properties['custom_field_changes'][0];
+
+    expect($change['code'])->toBe('website')
+        ->and($change['new']['label'])->toBe('https://www.linkedin.com/company/airbnb')
+        ->and($change['new']['label'])->not->toContain('\\/')
+        ->and($change['new']['label'])->not->toContain('[');
+});
+
 it('does not log when saving an empty value for a previously empty field', function (): void {
     $company = Company::factory()->for($this->team)->create();
     Activity::withoutGlobalScopes()->delete();
