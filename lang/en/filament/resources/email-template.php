@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'navigation_label' => 'Templates',
     'fields' => [
         'body_html' => [
             'label' => 'Body',

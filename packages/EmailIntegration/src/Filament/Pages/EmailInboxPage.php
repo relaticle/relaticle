@@ -66,18 +66,13 @@ final class EmailInboxPage extends Page
 
     protected static ?string $slug = 'email';
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 6;
 
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/email-inbox.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.emails');
     }
 
     public EmailFolder $folder = EmailFolder::Inbox;
@@ -89,6 +84,7 @@ final class EmailInboxPage extends Page
 
     public function mount(): void
     {
+        $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->ensureEmailSelected();
     }
 

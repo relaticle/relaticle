@@ -9,16 +9,15 @@ return [
 
     'user_menu' => [
         'profile' => 'Profile',
-        'email_privacy' => 'Email privacy',
     ],
 
     'navigation_groups' => [
         'tasks' => 'Tasks',
-        'emails' => 'Emails',
     ],
 
     'tenant_menu' => [
         'custom_fields' => 'Custom Fields',
+        'email_settings' => 'Email Settings',
         'import_history' => 'Import History',
     ],
 ];

@@ -24,9 +24,9 @@ use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\Email;
-use UnitEnum;
 
 final class EmailOutboxPage extends Page implements HasTable
 {
@@ -39,14 +39,11 @@ final class EmailOutboxPage extends Page implements HasTable
 
     protected static ?string $title = 'Outbox';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?string $cluster = EmailSettings::class;
 
-    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.emails');
-    }
+    protected static ?int $navigationSort = 5;
 
     public function table(Table $table): Table
     {

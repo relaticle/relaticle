@@ -32,13 +32,13 @@ final class MeetingResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 7;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
 
-    public static function getNavigationGroup(): string
+    public static function getNavigationLabel(): string
     {
-        return __('filament/navigation.groups.emails');
+        return __('filament/resources/meeting.navigation_label');
     }
 
     public static function form(Schema $schema): Schema
