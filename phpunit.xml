@@ -54,5 +54,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
+        <env name="RELATICLE_FEATURE_EMAIL_INTEGRATION" value="true"/>
     </php>
 </phpunit>
