@@ -10,6 +10,7 @@ use App\Providers\HorizonServiceProvider;
 use App\Providers\JetstreamServiceProvider;
 use App\Providers\LocaleServiceProvider;
 use App\Providers\MacroServiceProvider;
+use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\Documentation\DocumentationServiceProvider;
 use Relaticle\ImportWizard\ImportWizardNewServiceProvider;
 use Relaticle\SystemAdmin\SystemAdminPanelProvider;
@@ -24,6 +25,7 @@ return [
     JetstreamServiceProvider::class,
     LocaleServiceProvider::class,
     MacroServiceProvider::class,
+    ChatServiceProvider::class,
     DocumentationServiceProvider::class,
     ImportWizardNewServiceProvider::class,
     SystemAdminPanelProvider::class,

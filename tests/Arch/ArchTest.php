@@ -18,7 +18,10 @@ use App\Rules\ArrayExistsForTeam;
 
 arch()->preset()->php();
 
-// arch()->preset()->strict();
+// The strict preset is deliberately NOT enabled (evaluated 2026-06-12): its
+// no-protected-methods rule fights core Laravel idioms (Model::casts(),
+// provider hooks, base-tool templates), and pint already enforces final
+// classes + strict types repo-wide.
 
 arch()->preset()->security()->ignoring('assert');
 
@@ -31,10 +34,13 @@ arch()->preset()
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
+        // Chat tools intentionally reuse App\Http\Resources (consistent
+        // LLM-facing payloads); the preset forbids resources outside Http.
+        'Relaticle\Chat',
     ]);
 
 arch('strict types')
-    ->expect('App')
+    ->expect(['App', 'Relaticle'])
     ->toUseStrictTypes();
 
 arch('avoid open for extension')
@@ -80,10 +86,12 @@ arch('avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
         'App\Health',
+        'App\Http\Controllers\Chat',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -107,6 +115,7 @@ arch('avoid inheritance')
     ->classes()
     ->toExtendNothing()
     ->ignoring([
+        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
@@ -125,10 +134,54 @@ arch('avoid inheritance')
         'App\View',
     ]);
 
-// arch('annotations')
-//    ->expect('App')
-//    ->toHavePropertiesDocumented()
-//    ->toHaveMethodsDocumented();
+// Packages are kept final by pint (final_class, repo-wide) and strict-typed by
+// the rule above. Readonly/no-inheritance is enforced only on their plain-PHP
+// service layers — the rest of each package is framework-shaped (Filament,
+// Livewire, Models, Tools, Jobs) and would be ignored wholesale anyway, exactly
+// as the App rules above ignore those namespaces.
+// (tests/Arch/ConventionsTest.php forces this list to be revisited when a
+// package is added.)
+$packageServiceLayers = [
+    'Relaticle\Chat\Actions',
+    'Relaticle\Chat\Agents',
+    'Relaticle\Chat\Services',
+    'Relaticle\Chat\Support',
+    'Relaticle\Documentation\Services',
+    'Relaticle\ImportWizard\Support',
+    'Relaticle\OnboardSeed\Support',
+];
+
+arch('package service layers avoid mutation')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toBeReadonly()
+    ->ignoring([
+        // Grandfathered (2026-06-12) — make each readonly, then unlist:
+        'Relaticle\Chat\Agents\CrmAssistant',
+        'Relaticle\Chat\Services\TipTapDocumentParser',
+        'Relaticle\Chat\Support\ChatTelemetry',
+        'Relaticle\Chat\Support\LikePattern',
+        'Relaticle\Chat\Support\PromptText',
+        'Relaticle\Chat\Support\ProviderRateGate',
+        'Relaticle\Chat\Support\TitleSanitizer',
+        'Relaticle\Documentation\Services\DocumentationService',
+        'Relaticle\ImportWizard\Support\DataTypeInferencer',
+        'Relaticle\ImportWizard\Support\EntityLinkResolver',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\ForeignKeyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\MorphToManyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkValidator',
+        'Relaticle\ImportWizard\Support\Validation\ColumnValidator',
+        'Relaticle\OnboardSeed\Support\BaseModelSeeder',
+        'Relaticle\OnboardSeed\Support\BulkCustomFieldValueWriter',
+        'Relaticle\OnboardSeed\Support\FixtureLoader',
+        'Relaticle\OnboardSeed\Support\FixtureRegistry',
+    ]);
+
+arch('package service layers avoid inheritance')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toExtendNothing();
 
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
@@ -176,6 +229,28 @@ arch('MCP tools must not use DB facade directly')
     ->not
     ->toUse([
         'Illuminate\Support\Facades\DB',
+    ]);
+
+arch('UI surfaces must not use the DB facade directly')
+    ->expect([
+        'App\Filament',
+        'App\Livewire',
+        'Relaticle\Chat\Livewire',
+        'Relaticle\Chat\Tools',
+    ])
+    ->not
+    ->toUse([
+        'Illuminate\Support\Facades\DB',
+    ])
+    ->ignoring([
+        // Grandfathered (2026-06-12) — move these writes into actions, then unlist:
+        'App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard',
+        'App\Filament\Resources\TaskResource\Pages\TasksBoard',
+        'App\Livewire\App\AccessTokens\CreateAccessToken',
+        // Session-table infrastructure (no Eloquent model) — legitimate DB facade use:
+        'App\Livewire\App\Profile\LogoutOtherBrowserSessions',
+        // Read-only aggregate join for stream recovery:
+        'Relaticle\Chat\Livewire\Chat\ChatInterface',
     ]);
 
 arch('must not use custom-fields package models directly')

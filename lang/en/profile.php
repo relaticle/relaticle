@@ -59,6 +59,7 @@ return [
 
     'actions' => [
         'save' => 'Save',
+        'remove_photo' => 'Remove photo',
         'delete_account' => 'Delete Account',
         'log_out_other_browsers' => 'Log Out Other Browser Sessions',
     ],
@@ -67,6 +68,8 @@ return [
         'save' => [
             'success' => 'Saved.',
         ],
+        'photo_removed' => 'Profile photo removed.',
+        'photo_remove_failed' => 'Could not remove your profile photo. Please try again.',
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',
         ],

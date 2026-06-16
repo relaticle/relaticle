@@ -70,6 +70,58 @@ parameters:
             path: app/Http/Controllers/Auth/CallbackController.php
             reportUnmatched: false
 
+        # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
+        -
+            identifier: app.i18n.hardcodedUserFacingString
+            path: packages/Chat/src/Tools/*
+            reportUnmatched: false
+
+        # Writes outside actions: grandfathered violations (32 as of 2026-06-12).
+        # Move each file's writes into app/Actions, then remove its entry —
+        # PHPStan fails on unmatched ignores, so stale entries can't linger.
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Filament/Pages/Auth/Register.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Filament/Pages/CreateTeam.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Filament/Resources/PeopleResource.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Filament/Resources/TaskResource/Pages/TasksBoard.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Http/Controllers/AcceptTeamInvitationController.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Http/Controllers/Auth/CallbackController.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Livewire/App/AccessTokens/CreateAccessToken.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Livewire/App/AccessTokens/ManageAccessTokens.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Livewire/App/Profile/UpdatePassword.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Mcp/Tools/Note/AttachNoteToEntitiesTool.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Mcp/Tools/Note/DetachNoteFromEntitiesTool.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Mcp/Tools/Task/AttachTaskToEntitiesTool.php
+        -
+            identifier: app.architecture.eloquentWriteOutsideAction
+            path: app/Mcp/Tools/Task/DetachTaskFromEntitiesTool.php
+
 
     stubFiles:
         - stubs/Mailcoach.stub
@@ -83,14 +135,30 @@ parameters:
         - routes
 
     excludePaths:
+        # Deferred (measured 2026-06-12: 306 errors — 213 i18n, by design: the
+        # internal sysadmin panel is English-only; 92 type issues, 67 of them one
+        # identical.alwaysTrue cluster). Re-include when SystemAdmin gets dev time.
         - packages/SystemAdmin
 
     configDirectories:
         - config
+        - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
 
 services:
+    -
+        class: App\PHPStan\Rules\EloquentWriteOutsideActionRule
+        arguments:
+            guardedNamespaces:
+                - App\Http\Controllers
+                - App\Mcp
+                - App\Livewire
+                - App\Filament
+                - Relaticle\Chat\Tools
+                - Relaticle\Chat\Livewire
+        tags:
+            - phpstan.rules.rule
     -
         class: App\PHPStan\Rules\HardcodedUserFacingStringRule
         arguments:

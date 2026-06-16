@@ -1,0 +1,23 @@
+{
+  "persona": "end-user",
+  "journeys": [
+    {
+      "id": "S3",
+      "value_verdict": "delivered",
+      "happy_path": "pass",
+      "sad_paths_walked": [
+        {
+          "path": "checkout with expired card",
+          "result": "pre-flight validation blocked with clear error message",
+          "bug_ref": null
+        }
+      ]
+    }
+  ],
+  "bugs": [],
+  "ux_friction": [],
+  "coverage": {
+    "seams_hit": ["cart -> checkout", "checkout -> order confirmation", "payment gateway response handling"],
+    "frontier_not_reached": []
+  }
+}

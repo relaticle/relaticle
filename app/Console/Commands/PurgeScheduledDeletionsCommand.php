@@ -8,6 +8,8 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\TeamDeletionReminderNotification;
 use App\Notifications\UserDeletionReminderNotification;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,12 +17,10 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Jetstream\Contracts\DeletesTeams;
 use Laravel\Jetstream\Contracts\DeletesUsers;
 
+#[Description('Permanently delete users and teams past their scheduled deletion date, and send reminders ahead of purge')]
+#[Signature('app:purge-scheduled-deletions')]
 final class PurgeScheduledDeletionsCommand extends Command
 {
-    protected $signature = 'app:purge-scheduled-deletions';
-
-    protected $description = 'Permanently delete users and teams past their scheduled deletion date, and send reminders ahead of purge';
-
     public function handle(DeletesUsers $deletesUsers, DeletesTeams $deletesTeams): int
     {
         $this->purgeExpiredUsers($deletesUsers);
