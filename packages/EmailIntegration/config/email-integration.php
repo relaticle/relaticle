@@ -38,9 +38,9 @@ return [
      * Sync settings — override via .env
      */
     'sync' => [
-        'initial_days' => env('EMAIL_SYNC_INITIAL_DAYS', 90),
+        'initial_days' => (int) env('EMAIL_SYNC_INITIAL_DAYS', 90),
         'interval_minutes' => env('EMAIL_SYNC_INTERVAL_MINUTES', 5),
-        'batch_size' => env('EMAIL_SYNC_BATCH_SIZE', 50),
+        'batch_size' => (int) env('EMAIL_SYNC_BATCH_SIZE', 50),
     ],
 
     /*

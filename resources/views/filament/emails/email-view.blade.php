@@ -153,30 +153,9 @@
                     x-data
                     class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-gray-700"
                 >
-                    <button
-                        type="button"
-                        title="Reply"
-                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'reply' })"
-                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        title="Reply All"
-                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'reply_all' })"
-                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4 scale-x-[-1]" />
-                    </button>
-                    <button
-                        type="button"
-                        title="Forward"
-                        x-on:click="$dispatch('reply-email', { emailId: '{{ $record->id }}', mode: 'forward' })"
-                        class="flex items-center justify-center bg-white dark:bg-gray-800 p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                        <x-heroicon-o-arrow-right class="h-4 w-4" />
-                    </button>
+                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'reply']) }}
+                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'reply_all']) }}
+                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'forward']) }}
                 </div>
             @endif
 

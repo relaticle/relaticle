@@ -102,10 +102,21 @@ trait HasEmailComposeActions
             });
     }
 
-    protected function replyForwardEmailAction(): Action
+    public function replyForwardEmailAction(): Action
     {
         return Action::make('replyForwardEmail')
             ->slideOver()
+            ->link()
+            ->hiddenLabel()
+            ->icon(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
+                'reply_all' => 'heroicon-o-arrow-uturn-right',
+                'reply' => 'heroicon-o-arrow-uturn-left',
+                'forward' => 'heroicon-o-arrow-right',
+                default => 'heroicon-o-arrow-uturn-right',
+            })
+            ->extraAttributes([
+                'class' => 'p-2',
+            ])
             ->modalHeading(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
                 'reply_all' => 'Reply All',
                 'forward' => 'Forward',
