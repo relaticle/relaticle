@@ -17,6 +17,7 @@ no composer.json of their own). Service providers are registered in
 | `packages/ImportWizard` | CSV import flows |
 | `packages/Documentation` | Public docs pages |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
+| `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle — not for a new CRM entity (those go in `app/`). Package
