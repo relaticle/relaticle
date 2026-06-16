@@ -38,6 +38,7 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -270,6 +271,22 @@ final class EmailInboxPage extends Page
     {
         return Action::make('replyForwardEmail')
             ->slideOver()
+            ->link()
+            ->hiddenLabel()
+            ->icon(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
+                'reply_all' => 'heroicon-o-arrow-uturn-right',
+                'reply' => 'heroicon-o-arrow-uturn-left',
+                'forward' => 'heroicon-o-arrow-right',
+                default => 'heroicon-o-arrow-uturn-right',
+            })
+            ->tooltip(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
+                'reply_all' => 'Reply All',
+                'forward' => 'Forward',
+                default => 'Reply',
+            })
+            ->extraAttributes([
+                'class' => 'p-2',
+            ])
             ->modalHeading(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
                 'reply_all' => __('filament/pages/email-inbox.reply_forward.modal_headings.reply_all'),
                 'forward' => __('filament/pages/email-inbox.reply_forward.modal_headings.forward'),
