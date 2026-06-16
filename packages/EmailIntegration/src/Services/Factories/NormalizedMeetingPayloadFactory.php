@@ -11,7 +11,7 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Enums\CalendarVisibility;
 
-final class NormalizedMeetingPayloadFactory
+final readonly class NormalizedMeetingPayloadFactory
 {
     public function fromCalendarEvent(CalendarEventData $event, string $accountEmail): NormalizedMeetingPayload
     {

@@ -164,6 +164,8 @@ $packageServiceLayers = [
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
     'Relaticle\Documentation\Services',
+    'Relaticle\EmailIntegration\Actions',
+    'Relaticle\EmailIntegration\Services',
     'Relaticle\ImportWizard\Support',
     'Relaticle\OnboardSeed\Support',
 ];
@@ -182,6 +184,11 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',
         'Relaticle\Documentation\Services\DocumentationService',
+        // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
+        'Relaticle\EmailIntegration\Services\MicrosoftGraphMailService',
+        'Relaticle\EmailIntegration\Services\PrivacyService',
+        // Exceptions necessarily extend a base throwable:
+        'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
         'Relaticle\ImportWizard\Support\EntityLinkResolver',
         'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
@@ -198,7 +205,11 @@ arch('package service layers avoid mutation')
 arch('package service layers avoid inheritance')
     ->expect($packageServiceLayers)
     ->classes()
-    ->toExtendNothing();
+    ->toExtendNothing()
+    ->ignoring([
+        // Exceptions necessarily extend a base throwable:
+        'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
+    ]);
 
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
