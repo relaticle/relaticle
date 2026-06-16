@@ -12,6 +12,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailThread;
 
 mutates(StoreEmailAction::class);
 
@@ -225,6 +226,77 @@ it('runs CRM linking exactly once (no double email_count bump)', function (): vo
     expect($fresh->email_count)->toBe(1)
         ->and($fresh->inbound_email_count)->toBe(1)
         ->and($fresh->outbound_email_count)->toBe(0);
+});
+
+it('creates the email thread aggregate on first email', function (): void {
+    $sentAt = now()->subHour();
+    $data = makeFetchedEmailData([
+        'threadId' => 'thread-agg-1',
+        'subject' => 'Thread Subject',
+        'sentAt' => $sentAt,
+        'participants' => [
+            ['email_address' => 'a@external.com', 'name' => 'A', 'role' => 'from'],
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'to'],
+        ],
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $thread = EmailThread::query()
+        ->where('connected_account_id', $this->account->getKey())
+        ->where('thread_id', 'thread-agg-1')
+        ->first();
+
+    expect($thread)->not->toBeNull()
+        ->and($thread->team_id)->toBe($this->team->id)
+        ->and($thread->subject)->toBe('Thread Subject')
+        ->and($thread->email_count)->toBe(1)
+        ->and($thread->participant_count)->toBe(2)
+        ->and($thread->first_email_at->toDateTimeString())->toBe($sentAt->toDateTimeString())
+        ->and($thread->last_email_at->toDateTimeString())->toBe($sentAt->toDateTimeString());
+});
+
+it('refreshes the existing thread aggregate as later emails arrive', function (): void {
+    $first = now()->subHours(2);
+    $second = now()->subHour();
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'agg-msg-1',
+        'rfcMessageId' => '<agg-1@example.com>',
+        'threadId' => 'thread-agg-2',
+        'subject' => 'Original Subject',
+        'sentAt' => $first,
+        'participants' => [
+            ['email_address' => 'a@external.com', 'name' => 'A', 'role' => 'from'],
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'to'],
+        ],
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'agg-msg-2',
+        'rfcMessageId' => '<agg-2@example.com>',
+        'threadId' => 'thread-agg-2',
+        'subject' => 'Reply Subject',
+        'sentAt' => $second,
+        'participants' => [
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'from'],
+            ['email_address' => 'b@external.com', 'name' => 'B', 'role' => 'to'],
+        ],
+    ]));
+
+    $threads = EmailThread::query()
+        ->where('connected_account_id', $this->account->getKey())
+        ->where('thread_id', 'thread-agg-2')
+        ->get();
+
+    expect($threads)->toHaveCount(1);
+
+    $thread = $threads->first();
+    expect($thread->email_count)->toBe(2)
+        ->and($thread->participant_count)->toBe(3)
+        ->and($thread->subject)->toBe('Original Subject')
+        ->and($thread->first_email_at->toDateTimeString())->toBe($first->toDateTimeString())
+        ->and($thread->last_email_at->toDateTimeString())->toBe($second->toDateTimeString());
 });
 
 it('stores body in email_bodies table', function (): void {
