@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Privacy',
+    'navigation_label' => 'Privacy',
     'actions' => [
         'save' => 'Save',
     ],

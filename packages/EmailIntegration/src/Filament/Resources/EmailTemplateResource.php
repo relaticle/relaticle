@@ -19,6 +19,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Override;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
@@ -28,17 +29,21 @@ final class EmailTemplateResource extends Resource
 {
     use HasEmailFeatureFlag;
 
+    protected static ?string $cluster = EmailSettings::class;
+
     protected static ?string $model = EmailTemplate::class;
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?string $slug = 'templates';
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
+    protected static ?int $navigationSort = 3;
 
-    public static function getNavigationGroup(): string
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-duplicate';
+
+    public static function getNavigationLabel(): string
     {
-        return __('filament/navigation.groups.emails');
+        return __('filament/resources/email-template.navigation_label');
     }
 
     public static function form(Schema $schema): Schema

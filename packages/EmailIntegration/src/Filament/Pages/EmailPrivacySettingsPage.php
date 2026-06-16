@@ -17,6 +17,7 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
@@ -27,22 +28,24 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     protected string $view = 'email-integration::filament.pages.email-privacy-settings';
 
-    protected static ?string $slug = 'settings/email-privacy';
+    protected static ?string $cluster = EmailSettings::class;
+
+    protected static ?string $slug = 'privacy';
 
     protected static ?string $title = null;
 
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 4;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
 
     public function getTitle(): string
     {
         return __('filament/pages/email-privacy-settings.title');
     }
 
-    public static function getNavigationGroup(): string
+    public static function getNavigationLabel(): string
     {
-        return __('filament/navigation.groups.emails');
+        return __('filament/pages/email-privacy-settings.navigation_label');
     }
 
     public string $default_email_sharing_tier = 'metadata_only';

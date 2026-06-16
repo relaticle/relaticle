@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'navigation_label' => 'Email',
+    'navigation_label' => 'Emails',
     'compose' => [
         'label' => 'Compose',
         'notifications' => [

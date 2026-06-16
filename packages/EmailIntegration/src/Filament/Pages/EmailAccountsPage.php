@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -34,18 +35,15 @@ final class EmailAccountsPage extends Page
 
     protected string $view = 'email-integration::filament.pages.email-accounts';
 
-    protected static ?string $slug = 'settings/email-accounts';
+    protected static ?string $cluster = EmailSettings::class;
+
+    protected static ?string $slug = 'accounts';
 
     protected static ?string $title = 'Accounts';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 1;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.emails');
-    }
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-at-symbol';
 
     /**
      * @var Collection<int, ConnectedAccount>

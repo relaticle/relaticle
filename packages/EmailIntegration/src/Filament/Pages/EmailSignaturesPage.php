@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -26,18 +27,15 @@ final class EmailSignaturesPage extends Page
 
     protected string $view = 'email-integration::filament.pages.email-signatures';
 
-    protected static ?string $slug = 'settings/email-signatures';
+    protected static ?string $cluster = EmailSettings::class;
+
+    protected static ?string $slug = 'signatures';
 
     protected static ?string $title = 'Signatures';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.emails');
-    }
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-pencil-square';
 
     /**
      * @var Collection<int, EmailSignature>

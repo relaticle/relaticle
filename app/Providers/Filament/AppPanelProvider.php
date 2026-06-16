@@ -61,7 +61,8 @@ use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
-use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -173,9 +174,6 @@ final class AppPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('heroicon-o-shopping-cart'),
-                NavigationGroup::make()
-                    ->label(__('filament/panel.navigation_groups.emails'))
-                    ->icon('heroicon-o-envelope'),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -235,14 +233,7 @@ final class AppPanelProvider extends PanelProvider
             $panel
                 ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
                 ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
-                ->userMenuItems([
-                    Action::make('email_privacy')
-                        ->label(__('filament/panel.user_menu.email_privacy'))
-                        ->icon('heroicon-m-shield-check')
-                        ->url(fn (): string => $this->shouldRegisterMenuItem()
-                            ? url(EmailPrivacySettingsPage::getUrl())
-                            : url($panel->getPath())),
-                ]);
+                ->discoverClusters(in: base_path('packages/EmailIntegration/src/Filament/Clusters'), for: 'Relaticle\\EmailIntegration\\Filament\\Clusters');
         }
 
         $panel
@@ -271,6 +262,11 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.custom_fields'))
                     ->icon(Heroicon::OutlinedCube)
                     ->url(fn (): string => CustomFieldsManagementPage::getUrl()),
+                Action::make('email_settings')
+                    ->label(__('filament/panel.tenant_menu.email_settings'))
+                    ->icon(Heroicon::OutlinedEnvelope)
+                    ->visible(fn (): bool => EmailSettings::canAccess())
+                    ->url(fn (): string => EmailAccountsPage::getUrl()),
                 Action::make('import_history')
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)

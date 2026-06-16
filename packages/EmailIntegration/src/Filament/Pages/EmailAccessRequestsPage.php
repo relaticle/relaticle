@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
@@ -33,18 +34,15 @@ final class EmailAccessRequestsPage extends Page
 
     protected static ?string $navigationLabel = null;
 
-    protected static string|\UnitEnum|null $navigationGroup = null;
+    protected static ?string $cluster = EmailSettings::class;
 
-    protected static ?int $navigationSort = 4;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
+
+    protected static ?int $navigationSort = 6;
 
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/email-access-requests.navigation_label');
-    }
-
-    public static function getNavigationGroup(): string
-    {
-        return __('filament/navigation.groups.emails');
     }
 
     public string $tab = 'incoming';
