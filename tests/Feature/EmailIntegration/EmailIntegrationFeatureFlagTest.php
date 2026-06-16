@@ -17,7 +17,10 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentTeam);
 });
 
-it('is enabled by default, resolving from config', function (): void {
+it('resolves active when the config flag is enabled', function (): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
     expect(Feature::active(EmailIntegration::class))->toBeTrue();
 });
 
@@ -26,6 +29,15 @@ it('resolves inactive when the config flag is disabled', function (): void {
     Feature::flushCache();
 
     expect(Feature::active(EmailIntegration::class))->toBeFalse();
+});
+
+it('defaults to inactive when no config or env override is set', function (): void {
+    config()->set('relaticle.features.email_integration', (bool) env('RELATICLE_FEATURE_EMAIL_INTEGRATION', false));
+    Feature::flushCache();
+
+    // Production ships flag-OFF; the test env opts in via RELATICLE_FEATURE_EMAIL_INTEGRATION=true.
+    expect(Feature::active(EmailIntegration::class))
+        ->toBe((bool) env('RELATICLE_FEATURE_EMAIL_INTEGRATION', false));
 });
 
 it('allows access to email pages and resources when active', function (): void {
