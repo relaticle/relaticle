@@ -74,8 +74,11 @@ final readonly class EmailThreadSummaryService
             $lines[] = '';
         }
 
+        $provider = Provider::from(config('services.ai_summary.provider'));
+        $model = (string) config('services.ai_summary.model');
+
         $response = Prism::text()
-            ->using(Provider::Anthropic, config('services.anthropic.summary_model'))
+            ->using($provider, $model)
             ->withSystemPrompt($this->systemPrompt())
             ->withPrompt(implode("\n", $lines))
             ->generate();
@@ -90,7 +93,7 @@ final readonly class EmailThreadSummaryService
             'summarizable_type' => $thread->getMorphClass(),
             'summarizable_id' => $thread->getKey(),
             'summary' => $response->text,
-            'model_used' => config('services.anthropic.summary_model'),
+            'model_used' => $model,
             'prompt_tokens' => $response->usage->promptTokens,
             'completion_tokens' => $response->usage->completionTokens,
         ]);
