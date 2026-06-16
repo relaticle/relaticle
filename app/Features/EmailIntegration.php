@@ -8,6 +8,6 @@ final readonly class EmailIntegration
 {
     public function resolve(): bool
     {
-        return (bool) config('relaticle.features.email_integration', true);
+        return (bool) config('relaticle.features.email_integration', false);
     }
 }
