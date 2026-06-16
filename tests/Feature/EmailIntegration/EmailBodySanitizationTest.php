@@ -2,9 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
+use App\Models\People;
 use App\Models\User;
 use App\Support\EmailHtmlSanitizer;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -19,6 +24,12 @@ beforeEach(function (): void {
         'team_id' => $this->team->id,
         'user_id' => $this->owner->id,
     ]));
+
+    $this->person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Jane Doe',
+        'creator_id' => $this->owner->id,
+    ]);
 
     $this->actingAs($this->owner);
     Filament::setTenant($this->team);
@@ -39,7 +50,22 @@ function makeEmailWithBody(string $html): Email
         'body_html' => $html,
     ]);
 
+    test()->person->emails()->attach($email);
+
     return $email->fresh(['body', 'participants', 'labels', 'attachments']);
+}
+
+/**
+ * Render the email-view partial through its real entry point: the
+ * EmailsRelationManager's ViewAction modal, where the partial is bound to the
+ * Livewire component that exposes the reply/forward action it calls.
+ */
+function mountEmailView(Email $email): Testable
+{
+    return livewire(EmailsRelationManager::class, [
+        'ownerRecord' => test()->person,
+        'pageClass' => ViewPeople::class,
+    ])->mountAction(TestAction::make('view')->table($email));
 }
 
 const MALICIOUS_BODY = '<p>hello <b>world</b></p>'
@@ -51,14 +77,12 @@ const MALICIOUS_BODY = '<p>hello <b>world</b></p>'
 it('strips scripts, event handlers and javascript urls from the email view', function (): void {
     $email = makeEmailWithBody(MALICIOUS_BODY);
 
-    $html = view('filament.emails.email-view', ['record' => $email])->render();
-
-    expect($html)
-        ->not->toContain('onerror')
-        ->not->toContain('onload="alert')
-        ->not->toContain('javascript:')
-        ->not->toContain('document.cookie')
-        ->and($html)->toContain('hello');
+    mountEmailView($email)
+        ->assertMountedActionModalDontSeeHtml('onerror')
+        ->assertMountedActionModalDontSeeHtml('onload="alert')
+        ->assertMountedActionModalDontSeeHtml('javascript:')
+        ->assertMountedActionModalDontSeeHtml('document.cookie')
+        ->assertMountedActionModalSeeHtml('hello');
 });
 
 it('preserves inline styles and presentational attributes used by email layouts', function (): void {
@@ -69,25 +93,21 @@ it('preserves inline styles and presentational attributes used by email layouts'
         .'</td></tr></table>'
     );
 
-    $html = view('filament.emails.email-view', ['record' => $email])->render();
-
-    expect($html)
-        ->toContain('bgcolor=&quot;#eeeeee&quot;')
-        ->toContain('style=&quot;color:#ff0000;padding:10px&quot;')
-        ->toContain('class=&quot;lead&quot;')
-        ->toContain('align=&quot;center&quot;');
+    mountEmailView($email)
+        ->assertMountedActionModalSeeHtml('bgcolor=&quot;#eeeeee&quot;')
+        ->assertMountedActionModalSeeHtml('style=&quot;color:#ff0000;padding:10px&quot;')
+        ->assertMountedActionModalSeeHtml('class=&quot;lead&quot;')
+        ->assertMountedActionModalSeeHtml('align=&quot;center&quot;');
 });
 
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
-    $html = view('filament.emails.email-view', ['record' => $email])->render();
-
-    expect($html)
-        ->toContain('<iframe')
-        ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
-        ->toContain('referrerpolicy="no-referrer"')
-        ->not->toContain('allow-same-origin');
+    mountEmailView($email)
+        ->assertMountedActionModalSeeHtml('<iframe')
+        ->assertMountedActionModalSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->assertMountedActionModalSeeHtml('referrerpolicy="no-referrer"')
+        ->assertMountedActionModalDontSeeHtml('allow-same-origin');
 });
 
 it('strips dangerous markup in the threaded email view', function (): void {

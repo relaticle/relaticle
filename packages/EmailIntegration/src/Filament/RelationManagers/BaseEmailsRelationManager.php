@@ -193,6 +193,9 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 ViewAction::make()
                     ->modalHeading(__('filament/relation-managers/emails.actions.view.modal_heading'))
                     ->modalWidth(Width::SevenExtraLarge)
+                    ->registerModalActions([
+                        $this->replyForwardEmailAction(),
+                    ])
                     ->slideOver(),
 
                 ActionGroup::make([
