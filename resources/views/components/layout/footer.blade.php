@@ -57,6 +57,12 @@
                     </li>
                     @endfeature
                     <li>
+                        <a href="{{ route('blog.index') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            Blog
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ url('/#features') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
                             Features

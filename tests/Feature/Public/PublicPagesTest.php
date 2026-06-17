@@ -2,12 +2,19 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Blog\BlogCategoryController;
+use App\Http\Controllers\Blog\BlogFeedController;
+use App\Http\Controllers\Blog\BlogPreviewController;
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use Illuminate\Support\Facades\Http;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
+use Relaticle\Ink\Models\Tag;
 
-mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class);
+mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class, BlogCategoryController::class, BlogFeedController::class, BlogPreviewController::class);
 
 beforeEach(function () {
     Http::fake([
@@ -184,6 +191,97 @@ describe('Social authentication routes', function () {
         $response = $this->get('/auth/redirect/google');
 
         $response->assertStatus(302); // Redirect to Google
+    });
+});
+
+describe('Blog pages', function () {
+    it('displays the blog index', function () {
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('Engineering Blog');
+    });
+
+    it('displays published posts on the index', function () {
+        $post = Post::factory()->published()->create();
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee($post->title);
+    });
+
+    it('does not display draft posts on the index', function () {
+        $post = Post::factory()->draft()->create();
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertDontSee($post->title);
+    });
+
+    it('displays a single blog post', function () {
+        $post = Post::factory()->published()->create();
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($post->title);
+    });
+
+    it('returns 404 for non-existent blog post', function () {
+        $this->get('/blog/non-existent-post')
+            ->assertStatus(404);
+    });
+
+    it('displays posts filtered by category', function () {
+        $category = Category::factory()->create();
+        $post = Post::factory()->published()->create(['category_id' => $category->id]);
+
+        $this->get("/blog/category/{$category->slug}")
+            ->assertStatus(200)
+            ->assertSee($post->title)
+            ->assertSee($category->name);
+    });
+
+    it('displays posts filtered by tag', function () {
+        $tag = Tag::factory()->create();
+        $taggedPost = Post::factory()->published()->create();
+        $otherPost = Post::factory()->published()->create();
+
+        $taggedPost->tags()->attach($tag);
+
+        $this->get("/blog/tag/{$tag->slug}")
+            ->assertStatus(200)
+            ->assertSee($taggedPost->title)
+            ->assertSee('#'.$tag->name)
+            ->assertDontSee($otherPost->title);
+    });
+
+    it('returns 404 for non-existent tag', function () {
+        $this->get('/blog/tag/non-existent-tag')
+            ->assertStatus(404);
+    });
+
+    it('renders tag pills on a post show page', function () {
+        $tag = Tag::factory()->create();
+        $post = Post::factory()->published()->create();
+        $post->tags()->attach($tag);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee('#'.$tag->name)
+            ->assertSee(route('blog.tag', $tag->slug));
+    });
+
+    it('returns RSS feed', function () {
+        Post::factory()->published()->create();
+
+        $this->get('/blog/feed')
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'application/rss+xml');
+    });
+
+    it('includes blog link in navigation', function () {
+        $this->get('/')
+            ->assertStatus(200)
+            ->assertSee(route('blog.index'));
     });
 });
 

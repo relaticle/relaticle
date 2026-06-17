@@ -55,6 +55,9 @@ use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
+use Relaticle\Ink\Filament\Resources\CategoryResource;
+use Relaticle\Ink\Filament\Resources\PostResource;
+use Relaticle\Ink\InkPlugin;
 
 final class AppPanelProvider extends PanelProvider
 {
@@ -70,6 +73,9 @@ final class AppPanelProvider extends PanelProvider
             TenantSet::class,
             SwitchTeam::class,
         );
+
+        CategoryResource::scopeToTenant(false);
+        PostResource::scopeToTenant(false);
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
@@ -191,6 +197,7 @@ final class AppPanelProvider extends PanelProvider
                 CustomFieldsPlugin::make()
                     ->authorize(fn () => Gate::check('update', Filament::getTenant())),
                 ResizedColumnPlugin::make(),
+                InkPlugin::make(),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,

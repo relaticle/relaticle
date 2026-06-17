@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a9fb009fbf7e1aa5adc6cd087ca4df6f",
+    "content-hash": "923d4a6ad4d53723e6832c7738572118",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -8255,6 +8255,227 @@
             "time": "2019-03-08T08:55:37+00:00"
         },
         {
+            "name": "ralphjsmit/laravel-filament-seo",
+            "version": "2.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ralphjsmit/laravel-filament-seo.git",
+                "reference": "c217d80708a3947dfd04d44e91e86d8fa2366587"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ralphjsmit/laravel-filament-seo/zipball/c217d80708a3947dfd04d44e91e86d8fa2366587",
+                "reference": "c217d80708a3947dfd04d44e91e86d8fa2366587",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0|^5.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "php": "^8.0",
+                "ralphjsmit/laravel-seo": "^1.7",
+                "spatie/laravel-package-tools": "^1.9.2"
+            },
+            "require-dev": {
+                "doctrine/dbal": "^3.8|^4.4",
+                "nesbot/carbon": "^2.66|^3.0",
+                "nunomaduro/collision": "^8.0|^9.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^4.0",
+                "pestphp/pest-plugin-laravel": "^4.0",
+                "phpunit/phpunit": "^12.0",
+                "spatie/laravel-ray": "^1.39"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": [],
+                    "providers": [
+                        "RalphJSmit\\Filament\\SEO\\FilamentSEOServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "RalphJSmit\\Filament\\SEO\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ralph J. Smit",
+                    "email": "rjs@ralphjsmit.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A package to combine the power of Laravel SEO and Filament Admin.",
+            "homepage": "https://github.com/ralphjsmit/laravel-filament-seo",
+            "keywords": [
+                "laravel",
+                "laravel-filament-seo",
+                "ralphjsmit"
+            ],
+            "support": {
+                "issues": "https://github.com/ralphjsmit/laravel-filament-seo/issues",
+                "source": "https://github.com/ralphjsmit/laravel-filament-seo/tree/2.2.0"
+            },
+            "time": "2026-03-07T22:20:25+00:00"
+        },
+        {
+            "name": "ralphjsmit/laravel-helpers",
+            "version": "1.11.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ralphjsmit/laravel-helpers.git",
+                "reference": "cabfeb5e3f3a360bcd958fbf872271c56a74ebf0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ralphjsmit/laravel-helpers/zipball/cabfeb5e3f3a360bcd958fbf872271c56a74ebf0",
+                "reference": "cabfeb5e3f3a360bcd958fbf872271c56a74ebf0",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.4",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "php": "^8.0",
+                "spatie/laravel-package-tools": "^1.9.2"
+            },
+            "require-dev": {
+                "livewire/livewire": "^2.9|^3.4|^4.2",
+                "nesbot/carbon": "^2.66|^3.0",
+                "nunomaduro/collision": "^7.0|^8.0",
+                "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+                "pestphp/pest": "^2.34|^3.7|^4.4",
+                "pestphp/pest-plugin-laravel": "^2.3|^3.1|^4.1",
+                "phpunit/phpunit": "^10.5|^11.5|^12.5.12",
+                "spatie/invade": "^1.0|^2.0",
+                "spatie/laravel-ray": "^1.39"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Helpers": "RalphJSmit\\Helpers\\Facades\\Helpers"
+                    },
+                    "providers": [
+                        "RalphJSmit\\Helpers\\HelpersServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/Laravel/Support/helpers.php",
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "RalphJSmit\\Helpers\\": "src",
+                    "RalphJSmit\\Helpers\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ralph J. Smit",
+                    "email": "rjs@ralphjsmit.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A package containing handy helpers for your Laravel-application.",
+            "homepage": "https://github.com/ralphjsmit/laravel-helpers",
+            "keywords": [
+                "laravel",
+                "laravel-helpers",
+                "ralphjsmit"
+            ],
+            "support": {
+                "issues": "https://github.com/ralphjsmit/laravel-helpers/issues",
+                "source": "https://github.com/ralphjsmit/laravel-helpers/tree/1.11.0"
+            },
+            "time": "2026-03-07T22:24:40+00:00"
+        },
+        {
+            "name": "ralphjsmit/laravel-seo",
+            "version": "1.8.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ralphjsmit/laravel-seo.git",
+                "reference": "fef1dddfbc4f3f8f361eca9dab16d220ab595828"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ralphjsmit/laravel-seo/zipball/fef1dddfbc4f3f8f361eca9dab16d220ab595828",
+                "reference": "fef1dddfbc4f3f8f361eca9dab16d220ab595828",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.11|^12.0|^13.0",
+                "php": "^8.2",
+                "ralphjsmit/laravel-helpers": "^1.10",
+                "spatie/laravel-package-tools": "^1.9.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.16",
+                "nesbot/carbon": "^3.0",
+                "nunomaduro/collision": "^8.0|^9.0",
+                "orchestra/testbench": "^9.16|^10.0|^11.0",
+                "orchestra/testbench-core": "^9.1.4|^10.0|^11.0",
+                "pestphp/pest": "^2.0|^3.0|^4.4",
+                "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.1",
+                "phpunit/phpunit": "^10.5|^11.5|^12.5.12",
+                "spatie/laravel-ray": "^1.39",
+                "spatie/pest-plugin-test-time": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "SEOManager": "RalphJSmit\\Laravel\\SEO\\Facades\\SEOManager"
+                    },
+                    "providers": [
+                        "RalphJSmit\\Laravel\\SEO\\LaravelSEOServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "RalphJSmit\\Laravel\\SEO\\": "src",
+                    "RalphJSmit\\Laravel\\SEO\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ralph J. Smit",
+                    "email": "rjs@ralphjsmit.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A package to handle the SEO in any Laravel application, big or small.",
+            "homepage": "https://github.com/ralphjsmit/laravel-seo",
+            "keywords": [
+                "laravel",
+                "laravel-seo",
+                "ralphjsmit"
+            ],
+            "support": {
+                "issues": "https://github.com/ralphjsmit/laravel-seo/issues",
+                "source": "https://github.com/ralphjsmit/laravel-seo/tree/1.8.1"
+            },
+            "time": "2026-03-26T20:29:46+00:00"
+        },
+        {
             "name": "ramsey/collection",
             "version": "2.1.1",
             "source": {
@@ -9183,6 +9404,76 @@
                 }
             ],
             "time": "2026-06-14T05:36:01+00:00"
+        },
+        {
+            "name": "relaticle/ink",
+            "version": "v2.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/relaticle/ink.git",
+                "reference": "1a4a2774ead4ed2e3b05f4469dd61ba534844a59"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/relaticle/ink/zipball/1a4a2774ead4ed2e3b05f4469dd61ba534844a59",
+                "reference": "1a4a2774ead4ed2e3b05f4469dd61ba534844a59",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.0",
+                "illuminate/contracts": "^12.0|^13.0",
+                "php": "^8.4",
+                "ralphjsmit/laravel-filament-seo": "^2.0",
+                "ralphjsmit/laravel-seo": "^1.7",
+                "spatie/laravel-markdown": "^2.7",
+                "spatie/laravel-package-tools": "^1.15",
+                "spatie/laravel-sitemap": "^7.0 || ^8.0",
+                "spatie/laravel-sluggable": "^3.0"
+            },
+            "require-dev": {
+                "laravel/mcp": "^0.5",
+                "laravel/pint": "^1.14",
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^3.0",
+                "pestphp/pest-plugin-laravel": "^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Relaticle\\Ink\\InkServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Relaticle\\Ink\\": "src/",
+                    "Relaticle\\Ink\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Filament-native content publishing for blog, docs, and AI-citable articles. Headless by default, with opt-in public routes.",
+            "homepage": "https://github.com/relaticle/ink",
+            "keywords": [
+                "blog",
+                "cms",
+                "content",
+                "filament",
+                "headless",
+                "ink",
+                "laravel",
+                "markdown",
+                "mcp",
+                "seo"
+            ],
+            "support": {
+                "issues": "https://github.com/relaticle/ink/issues",
+                "source": "https://github.com/relaticle/ink"
+            },
+            "time": "2026-05-13T21:25:46+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",
