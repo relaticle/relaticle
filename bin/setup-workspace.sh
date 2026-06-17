@@ -1,16 +1,32 @@
 #!/usr/bin/env bash
-# Bootstrap a Polyscope workspace: refresh dependencies and point .env at
-# the workspace's own hostname.
+# Bootstrap a parallel workspace (Polyscope or Conductor): install dependencies
+# and point .env at the workspace's own hostname.
 #
-# Polyscope creates each workspace as a copy-on-write clone of the base repo
-# (vendor/, node_modules/, and .env are copied). The database stays shared
-# across workspaces. We rewrite APP_URL and SESSION_DOMAIN so absolute URLs
-# and session cookies match `<workspace>.test`, and blank APP_PANEL_DOMAIN
-# and SYSADMIN_DOMAIN so both panels serve path-based at `<workspace>.test/app`
-# and `<workspace>.test/sysadmin` — the copied `*.relaticle.test` values would
-# route to the base checkout, not the clone.
+# This file is the SINGLE SOURCE OF TRUTH and lives in the repository ROOT
+# checkout. Conductor's `setup` script (in .conductor/settings.toml) invokes it
+# by absolute path via "$CONDUCTOR_ROOT_PATH/bin/setup-workspace.sh", so edits
+# here take effect for every new workspace WITHOUT a commit to the base branch —
+# mirroring Polyscope, which copy-on-write-clones untracked base files. The
+# tracked copy that ships in each worktree from origin/main is unused.
 #
-# Mac-only: uses BSD sed (`sed -i ''`). Polyscope itself is macOS-only.
+# Copy-on-write parity:
+# - Polyscope CoW-clones the whole base repo (vendor/, node_modules/, .env), so
+#   the installs below are fast refreshes.
+# - Conductor's git worktree copies only `.env`. To match the feel we APFS-clone
+#   vendor/ and node_modules/ from the base checkout first (`cp -c` = clonefile:
+#   near-instant, copy-on-write, each workspace diverges on its own writes),
+#   turning the installs below into the same fast refreshes.
+#   NOTE: we use `npm install` (incremental), NOT `npm ci` — `npm ci` deletes
+#   node_modules before installing, which would throw away the clone.
+#
+# The database stays shared across workspaces. We rewrite APP_URL and
+# SESSION_DOMAIN so absolute URLs and session cookies match `<workspace>.test`,
+# and blank APP_PANEL_DOMAIN and SYSADMIN_DOMAIN so both panels serve path-based
+# at `<workspace>.test/app` and `<workspace>.test/sysadmin` — the copied
+# `*.relaticle.test` values would route to the base checkout, not the workspace.
+#
+# Mac-only: uses BSD sed (`sed -i ''`) and APFS clonefile. Both orchestrators
+# are macOS-only.
 
 set -euo pipefail
 
@@ -22,11 +38,31 @@ if [[ ! -f .env ]]; then
     exit 1
 fi
 
+# Base checkout to clone dependencies from. Conductor sets CONDUCTOR_ROOT_PATH;
+# fall back to the git common dir's parent for Polyscope / manual runs.
+BASE="${CONDUCTOR_ROOT_PATH:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")}"
+
+# APFS copy-on-write seed: when a dependency dir is missing (Conductor worktree),
+# clone it from the base checkout via clonefile so the install below is a fast
+# refresh, not a cold install. No-op when already present (Polyscope) or when
+# this checkout IS the base (run from the root).
+clone_from_base() {
+    local dir="$1"
+    if [[ -d "$dir" || "$BASE" == "$PWD" || ! -d "$BASE/$dir" ]]; then
+        return 0
+    fi
+    echo "→ Cloning ${dir}/ from base (APFS copy-on-write)"
+    cp -c -R "$BASE/$dir" "$dir"
+}
+
+clone_from_base vendor
+clone_from_base node_modules
+
 echo "→ Refreshing PHP dependencies"
 composer install --no-interaction --prefer-dist
 
 echo "→ Refreshing JS dependencies"
-npm ci
+npm install --no-audit --no-fund
 
 echo "→ Pointing .env at ${WORKSPACE_HOST}"
 sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
