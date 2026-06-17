@@ -68,7 +68,7 @@ it('generates and caches a summary for an email thread', function (): void {
     expect($summary)
         ->toBeInstanceOf(AiSummary::class)
         ->summary->toBe('The prospect requested pricing and the account manager will follow up next week.')
-        ->model_used->toBe(config('services.ai_summary.model'))
+        ->model_used->toBe(config('services.openai.summary_model'))
         ->prompt_tokens->toBe(120)
         ->completion_tokens->toBe(60);
 

@@ -74,11 +74,10 @@ final readonly class EmailThreadSummaryService
             $lines[] = '';
         }
 
-        $provider = Provider::from(config('services.ai_summary.provider'));
-        $model = (string) config('services.ai_summary.model');
+        $model = (string) config('services.openai.summary_model');
 
         $response = Prism::text()
-            ->using($provider, $model)
+            ->using(Provider::OpenAI, $model)
             ->withSystemPrompt($this->systemPrompt())
             ->withPrompt(implode("\n", $lines))
             ->generate();
