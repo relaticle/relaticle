@@ -15,7 +15,7 @@ it('can create a new team through the browser', function (): void {
     $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate('/app/new')
         ->assertSee('Create your workspace')

@@ -195,24 +195,29 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
                 fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
+            )
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                fn (): View|Factory => view('filament.auth.login_options'),
             );
 
         if (Feature::active(SocialAuth::class)) {
-            $panel
-                ->renderHook(
-                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                )
-                ->renderHook(
-                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                );
+            $panel->renderHook(
+                PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
+                fn (): View|Factory => view('filament.auth.social_login_buttons')
+            );
         }
 
         $panel
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            );
+
+        $panel
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory => view('filament.scripts.identity-confirmation'),
             );
 
         if (Features::hasApiFeatures()) {

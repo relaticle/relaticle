@@ -15,7 +15,7 @@ it('can create a company through the browser', function (): void {
     $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->press('New company')

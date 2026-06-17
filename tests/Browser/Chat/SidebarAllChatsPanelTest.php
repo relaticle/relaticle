@@ -31,7 +31,7 @@ it('opens the all-chats flyout from the sidebar trigger and lists chats', functi
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->assertSourceHas('aria-label="Open all chats"');
 
@@ -73,7 +73,7 @@ it('navigates to a chat when clicked from the panel', function (): void {
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->click('button[aria-label="Open all chats"]');
 

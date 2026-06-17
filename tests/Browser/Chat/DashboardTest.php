@@ -14,7 +14,7 @@ it('can load the dashboard with chat input', function (): void {
     $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->assertSourceHas('placeholder="Ask anything..."');
 });
@@ -26,7 +26,7 @@ it('shows greeting on the dashboard', function (): void {
     $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+        ->click('button[type="submit"]')
         ->assertPathIs("/app/{$team->slug}")
         ->assertSee('Good');
 });

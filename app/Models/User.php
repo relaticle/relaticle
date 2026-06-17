@@ -27,6 +27,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
@@ -67,7 +69,7 @@ use Laravel\Sanctum\HasApiTokens;
     'mailcoach_subscriber_uuid',
     'subscriber_recency_bucket',
 ])]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -78,6 +80,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use HasTeams;
     use HasUlids;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
     /**
@@ -107,6 +110,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function hasPassword(): bool
     {
         return $this->password !== null;
+    }
+
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
     }
 
     public function isScheduledForDeletion(): bool

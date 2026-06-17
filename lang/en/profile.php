@@ -24,6 +24,7 @@ return [
         ],
         'password' => [
             'label' => 'Password',
+            'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
         ],
     ],
 
@@ -54,6 +55,32 @@ return [
             'title' => 'Delete Account',
             'description' => 'Schedule your account for deletion.',
             'notice' => 'Deleting your account will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion by logging back in at any time before that. After the grace period, all your data will be permanently deleted.',
+            'confirm_email_label' => 'Type your account email to confirm',
+            'confirm_email_mismatch' => 'That does not match your account email.',
+        ],
+        'passkeys' => [
+            'title' => 'Passkeys',
+            'description' => 'Manage your passkeys for passwordless sign-in.',
+            'unsupported' => 'Passkeys are not supported in this browser.',
+            'empty' => 'No passkeys yet. Add one to sign in without a password.',
+            'added' => 'Added :time',
+            'last_used' => 'Last used :time',
+            'add_passkey' => 'Add passkey',
+            'add_description' => 'Register a new passkey for this device to sign in without a password.',
+            'name_label' => 'Passkey name',
+            'name_placeholder' => 'e.g., MacBook Pro, iPhone',
+            'password_help' => 'For your security, confirm your account password before adding a passkey.',
+            'use_password' => 'Use your password instead',
+            'method_hint' => "You'll confirm with Face ID, Touch ID, or your passkey.",
+            'confirmed' => 'Confirmed',
+            'register' => 'Register passkey',
+            'registering' => 'Registering...',
+            'waiting' => 'Waiting for passkey…',
+            'cancel' => 'Cancel',
+            'remove' => 'Remove',
+            'removing' => 'Removing…',
+            'remove_confirm_title' => 'Remove passkey',
+            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
         ],
     ],
 
@@ -76,17 +103,27 @@ return [
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',
         ],
+        'passkey_removed' => [
+            'success' => 'Passkey removed.',
+        ],
+        'passkey_registration_failed' => [
+            'title' => 'Could not add passkey. Please try again.',
+        ],
+        'passkey_confirmation_failed' => [
+            'title' => 'Passkey verification failed. Please try again.',
+        ],
+        'identity_confirmation_failed' => [
+            'title' => 'Identity confirmation failed. Please try again.',
+        ],
     ],
 
     'modals' => [
         'delete_account' => [
-            'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed. Please enter your password to confirm.',
-            'notice_no_password' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
+            'notice' => 'This will schedule your account for deletion. You will have 30 days to cancel by logging back in. After that, all data will be permanently removed.',
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
-            'description' => 'Enter your password to confirm you would like to log out of your other browser sessions across all of your devices.',
-            'description_no_password' => 'Are you sure you would like to log out of your other browser sessions across all of your devices?',
+            'description' => 'Confirm it\'s you to log out of your other browser sessions across all of your devices.',
         ],
     ],
 
