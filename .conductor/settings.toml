@@ -8,6 +8,8 @@ file_include_globs = ".env"
 [scripts]
 # Mirrors polyscope.json: link + secure the Herd site, then install deps and
 # point .env at this workspace's hostname. Scripts run from the workspace dir.
+# The script APFS-clones vendor/ + node_modules/ from the base checkout
+# (detected via $CONDUCTOR_ROOT_PATH) for Polyscope-parity copy-on-write.
 setup = "herd link && herd secure && bin/setup-workspace.sh"
 archive = "herd unsecure && herd unlink"
 run = 'open "https://$(basename "$CONDUCTOR_WORKSPACE_PATH").test"'

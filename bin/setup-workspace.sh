@@ -3,10 +3,15 @@
 # and point .env at the workspace's own hostname. Both orchestrators copy a
 # working `.env` from the base checkout and run this from the workspace dir.
 #
-# - Polyscope copy-on-write clones the base repo (vendor/, node_modules/, .env
-#   copied), so composer/npm below are fast refreshes.
-# - Conductor creates a git worktree and copies only `.env`, so composer/npm
-#   below do full installs of the absent vendor/ and node_modules/.
+# Copy-on-write parity:
+# - Polyscope CoW-clones the whole base repo (vendor/, node_modules/, .env), so
+#   the installs below are fast refreshes.
+# - Conductor's git worktree copies only `.env`. To match the feel we APFS-clone
+#   vendor/ and node_modules/ from the base checkout first (`cp -c` = clonefile:
+#   near-instant, copy-on-write, each workspace diverges on its own writes),
+#   turning the installs below into the same fast refreshes.
+#   NOTE: we use `npm install` (incremental), NOT `npm ci` — `npm ci` deletes
+#   node_modules before installing, which would throw away the clone.
 #
 # The database stays shared across workspaces. We rewrite APP_URL and
 # SESSION_DOMAIN so absolute URLs and session cookies match `<workspace>.test`,
@@ -14,7 +19,8 @@
 # at `<workspace>.test/app` and `<workspace>.test/sysadmin` — the copied
 # `*.relaticle.test` values would route to the base checkout, not the workspace.
 #
-# Mac-only: uses BSD sed (`sed -i ''`). Both orchestrators are macOS-only.
+# Mac-only: uses BSD sed (`sed -i ''`) and APFS clonefile. Both orchestrators
+# are macOS-only.
 
 set -euo pipefail
 
@@ -26,11 +32,31 @@ if [[ ! -f .env ]]; then
     exit 1
 fi
 
+# Base checkout to clone dependencies from. Conductor sets CONDUCTOR_ROOT_PATH;
+# fall back to the git common dir's parent for Polyscope / manual runs.
+BASE="${CONDUCTOR_ROOT_PATH:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")}"
+
+# APFS copy-on-write seed: when a dependency dir is missing (Conductor worktree),
+# clone it from the base checkout via clonefile so the install below is a fast
+# refresh, not a cold install. No-op when already present (Polyscope) or when
+# this checkout IS the base (run from the root).
+clone_from_base() {
+    local dir="$1"
+    if [[ -d "$dir" || "$BASE" == "$PWD" || ! -d "$BASE/$dir" ]]; then
+        return 0
+    fi
+    echo "→ Cloning ${dir}/ from base (APFS copy-on-write)"
+    cp -c -R "$BASE/$dir" "$dir"
+}
+
+clone_from_base vendor
+clone_from_base node_modules
+
 echo "→ Refreshing PHP dependencies"
 composer install --no-interaction --prefer-dist
 
 echo "→ Refreshing JS dependencies"
-npm ci
+npm install --no-audit --no-fund
 
 echo "→ Pointing .env at ${WORKSPACE_HOST}"
 sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
