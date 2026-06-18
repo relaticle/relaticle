@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -38,6 +39,10 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property Carbon|null $scheduled_deletion_at
+ * @property ?string $stripe_id
+ * @property ?string $pm_type
+ * @property ?string $pm_last_four
+ * @property Carbon|null $trial_ends_at
  */
 #[Fillable([
     'name',
@@ -52,6 +57,8 @@ use Spatie\Sluggable\SlugOptions;
 ])]
 final class Team extends JetstreamTeam implements HasAvatar
 {
+    use Billable;
+
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
 
@@ -77,7 +84,7 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Account & billing
         'account', 'billing', 'checkout', 'invoices', 'plan', 'plans',
-        'pricing', 'settings', 'subscription', 'subscriptions',
+        'pricing', 'settings', 'subscription', 'subscriptions', 'stripe',
 
         // Teams & orgs
         'teams', 'team', 'org', 'organization', 'workspace', 'invitations', 'invite',
@@ -149,6 +156,7 @@ final class Team extends JetstreamTeam implements HasAvatar
             'onboarding_referral_source' => OnboardingReferralSource::class,
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
         ];
     }
 

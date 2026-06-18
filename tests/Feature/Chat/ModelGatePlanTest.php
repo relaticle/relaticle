@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Tests\Helpers\ChatDocument;
@@ -14,6 +16,8 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatController::class);
 
 it('rejects an Opus request from a Free user with a 403', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     expect($team->plan)->toBe(Plan::Free);
