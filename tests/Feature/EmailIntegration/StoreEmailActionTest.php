@@ -10,6 +10,7 @@ use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailThread;
@@ -297,6 +298,41 @@ it('refreshes the existing thread aggregate as later emails arrive', function ()
         ->and($thread->subject)->toBe('Original Subject')
         ->and($thread->first_email_at->toDateTimeString())->toBe($first->toDateTimeString())
         ->and($thread->last_email_at->toDateTimeString())->toBe($second->toDateTimeString());
+});
+
+it('excludes queued unsent emails from the thread aggregate', function (): void {
+    $sentAt = now()->subHour();
+
+    // A queued outbound reply already sits in the thread with no sent_at yet.
+    Email::query()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => null,
+        'provider_message_id' => null,
+        'thread_id' => 'thread-queued-1',
+        'subject' => 'Queued Reply',
+        'snippet' => 'Queued',
+        'sent_at' => null,
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::QUEUED,
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'threadId' => 'thread-queued-1',
+        'subject' => 'Inbound Subject',
+        'sentAt' => $sentAt,
+    ]));
+
+    $thread = EmailThread::query()
+        ->where('connected_account_id', $this->account->getKey())
+        ->where('thread_id', 'thread-queued-1')
+        ->first();
+
+    expect($thread)->not->toBeNull()
+        ->and($thread->email_count)->toBe(1)
+        ->and($thread->last_email_at?->toDateTimeString())->toBe($sentAt->toDateTimeString())
+        ->and($thread->first_email_at?->toDateTimeString())->toBe($sentAt->toDateTimeString());
 });
 
 it('stores body in email_bodies table', function (): void {
