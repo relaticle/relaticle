@@ -486,6 +486,7 @@ final class EmailInboxPage extends Page
             ->icon('heroicon-o-sparkles')
             ->color('gray')
             ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
+            ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
