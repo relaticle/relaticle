@@ -32,6 +32,21 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            Action::make('askAboutThis')
+                ->label(__('filament/resources/company.pages.view.actions.ask_about_this.label'))
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->color('gray')
+                ->action(function (Company $record): void {
+                    $mention = Js::from([
+                        'type' => 'company',
+                        'id' => (string) $record->getKey(),
+                        'label' => $record->name,
+                    ]);
+                    $this->js("
+                        sessionStorage.setItem('chat:mention', JSON.stringify({$mention}));
+                        window.Livewire.dispatch('chat:open-panel');
+                    ");
+                }),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([

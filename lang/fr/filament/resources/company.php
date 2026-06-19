@@ -54,6 +54,9 @@ return [
                 'edit' => [
                     'label' => 'Modifier',
                 ],
+                'ask_about_this' => [
+                    'label' => 'Demander à propos de ceci',
+                ],
                 'copy_page_url' => [
                     'label' => "Copier l'URL de la page",
                 ],
