@@ -9,6 +9,7 @@ use App\Models\CustomFieldValue;
 use Illuminate\Support\Carbon;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 
@@ -50,7 +51,16 @@ final readonly class CustomFieldValueObserver
             return;
         }
 
-        $this->log($value, old: $value->getOriginal($column));
+        $old = $value->getOriginal($column);
+
+        // A normalization-only rewrite (e.g. a link field stripping its URL scheme on
+        // save) is not a user edit — comparing the field-type-normalized old and new
+        // values keeps the timeline from attributing a change the user never made.
+        if ($this->normalize($value->customField, $old) === $this->normalize($value->customField, $value->getValue())) {
+            return;
+        }
+
+        $this->log($value, old: $old);
     }
 
     private function log(CustomFieldValue $value, mixed $old): void
@@ -99,6 +109,19 @@ final readonly class CustomFieldValueObserver
         };
 
         return ['value' => $value, 'label' => $label];
+    }
+
+    private function normalize(CustomField $field, mixed $value): string
+    {
+        $type = CustomFieldsType::getFieldTypeInstance($field->type);
+
+        return collect(is_iterable($value) ? $value : [$value])
+            ->filter(fn (mixed $item): bool => filled($item))
+            ->map(fn (mixed $item): string => $type instanceof BaseFieldType
+                ? $type->setValue((string) $item)
+                : (string) $item)
+            ->values()
+            ->implode("\n");
     }
 
     private function optionLabel(CustomField $field, mixed $value): ?string

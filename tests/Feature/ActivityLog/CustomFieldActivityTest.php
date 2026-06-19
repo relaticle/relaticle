@@ -103,3 +103,51 @@ it('does not log when saving an empty value for a previously empty field', funct
 
     expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
 });
+
+it('does not log a link change that is only a URL-scheme normalization', function (): void {
+    $linkField = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'website',
+        'name' => 'Website',
+        'type' => 'link',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $company = Company::factory()->for($this->team)->create();
+    $company->saveCustomFields(['website' => ['https://airbnb.com']]);
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFields(['website' => ['airbnb.com']]);
+
+    expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
+});
+
+it('still logs a genuine link value change', function (): void {
+    $linkField = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'website',
+        'name' => 'Website',
+        'type' => 'link',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $company = Company::factory()->for($this->team)->create();
+    $company->saveCustomFields(['website' => ['airbnb.com']]);
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFields(['website' => ['google.com']]);
+
+    $activity = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->latest('id')->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->properties['custom_field_changes'][0]['old']['label'])->toBe('airbnb.com')
+        ->and($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('google.com');
+});
