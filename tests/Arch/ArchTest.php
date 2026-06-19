@@ -34,6 +34,7 @@ arch()->preset()
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
+        'App\Models\ActivityLog\Scopes\TeamScope',
         // Chat tools intentionally reuse App\Http\Resources (consistent
         // LLM-facing payloads); the preset forbids resources outside Http.
         'Relaticle\Chat',
@@ -100,9 +101,11 @@ arch('avoid mutation')
         'App\Mail',
         'App\Mcp',
         'App\Models',
+        'App\Observers',
         'App\Data',
         'App\Notifications',
         'App\Providers',
+        'App\Support\ActivityLog\CleanActivityLogAction',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -132,6 +135,7 @@ arch('avoid inheritance')
         'App\Providers',
         'App\Scribe',
         'App\View',
+        'App\Support\ActivityLog\CleanActivityLogAction',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

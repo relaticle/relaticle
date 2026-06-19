@@ -27,6 +27,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\GitHubService;
+use App\Support\ActivityLog\CustomFieldChangesRenderer;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -50,6 +51,7 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -93,6 +95,8 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureLivewire();
         $this->configureRateLimiting();
         $this->configureScribe();
+
+        Timeline::registerRenderer('custom_field_changes', CustomFieldChangesRenderer::class);
     }
 
     private function configurePolicies(): void
