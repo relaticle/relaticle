@@ -49,4 +49,9 @@ final class ListOpportunitiesTool extends BaseReadListTool
             'contact_id' => $request['contact_id'] ?? null,
         ]);
     }
+
+    protected function citationType(): string
+    {
+        return 'opportunity';
+    }
 }

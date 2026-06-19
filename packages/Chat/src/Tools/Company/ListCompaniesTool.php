@@ -29,4 +29,9 @@ final class ListCompaniesTool extends BaseReadListTool
     {
         return 'name';
     }
+
+    protected function citationType(): string
+    {
+        return 'company';
+    }
 }

@@ -29,4 +29,9 @@ final class GetOpportunityTool extends BaseReadShowTool
     {
         return 'Opportunity';
     }
+
+    protected function citationType(): string
+    {
+        return 'opportunity';
+    }
 }

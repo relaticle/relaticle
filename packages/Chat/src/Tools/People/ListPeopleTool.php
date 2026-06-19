@@ -47,4 +47,9 @@ final class ListPeopleTool extends BaseReadListTool
             'company_id' => $request['company_id'] ?? null,
         ]);
     }
+
+    protected function citationType(): string
+    {
+        return 'people';
+    }
 }
