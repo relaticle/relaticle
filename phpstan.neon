@@ -10,6 +10,7 @@ parameters:
         -
             identifier: argument.type
             message: '#(Closure\(App\\Models\\CustomField|Relaticle\\CustomFields\\Models\\CustomField)(Option|Value|Section)?#'
+            reportUnmatched: false
 
         # Base ValidateSignature has untyped variadic ...$args that PHPStan infers as array|null
         -
