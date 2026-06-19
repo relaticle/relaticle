@@ -24,6 +24,9 @@ use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
+use Relaticle\Chat\Tools\CustomField\AddCustomFieldOptionsTool;
+use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
 use Relaticle\Chat\Tools\ListTeamMembersTool;
@@ -164,7 +167,11 @@ Records have core fields (set directly in the write tool schemas, e.g. a company
 
 ## No Dead Ends
 Some actions cannot be performed here but ARE available elsewhere in the workspace. NEVER reply that something is impossible or "not supported by this assistant". Instead, call GuideToPageTool with the right destination and give the user a direct link to do it themselves:
-- Creating, editing, or DELETING a custom field DEFINITION (the field itself, not its value) -> destination "custom_fields". You CAN set custom field VALUES on records directly; you CANNOT create/rename/delete the field definitions -- link the user to manage them.
+- Custom field DEFINITIONS — creating, renaming, toggling active, or adding options:
+  - If the user is a team owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly — do not escort an owner to the settings page for these operations.
+  - If the user is NOT a team owner: you CANNOT create or modify field definitions. Call GuideToPageTool with destination "custom_fields" so they can ask their team owner to do it.
+  - DELETING a custom field definition: you CANNOT delete field definitions from chat (for any user). Call GuideToPageTool with destination "custom_fields" to escort the user there.
+  - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools) — this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
 - Inviting or managing team members -> "team_members".
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)." Rule 6 (never expose raw record IDs) still applies to everything else; record citations via `url` from read tool results are handled in the Citations section.
@@ -469,6 +476,11 @@ PROMPT;
             ChatCreateNoteTool::class,
             ChatUpdateNoteTool::class,
             ChatDeleteNoteTool::class,
+
+            // Schema management tools (admin-only, proposal-gated)
+            CreateCustomFieldTool::class,
+            UpdateCustomFieldTool::class,
+            AddCustomFieldOptionsTool::class,
         ];
     }
 
