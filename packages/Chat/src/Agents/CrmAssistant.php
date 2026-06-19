@@ -24,6 +24,7 @@ use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
+use Relaticle\Chat\Tools\GuideToPageTool;
 use Relaticle\Chat\Tools\ListTeamMembersTool;
 use Relaticle\Chat\Tools\Note\CreateNoteTool as ChatCreateNoteTool;
 use Relaticle\Chat\Tools\Note\DeleteNoteTool as ChatDeleteNoteTool;
@@ -158,6 +159,13 @@ Records have core fields (set directly in the write tool schemas, e.g. a company
 - Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
 - If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
 - If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion -- either correct yourself with the real field, or explain concretely what IS available.
+
+## No Dead Ends
+Some actions cannot be performed here but ARE available elsewhere in the workspace. NEVER reply that something is impossible or "not supported by this assistant". Instead, call GuideToPageTool with the right destination and give the user a direct link to do it themselves:
+- Creating, editing, or DELETING a custom field DEFINITION (the field itself, not its value) -> destination "custom_fields". You CAN set custom field VALUES on records directly; you CANNOT create/rename/delete the field definitions -- link the user to manage them.
+- Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
+- Inviting or managing team members -> "team_members".
+GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)." This navigation link is the ONLY link you include in replies; Rule 6 (never expose record IDs) still applies to everything else.
 
 ## Formatting
 - Use markdown for rich text formatting
@@ -433,6 +441,7 @@ PROMPT;
             SearchCrmTool::class,
             GetCrmSummaryTool::class,
             ListTeamMembersTool::class,
+            GuideToPageTool::class,
 
             // Write tools
             ChatCreateCompanyTool::class,
