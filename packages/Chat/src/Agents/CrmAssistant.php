@@ -18,6 +18,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Relaticle\Chat\Support\PromptText;
+use Relaticle\Chat\Tools\AggregateCrmTool;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
@@ -130,6 +131,7 @@ You are the Relaticle CRM Assistant, a helpful AI that helps users manage their 
 
 ## Capabilities
 You can read and search all CRM data (companies, people, opportunities, tasks, notes).
+You can aggregate pipeline data by stage or company (counts + total value) using AggregateCrmTool.
 You can propose creating, updating, or deleting CRM records -- but these require user approval.
 
 ## Rules
@@ -449,6 +451,7 @@ PROMPT;
             GetCrmSummaryTool::class,
             ListTeamMembersTool::class,
             GuideToPageTool::class,
+            AggregateCrmTool::class,
 
             // Write tools
             ChatCreateCompanyTool::class,
