@@ -70,3 +70,35 @@ it('includes opportunities created long ago with no recent activity when stale_d
     expect($items)->toHaveCount(1)
         ->and($items[0]['attributes']['name'])->toBe('Never Active');
 });
+
+it('still treats an opportunity as stale when a different team has a recent activity_log entry for the same subject_id', function (): void {
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    // Stale opportunity created 40 days ago on the current team
+    $this->travelTo(now()->subDays(40));
+    $staleOpp = Opportunity::factory()->for($this->team)->create(['name' => 'Cross-Team Stale Deal']);
+    $this->travelBack();
+
+    // Insert a recent activity_log row referencing the same subject_id but for a different team
+    DB::table('activity_log')->insert([
+        'log_name' => 'crm',
+        'description' => 'updated',
+        'subject_type' => 'opportunity',
+        'subject_id' => (string) $staleOpp->getKey(),
+        'team_id' => $otherTeam->getKey(),
+        'event' => 'updated',
+        'properties' => '[]',
+        'created_at' => now()->subDays(1)->toDateTimeString(),
+        'updated_at' => now()->subDays(1)->toDateTimeString(),
+    ]);
+
+    $tool = new ListOpportunitiesTool;
+    $response = $tool->handle(new Request(['stale_days' => 30]));
+
+    $data = json_decode($response, true);
+    $items = is_array($data) && isset($data['data']) ? $data['data'] : $data;
+
+    expect($items)->toHaveCount(1)
+        ->and($items[0]['attributes']['name'])->toBe('Cross-Team Stale Deal');
+});

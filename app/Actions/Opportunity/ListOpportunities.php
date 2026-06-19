@@ -47,12 +47,17 @@ final readonly class ListOpportunities
                 AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '<=', $value)),
-                AllowedFilter::callback('stale_days', fn (Builder $query, string $value) => $query->whereNotExists(
-                    fn (DbBuilder $sub) => $sub->from('activity_log')
-                        ->where('activity_log.subject_type', 'opportunity')
-                        ->whereColumn('activity_log.subject_id', 'opportunities.id')
-                        ->where('activity_log.created_at', '>=', now()->subDays((int) $value))
-                )),
+                AllowedFilter::callback('stale_days', function (Builder $query, string $value) use ($user): void {
+                    $teamId = $user->currentTeam->getKey();
+
+                    $query->whereNotExists(
+                        fn (DbBuilder $sub) => $sub->from('activity_log')
+                            ->where('activity_log.team_id', $teamId)
+                            ->where('activity_log.subject_type', 'opportunity')
+                            ->whereColumn('activity_log.subject_id', 'opportunities.id')
+                            ->where('activity_log.created_at', '>=', now()->subDays((int) $value))
+                    );
+                }),
             )
             ->allowedFields('id', 'name', 'company_id', 'contact_id', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(
