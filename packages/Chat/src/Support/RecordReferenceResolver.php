@@ -14,6 +14,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\User;
 use Throwable;
 
 final readonly class RecordReferenceResolver
@@ -46,13 +47,25 @@ final readonly class RecordReferenceResolver
      */
     public function resolve(string $entityType, string $recordId): ?array
     {
+        $authUser = auth()->user();
+
+        if (! $authUser instanceof User) {
+            return null;
+        }
+
+        $team = $authUser->currentTeam;
+
+        if ($team === null) {
+            return null;
+        }
+
         try {
             $url = match ($entityType) {
-                'company' => CompanyResource::getUrl('view', ['record' => $recordId]),
-                'people' => PeopleResource::getUrl('view', ['record' => $recordId]),
-                'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId]),
-                'task' => TaskResource::getUrl('index'),
-                'note' => NoteResource::getUrl('index'),
+                'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
+                'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
+                'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
+                'task' => TaskResource::getUrl('index', panel: 'app', tenant: $team),
+                'note' => NoteResource::getUrl('index', panel: 'app', tenant: $team),
                 default => null,
             };
         } catch (Throwable) {
