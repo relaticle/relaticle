@@ -5,10 +5,10 @@ declare(strict_types=1);
 use App\Models\AiSummary;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Prism\Prism\Enums\FinishReason;
-use Prism\Prism\Facades\Prism;
-use Prism\Prism\Testing\TextResponseFake;
-use Prism\Prism\ValueObjects\Usage;
+use Laravel\Ai\Responses\Data\Meta;
+use Laravel\Ai\Responses\Data\Usage;
+use Laravel\Ai\Responses\TextResponse;
+use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -16,6 +16,18 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
+
+function fakeSummary(string $text, int $promptTokens, int $completionTokens): TextResponse
+{
+    return new TextResponse(
+        $text,
+        new Usage($promptTokens, $completionTokens),
+        new Meta(
+            (string) config('services.email_summary.provider'),
+            (string) config('services.email_summary.model'),
+        ),
+    );
+}
 
 mutates(EmailThreadSummaryService::class);
 
@@ -54,11 +66,8 @@ function makeThreadWithEmail(): EmailThread
 }
 
 it('generates and caches a summary for an email thread', function (): void {
-    Prism::fake([
-        TextResponseFake::make()
-            ->withText('The prospect requested pricing and the account manager will follow up next week.')
-            ->withUsage(new Usage(120, 60))
-            ->withFinishReason(FinishReason::Stop),
+    ThreadSummarizer::fake([
+        fakeSummary('The prospect requested pricing and the account manager will follow up next week.', 120, 60),
     ]);
 
     $thread = makeThreadWithEmail();
@@ -68,7 +77,7 @@ it('generates and caches a summary for an email thread', function (): void {
     expect($summary)
         ->toBeInstanceOf(AiSummary::class)
         ->summary->toBe('The prospect requested pricing and the account manager will follow up next week.')
-        ->model_used->toBe(config('services.ai_summary.model'))
+        ->model_used->toBe(config('services.email_summary.model'))
         ->prompt_tokens->toBe(120)
         ->completion_tokens->toBe(60);
 
@@ -113,11 +122,8 @@ it('regenerates the summary when requested', function (): void {
         'completion_tokens' => 5,
     ]);
 
-    Prism::fake([
-        TextResponseFake::make()
-            ->withText('Fresh summary')
-            ->withUsage(new Usage(100, 50))
-            ->withFinishReason(FinishReason::Stop),
+    ThreadSummarizer::fake([
+        fakeSummary('Fresh summary', 100, 50),
     ]);
 
     $summary = resolve(EmailThreadSummaryService::class)

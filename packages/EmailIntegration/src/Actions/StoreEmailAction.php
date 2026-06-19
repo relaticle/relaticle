@@ -82,6 +82,8 @@ final readonly class StoreEmailAction
 
             $email->updateQuietly(['is_internal' => $isInternal]);
 
+            resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+
             resolve(LinkEmailAction::class)->execute($email);
 
             return $email;

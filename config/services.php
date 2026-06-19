@@ -62,9 +62,13 @@ return [
         'secret' => env('TURNSTILE_SECRET_KEY'),
     ],
 
-    'ai_summary' => [
-        'provider' => env('AI_SUMMARY_PROVIDER', 'openai'),
-        'model' => env('AI_SUMMARY_MODEL', 'gpt-4o-mini'),
+    'anthropic' => [
+        'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
+    ],
+
+    'email_summary' => [
+        'provider' => env('EMAIL_SUMMARY_PROVIDER', 'openai'),
+        'model' => env('EMAIL_SUMMARY_MODEL', 'gpt-4o-mini'),
     ],
 
     // Email config

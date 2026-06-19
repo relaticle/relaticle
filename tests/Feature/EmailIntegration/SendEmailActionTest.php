@@ -13,6 +13,9 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 
 mutates(SendEmailAction::class, EmailSendingService::class);
@@ -52,6 +55,63 @@ it('persists a queued Email row for the outbox', function (): void {
         ->and($email->connected_account_id)->toBe($this->account->id)
         ->and($email->subject)->toBe('Hello World')
         ->and($email->batch_id)->toBeNull();
+});
+
+it('syncs the email thread aggregate when an outbound reply is sent', function (): void {
+    $original = Email::query()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => '<original@example.com>',
+        'provider_message_id' => 'provider-original',
+        'thread_id' => 'thread-reply-1',
+        'subject' => 'Original Subject',
+        'snippet' => 'Original',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'status' => EmailStatus::SENT,
+    ]);
+    $original->participants()->create([
+        'email_address' => 'recipient@example.com',
+        'name' => 'Recipient',
+        'role' => 'from',
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Original Subject',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => $original->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturn([
+        'provider_message_id' => 'provider-reply',
+        'thread_id' => 'thread-reply-1',
+        'rfc_message_id' => '<reply@example.com>',
+    ]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    app(EmailSendingService::class)->send($reply);
+
+    $thread = EmailThread::query()
+        ->where('connected_account_id', $this->account->getKey())
+        ->where('thread_id', 'thread-reply-1')
+        ->first();
+
+    expect($thread)->not->toBeNull()
+        ->and($thread->email_count)->toBe(2)
+        ->and($thread->last_email_at->greaterThan($thread->first_email_at))->toBeTrue();
 });
 
 it('links the queued email to a CRM record via emailables', function (): void {
