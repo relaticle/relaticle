@@ -66,8 +66,9 @@ return [
         'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
     ],
 
-    'openai' => [
-        'summary_model' => env('OPENAI_SUMMARY_MODEL', 'gpt-4o-mini'),
+    'email_summary' => [
+        'provider' => env('EMAIL_SUMMARY_PROVIDER', 'openai'),
+        'model' => env('EMAIL_SUMMARY_MODEL', 'gpt-4o-mini'),
     ],
 
     // Email config
