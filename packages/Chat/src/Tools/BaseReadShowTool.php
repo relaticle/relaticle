@@ -14,8 +14,6 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 
 abstract class BaseReadShowTool implements Tool
 {
-    public function __construct(protected RecordReferenceResolver $recordReferenceResolver) {}
-
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
 
@@ -71,7 +69,7 @@ abstract class BaseReadShowTool implements Tool
         $payload = new $resourceClass($model)->resolve();
 
         $id = (string) $model->getKey();
-        $ref = $this->recordReferenceResolver->resolve($this->citationType(), $id);
+        $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
 
         return (string) json_encode(
             array_merge($payload, $this->extraPayload($model), ['url' => $ref['url'] ?? null]),

@@ -18,8 +18,6 @@ abstract class BaseReadListTool implements Tool
 {
     use NormalizesToolInput;
 
-    public function __construct(protected RecordReferenceResolver $recordReferenceResolver) {}
-
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -96,7 +94,7 @@ abstract class BaseReadListTool implements Tool
                 : null;
 
             $ref = $id !== null
-                ? $this->recordReferenceResolver->resolve($citationType, $id)
+                ? resolve(RecordReferenceResolver::class)->resolve($citationType, $id)
                 : null;
 
             $item['url'] = $ref['url'] ?? null;
