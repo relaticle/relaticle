@@ -6,6 +6,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Batch Write Cap
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of records that may be created or deleted in a single
+    | tool call. Enforced server-side in the tool layer (never via prompt text).
+    | Override with CHAT_MAX_BATCH_SIZE in .env for local testing.
+    */
+
+    'max_batch_size' => (int) env('CHAT_MAX_BATCH_SIZE', 25),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tool Call Credit Bonus
     |--------------------------------------------------------------------------
     */
