@@ -41,7 +41,7 @@ final class AgentConversationResource extends Resource
         return $schema
             ->components([
                 Section::make([
-                    TextEntry::make('title')->placeholder('Untitled'),
+                    TextEntry::make('title'),
                     TextEntry::make('team.name')->label('Team')->placeholder('—'),
                     TextEntry::make('user.name')->label('User')->placeholder('—'),
                     TextEntry::make('messages_count')->label('Messages')->state(fn (AgentConversation $record): int => $record->messages()->count()),
@@ -61,7 +61,6 @@ final class AgentConversationResource extends Resource
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('title')
-                    ->placeholder('Untitled')
                     ->limit(50)
                     ->searchable(),
                 TextColumn::make('team.name')

@@ -82,10 +82,7 @@ abstract class BaseWriteDeleteTool implements Tool
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Delete,
             entityType: $this->entityType(),
-            actionData: [
-                '_record_ids' => $deletable->map(fn (Model $model) => $model->getKey())->all(),
-                '_model_class' => $this->modelClass(),
-            ],
+            actionData: $this->actionData($deletable),
             displayData: $this->displayData($deletable),
         );
 
@@ -120,30 +117,67 @@ abstract class BaseWriteDeleteTool implements Tool
     }
 
     /**
+     * Single delete stays an all-or-nothing proposal (`_record_ids`); a multi-record
+     * delete becomes a per-item `_batch` (each record self-contained with its own
+     * `_record_id`/`_model_class`) so the dock can approve/skip each one individually,
+     * mirroring create.
+     *
+     * @param  Collection<int, Model>  $models
+     * @return array<string, mixed>
+     */
+    private function actionData(Collection $models): array
+    {
+        if ($models->count() === 1) {
+            return [
+                '_record_ids' => [$models->first()->getKey()],
+                '_model_class' => $this->modelClass(),
+            ];
+        }
+
+        return [
+            '_batch' => true,
+            'records' => $models->values()->map(fn (Model $model): array => [
+                '_record_id' => $model->getKey(),
+                '_model_class' => $this->modelClass(),
+            ])->all(),
+        ];
+    }
+
+    /**
      * @param  Collection<int, Model>  $models
      * @return array<string, mixed>
      */
     private function displayData(Collection $models): array
     {
         $count = $models->count();
-        $isSingle = $count === 1;
-        $plural = Str::plural(strtolower($this->entityLabel()), $count);
 
-        $fields = $models->values()
-            ->map(fn (Model $model, int $i): array => [
-                'label' => $isSingle ? 'Name' : "{$this->entityLabel()} ".($i + 1),
-                'value' => (string) $model->{$this->nameAttribute()},
-            ])
+        if ($count === 1) {
+            $name = (string) $models->first()->{$this->nameAttribute()};
+
+            return [
+                'title' => "Delete {$this->entityLabel()}",
+                'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
+                'fields' => [['label' => 'Name', 'value' => $name]],
+            ];
+        }
+
+        $items = $models->values()
+            ->map(function (Model $model): array {
+                $name = (string) $model->{$this->nameAttribute()};
+
+                return [
+                    'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
+                    'fields' => [['label' => 'Name', 'value' => $name]],
+                ];
+            })
             ->all();
 
-        $summary = $isSingle
-            ? "Delete {$this->entityLabel()} \"".$models->first()->{$this->nameAttribute()}.'"'
-            : "Delete {$count} {$plural}";
+        $titleNoun = Str::plural(Str::headline($this->entityLabel()), $count);
 
         return [
-            'title' => $isSingle ? "Delete {$this->entityLabel()}" : "Delete {$count} {$plural}",
-            'summary' => $summary,
-            'fields' => $fields,
+            'title' => "Delete {$count} {$titleNoun}",
+            'summary' => sprintf('Delete %d %s', $count, Str::plural(strtolower($this->entityLabel()), $count)),
+            'items' => $items,
         ];
     }
 }
