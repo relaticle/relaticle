@@ -261,6 +261,7 @@ abstract class BaseRecordEmailsPage extends Page
             ->icon('heroicon-o-sparkles')
             ->color('gray')
             ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
+            ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (array $arguments): View {
