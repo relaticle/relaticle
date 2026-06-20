@@ -14,11 +14,12 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
-use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
+use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final class AddCustomFieldOptionsTool implements Tool
 {
+    use ResolvesOwnedCustomField;
     use WithConversationContext;
 
     public function name(): string
@@ -34,8 +35,11 @@ final class AddCustomFieldOptionsTool implements Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'id' => $schema->string()
-                ->description('The custom field ID to add options to.')
+            'entity_type' => $schema->string()
+                ->description('The CRM entity the field belongs to: company, people, opportunity, task, or note.')
+                ->required(),
+            'code' => $schema->string()
+                ->description('The machine code of the choice-type custom field to add options to, as shown in the custom_fields field list for that entity (e.g. "industry").')
                 ->required(),
             'options' => $schema->array()
                 ->items($schema->object([
@@ -57,10 +61,11 @@ final class AddCustomFieldOptionsTool implements Tool
             ]);
         }
 
-        $id = (string) ($request['id'] ?? '');
+        $entityType = (string) ($request['entity_type'] ?? '');
+        $code = (string) ($request['code'] ?? '');
 
-        if ($id === '') {
-            return (string) json_encode(['error' => 'Field ID is required.']);
+        if ($entityType === '' || $code === '') {
+            return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.']);
         }
 
         $options = is_array($request['options'] ?? null) ? $request['options'] : [];
@@ -70,20 +75,10 @@ final class AddCustomFieldOptionsTool implements Tool
         }
 
         $teamId = $user->currentTeam->getKey();
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
-
-        try {
-            $field = CustomField::query()
-                ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
-                ->find($id);
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
 
         if (! $field instanceof CustomField) {
-            return (string) json_encode(['error' => "Custom field with ID [{$id}] not found."]);
+            return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."]);
         }
 
         if (! in_array($field->type, CreateCustomField::CHOICE_TYPES, true)) {

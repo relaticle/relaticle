@@ -80,7 +80,8 @@ it('proposes adding options and creates them on approval', function (): void {
     $tool = makeAddOptionsTool($this->convId);
 
     $result = $tool->handle(new Request([
-        'id' => $this->selectField->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
         'options' => [['name' => 'Inactive'], ['name' => 'Pending']],
     ]));
 
@@ -121,7 +122,8 @@ it('returns error when non-owner tries to add options', function (): void {
 
     $tool = makeAddOptionsTool($this->convId);
     $result = $tool->handle(new Request([
-        'id' => $this->selectField->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
         'options' => [['name' => 'Inactive']],
     ]));
 
@@ -135,7 +137,8 @@ it('returns error when adding options to a non-choice type field', function (): 
     $tool = makeAddOptionsTool($this->convId);
 
     $result = $tool->handle(new Request([
-        'id' => $this->textField->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->textField->code,
         'options' => [['name' => 'Some Option']],
     ]));
 
@@ -151,7 +154,8 @@ it('returns error when adding options would exceed the cap', function (): void {
     $tool = makeAddOptionsTool($this->convId);
 
     $result = $tool->handle(new Request([
-        'id' => $this->selectField->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
         'options' => [['name' => 'Too Many'], ['name' => 'Options Here']],
     ]));
 

@@ -65,7 +65,8 @@ it('proposes renaming a custom field and updates name on approval', function ():
     $tool = makeUpdateFieldTool($this->convId);
 
     $result = $tool->handle(new Request([
-        'id' => $this->field->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->field->code,
         'name' => 'Sector',
     ]));
 
@@ -100,7 +101,8 @@ it('returns error and creates no proposal for non-owner', function (): void {
 
     $tool = makeUpdateFieldTool($this->convId);
     $result = $tool->handle(new Request([
-        'id' => $this->field->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->field->code,
         'name' => 'Sector',
     ]));
 
@@ -122,7 +124,8 @@ it('returns error when trying to update a system_defined field', function (): vo
 
     $tool = makeUpdateFieldTool($this->convId);
     $result = $tool->handle(new Request([
-        'id' => $systemField->getKey(),
+        'entity_type' => 'company',
+        'code' => $systemField->code,
         'name' => 'Hacked',
     ]));
 
@@ -136,7 +139,8 @@ it('proposes toggling active status and applies it on approval', function (): vo
     $tool = makeUpdateFieldTool($this->convId);
 
     $result = $tool->handle(new Request([
-        'id' => $this->field->getKey(),
+        'entity_type' => 'company',
+        'code' => $this->field->code,
         'active' => false,
     ]));
 
