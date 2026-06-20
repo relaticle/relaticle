@@ -105,7 +105,7 @@ final class AddCustomFieldOptionsTool implements Tool
 
         if (($existingCount + count($options)) > $maxOptions) {
             return (string) json_encode([
-                'error' => "Adding {$maxOptions} more options would exceed the {$maxOptions} options limit for this field (currently has {$existingCount}).",
+                'error' => 'Adding '.count($options)." more options would exceed the {$maxOptions} options limit for this field (currently has {$existingCount}).",
             ]);
         }
 
