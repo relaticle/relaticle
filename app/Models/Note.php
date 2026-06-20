@@ -140,6 +140,6 @@ final class Note extends Model implements HasCustomFields, HasTimeline
 
     public function timeline(): TimelineBuilder
     {
-        return TimelineBuilder::make($this)->fromActivityLog();
+        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }

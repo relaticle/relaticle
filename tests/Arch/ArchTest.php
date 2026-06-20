@@ -106,6 +106,9 @@ arch('avoid mutation')
         'App\Notifications',
         'App\Providers',
         'App\Support\ActivityLog\CleanActivityLogAction',
+        // Request-scoped batch_uuid holder — mutable by design (lazily caches the
+        // per-request id), like a value cache rather than a service.
+        'App\Support\ActivityLog\RequestActivityBatch',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
