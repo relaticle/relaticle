@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SupportFormType;
+use App\Features\SupportMenu;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Support\SupportForms;
@@ -11,6 +12,7 @@ use Illuminate\Testing\TestResponse;
 
 mutates(SupportForms::class);
 mutates(SupportFormType::class);
+mutates(SupportMenu::class);
 
 function visitDashboard(): TestResponse
 {
@@ -23,6 +25,7 @@ function visitDashboard(): TestResponse
 
 it('renders the help menu items for the configured support forms', function (): void {
     config([
+        'relaticle.features.support_menu' => true,
         'support.forms.contact' => 'https://form.maxforms.com/relcontact',
         'support.forms.bug' => 'https://form.maxforms.com/relbug',
         'support.forms.feature' => 'https://form.maxforms.com/relfeature',
@@ -38,8 +41,24 @@ it('renders the help menu items for the configured support forms', function (): 
         ->assertSee('form.maxforms.com/relfeature', false);
 });
 
+it('hides the entire help menu when the support_menu feature is disabled', function (): void {
+    config([
+        'relaticle.features.support_menu' => false,
+        'support.forms.contact' => 'https://form.maxforms.com/relcontact',
+        'support.forms.bug' => 'https://form.maxforms.com/relbug',
+        'support.forms.feature' => 'https://form.maxforms.com/relfeature',
+    ]);
+
+    visitDashboard()
+        ->assertOk()
+        ->assertDontSee('Contact / Help')
+        ->assertDontSee('Report a bug')
+        ->assertDontSee('Suggest a feature');
+});
+
 it('hides a help menu item whose form url is not configured', function (): void {
     config([
+        'relaticle.features.support_menu' => true,
         'support.forms.contact' => 'https://form.maxforms.com/relcontact',
         'support.forms.bug' => null,
         'support.forms.feature' => null,

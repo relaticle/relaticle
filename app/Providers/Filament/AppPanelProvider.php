@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
 use App\Features\SocialAuth;
+use App\Features\SupportMenu;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -259,6 +260,10 @@ final class AppPanelProvider extends PanelProvider
      */
     private function supportMenuItems(): array
     {
+        if (! Feature::active(SupportMenu::class)) {
+            return [];
+        }
+
         $support = resolve(SupportForms::class);
         $prefill = $this->supportPrefill();
 
