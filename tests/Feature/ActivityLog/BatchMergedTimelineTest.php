@@ -143,3 +143,30 @@ it('never merges an un-batched legacy row', function (): void {
     expect($entries)->toHaveCount(2)
         ->and($entries->first()->renderer)->toBe('merged-activity');
 });
+
+it('labels a created event as created and hides the system-column diff', function (): void {
+    seedActivityRow($this->company, 'created', '55555555-5555-5555-5555-555555555555', [
+        'attributes' => ['name' => $this->company->name, 'email_count' => 0, 'meeting_count' => 0],
+    ]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)
+        ->not->toContain(__('activity-log::messages.entry.changed'))
+        ->not->toContain('Email Count')
+        ->toContain($this->company->name);
+})->mutates(MergedActivityRenderer::class);
+
+it('still labels an updated event as changed with its diff', function (): void {
+    seedActivityRow($this->company, 'updated', '66666666-6666-6666-6666-666666666666', [
+        'attributes' => ['name' => 'New name'], 'old' => ['name' => 'Old name'],
+    ]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)
+        ->toContain(__('activity-log::messages.entry.changed'))
+        ->toContain('New name');
+})->mutates(MergedActivityRenderer::class);

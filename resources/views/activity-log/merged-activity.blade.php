@@ -6,8 +6,13 @@
     /** @var list<array{label: string, old: string, new: string}> $rows */
 
     $count = count($rows);
-    $isChange = $summary->operation === ActivityLogOperation::Updated || $count > 0;
-    $hasDiff = $count > 0;
+    // Only updates (and custom-field-only saves, whose event isn't a known operation)
+    // read as "changed" with a diff. Created/deleted/restored keep their own verb and
+    // never dump the row's attribute set — on create that is every logged column,
+    // including internal system fields the user never touched.
+    $isChange = $summary->operation === ActivityLogOperation::Updated
+        || ($summary->operation === null && $count > 0);
+    $hasDiff = $isChange && $count > 0;
     $icon = $summary->operation?->icon() ?? 'heroicon-o-adjustments-horizontal';
 @endphp
 
