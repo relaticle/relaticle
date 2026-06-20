@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4c3ed6d9fc18304fcead3ab5e0f44dde",
+    "content-hash": "40faf0a1775f08fd100bb1f651afe325",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -8998,16 +8998,16 @@
         },
         {
             "name": "relaticle/activity-log",
-            "version": "dev-activity-timeline-batch-merge",
+            "version": "v1.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/activity-log.git",
-                "reference": "271c53b0a0dd19ccebac007fb455ff9dd95fdbb9"
+                "reference": "cfe587a778854db17f719765306500247f7182fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/271c53b0a0dd19ccebac007fb455ff9dd95fdbb9",
-                "reference": "271c53b0a0dd19ccebac007fb455ff9dd95fdbb9",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/cfe587a778854db17f719765306500247f7182fd",
+                "reference": "cfe587a778854db17f719765306500247f7182fd",
                 "shasum": ""
             },
             "require": {
@@ -9039,28 +9039,16 @@
                     "Relaticle\\ActivityLog\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Relaticle\\ActivityLog\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "vendor/bin/pest"
-                ],
-                "pint": [
-                    "vendor/bin/pint"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
             "description": "Reusable Filament plugin that renders a unified activity-log timeline for any Eloquent model",
             "support": {
-                "source": "https://github.com/relaticle/activity-log/tree/activity-timeline-batch-merge",
-                "issues": "https://github.com/relaticle/activity-log/issues"
+                "issues": "https://github.com/relaticle/activity-log/issues",
+                "source": "https://github.com/relaticle/activity-log/tree/v1.2.0"
             },
-            "time": "2026-06-20T05:55:18+00:00"
+            "time": "2026-06-20T10:08:17+00:00"
         },
         {
             "name": "relaticle/custom-fields",
@@ -22988,17 +22976,9 @@
             "time": "2026-06-07T12:35:00+00:00"
         }
     ],
-    "aliases": [
-        {
-            "package": "relaticle/activity-log",
-            "version": "dev-activity-timeline-batch-merge",
-            "alias": "1.2.0",
-            "alias_normalized": "1.2.0.0"
-        }
-    ],
+    "aliases": [],
     "minimum-stability": "beta",
     "stability-flags": {
-        "relaticle/activity-log": 20,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,
