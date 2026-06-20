@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Enums\SupportFormType;
 use App\Features\SocialAuth;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
@@ -19,6 +20,7 @@ use App\Http\Middleware\CheckScheduledDeletion;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
+use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
 use Filament\Actions\Action;
@@ -135,6 +137,10 @@ final class AppPanelProvider extends PanelProvider
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
             ])
+            ->renderHook(
+                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
+                fn (): View => view('filament.app.help-menu', ['items' => $this->supportMenuItems()]),
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -242,6 +248,56 @@ final class AppPanelProvider extends PanelProvider
             ]);
 
         return $panel;
+    }
+
+    /**
+     * Help launcher entries — every support form type that resolves to a URL,
+     * rendered in the topbar Help dropdown and opening its Maxforms form in a
+     * new tab. Empty when nothing is configured, so the control hides itself.
+     *
+     * @return list<array{label: string, icon: string, url: string}>
+     */
+    private function supportMenuItems(): array
+    {
+        $support = resolve(SupportForms::class);
+        $prefill = $this->supportPrefill();
+
+        $items = [];
+
+        foreach (SupportFormType::cases() as $type) {
+            $url = $support->publicUrl($type, $prefill);
+
+            if ($url === null) {
+                continue;
+            }
+
+            $items[] = [
+                'label' => $type->label(),
+                'icon' => $type->icon(),
+                'url' => $url,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Context carried into the support form as prefilled hidden fields. Blank
+     * values are stripped at the boundary in SupportForms::publicUrl().
+     *
+     * @return array<string, string>
+     */
+    private function supportPrefill(): array
+    {
+        $user = Auth::user();
+
+        return [
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+            'workspace_id' => (string) (Filament::getTenant()?->getKey() ?? ''),
+            'source_url' => url()->current(),
+            'app_version' => (string) config('app.version', ''),
+        ];
     }
 
     public function shouldRegisterMenuItem(): bool
