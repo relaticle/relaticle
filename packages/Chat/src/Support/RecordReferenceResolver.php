@@ -47,6 +47,22 @@ final readonly class RecordReferenceResolver
      */
     public function resolve(string $entityType, string $recordId): ?array
     {
+        $url = $this->urlFor($entityType, $recordId);
+
+        if ($url === null) {
+            return null;
+        }
+
+        return [
+            'id' => $recordId,
+            'type' => $entityType,
+            'url' => $url,
+            'label' => $this->resolveLabel($entityType, $recordId),
+        ];
+    }
+
+    public function urlFor(string $entityType, string $recordId): ?string
+    {
         $authUser = auth()->user();
 
         if (! $authUser instanceof User) {
@@ -60,7 +76,7 @@ final readonly class RecordReferenceResolver
         }
 
         try {
-            $url = match ($entityType) {
+            return match ($entityType) {
                 'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
@@ -71,17 +87,6 @@ final readonly class RecordReferenceResolver
         } catch (Throwable) {
             return null;
         }
-
-        if ($url === null) {
-            return null;
-        }
-
-        return [
-            'id' => $recordId,
-            'type' => $entityType,
-            'url' => $url,
-            'label' => $this->resolveLabel($entityType, $recordId),
-        ];
     }
 
     private function resolveLabel(string $entityType, string $recordId): ?string

@@ -713,31 +713,76 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (!message.document || (Array.isArray(message.document.content) && message.document.content.length === 0)) {
             return this.escapeHtml(message.content ?? '');
         }
-        return this.walkDocumentToHtml(message.document);
+
+        // Server-resolved mention URLs are authoritative. When a message carries a
+        // `mentions` array (loaded from the backend) links are rendered ONLY from
+        // it — never from the client-controlled document. A just-sent (optimistic)
+        // message has no server mentions yet, so it falls back to the picker URL
+        // stored on the node, which is still scheme-validated before use.
+        const serverMentions = Array.isArray(message.mentions) ? message.mentions : null;
+        const mentionUrls = {};
+        (serverMentions ?? []).forEach((m) => {
+            if (m && m.id != null && m.url) {
+                mentionUrls[String(m.id)] = m.url;
+            }
+        });
+
+        return this.walkDocumentToHtml(message.document, { mentionUrls, allowNodeUrl: serverMentions === null });
     },
 
-    walkDocumentToHtml(node) {
+    walkDocumentToHtml(node, ctx = {}) {
         if (!node) return '';
         if (node.type === 'doc') {
-            return (node.content ?? []).map((c) => this.walkDocumentToHtml(c)).join('');
+            return (node.content ?? []).map((c) => this.walkDocumentToHtml(c, ctx)).join('');
         }
         if (node.type === 'paragraph') {
-            const children = (node.content ?? []).map((c) => this.walkDocumentToHtml(c)).join('');
+            const children = (node.content ?? []).map((c) => this.walkDocumentToHtml(c, ctx)).join('');
             return `<p>${children}</p>`;
         }
         if (node.type === 'text') {
             return this.escapeHtml(node.text ?? '');
         }
         if (node.type === 'mention') {
-            const id = this.escapeAttr(node.attrs?.id ?? '');
-            const type = this.escapeAttr(node.attrs?.type ?? '');
-            const label = this.escapeHtml(node.attrs?.label ?? '');
-            return `<span data-mention-id="${id}" data-mention-type="${type}" class="inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">@${label}</span>`;
+            return this.renderMentionNode(node, ctx);
         }
         if (node.type === 'hardBreak') {
             return '<br>';
         }
         return '';
+    },
+
+    renderMentionNode(node, ctx = {}) {
+        const id = node.attrs?.id ?? '';
+        const idAttr = this.escapeAttr(id);
+        const type = this.escapeAttr(node.attrs?.type ?? '');
+        const label = this.escapeHtml(node.attrs?.label ?? '');
+        const baseClass = 'inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200';
+
+        let url = ctx.mentionUrls?.[String(id)] ?? null;
+        if (!url && ctx.allowNodeUrl) {
+            url = node.attrs?.url ?? null;
+        }
+
+        if (url && this.isSafeUrl(url)) {
+            const href = this.escapeAttr(url);
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer" data-mention-id="${idAttr}" data-mention-type="${type}" class="${baseClass} no-underline transition-colors hover:bg-primary-200 dark:hover:bg-primary-900/60">@${label}</a>`;
+        }
+
+        return `<span data-mention-id="${idAttr}" data-mention-type="${type}" class="${baseClass}">@${label}</span>`;
+    },
+
+    isSafeUrl(url) {
+        if (typeof url !== 'string' || url === '') return false;
+        // Root-relative ("/app/...") URLs are same-origin and safe; reject the
+        // protocol-relative "//host" form which would point off-origin.
+        if (url.startsWith('//')) return false;
+        if (url.startsWith('/')) return true;
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
     },
 
     escapeHtml(str) {
