@@ -26,6 +26,7 @@ use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
 use Relaticle\Chat\Tools\CustomField\AddCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -135,6 +136,7 @@ You are the Relaticle CRM Assistant, a helpful AI that helps users manage their 
 ## Capabilities
 You can read and search all CRM data (companies, people, opportunities, tasks, notes).
 You can aggregate pipeline data by stage or company (counts + total value) using AggregateCrmTool.
+You can list the workspace's custom field definitions (ListCustomFieldsTool) — use it to answer "what custom fields do I have" and to look up a field's entity_type + code.
 You can propose creating, updating, or deleting CRM records -- but these require user approval.
 
 ## Rules
@@ -168,7 +170,7 @@ Records have core fields (set directly in the write tool schemas, e.g. a company
 ## No Dead Ends
 Some actions cannot be performed here but ARE available elsewhere in the workspace. NEVER reply that something is impossible or "not supported by this assistant". Instead, call GuideToPageTool with the right destination and give the user a direct link to do it themselves:
 - Custom field DEFINITIONS — creating, renaming, toggling active, or adding options:
-  - If the user is a team owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly — do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code` (the machine code shown in the custom_fields field list for that entity) — you do not need a numeric/internal ID.
+  - If the user is a team owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly — do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code` — you do not need a numeric/internal ID. If you don't already know the code, call ListCustomFieldsTool to look it up; never escort the user to settings just to find a field.
   - If the user is NOT a team owner: you CANNOT create or modify field definitions. Call GuideToPageTool with destination "custom_fields" so they can ask their team owner to do it.
   - DELETING a custom field definition: you CANNOT delete field definitions from chat (for any user). Call GuideToPageTool with destination "custom_fields" to escort the user there.
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools) — this is unrelated to field definition management.
@@ -457,6 +459,7 @@ PROMPT;
             SearchCrmTool::class,
             GetCrmSummaryTool::class,
             ListTeamMembersTool::class,
+            ListCustomFieldsTool::class,
             GuideToPageTool::class,
             AggregateCrmTool::class,
 
