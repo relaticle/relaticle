@@ -18,7 +18,10 @@
 
 set -euo pipefail
 
-WORKSPACE="$(basename "$PWD")"
+# Conductor previews/links by workspace name; Polyscope works off the folder
+# (and clones into a folder named after the workspace, so they match). Prefer
+# CONDUCTOR_WORKSPACE_NAME when present, fall back to the folder basename.
+WORKSPACE="${CONDUCTOR_WORKSPACE_NAME:-$(basename "$PWD")}"
 WORKSPACE_HOST="${WORKSPACE}.test"
 
 if [[ ! -f .env ]]; then

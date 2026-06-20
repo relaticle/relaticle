@@ -6,8 +6,13 @@
 file_include_globs = ".env"
 
 [scripts]
-# Mirrors polyscope.json: link + secure the Herd site, then install deps and
-# point .env at this workspace's hostname. Scripts run from the workspace dir.
-setup = "herd link && herd secure && bin/setup-workspace.sh"
-archive = "herd unsecure && herd unlink"
-run = 'open "https://$(basename "$CONDUCTOR_WORKSPACE_PATH").test"'
+# Link + secure the Herd site, then install deps and point .env at this
+# workspace's hostname. Scripts run from the workspace dir. We key the Herd
+# site off CONDUCTOR_WORKSPACE_NAME (the branch-derived workspace name) rather
+# than the folder basename, because Conductor's in-app preview opens
+# https://<workspace-name>.test — keep the site, .env, and preview aligned.
+# bin/setup-workspace.sh falls back to the folder name when the var is unset
+# (Polyscope), so that orchestrator's folder-based behavior is unchanged.
+setup = 'herd link "$CONDUCTOR_WORKSPACE_NAME" && herd secure "$CONDUCTOR_WORKSPACE_NAME" && bin/setup-workspace.sh'
+archive = 'herd unsecure "$CONDUCTOR_WORKSPACE_NAME" && herd unlink "$CONDUCTOR_WORKSPACE_NAME"'
+run = 'open "https://$CONDUCTOR_WORKSPACE_NAME.test"'
