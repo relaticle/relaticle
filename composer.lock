@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "06471601f587a1c8c317ab89a1ad9769",
+    "content-hash": "40faf0a1775f08fd100bb1f651afe325",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -8998,16 +8998,16 @@
         },
         {
             "name": "relaticle/activity-log",
-            "version": "v1.1.1",
+            "version": "v1.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/activity-log.git",
-                "reference": "80a3e6373eddb5f89123a6ae0731c2a7bd76995b"
+                "reference": "cfe587a778854db17f719765306500247f7182fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/80a3e6373eddb5f89123a6ae0731c2a7bd76995b",
-                "reference": "80a3e6373eddb5f89123a6ae0731c2a7bd76995b",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/cfe587a778854db17f719765306500247f7182fd",
+                "reference": "cfe587a778854db17f719765306500247f7182fd",
                 "shasum": ""
             },
             "require": {
@@ -9046,9 +9046,9 @@
             "description": "Reusable Filament plugin that renders a unified activity-log timeline for any Eloquent model",
             "support": {
                 "issues": "https://github.com/relaticle/activity-log/issues",
-                "source": "https://github.com/relaticle/activity-log/tree/v1.1.1"
+                "source": "https://github.com/relaticle/activity-log/tree/v1.2.0"
             },
-            "time": "2026-06-15T01:49:04+00:00"
+            "time": "2026-06-20T10:08:17+00:00"
         },
         {
             "name": "relaticle/custom-fields",

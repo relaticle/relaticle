@@ -140,6 +140,6 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
 
     public function timeline(): TimelineBuilder
     {
-        return TimelineBuilder::make($this)->fromActivityLog();
+        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }
