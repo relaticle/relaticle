@@ -9002,12 +9002,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/activity-log.git",
-                "reference": "162852927242da806ab8fd8dfab1ab25c36e9331"
+                "reference": "271c53b0a0dd19ccebac007fb455ff9dd95fdbb9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/162852927242da806ab8fd8dfab1ab25c36e9331",
-                "reference": "162852927242da806ab8fd8dfab1ab25c36e9331",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/271c53b0a0dd19ccebac007fb455ff9dd95fdbb9",
+                "reference": "271c53b0a0dd19ccebac007fb455ff9dd95fdbb9",
                 "shasum": ""
             },
             "require": {
@@ -9060,7 +9060,7 @@
                 "source": "https://github.com/relaticle/activity-log/tree/activity-timeline-batch-merge",
                 "issues": "https://github.com/relaticle/activity-log/issues"
             },
-            "time": "2026-06-20T03:55:24+00:00"
+            "time": "2026-06-20T05:55:18+00:00"
         },
         {
             "name": "relaticle/custom-fields",

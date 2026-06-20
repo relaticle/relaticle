@@ -100,6 +100,28 @@ it('collapses a save\'s native and custom-field rows into one merged entry', fun
         ->and($entry->properties['custom_field_changes'][0]['code'])->toBe('lead_source');
 })->mutates(MergedActivityRenderer::class);
 
+it('keeps every custom field when one save touches several', function (): void {
+    $batch = '44444444-4444-4444-4444-444444444444';
+
+    seedActivityRow($this->company, 'updated', $batch, ['attributes' => ['name' => 'Renamed Co'], 'old' => ['name' => 'Old Co']]);
+
+    foreach (['icp', 'domains', 'linkedin'] as $code) {
+        seedActivityRow($this->company, 'custom_field_changes', $batch, [], [
+            'custom_field_changes' => [['code' => $code, 'label' => $code, 'old' => ['label' => '—'], 'new' => ['label' => 'x']]],
+        ]);
+    }
+
+    $entries = $this->company->timeline()->get();
+
+    expect($entries)->toHaveCount(1);
+
+    $codes = array_column($entries->first()->properties['custom_field_changes'], 'code');
+
+    expect($codes)->toHaveCount(3)
+        ->and($codes)->toContain('icp', 'domains', 'linkedin')
+        ->and($entries->first()->properties['attributes']['name'])->toBe('Renamed Co');
+})->mutates(MergedActivityRenderer::class);
+
 it('keeps rows from different batches as separate entries', function (): void {
     seedActivityRow($this->company, 'custom_field_changes', '22222222-2222-2222-2222-222222222222', [], [
         'custom_field_changes' => [['code' => 'lead_source', 'label' => 'Lead source', 'old' => ['label' => '—'], 'new' => ['label' => 'referral']]],
