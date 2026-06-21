@@ -54,7 +54,9 @@ it('persists a queued Email row for the outbox', function (): void {
         ->and($email->direction)->toBe(EmailDirection::OUTBOUND)
         ->and($email->connected_account_id)->toBe($this->account->id)
         ->and($email->subject)->toBe('Hello World')
-        ->and($email->batch_id)->toBeNull();
+        ->and($email->batch_id)->toBeNull()
+        // A stable Message-ID is stamped at queue time for retry de-duplication.
+        ->and($email->rfc_message_id)->toMatch('/^<[0-9A-Za-z]+@.+>$/');
 });
 
 it('syncs the email thread aggregate when an outbound reply is sent', function (): void {

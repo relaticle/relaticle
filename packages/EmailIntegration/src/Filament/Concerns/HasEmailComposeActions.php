@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\User;
-use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
@@ -37,6 +36,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use RuntimeException;
 
@@ -457,7 +457,7 @@ trait HasEmailComposeActions
                 ->content(function (Get $get): HtmlString {
                     $isForward = $get('mode') === 'forward';
                     $label = $isForward ? 'Forwarded message' : 'Original message';
-                    $safeQuotedHtml = EmailHtmlSanitizer::sanitize($get('quoted_body_html')) ?? '';
+                    $safeQuotedHtml = resolve(HtmlSanitizerService::class)->sanitizeEmailBody($get('quoted_body_html')) ?? '';
 
                     return new HtmlString(
                         '<div x-data="{ open: false }" class="mt-1">'

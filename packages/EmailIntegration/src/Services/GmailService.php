@@ -181,7 +181,31 @@ final readonly class GmailService implements MailServiceInterface
         return [
             'provider_message_id' => $sent->getId(),
             'thread_id' => $sent->getThreadId(),
-            'rfc_message_id' => '<'.$sent->getId().'@mail.gmail.com>',
+            // Prefer the Message-ID we stamped on the outgoing MIME (used for retry
+            // de-duplication); fall back to a Gmail-derived id for older callers.
+            'rfc_message_id' => $data['rfc_message_id'] ?? '<'.$sent->getId().'@mail.gmail.com>',
+        ];
+    }
+
+    public function findSentMessage(string $rfcMessageId): ?array
+    {
+        $list = $this->gmail->users_messages->listUsersMessages('me', [
+            'q' => 'rfc822msgid:'.trim($rfcMessageId, '<>'),
+            'maxResults' => 1,
+        ]);
+
+        $messages = $list->getMessages();
+
+        if ($messages === null || $messages === []) {
+            return null;
+        }
+
+        $message = $this->gmail->users_messages->get('me', $messages[0]->getId(), ['format' => 'minimal']);
+
+        return [
+            'provider_message_id' => $message->getId(),
+            'thread_id' => $message->getThreadId(),
+            'rfc_message_id' => $rfcMessageId,
         ];
     }
 
@@ -220,6 +244,12 @@ final readonly class GmailService implements MailServiceInterface
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = 'Content-Type: multipart/alternative; boundary="boundary_relaticle"';
         $headers[] = 'Date: '.now()->toRfc2822String();
+
+        // Stamp our own Message-ID so a retry can find an already-sent copy via
+        // Gmail's rfc822msgid search instead of re-delivering the message.
+        if (isset($data['rfc_message_id'])) {
+            $headers[] = 'Message-ID: '.$data['rfc_message_id'];
+        }
 
         if ($inReplyTo !== null) {
             $headers[] = 'In-Reply-To: '.$inReplyTo;
