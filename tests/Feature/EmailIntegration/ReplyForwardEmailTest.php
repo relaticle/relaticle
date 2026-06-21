@@ -12,6 +12,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
@@ -128,6 +129,24 @@ it('forward persists a queued Email with FORWARD creation_source', function (): 
 
     expect($forward->status)->toBe(EmailStatus::QUEUED)
         ->and($forward->in_reply_to)->toBeNull();
+});
+
+it('renders the quoted original message in a sandboxed iframe with sanitized content', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => '<style>body{background:#fff}</style><p>Quoted body</p><script>alert(1)</script>',
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->mountAction(
+            'replyForwardEmail',
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply'],
+        )
+        ->assertActionMounted('replyForwardEmail')
+        // Quoted body is isolated in a sandboxed iframe, mirroring the email body view,
+        // instead of being dumped inline where the email's own styles leak into the panel.
+        ->assertSee('sandbox="allow-popups allow-popups-to-escape-sandbox"', escape: false)
+        // The untrusted script tag is stripped by the sanitizer before display.
+        ->assertDontSee('alert(1)', escape: false);
 });
 
 it('reply_all persists a queued Email with REPLY_ALL creation_source', function (): void {

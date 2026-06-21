@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use App\Models\User;
+use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -829,6 +830,7 @@ final class EmailInboxPage extends Page
                 ->content(function (Get $get): HtmlString {
                     $isForward = $get('mode') === 'forward';
                     $label = $isForward ? 'Forwarded message' : 'Original message';
+                    $safeQuotedHtml = EmailHtmlSanitizer::sanitize($get('quoted_body_html')) ?? '';
 
                     return new HtmlString(
                         '<div x-data="{ open: false }" class="mt-1">'
@@ -840,8 +842,8 @@ final class EmailInboxPage extends Page
                         .'</span>'
                         .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
                         .'</div>'
-                        .'<div x-show="open" x-collapse class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 prose dark:prose-invert max-w-none">'
-                        .($get('quoted_body_html') ?? '')
+                        .'<div x-show="open" x-collapse class="mt-2 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white">'
+                        .'<iframe srcdoc="'.e($safeQuotedHtml).'" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="block w-full border-0" style="height:20rem"></iframe>'
                         .'</div>'
                         .'</div>'
                     );
