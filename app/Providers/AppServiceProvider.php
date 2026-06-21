@@ -294,6 +294,7 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
+            'custom_field' => CustomField::class,
         ]);
 
         // Use custom models for custom-fields package

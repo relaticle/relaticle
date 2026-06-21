@@ -38,6 +38,9 @@ final class ListOpportunitiesTool extends BaseReadListTool
         return [
             'company_id' => $schema->string()->description('Filter by company ID.'),
             'contact_id' => $schema->string()->description('Filter by contact/person ID.'),
+            'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
+            'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
+            'stale_days' => $schema->integer()->description('Return only opportunities with no activity in the last N days (default 30). Use this to find deals that have gone quiet.'),
         ];
     }
 
@@ -47,6 +50,14 @@ final class ListOpportunitiesTool extends BaseReadListTool
         return array_filter([
             'company_id' => $request['company_id'] ?? null,
             'contact_id' => $request['contact_id'] ?? null,
+            'created_after' => $request['created_after'] ?? null,
+            'created_before' => $request['created_before'] ?? null,
+            'stale_days' => isset($request['stale_days']) ? (string) $request['stale_days'] : null,
         ]);
+    }
+
+    protected function citationType(): string
+    {
+        return 'opportunity';
     }
 }

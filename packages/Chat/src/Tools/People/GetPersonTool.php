@@ -29,4 +29,9 @@ final class GetPersonTool extends BaseReadShowTool
     {
         return 'Person';
     }
+
+    protected function citationType(): string
+    {
+        return 'people';
+    }
 }

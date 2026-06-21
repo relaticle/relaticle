@@ -78,7 +78,7 @@ export function createMentionSuggestion() {
             const body = await res.json();
             if (myToken !== fetchToken) return null;
             return {
-                results: (body.data || []).map((item) => ({ type: item.type, id: item.id, label: item.name })),
+                results: (body.data || []).map((item) => ({ type: item.type, id: item.id, label: item.name, url: item.url ?? null })),
                 error: false,
             };
         } catch (_e) {
@@ -152,7 +152,7 @@ export function createMentionSuggestion() {
 
                     activeIndex = 0;
                     items = [];
-                    onSelect = (item) => props.command({ id: item.id, type: item.type, label: item.label });
+                    onSelect = (item) => props.command({ id: item.id, type: item.type, label: item.label, url: item.url ?? null });
 
                     document.body.appendChild(renderPopup({
                         query: props.query, fetching: true, error: false,
@@ -169,7 +169,7 @@ export function createMentionSuggestion() {
 
                 onUpdate: (props) => {
                     clientRect = props.clientRect;
-                    onSelect = (item) => props.command({ id: item.id, type: item.type, label: item.label });
+                    onSelect = (item) => props.command({ id: item.id, type: item.type, label: item.label, url: item.url ?? null });
 
                     if (!props.query || props.query.length < MIN_QUERY_LENGTH) {
                         if (popupEl?.parentNode) popupEl.parentNode.removeChild(popupEl);

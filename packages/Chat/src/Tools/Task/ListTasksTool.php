@@ -29,4 +29,9 @@ final class ListTasksTool extends BaseReadListTool
     {
         return 'title';
     }
+
+    protected function citationType(): string
+    {
+        return 'task';
+    }
 }
