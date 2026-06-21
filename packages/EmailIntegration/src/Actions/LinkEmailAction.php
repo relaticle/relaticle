@@ -9,6 +9,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -33,6 +34,14 @@ final readonly class LinkEmailAction
 
         $team = $email->team;
 
+        // A single email can resolve to the same company/person/opportunity through
+        // multiple participants (e.g. two recipients at the same domain). Metrics
+        // must be counted once per email, so track which records were already
+        // incremented during this run.
+        $countedCompanies = [];
+        $countedPeople = [];
+        $countedOpportunities = [];
+
         foreach ($participants as $participant) {
             // 1. Try to match Company by email domain first, so the person can be born already linked.
             $company = null;
@@ -54,7 +63,11 @@ final readonly class LinkEmailAction
                 if ($company) {
                     $participant->update(['company_id' => $company->getKey()]);
                     $email->companies()->syncWithoutDetaching([$company->getKey()]);
-                    $this->updateCompanyMetrics($company, $email);
+
+                    if (! isset($countedCompanies[$company->getKey()])) {
+                        $countedCompanies[$company->getKey()] = true;
+                        $this->incrementEmailMetrics($company, $email);
+                    }
                 }
             }
 
@@ -81,7 +94,11 @@ final readonly class LinkEmailAction
             if ($person) {
                 $participant->update(['contact_id' => $person->getKey()]);
                 $email->people()->syncWithoutDetaching([$person->getKey()]);
-                $this->updatePersonMetrics($person, $email);
+
+                if (! isset($countedPeople[$person->getKey()])) {
+                    $countedPeople[$person->getKey()] = true;
+                    $this->incrementEmailMetrics($person, $email);
+                }
 
                 // Link to person's company if set.
                 if ($person->company_id) {
@@ -95,7 +112,11 @@ final readonly class LinkEmailAction
 
                 foreach ($opportunities as $opportunity) {
                     $email->opportunities()->syncWithoutDetaching([$opportunity->getKey()]);
-                    $this->updateOpportunityMetrics($opportunity, $email);
+
+                    if (! isset($countedOpportunities[$opportunity->getKey()])) {
+                        $countedOpportunities[$opportunity->getKey()] = true;
+                        $this->incrementEmailMetrics($opportunity, $email);
+                    }
                 }
             }
         }
@@ -171,42 +192,38 @@ final readonly class LinkEmailAction
         return '(^|["/.])'.preg_quote($domain).'(["/:]|$)';
     }
 
-    private function updatePersonMetrics(People $person, Email $email): void
+    /**
+     * Increment the shared email-interaction counters on a linked CRM record
+     * (People, Company, or Opportunity — all expose the same metric columns).
+     *
+     * Counters use atomic SQL increments so concurrent StoreEmailJob workers
+     * don't lose updates. The timestamps use GREATEST so an older email linked
+     * after a newer one (out-of-order parallel backfill) never moves
+     * last_email_at backwards.
+     */
+    private function incrementEmailMetrics(Model $record, Email $email): void
     {
         $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
 
-        $person->updateQuietly([
+        $values = [
             'email_count' => DB::raw('email_count + 1'),
             'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
             'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
-    }
+            'updated_at' => now(),
+        ];
 
-    private function updateCompanyMetrics(Company $company, Email $email): void
-    {
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
+        if ($email->sent_at !== null) {
+            $sentAt = $email->sent_at->toDateTimeString();
+            $values['last_email_at'] = DB::raw("GREATEST(last_email_at, '{$sentAt}')");
+            $values['last_interaction_at'] = DB::raw("GREATEST(last_interaction_at, '{$sentAt}')");
+        }
 
-        $company->updateQuietly([
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
-    }
-
-    private function updateOpportunityMetrics(Opportunity $opportunity, Email $email): void
-    {
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
-
-        $opportunity->updateQuietly([
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
+        // Update through the query builder (targeting the row by primary key) so the
+        // raw GREATEST/increment expressions reach SQL untouched — passing an
+        // Expression through Eloquent's date casts would blow up. This also keeps
+        // the write quiet (no model events) like the previous updateQuietly call.
+        $record->newQueryWithoutScopes()
+            ->whereKey($record->getKey())
+            ->update($values);
     }
 }
