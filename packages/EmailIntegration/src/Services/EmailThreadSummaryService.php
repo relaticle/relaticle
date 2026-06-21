@@ -7,8 +7,7 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\AiSummary;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Prism\Prism\Enums\Provider;
-use Prism\Prism\Facades\Prism;
+use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use RuntimeException;
@@ -74,11 +73,14 @@ final readonly class EmailThreadSummaryService
             $lines[] = '';
         }
 
-        $response = Prism::text()
-            ->using(Provider::Anthropic, config('services.anthropic.summary_model'))
-            ->withSystemPrompt($this->systemPrompt())
-            ->withPrompt(implode("\n", $lines))
-            ->generate();
+        $provider = (string) config('services.email_summary.provider');
+        $model = (string) config('services.email_summary.model');
+
+        $response = (new ThreadSummarizer)->prompt(
+            implode("\n", $lines),
+            provider: $provider,
+            model: $model,
+        );
 
         $teamId = Filament::getTenant()?->getKey();
         throw_if($teamId === null, RuntimeException::class, 'No team context available for AI thread summary');
@@ -90,23 +92,9 @@ final readonly class EmailThreadSummaryService
             'summarizable_type' => $thread->getMorphClass(),
             'summarizable_id' => $thread->getKey(),
             'summary' => $response->text,
-            'model_used' => config('services.anthropic.summary_model'),
+            'model_used' => $model,
             'prompt_tokens' => $response->usage->promptTokens,
             'completion_tokens' => $response->usage->completionTokens,
         ]);
-    }
-
-    private function systemPrompt(): string
-    {
-        return <<<'PROMPT'
-You are a CRM assistant summarising email threads for sales and account management professionals.
-
-Rules:
-- 2-4 sentences maximum
-- Identify the main topic, key decisions, next steps, and any urgency
-- Mention participants by role (e.g., "prospect", "account manager") not by name unless highly relevant
-- Never reproduce verbatim content from the emails
-- Write in flowing professional prose, no bullet points
-PROMPT;
     }
 }
