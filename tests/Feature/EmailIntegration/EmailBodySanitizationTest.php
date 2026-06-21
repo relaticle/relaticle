@@ -100,6 +100,22 @@ it('preserves inline styles and presentational attributes used by email layouts'
         ->assertMountedActionModalSeeHtml('align=&quot;center&quot;');
 });
 
+it('does not truncate email bodies larger than the sanitizer default input cap', function (): void {
+    // Symfony HtmlSanitizer truncates input at 20 KB by default; real email
+    // bodies routinely exceed that, so the tail of the message must survive.
+    $body = '<p>START-MARKER</p>'
+        .str_repeat('<p>filler paragraph to exceed the twenty kilobyte input cap</p>', 600)
+        .'<p>END-MARKER-9F3A</p>';
+
+    expect(strlen($body))->toBeGreaterThan(20_000);
+
+    $email = makeEmailWithBody($body);
+
+    mountEmailView($email)
+        ->assertMountedActionModalSeeHtml('START-MARKER')
+        ->assertMountedActionModalSeeHtml('END-MARKER-9F3A');
+});
+
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 

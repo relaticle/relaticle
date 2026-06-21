@@ -26,6 +26,11 @@ final readonly class EmailHtmlSanitizer
         // CSS values are not deep-sanitized, but the body is rendered in an
         // opaque-origin sandboxed iframe, so CSS cannot read cookies or run JS.
         $config = (new HtmlSanitizerConfig)
+            // Symfony defaults to truncating input at 20 KB, which silently
+            // clips real email bodies (newsletters routinely run 50–150 KB) to a
+            // fraction of their content. The body is already size-bounded at
+            // ingestion, so lift the cap and let the full message render.
+            ->withMaxInputLength(-1)
             ->allowSafeElements()
             ->allowElement('style')
             ->allowRelativeLinks()
