@@ -11,7 +11,7 @@
 
     $canViewSubject   = $authUser->can('viewSubject', $email);
     $isOwner          = $email->user_id === $authUser->getKey();
-    $canSummarize     = false;
+    $canSummarize     = $isOwner || $authUser->can('viewBody', $email);
     $canRequestAccess = $authUser->cannot('viewBody', $email) && $authUser->can('requestAccess', $email);
     $hasActions       = $isOwner || $canSummarize || $canRequestAccess;
 @endphp

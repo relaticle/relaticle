@@ -3,7 +3,7 @@
 @php
     $authUser         = auth()->user();
     $isOwner          = $email->user_id === $authUser->getKey();
-    $canSummarize     = false;
+    $canSummarize     = $isOwner || $authUser->can('viewBody', $email);
     $canRequestAccess = $authUser->cannot('viewBody', $email) && $authUser->can('requestAccess', $email);
 @endphp
 

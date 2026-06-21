@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Relaticle\EmailIntegration\Actions\SyncEmailThreadAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -24,7 +25,13 @@ final readonly class EmailSendingService
     {
         $providerData = $this->dispatchToProvider($email);
 
-        return $this->updateSentEmail($email, $providerData);
+        $email = $this->updateSentEmail($email, $providerData);
+
+        if ($email->thread_id !== null) {
+            resolve(SyncEmailThreadAction::class)->execute($email->connectedAccount, $email->thread_id);
+        }
+
+        return $email;
     }
 
     /**

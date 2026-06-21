@@ -203,8 +203,9 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ->label(__('filament/relation-managers/emails.actions.summarize_thread.label'))
                         ->icon('heroicon-o-sparkles')
                         ->color('gray')
-                        ->visible(false)
+                        ->visible(fn (Email $record): bool => $record->user_id === $this->authUser()->getKey() || $this->authUser()->can('viewBody', $record))
                         ->modalHeading(__('filament/relation-managers/emails.actions.summarize_thread.modal_heading'))
+                        ->modalIcon('heroicon-o-sparkles')
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel('Close')
                         ->modalContent(fn (Email $record): View => $this->buildThreadSummaryView($record)),
