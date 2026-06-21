@@ -61,7 +61,7 @@ final class PrivacyService
             return $user->default_email_sharing_tier;
         }
 
-        return $user->currentTeam->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+        return $user->currentTeam?->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
     }
 
     /**

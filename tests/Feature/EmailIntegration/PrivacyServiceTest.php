@@ -172,6 +172,17 @@ it('defaultTierForUser falls back to team default when user has no preference', 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
+it('defaultTierForUser returns metadata-only when the user has no current team', function (): void {
+    $orphan = User::factory()->create([
+        'current_team_id' => null,
+        'default_email_sharing_tier' => null,
+    ]);
+
+    $tier = $this->service->defaultTierForUser($orphan);
+
+    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+});
+
 it('effectiveTier owner access is not blocked by protected recipient', function (): void {
     ProtectedRecipient::factory()->email('protected@sensitive.com')->create([
         'team_id' => $this->team->id,

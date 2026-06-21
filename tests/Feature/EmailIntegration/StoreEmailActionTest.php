@@ -152,12 +152,34 @@ it('creates email attachments', function (): void {
 });
 
 it('marks email as internal when all participants are team members', function (): void {
-    $teamMember = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teamMember = User::factory()->create();
+    $this->team->users()->attach($teamMember, ['role' => 'editor']);
 
     $data = makeFetchedEmailData([
         'participants' => [
             ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'from'],
             ['email_address' => $teamMember->email, 'name' => 'Team Member', 'role' => 'to'],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    expect($email->is_internal)->toBeTrue();
+});
+
+it('treats a member as internal even when their active team is a different team', function (): void {
+    // Membership in THIS team, but their current_team_id points at another team.
+    // Keying internal-detection off current_team_id (instead of membership) would
+    // wrongly classify the email as external and leak it to other members.
+    $otherTeamMember = User::factory()->withTeam()->create();
+    $this->team->users()->attach($otherTeamMember, ['role' => 'editor']);
+
+    expect($otherTeamMember->current_team_id)->not->toBe($this->team->id);
+
+    $data = makeFetchedEmailData([
+        'participants' => [
+            ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'from'],
+            ['email_address' => $otherTeamMember->email, 'name' => 'Member', 'role' => 'to'],
         ],
     ]);
 

@@ -416,3 +416,77 @@ it('also links email to opportunity via person relationship', function (): void 
 
     expect($email->opportunities()->where('opportunities.id', $opportunity->getKey())->exists())->toBeTrue();
 });
+
+function makeAcmeCompanyWithDomain(): ?Company
+{
+    $domainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', test()->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if (! $domainsField) {
+        return null;
+    }
+
+    $company = Company::create([
+        'team_id' => test()->team->id,
+        'name' => 'Acme',
+        'creator_id' => test()->user->id,
+    ]);
+
+    $company->saveCustomFieldValue($domainsField, 'https://acme.com', test()->team);
+
+    return $company;
+}
+
+it('counts company email metrics once per email despite multiple participants at the same domain', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+
+    if (! $company) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => now()]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'alice@acme.com',
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'bob@acme.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect((int) $company->fresh()->email_count)->toBe(1)
+        ->and((int) $company->fresh()->inbound_email_count)->toBe(1);
+});
+
+it('does not move last_email_at backwards when an older email is linked after a newer one', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+
+    if (! $company) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $newerSentAt = now();
+    $newer = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => $newerSentAt]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $newer->getKey(),
+        'email_address' => 'alice@acme.com',
+    ]);
+    app(LinkEmailAction::class)->execute($newer);
+
+    // An older message arrives out of order (parallel backfill).
+    $older = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => now()->subDays(5)]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $older->getKey(),
+        'email_address' => 'bob@acme.com',
+    ]);
+    app(LinkEmailAction::class)->execute($older);
+
+    expect($company->fresh()->last_email_at->toDateTimeString())->toBe($newerSentAt->toDateTimeString());
+});

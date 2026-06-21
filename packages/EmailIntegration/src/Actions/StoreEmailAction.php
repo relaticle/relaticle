@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Models\User;
+use App\Models\Team;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -67,8 +67,13 @@ final readonly class StoreEmailAction
                 ]);
             }
 
-            $teamUserEmails = User::query()
-                ->where('current_team_id', $email->team_id)
+            // "Internal" means every participant is a member of this workspace.
+            // Membership lives in the team_user pivot (plus the owner) — NOT in
+            // users.current_team_id, which only reflects a user's *active* team and
+            // would misclassify members whose active team is elsewhere.
+            $team = Team::query()->find($connectedAccount->team_id);
+
+            $teamUserEmails = ($team?->allUsers() ?? collect())
                 ->pluck('email')
                 ->map(fn (string $e): string => strtolower($e));
 

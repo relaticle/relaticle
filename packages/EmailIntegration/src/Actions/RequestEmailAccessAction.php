@@ -15,6 +15,11 @@ final readonly class RequestEmailAccessAction
 {
     public function execute(Email $email, User $requester, EmailPrivacyTier $tierRequested): ?EmailAccessRequest
     {
+        // Access requests are only valid within the email's own workspace — never
+        // let a user from another team open a cross-team request (mirrors the team
+        // check already enforced on the approval path).
+        abort_unless($requester->current_team_id === $email->team_id, 403);
+
         $existing = EmailAccessRequest::query()
             ->where('email_id', $email->getKey())
             ->where('requester_id', $requester->getKey())
