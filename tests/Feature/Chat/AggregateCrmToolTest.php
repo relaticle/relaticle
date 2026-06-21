@@ -7,6 +7,7 @@ use App\Actions\Opportunity\CreateOpportunity;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
@@ -155,6 +156,21 @@ it('applies date_from filter correctly', function (): void {
     $data = json_decode($response, true);
     expect($data['total_count'])->toBe(1)
         ->and((float) $data['total_amount'])->toBe(1000.0);
+});
+
+it('reports accurate grand totals when company groups exceed the row cap', function (): void {
+    Company::factory()->count(101)->for($this->team)->create()->each(function (Company $company): void {
+        Opportunity::factory()->for($this->team)->create(['company_id' => $company->getKey()]);
+    });
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'company']));
+
+    $data = json_decode($response, true);
+
+    expect($data['total_count'])->toBe(101)
+        ->and($data['rows'])->toHaveCount(100)
+        ->and($data['truncated'])->toBeTrue();
 });
 
 it('returns an error for invalid group_by value', function (): void {

@@ -13,9 +13,15 @@ use Illuminate\Support\Facades\DB;
 final readonly class AggregateOpportunities
 {
     /**
+     * Cap on the number of grouped rows returned. Grand totals are computed
+     * separately so they stay accurate even when groups exceed this cap.
+     */
+    private const int MAX_GROUPS = 100;
+
+    /**
      * Aggregate opportunities by stage or company.
      *
-     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float}
+     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
     public function execute(
         User $user,
@@ -35,7 +41,7 @@ final readonly class AggregateOpportunities
     }
 
     /**
-     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float}
+     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
     private function byStage(mixed $teamId, ?string $dateFrom, ?string $dateTo): array
     {
@@ -53,23 +59,16 @@ final readonly class AggregateOpportunities
             : '0 as total_amount';
         $amountBindings = $amountFieldId !== null ? [$amountFieldId] : [];
 
-        if ($stageFieldId === null) {
-            $rows = DB::select(
-                "SELECT 'Unspecified' as label, COUNT(*) as count, {$amountSelect}
-                 FROM opportunities o
-                 {$amountJoin}
-                 WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
-                 LIMIT 100",
-                [...$amountBindings, $teamId, ...$dateBindings],
-            );
+        $totals = $this->grandTotals($teamId, $amountFieldId, $dateFrom, $dateTo);
 
+        if ($stageFieldId === null) {
             $mappedRows = [[
                 'label' => 'Unspecified',
-                'count' => (int) ($rows[0]->count ?? 0),
-                'total_amount' => (float) ($rows[0]->total_amount ?? 0),
+                'count' => $totals['count'],
+                'total_amount' => $totals['amount'],
             ]];
 
-            return $this->buildResult('stage', $mappedRows);
+            return $this->buildResult('stage', $mappedRows, $totals['count'], $totals['amount']);
         }
 
         $rows = DB::select(
@@ -80,7 +79,7 @@ final readonly class AggregateOpportunities
              WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY stage_cfv.string_value
              ORDER BY count DESC
-             LIMIT 100",
+             LIMIT ".self::MAX_GROUPS,
             [$stageFieldId, ...$amountBindings, $teamId, ...$dateBindings],
         );
 
@@ -101,11 +100,11 @@ final readonly class AggregateOpportunities
             ];
         }
 
-        return $this->buildResult('stage', $mappedRows);
+        return $this->buildResult('stage', $mappedRows, $totals['count'], $totals['amount']);
     }
 
     /**
-     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float}
+     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
     private function byCompany(mixed $teamId, ?string $dateFrom, ?string $dateTo): array
     {
@@ -130,7 +129,7 @@ final readonly class AggregateOpportunities
              WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY c.id, c.name
              ORDER BY count DESC
-             LIMIT 100",
+             LIMIT ".self::MAX_GROUPS,
             [...$amountBindings, $teamId, ...$dateBindings],
         );
 
@@ -143,7 +142,43 @@ final readonly class AggregateOpportunities
             ];
         }
 
-        return $this->buildResult('company', $mappedRows);
+        $totals = $this->grandTotals($teamId, $amountFieldId, $dateFrom, $dateTo);
+
+        return $this->buildResult('company', $mappedRows, $totals['count'], $totals['amount']);
+    }
+
+    /**
+     * Grand totals across ALL matching opportunities, independent of the grouped
+     * row cap, so reported counts and pipeline value stay correct when the number
+     * of groups exceeds the cap.
+     *
+     * @return array{count: int, amount: float}
+     */
+    private function grandTotals(mixed $teamId, mixed $amountFieldId, ?string $dateFrom, ?string $dateTo): array
+    {
+        $dateClause = $this->dateClause($dateFrom, $dateTo);
+        $dateBindings = $this->dateBindings($dateFrom, $dateTo);
+
+        $amountJoin = $amountFieldId !== null
+            ? "LEFT JOIN custom_field_values amount_cfv ON amount_cfv.entity_id = o.id AND amount_cfv.entity_type = 'opportunity' AND amount_cfv.custom_field_id = ?"
+            : '';
+        $amountSelect = $amountFieldId !== null
+            ? 'COALESCE(SUM(amount_cfv.float_value), 0) as total_amount'
+            : '0 as total_amount';
+        $amountBindings = $amountFieldId !== null ? [$amountFieldId] : [];
+
+        $row = DB::select(
+            "SELECT COUNT(*) as count, {$amountSelect}
+             FROM opportunities o
+             {$amountJoin}
+             WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}",
+            [...$amountBindings, $teamId, ...$dateBindings],
+        );
+
+        return [
+            'count' => (int) ($row[0]->count ?? 0),
+            'amount' => (float) ($row[0]->total_amount ?? 0),
+        ];
     }
 
     private function resolveFieldId(mixed $teamId, string $code): mixed
@@ -192,23 +227,16 @@ final readonly class AggregateOpportunities
 
     /**
      * @param  list<array{label: string, count: int, total_amount: float}>  $rows
-     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float}
+     * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
-    private function buildResult(string $groupBy, array $rows): array
+    private function buildResult(string $groupBy, array $rows, int $totalCount, float $totalAmount): array
     {
-        $totalCount = 0;
-        $totalAmount = 0.0;
-
-        foreach ($rows as $row) {
-            $totalCount += $row['count'];
-            $totalAmount += $row['total_amount'];
-        }
-
         return [
             'group_by' => $groupBy,
             'rows' => $rows,
             'total_count' => $totalCount,
             'total_amount' => $totalAmount,
+            'truncated' => count($rows) >= self::MAX_GROUPS,
         ];
     }
 }
