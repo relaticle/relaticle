@@ -89,6 +89,7 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                             ])
                             ->columns(2)
                             ->addActionLabel(__('email/privacy-settings.blocklist.add_entry'))
+                            ->addAction(fn (Action $action): Action => $action->icon('heroicon-m-plus'))
                             ->reorderable(false),
                         Actions::make([
                             Action::make('saveBlocklist')
