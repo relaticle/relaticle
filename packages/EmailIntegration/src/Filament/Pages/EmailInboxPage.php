@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use App\Models\User;
-use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -52,6 +51,7 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
+use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final class EmailInboxPage extends Page
@@ -830,7 +830,7 @@ final class EmailInboxPage extends Page
                 ->content(function (Get $get): HtmlString {
                     $isForward = $get('mode') === 'forward';
                     $label = $isForward ? 'Forwarded message' : 'Original message';
-                    $safeQuotedHtml = EmailHtmlSanitizer::sanitize($get('quoted_body_html')) ?? '';
+                    $safeQuotedHtml = resolve(HtmlSanitizerService::class)->sanitizeEmailBody($get('quoted_body_html')) ?? '';
 
                     return new HtmlString(
                         '<div x-data="{ open: false }" class="mt-1">'

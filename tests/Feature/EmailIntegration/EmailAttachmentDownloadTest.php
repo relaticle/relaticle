@@ -6,6 +6,7 @@ use App\Http\Controllers\EmailAttachmentController;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -101,4 +102,38 @@ it('aborts 404 when the connected account is missing', function (): void {
 
     $this->get(route('email-attachments.download', ['attachment' => $attachment->id]))
         ->assertNotFound();
+});
+
+it('streams attachment bytes for a Microsoft Graph account', function (): void {
+    config()->set('services.azure.client_id', 'azure-client-id');
+    config()->set('services.azure.client_secret', 'azure-client-secret');
+    config()->set('services.azure.tenant', 'common');
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->azure()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'access_token' => 'access',
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $attachment = makeAttachmentForUser(
+        $this->user,
+        $this->team,
+        $account,
+        ['provider_message_id' => 'ms-msg-1'],
+        ['provider_attachment_id' => 'ms-att-1'],
+    );
+
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/ms-msg-1/attachments/ms-att-1' => Http::response([
+            '@odata.type' => '#microsoft.graph.fileAttachment',
+            'contentBytes' => base64_encode('hello bytes'),
+        ]),
+    ]);
+
+    $response = $this->get(route('email-attachments.download', ['attachment' => $attachment->id]));
+
+    $response->assertOk();
+    expect($response->streamedContent())->toBe('hello bytes');
 });
