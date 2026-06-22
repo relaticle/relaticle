@@ -12,9 +12,9 @@ use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
-mutates(HtmlSanitizerService::class);
+mutates(EmailHtmlSanitizer::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();

@@ -36,8 +36,8 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
-use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use RuntimeException;
 
 trait HasEmailComposeActions
@@ -457,7 +457,7 @@ trait HasEmailComposeActions
                 ->content(function (Get $get): HtmlString {
                     $isForward = $get('mode') === 'forward';
                     $label = $isForward ? 'Forwarded message' : 'Original message';
-                    $safeQuotedHtml = resolve(HtmlSanitizerService::class)->sanitizeEmailBody($get('quoted_body_html')) ?? '';
+                    $safeQuotedHtml = EmailHtmlSanitizer::sanitize($get('quoted_body_html')) ?? '';
 
                     return new HtmlString(
                         '<div x-data="{ open: false }" class="mt-1">'

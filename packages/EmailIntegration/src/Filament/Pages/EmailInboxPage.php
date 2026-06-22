@@ -51,8 +51,8 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
-use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class EmailInboxPage extends Page
 {
@@ -830,7 +830,7 @@ final class EmailInboxPage extends Page
                 ->content(function (Get $get): HtmlString {
                     $isForward = $get('mode') === 'forward';
                     $label = $isForward ? 'Forwarded message' : 'Original message';
-                    $safeQuotedHtml = resolve(HtmlSanitizerService::class)->sanitizeEmailBody($get('quoted_body_html')) ?? '';
+                    $safeQuotedHtml = EmailHtmlSanitizer::sanitize($get('quoted_body_html')) ?? '';
 
                     return new HtmlString(
                         '<div x-data="{ open: false }" class="mt-1">'
