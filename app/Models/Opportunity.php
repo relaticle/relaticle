@@ -11,7 +11,6 @@ use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
-use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\OpportunityObserver;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,6 +27,8 @@ use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
@@ -58,7 +59,7 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
     use HasNotes;
     use HasTeam;
     use HasUlids;
-    use LogsCrmActivity;
+    use LogsActivity;
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;
@@ -106,5 +107,19 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
     public function tasks(): MorphToMany
     {
         return $this->morphToMany(Task::class, 'taskable');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->logExcept([
+                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
+                'created_at', 'updated_at', 'deleted_at', 'order_column',
+            ])
+            ->useLogName('crm')
+            ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
     }
 }

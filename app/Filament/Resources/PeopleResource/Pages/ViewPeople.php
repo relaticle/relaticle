@@ -21,7 +21,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
-use Relaticle\ActivityLog\Filament\Actions\ActivityLogAction;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -32,12 +31,26 @@ final class ViewPeople extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
-            ActivityLogAction::make(),
             Action::make('viewEmails')
                 ->label(__('filament/resources/person.pages.view.actions.view_emails.label'))
                 ->icon('heroicon-o-envelope')
                 ->color('gray')
                 ->url(fn (): string => PeopleResource::getUrl('emails', ['record' => $this->getRecord()])),
+            Action::make('askAboutThis')
+                ->label(__('filament/resources/person.pages.view.actions.ask_about_this.label'))
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->color('gray')
+                ->action(function (People $record): void {
+                    $mention = Js::from([
+                        'type' => 'people',
+                        'id' => (string) $record->getKey(),
+                        'label' => $record->name,
+                    ]);
+                    $this->js("
+                        sessionStorage.setItem('chat:mention', JSON.stringify({$mention}));
+                        window.Livewire.dispatch('chat:open-panel');
+                    ");
+                }),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([

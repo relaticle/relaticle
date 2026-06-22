@@ -20,7 +20,7 @@ Visit `http://localhost:8000` to access the application.
 
 | Component | Technology                            |
 |-----------|---------------------------------------|
-| Backend | PHP 8.4, Laravel 12                   |
+| Backend | PHP 8.4, Laravel 13                   |
 | Admin UI | Filament 5                            |
 | Frontend | Livewire 4, Alpine.js, Tailwind CSS 4 |
 | Database | PostgreSQL                             |
@@ -172,7 +172,7 @@ PRs must pass all checks before merge.
 
 ## Resources
 
-- [Laravel Docs](https://laravel.com/docs/12.x)
+- [Laravel Docs](https://laravel.com/docs/13.x)
 - [Filament Docs](https://filamentphp.com/docs)
 - [Livewire Docs](https://livewire.laravel.com/)
 - [Pest Docs](https://pestphp.com/)

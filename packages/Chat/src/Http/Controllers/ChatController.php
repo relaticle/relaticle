@@ -28,6 +28,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 
 final readonly class ChatController
@@ -288,7 +289,7 @@ final readonly class ChatController
         return response()->json(['superseded' => $superseded]);
     }
 
-    public function mentions(Request $request): JsonResponse
+    public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
@@ -315,7 +316,7 @@ final readonly class ChatController
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (People $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people'])
+                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people', 'url' => $resolver->urlFor('people', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -330,7 +331,7 @@ final readonly class ChatController
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Company $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company'])
+                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company', 'url' => $resolver->urlFor('company', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -345,7 +346,7 @@ final readonly class ChatController
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Opportunity $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity'])
+                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity', 'url' => $resolver->urlFor('opportunity', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -360,7 +361,7 @@ final readonly class ChatController
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Task $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task'])
+                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task', 'url' => $resolver->urlFor('task', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -375,7 +376,7 @@ final readonly class ChatController
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Note $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note'])
+                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note', 'url' => $resolver->urlFor('note', (string) $r->id)])
         );
 
         return response()->json(['data' => $results->take(15)->values()]);

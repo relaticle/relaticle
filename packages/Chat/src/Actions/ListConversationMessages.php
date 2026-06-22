@@ -19,7 +19,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string}>}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -105,6 +105,7 @@ final readonly class ListConversationMessages
                         'type' => (string) $row->type,
                         'id' => (string) $row->record_id,
                         'label' => (string) $row->label,
+                        'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
                     ])
                     ->all()
             ),

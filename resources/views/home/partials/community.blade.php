@@ -43,7 +43,7 @@
         <div class="max-w-3xl mx-auto">
             <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.015] overflow-hidden">
                 <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200/60 dark:divide-white/[0.04]">
-                    @foreach([['AGPL-3.0', 'Open Source'], ['1,100+', 'Automated Tests'], ['30', 'MCP Tools'], ['Free', 'Forever']] as $index => [$value, $label])
+                    @foreach([['AGPL-3.0', 'Open Source'], ['2,000+', 'Automated Tests'], ['30', 'MCP Tools'], ['Free', 'Forever']] as $index => [$value, $label])
                         <div class="px-6 py-5 text-center @if($index >= 2) border-t border-gray-200/60 dark:border-white/[0.04] md:border-t-0 @endif">
                             <div class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">{{ $value }}</div>
                             <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 uppercase tracking-wider font-medium">{{ $label }}</div>
