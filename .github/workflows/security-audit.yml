@@ -1,0 +1,70 @@
+name: Security Audit
+
+on: [pull_request]
+
+jobs:
+  composer-audit:
+    runs-on: ubuntu-latest
+    name: Composer Audit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.4-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      # composer audit has no severity threshold; fail on any reported advisory (>= low).
+      # Medium-and-up gating is applied to the npm side below.
+      - name: Run Composer Audit
+        run: composer audit --locked --no-dev --ansi
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    name: NPM Audit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node & NPM
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+
+      - name: Get NPM cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+
+      - name: Cache NPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      # moderate == "medium" severity in npm's scale (info/low/moderate/high/critical).
+      - name: Run NPM Audit
+        run: npm audit --audit-level=moderate

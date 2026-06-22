@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
@@ -41,6 +42,8 @@ final readonly class ListCompanies
             ->allowedFilters(
                 AllowedFilter::partial('name'),
                 AllowedFilter::custom('custom_fields', new CustomFieldFilter('company')),
+                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('companies.created_at', '>=', $value)),
+                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('companies.created_at', '<=', $value)),
             )
             ->allowedFields('id', 'name', 'creator_id', 'account_owner_id', 'created_at', 'updated_at')
             ->allowedIncludes(

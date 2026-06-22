@@ -11,7 +11,6 @@ use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
-use App\Models\Concerns\LogsCrmActivity;
 use App\Observers\CompanyObserver;
 use App\Services\AvatarService;
 use Database\Factories\CompanyFactory;
@@ -30,6 +29,8 @@ use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
 use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -66,7 +67,7 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
     use HasTeam;
     use HasUlids;
     use InteractsWithMedia;
-    use LogsCrmActivity;
+    use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
 
@@ -132,5 +133,21 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
     public function tasks(): MorphToMany
     {
         return $this->morphToMany(Task::class, 'taskable');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->logExcept([
+                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
+                'created_at', 'updated_at', 'deleted_at', 'account_owner_id',
+                'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
+                'outbound_email_count', 'avg_response_time_hours',
+            ])
+            ->useLogName('crm')
+            ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
     }
 }

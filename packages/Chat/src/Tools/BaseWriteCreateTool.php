@@ -21,8 +21,6 @@ abstract class BaseWriteCreateTool implements Tool
 {
     use WithConversationContext;
 
-    private const int MAX_BATCH_SIZE = 25;
-
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -75,7 +73,7 @@ abstract class BaseWriteCreateTool implements Tool
                 ->required()
                 ->description(
                     "The {$this->entityType()} records to create. Pass ONE item for a single record,"
-                    .' or up to '.self::MAX_BATCH_SIZE.' items to create them all in ONE proposal'
+                    .' or up to '.config('chat.max_batch_size').' items to create them all in ONE proposal'
                     .' (never loop one call per record).',
                 ),
             'plan' => $schema->object([
@@ -97,8 +95,10 @@ abstract class BaseWriteCreateTool implements Tool
             return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.']);
         }
 
-        if (count($records) > self::MAX_BATCH_SIZE) {
-            return (string) json_encode(['error' => 'Too many records — at most '.self::MAX_BATCH_SIZE.' per proposal.']);
+        $maxBatchSize = (int) config('chat.max_batch_size');
+
+        if (count($records) > $maxBatchSize) {
+            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."]);
         }
 
         $validator = resolve(CustomFieldsRequestValidator::class);

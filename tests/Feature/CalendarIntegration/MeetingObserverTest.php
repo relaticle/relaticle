@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Activity;
+use App\Models\ActivityLog\Activity;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;

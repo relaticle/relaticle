@@ -29,4 +29,9 @@ final class ListNotesTool extends BaseReadListTool
     {
         return 'title';
     }
+
+    protected function citationType(): string
+    {
+        return 'note';
+    }
 }

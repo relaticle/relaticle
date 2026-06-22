@@ -427,9 +427,9 @@ it('seeds custom field values correctly for sales', function (): void {
         ->get()
         ->keyBy('custom_field_id');
 
-    expect($appleValues[$companyFields['domains']]->json_value)->toContain('https://apple.com')
+    expect($appleValues[$companyFields['domains']]->json_value)->toContain('www.apple.com')
         ->and($appleValues[$companyFields['icp']]->boolean_value)->toBeTrue()
-        ->and($appleValues[$companyFields['linkedin']]->json_value)->toContain('https://www.linkedin.com/company/apple');
+        ->and($appleValues[$companyFields['linkedin']]->json_value)->toContain('www.linkedin.com/company/apple');
 });
 
 it('subsequent teams still require use case selection', function (): void {

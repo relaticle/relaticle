@@ -13,6 +13,7 @@ use App\Listeners\Email\TeamCreatedTagListener;
 use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
+use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -30,6 +31,8 @@ use App\Policies\EmailPolicy;
 use App\Policies\EmailTemplatePolicy;
 use App\Policies\MeetingPolicy;
 use App\Services\GitHubService;
+use App\Support\ActivityLog\MergedActivityRenderer;
+use App\Support\ActivityLog\RequestActivityBatch;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -54,6 +57,7 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -65,6 +69,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -77,6 +82,10 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
+
+        // One batch_uuid per request/job, lazily generated and forgotten between
+        // them — the key the activity timeline groups a single save's rows on.
+        $this->app->scoped(RequestActivityBatch::class);
     }
 
     /**
@@ -111,6 +120,24 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureMacros();
         $this->configureRateLimiting();
         $this->configureScribe();
+
+        $this->configureActivityLog();
+    }
+
+    /**
+     * Stamp every activity row written during one request/job with that request's
+     * shared batch_uuid, and render a same-save group (native columns + custom
+     * fields) as a single merged timeline entry.
+     */
+    private function configureActivityLog(): void
+    {
+        ActivityLogger::beforeLogging(function (ActivityModel $activity): void {
+            if (blank($activity->getAttribute('batch_uuid'))) {
+                $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
+            }
+        });
+
+        Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
     }
 
     private function configurePolicies(): void
@@ -294,6 +321,7 @@ final class AppServiceProvider extends ServiceProvider
             'email_thread' => EmailThread::class,
             'email_access_request' => EmailAccessRequest::class,
             'meeting' => Meeting::class,
+            'custom_field' => CustomField::class,
         ]);
 
         // Use custom models for custom-fields package

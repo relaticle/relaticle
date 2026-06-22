@@ -71,3 +71,22 @@ it('shows a conversation detail page', function (): void {
     livewire(ViewAgentConversation::class, ['record' => $conversation->getKey()])
         ->assertSuccessful();
 });
+
+it('renders the stored title in the table without an Untitled placeholder', function (): void {
+    $conversation = seedAdminConversation('Real conversation title');
+
+    livewire(ListAgentConversations::class)
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$conversation])
+        ->assertTableColumnStateSet('title', 'Real conversation title', record: $conversation)
+        ->assertDontSee('Untitled');
+});
+
+it('renders the stored title on the detail page without an Untitled placeholder', function (): void {
+    $conversation = seedAdminConversation('Detail page title');
+
+    livewire(ViewAgentConversation::class, ['record' => $conversation->getKey()])
+        ->assertSuccessful()
+        ->assertSee('Detail page title')
+        ->assertDontSee('Untitled');
+});

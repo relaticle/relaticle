@@ -31,6 +31,11 @@ final class GetCompanyTool extends BaseReadShowTool
         return 'Company';
     }
 
+    protected function citationType(): string
+    {
+        return 'company';
+    }
+
     protected function eagerLoad(): array
     {
         return [...parent::eagerLoad(), 'accountOwner'];
