@@ -205,25 +205,33 @@ final readonly class LinkEmailAction
     {
         $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
 
-        $values = [
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'updated_at' => now(),
+        // Raw, parameterised UPDATE: counters increment atomically (no lost updates
+        // under concurrent StoreEmailJob workers) and the timestamps use GREATEST so
+        // an older email linked after a newer one (out-of-order parallel backfill)
+        // never moves last_email_at backwards. Bindings keep the date out of the SQL
+        // string; the table/key come from model metadata, never user input.
+        $sets = [
+            'email_count = email_count + 1',
+            'inbound_email_count = inbound_email_count + ?',
+            'outbound_email_count = outbound_email_count + ?',
+            'updated_at = ?',
         ];
 
+        /** @var list<mixed> $bindings */
+        $bindings = [$isInbound ? 1 : 0, $isInbound ? 0 : 1, now()];
+
         if ($email->sent_at !== null) {
-            $sentAt = $email->sent_at->toDateTimeString();
-            $values['last_email_at'] = DB::raw("GREATEST(last_email_at, '{$sentAt}')");
-            $values['last_interaction_at'] = DB::raw("GREATEST(last_interaction_at, '{$sentAt}')");
+            $sets[] = 'last_email_at = GREATEST(last_email_at, ?)';
+            $sets[] = 'last_interaction_at = GREATEST(last_interaction_at, ?)';
+            $bindings[] = $email->sent_at;
+            $bindings[] = $email->sent_at;
         }
 
-        // Update through the query builder (targeting the row by primary key) so the
-        // raw GREATEST/increment expressions reach SQL untouched — passing an
-        // Expression through Eloquent's date casts would blow up. This also keeps
-        // the write quiet (no model events) like the previous updateQuietly call.
-        $record->newQueryWithoutScopes()
-            ->whereKey($record->getKey())
-            ->update($values);
+        $bindings[] = $record->getKey();
+
+        DB::update(
+            'update '.$record->getTable().' set '.implode(', ', $sets).' where '.$record->getKeyName().' = ?',
+            $bindings,
+        );
     }
 }

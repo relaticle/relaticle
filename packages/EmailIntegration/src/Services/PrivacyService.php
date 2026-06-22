@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\Team;
 use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
@@ -61,7 +62,16 @@ final class PrivacyService
             return $user->default_email_sharing_tier;
         }
 
-        return $user->currentTeam?->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+        // Resolve the team explicitly (instead of $user->currentTeam, whose accessor
+        // larastan types as never-null and which can auto-switch teams as a side
+        // effect) so the null case — a user without a current team — is handled.
+        $team = $user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null;
+
+        if ($team === null) {
+            return EmailPrivacyTier::METADATA_ONLY;
+        }
+
+        return $team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
     }
 
     /**
