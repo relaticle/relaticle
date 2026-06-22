@@ -85,7 +85,7 @@ final class EmailSignaturesPage extends Page
             ->where('user_id', auth()->id())
             ->where('team_id', filament()->getTenant()?->getKey())
             ->where('status', 'active')
-            ->orderBy('created_at')
+            ->oldest()
             ->get();
     }
 
