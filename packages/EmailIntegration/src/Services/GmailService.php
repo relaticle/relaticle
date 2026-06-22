@@ -160,6 +160,7 @@ final readonly class GmailService implements MailServiceInterface
      *     from_name?: string,
      *     in_reply_to?: string,
      *     thread_id?: string,
+     *     rfc_message_id?: string,
      * } $data
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
      */
