@@ -294,7 +294,7 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
 
     if ($domainsField) {
         expect($company->getCustomFieldValue($domainsField))
-            ->toContain('brandnewcorp.com')
+            ->toContain('www.brandnewcorp.com')
             ->not->toContain('https://');
     }
 
