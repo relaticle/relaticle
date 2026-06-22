@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -60,9 +61,16 @@ final readonly class SendEmailAction
         $scheduledFor = $this->resolveScheduledFor($data, $priority);
 
         return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId): Email {
+            // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives
+            // from a client-controlled hidden field and Email has no team global scope,
+            // so an unscoped lookup would let a user thread their outbound mail onto
+            // another tenant's email and leak its thread_id / rfc_message_id.
             /** @var Email|null $inReplyTo */
             $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()->whereKey($data['in_reply_to_email_id'])->first()
+                ? Email::query()
+                    ->where('team_id', $account->team_id)
+                    ->whereKey($data['in_reply_to_email_id'])
+                    ->first()
                 : null;
 
             /** @var Email $email */
@@ -70,7 +78,11 @@ final readonly class SendEmailAction
                 'team_id' => $account->team_id,
                 'user_id' => $account->user_id,
                 'connected_account_id' => $account->getKey(),
-                'rfc_message_id' => null,
+                // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
+                // header) so a retry that re-enters after the provider already
+                // delivered can find the sent message and adopt it instead of
+                // double-sending. See EmailSendingService::send().
+                'rfc_message_id' => $this->generateRfcMessageId($account),
                 'provider_message_id' => null,
                 'thread_id' => $inReplyTo?->thread_id,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
@@ -127,6 +139,17 @@ final readonly class SendEmailAction
 
             return $email;
         });
+    }
+
+    /**
+     * Build a globally-unique RFC 2822 Message-ID rooted at the sender's domain.
+     */
+    private function generateRfcMessageId(ConnectedAccount $account): string
+    {
+        $email = (string) $account->email_address;
+        $domain = str_contains($email, '@') ? Str::after($email, '@') : 'relaticle.app';
+
+        return '<'.Str::ulid().'@'.$domain.'>';
     }
 
     private function assertUnderMaxQueued(string $userId): void

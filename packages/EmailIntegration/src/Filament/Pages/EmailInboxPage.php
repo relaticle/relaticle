@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use App\Models\User;
-use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -53,6 +52,7 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class EmailInboxPage extends Page
 {

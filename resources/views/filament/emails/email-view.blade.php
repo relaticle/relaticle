@@ -1,8 +1,8 @@
 @php
-    use App\Support\EmailHtmlSanitizer;
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+    use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser = auth()->user();
 

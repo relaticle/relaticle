@@ -7,14 +7,13 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
-use Relaticle\EmailIntegration\Services\Factories\GmailServiceFactory;
-use Relaticle\EmailIntegration\Services\GmailService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final readonly class EmailAttachmentController
 {
     public function __construct(
-        private GmailServiceFactory $gmailServiceFactory,
+        private MailServiceFactoryInterface $mailServiceFactory,
     ) {}
 
     public function __invoke(Request $request, string $attachmentId): StreamedResponse
@@ -42,14 +41,15 @@ final readonly class EmailAttachmentController
         abort_if($connectedAccount === null, 404, 'Email account is no longer connected.');
 
         // File downloads may legitimately take longer than the default 30 s PHP limit —
-        // raise it before the Gmail API call so large attachments don't time out.
+        // raise it before the provider API call so large attachments don't time out.
         set_time_limit(120);
 
-        // Fetch the binary before streaming so any API/auth errors surface as proper HTTP responses
-        $gmailService = $this->gmailServiceFactory->make($connectedAccount);
-        assert($gmailService instanceof GmailService);
+        // Resolve the provider-appropriate mail service (Gmail or Microsoft Graph) and
+        // fetch the binary before streaming so any API/auth errors surface as proper
+        // HTTP responses rather than mid-stream failures.
+        $mailService = $this->mailServiceFactory->make($connectedAccount);
 
-        $binary = $gmailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
+        $binary = $mailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
 
         $filename = $attachment->filename ?? 'attachment';
 

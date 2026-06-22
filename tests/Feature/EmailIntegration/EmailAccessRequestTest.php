@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -17,7 +18,7 @@ use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ApproveEmailAccessRequestAction::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class);
+mutates(ApproveEmailAccessRequestAction::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class, RequestEmailAccessAction::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -278,5 +279,32 @@ describe('CancelEmailAccessRequestAction', function (): void {
             ->toThrow(HttpException::class);
 
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeTrue();
+    });
+});
+
+describe('RequestEmailAccessAction', function (): void {
+    it('creates a pending access request for a team member', function (): void {
+        $this->team->users()->attach($this->requester, ['role' => 'editor']);
+
+        Notification::fake();
+
+        $request = app(RequestEmailAccessAction::class)
+            ->execute($this->email, $this->requester, EmailPrivacyTier::FULL);
+
+        expect($request)->not->toBeNull()
+            ->and($request->status)->toBe(EmailAccessRequestStatus::PENDING)
+            ->and($request->owner_id)->toBe($this->owner->id);
+    });
+
+    it('aborts with 403 when the requester is not in the email\'s team', function (): void {
+        $outsider = User::factory()->withTeam()->create();
+
+        expect($outsider->current_team_id)->not->toBe($this->team->id);
+
+        expect(fn () => app(RequestEmailAccessAction::class)
+            ->execute($this->email, $outsider, EmailPrivacyTier::FULL))
+            ->toThrow(HttpException::class);
+
+        expect(EmailAccessRequest::query()->where('email_id', $this->email->getKey())->count())->toBe(0);
     });
 });

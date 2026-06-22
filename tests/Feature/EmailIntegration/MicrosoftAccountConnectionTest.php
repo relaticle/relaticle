@@ -54,3 +54,39 @@ it('stores an azure connected account and flips calendar capability when Graph c
 
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });
+
+it('makes the first connected account the default and leaves later connections non-default', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $connect = function (string $email) use ($user): ConnectedAccount {
+        $social = new SocialiteUser;
+        $social->id = "gmail-{$email}";
+        $social->email = $email;
+        $social->name = 'Demo';
+        $social->token = 'access-token';
+        $social->refreshToken = 'refresh-token';
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('google', $social);
+
+        $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('email_address', $email)
+            ->firstOrFail();
+    };
+
+    $first = $connect('first@example.com');
+    $second = $connect('second@example.com');
+
+    expect($first->refresh()->is_default)->toBeTrue()
+        ->and($second->refresh()->is_default)->toBeFalse();
+});

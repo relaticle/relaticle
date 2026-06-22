@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
@@ -61,7 +63,16 @@ final class PrivacyService
             return $user->default_email_sharing_tier;
         }
 
-        return $user->currentTeam->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+        // Resolve the team explicitly (instead of $user->currentTeam, whose accessor
+        // larastan types as never-null and which can auto-switch teams as a side
+        // effect) so the null case — a user without a current team — is handled.
+        $team = $user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null;
+
+        if ($team === null) {
+            return EmailPrivacyTier::METADATA_ONLY;
+        }
+
+        return $team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
     }
 
     /**
@@ -83,7 +94,9 @@ final class PrivacyService
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);
-            $domain = explode('@', $address)[1] ?? '';
+            // Take the host after the LAST '@' so addresses with multiple '@' are
+            // read by their real domain rather than the first label.
+            $domain = str_contains($address, '@') ? Str::afterLast($address, '@') : '';
 
             if (in_array($address, $protectedEmails, true)) {
                 return true;

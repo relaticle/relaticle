@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(EmailPrivacySettingsPage::class);
+mutates(EmailPrivacySettingsPage::class, UpdateTeamEmailPrivacySettingsAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -105,4 +107,32 @@ it('pre-fills protected_domains from existing ProtectedRecipient rows on mount',
 
     livewire(EmailPrivacySettingsPage::class)
         ->assertSet('protected_domains', ['acme.com']);
+});
+
+it('forbids a non-admin member from changing team privacy settings', function (): void {
+    $member = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    expect(fn () => resolve(UpdateTeamEmailPrivacySettingsAction::class)->execute(
+        $this->team,
+        $member,
+        EmailPrivacyTier::FULL,
+        [],
+        [],
+    ))->toThrow(HttpException::class);
+
+    expect($this->team->fresh()->default_email_sharing_tier)->not->toBe(EmailPrivacyTier::FULL);
+});
+
+it('allows an admin member to change team privacy settings', function (): void {
+    $admin = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($admin, ['role' => 'admin']);
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
+        ->callAction('save');
+
+    expect($this->team->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
 });

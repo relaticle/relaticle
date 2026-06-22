@@ -86,6 +86,28 @@ it('effectiveTier returns null when a participant matches a protected domain', f
     expect($tier)->toBeNull();
 });
 
+it('matches the protected domain by the host after the last @ for malformed addresses', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    ProtectedRecipient::factory()->domain('sensitive.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->owner->id,
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    // The real domain is the host after the LAST '@'. Reading the first label
+    // ("decoy.com") would wrongly expose this email.
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@decoy.com@sensitive.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBeNull();
+});
+
 it('effectiveTier returns null for internal emails', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
@@ -170,6 +192,17 @@ it('defaultTierForUser falls back to team default when user has no preference', 
     $tier = $this->service->defaultTierForUser($this->owner->fresh());
 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('defaultTierForUser returns metadata-only when the user has no current team', function (): void {
+    $orphan = User::factory()->create([
+        'current_team_id' => null,
+        'default_email_sharing_tier' => null,
+    ]);
+
+    $tier = $this->service->defaultTierForUser($orphan);
+
+    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
 it('effectiveTier owner access is not blocked by protected recipient', function (): void {

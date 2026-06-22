@@ -9,6 +9,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -33,6 +34,14 @@ final readonly class LinkEmailAction
 
         $team = $email->team;
 
+        // A single email can resolve to the same company/person/opportunity through
+        // multiple participants (e.g. two recipients at the same domain). Metrics
+        // must be counted once per email, so track which records were already
+        // incremented during this run.
+        $countedCompanies = [];
+        $countedPeople = [];
+        $countedOpportunities = [];
+
         foreach ($participants as $participant) {
             // 1. Try to match Company by email domain first, so the person can be born already linked.
             $company = null;
@@ -54,7 +63,11 @@ final readonly class LinkEmailAction
                 if ($company) {
                     $participant->update(['company_id' => $company->getKey()]);
                     $email->companies()->syncWithoutDetaching([$company->getKey()]);
-                    $this->updateCompanyMetrics($company, $email);
+
+                    if (! isset($countedCompanies[$company->getKey()])) {
+                        $countedCompanies[$company->getKey()] = true;
+                        $this->incrementEmailMetrics($company, $email);
+                    }
                 }
             }
 
@@ -81,7 +94,11 @@ final readonly class LinkEmailAction
             if ($person) {
                 $participant->update(['contact_id' => $person->getKey()]);
                 $email->people()->syncWithoutDetaching([$person->getKey()]);
-                $this->updatePersonMetrics($person, $email);
+
+                if (! isset($countedPeople[$person->getKey()])) {
+                    $countedPeople[$person->getKey()] = true;
+                    $this->incrementEmailMetrics($person, $email);
+                }
 
                 // Link to person's company if set.
                 if ($person->company_id) {
@@ -95,7 +112,11 @@ final readonly class LinkEmailAction
 
                 foreach ($opportunities as $opportunity) {
                     $email->opportunities()->syncWithoutDetaching([$opportunity->getKey()]);
-                    $this->updateOpportunityMetrics($opportunity, $email);
+
+                    if (! isset($countedOpportunities[$opportunity->getKey()])) {
+                        $countedOpportunities[$opportunity->getKey()] = true;
+                        $this->incrementEmailMetrics($opportunity, $email);
+                    }
                 }
             }
         }
@@ -171,42 +192,46 @@ final readonly class LinkEmailAction
         return '(^|["/.])'.preg_quote($domain).'(["/:]|$)';
     }
 
-    private function updatePersonMetrics(People $person, Email $email): void
+    /**
+     * Increment the shared email-interaction counters on a linked CRM record
+     * (People, Company, or Opportunity — all expose the same metric columns).
+     *
+     * Counters use atomic SQL increments so concurrent StoreEmailJob workers
+     * don't lose updates. The timestamps use GREATEST so an older email linked
+     * after a newer one (out-of-order parallel backfill) never moves
+     * last_email_at backwards.
+     */
+    private function incrementEmailMetrics(Model $record, Email $email): void
     {
         $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
 
-        $person->updateQuietly([
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
-    }
+        // Raw, parameterised UPDATE: counters increment atomically (no lost updates
+        // under concurrent StoreEmailJob workers) and the timestamps use GREATEST so
+        // an older email linked after a newer one (out-of-order parallel backfill)
+        // never moves last_email_at backwards. Bindings keep the date out of the SQL
+        // string; the table/key come from model metadata, never user input.
+        $sets = [
+            'email_count = email_count + 1',
+            'inbound_email_count = inbound_email_count + ?',
+            'outbound_email_count = outbound_email_count + ?',
+            'updated_at = ?',
+        ];
 
-    private function updateCompanyMetrics(Company $company, Email $email): void
-    {
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
+        /** @var list<mixed> $bindings */
+        $bindings = [$isInbound ? 1 : 0, $isInbound ? 0 : 1, now()];
 
-        $company->updateQuietly([
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
-    }
+        if ($email->sent_at !== null) {
+            $sets[] = 'last_email_at = GREATEST(last_email_at, ?)';
+            $sets[] = 'last_interaction_at = GREATEST(last_interaction_at, ?)';
+            $bindings[] = $email->sent_at;
+            $bindings[] = $email->sent_at;
+        }
 
-    private function updateOpportunityMetrics(Opportunity $opportunity, Email $email): void
-    {
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
+        $bindings[] = $record->getKey();
 
-        $opportunity->updateQuietly([
-            'email_count' => DB::raw('email_count + 1'),
-            'inbound_email_count' => $isInbound ? DB::raw('inbound_email_count + 1') : DB::raw('inbound_email_count'),
-            'outbound_email_count' => $isInbound ? DB::raw('outbound_email_count') : DB::raw('outbound_email_count + 1'),
-            'last_email_at' => $email->sent_at,
-            'last_interaction_at' => $email->sent_at,
-        ]);
+        DB::update(
+            'update '.$record->getTable().' set '.implode(', ', $sets).' where '.$record->getKeyName().' = ?',
+            $bindings,
+        );
     }
 }

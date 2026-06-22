@@ -29,6 +29,7 @@ final class ConnectedAccountFactory extends Factory
             'email_address' => $this->faker->unique()->safeEmail(),
             'display_name' => $this->faker->name(),
             'access_token' => 'fake-token',
+            'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
             'contact_creation_mode' => ContactCreationMode::None,
             'auto_create_companies' => false,
@@ -39,6 +40,13 @@ final class ConnectedAccountFactory extends Factory
     {
         return $this->state(fn (): array => [
             'provider' => EmailProvider::AZURE,
+        ]);
+    }
+
+    public function default(): static
+    {
+        return $this->state(fn (): array => [
+            'is_default' => true,
         ]);
     }
 
