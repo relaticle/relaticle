@@ -72,6 +72,26 @@ it('preselects the connected account when opening the create form', function ():
         ->assertSet('mountedActions.0.data.connected_account_id', $this->account->id);
 });
 
+it('preselects the default account, not merely the oldest, when opening the create form', function (): void {
+    // $this->account is the oldest. Add a newer account and mark it default.
+    $newer = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'default-account-id',
+        'email_address' => 'default@example.com',
+        'display_name' => 'Default Sender',
+        'is_default' => true,
+        'access_token' => 'fake-token-default',
+        'status' => EmailAccountStatus::ACTIVE,
+        'contact_creation_mode' => ContactCreationMode::None,
+    ]));
+
+    livewire(EmailSignaturesPage::class)
+        ->mountAction('createSignature')
+        ->assertSet('mountedActions.0.data.connected_account_id', $newer->id);
+});
+
 it('requires connected_account_id when creating a signature', function (): void {
     livewire(EmailSignaturesPage::class)
         ->callAction('createSignature', data: [
