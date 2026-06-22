@@ -61,9 +61,16 @@ final readonly class SendEmailAction
         $scheduledFor = $this->resolveScheduledFor($data, $priority);
 
         return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId): Email {
+            // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives
+            // from a client-controlled hidden field and Email has no team global scope,
+            // so an unscoped lookup would let a user thread their outbound mail onto
+            // another tenant's email and leak its thread_id / rfc_message_id.
             /** @var Email|null $inReplyTo */
             $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()->whereKey($data['in_reply_to_email_id'])->first()
+                ? Email::query()
+                    ->where('team_id', $account->team_id)
+                    ->whereKey($data['in_reply_to_email_id'])
+                    ->first()
                 : null;
 
             /** @var Email $email */

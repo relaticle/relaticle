@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Jobs\ClassifyEmailJob;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -18,6 +20,10 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 mutates(StoreEmailAction::class);
 
 beforeEach(function (): void {
+    // Email classification runs asynchronously via ClassifyEmailJob (it calls an
+    // LLM). Fake the queue so it is recorded rather than executed inline.
+    Queue::fake();
+
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
     $this->team = $this->user->currentTeam;
@@ -83,6 +89,15 @@ it('persists the email record with correct fields', function (): void {
         ->and($email->folder)->toBe(EmailFolder::Inbox)
         ->and($email->has_attachments)->toBeFalse()
         ->and($email->read_at)->toBeNull();
+});
+
+it('dispatches ClassifyEmailJob after storing the email', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    Queue::assertPushed(
+        ClassifyEmailJob::class,
+        fn (ClassifyEmailJob $job): bool => $job->emailId === $email->getKey()
+    );
 });
 
 it('sets read_at when isRead is true', function (): void {

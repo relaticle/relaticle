@@ -102,6 +102,29 @@ it('refreshes when token_expires_at is null', function (): void {
     Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'login.microsoftonline.com'));
 });
 
+it('fails with an auth-error marker instead of POSTing an empty refresh token', function (): void {
+    Http::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $account = ConnectedAccount::factory()
+        ->azure()
+        ->for($user)
+        ->create([
+            'team_id' => $user->currentTeam->getKey(),
+            'access_token' => 'expired-token',
+            'refresh_token' => null,
+            'token_expires_at' => now()->subMinute(),
+        ]);
+
+    // invalid_grant is recognised by DetectsAuthErrors, so the sync job flags the
+    // account for re-authentication rather than retrying to death.
+    expect(fn () => resolve(MicrosoftGraphClientFactory::class)->make($account))
+        ->toThrow(RuntimeException::class, 'invalid_grant');
+
+    // No token request is made when there is nothing to refresh with.
+    Http::assertNothingSent();
+});
+
 it('throws RuntimeException when the refresh endpoint returns an error', function (): void {
     Http::fake([
         'https://login.microsoftonline.com/*' => Http::response([
