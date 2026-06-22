@@ -173,7 +173,7 @@
             <div class="mt-16 max-w-4xl mx-auto">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach([
-                        ['ri-shield-check-line', '1,100+', 'Automated Tests'],
+                        ['ri-shield-check-line', '2,000+', 'Automated Tests'],
                         ['ri-robot-2-line', '30', 'MCP Tools'],
                         ['ri-stack-line', '22', 'Field Types'],
                         ['ri-lock-line', '5-Layer', 'Authorization'],
