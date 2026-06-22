@@ -4,7 +4,7 @@
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-    use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
+    use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser = auth()->user();
 
@@ -171,7 +171,7 @@
             <div class="w-full max-w-3xl rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-8 py-6 shadow-xs">
                 @if ($record->body?->body_html)
                     @php
-                        $safeHtml = app(HtmlSanitizerService::class)->sanitizeEmailBody($record->body->body_html);
+                        $safeHtml = EmailHtmlSanitizer::sanitize($record->body->body_html);
                     @endphp
                     <iframe
                         srcdoc="{{ $safeHtml }}"

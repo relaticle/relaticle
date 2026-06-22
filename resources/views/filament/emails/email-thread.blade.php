@@ -1,7 +1,7 @@
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
-    use Relaticle\EmailIntegration\Services\HtmlSanitizerService;
+    use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser    = auth()->user();
     $firstEmail  = $emails->first();
@@ -41,7 +41,7 @@
             $isOutbound     = $email->direction === EmailDirection::OUTBOUND;
 
             $safeHtml = $canViewBody && $email->body?->body_html
-                ? app(HtmlSanitizerService::class)->sanitizeEmailBody($email->body->body_html)
+                ? EmailHtmlSanitizer::sanitize($email->body->body_html)
                 : null;
         @endphp
 
