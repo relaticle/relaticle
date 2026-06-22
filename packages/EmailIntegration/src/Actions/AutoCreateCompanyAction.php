@@ -28,7 +28,7 @@ final readonly class AutoCreateCompanyAction
         $domainsField = $this->customFieldByCode('domains', $teamId);
 
         if ($domainsField instanceof BaseCustomField) {
-            $company->saveCustomFieldValue($domainsField, $domain, $team);
+            $company->saveCustomFieldValue($domainsField, $this->toWwwDomain($domain), $team);
         }
 
         // Seed the ICP toggle to false on creation so it renders as "No"
@@ -52,6 +52,15 @@ final readonly class AutoCreateCompanyAction
         $parts = explode('.', $domain);
 
         return ucfirst($parts[0]);
+    }
+
+    /**
+     * Prefix the bare domain with "www." for display, without a scheme,
+     * e.g. "acme.com" → "www.acme.com". Leaves an existing www. intact.
+     */
+    private function toWwwDomain(string $domain): string
+    {
+        return str_starts_with($domain, 'www.') ? $domain : "www.{$domain}";
     }
 
     private function customFieldByCode(string $code, string $teamId): ?BaseCustomField
