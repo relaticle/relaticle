@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
@@ -93,7 +94,9 @@ final class PrivacyService
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);
-            $domain = explode('@', $address)[1] ?? '';
+            // Take the host after the LAST '@' so addresses with multiple '@' are
+            // read by their real domain rather than the first label.
+            $domain = str_contains($address, '@') ? Str::afterLast($address, '@') : '';
 
             if (in_array($address, $protectedEmails, true)) {
                 return true;
