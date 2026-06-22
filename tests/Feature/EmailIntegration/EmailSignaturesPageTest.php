@@ -66,6 +66,12 @@ it('creates a signature and sends success notification', function (): void {
     expect(EmailSignature::where('name', 'Work Signature')->exists())->toBeTrue();
 });
 
+it('preselects the connected account when opening the create form', function (): void {
+    livewire(EmailSignaturesPage::class)
+        ->mountAction('createSignature')
+        ->assertSet('mountedActions.0.data.connected_account_id', $this->account->id);
+});
+
 it('requires connected_account_id when creating a signature', function (): void {
     livewire(EmailSignaturesPage::class)
         ->callAction('createSignature', data: [
