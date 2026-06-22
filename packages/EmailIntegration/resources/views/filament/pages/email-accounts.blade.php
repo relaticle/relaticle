@@ -12,6 +12,11 @@
                         <x-filament::badge :color="$account->status->getColor()">
                             {{ $account->status->getLabel() }}
                         </x-filament::badge>
+                        @if ($account->is_default)
+                            <x-filament::badge color="warning" icon="heroicon-s-star">
+                                {{ __('filament/pages/email-accounts.default_badge') }}
+                            </x-filament::badge>
+                        @endif
                     </div>
                     <div class="flex items-center gap-3">
                         @if ($account->last_synced_at)

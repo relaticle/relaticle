@@ -45,6 +45,20 @@ final readonly class ConnectAccountAction
                 $account->restore();
             }
 
+            // The first account a user connects becomes their default. This also
+            // re-promotes a fresh connection when a previous default was removed,
+            // so the user is never left without one.
+            $hasDefault = ConnectedAccount::query()
+                ->where('user_id', $data->userId)
+                ->where('team_id', $data->teamId)
+                ->where('is_default', true)
+                ->whereKeyNot($account->getKey())
+                ->exists();
+
+            if (! $hasDefault && ! $account->is_default) {
+                $account->update(['is_default' => true]);
+            }
+
             return $account;
         });
     }

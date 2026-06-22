@@ -70,6 +70,7 @@ trait HasEmailComposeActions
                     ->where('user_id', $this->getAuthenticatedUser()->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
+                    ->defaultFirst()
                     ->first();
 
                 if ($account === null) {
@@ -143,6 +144,7 @@ trait HasEmailComposeActions
                     ->where('user_id', $user->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
+                    ->defaultFirst()
                     ->first();
 
                 $toParticipants = match ($mode) {
@@ -586,6 +588,7 @@ trait HasEmailComposeActions
                 ->where('user_id', $this->getAuthenticatedUser()->getKey())
                 ->where('team_id', filament()->getTenant()?->getKey())
                 ->where('status', 'active')
+                ->defaultFirst()
                 ->value('id');
         }
 
@@ -608,6 +611,7 @@ trait HasEmailComposeActions
             ->where('user_id', $this->getAuthenticatedUser()->getKey())
             ->where('team_id', filament()->getTenant()?->getKey())
             ->where('status', 'active')
+            ->defaultFirst()
             ->get()
             ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
             ->all();
