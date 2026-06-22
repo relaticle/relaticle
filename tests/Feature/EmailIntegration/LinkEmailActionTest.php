@@ -263,6 +263,46 @@ it('auto-creates a company when auto_create_companies is true', function (): voi
     expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->exists())->toBeTrue();
 });
 
+it('seeds an auto-created company with a protocol-less domain and ICP set to false', function (): void {
+    $this->account->update(['auto_create_companies' => true]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'contact@brandnewcorp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    $company = Company::where('team_id', $this->team->id)
+        ->where('name', 'Brandnewcorp')
+        ->with('customFieldValues.customField')
+        ->firstOrFail();
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    $icpField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'icp')
+        ->first();
+
+    if ($domainsField) {
+        expect($company->getCustomFieldValue($domainsField))
+            ->toContain('www.brandnewcorp.com')
+            ->not->toContain('https://');
+    }
+
+    if ($icpField) {
+        expect($company->getCustomFieldValue($icpField))->toBeFalse();
+    }
+});
+
 it('does not auto-create a person when contact_creation_mode is None', function (): void {
     $countBefore = People::where('team_id', $this->team->id)->count();
 
