@@ -277,6 +277,7 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
 
     $company = Company::where('team_id', $this->team->id)
         ->where('name', 'Brandnewcorp')
+        ->with('customFieldValues.customField')
         ->firstOrFail();
 
     $domainsField = CustomField::query()
