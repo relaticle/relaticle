@@ -13,6 +13,6 @@ file_include_globs = ".env"
 # https://<workspace-name>.test — keep the site, .env, and preview aligned.
 # bin/setup-workspace.sh falls back to the folder name when the var is unset
 # (Polyscope), so that orchestrator's folder-based behavior is unchanged.
-setup = 'herd link "$CONDUCTOR_WORKSPACE_NAME" && herd secure "$CONDUCTOR_WORKSPACE_NAME" && bin/setup-workspace.sh'
-archive = 'herd unsecure "$CONDUCTOR_WORKSPACE_NAME" && herd unlink "$CONDUCTOR_WORKSPACE_NAME"'
-run = 'open "https://$CONDUCTOR_WORKSPACE_NAME.test"'
+setup = 'bin/setup-workspace.sh'
+archive = 'bin/run.sh'
+run = 'bin/archive.sh'

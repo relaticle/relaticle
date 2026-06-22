@@ -1,50 +1,25 @@
-#!/usr/bin/env bash
-# Bootstrap a parallel workspace (Polyscope or Conductor): install dependencies
-# and point .env at the workspace's own hostname. Both orchestrators copy a
-# working `.env` from the base checkout and run this from the workspace dir.
-#
-# - Polyscope copy-on-write clones the base repo (vendor/, node_modules/, .env
-#   copied), so composer/npm below are fast refreshes.
-# - Conductor creates a git worktree and copies only `.env`, so composer/npm
-#   below do full installs of the absent vendor/ and node_modules/.
-#
-# The database stays shared across workspaces. We rewrite APP_URL and
-# SESSION_DOMAIN so absolute URLs and session cookies match `<workspace>.test`,
-# and blank APP_PANEL_DOMAIN and SYSADMIN_DOMAIN so both panels serve path-based
-# at `<workspace>.test/app` and `<workspace>.test/sysadmin` — the copied
-# `*.relaticle.test` values would route to the base checkout, not the workspace.
-#
-# Mac-only: uses BSD sed (`sed -i ''`). Both orchestrators are macOS-only.
+#!/bin/zsh
 
-set -euo pipefail
+# Conductor Environment Variables:
+# CONDUCTOR_WORKSPACE_NAME - Workspace name
+# CONDUCTOR_WORKSPACE_PATH - Workspace path
+# CONDUCTOR_ROOT_PATH      - Path to the main repo root
+# CONDUCTOR_DEFAULT_BRANCH - Default branch name
+# CONDUCTOR_PORT           - First of 10 reserved ports
 
-# Conductor previews/links by workspace name; Polyscope works off the folder
-# (and clones into a folder named after the workspace, so they match). Prefer
-# CONDUCTOR_WORKSPACE_NAME when present, fall back to the folder basename.
-WORKSPACE="${CONDUCTOR_WORKSPACE_NAME:-$(basename "$PWD")}"
-WORKSPACE_HOST="${WORKSPACE}.test"
+# Register this worktree as a Herd site (creates http://WORKSPACE.test)
+herd link ${CONDUCTOR_WORKSPACE_NAME}
 
-if [[ ! -f .env ]]; then
-    echo "✗ .env not found in $(pwd)" >&2
-    exit 1
-fi
+# Pin PHP version so it doesn't depend on your global Herd setting
+herd isolate 8.3 --site="${CONDUCTOR_WORKSPACE_NAME}"
 
-echo "→ Refreshing PHP dependencies"
-composer install --no-interaction --prefer-dist
+# Symlink .env from the main repo — every worktree shares the same config.
+# ln -sf won't fail if the target doesn't exist yet (creates a dangling symlink).
+ln -sf "${CONDUCTOR_ROOT_PATH}/.env" .env
 
-echo "→ Refreshing JS dependencies"
-npm ci
-
-echo "→ Pointing .env at ${WORKSPACE_HOST}"
-sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
-sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${WORKSPACE_HOST}|" .env
-sed -i '' "s|^APP_PANEL_DOMAIN=.*|APP_PANEL_DOMAIN=|" .env
-sed -i '' "s|^SYSADMIN_DOMAIN=.*|SYSADMIN_DOMAIN=|" .env
-
-php artisan config:clear --no-interaction
-php artisan route:clear --no-interaction
-
-echo "→ Building frontend assets"
-npm run build
-
-echo "✓ Workspace ready: https://${WORKSPACE_HOST} (app panel at /app, sysadmin at /sysadmin)"
+# Install dependencies
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+nvm use
+herd composer install
+npm install
