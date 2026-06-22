@@ -25,10 +25,20 @@ final readonly class AutoCreateCompanyAction
                 'creation_source' => CreationSource::SYSTEM,
             ]);
 
-        $domainsField = $this->customFieldByCode($teamId);
+        $domainsField = $this->customFieldByCode('domains', $teamId);
 
         if ($domainsField instanceof BaseCustomField) {
-            $company->saveCustomFieldValue($domainsField, "https://{$domain}", $team);
+            $company->saveCustomFieldValue($domainsField, $domain, $team);
+        }
+
+        // Seed the ICP toggle to false on creation so it renders as "No"
+        // rather than an empty/null cell. Existing companies keep their value.
+        if ($company->wasRecentlyCreated) {
+            $icpField = $this->customFieldByCode('icp', $teamId);
+
+            if ($icpField instanceof BaseCustomField) {
+                $company->saveCustomFieldValue($icpField, false, $team);
+            }
         }
 
         return $company;
@@ -44,10 +54,10 @@ final readonly class AutoCreateCompanyAction
         return ucfirst($parts[0]);
     }
 
-    private function customFieldByCode(string $teamId): ?BaseCustomField
+    private function customFieldByCode(string $code, string $teamId): ?BaseCustomField
     {
         return CustomField::query()
-            ->where('code', 'domains')
+            ->where('code', $code)
             ->where('entity_type', 'company')
             ->where('tenant_id', $teamId)
             ->first();
