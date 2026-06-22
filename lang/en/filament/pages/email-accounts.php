@@ -10,6 +10,7 @@ return [
         'manage' => 'Manage',
         're_auth' => 'Re-authenticate',
         'edit_settings' => 'Settings',
+        'set_default' => 'Set as default',
         'disconnect' => 'Disconnect',
         'sync_calendar' => [
             'enable_label' => 'Sync calendar',
@@ -61,5 +62,10 @@ return [
             'title' => 'Account disconnected.',
             'body' => 'The account and its signatures have been removed.',
         ],
+        'default_set' => [
+            'title' => 'Default account updated.',
+            'body' => ':email is now your default sending account.',
+        ],
     ],
+    'default_badge' => 'Default',
 ];

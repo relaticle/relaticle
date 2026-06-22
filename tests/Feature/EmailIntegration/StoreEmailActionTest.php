@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Jobs\ClassifyEmailJob;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -18,6 +20,10 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 mutates(StoreEmailAction::class);
 
 beforeEach(function (): void {
+    // Email classification runs asynchronously via ClassifyEmailJob (it calls an
+    // LLM). Fake the queue so it is recorded rather than executed inline.
+    Queue::fake();
+
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
     $this->team = $this->user->currentTeam;
@@ -83,6 +89,15 @@ it('persists the email record with correct fields', function (): void {
         ->and($email->folder)->toBe(EmailFolder::Inbox)
         ->and($email->has_attachments)->toBeFalse()
         ->and($email->read_at)->toBeNull();
+});
+
+it('dispatches ClassifyEmailJob after storing the email', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    Queue::assertPushed(
+        ClassifyEmailJob::class,
+        fn (ClassifyEmailJob $job): bool => $job->emailId === $email->getKey()
+    );
 });
 
 it('sets read_at when isRead is true', function (): void {
@@ -152,12 +167,34 @@ it('creates email attachments', function (): void {
 });
 
 it('marks email as internal when all participants are team members', function (): void {
-    $teamMember = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teamMember = User::factory()->create();
+    $this->team->users()->attach($teamMember, ['role' => 'editor']);
 
     $data = makeFetchedEmailData([
         'participants' => [
             ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'from'],
             ['email_address' => $teamMember->email, 'name' => 'Team Member', 'role' => 'to'],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    expect($email->is_internal)->toBeTrue();
+});
+
+it('treats a member as internal even when their active team is a different team', function (): void {
+    // Membership in THIS team, but their current_team_id points at another team.
+    // Keying internal-detection off current_team_id (instead of membership) would
+    // wrongly classify the email as external and leak it to other members.
+    $otherTeamMember = User::factory()->withTeam()->create();
+    $this->team->users()->attach($otherTeamMember, ['role' => 'editor']);
+
+    expect($otherTeamMember->current_team_id)->not->toBe($this->team->id);
+
+    $data = makeFetchedEmailData([
+        'participants' => [
+            ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'from'],
+            ['email_address' => $otherTeamMember->email, 'name' => 'Member', 'role' => 'to'],
         ],
     ]);
 

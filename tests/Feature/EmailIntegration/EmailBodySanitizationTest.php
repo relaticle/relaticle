@@ -6,13 +6,13 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
-use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 mutates(EmailHtmlSanitizer::class);
 

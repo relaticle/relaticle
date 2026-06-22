@@ -27,6 +27,16 @@ final readonly class MicrosoftGraphClientFactory
             return;
         }
 
+        // No refresh token means the account can never silently re-mint an access
+        // token. Fail with an auth-error marker (DetectsAuthErrors recognises
+        // "invalid_grant") so the sync job flags the account for re-authentication
+        // instead of POSTing an empty refresh_token and retrying to death.
+        throw_if(
+            blank($account->refresh_token),
+            RuntimeException::class,
+            'Microsoft token refresh failed: invalid_grant (no refresh token stored; account must re-authenticate)'
+        );
+
         $tenant = (string) (config('services.azure.tenant') ?: 'common');
 
         $response = Http::asForm()->post(

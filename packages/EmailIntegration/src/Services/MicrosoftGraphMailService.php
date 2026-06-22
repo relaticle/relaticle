@@ -13,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
+use RuntimeException;
 
 final class MicrosoftGraphMailService implements MailServiceInterface
 {
@@ -145,22 +146,26 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     public function sendMessage(array $data): array
     {
-        $payload = [
-            'message' => [
-                'subject' => $data['subject'],
-                'body' => [
-                    'contentType' => 'HTML',
-                    'content' => $data['body_html'],
-                ],
-                'toRecipients' => $this->formatRecipients($data['to']),
-                'ccRecipients' => $this->formatRecipients($data['cc'] ?? []),
-                'bccRecipients' => $this->formatRecipients($data['bcc'] ?? []),
+        $message = [
+            'subject' => $data['subject'],
+            'body' => [
+                'contentType' => 'HTML',
+                'content' => $data['body_html'],
             ],
-            'saveToSentItems' => true,
+            'toRecipients' => $this->formatRecipients($data['to']),
+            'ccRecipients' => $this->formatRecipients($data['cc'] ?? []),
+            'bccRecipients' => $this->formatRecipients($data['bcc'] ?? []),
         ];
 
+        // Best-effort: ask Graph to use our Message-ID so a retry can reconcile via
+        // findSentMessage(). Graph may override it on /me/sendMail, in which case
+        // retry de-duplication degrades to the synthetic id below.
+        if (isset($data['rfc_message_id'])) {
+            $message['internetMessageId'] = $data['rfc_message_id'];
+        }
+
         $this->clientFactory->make($this->account)
-            ->post('/me/sendMail', $payload)
+            ->post('/me/sendMail', ['message' => $message, 'saveToSentItems' => true])
             ->throw();
 
         // Graph /me/sendMail returns 202 with no body. Synthesize ids; the next
@@ -170,8 +175,48 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         return [
             'provider_message_id' => "ms-pending-{$synthetic}",
             'thread_id' => "ms-pending-thread-{$synthetic}",
-            'rfc_message_id' => "<{$synthetic}@graph.microsoft.com>",
+            'rfc_message_id' => $data['rfc_message_id'] ?? "<{$synthetic}@graph.microsoft.com>",
         ];
+    }
+
+    public function findSentMessage(string $rfcMessageId): ?array
+    {
+        $escaped = str_replace("'", "''", $rfcMessageId);
+
+        $message = $this->clientFactory->make($this->account)
+            ->get('/me/messages', [
+                '$filter' => "internetMessageId eq '{$escaped}'",
+                '$select' => 'id,conversationId,internetMessageId',
+                '$top' => 1,
+            ])
+            ->throw()
+            ->json('value.0');
+
+        if (! is_array($message) || ! isset($message['id'])) {
+            return null;
+        }
+
+        return [
+            'provider_message_id' => (string) $message['id'],
+            'thread_id' => (string) ($message['conversationId'] ?? ''),
+            'rfc_message_id' => (string) ($message['internetMessageId'] ?? $rfcMessageId),
+        ];
+    }
+
+    public function downloadAttachment(string $providerMessageId, string $providerAttachmentId): string
+    {
+        $attachment = $this->clientFactory->make($this->account)
+            ->get("/me/messages/{$providerMessageId}/attachments/{$providerAttachmentId}")
+            ->throw()
+            ->json();
+
+        // Only fileAttachment carries inline bytes; itemAttachment / referenceAttachment
+        // have no contentBytes and cannot be streamed as a binary download.
+        $contentBytes = $attachment['contentBytes'] ?? null;
+
+        throw_if(! is_string($contentBytes) || $contentBytes === '', RuntimeException::class, 'Attachment is not available for download.');
+
+        return (string) base64_decode($contentBytes, strict: true);
     }
 
     /**

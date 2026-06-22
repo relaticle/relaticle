@@ -11,6 +11,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
 final readonly class EmailSendingService
 {
@@ -23,8 +24,31 @@ final readonly class EmailSendingService
      */
     public function send(Email $email): Email
     {
-        $providerData = $this->dispatchToProvider($email);
+        $service = $this->mailFactory->make($email->connectedAccount);
 
+        // Retry reconciliation: a prior attempt may have delivered to the provider
+        // before its result was persisted (process killed between the network call
+        // and the DB write). Re-sending would double-deliver, so first look the
+        // message up by the Message-ID we stamped at queue time and adopt it if the
+        // provider already has it.
+        if ($email->attempts > 1 && $email->rfc_message_id !== null) {
+            $existing = $service->findSentMessage($email->rfc_message_id);
+
+            if ($existing !== null) {
+                return $this->finalizeSentEmail($email, $existing);
+            }
+        }
+
+        $providerData = $this->dispatchToProvider($email, $service);
+
+        return $this->finalizeSentEmail($email, $providerData);
+    }
+
+    /**
+     * @param  array{provider_message_id: string, thread_id: string, rfc_message_id: string}  $providerData
+     */
+    private function finalizeSentEmail(Email $email, array $providerData): Email
+    {
         $email = $this->updateSentEmail($email, $providerData);
 
         if ($email->thread_id !== null) {
@@ -37,15 +61,13 @@ final readonly class EmailSendingService
     /**
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
      */
-    private function dispatchToProvider(Email $email): array
+    private function dispatchToProvider(Email $email, MailServiceInterface $service): array
     {
         /** @var ConnectedAccount $account */
         $account = $email->connectedAccount;
 
         /** @var EmailBody|null $body */
         $body = $email->body;
-
-        $service = $this->mailFactory->make($account);
 
         $participants = $email->participants;
 
@@ -70,6 +92,10 @@ final readonly class EmailSendingService
                 ->all(),
             'from_name' => $account->display_name,
         ];
+
+        if ($email->rfc_message_id !== null) {
+            $payload['rfc_message_id'] = $email->rfc_message_id;
+        }
 
         if ($email->in_reply_to !== null) {
             $payload['in_reply_to'] = (string) $email->in_reply_to;

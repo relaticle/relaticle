@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
+use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -62,7 +63,7 @@ final class EmailAccountsPage extends Page
      */
     private function getAccounts(): Collection
     {
-        return $this->ownedAccountsQuery()->get();
+        return $this->ownedAccountsQuery()->defaultFirst()->get();
     }
 
     public function connectGmailAction(): Action
@@ -246,6 +247,31 @@ final class EmailAccountsPage extends Page
         return ConnectedAccount::query()->ownedBy($user, $team);
     }
 
+    public function setDefaultAction(): Action
+    {
+        return Action::make('setDefault')
+            ->label(__('filament/pages/email-accounts.actions.set_default'))
+            ->icon('heroicon-o-star')
+            ->color('warning')
+            ->size(Size::Small)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments)?->is_default === false)
+            ->action(function (array $arguments): void {
+                $account = $this->findOwnedAccountOrFail($arguments);
+
+                resolve(SetDefaultConnectedAccountAction::class)->execute($account);
+
+                $this->connectedAccounts = $this->getAccounts();
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-accounts.notifications.default_set.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.default_set.body', [
+                        'email' => $account->email_address,
+                    ]))
+                    ->send();
+            });
+    }
+
     public function disconnectAction(): Action
     {
         return Action::make('disconnect')
@@ -280,6 +306,7 @@ final class EmailAccountsPage extends Page
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
+            ($this->setDefaultAction())($arguments),
             ($this->reAuthAction())($arguments)
                 ->visible(in_array($account->status, [
                     EmailAccountStatus::REAUTH_REQUIRED,

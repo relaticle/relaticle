@@ -54,7 +54,51 @@ it('persists a queued Email row for the outbox', function (): void {
         ->and($email->direction)->toBe(EmailDirection::OUTBOUND)
         ->and($email->connected_account_id)->toBe($this->account->id)
         ->and($email->subject)->toBe('Hello World')
-        ->and($email->batch_id)->toBeNull();
+        ->and($email->batch_id)->toBeNull()
+        // A stable Message-ID is stamped at queue time for retry de-duplication.
+        ->and($email->rfc_message_id)->toMatch('/^<[0-9A-Za-z]+@.+>$/');
+});
+
+it('ignores an in_reply_to_email_id that belongs to another team', function (): void {
+    // An email owned by a different tenant, with its own active connected account so
+    // it is not filtered out by the ActiveAccountScope — only the team_id scope on
+    // the reply lookup should exclude it.
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $otherUser->currentTeam->getKey(),
+        'user_id' => $otherUser->getKey(),
+    ]));
+    $foreignEmail = Email::query()->create([
+        'team_id' => $otherUser->currentTeam->getKey(),
+        'user_id' => $otherUser->getKey(),
+        'connected_account_id' => $otherAccount->getKey(),
+        'rfc_message_id' => '<secret@other-team.com>',
+        'provider_message_id' => 'provider-foreign',
+        'thread_id' => 'foreign-thread-id',
+        'subject' => 'Confidential',
+        'snippet' => 'secret',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'status' => EmailStatus::SENT,
+    ]);
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: nothing',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => $foreignEmail->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    // The foreign thread_id / rfc_message_id must not leak into this tenant's email.
+    expect($email->thread_id)->toBeNull()
+        ->and($email->in_reply_to)->toBeNull();
 });
 
 it('syncs the email thread aggregate when an outbound reply is sent', function (): void {

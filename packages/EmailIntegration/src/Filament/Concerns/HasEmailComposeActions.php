@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\User;
-use App\Support\EmailHtmlSanitizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
@@ -38,6 +37,7 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use RuntimeException;
 
 trait HasEmailComposeActions
@@ -70,6 +70,7 @@ trait HasEmailComposeActions
                     ->where('user_id', $this->getAuthenticatedUser()->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
+                    ->defaultFirst()
                     ->first();
 
                 if ($account === null) {
@@ -143,6 +144,7 @@ trait HasEmailComposeActions
                     ->where('user_id', $user->getKey())
                     ->where('team_id', filament()->getTenant()?->getKey())
                     ->where('status', 'active')
+                    ->defaultFirst()
                     ->first();
 
                 $toParticipants = match ($mode) {
@@ -586,6 +588,7 @@ trait HasEmailComposeActions
                 ->where('user_id', $this->getAuthenticatedUser()->getKey())
                 ->where('team_id', filament()->getTenant()?->getKey())
                 ->where('status', 'active')
+                ->defaultFirst()
                 ->value('id');
         }
 
@@ -608,6 +611,7 @@ trait HasEmailComposeActions
             ->where('user_id', $this->getAuthenticatedUser()->getKey())
             ->where('team_id', filament()->getTenant()?->getKey())
             ->where('status', 'active')
+            ->defaultFirst()
             ->get()
             ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
             ->all();

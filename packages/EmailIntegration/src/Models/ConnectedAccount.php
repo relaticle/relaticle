@@ -33,6 +33,7 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property string $provider_account_id
  * @property string $email_address
  * @property string|null $display_name
+ * @property bool $is_default
  * @property string $access_token
  * @property string|null $refresh_token
  * @property Carbon|null $token_expires_at
@@ -61,6 +62,7 @@ final class ConnectedAccount extends Model
         'provider_account_id',
         'email_address',
         'display_name',
+        'is_default',
         'access_token',
         'refresh_token',
         'token_expires_at',
@@ -85,6 +87,7 @@ final class ConnectedAccount extends Model
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'last_calendar_synced_at' => 'datetime',
+        'is_default' => 'boolean',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
         'contact_creation_mode' => ContactCreationMode::class,
@@ -122,6 +125,19 @@ final class ConnectedAccount extends Model
     protected function active(Builder $query): Builder
     {
         return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
+    /**
+     * Scope ordering the user's default account ahead of the rest, so callers that
+     * pick a single sending account (compose, reply) land on the default first.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function defaultFirst(Builder $query): Builder
+    {
+        return $query->orderByDesc('is_default')->oldest();
     }
 
     // Relations

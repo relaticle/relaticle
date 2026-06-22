@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support;
+namespace Relaticle\EmailIntegration\Support;
 
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
@@ -14,7 +14,8 @@ final readonly class EmailHtmlSanitizer
      *
      * Strips scripts, inline event handlers (onerror, onload, ...),
      * `javascript:` URLs, and unsafe elements that a regex filter cannot
-     * reliably catch.
+     * reliably catch, while preserving the presentational attributes/elements
+     * that real-world email layouts depend on.
      */
     public static function sanitize(?string $html): ?string
     {
