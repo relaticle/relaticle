@@ -76,6 +76,19 @@ final class EmailSignaturesPage extends Page
             ->where('user_id', auth()->id());
     }
 
+    /**
+     * @return Collection<int, ConnectedAccount>
+     */
+    private function activeAccounts(): Collection
+    {
+        return ConnectedAccount::query()
+            ->where('user_id', auth()->id())
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->active()
+            ->defaultFirst()
+            ->get();
+    }
+
     private function findOwnedAccount(string $id): ConnectedAccount
     {
         /** @var ConnectedAccount */
@@ -95,16 +108,13 @@ final class EmailSignaturesPage extends Page
             ->schema([
                 Select::make('connected_account_id')
                     ->label(__('filament/pages/email-signatures.fields.connected_account'))
-                    ->options(fn (): array => ConnectedAccount::query()
-                        ->where('user_id', auth()->id())
-                        ->where('team_id', filament()->getTenant()?->getKey())
-                        ->where('status', 'active')
-                        ->get()
+                    ->options(fn (): array => $this->activeAccounts()
                         ->mapWithKeys(fn (ConnectedAccount $account): array => [
                             $account->getKey() => $account->label,
                         ])
                         ->all()
                     )
+                    ->default(fn (): ?string => $this->activeAccounts()->first()?->getKey())
                     ->required(),
 
                 TextInput::make('name')
