@@ -84,8 +84,8 @@ final class EmailSignaturesPage extends Page
         return ConnectedAccount::query()
             ->where('user_id', auth()->id())
             ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->oldest()
+            ->active()
+            ->defaultFirst()
             ->get();
     }
 
