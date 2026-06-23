@@ -8,6 +8,7 @@ return [
         'description' => 'Overrides the workspace default for emails you sync. Set to blank to use the workspace default.',
         'tier_label' => 'Default sharing tier',
         'use_workspace_default' => 'Use workspace default',
+        'workspace_default_hint' => 'Workspace default: :tier',
     ],
     'blocklist' => [
         'heading' => 'Blocked Addresses & Domains',

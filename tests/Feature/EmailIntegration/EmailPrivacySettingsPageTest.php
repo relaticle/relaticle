@@ -136,3 +136,25 @@ it('allows an admin member to change team privacy settings', function (): void {
 
     expect($this->team->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
 });
+
+it('grants the team owner access to the workspace privacy page', function (): void {
+    expect(EmailPrivacySettingsPage::canAccess())->toBeTrue();
+});
+
+it('grants an admin member access to the workspace privacy page', function (): void {
+    $admin = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($admin, ['role' => 'admin']);
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    expect(EmailPrivacySettingsPage::canAccess())->toBeTrue();
+});
+
+it('denies a non-admin member access to the workspace privacy page', function (): void {
+    $member = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->actingAs($member);
+    Filament::setTenant($this->team);
+
+    expect(EmailPrivacySettingsPage::canAccess())->toBeFalse();
+});
