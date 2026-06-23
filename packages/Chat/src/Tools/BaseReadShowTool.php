@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 
 abstract class BaseReadShowTool implements Tool
 {
@@ -20,6 +21,8 @@ abstract class BaseReadShowTool implements Tool
     abstract protected function resourceClass(): string;
 
     abstract protected function entityLabel(): string;
+
+    abstract protected function citationType(): string;
 
     abstract public function description(): string;
 
@@ -65,8 +68,11 @@ abstract class BaseReadShowTool implements Tool
 
         $payload = new $resourceClass($model)->resolve();
 
+        $id = (string) $model->getKey();
+        $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
+
         return (string) json_encode(
-            array_merge($payload, $this->extraPayload($model)),
+            array_merge($payload, $this->extraPayload($model), ['url' => $ref['url'] ?? null]),
             JSON_PRETTY_PRINT,
         );
     }

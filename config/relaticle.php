@@ -29,6 +29,7 @@ return [
         'social_auth' => (bool) env('RELATICLE_FEATURE_SOCIAL_AUTH', true),
         'documentation' => (bool) env('RELATICLE_FEATURE_DOCUMENTATION', true),
         'email_integration' => (bool) env('RELATICLE_FEATURE_EMAIL_INTEGRATION', false),
+        'support_menu' => (bool) env('RELATICLE_FEATURE_SUPPORT_MENU', false),
     ],
 
 ];

@@ -1,0 +1,18 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Conductor creates each workspace as a git worktree and copies the untracked
+# `.env` from the base checkout (the tracked `.env.*` files come with the
+# worktree). Pin the copy pattern so it does not depend on the per-user default.
+file_include_globs = ".env"
+
+[scripts]
+# Link + secure the Herd site, then install deps and point .env at this
+# workspace's hostname. Scripts run from the workspace dir. We key the Herd
+# site off CONDUCTOR_WORKSPACE_NAME (the branch-derived workspace name) rather
+# than the folder basename, because Conductor's in-app preview opens
+# https://<workspace-name>.test — keep the site, .env, and preview aligned.
+# bin/setup-workspace.sh falls back to the folder name when the var is unset
+# (Polyscope), so that orchestrator's folder-based behavior is unchanged.
+setup = 'herd link "$CONDUCTOR_WORKSPACE_NAME" && herd secure "$CONDUCTOR_WORKSPACE_NAME" && bin/setup-workspace.sh'
+archive = 'herd unsecure "$CONDUCTOR_WORKSPACE_NAME" && herd unlink "$CONDUCTOR_WORKSPACE_NAME"'
+run = 'open "https://$CONDUCTOR_WORKSPACE_NAME.test"'

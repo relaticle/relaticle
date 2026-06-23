@@ -62,6 +62,22 @@ it('returns matching companies for current team only', function (): void {
         ->and($companies->first()['name'])->toBe('Acme Inc');
 });
 
+it('includes a resolved record url for each result', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
+
+    $data = collect(
+        $this->getJson(route('chat.mentions', ['q' => 'Acme']))
+            ->assertOk()
+            ->json('data')
+    );
+
+    $match = $data->firstWhere('type', 'company');
+
+    expect($match)->not->toBeNull()
+        ->and($match['url'])->toBeString()
+        ->and($match['url'])->toContain((string) $company->id);
+});
+
 it('applies rate limiting', function (): void {
     for ($i = 0; $i < 60; $i++) {
         $response = $this->getJson(route('chat.mentions', ['q' => 'test']));

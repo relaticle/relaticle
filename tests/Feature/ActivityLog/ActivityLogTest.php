@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Activity;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
