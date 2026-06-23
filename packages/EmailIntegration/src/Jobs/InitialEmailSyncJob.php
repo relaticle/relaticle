@@ -68,6 +68,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         Bus::batch($jobs)
             ->name("Initial sync: {$account->email_address}")
+            ->onQueue('emails-sync')
             ->allowFailures()
             ->dispatch();
     }
