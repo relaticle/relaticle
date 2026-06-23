@@ -113,7 +113,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             $attendees[] = [
                 'email' => $attendeeEmail,
                 'name' => $attendee['emailAddress']['name'] ?? null,
-                'response_status' => $attendee['status']['response'] ?? null,
+                'response_status' => $this->mapResponseStatus($attendee['status']['response'] ?? null),
                 'is_organizer' => $organizerEmail !== null
                     && strtolower((string) $organizerEmail) === $attendeeEmail,
             ];
@@ -131,10 +131,44 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             location: $event['location']['displayName'] ?? null,
             htmlLink: $event['webLink'] ?? null,
             status: ($event['isCancelled'] ?? false) ? 'cancelled' : 'confirmed',
-            visibility: $event['sensitivity'] ?? null,
+            visibility: $this->mapSensitivity($event['sensitivity'] ?? null),
             organizerEmail: $organizerEmail,
             organizerName: $event['organizer']['emailAddress']['name'] ?? null,
             attendees: $attendees,
         );
+    }
+
+    /**
+     * Translate Microsoft Graph attendee response codes into the canonical
+     * AttendeeResponseStatus vocabulary (Google's), so downstream tryFrom() resolves.
+     * Graph emits: none, organizer, tentativelyAccepted, accepted, declined, notResponded.
+     */
+    private function mapResponseStatus(?string $response): ?string
+    {
+        return match ($response) {
+            'accepted' => 'accepted',
+            'declined' => 'declined',
+            'tentativelyAccepted' => 'tentative',
+            // The organizer implicitly accepts their own meeting.
+            'organizer' => 'accepted',
+            'none', 'notResponded' => 'needsAction',
+            default => null,
+        };
+    }
+
+    /**
+     * Translate Microsoft Graph sensitivity into the canonical CalendarVisibility
+     * vocabulary. Graph emits: normal, personal, private, confidential. 'personal'
+     * must map to private so personal events are treated as private (and skipped),
+     * not silently exposed as the public DEFAULT.
+     */
+    private function mapSensitivity(?string $sensitivity): ?string
+    {
+        return match ($sensitivity) {
+            'normal' => 'default',
+            'personal', 'private' => 'private',
+            'confidential' => 'confidential',
+            default => null,
+        };
     }
 }

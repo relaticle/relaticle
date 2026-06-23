@@ -17,8 +17,10 @@ final readonly class GoogleClientFactory
         $client->setClientId(config('services.gmail.client_id'));
         $client->setClientSecret(config('services.gmail.client_secret'));
 
+        // Seconds until expiry, clamped to 0 so an already-expired token reports
+        // expires_in=0 (not a positive magnitude via abs()) and trips the refresh below.
         $expiresIn = $account->token_expires_at
-            ? (int) round(abs($account->token_expires_at->diffInSeconds(now())))
+            ? max(0, (int) round(now()->diffInSeconds($account->token_expires_at, false)))
             : 0;
 
         $client->setAccessToken([

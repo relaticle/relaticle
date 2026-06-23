@@ -55,6 +55,41 @@ it('stores an azure connected account and flips calendar capability when Graph c
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });
 
+it('preserves the stored refresh token when a reconnect returns none', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $connect = function (?string $refreshToken) use ($user): ConnectedAccount {
+        $social = new SocialiteUser;
+        $social->id = 'gmail-reconnect';
+        $social->email = 'reconnect@example.com';
+        $social->name = 'Demo';
+        $social->token = 'access-'.($refreshToken ?? 'none');
+        $social->refreshToken = $refreshToken;
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('google', $social);
+
+        $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('email_address', 'reconnect@example.com')
+            ->firstOrFail();
+    };
+
+    $connect('original-refresh');   // first consent issues a refresh token
+    $account = $connect(null);      // re-consent returns none — must NOT clobber the stored token
+
+    expect($account->refresh()->refresh_token)->toBe('original-refresh');
+});
+
 it('makes the first connected account the default and leaves later connections non-default', function (): void {
     Bus::fake();
 
