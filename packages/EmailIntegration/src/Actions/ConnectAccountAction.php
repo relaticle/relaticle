@@ -17,6 +17,29 @@ final readonly class ConnectAccountAction
             // Match against trashed rows too: the unique index spans soft-deleted
             // records, so a previously disconnected account must be reused and
             // restored rather than inserted again.
+            $values = [
+                'display_name' => $data->displayName,
+                'provider_account_id' => $data->providerAccountId,
+                'access_token' => $data->accessToken,
+                'token_expires_at' => $data->tokenExpiresAt,
+                'status' => 'active',
+                'last_error' => null,
+                'auto_create_companies' => true,
+                'contact_creation_mode' => ContactCreationMode::All,
+                'capabilities' => [
+                    'email' => true,
+                    'calendar' => $data->hasCalendar,
+                ],
+            ];
+
+            // On re-consent the provider often returns no refresh token (it is only
+            // issued on first authorization). Overwriting with null would strip the
+            // stored working token and leave the account permanently unable to refresh.
+            // Only write it when the provider actually returned one.
+            if ($data->refreshToken !== null) {
+                $values['refresh_token'] = $data->refreshToken;
+            }
+
             $account = ConnectedAccount::withTrashed()->updateOrCreate(
                 [
                     'user_id' => $data->userId,
@@ -24,21 +47,7 @@ final readonly class ConnectAccountAction
                     'email_address' => $data->emailAddress,
                     'team_id' => $data->teamId,
                 ],
-                [
-                    'display_name' => $data->displayName,
-                    'provider_account_id' => $data->providerAccountId,
-                    'access_token' => $data->accessToken,
-                    'refresh_token' => $data->refreshToken,
-                    'token_expires_at' => $data->tokenExpiresAt,
-                    'status' => 'active',
-                    'last_error' => null,
-                    'auto_create_companies' => true,
-                    'contact_creation_mode' => ContactCreationMode::All,
-                    'capabilities' => [
-                        'email' => true,
-                        'calendar' => $data->hasCalendar,
-                    ],
-                ]
+                $values
             );
 
             if ($account->trashed()) {

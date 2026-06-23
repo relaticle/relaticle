@@ -44,15 +44,19 @@ it('cancels a single send within the 30s undo window', function (): void {
     expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
 });
 
-it('allows undo while SENDING when Gmail has not been called yet', function (): void {
+it('rejects undo once the email is claimed for sending', function (): void {
+    // SENDING means a worker is actively delivering. send() calls the provider
+    // outside any row lock, so cancelling here could mark CANCELLED an email the
+    // provider already accepted. Undo is only safe while the email is still QUEUED.
     $email = ConnectedAccount::withoutEvents(fn (): Email => Email::factory()->create([
         'status' => EmailStatus::SENDING,
         'provider_message_id' => null,
     ]));
 
-    resolve(CancelQueuedEmailAction::class)->execute($email);
+    expect(fn () => resolve(CancelQueuedEmailAction::class)->execute($email))
+        ->toThrow(RuntimeException::class);
 
-    expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+    expect($email->refresh()->status)->toBe(EmailStatus::SENDING);
 });
 
 it('rejects undo once Gmail has accepted the message', function (): void {

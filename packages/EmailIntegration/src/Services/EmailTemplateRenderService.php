@@ -38,8 +38,11 @@ final readonly class EmailTemplateRenderService
         $variables = $this->buildVariables($record);
 
         return [
+            // Subject is plain text; body is HTML, so merge values must be HTML-escaped
+            // there to stop attacker-influenced CRM field values (e.g. a contact name)
+            // injecting markup into the rendered/sent email.
             'subject' => $this->substitute($template->subject ?? '', $variables),
-            'body_html' => $this->substitute($template->body_html ?? '', $variables),
+            'body_html' => $this->substitute($template->body_html ?? '', $variables, escapeHtml: true),
         ];
     }
 
@@ -127,7 +130,8 @@ final readonly class EmailTemplateRenderService
      */
     public function renderContent(string $content, ?Model $record = null): string
     {
-        return $this->substitute($content, $this->buildVariables($record));
+        // Used on already-rendered email HTML (renderForSending), so escape values.
+        return $this->substitute($content, $this->buildVariables($record), escapeHtml: true);
     }
 
     /**
@@ -168,25 +172,38 @@ final readonly class EmailTemplateRenderService
     /**
      * Replace both legacy `{name}` and Filament v5 `{{ name }}` merge tags.
      *
+     * When $escapeHtml is true the substituted values are HTML-escaped — required
+     * whenever the result is HTML (body), so a merge value can never inject markup.
+     * Substitution happens in a single pass (callback for `{{ }}`, then strtr for the
+     * legacy `{ }` form) so an injected value is never re-scanned for further tags.
+     *
      * @param  array<string, string>  $variables
      */
-    private function substitute(string $content, array $variables): string
+    private function substitute(string $content, array $variables, bool $escapeHtml = false): string
     {
         if ($variables === []) {
             return $content;
         }
 
+        $resolve = fn (string $value): string => $escapeHtml
+            ? htmlspecialchars($value, ENT_QUOTES, 'UTF-8')
+            : $value;
+
         $content = preg_replace_callback(
             '/\{\{\s*(\w+)\s*\}\}/',
-            fn (array $matches): string => $variables[$matches[1]] ?? $matches[0],
+            fn (array $matches): string => isset($variables[$matches[1]])
+                ? $resolve($variables[$matches[1]])
+                : $matches[0],
             $content
         ) ?? $content;
 
         $legacyPairs = [];
         foreach ($variables as $key => $value) {
-            $legacyPairs['{'.$key.'}'] = $value;
+            $legacyPairs['{'.$key.'}'] = $resolve($value);
         }
 
-        return str_replace(array_keys($legacyPairs), array_values($legacyPairs), $content);
+        // strtr replaces the longest keys first and never re-scans replacements,
+        // so a value containing another `{tag}` is not recursively substituted.
+        return strtr($content, $legacyPairs);
     }
 }

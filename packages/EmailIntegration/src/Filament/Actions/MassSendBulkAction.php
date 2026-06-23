@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -124,44 +125,52 @@ final class MassSendBulkAction extends BulkAction
                     return;
                 }
 
-                $batch = EmailBatch::query()->create([
-                    'team_id' => $teamId,
-                    'user_id' => $userId,
-                    'connected_account_id' => $accountId,
-                    'subject' => $data['subject'],
-                    'total_recipients' => $validRecipients->count(),
-                    'status' => EmailBatchStatus::Queued,
-                ]);
-
                 $renderService = resolve(EmailTemplateRenderService::class);
                 /** @var EmailTemplate|null $template */
                 $template = isset($data['template_id']) ? EmailTemplate::query()->whereKey($data['template_id'])->first() : null;
 
-                foreach ($validRecipients as $person) {
-                    $rendered = $template !== null
-                        ? $renderService->render($template, $person)
-                        : [
-                            'subject' => $renderService->renderContent((string) $data['subject'], $person),
-                            'body_html' => $renderService->renderContent((string) $data['body_html'], $person),
-                        ];
+                // All-or-nothing: SendEmailAction throws once the per-user queue cap is
+                // hit. Without a transaction a mid-loop failure would leave the batch with
+                // total_recipients set to the full count but only some emails queued, so
+                // sent_count+failed_count can never reach total and the batch is stuck
+                // Queued forever. Wrap creation + every send so a failure rolls all of it
+                // back, leaving no orphaned batch.
+                DB::transaction(function () use ($validRecipients, $personEmails, $template, $renderService, $data, $teamId, $userId, $accountId): void {
+                    $batch = EmailBatch::query()->create([
+                        'team_id' => $teamId,
+                        'user_id' => $userId,
+                        'connected_account_id' => $accountId,
+                        'subject' => $data['subject'],
+                        'total_recipients' => $validRecipients->count(),
+                        'status' => EmailBatchStatus::Queued,
+                    ]);
 
-                    resolve(SendEmailAction::class)->execute(
-                        data: [
-                            'connected_account_id' => $accountId,
-                            'subject' => $rendered['subject'],
-                            'body_html' => $rendered['body_html'],
-                            'to' => [['email' => (string) $personEmails->get($person->getKey()), 'name' => $person->name]],
-                            'cc' => [],
-                            'bcc' => [],
-                            'in_reply_to_email_id' => null,
-                            'creation_source' => EmailCreationSource::MASS_SEND,
-                            'privacy_tier' => EmailPrivacyTier::FULL,
-                            'batch_id' => $batch->getKey(),
-                        ],
-                        linkToType: People::class,
-                        linkToId: $person->getKey(),
-                    );
-                }
+                    foreach ($validRecipients as $person) {
+                        $rendered = $template !== null
+                            ? $renderService->render($template, $person)
+                            : [
+                                'subject' => $renderService->renderContent((string) $data['subject'], $person),
+                                'body_html' => $renderService->renderContent((string) $data['body_html'], $person),
+                            ];
+
+                        resolve(SendEmailAction::class)->execute(
+                            data: [
+                                'connected_account_id' => $accountId,
+                                'subject' => $rendered['subject'],
+                                'body_html' => $rendered['body_html'],
+                                'to' => [['email' => (string) $personEmails->get($person->getKey()), 'name' => $person->name]],
+                                'cc' => [],
+                                'bcc' => [],
+                                'in_reply_to_email_id' => null,
+                                'creation_source' => EmailCreationSource::MASS_SEND,
+                                'privacy_tier' => EmailPrivacyTier::FULL,
+                                'batch_id' => $batch->getKey(),
+                            ],
+                            linkToType: People::class,
+                            linkToId: $person->getKey(),
+                        );
+                    }
+                });
 
                 Notification::make()
                     ->title(__('filament/actions/mass-send.notifications.queued.title'))

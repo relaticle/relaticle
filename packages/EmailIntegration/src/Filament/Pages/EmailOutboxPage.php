@@ -130,6 +130,7 @@ final class EmailOutboxPage extends Page implements HasTable
     {
         return Email::query()
             ->with(['participants'])
+            ->where('team_id', filament()->getTenant()?->getKey())
             ->where('user_id', auth()->id())
             ->where('direction', EmailDirection::OUTBOUND);
     }

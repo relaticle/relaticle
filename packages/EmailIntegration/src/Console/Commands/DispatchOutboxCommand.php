@@ -26,6 +26,8 @@ final class DispatchOutboxCommand extends Command
         $defaultHourly = Config::integer('email-integration.outbox.defaults.hourly_send_limit');
         $defaultDaily = Config::integer('email-integration.outbox.defaults.daily_send_limit');
 
+        $this->reclaimStuckSending();
+
         ConnectedAccount::query()
             ->active()
             ->whereHas('outgoingEmails', fn (Builder $emailQuery): Builder => $emailQuery
@@ -37,6 +39,26 @@ final class DispatchOutboxCommand extends Command
             });
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Return emails stuck in SENDING (their worker died before failed() ran) back to
+     * QUEUED so they can be re-dispatched. Only rows with no provider_message_id are
+     * touched — once the provider has accepted, the message is delivered and must not
+     * be re-sent. `attempts` is left intact so EmailSendingService's reconciliation
+     * lookup still fires and catches any send that completed but never persisted.
+     */
+    private function reclaimStuckSending(): void
+    {
+        $threshold = now()->subMinutes(
+            Config::integer('email-integration.outbox.reclaim_sending_after_minutes')
+        );
+
+        Email::query()
+            ->where('status', EmailStatus::SENDING)
+            ->whereNull('provider_message_id')
+            ->where('updated_at', '<', $threshold)
+            ->update(['status' => EmailStatus::QUEUED]);
     }
 
     private function dispatchForAccount(ConnectedAccount $account, int $defaultHourly, int $defaultDaily): void
