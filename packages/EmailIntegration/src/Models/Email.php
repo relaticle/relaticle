@@ -203,7 +203,7 @@ final class Email extends Model
      * (never bcc), excluding the replying user's own account address. De-duplicated
      * case-insensitively. Operates on the loaded `participants` relation.
      *
-     * @return list<string>
+     * @return array<int, non-empty-string>
      */
     public function replyAllRecipients(?string $excludeAddress = null): array
     {
@@ -212,8 +212,7 @@ final class Email extends Model
         return $this->participants
             ->whereIn('role', [EmailParticipantRole::FROM, EmailParticipantRole::TO, EmailParticipantRole::CC])
             ->pluck('email_address')
-            ->filter(fn (?string $address): bool => $address !== null && $address !== '')
-            ->reject(fn (string $address): bool => $normalizedExclude !== null && strtolower($address) === $normalizedExclude)
+            ->filter(fn (string $address): bool => $address !== '' && strtolower($address) !== $normalizedExclude)
             ->unique(fn (string $address): string => strtolower($address))
             ->values()
             ->all();
