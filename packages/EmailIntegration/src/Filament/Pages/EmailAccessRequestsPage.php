@@ -224,6 +224,8 @@ final class EmailAccessRequestsPage extends Page
             ->color('success')
             ->size(Size::ExtraSmall)
             ->requiresConfirmation()
+            ->modalIcon('heroicon-o-check-circle')
+            ->modalIconColor('success')
             ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
             ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.approve.modal_description', [
                 'name' => $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
