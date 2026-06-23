@@ -35,4 +35,9 @@ final class GetTaskTool extends BaseReadShowTool
     {
         return ['assignees', 'customFieldValues.customField.options'];
     }
+
+    protected function citationType(): string
+    {
+        return 'task';
+    }
 }

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Activity;
-use Spatie\Activitylog\Actions\CleanActivityLogAction;
+use App\Models\ActivityLog\Activity;
+use App\Support\ActivityLog\CleanActivityLogAction;
 use Spatie\Activitylog\Actions\LogActivityAction;
 
 return [
@@ -23,7 +23,7 @@ return [
      * If no log name is passed to the activity() helper
      * we use this default log name.
      */
-    'default_log_name' => 'default',
+    'default_log_name' => 'crm',
 
     /*
      * You can specify an auth driver here that gets user models.
@@ -35,7 +35,7 @@ return [
      * If set to true, the subject relationship on activities
      * will include soft deleted models.
      */
-    'include_soft_deleted_subjects' => false,
+    'include_soft_deleted_subjects' => true,
 
     /*
      * This model will be used to log activity.

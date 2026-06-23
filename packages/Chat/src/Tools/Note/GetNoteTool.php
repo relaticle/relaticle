@@ -29,4 +29,9 @@ final class GetNoteTool extends BaseReadShowTool
     {
         return 'Note';
     }
+
+    protected function citationType(): string
+    {
+        return 'note';
+    }
 }

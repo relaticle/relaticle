@@ -7,6 +7,9 @@ namespace Relaticle\Chat\Services;
 use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
+use App\Actions\CustomFields\AddCustomFieldOptions;
+use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\CustomFields\UpdateCustomField;
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
 use App\Actions\Note\UpdateNote;
@@ -22,6 +25,7 @@ use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Concerns\InvalidatesRelatedAiSummaries;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -32,6 +36,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
@@ -44,6 +49,7 @@ final readonly class PendingActionService
         Opportunity::class,
         Task::class,
         Note::class,
+        CustomField::class,
     ];
 
     /** @var list<class-string> */
@@ -63,6 +69,9 @@ final readonly class PendingActionService
         CreateNote::class,
         UpdateNote::class,
         DeleteNote::class,
+        CreateCustomField::class,
+        UpdateCustomField::class,
+        AddCustomFieldOptions::class,
     ];
 
     /**
@@ -633,9 +642,21 @@ final readonly class PendingActionService
 
         throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in action data');
 
-        return $modelClass::query()
-            ->where('team_id', $pendingAction->team_id)
-            ->findOrFail($recordId);
+        // CustomField uses tenant_id (from the custom-fields package) rather than the
+        // team_id column used by all other CRM models. Scope the lookup accordingly.
+        $tenantColumn = $modelClass === CustomField::class
+            ? (string) config('custom-fields.database.column_names.tenant_foreign_key', 'tenant_id')
+            : 'team_id';
+
+        $query = $modelClass::query()->where($tenantColumn, $pendingAction->team_id);
+
+        // CustomField has a global active scope that would exclude deactivated fields;
+        // skip it so an update-to-deactivate proposal can find the field regardless.
+        if ($modelClass === CustomField::class) {
+            $query->withoutGlobalScope(CustomFieldsActivableScope::class);
+        }
+
+        return $query->findOrFail($recordId);
     }
 
     /**

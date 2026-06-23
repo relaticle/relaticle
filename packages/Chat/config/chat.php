@@ -6,6 +6,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Batch Write Cap
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of records that may be created or deleted in a single
+    | tool call. Enforced server-side in the tool layer (never via prompt text).
+    | Override with CHAT_MAX_BATCH_SIZE in .env for local testing.
+    */
+
+    'max_batch_size' => (int) env('CHAT_MAX_BATCH_SIZE', 25),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tool Call Credit Bonus
     |--------------------------------------------------------------------------
     */
@@ -56,5 +68,19 @@ return [
     */
 
     'provider_starts_per_second' => (int) env('CHAT_PROVIDER_STARTS_PER_SECOND', 8),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Field Schema Caps
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of custom fields per entity type (across all entities of
+    | that type for a tenant) and maximum options per choice field. Enforced
+    | server-side in the action layer — never via prompt text only.
+    */
+
+    'max_custom_fields_per_entity' => (int) env('CHAT_MAX_CUSTOM_FIELDS_PER_ENTITY', 50),
+
+    'max_field_options' => (int) env('CHAT_MAX_FIELD_OPTIONS', 50),
 
 ];
