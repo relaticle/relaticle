@@ -155,7 +155,7 @@ it('labels a created event as created and hides the system-column diff', functio
     expect($html)
         ->not->toContain(__('activity-log::messages.entry.changed'))
         ->not->toContain('Email Count')
-        ->toContain($this->company->name);
+        ->toContain(e($this->company->name));
 })->mutates(MergedActivityRenderer::class);
 
 it('still labels an updated event as changed with its diff', function (): void {
