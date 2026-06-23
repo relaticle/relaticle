@@ -53,7 +53,10 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                                     ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => $tier->getLabel()])
                                     ->all()
                             )
-                            ->placeholder(__('email/privacy-settings.sharing_preference.use_workspace_default')),
+                            ->placeholder(__('email/privacy-settings.sharing_preference.use_workspace_default'))
+                            ->helperText(fn (): string => __('email/privacy-settings.sharing_preference.workspace_default_hint', [
+                                'tier' => ($this->authUser()->currentTeam->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY)->getLabel(),
+                            ])),
                         Actions::make([
                             Action::make('saveTier')
                                 ->label(__('email/privacy-settings.actions.save'))
