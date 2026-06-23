@@ -322,6 +322,8 @@ abstract class BaseRecordEmailsPage extends Page
     {
         return Action::make('approveAccessRequest')
             ->requiresConfirmation()
+            ->modalIcon('heroicon-o-check-circle')
+            ->modalIconColor('success')
             ->modalHeading(__('filament/pages/record-emails.actions.approve_access_request.modal_heading'))
             ->modalDescription(fn (array $arguments): string => sprintf(
                 'Grant %s access to this email?',
