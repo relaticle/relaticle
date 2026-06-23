@@ -143,20 +143,27 @@ abstract class BaseMeetingsRelationManager extends RelationManager
     /** @return array<string, string> */
     private function searchOptions(string $type): array
     {
+        // CRM models carry no global tenant scope, so every query here must be
+        // constrained to the current tenant — otherwise the option list (and the
+        // resolveRecord lookup below) would expose and link records from other teams.
+        $teamId = filament()->getTenant()?->getKey();
+
         return match ($type) {
-            'People' => People::query()->pluck('name', 'id')->all(),
-            'Company' => Company::query()->pluck('name', 'id')->all(),
-            'Opportunity' => Opportunity::query()->pluck('name', 'id')->all(),
+            'People' => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            'Company' => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
             default => [],
         };
     }
 
     private function resolveRecord(string $type, string $id): Model
     {
+        $teamId = filament()->getTenant()?->getKey();
+
         return match ($type) {
-            'People' => People::query()->findOrFail($id),
-            'Company' => Company::query()->findOrFail($id),
-            'Opportunity' => Opportunity::query()->findOrFail($id),
+            'People' => People::query()->where('team_id', $teamId)->findOrFail($id),
+            'Company' => Company::query()->where('team_id', $teamId)->findOrFail($id),
+            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->findOrFail($id),
             default => throw new \InvalidArgumentException("Unsupported type: {$type}"),
         };
     }

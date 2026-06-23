@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 
@@ -27,7 +28,9 @@ final readonly class BlocklistService
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);
-            $domain = explode('@', $address)[1] ?? '';
+            // Host after the LAST '@', matching PrivacyService::isProtected — explode[1]
+            // grabs the wrong segment for addresses with more than one '@'.
+            $domain = str_contains($address, '@') ? Str::afterLast($address, '@') : '';
 
             if ($blockedEmails->contains($address) || $blockedDomains->contains($domain)) {
                 return true;
