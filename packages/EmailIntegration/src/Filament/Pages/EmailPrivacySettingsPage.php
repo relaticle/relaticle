@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Enums\TeamRole;
+use App\Features\EmailIntegration;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
@@ -15,16 +18,41 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
-    use HasEmailFeatureFlag;
     use InteractsWithSchemas;
+
+    /**
+     * Workspace-wide privacy settings may only be viewed and changed by the team
+     * owner or an admin. Mirrors the write guard in
+     * {@see UpdateTeamEmailPrivacySettingsAction}; other roles use the
+     * per-user "My Email Privacy" page instead.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    public static function canAccess(array $parameters = []): bool
+    {
+        if (! Feature::active(EmailIntegration::class) || ! parent::canAccess()) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $team = $user->currentTeam;
+
+        return $team instanceof Team
+            && ($user->ownsTeam($team) || $user->hasTeamRole($team, TeamRole::Admin->value));
+    }
 
     protected string $view = 'email-integration::filament.pages.email-privacy-settings';
 
