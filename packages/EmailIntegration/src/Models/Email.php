@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -195,6 +196,26 @@ final class Email extends Model
     public function from(): HasMany
     {
         return $this->hasMany(EmailParticipant::class)->where('role', 'from');
+    }
+
+    /**
+     * Reply-all recipient addresses: the original sender PLUS the to/cc recipients
+     * (never bcc), excluding the replying user's own account address. De-duplicated
+     * case-insensitively. Operates on the loaded `participants` relation.
+     *
+     * @return array<int, non-empty-string>
+     */
+    public function replyAllRecipients(?string $excludeAddress = null): array
+    {
+        $normalizedExclude = $excludeAddress !== null ? strtolower($excludeAddress) : null;
+
+        return $this->participants
+            ->whereIn('role', [EmailParticipantRole::FROM, EmailParticipantRole::TO, EmailParticipantRole::CC])
+            ->pluck('email_address')
+            ->filter(fn (string $address): bool => $address !== '' && strtolower($address) !== $normalizedExclude)
+            ->unique(fn (string $address): string => strtolower($address))
+            ->values()
+            ->all();
     }
 
     /**

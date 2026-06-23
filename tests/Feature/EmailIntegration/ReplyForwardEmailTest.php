@@ -149,6 +149,24 @@ it('renders the quoted original message in a sandboxed iframe with sanitized con
         ->assertDontSee('alert(1)', escape: false);
 });
 
+it('reply_all recipients keep the original sender and drop the user\'s own address', function (): void {
+    // The user's own address appears as a To recipient on the original — it must be
+    // filtered out of a reply-all, while the original sender (FROM) must be kept.
+    EmailParticipant::create([
+        'email_id' => $this->inboundEmail->id,
+        'email_address' => 'me@example.com',
+        'name' => 'Me',
+        'role' => EmailParticipantRole::TO,
+    ]);
+
+    $recipients = $this->inboundEmail->fresh('participants')->replyAllRecipients('me@example.com');
+
+    expect($recipients)
+        ->toContain('sender@contact.com')      // original sender is NOT dropped
+        ->toContain('cc-person@contact.com')   // cc recipients included
+        ->not->toContain('me@example.com');    // self excluded
+});
+
 it('reply_all persists a queued Email with REPLY_ALL creation_source', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,

@@ -54,5 +54,15 @@ return [
         ],
         'undo_send_window_seconds' => (int) env('EMAIL_UNDO_SEND_WINDOW', 30),
         'max_queued_per_user' => (int) env('EMAIL_MAX_QUEUED_PER_USER', 100),
+
+        /*
+         * A SENDING email whose worker died (queue eviction, SIGKILL) before failed()
+         * ran would otherwise stay SENDING forever — never sent, not retryable, and
+         * permanently consuming the account's in-flight send capacity. The dispatcher
+         * reclaims such rows (no provider_message_id yet) back to QUEUED once they have
+         * been SENDING longer than this. Must exceed the worst-case job runtime
+         * (SendEmailJob tries x (timeout + backoff)).
+         */
+        'reclaim_sending_after_minutes' => (int) env('EMAIL_RECLAIM_SENDING_AFTER_MINUTES', 15),
     ],
 ];

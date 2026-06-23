@@ -10,6 +10,14 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 final readonly class EmailHtmlSanitizer
 {
     /**
+     * Upper bound on the HTML handed to the DOM sanitizer. Symfony's 20 KB default
+     * clips real email bodies (newsletters run 50–150 KB), but lifting the cap
+     * entirely lets a pathological multi-MB body turn every render into an unbounded
+     * DOM parse (CPU/memory DoS). 2 MB comfortably fits any legitimate email body.
+     */
+    private const int MAX_INPUT_BYTES = 2_000_000;
+
+    /**
      * Sanitize untrusted email body HTML before rendering it in an iframe.
      *
      * Strips scripts, inline event handlers (onerror, onload, ...),
@@ -27,11 +35,9 @@ final readonly class EmailHtmlSanitizer
         // CSS values are not deep-sanitized, but the body is rendered in an
         // opaque-origin sandboxed iframe, so CSS cannot read cookies or run JS.
         $config = (new HtmlSanitizerConfig)
-            // Symfony defaults to truncating input at 20 KB, which silently
-            // clips real email bodies (newsletters routinely run 50–150 KB) to a
-            // fraction of their content. The body is already size-bounded at
-            // ingestion, so lift the cap and let the full message render.
-            ->withMaxInputLength(-1)
+            // Raise Symfony's 20 KB default (which clips real newsletters) to a
+            // bounded ceiling rather than removing it — see MAX_INPUT_BYTES.
+            ->withMaxInputLength(self::MAX_INPUT_BYTES)
             ->allowSafeElements()
             ->allowElement('style')
             ->allowRelativeLinks()

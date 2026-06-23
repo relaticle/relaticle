@@ -121,7 +121,10 @@ it('retry row action re-queues a failed email', function (): void {
     expect($email->refresh())
         ->status->toBe(EmailStatus::QUEUED)
         ->last_error->toBeNull()
-        ->attempts->toBe(0);
+        // attempts is intentionally preserved (not reset to 0): EmailSendingService only
+        // runs its provider-side dedup lookup when attempts > 1, so zeroing it here would
+        // let a retry re-deliver an email a prior attempt already handed to the provider.
+        ->attempts->toBe(3);
 });
 
 it('retry row action is hidden for queued emails', function (): void {

@@ -149,10 +149,10 @@ trait HasEmailComposeActions
 
                 $toParticipants = match ($mode) {
                     'forward' => [],
-                    'reply_all' => $email->participants
-                        ->where('role', '!=', 'from')
-                        ->pluck('email_address')
-                        ->all(),
+                    // Reply-all addresses the original sender PLUS the to/cc recipients
+                    // (never bcc), minus the user's own account address. Excluding the
+                    // 'from' role here would drop the very person being replied to.
+                    'reply_all' => $email->replyAllRecipients($account?->email_address),
                     default => $email->participants
                         ->where('role', 'from')
                         ->pluck('email_address')
