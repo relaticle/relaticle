@@ -17,12 +17,14 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkEmailAction
 {
     public function __construct(
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
+        private CompanyDomainMatcher $domainMatcher,
     ) {}
 
     public function execute(Email $email): void
@@ -48,19 +50,14 @@ final readonly class LinkEmailAction
             $domain = $this->extractDomain($participant->email_address);
 
             if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = Company::query()->where('team_id', $teamId)
-                    ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
-                        ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('code', 'domains'))
-                        ->whereRaw('json_value::text ~* ?', [$this->domainMatchPattern($domain)])
-                    )
-                    ->first();
+                $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
                 // 2. Auto-create Company when no existing record found.
                 if (! $company && $connectedAccount?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
-                if ($company) {
+                if ($company instanceof Company) {
                     $participant->update(['company_id' => $company->getKey()]);
                     $email->companies()->syncWithoutDetaching([$company->getKey()]);
 
@@ -179,17 +176,6 @@ final readonly class LinkEmailAction
         $parts = explode('@', $email);
 
         return count($parts) === 2 ? strtolower($parts[1]) : null;
-    }
-
-    /**
-     * Build a POSIX regex matching the domain as a complete host token inside the
-     * JSON-encoded domains array. Tolerates scheme/subdomain/path variants while
-     * avoiding substring collisions (e.g. "acme.co" vs "acme.com.au") and
-     * neutralising LIKE wildcards present in sender-controlled input.
-     */
-    private function domainMatchPattern(string $domain): string
-    {
-        return '(^|["/.])'.preg_quote($domain).'(["/:]|$)';
     }
 
     /**
