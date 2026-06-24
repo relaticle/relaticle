@@ -8,6 +8,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -303,6 +304,39 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
     if ($icpField) {
         expect($company->getCustomFieldValue($icpField))->toBeFalse();
     }
+});
+
+it('does not create a duplicate company when the domain is already owned', function (): void {
+    $action = app(AutoCreateCompanyAction::class);
+
+    $first = $action->execute('brandnewcorp.com', $this->team->id, $this->team);
+    $second = $action->execute('brandnewcorp.com', $this->team->id, $this->team);
+
+    expect($second->getKey())->toBe($first->getKey());
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->count())->toBe(1);
+});
+
+it('reuses an existing company that already owns the domain instead of creating one', function (): void {
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if (! $domainsField) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $existing = Company::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Acme Corp',
+    ]);
+    $existing->saveCustomFieldValue($domainsField, 'https://acme.com', $this->team);
+
+    $resolved = app(AutoCreateCompanyAction::class)->execute('acme.com', $this->team->id, $this->team);
+
+    expect($resolved->getKey())->toBe($existing->getKey());
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Acme')->exists())->toBeFalse();
 });
 
 it('does not auto-create a person when contact_creation_mode is None', function (): void {

@@ -9,14 +9,46 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Team;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
+use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
+use Relaticle\EmailIntegration\Support\UsesTransactionalLock;
 
 final readonly class AutoCreateCompanyAction
 {
+    use UsesTransactionalLock;
+
+    public function __construct(
+        private CompanyDomainMatcher $domainMatcher,
+    ) {}
+
+    /**
+     * Resolve a Company for the domain, creating one only when no existing company
+     * already owns it. Serialised per (team, domain) with a transaction-level
+     * advisory lock so two StoreEmailJob/calendar workers processing the first
+     * email from a brand-new domain in parallel can't both miss the match and
+     * create duplicate companies: the first holder creates, the rest re-check
+     * inside the lock and reuse it.
+     */
+    public function execute(string $domain, string $teamId, Team $team): Company
+    {
+        return $this->transactional("auto-create-company:{$teamId}:{$domain}", function () use ($domain, $teamId, $team): Company {
+            // Only create when the domain is not already in another company. The
+            // caller's unlocked match can be stale by the time we get the lock, so
+            // re-check here under mutual exclusion before creating.
+            $existing = $this->domainMatcher->firstMatching($domain, $teamId);
+
+            if ($existing instanceof Company) {
+                return $existing;
+            }
+
+            return $this->createCompany($domain, $teamId, $team);
+        });
+    }
+
     /**
      * Create a new Company record seeded with a name derived from the domain
      * and the domain stored in the domains custom field.
      */
-    public function execute(string $domain, string $teamId, Team $team): Company
+    private function createCompany(string $domain, string $teamId, Team $team): Company
     {
         $company = Company::query()
             ->updateOrCreate([

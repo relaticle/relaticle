@@ -12,6 +12,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
 use Throwable;
 
 final readonly class StoreEmailAction
@@ -39,8 +40,17 @@ final readonly class StoreEmailAction
                 'direction' => $data->direction,
                 'folder' => $data->folder,
                 'has_attachments' => $data->hasAttachments,
-                'read_at' => $data->isRead ? $data->sentAt : null,
             ]);
+
+            // Read state is per-viewer; the provider's "already read" flag reflects
+            // the owner's mailbox, so seed only the owner's read row.
+            if ($data->isRead) {
+                EmailRead::query()->create([
+                    'email_id' => $email->getKey(),
+                    'user_id' => $connectedAccount->user_id,
+                    'read_at' => $data->sentAt,
+                ]);
+            }
 
             $email->body()->create([
                 'body_text' => $data->bodyText,
