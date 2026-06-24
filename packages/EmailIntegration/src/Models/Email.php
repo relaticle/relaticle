@@ -51,7 +51,6 @@ use Relaticle\EmailIntegration\Observers\EmailObserver;
  * @property EmailPrivacyTier $privacy_tier
  * @property bool $has_attachments
  * @property bool $is_internal
- * @property Carbon|null $read_at
  * @property EmailCreationSource $creation_source
  * @property string|null $batch_id
  * @property Carbon|null $scheduled_for
@@ -90,7 +89,6 @@ final class Email extends Model
         'privacy_tier',
         'has_attachments',
         'is_internal',
-        'read_at',
         'creation_source',
         'batch_id',
         'scheduled_for',
@@ -109,7 +107,6 @@ final class Email extends Model
 
     protected $casts = [
         'sent_at' => 'datetime',
-        'read_at' => 'datetime',
         'direction' => EmailDirection::class,
         'folder' => EmailFolder::class,
         'status' => EmailStatus::class,
@@ -154,6 +151,32 @@ final class Email extends Model
     protected function inbox(Builder $query): Builder
     {
         return $query->where('direction', EmailDirection::INBOUND);
+    }
+
+    /**
+     * Expose a per-viewer `is_read` boolean so list rows can render unread state
+     * for the authenticated user (not the owner's global state).
+     *
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function withReadStateFor(Builder $query, string $userId): Builder
+    {
+        return $query->withExists(['reads as is_read' => fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId)]);
+    }
+
+    /**
+     * Inbound emails the given user has not yet read.
+     *
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function unreadFor(Builder $query, string $userId): Builder
+    {
+        return $query->where('direction', EmailDirection::INBOUND)
+            ->whereDoesntHave('reads', fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId));
     }
 
     // Relations
@@ -232,6 +255,14 @@ final class Email extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(EmailShare::class);
+    }
+
+    /**
+     * @return HasMany<EmailRead, $this>
+     */
+    public function reads(): HasMany
+    {
+        return $this->hasMany(EmailRead::class);
     }
 
     /**
