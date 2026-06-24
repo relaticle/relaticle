@@ -87,8 +87,12 @@ it('persists the email record with correct fields', function (): void {
         ->and($email->snippet)->toBe('First 255 chars...')
         ->and($email->direction)->toBe(EmailDirection::INBOUND)
         ->and($email->folder)->toBe(EmailFolder::Inbox)
-        ->and($email->has_attachments)->toBeFalse()
-        ->and($email->read_at)->toBeNull();
+        ->and($email->has_attachments)->toBeFalse();
+
+    $this->assertDatabaseMissing('email_reads', [
+        'email_id' => $email->getKey(),
+        'user_id' => $this->user->id,
+    ]);
 });
 
 it('dispatches ClassifyEmailJob after storing the email', function (): void {
@@ -100,14 +104,15 @@ it('dispatches ClassifyEmailJob after storing the email', function (): void {
     );
 });
 
-it('sets read_at when isRead is true', function (): void {
+it("records the owner's read state when isRead is true", function (): void {
     $sentAt = now()->subHour();
     $data = makeFetchedEmailData(['sentAt' => $sentAt, 'isRead' => true]);
 
     $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
-    expect($email->read_at)->not->toBeNull()
-        ->and($email->read_at->toDateTimeString())->toBe($sentAt->toDateTimeString());
+    $read = $email->reads()->where('user_id', $this->user->id)->sole();
+
+    expect($read->read_at->toDateTimeString())->toBe($sentAt->toDateTimeString());
 });
 
 it('stores body_text and body_html in email_bodies', function (): void {

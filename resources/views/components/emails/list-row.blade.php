@@ -4,7 +4,8 @@
     use Relaticle\EmailIntegration\Enums\EmailDirection;
 
     $isSelected  = $selectedEmailId === $email->id;
-    $isUnread    = $email->read_at === null && $email->direction === EmailDirection::INBOUND;
+    // `is_read` is a per-viewer flag set by the withReadStateFor() query scope.
+    $isUnread    = ! $email->is_read && $email->direction === EmailDirection::INBOUND;
     $from        = $email->from->first();
     $senderName  = $from?->name ?: $from?->email_address ?: '?';
     $authUser    = auth()->user();

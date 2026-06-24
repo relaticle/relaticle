@@ -35,7 +35,6 @@ use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -125,6 +124,7 @@ final class EmailInboxPage extends Page
 
         $query = Email::query()
             ->with(['from', 'labels'])
+            ->withReadStateFor($user->getKey())
             ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
@@ -168,8 +168,7 @@ final class EmailInboxPage extends Page
         return Email::query()
             ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->where('direction', EmailDirection::INBOUND)
-            ->whereNull('read_at')
+            ->unreadFor($user->getKey())
             ->count();
     }
 
