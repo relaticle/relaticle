@@ -8,6 +8,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -17,6 +18,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 
 mutates(LinkEmailAction::class);
+mutates(AutoCreatePersonAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -332,6 +334,48 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
     app(LinkEmailAction::class)->execute($email);
 
     expect(People::where('team_id', $this->team->id)->where('name', 'New Contact')->exists())->toBeTrue();
+});
+
+it('creates distinct people for participants sharing a display name but different emails', function (): void {
+    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'john@a-corp.com',
+        'name' => 'John Smith',
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'john@b-corp.com',
+        'name' => 'John Smith',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'John Smith')->count())->toBe(2);
+});
+
+it('does not duplicate a person when the same address appears on multiple participants', function (): void {
+    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'dup@partner.com',
+        'name' => 'Dup Person',
+    ]);
+    EmailParticipant::factory()->cc()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'dup@partner.com',
+        'name' => 'Dup Person',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Dup Person')->count())->toBe(1);
 });
 
 it('does not auto-create a person when Bidirectional and only one direction exists', function (): void {
