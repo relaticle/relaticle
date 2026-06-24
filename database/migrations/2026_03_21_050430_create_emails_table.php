@@ -42,7 +42,6 @@ return new class extends Migration
             // Computed flags — set during sync
             $table->boolean('has_attachments')->default(false);
             $table->boolean('is_internal')->default(false);      // true when all participants are workspace members
-            $table->timestamp('read_at')->nullable();
 
             $table->string('creation_source', 50)->default('sync'); // EmailCreationSource: sync | compose | forward | bcc_inbound
             $table->foreignUlid('batch_id')->nullable()->constrained('email_batches')->nullOnDelete();

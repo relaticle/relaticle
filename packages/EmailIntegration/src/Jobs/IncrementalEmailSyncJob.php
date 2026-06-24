@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
@@ -60,26 +61,40 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             dispatch(new StoreEmailJob($account, $messageId));
         }
 
-        // Mark emails as read when UNREAD label was removed in Gmail
+        // Read state is per-viewer; the provider delta reflects the OWNER's mailbox,
+        // so toggle only the owner's read rows (teammates' read state is untouched).
+        $ownerId = $account->user_id;
+
+        // Mark emails as read when the UNREAD label was removed in Gmail.
         $readIds = $delta->readMessageIds->all();
 
         if ($readIds !== []) {
-            Email::query()
+            $readEmailIds = Email::query()
                 ->where('connected_account_id', $account->getKey())
                 ->whereIn('provider_message_id', $readIds)
-                ->whereNull('read_at')
-                ->update(['read_at' => now()]);
+                ->pluck('id');
+
+            foreach ($readEmailIds as $emailId) {
+                EmailRead::query()->firstOrCreate(
+                    ['email_id' => $emailId, 'user_id' => $ownerId],
+                    ['read_at' => now()],
+                );
+            }
         }
 
         // Mark emails unread again when the provider flipped them back to unread.
         $unreadIds = $delta->unreadMessageIds?->all() ?? [];
 
         if ($unreadIds !== []) {
-            Email::query()
+            $unreadEmailIds = Email::query()
                 ->where('connected_account_id', $account->getKey())
                 ->whereIn('provider_message_id', $unreadIds)
-                ->whereNotNull('read_at')
-                ->update(['read_at' => null]);
+                ->pluck('id');
+
+            EmailRead::query()
+                ->whereIn('email_id', $unreadEmailIds)
+                ->where('user_id', $ownerId)
+                ->delete();
         }
 
         $account->update([
