@@ -1,4 +1,4 @@
-<x-filament-panels::page class="!pb-0">
+<x-filament-panels::page class="[&_.fi-page-header-main-ctn]:!pb-0">
     <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
 
         {{-- ── Left panel: folder tabs + search + email list ─────────── --}}
