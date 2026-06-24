@@ -18,12 +18,14 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkMeetingAction
 {
     public function __construct(
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
+        private CompanyDomainMatcher $domainMatcher,
     ) {}
 
     public function execute(Meeting $meeting): void
@@ -39,18 +41,13 @@ final readonly class LinkMeetingAction
             $domain = $this->extractDomain($attendee->email_address);
 
             if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = Company::query()->where('team_id', $teamId)
-                    ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
-                        ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('code', 'domains'))
-                        ->whereRaw('json_value::text ~* ?', [$this->domainMatchPattern($domain)])
-                    )
-                    ->first();
+                $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
                 if (! $company && $account?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
-                if ($company) {
+                if ($company instanceof Company) {
                     $attendee->update(['company_id' => $company->getKey()]);
                     if ($this->autoAttach($meeting->companies(), $company->getKey())) {
                         $this->updateCompanyMetrics($company, $meeting);
@@ -193,16 +190,5 @@ final readonly class LinkMeetingAction
         $parts = explode('@', $email);
 
         return count($parts) === 2 ? strtolower($parts[1]) : null;
-    }
-
-    /**
-     * Build a POSIX regex matching the domain as a complete host token inside the
-     * JSON-encoded domains array. Tolerates scheme/subdomain/path variants while
-     * avoiding substring collisions (e.g. "acme.co" vs "acme.com.au") and
-     * neutralising LIKE wildcards present in attendee-controlled input.
-     */
-    private function domainMatchPattern(string $domain): string
-    {
-        return '(^|["/.])'.preg_quote($domain).'(["/:]|$)';
     }
 }
