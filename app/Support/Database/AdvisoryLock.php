@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  * place so call sites read as portable, intent-revealing code instead of raw
  * SQL. This is the only file that should reference the advisory-lock primitive.
  */
-final class AdvisoryLock
+final readonly class AdvisoryLock
 {
     /**
      * Run $callback while holding a transaction-scoped advisory lock keyed on $key.
