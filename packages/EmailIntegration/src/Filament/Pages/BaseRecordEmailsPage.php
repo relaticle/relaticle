@@ -26,7 +26,6 @@ use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
@@ -98,6 +97,7 @@ abstract class BaseRecordEmailsPage extends Page
             ->emails()
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
             ->with(['from', 'labels', 'participants', 'shares'])
+            ->withReadStateFor($user->getKey())
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
@@ -144,8 +144,7 @@ abstract class BaseRecordEmailsPage extends Page
         return $record
             ->emails()
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
-            ->where('direction', EmailDirection::INBOUND)
-            ->whereNull('read_at')
+            ->unreadFor($this->authUser()->getKey())
             ->count();
     }
 
