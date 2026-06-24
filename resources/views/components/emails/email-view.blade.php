@@ -40,7 +40,7 @@
     };
 @endphp
 
-<div class="flex flex-col">
+<div class="flex flex-col [&_.fi-page-header-main-ctn]:!pb-0">
 
     {{-- ── Internal email banner ──────────────────────────────────────────── --}}
     @if ($record->is_internal && $isOwner)
