@@ -104,105 +104,148 @@ trait HasEmailComposeActions
             });
     }
 
+    /**
+     * Legacy single action mounted by name from the email-thread reply buttons
+     * (the `reply-email` browser event → {@see openReplyModal()}), where the mode
+     * and target email arrive as runtime arguments.
+     */
     public function replyForwardEmailAction(): Action
     {
         return Action::make('replyForwardEmail')
-            ->slideOver()
             ->link()
             ->hiddenLabel()
-            ->icon(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
-                'reply_all' => 'heroicon-o-arrow-uturn-right',
-                'reply' => 'heroicon-o-arrow-uturn-left',
-                'forward' => 'heroicon-o-arrow-right',
-                default => 'heroicon-o-arrow-uturn-right',
-            })
-            ->extraAttributes([
-                'class' => 'p-2',
-            ])
-            ->modalHeading(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
-                'reply_all' => 'Reply All',
-                'forward' => 'Forward',
-                default => 'Reply',
-            })
-            ->tooltip(fn (array $arguments): string => match ($arguments['mode'] ?? 'reply') {
-                'reply_all' => 'Reply All',
-                'forward' => 'Forward',
-                default => 'Reply',
-            })
+            ->extraAttributes(['class' => 'p-2'])
+            ->icon(fn (array $arguments): string => $this->replyForwardIcon($arguments['mode'] ?? 'reply'))
+            ->tooltip(fn (array $arguments): string => $this->replyForwardLabel($arguments['mode'] ?? 'reply'))
+            ->modalHeading(fn (array $arguments): string => $this->replyForwardLabel($arguments['mode'] ?? 'reply'))
+            ->slideOver()
             ->modalWidth(Width::SevenExtraLarge)
-            ->fillForm(function (array $arguments): array {
-                $email = $this->resolveComposableEmail($arguments['emailId'] ?? null);
-
-                if (! $email instanceof Email) {
-                    return [];
-                }
-
-                $user = $this->getAuthenticatedUser();
-                $mode = $arguments['mode'] ?? 'reply';
-
-                $account = ConnectedAccount::query()
-                    ->where('user_id', $user->getKey())
-                    ->where('team_id', filament()->getTenant()?->getKey())
-                    ->where('status', 'active')
-                    ->defaultFirst()
-                    ->first();
-
-                $toParticipants = match ($mode) {
-                    'forward' => [],
-                    // Reply-all addresses the original sender PLUS the to/cc recipients
-                    // (never bcc), minus the user's own account address. Excluding the
-                    // 'from' role here would drop the very person being replied to.
-                    'reply_all' => $email->replyAllRecipients($account?->email_address),
-                    default => $email->participants
-                        ->where('role', 'from')
-                        ->pluck('email_address')
-                        ->all(),
-                };
-
-                // Only quote the original body when the viewer is entitled to read it.
-                $quotedBody = $user->can('viewBody', $email) ? ($email->body->body_html ?? '') : '';
-
-                $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
-
-                return [
-                    'connected_account_id' => $account?->getKey(),
-                    'to' => $toParticipants,
-                    'subject' => $subjectPrefix.($email->subject ?? ''),
-                    'body_html' => '',
-                    'quoted_body_html' => $quotedBody,
-                    'mode' => $mode,
-                    'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
-                    'privacy_tier' => $this->defaultPrivacyTier()->value,
-                ];
-            })
+            ->fillForm(fn (array $arguments): array => $this->replyForwardFormData(
+                $arguments['emailId'] ?? null,
+                $arguments['mode'] ?? 'reply',
+            ))
             ->schema($this->replyFormSchema())
             ->action(function (array $data, array $arguments): void {
-                $mode = $arguments['mode'] ?? 'reply';
-
-                if (filled($data['quoted_body_html'] ?? '')) {
-                    $quotedSection = $mode === 'forward'
-                        ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$data['quoted_body_html']
-                        : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$data['quoted_body_html'].'</blockquote>';
-
-                    $data['body_html'] = ($data['body_html'] ?? '').$quotedSection;
-                }
-
-                $source = match ($mode) {
-                    'reply_all' => EmailCreationSource::REPLY_ALL,
-                    'forward' => EmailCreationSource::FORWARD,
-                    default => EmailCreationSource::REPLY,
-                };
-
-                $record = $this->getCrmRecord();
-
-                $email = resolve(SendEmailAction::class)->execute(
-                    data: $this->buildSendData($data, $source),
-                    linkToType: $record::class,
-                    linkToId: $record->getKey(),
-                );
-
-                $this->sendQueuedNotification($email);
+                $this->submitReplyForward($data, $arguments['mode'] ?? 'reply');
             });
+    }
+
+    /**
+     * Build a reply/reply-all/forward action with its mode baked in, for use as a
+     * child of the native `<x-filament-actions::group>` dropdown. Grouped-action
+     * triggers cannot carry per-action arguments, so callers supply the target
+     * email id (the one currently open in the detail pane).
+     */
+    protected function replyForwardModeAction(string $name, string $mode, ?string $emailId): Action
+    {
+        return Action::make($name)
+            ->label($this->replyForwardLabel($mode))
+            ->icon($this->replyForwardIcon($mode))
+            ->modalHeading($this->replyForwardLabel($mode))
+            ->slideOver()
+            ->modalWidth(Width::SevenExtraLarge)
+            ->fillForm(fn (): array => $this->replyForwardFormData($emailId, $mode))
+            ->schema($this->replyFormSchema())
+            ->action(function (array $data) use ($mode): void {
+                $this->submitReplyForward($data, $mode);
+            });
+    }
+
+    private function replyForwardIcon(string $mode): string
+    {
+        return match ($mode) {
+            'reply_all' => 'heroicon-o-arrow-uturn-right',
+            'forward' => 'heroicon-o-arrow-right',
+            default => 'heroicon-o-arrow-uturn-left',
+        };
+    }
+
+    private function replyForwardLabel(string $mode): string
+    {
+        return match ($mode) {
+            'reply_all' => 'Reply All',
+            'forward' => 'Forward',
+            default => 'Reply',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function replyForwardFormData(?string $emailId, string $mode): array
+    {
+        $email = $this->resolveComposableEmail($emailId);
+
+        if (! $email instanceof Email) {
+            return [];
+        }
+
+        $user = $this->getAuthenticatedUser();
+
+        $account = ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where('status', 'active')
+            ->defaultFirst()
+            ->first();
+
+        $toParticipants = match ($mode) {
+            'forward' => [],
+            // Reply-all addresses the original sender PLUS the to/cc recipients
+            // (never bcc), minus the user's own account address. Excluding the
+            // 'from' role here would drop the very person being replied to.
+            'reply_all' => $email->replyAllRecipients($account?->email_address),
+            default => $email->participants
+                ->where('role', 'from')
+                ->pluck('email_address')
+                ->all(),
+        };
+
+        // Only quote the original body when the viewer is entitled to read it.
+        $quotedBody = $user->can('viewBody', $email) ? ($email->body->body_html ?? '') : '';
+
+        $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
+
+        return [
+            'connected_account_id' => $account?->getKey(),
+            'to' => $toParticipants,
+            'subject' => $subjectPrefix.($email->subject ?? ''),
+            'body_html' => '',
+            'quoted_body_html' => $quotedBody,
+            'mode' => $mode,
+            'in_reply_to_email_id' => $mode !== 'forward' ? $email->getKey() : null,
+            'privacy_tier' => $this->defaultPrivacyTier()->value,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function submitReplyForward(array $data, string $mode): void
+    {
+        if (filled($data['quoted_body_html'] ?? '')) {
+            $quotedSection = $mode === 'forward'
+                ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$data['quoted_body_html']
+                : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$data['quoted_body_html'].'</blockquote>';
+
+            $data['body_html'] = ($data['body_html'] ?? '').$quotedSection;
+        }
+
+        $source = match ($mode) {
+            'reply_all' => EmailCreationSource::REPLY_ALL,
+            'forward' => EmailCreationSource::FORWARD,
+            default => EmailCreationSource::REPLY,
+        };
+
+        $record = $this->getCrmRecord();
+
+        $email = resolve(SendEmailAction::class)->execute(
+            data: $this->buildSendData($data, $source),
+            linkToType: $record::class,
+            linkToId: $record->getKey(),
+        );
+
+        $this->sendQueuedNotification($email);
     }
 
     private function sendQueuedNotification(Email $email): void
