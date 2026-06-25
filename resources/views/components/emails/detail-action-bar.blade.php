@@ -22,14 +22,7 @@
         @endif
 
         @if ($canSummarize)
-            <button
-                x-on:click="$wire.mountAction('summarizeThread', { emailId: '{{ $email->id }}' })"
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-            >
-                <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
-                Summarize Thread
-            </button>
+            {{ ($this->summarizeThreadAction)(['emailId' => $email->id]) }}
         @endif
 
         @if ($canRequestAccess)
