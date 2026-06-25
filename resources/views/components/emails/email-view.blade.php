@@ -125,12 +125,28 @@
         {{-- Right column: date · badges · action icons --}}
         <div class="flex shrink-0 flex-col items-end gap-2.5">
 
-            {{-- Date --}}
-            @if ($record->sent_at)
-                <time class="whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
-                    {{ $record->sent_at->format('M j, Y · g:i A') }}
-                </time>
-            @endif
+            {{-- Date + reply action group --}}
+            <div class="flex items-center gap-3">
+                @if ($record->sent_at)
+                    <time class="whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
+                        {{ $record->sent_at->format('M j, Y · g:i A') }}
+                    </time>
+                @endif
+
+                @if ($canViewBody)
+                    <x-filament-actions::group
+                        :actions="[
+                            $this->replyAction,
+                            $this->replyAllAction,
+                            $this->forwardAction,
+                        ]"
+                        icon="heroicon-o-ellipsis-vertical"
+                        color="gray"
+                        size="sm"
+                        dropdown-placement="bottom-end"
+                    />
+                @endif
+            </div>
 
             {{-- Direction + AI badges --}}
             <div class="flex flex-wrap items-center justify-end gap-1.5">
@@ -148,19 +164,6 @@
                     </span>
                 @endif
             </div>
-
-            {{-- Icon-only action group --}}
-            @if ($canViewBody)
-                <div
-                    x-data
-                    class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-gray-700"
-                >
-                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'reply']) }}
-                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'reply_all']) }}
-                    {{ ($this->replyForwardEmailAction)(['emailId' => $record->id, 'mode' => 'forward']) }}
-
-                </div>
-            @endif
 
         </div>
     </div>

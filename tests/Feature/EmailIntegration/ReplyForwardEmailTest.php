@@ -167,6 +167,35 @@ it('reply_all recipients keep the original sender and drop the user\'s own addre
         ->not->toContain('me@example.com');    // self excluded
 });
 
+it('header reply action group targets the selected email without trigger arguments', function (): void {
+    // The native <x-filament-actions::group> dropdown renders its child triggers
+    // without per-action arguments, so the `reply` action must resolve its target
+    // from the currently selected email rather than from mounted arguments.
+    livewire(EmailInboxPage::class)
+        ->set('selectedEmailId', $this->inboundEmail->id)
+        ->callAction(
+            'reply',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['sender@contact.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Re: Original Subject',
+                'body_html' => '<p>Reply via group</p>',
+                'in_reply_to_email_id' => $this->inboundEmail->id,
+            ],
+        )
+        ->assertHasNoActionErrors();
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->firstOrFail();
+
+    expect($reply->status)->toBe(EmailStatus::QUEUED)
+        ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
+});
+
 it('reply_all persists a queued Email with REPLY_ALL creation_source', function (): void {
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
