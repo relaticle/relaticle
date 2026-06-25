@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Jobs\ClassifyEmailJob;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -20,10 +19,6 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 mutates(StoreEmailAction::class);
 
 beforeEach(function (): void {
-    // Email classification runs asynchronously via ClassifyEmailJob (it calls an
-    // LLM). Fake the queue so it is recorded rather than executed inline.
-    Queue::fake();
-
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
     $this->team = $this->user->currentTeam;
@@ -56,6 +51,7 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
             ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'to'],
         ],
         attachments: $overrides['attachments'] ?? [],
+        providerCategory: $overrides['providerCategory'] ?? null,
     );
 }
 
@@ -95,13 +91,80 @@ it('persists the email record with correct fields', function (): void {
     ]);
 });
 
-it('dispatches ClassifyEmailJob after storing the email', function (): void {
+it('stores a single system category label derived by rules', function (): void {
     $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
 
-    Queue::assertPushed(
-        ClassifyEmailJob::class,
-        fn (ClassifyEmailJob $job): bool => $job->emailId === $email->getKey()
-    );
+    expect($email->labels()->where('source', 'system')->count())->toBe(1);
+});
+
+it("trusts the provider's native category when one is supplied", function (): void {
+    $data = makeFetchedEmailData(['providerCategory' => EmailCategory::Marketing]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $this->assertDatabaseHas('email_labels', [
+        'email_id' => $email->getKey(),
+        'label' => EmailCategory::Marketing->value,
+        'source' => 'system',
+    ]);
+});
+
+it('classifies a calendar invite as Scheduling from the .ics part', function (): void {
+    $data = makeFetchedEmailData([
+        'subject' => 'Project kickoff',
+        'attachments' => [[
+            'filename' => 'invite.ics',
+            'mime_type' => 'text/calendar',
+            'size' => 1024,
+            'content_id' => null,
+            'attachment_id' => null,
+            'inline_data' => null,
+        ]],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $this->assertDatabaseHas('email_labels', [
+        'email_id' => $email->getKey(),
+        'label' => EmailCategory::Scheduling->value,
+        'source' => 'system',
+    ]);
+});
+
+it('classifies a billing sender as Invoice', function (): void {
+    $data = makeFetchedEmailData([
+        'subject' => 'Your monthly statement',
+        'participants' => [
+            ['email_address' => 'billing@vendor.com', 'name' => 'Vendor', 'role' => 'from'],
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'to'],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $this->assertDatabaseHas('email_labels', [
+        'email_id' => $email->getKey(),
+        'label' => EmailCategory::Invoice->value,
+        'source' => 'system',
+    ]);
+});
+
+it('falls back to Other for unrecognised external mail', function (): void {
+    $data = makeFetchedEmailData([
+        'subject' => 'hey there',
+        'participants' => [
+            ['email_address' => 'jane@external.com', 'name' => 'Jane', 'role' => 'from'],
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'to'],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $this->assertDatabaseHas('email_labels', [
+        'email_id' => $email->getKey(),
+        'label' => EmailCategory::Other->value,
+        'source' => 'system',
+    ]);
 });
 
 it("records the owner's read state when isRead is true", function (): void {
