@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 return [
     'navigation_label' => 'Emails',
+    'account_filter' => [
+        'label' => 'Account',
+        'all' => 'All accounts',
+    ],
     'compose' => [
         'label' => 'Compose',
         'notifications' => [
