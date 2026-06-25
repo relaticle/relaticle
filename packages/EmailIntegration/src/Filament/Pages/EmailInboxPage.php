@@ -24,6 +24,7 @@ use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -81,11 +82,52 @@ final class EmailInboxPage extends Page
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
+    /**
+     * Active connected-account scope for the list: a ConnectedAccount id, or the
+     * literal `all` for the unified cross-account view.
+     */
+    #[Url(as: 'account')]
+    public string $accountId = '';
+
     public string $search = '';
 
     public function mount(): void
     {
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
+        $this->accountId = $this->resolveInitialAccountId();
+        $this->ensureEmailSelected();
+    }
+
+    /**
+     * Land on the user's default account first (option 1). Honour a valid account
+     * already in the URL (or the `all` sentinel); otherwise fall back to the
+     * default account, then any account, then `all` when none are connected.
+     */
+    private function resolveInitialAccountId(): string
+    {
+        if ($this->accountId === 'all') {
+            return 'all';
+        }
+
+        $accounts = $this->userActiveAccounts();
+
+        if ($this->accountId !== '' && $accounts->has($this->accountId)) {
+            return $this->accountId;
+        }
+
+        return (string) ($accounts->keys()->first() ?? 'all');
+    }
+
+    public function updatedAccountId(): void
+    {
+        if ($this->accountId !== 'all' && ! $this->userActiveAccounts()->has($this->accountId)) {
+            $this->accountId = 'all';
+        }
+
+        $this->search = '';
+        $this->selectedEmailId = null;
+        $this->resetPage();
+        unset($this->emails, $this->inboxUnreadCount);
         $this->ensureEmailSelected();
     }
 
@@ -129,6 +171,10 @@ final class EmailInboxPage extends Page
             ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
+        if ($this->accountId !== '' && $this->accountId !== 'all') {
+            $query->where('connected_account_id', $this->accountId);
+        }
+
         if ($this->folder === EmailFolder::Sent) {
             $query->sent();
         } elseif ($this->folder === EmailFolder::Inbox) {
@@ -166,11 +212,16 @@ final class EmailInboxPage extends Page
     {
         $user = $this->authUser();
 
-        return Email::query()
+        $query = Email::query()
             ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->unreadFor($user->getKey())
-            ->count();
+            ->unreadFor($user->getKey());
+
+        if ($this->accountId !== '' && $this->accountId !== 'all') {
+            $query->where('connected_account_id', $this->accountId);
+        }
+
+        return $query->count();
     }
 
     public function selectEmail(string $id): void
@@ -440,6 +491,9 @@ final class EmailInboxPage extends Page
         return Action::make('manageSharing')
             ->label(__('filament/pages/email-inbox.sharing.label'))
             ->icon('heroicon-o-lock-open')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
             ->modalSubmitActionLabel('Save')
             ->schema([
@@ -556,6 +610,8 @@ final class EmailInboxPage extends Page
             ->label(__('filament/pages/email-inbox.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
@@ -576,6 +632,9 @@ final class EmailInboxPage extends Page
         return Action::make('requestAccess')
             ->label(__('filament/pages/email-inbox.request_access.label'))
             ->icon('heroicon-o-key')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))
@@ -1034,17 +1093,53 @@ final class EmailInboxPage extends Page
     }
 
     /**
+     * The user's active connected accounts for the current team, default first,
+     * keyed by id. Cached per request so the switcher and list filter share it.
+     *
+     * @return Collection<string, ConnectedAccount>
+     */
+    private function userActiveAccounts(): Collection
+    {
+        /** @var Collection<string, ConnectedAccount> */
+        return once(fn (): Collection => ConnectedAccount::query()
+            ->where('user_id', $this->authUser()->getKey())
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where('status', 'active')
+            ->orderByDesc('is_default')
+            ->oldest()
+            ->get()
+            ->keyBy('id'));
+    }
+
+    /**
      * @return array<string, string>
      */
     private function activeAccountOptions(): array
     {
-        return ConnectedAccount::query()
-            ->where('user_id', $this->authUser()->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->get()
+        return $this->userActiveAccounts()
             ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
             ->all();
+    }
+
+    /**
+     * Switcher options: every active account plus an "All accounts" entry. Shown
+     * only when the user has more than one account ({@see $this->accountId}).
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function accountFilterOptions(): array
+    {
+        return [
+            ...$this->activeAccountOptions(),
+            'all' => __('filament/pages/email-inbox.account_filter.all'),
+        ];
+    }
+
+    #[Computed]
+    public function showAccountSwitcher(): bool
+    {
+        return $this->userActiveAccounts()->count() > 1;
     }
 
     /**
