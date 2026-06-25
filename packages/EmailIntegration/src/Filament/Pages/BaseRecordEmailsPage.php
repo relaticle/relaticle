@@ -274,6 +274,8 @@ abstract class BaseRecordEmailsPage extends Page
             ->label(__('filament/pages/record-emails.actions.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
