@@ -10,7 +10,7 @@
                     <select
                         wire:model.live="accountId"
                         aria-label="{{ __('filament/pages/email-inbox.account_filter.label') }}"
-                        class="w-full cursor-pointer border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0"
+                        class="w-full min-w-0 truncate cursor-pointer border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0"
                     >
                         @foreach ($this->accountFilterOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
