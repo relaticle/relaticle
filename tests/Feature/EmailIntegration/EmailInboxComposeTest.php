@@ -53,6 +53,20 @@ it('keeps the default signature in the body when a template is selected', functi
         });
 });
 
+it('defaults the compose account to the inbox-selected account', function (): void {
+    $secondary = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'second@example.com',
+        'display_name' => 'Second Sender',
+    ]));
+
+    livewire(EmailInboxPage::class)
+        ->set('accountId', $secondary->id)
+        ->mountAction('composeEmail')
+        ->assertSet('mountedActions.0.data.connected_account_id', $secondary->id);
+});
+
 it('removes the signature block when "no signature" is selected', function (): void {
     $signature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,
