@@ -77,13 +77,19 @@ final readonly class AutoCreateCompanyAction
     }
 
     /**
-     * Convert "acme.com" → "Acme" as a sensible default company name.
+     * Convert a domain to a sensible default company name using the registrable
+     * label — the part right before the TLD — so mail subdomains don't leak in:
+     * "acme.com" → "Acme", "email.anthropic.com" → "Anthropic", "mg.acme.io" → "Acme".
      */
     private function domainToCompanyName(string $domain): string
     {
         $parts = explode('.', $domain);
 
-        return ucfirst($parts[0]);
+        // ponytail: "last dot" heuristic — second-from-last label. Wrong for multi-part
+        // TLDs (acme.co.uk → "Co"); swap in a public-suffix list if that becomes common.
+        $label = $parts[count($parts) - 2] ?? $parts[0];
+
+        return ucfirst($label);
     }
 
     /**

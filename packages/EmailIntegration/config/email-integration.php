@@ -35,6 +35,31 @@ return [
     ],
 
     /*
+     * Sender local-parts treated as automated/no-reply. Mail from these addresses
+     * (notice@, no-reply@, bounce@, …) does not auto-create a Company or Person
+     * during sync — it's machine-sent, so there is no real contact behind it.
+     * Matched as a case-insensitive substring of the local-part (before the @).
+     */
+    'automated_local_parts' => [
+        'no-reply',
+        'noreply',
+        'no_reply',
+        'donotreply',
+        'do-not-reply',
+        'notice',
+        'notification',
+        'notifications',
+        'newsletter',
+        'mailer-daemon',
+        'mailer',
+        'bounce',
+        'postmaster',
+        'auto-reply',
+        'autoreply',
+        'automated',
+    ],
+
+    /*
      * Sync settings — override via .env
      */
     'sync' => [
