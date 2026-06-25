@@ -74,15 +74,18 @@
             </p>
         @endif
 
-        {{-- Labels --}}
-        @if ($email->labels->isNotEmpty())
-            <div class="mt-1.5 flex gap-1">
-                @foreach ($email->labels->take(2) as $label)
-                    <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                        {{ $label->label }}
-                    </span>
-                @endforeach
-            </div>
+        {{-- Category — a quiet metadata cue, not a content element. A small
+             semantic dot keeps it scannable without a filled pill stealing focus
+             from the sender and subject. --}}
+        @php
+            $category = \Relaticle\EmailIntegration\Enums\EmailCategory::tryFrom($email->labels->first()?->label ?? '');
+        @endphp
+        @if ($category)
+            <span class="mt-1.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {{-- Filament's own color system: fi-color-* sets --color-400, no Tailwind literals needed --}}
+                <span @class(['h-1.5 w-1.5 rounded-full', 'fi-color-'.$category->getColor()]) style="background-color: var(--color-400)"></span>
+                {{ $category->getLabel() }}
+            </span>
         @endif
 
     </button>
