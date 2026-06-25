@@ -30,6 +30,7 @@ use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
@@ -179,6 +180,18 @@ final class EmailInboxPage extends Page
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
+    }
+
+    public function markAllAsRead(): void
+    {
+        $count = resolve(MarkAllEmailsAsReadAction::class)->execute($this->authUser(), $this->folder);
+
+        unset($this->inboxUnreadCount, $this->emails);
+
+        Notification::make()
+            ->success()
+            ->title(trans_choice('filament/pages/email-inbox.mark_all_read.notification', $count, ['count' => $count]))
+            ->send();
     }
 
     public function setFolder(string $folder): void
