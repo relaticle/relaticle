@@ -26,6 +26,7 @@ return [
         'queued' => [
             'title' => 'Mass email queued',
             'body' => 'Sending to :count recipient(s).',
+            'body_with_skipped' => 'Queued :count recipient(s), skipped :skipped without an email address.',
         ],
     ],
 ];

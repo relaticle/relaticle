@@ -124,11 +124,16 @@ final readonly class LinkMeetingAction
      */
     private function autoAttach(MorphToMany $relation, string $relatedId): bool
     {
-        $result = $relation->syncWithoutDetaching([
-            $relatedId => ['link_source' => 'auto'],
-        ]);
+        // Only attach (with link_source 'auto') when the record isn't already
+        // linked — never touch an existing pivot, so a prior manual link keeps
+        // its 'manual' source instead of being silently downgraded to 'auto'.
+        if ($relation->whereKey($relatedId)->exists()) {
+            return false;
+        }
 
-        return in_array($relatedId, $result['attached'], true);
+        $relation->attach($relatedId, ['link_source' => 'auto']);
+
+        return true;
     }
 
     private function updatePersonMetrics(People $person, Meeting $meeting): void

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Actions;
 
+use App\Enums\CustomFields\PeopleField;
+use App\Models\CustomField;
 use App\Models\People;
+use App\Models\User;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -14,14 +17,8 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
-use Relaticle\EmailIntegration\Actions\SendEmailAction;
-use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
-use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Models\EmailBatch;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
@@ -96,26 +93,43 @@ final class MassSendBulkAction extends BulkAction
                     ]),
             ])
             ->action(function (Collection $records, array $data): void {
-                $teamId = filament()->getTenant()?->getKey();
-                $userId = auth()->id();
-                $accountId = $data['connected_account_id'];
+                /** @var User $user */
+                $user = auth()->user();
 
-                // Resolve email address for each person from their participant records
-                $personEmails = EmailParticipant::query()
-                    ->whereIn('contact_id', $records->pluck('id'))
-                    ->whereNotNull('email_address')
-                    ->select('contact_id', 'email_address')
-                    ->distinct()
-                    ->get()
-                    ->groupBy('contact_id')
-                    ->map(fn (Collection $participants): string => $participants->first()->email_address);
+                // Resolve each selected person's send-to address from the People EMAILS
+                // custom field — the canonical source LinkEmailAction matches participants
+                // against. Resolving from participant rows alone would silently drop people
+                // you have never emailed (those rows are a side effect of past exchange).
+                $emailsField = CustomField::query()
+                    ->withoutGlobalScopes()
+                    ->where('tenant_id', filament()->getTenant()?->getKey())
+                    ->where('entity_type', 'people')
+                    ->where('code', PeopleField::EMAILS->value)
+                    ->first();
 
-                // Filter out people without a known email address
-                $validRecipients = $records->filter(
-                    fn (mixed $person): bool => $person instanceof People && filled($personEmails->get($person->getKey()))
-                );
+                /** @var list<array{person: People, email: string}> $recipients */
+                $recipients = [];
+                $skipped = 0;
 
-                if ($validRecipients->isEmpty()) {
+                // ponytail: getCustomFieldValue lazy-loads per person (N+1) — fine for a
+                // manual bulk selection; eager-load customFieldValues if selections grow huge.
+                foreach ($records as $person) {
+                    if (! $person instanceof People) {
+                        continue;
+                    }
+
+                    $email = self::resolvePrimaryEmail($person, $emailsField);
+
+                    if ($email === null) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $recipients[] = ['person' => $person, 'email' => $email];
+                }
+
+                if ($recipients === []) {
                     Notification::make()
                         ->title(__('filament/actions/mass-send.notifications.no_recipients.title'))
                         ->body(__('filament/actions/mass-send.notifications.no_recipients.body'))
@@ -125,58 +139,46 @@ final class MassSendBulkAction extends BulkAction
                     return;
                 }
 
-                $renderService = resolve(EmailTemplateRenderService::class);
                 /** @var EmailTemplate|null $template */
                 $template = isset($data['template_id']) ? EmailTemplate::query()->whereKey($data['template_id'])->first() : null;
 
-                // All-or-nothing: SendEmailAction throws once the per-user queue cap is
-                // hit. Without a transaction a mid-loop failure would leave the batch with
-                // total_recipients set to the full count but only some emails queued, so
-                // sent_count+failed_count can never reach total and the batch is stuck
-                // Queued forever. Wrap creation + every send so a failure rolls all of it
-                // back, leaving no orphaned batch.
-                DB::transaction(function () use ($validRecipients, $personEmails, $template, $renderService, $data, $teamId, $userId, $accountId): void {
-                    $batch = EmailBatch::query()->create([
-                        'team_id' => $teamId,
-                        'user_id' => $userId,
-                        'connected_account_id' => $accountId,
-                        'subject' => $data['subject'],
-                        'total_recipients' => $validRecipients->count(),
-                        'status' => EmailBatchStatus::Queued,
-                    ]);
-
-                    foreach ($validRecipients as $person) {
-                        $rendered = $template !== null
-                            ? $renderService->render($template, $person)
-                            : [
-                                'subject' => $renderService->renderContent((string) $data['subject'], $person),
-                                'body_html' => $renderService->renderContent((string) $data['body_html'], $person),
-                            ];
-
-                        resolve(SendEmailAction::class)->execute(
-                            data: [
-                                'connected_account_id' => $accountId,
-                                'subject' => $rendered['subject'],
-                                'body_html' => $rendered['body_html'],
-                                'to' => [['email' => (string) $personEmails->get($person->getKey()), 'name' => $person->name]],
-                                'cc' => [],
-                                'bcc' => [],
-                                'in_reply_to_email_id' => null,
-                                'creation_source' => EmailCreationSource::MASS_SEND,
-                                'privacy_tier' => EmailPrivacyTier::FULL,
-                                'batch_id' => $batch->getKey(),
-                            ],
-                            linkToType: People::class,
-                            linkToId: $person->getKey(),
-                        );
-                    }
-                });
+                resolve(SendEmailBatchAction::class)->execute(
+                    user: $user,
+                    recipients: $recipients,
+                    payload: [
+                        'connected_account_id' => $data['connected_account_id'],
+                        'subject' => (string) $data['subject'],
+                        'body_html' => (string) $data['body_html'],
+                    ],
+                    template: $template,
+                );
 
                 Notification::make()
                     ->title(__('filament/actions/mass-send.notifications.queued.title'))
-                    ->body(__('filament/actions/mass-send.notifications.queued.body', ['count' => $validRecipients->count()]))
+                    ->body($skipped > 0
+                        ? __('filament/actions/mass-send.notifications.queued.body_with_skipped', [
+                            'count' => count($recipients),
+                            'skipped' => $skipped,
+                        ])
+                        : __('filament/actions/mass-send.notifications.queued.body', ['count' => count($recipients)]))
                     ->success()
                     ->send();
             });
+    }
+
+    /**
+     * Resolve a person's first email address from the EMAILS custom field
+     * (stored as a JSON array). Returns null when the person has no email.
+     */
+    private static function resolvePrimaryEmail(People $person, ?CustomField $emailsField): ?string
+    {
+        if (! $emailsField instanceof CustomField) {
+            return null;
+        }
+
+        $value = $person->getCustomFieldValue($emailsField);
+        $email = is_array($value) ? ($value[0] ?? null) : $value;
+
+        return filled($email) ? (string) $email : null;
     }
 }
