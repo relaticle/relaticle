@@ -82,6 +82,21 @@ abstract class BaseRecordEmailsPage extends Page
         ];
     }
 
+    public function replyAction(): Action
+    {
+        return $this->replyForwardModeAction('reply', 'reply', $this->selectedEmailId);
+    }
+
+    public function replyAllAction(): Action
+    {
+        return $this->replyForwardModeAction('replyAll', 'reply_all', $this->selectedEmailId);
+    }
+
+    public function forwardAction(): Action
+    {
+        return $this->replyForwardModeAction('forward', 'forward', $this->selectedEmailId);
+    }
+
     /**
      * @return LengthAwarePaginator<int, Email&object{pivot: MorphPivot}>
      */
