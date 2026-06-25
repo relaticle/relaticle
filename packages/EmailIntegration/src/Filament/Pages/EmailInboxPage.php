@@ -440,6 +440,9 @@ final class EmailInboxPage extends Page
         return Action::make('manageSharing')
             ->label(__('filament/pages/email-inbox.sharing.label'))
             ->icon('heroicon-o-lock-open')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
             ->modalSubmitActionLabel('Save')
             ->schema([
@@ -556,6 +559,8 @@ final class EmailInboxPage extends Page
             ->label(__('filament/pages/email-inbox.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
@@ -576,6 +581,9 @@ final class EmailInboxPage extends Page
         return Action::make('requestAccess')
             ->label(__('filament/pages/email-inbox.request_access.label'))
             ->icon('heroicon-o-key')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))
