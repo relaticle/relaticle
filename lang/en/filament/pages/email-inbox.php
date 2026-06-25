@@ -13,6 +13,10 @@ return [
             ],
         ],
     ],
+    'mark_all_read' => [
+        'label' => 'Mark all read',
+        'notification' => '{0}No unread emails to mark|{1}1 email marked as read|[2,*]:count emails marked as read',
+    ],
     'reply_forward' => [
         'modal_headings' => [
             'reply_all' => 'Reply All',
