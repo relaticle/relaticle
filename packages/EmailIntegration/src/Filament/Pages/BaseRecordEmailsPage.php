@@ -194,6 +194,9 @@ abstract class BaseRecordEmailsPage extends Page
         return Action::make('manageSharing')
             ->label(__('filament/pages/record-emails.actions.manage_sharing.label'))
             ->icon('heroicon-o-lock-open')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->modalHeading(__('filament/pages/record-emails.actions.manage_sharing.modal_heading'))
             ->modalSubmitActionLabel(__('filament/pages/record-emails.actions.manage_sharing.submit'))
             ->schema([
@@ -296,6 +299,9 @@ abstract class BaseRecordEmailsPage extends Page
         return Action::make('requestAccess')
             ->label(__('filament/pages/record-emails.actions.request_access.label'))
             ->icon('heroicon-o-key')
+            ->color('gray')
+            ->link()
+            ->extraAttributes(['class' => 'text-xs'])
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/record-emails.fields.tier_requested.label'))
