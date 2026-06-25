@@ -91,10 +91,4 @@ return [
         'tenant' => env('AZURE_TENANT_ID'),
         'proxy' => env('PROXY'),  // optionally
     ],
-
-    'email_sync' => [
-        'initial_days' => env('EMAIL_SYNC_INITIAL_DAYS', 90),
-        'interval' => env('EMAIL_SYNC_INTERVAL_MINUTES', 5),
-        'batch_size' => env('EMAIL_SYNC_BATCH_SIZE', 50),
-    ],
 ];

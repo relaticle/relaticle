@@ -62,7 +62,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $jobs = collect($newIds)
-            ->chunk(config('services.email_sync.batch_size', 50))
+            ->chunk(Config::integer('email-integration.sync.batch_size', 50))
             ->flatMap(fn (Collection $chunk): array => $chunk->map(fn (string $id): StoreEmailJob => new StoreEmailJob($account, $id))->all())
             ->all();
 
