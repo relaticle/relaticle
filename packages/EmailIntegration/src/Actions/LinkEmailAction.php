@@ -17,6 +17,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkEmailAction
@@ -25,6 +26,7 @@ final readonly class LinkEmailAction
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
+        private AutomatedSenderMatcher $automatedSender,
     ) {}
 
     public function execute(Email $email): void
@@ -45,6 +47,11 @@ final readonly class LinkEmailAction
         $countedOpportunities = [];
 
         foreach ($participants as $participant) {
+            // Machine-sent senders (no-reply@, notice@, bounce@) still link to existing
+            // records but must never spawn a new Company/Person — there's no real
+            // contact behind them.
+            $isAutomatedSender = $this->automatedSender->matches($participant->email_address);
+
             // 1. Try to match Company by email domain first, so the person can be born already linked.
             $company = null;
             $domain = $this->extractDomain($participant->email_address);
@@ -53,7 +60,7 @@ final readonly class LinkEmailAction
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
                 // 2. Auto-create Company when no existing record found.
-                if (! $company && $connectedAccount?->auto_create_companies) {
+                if (! $company && ! $isAutomatedSender && $connectedAccount?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -78,7 +85,7 @@ final readonly class LinkEmailAction
                 ->first();
 
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && $connectedAccount && $this->shouldCreatePerson($connectedAccount, $participant->email_address)) {
+            if (! $person && ! $isAutomatedSender && $connectedAccount && $this->shouldCreatePerson($connectedAccount, $participant->email_address)) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,

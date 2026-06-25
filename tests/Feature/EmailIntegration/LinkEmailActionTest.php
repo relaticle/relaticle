@@ -266,6 +266,57 @@ it('auto-creates a company when auto_create_companies is true', function (): voi
     expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->exists())->toBeTrue();
 });
 
+it('derives the company name from the registrable domain, not a mail subdomain', function (): void {
+    $this->account->update(['auto_create_companies' => true]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'john@email.anthropic.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Anthropic')->exists())->toBeTrue()
+        ->and(Company::where('team_id', $this->team->id)->where('name', 'Email')->exists())->toBeFalse();
+});
+
+it('does not auto-create a company for a no-reply / automated sender', function (): void {
+    $this->account->update(['auto_create_companies' => true]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'notice@email.anthropic.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a person for a no-reply / automated sender', function (): void {
+    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'noreply@partner.com',
+        'name' => 'Partner Notifications',
+    ]);
+
+    $countBefore = People::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
 it('seeds an auto-created company with a protocol-less domain and ICP set to false', function (): void {
     $this->account->update(['auto_create_companies' => true]);
 
