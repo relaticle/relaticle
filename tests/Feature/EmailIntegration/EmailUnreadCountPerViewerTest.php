@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailRead;
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -66,4 +67,50 @@ it('keeps each viewer unread state independent of the owner', function (): void 
 
     $ownerPage = livewire(EmailInboxPage::class);
     expect($ownerPage->instance()->inboxUnreadCount())->toBe(1);
+});
+
+it('marks every visible unread inbox email as read for the viewer', function (): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    $page = livewire(EmailInboxPage::class);
+    // Mounting auto-reads only the newest, leaving the older one unread.
+    expect($page->instance()->inboxUnreadCount())->toBe(1);
+
+    $page->call('markAllAsRead');
+
+    expect($page->instance()->inboxUnreadCount())->toBe(0);
+    expect(EmailRead::query()->where('user_id', $this->viewer->id)->whereIn('email_id', [$this->newer->id, $this->older->id])->count())->toBe(2);
+});
+
+it('does not mark emails the viewer cannot see', function (): void {
+    // A private email the owner never shared — invisible to the viewer.
+    $private = Email::factory()->inbound()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'sent_at' => now()->subDay(),
+    ]);
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    livewire(EmailInboxPage::class)->call('markAllAsRead');
+
+    expect(EmailRead::query()->where('user_id', $this->viewer->id)->where('email_id', $private->id)->exists())->toBeFalse();
+});
+
+it('leaves an already-read row untouched when marking all as read', function (): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    $page = livewire(EmailInboxPage::class);
+    // Mount already read the newest email for the viewer.
+    $existing = EmailRead::query()->where('user_id', $this->viewer->id)->where('email_id', $this->newer->id)->sole();
+
+    $page->call('markAllAsRead');
+
+    $after = EmailRead::query()->where('user_id', $this->viewer->id)->where('email_id', $this->newer->id)->sole();
+    expect($after->id)->toBe($existing->id)
+        ->and($after->read_at->equalTo($existing->read_at))->toBeTrue();
 });

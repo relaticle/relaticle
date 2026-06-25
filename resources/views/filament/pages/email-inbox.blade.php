@@ -12,6 +12,24 @@
 
             <x-emails.search-bar :search="$search" />
 
+            @if ($this->inboxUnreadCount > 0)
+                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-3 py-1.5">
+                    <span class="text-xs text-gray-400 dark:text-gray-500">
+                        {{ $this->inboxUnreadCount }} unread
+                    </span>
+                    <button
+                        wire:click="markAllAsRead"
+                        wire:loading.attr="disabled"
+                        wire:target="markAllAsRead"
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-50"
+                    >
+                        <x-ri-check-double-line class="h-3.5 w-3.5" />
+                        {{ __('filament/pages/email-inbox.mark_all_read.label') }}
+                    </button>
+                </div>
+            @endif
+
             <div class="flex-1 overflow-y-scroll divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse ($this->emails as $email)
                     <x-emails.list-row :email="$email" :selected-email-id="$selectedEmailId" :folder="$folder" />
