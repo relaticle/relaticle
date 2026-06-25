@@ -11,6 +11,7 @@ use Google\Service\Gmail\MessagePartHeader;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -103,6 +104,7 @@ final readonly class GmailService implements MailServiceInterface
             bodyHtml: $this->extractBody($payload, 'text/html'),
             participants: $this->extractParticipants($headers),
             attachments: $this->extractAttachments($payload),
+            providerCategory: $this->resolveProviderCategory($labelIds),
         );
     }
 
@@ -285,6 +287,28 @@ final readonly class GmailService implements MailServiceInterface
             in_array('DRAFT', $labelIds) => EmailFolder::Drafts,
             in_array('INBOX', $labelIds) => EmailFolder::Inbox,
             default => EmailFolder::Archive,
+        };
+    }
+
+    /**
+     * Map Gmail's free, native inbox-category labels to our classification
+     * vocabulary so we skip a paid LLM call for the high-volume noise buckets.
+     *
+     * Only high-confidence consumer categories are mapped. CATEGORY_UPDATES
+     * (receipts, statements, confirmations) is deliberately left unmapped — it
+     * frequently hides Invoice/Scheduling/Support mail that only AI resolves —
+     * as is an inbox-only message with no category at all.
+     *
+     * @param  array<int, string>  $labelIds
+     */
+    private function resolveProviderCategory(array $labelIds): ?EmailCategory
+    {
+        return match (true) {
+            in_array('CATEGORY_PROMOTIONS', $labelIds, true) => EmailCategory::Marketing,
+            in_array('CATEGORY_PERSONAL', $labelIds, true) => EmailCategory::Personal,
+            in_array('CATEGORY_SOCIAL', $labelIds, true) => EmailCategory::Other,
+            in_array('CATEGORY_FORUMS', $labelIds, true) => EmailCategory::Other,
+            default => null,
         };
     }
 

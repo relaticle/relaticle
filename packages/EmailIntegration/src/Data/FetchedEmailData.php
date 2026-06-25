@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Data;
 
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 
@@ -30,5 +31,12 @@ final readonly class FetchedEmailData
         public ?string $bodyHtml,
         public array $participants,
         public array $attachments,
+        /**
+         * Provider-native category, mapped to our vocabulary during fetch.
+         * When set, the email is already classified and AI classification is
+         * skipped. Null means the provider gave no confident hint — fall back
+         * to AI.
+         */
+        public ?EmailCategory $providerCategory = null,
     ) {}
 }
