@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -57,10 +58,6 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $newIds = array_values(array_diff($allIds, $storedIds));
 
-        foreach ($newIds as $messageId) {
-            dispatch(new StoreEmailJob($account, $messageId));
-        }
-
         // Read state is per-viewer; the provider delta reflects the OWNER's mailbox,
         // so toggle only the owner's read rows (teammates' read state is untouched).
         $ownerId = $account->user_id;
@@ -97,8 +94,45 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
                 ->delete();
         }
 
+        // Advancing the cursor before the fetched messages are stored loses any message
+        // whose StoreEmailJob exhausts its retries — the next sync starts past it and it
+        // is never retried. So advance the cursor only once the batch has fully stored.
+        // With no new messages the delta is read-only state, so advance inline.
+        if ($newIds === []) {
+            $this->advanceCursor($account, $delta->newCursor);
+
+            return;
+        }
+
+        $accountId = $account->getKey();
+        $newCursor = $delta->newCursor;
+
+        Bus::batch(array_map(
+            fn (string $messageId): StoreEmailJob => new StoreEmailJob($account, $messageId),
+            $newIds,
+        ))
+            ->name("Incremental sync: {$account->email_address}")
+            ->onQueue('emails-sync')
+            ->allowFailures()
+            ->then(function () use ($accountId, $newCursor): void {
+                $account = ConnectedAccount::query()->find($accountId);
+                $account?->update([
+                    'sync_cursor' => $newCursor,
+                    'last_synced_at' => now(),
+                    'status' => EmailAccountStatus::ACTIVE,
+                    'last_error' => null,
+                ]);
+            })
+            // ponytail: a single failed StoreEmailJob in the batch holds back the cursor
+            // for the WHOLE batch, so its already-stored siblings get re-fetched (deduped,
+            // cheap) next sync. Per-message cursors would avoid that re-fetch; not worth it.
+            ->dispatch();
+    }
+
+    private function advanceCursor(ConnectedAccount $account, string $newCursor): void
+    {
         $account->update([
-            'sync_cursor' => $delta->newCursor,
+            'sync_cursor' => $newCursor,
             'last_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,

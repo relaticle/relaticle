@@ -34,6 +34,8 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property string $email_address
  * @property string|null $display_name
  * @property bool $is_default
+ * @property bool $sync_inbox
+ * @property bool $sync_sent
  * @property string $access_token
  * @property string|null $refresh_token
  * @property Carbon|null $token_expires_at

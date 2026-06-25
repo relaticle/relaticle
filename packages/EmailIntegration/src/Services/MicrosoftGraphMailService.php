@@ -17,7 +17,10 @@ use RuntimeException;
 
 final class MicrosoftGraphMailService implements MailServiceInterface
 {
-    private const string INBOX_DELTA = '/me/mailFolders/Inbox/messages/delta';
+    // All-folder delta stream. Unlike a per-folder endpoint (/me/mailFolders/Inbox/...),
+    // this spans Inbox, SentItems, etc. in a single cursor, so Sent mail syncs too.
+    // Folder/direction is derived per message from parentFolderId in fetchMessage().
+    private const string MESSAGES_DELTA = '/me/messages/delta';
 
     /**
      * @var array<string, string>|null Cached folder id => lowercase displayName map per instance.
@@ -125,7 +128,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
         $messageIds = [];
         $deltaLink = '';
-        $nextUrl = self::INBOX_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
+        $nextUrl = self::MESSAGES_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
 
         do {
             $response = $http->get($nextUrl)->throw()->json();

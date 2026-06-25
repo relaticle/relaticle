@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\Email;
+use RuntimeException;
 
 final class EmailOutboxPage extends Page implements HasTable
 {
@@ -112,13 +113,30 @@ final class EmailOutboxPage extends Page implements HasTable
                     ->requiresConfirmation()
                     ->action(function (Collection $records): void {
                         $cancelled = 0;
+                        $skipped = 0;
+                        $action = resolve(CancelQueuedEmailAction::class);
                         foreach ($records as $record) {
-                            if ($record instanceof Email && $record->status === EmailStatus::QUEUED) {
-                                resolve(CancelQueuedEmailAction::class)->execute($record);
+                            if (! $record instanceof Email) {
+                                continue;
+                            }
+
+                            try {
+                                // The pre-check on $record->status uses stale, table-loaded
+                                // data; the action re-locks the row and throws if it is no
+                                // longer QUEUED (e.g. it transitioned to SENDING since render).
+                                // Skip those rather than aborting the whole batch.
+                                $action->execute($record);
                                 $cancelled++;
+                            } catch (RuntimeException) {
+                                $skipped++;
                             }
                         }
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.bulk_cancelled', ['count' => $cancelled]))->success()->send();
+
+                        $title = $skipped > 0
+                            ? __('filament/pages/email-outbox.notifications.bulk_cancelled_with_skipped', ['cancelled' => $cancelled, 'skipped' => $skipped])
+                            : __('filament/pages/email-outbox.notifications.bulk_cancelled', ['count' => $cancelled]);
+
+                        Notification::make()->title($title)->success()->send();
                     }),
             ]);
     }

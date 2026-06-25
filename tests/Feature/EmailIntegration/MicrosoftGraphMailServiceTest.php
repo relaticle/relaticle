@@ -40,14 +40,14 @@ function makeAzureAccount(): ConnectedAccount
         ]);
 }
 
-it('returns initial backfill cursor as the Graph deltaLink', function (): void {
+it('backfills from the all-folder /me/messages/delta stream and returns the Graph deltaLink', function (): void {
     Http::fake([
-        'https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages/delta*' => Http::response([
+        'https://graph.microsoft.com/v1.0/me/messages/delta*' => Http::response([
             'value' => [
                 ['id' => 'AAA1', 'isRead' => false],
                 ['id' => 'AAA2', 'isRead' => true],
             ],
-            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages/delta?$deltatoken=TKN',
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken=TKN',
         ]),
     ]);
 
@@ -57,6 +57,10 @@ it('returns initial backfill cursor as the Graph deltaLink', function (): void {
 
     expect($result['cursor'])->toContain('$deltatoken=TKN')
         ->and($result['message_ids']->all())->toEqual(['AAA1', 'AAA2']);
+
+    // Must hit the all-folder endpoint, not the Inbox-only one, so Sent mail syncs.
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/messages/delta')
+        && ! str_contains((string) $r->url(), 'mailFolders'));
 });
 
 it('paginates delta with @odata.nextLink and surfaces new + read ids + new cursor', function (): void {
