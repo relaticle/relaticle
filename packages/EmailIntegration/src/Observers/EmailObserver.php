@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Observers;
 
-use App\Jobs\ClassifyEmailJob;
 use App\Models\User;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Models\Email;
@@ -35,7 +34,5 @@ final readonly class EmailObserver
         }
 
         $this->linkEmail->execute($email);
-
-        dispatch(new ClassifyEmailJob($email->getKey()))->delay(now()->addSeconds(5));
     }
 }

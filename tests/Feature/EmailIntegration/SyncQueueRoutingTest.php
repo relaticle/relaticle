@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Jobs\ClassifyEmailJob;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
@@ -18,7 +17,6 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
 mutates(
-    ClassifyEmailJob::class,
     IncrementalEmailSyncJob::class,
     InitialEmailSyncJob::class,
     StoreEmailJob::class,
@@ -27,7 +25,7 @@ mutates(
     StoreMeetingJob::class,
 );
 
-it('routes inbound email sync and classify jobs to emails-sync queue', function (): void {
+it('routes inbound email and calendar sync jobs to emails-sync queue', function (): void {
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
 
     $event = new CalendarEventData(
@@ -53,8 +51,7 @@ it('routes inbound email sync and classify jobs to emails-sync queue', function 
         ->and((new StoreEmailJob($account, 'msg-1'))->queue)->toBe('emails-sync')
         ->and((new IncrementalCalendarSyncJob($account))->queue)->toBe('emails-sync')
         ->and((new InitialCalendarSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new StoreMeetingJob($account, $event))->queue)->toBe('emails-sync')
-        ->and((new ClassifyEmailJob('email-id'))->queue)->toBe('emails-sync');
+        ->and((new StoreMeetingJob($account, $event))->queue)->toBe('emails-sync');
 });
 
 it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue', function (): void {

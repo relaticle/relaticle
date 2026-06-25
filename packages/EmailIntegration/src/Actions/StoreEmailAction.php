@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Jobs\ClassifyEmailJob;
 use App\Models\Team;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
+use Relaticle\EmailIntegration\Services\EmailClassifier;
 use Throwable;
 
 final readonly class StoreEmailAction
@@ -25,7 +26,7 @@ final readonly class StoreEmailAction
      */
     public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
-        $email = DB::transaction(function () use ($connectedAccount, $data): Email {
+        return DB::transaction(function () use ($connectedAccount, $data): Email {
             $email = Email::query()->create([
                 'team_id' => $connectedAccount->team_id,
                 'user_id' => $connectedAccount->user_id,
@@ -98,19 +99,21 @@ final readonly class StoreEmailAction
 
             $email->updateQuietly(['is_internal' => $isInternal]);
 
+            // Deterministic, rule-based categorisation — cheap string heuristics,
+            // no LLM call. Runs inline now that participants/attachments/internal
+            // state are all known.
+            EmailLabel::query()->create([
+                'email_id' => $email->getKey(),
+                'label' => resolve(EmailClassifier::class)->classify($data, $isInternal)->value,
+                'source' => 'system',
+                'created_at' => now(),
+            ]);
+
             resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
             resolve(LinkEmailAction::class)->execute($email);
 
             return $email;
         });
-
-        // Classify after commit: the EmailObserver only dispatches when participants
-        // already exist at create() time, which never holds on the sync path (they
-        // are attached above, after the row is inserted), so the job would otherwise
-        // never run. afterCommit keeps the queued worker from racing the insert.
-        dispatch(new ClassifyEmailJob($email->getKey()))->afterCommit();
-
-        return $email;
     }
 }
