@@ -28,8 +28,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/email-integration.php', 'email-integration');
-
         $this->app->bind(CalendarServiceFactoryInterface::class, CalendarServiceFactory::class);
         $this->app->bind(MailServiceFactoryInterface::class, MailServiceFactory::class);
 
@@ -73,10 +71,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 BackfillEmailThreadsCommand::class,
                 DispatchOutboxCommand::class,
             ]);
-
-            $this->publishes([
-                __DIR__.'/../config/email-integration.php' => config_path('email-integration.php'),
-            ], 'email-integration-config');
         }
     }
 }
