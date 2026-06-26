@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Bus;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Relaticle\EmailIntegration\Controllers\CallbackController;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -50,7 +51,8 @@ it('stores an azure connected account and flips calendar capability when Graph c
         ->firstOrFail();
 
     expect($account->hasCalendar())->toBeTrue()
-        ->and($account->capabilities['email'])->toBeTrue();
+        ->and($account->capabilities['email'])->toBeTrue()
+        ->and($account->contact_creation_mode)->toBe(ContactCreationMode::Bidirectional);
 
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });

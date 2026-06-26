@@ -11,12 +11,14 @@ use App\Models\Team;
 use App\Support\Database\AdvisoryLock;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
+use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
 final readonly class AutoCreateCompanyAction
 {
     public function __construct(
         private CompanyDomainMatcher $domainMatcher,
         private AdvisoryLock $advisoryLock,
+        private PublicSuffixList $publicSuffixList,
     ) {}
 
     /**
@@ -79,13 +81,16 @@ final readonly class AutoCreateCompanyAction
     }
 
     /**
-     * Convert "acme.com" → "Acme" as a sensible default company name.
+     * Convert a domain to a sensible default company name using the registrable
+     * label resolved against the Public Suffix List — so mail subdomains and
+     * multi-part TLDs never leak in: "acme.com" → "Acme",
+     * "email.anthropic.com" → "Anthropic", "mail.acme.co.uk" → "Acme".
      */
     private function domainToCompanyName(string $domain): string
     {
-        $parts = explode('.', $domain);
+        $label = $this->publicSuffixList->registrableLabel($domain) ?? explode('.', $domain)[0];
 
-        return ucfirst($parts[0]);
+        return ucfirst($label);
     }
 
     /**

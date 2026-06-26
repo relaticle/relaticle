@@ -293,11 +293,10 @@ final class EmailInboxPage extends Page
             ->tooltip('⌘ + e')
             ->visible(fn (): bool => $this->hasActiveConnectedAccount())
             ->fillForm(function (): array {
-                $account = ConnectedAccount::query()
-                    ->where('user_id', $this->authUser()->getKey())
-                    ->where('team_id', filament()->getTenant()?->getKey())
-                    ->where('status', 'active')
-                    ->first();
+                // Default to the account currently filtered in the inbox; fall back
+                // to the first active account when viewing "all" or none selected.
+                $accounts = $this->userActiveAccounts();
+                $account = $accounts->get($this->accountId) ?? $accounts->first();
 
                 if ($account === null) {
                     return [];
