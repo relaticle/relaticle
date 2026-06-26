@@ -282,6 +282,26 @@ it('derives the company name from the registrable domain, not a mail subdomain',
         ->and(Company::where('team_id', $this->team->id)->where('name', 'Email')->exists())->toBeFalse();
 });
 
+it('derives the company name from the registrable label across TLD shapes', function (string $address, string $expected): void {
+    $this->account->update(['auto_create_companies' => true]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $address,
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->where('name', $expected)->exists())->toBeTrue();
+})->with([
+    'plain TLD' => ['john@acme.com', 'Acme'],
+    'mail subdomain' => ['john@mail.acme.io', 'Acme'],
+    'two-label TLD' => ['john@acme.co.uk', 'Acme'],
+    'subdomain + two-label TLD' => ['john@mail.acme.co.uk', 'Acme'],
+]);
+
 it('does not auto-create a company for a no-reply / automated sender', function (): void {
     $this->account->update(['auto_create_companies' => true]);
 
