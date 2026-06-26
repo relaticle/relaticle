@@ -22,6 +22,7 @@ use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterfac
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
+use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
@@ -31,6 +32,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         $this->app->bind(CalendarServiceFactoryInterface::class, CalendarServiceFactory::class);
         $this->app->bind(MailServiceFactoryInterface::class, MailServiceFactory::class);
+
+        // Parse the Public Suffix List once per process.
+        $this->app->singleton(PublicSuffixList::class);
     }
 
     public function boot(): void
