@@ -23,6 +23,7 @@ use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
@@ -181,6 +182,21 @@ abstract class BaseRecordEmailsPage extends Page
         unset($this->emails);
         $firstItem = $this->emails()->items()[0] ?? null;
         $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
+    }
+
+    public function markAllAsRead(): void
+    {
+        /** @var Company|Opportunity|People $record */
+        $record = $this->getRecord();
+
+        $count = resolve(MarkAllEmailsAsReadAction::class)->execute($this->authUser(), $this->folder, $record);
+
+        unset($this->inboxUnreadCount, $this->emails);
+
+        Notification::make()
+            ->success()
+            ->title(trans_choice('filament/pages/email-inbox.mark_all_read.notification', $count, ['count' => $count]))
+            ->send();
     }
 
     public function updatedSearch(): void
