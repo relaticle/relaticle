@@ -12,6 +12,24 @@
 
             <x-emails.search-bar :search="$search" />
 
+            @if ($this->inboxUnreadCount > 0)
+                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-3 py-1.5">
+                    <span class="text-xs text-gray-400 dark:text-gray-500">
+                        {{ $this->inboxUnreadCount }} unread
+                    </span>
+                    <button
+                        wire:click="markAllAsRead"
+                        wire:loading.attr="disabled"
+                        wire:target="markAllAsRead"
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-50"
+                    >
+                        <x-ri-check-double-line class="h-3.5 w-3.5" />
+                        {{ __('filament/pages/email-inbox.mark_all_read.label') }}
+                    </button>
+                </div>
+            @endif
+
             <div class="flex-1 overflow-y-scroll divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse($this->emails as $email)
                     <x-emails.list-row :email="$email" :selected-email-id="$selectedEmailId" :folder="$folder" />
@@ -47,17 +65,17 @@
         </div>
 
         {{-- ── Right panel: email detail ───────────────────────────────── --}}
-        <div class="relative flex flex-1 flex-col overflow-y-auto">
+        <div class="relative flex flex-1 flex-col min-h-0">
 
             {{-- Loading overlay while switching emails --}}
-            <div wire:loading wire:target="selectEmail" class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
-                <svg class="h-8 w-8 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <div wire:loading wire:target="selectEmail,setFolder" class="absolute inset-0 z-10 bg-white/70 dark:bg-gray-900/70">
+                <svg class="absolute top-1/2 left-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
             </div>
 
-            <div wire:loading.class="opacity-0" wire:target="selectEmail">
+            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-y-auto min-h-0">
                 @if ($this->selectedEmail !== null)
                     <x-emails.detail-action-bar :email="$this->selectedEmail" />
 
