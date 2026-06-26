@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -20,11 +23,13 @@ final readonly class MarkAllEmailsAsReadAction
      *
      * Unread is meaningful only for inbound mail, so Sent (and other outbound-only
      * folders) resolve to zero matches and the action is a no-op there.
+     *
+     * When $record is given (a Company/People/Opportunity record page), only that
+     * record's emails are marked — not the user's whole team inbox.
      */
-    public function execute(User $user, EmailFolder $folder): int
+    public function execute(User $user, EmailFolder $folder, Company|Opportunity|People|null $record = null): int
     {
-        $query = Email::query()
-            ->forTeam($user->current_team_id)
+        $query = ($record?->emails() ?? Email::query()->forTeam($user->current_team_id))
             ->withGlobalScope('visible', new VisibleEmailScope($user))
             ->unreadFor($user->getKey());
 
@@ -34,7 +39,9 @@ final readonly class MarkAllEmailsAsReadAction
             $query->inbox();
         }
 
-        $emailIds = $query->pluck('id');
+        // Qualify the column — the record-scoped path joins through `emailables`,
+        // where a bare "id" is ambiguous.
+        $emailIds = $query->pluck('emails.id');
 
         if ($emailIds->isEmpty()) {
             return 0;

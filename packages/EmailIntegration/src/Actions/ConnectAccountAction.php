@@ -25,7 +25,7 @@ final readonly class ConnectAccountAction
                 'status' => 'active',
                 'last_error' => null,
                 'auto_create_companies' => true,
-                'contact_creation_mode' => ContactCreationMode::All,
+                'contact_creation_mode' => ContactCreationMode::Bidirectional,
                 'capabilities' => [
                     'email' => true,
                     'calendar' => $data->hasCalendar,

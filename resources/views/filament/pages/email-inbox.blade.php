@@ -5,12 +5,12 @@
         <div class="flex w-80 shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
 
             @if ($this->showAccountSwitcher)
-                <div class="flex shrink-0 items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3 py-2">
+                <div class="flex h-8 shrink-0 items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3">
                     <x-ri-mail-line class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
                     <select
                         wire:model.live="accountId"
                         aria-label="{{ __('filament/pages/email-inbox.account_filter.label') }}"
-                        class="w-full cursor-pointer border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0"
+                        class="w-full min-w-0 truncate cursor-pointer border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-medium text-gray-700 dark:text-gray-200 focus:ring-0"
                     >
                         @foreach ($this->accountFilterOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>

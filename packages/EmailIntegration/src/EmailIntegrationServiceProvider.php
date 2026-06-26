@@ -22,15 +22,17 @@ use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterfac
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
+use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/email-integration.php', 'email-integration');
-
         $this->app->bind(CalendarServiceFactoryInterface::class, CalendarServiceFactory::class);
         $this->app->bind(MailServiceFactoryInterface::class, MailServiceFactory::class);
+
+        // Parse the Public Suffix List once per process.
+        $this->app->singleton(PublicSuffixList::class);
     }
 
     public function boot(): void
@@ -69,10 +71,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 BackfillEmailThreadsCommand::class,
                 DispatchOutboxCommand::class,
             ]);
-
-            $this->publishes([
-                __DIR__.'/../config/email-integration.php' => config_path('email-integration.php'),
-            ], 'email-integration-config');
         }
     }
 }
