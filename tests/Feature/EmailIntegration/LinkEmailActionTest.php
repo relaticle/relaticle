@@ -298,8 +298,11 @@ it('derives the company name from the registrable label across TLD shapes', func
 })->with([
     'plain TLD' => ['john@acme.com', 'Acme'],
     'mail subdomain' => ['john@mail.acme.io', 'Acme'],
-    'two-label TLD' => ['john@acme.co.uk', 'Acme'],
+    'two-label TLD (co.uk)' => ['john@acme.co.uk', 'Acme'],
     'subdomain + two-label TLD' => ['john@mail.acme.co.uk', 'Acme'],
+    'two-label TLD (co.us)' => ['john@acme.co.us', 'Acme'],
+    'three-label suffix (k12.ak.us)' => ['john@acme.k12.ak.us', 'Acme'],
+    'unknown new TLD' => ['john@acme.xyz', 'Acme'],
 ]);
 
 it('does not auto-create a company for a no-reply / automated sender', function (): void {
