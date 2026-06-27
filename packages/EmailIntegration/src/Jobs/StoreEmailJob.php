@@ -61,6 +61,15 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 
         $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
 
+        // Honour the account's inbox/sent toggles. Gated here rather than in a
+        // provider service so it covers Gmail and Microsoft, and both the initial
+        // backfill and incremental syncs, in one place. Re-read from the DB on
+        // unserialize (SerializesModels), so a toggle change before this job runs
+        // takes effect.
+        if (! $this->connectedAccount->syncsDirection($fetched->direction)) {
+            return;
+        }
+
         $action->execute($this->connectedAccount, $fetched);
     }
 
