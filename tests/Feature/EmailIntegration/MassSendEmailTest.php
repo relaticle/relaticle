@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\PeopleField;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBatch;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 mutates(MassSendBulkAction::class);
+mutates(SendEmailBatchAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -34,28 +34,20 @@ beforeEach(function (): void {
 });
 
 /**
- * Helper to attach a known email address to a person via EmailParticipant.
+ * Set a person's canonical email on the EMAILS custom field — the same source
+ * MassSendBulkAction resolves recipients from. A person can have this value with
+ * NO prior EmailParticipant row (i.e. never emailed before).
  */
-function attachEmailToPerson(People $person, string $emailAddress, string $teamId, string $userId, string $accountId): void
+function setPersonEmail(People $person, string $emailAddress): void
 {
-    $email = Email::create([
-        'team_id' => $teamId,
-        'user_id' => $userId,
-        'connected_account_id' => $accountId,
-        'subject' => 'Previous email',
-        'sent_at' => now()->subDays(1),
-        'direction' => EmailDirection::INBOUND,
-        'status' => EmailStatus::SYNCED,
-        'privacy_tier' => EmailPrivacyTier::FULL,
-        'creation_source' => EmailCreationSource::SYNC,
-    ]);
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $person->team_id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
 
-    EmailParticipant::create([
-        'email_id' => $email->id,
-        'email_address' => $emailAddress,
-        'contact_id' => $person->id,
-        'role' => 'to',
-    ]);
+    $person->saveCustomFieldValue($emailsField, [$emailAddress], $person->team);
 }
 
 it('creates an EmailBatch and persists one Email row per recipient', function (): void {
@@ -66,13 +58,7 @@ it('creates an EmailBatch and persists one Email row per recipient', function ()
     ]));
 
     $people->each(function (People $person, int $index): void {
-        attachEmailToPerson(
-            $person,
-            "person{$index}@example.com",
-            $this->team->id,
-            $this->user->id,
-            $this->account->id,
-        );
+        setPersonEmail($person, "person{$index}@example.com");
     });
 
     livewire(ListPeople::class)
@@ -104,7 +90,7 @@ it('skips people with no known email address', function (): void {
         'creator_id' => $this->user->id,
     ]);
 
-    attachEmailToPerson($withEmail, 'has@example.com', $this->team->id, $this->user->id, $this->account->id);
+    setPersonEmail($withEmail, 'has@example.com');
 
     $withoutEmail = People::create([
         'team_id' => $this->team->id,
@@ -121,7 +107,10 @@ it('skips people with no known email address', function (): void {
                 'subject' => 'Hello',
                 'body_html' => '<p>Hi</p>',
             ],
-        );
+        )
+        // The undercount bug: when some are skipped the toast must say so,
+        // not silently report only the queued count.
+        ->assertNotified('Mass email queued');
 
     $batch = EmailBatch::where('team_id', $this->team->id)->first();
     expect($batch->total_recipients)->toBe(1)
@@ -133,6 +122,42 @@ it('skips people with no known email address', function (): void {
         'email_id' => $email->getKey(),
         'emailable_type' => People::class,
         'emailable_id' => $withEmail->id,
+    ]);
+});
+
+it('queues a person whose email is only in the custom field with no prior correspondence', function (): void {
+    // No EmailParticipant row exists for this person — the only place their
+    // address lives is the EMAILS custom field. The old participant-based
+    // resolution silently dropped them.
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Never Emailed',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'never@example.com');
+
+    livewire(ListPeople::class)
+        ->callTableBulkAction(
+            'massSend',
+            records: [$person],
+            data: [
+                'connected_account_id' => $this->account->id,
+                'subject' => 'Hello',
+                'body_html' => '<p>Hi</p>',
+            ],
+        )
+        ->assertNotified('Mass email queued');
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+    expect($batch->total_recipients)->toBe(1);
+
+    $email = Email::where('batch_id', $batch->id)->firstOrFail();
+
+    $this->assertDatabaseHas('email_participants', [
+        'email_id' => $email->getKey(),
+        'email_address' => 'never@example.com',
+        'role' => 'to',
     ]);
 });
 
@@ -171,8 +196,8 @@ it('applies template variables per recipient', function (): void {
         'creator_id' => $this->user->id,
     ]);
 
-    attachEmailToPerson($personA, 'alice@example.com', $this->team->id, $this->user->id, $this->account->id);
-    attachEmailToPerson($personB, 'bob@example.com', $this->team->id, $this->user->id, $this->account->id);
+    setPersonEmail($personA, 'alice@example.com');
+    setPersonEmail($personB, 'bob@example.com');
 
     $template = EmailTemplate::create([
         'team_id' => $this->team->id,

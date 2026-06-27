@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Bus\PendingBatch;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -56,8 +58,8 @@ function syncableAccount(): ConnectedAccount
         ]);
 }
 
-it('advances the cursor and dispatches StoreEmailJob for new Microsoft messages', function (): void {
-    Queue::fake();
+it('batches StoreEmailJob for new Microsoft messages and defers the cursor to the batch callback', function (): void {
+    Bus::fake();
 
     $user = User::factory()->withTeam()->create();
     $account = ConnectedAccount::factory()
@@ -86,9 +88,34 @@ it('advances the cursor and dispatches StoreEmailJob for new Microsoft messages'
 
     (new IncrementalEmailSyncJob($account))->handle($factory);
 
-    Queue::assertPushed(StoreEmailJob::class, 2);
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 2
+        && $batch->jobs->every(fn (object $job): bool => $job instanceof StoreEmailJob));
 
-    expect($account->refresh()->sync_cursor)->toBe('new-cursor');
+    // The cursor must NOT advance until the batch's then() callback runs — otherwise an
+    // unstored message is skipped forever.
+    expect($account->refresh()->sync_cursor)->toBe('old-cursor');
+});
+
+it('advances the cursor inline when the delta has no new messages', function (): void {
+    Bus::fake();
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->andReturn(new MailDeltaResult(
+        messageIds: collect([]),
+        readMessageIds: collect([]),
+        newCursor: 'fresh-cursor',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    $this->app->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    Bus::assertNothingBatched();
+    expect($account->refresh()->sync_cursor)->toBe('fresh-cursor');
 });
 
 it('records the owner read state when the provider marks a message read', function (): void {

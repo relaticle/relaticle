@@ -27,11 +27,6 @@ final readonly class GmailService implements MailServiceInterface
      */
     public function fetchDelta(string $cursor): MailDeltaResult
     {
-        $history = $this->gmail->users_history->listUsersHistory('me', [
-            'startHistoryId' => $cursor,
-            'historyTypes' => ['messageAdded', 'labelsRemoved', 'labelsAdded'],
-        ]);
-
         /** @var array<int, string> $messageIds */
         $messageIds = [];
         /** @var array<int, string> $readMessageIds */
@@ -39,39 +34,64 @@ final readonly class GmailService implements MailServiceInterface
         /** @var array<int, string> $unreadMessageIds */
         $unreadMessageIds = [];
 
-        foreach ($history->getHistory() ?? [] as $item) {
-            foreach ($item->getMessagesAdded() ?? [] as $added) {
-                $id = $added->getMessage()->getId();
-                if (! in_array($id, $messageIds, strict: true)) {
-                    $messageIds[] = $id;
-                }
+        $newCursor = $cursor;
+        $pageToken = null;
+
+        // The History API paginates: a single page may not contain all changes since
+        // the cursor. Follow getNextPageToken() until exhausted, otherwise multi-page
+        // history is dropped and newCursor jumps ahead of unfetched messages (data loss).
+        do {
+            $params = [
+                'startHistoryId' => $cursor,
+                'historyTypes' => ['messageAdded', 'labelsRemoved', 'labelsAdded'],
+            ];
+
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
             }
 
-            // Track messages where the UNREAD label was removed (user read the email)
-            foreach ($item->getLabelsRemoved() ?? [] as $change) {
-                if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                    $id = $change->getMessage()->getId();
-                    if (! in_array($id, $readMessageIds, strict: true)) {
-                        $readMessageIds[] = $id;
+            $history = $this->gmail->users_history->listUsersHistory('me', $params);
+
+            foreach ($history->getHistory() ?? [] as $item) {
+                foreach ($item->getMessagesAdded() ?? [] as $added) {
+                    $id = $added->getMessage()->getId();
+                    if (! in_array($id, $messageIds, strict: true)) {
+                        $messageIds[] = $id;
+                    }
+                }
+
+                // Track messages where the UNREAD label was removed (user read the email)
+                foreach ($item->getLabelsRemoved() ?? [] as $change) {
+                    if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
+                        $id = $change->getMessage()->getId();
+                        if (! in_array($id, $readMessageIds, strict: true)) {
+                            $readMessageIds[] = $id;
+                        }
+                    }
+                }
+
+                // Track messages where the UNREAD label was re-added (marked unread again)
+                foreach ($item->getLabelsAdded() ?? [] as $change) {
+                    if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
+                        $id = $change->getMessage()->getId();
+                        if (! in_array($id, $unreadMessageIds, strict: true)) {
+                            $unreadMessageIds[] = $id;
+                        }
                     }
                 }
             }
 
-            // Track messages where the UNREAD label was re-added (marked unread again)
-            foreach ($item->getLabelsAdded() ?? [] as $change) {
-                if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                    $id = $change->getMessage()->getId();
-                    if (! in_array($id, $unreadMessageIds, strict: true)) {
-                        $unreadMessageIds[] = $id;
-                    }
-                }
-            }
-        }
+            // historyId is the same on every page (= head of history at request time);
+            // keep the latest non-null so the cursor advances only past fully-paged history.
+            $newCursor = (string) ($history->getHistoryId() ?? $newCursor);
+
+            $pageToken = $history->getNextPageToken();
+        } while ($pageToken !== null && $pageToken !== '');
 
         return new MailDeltaResult(
             messageIds: collect($messageIds),
             readMessageIds: collect($readMessageIds),
-            newCursor: (string) ($history->getHistoryId() ?? $cursor),
+            newCursor: $newCursor,
             unreadMessageIds: collect($unreadMessageIds),
         );
     }
@@ -229,14 +249,14 @@ final readonly class GmailService implements MailServiceInterface
             $data['to'] ?? []
         ));
 
-        if (filled($data['cc'])) {
+        if (filled($data['cc'] ?? null)) {
             $headers[] = 'Cc: '.implode(', ', array_map(
                 fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['cc']
             ));
         }
 
-        if (filled($data['bcc'])) {
+        if (filled($data['bcc'] ?? null)) {
             $headers[] = 'Bcc: '.implode(', ', array_map(
                 fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['bcc']

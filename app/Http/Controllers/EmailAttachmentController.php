@@ -36,6 +36,11 @@ final readonly class EmailAttachmentController
 
         abort_if(blank($attachment->provider_attachment_id), 404, 'Attachment is not available for download.');
 
+        // The provider download needs the parent message id; outbound/partially-synced
+        // rows can have a null provider_message_id, so guard for a clean 404 rather than
+        // passing null into the string-typed downloadAttachment() (TypeError → 500).
+        abort_if(blank($email->provider_message_id), 404, 'Attachment is not available for download.');
+
         $connectedAccount = $email->connectedAccount;
 
         abort_if($connectedAccount === null, 404, 'Email account is no longer connected.');

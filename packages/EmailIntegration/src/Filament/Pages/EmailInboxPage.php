@@ -166,7 +166,10 @@ final class EmailInboxPage extends Page
         $user = $this->authUser();
 
         $query = Email::query()
-            ->with(['from', 'labels'])
+            // participants + shares are needed by PrivacyService::effectiveTier() (which each
+            // row's can('viewSubject'/'viewBody') hits) — eager-load them to avoid 2 lazy
+            // queries per row, matching BaseRecordEmailsPage / BaseEmailsRelationManager.
+            ->with(['from', 'labels', 'participants', 'shares'])
             ->withReadStateFor($user->getKey())
             ->forTeam($user->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($user));

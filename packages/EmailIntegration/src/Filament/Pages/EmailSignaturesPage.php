@@ -15,6 +15,7 @@ use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
+use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -208,19 +209,21 @@ final class EmailSignaturesPage extends Page
             ->color('danger')
             ->size(Size::Small)
             ->requiresConfirmation()
-            ->action(function (array $arguments): void {
-                $deleted = $this->ownedSignatures()
-                    ->whereKey($arguments['signature_id'])
-                    ->delete();
+            ->action(function (array $arguments, DeleteSignatureAction $deleteSignatureAction): void {
+                $signature = $this->ownedSignatures()->whereKey($arguments['signature_id'])->first();
+
+                if ($signature === null) {
+                    return;
+                }
+
+                $deleteSignatureAction->execute($signature);
 
                 $this->signatures = $this->loadSignatures();
 
-                if ($deleted > 0) {
-                    Notification::make()
-                        ->title(__('filament/pages/email-signatures.notifications.deleted'))
-                        ->success()
-                        ->send();
-                }
+                Notification::make()
+                    ->title(__('filament/pages/email-signatures.notifications.deleted'))
+                    ->success()
+                    ->send();
             });
     }
 }

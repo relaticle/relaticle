@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -411,6 +412,35 @@ it('reuses an existing company that already owns the domain instead of creating 
 
     expect($resolved->getKey())->toBe($existing->getKey());
     expect(Company::where('team_id', $this->team->id)->where('name', 'Acme')->exists())->toBeFalse();
+});
+
+it('creates distinct companies for same-named domains with different TLDs and preserves the first domain', function (): void {
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if (! $domainsField) {
+        $this->markTestSkipped('No domains custom field seeded for this team.');
+    }
+
+    $action = app(AutoCreateCompanyAction::class);
+
+    $first = $action->execute('acme.com', $this->team->id, $this->team);
+    $second = $action->execute('acme.org', $this->team->id, $this->team);
+
+    // Two distinct companies — same first label, different TLD must not dedup.
+    expect($second->getKey())->not->toBe($first->getKey());
+    expect(Company::where('team_id', $this->team->id)
+        ->where('creation_source', CreationSource::SYSTEM)
+        ->count())->toBe(2);
+
+    // acme.com's domain is intact, not clobbered by acme.org.
+    $firstFresh = Company::with('customFieldValues.customField')->findOrFail($first->getKey());
+    $secondFresh = Company::with('customFieldValues.customField')->findOrFail($second->getKey());
+    expect($firstFresh->getCustomFieldValue($domainsField))->toContain('www.acme.com');
+    expect($secondFresh->getCustomFieldValue($domainsField))->toContain('www.acme.org');
 });
 
 it('does not auto-create a person when contact_creation_mode is None', function (): void {

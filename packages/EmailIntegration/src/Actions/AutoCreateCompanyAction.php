@@ -8,17 +8,16 @@ use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Team;
+use App\Support\Database\AdvisoryLock;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
-use Relaticle\EmailIntegration\Support\UsesTransactionalLock;
 
 final readonly class AutoCreateCompanyAction
 {
-    use UsesTransactionalLock;
-
     public function __construct(
         private CompanyDomainMatcher $domainMatcher,
+        private AdvisoryLock $advisoryLock,
         private PublicSuffixList $publicSuffixList,
     ) {}
 
@@ -32,7 +31,7 @@ final readonly class AutoCreateCompanyAction
      */
     public function execute(string $domain, string $teamId, Team $team): Company
     {
-        return $this->transactional("auto-create-company:{$teamId}:{$domain}", function () use ($domain, $teamId, $team): Company {
+        return $this->advisoryLock->transactional("auto-create-company:{$teamId}:{$domain}", function () use ($domain, $teamId, $team): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.
@@ -49,15 +48,20 @@ final readonly class AutoCreateCompanyAction
     /**
      * Create a new Company record seeded with a name derived from the domain
      * and the domain stored in the domains custom field.
+     *
+     * Only reached after firstMatching() confirmed (under the lock) that no
+     * company owns this domain, so we always create a fresh record. The name is
+     * just a default seed and must NOT be used as a dedup key: distinct domains
+     * sharing a first label (acme.com vs acme.org) are distinct companies, and
+     * keying on name would clobber an unrelated same-named company's domains.
      */
     private function createCompany(string $domain, string $teamId, Team $team): Company
     {
-        $company = Company::query()
-            ->updateOrCreate([
-                'name' => $this->domainToCompanyName($domain),
-                'team_id' => $teamId,
-                'creation_source' => CreationSource::SYSTEM,
-            ]);
+        $company = Company::query()->create([
+            'name' => $this->domainToCompanyName($domain),
+            'team_id' => $teamId,
+            'creation_source' => CreationSource::SYSTEM,
+        ]);
 
         $domainsField = $this->customFieldByCode('domains', $teamId);
 
@@ -66,13 +70,11 @@ final readonly class AutoCreateCompanyAction
         }
 
         // Seed the ICP toggle to false on creation so it renders as "No"
-        // rather than an empty/null cell. Existing companies keep their value.
-        if ($company->wasRecentlyCreated) {
-            $icpField = $this->customFieldByCode('icp', $teamId);
+        // rather than an empty/null cell.
+        $icpField = $this->customFieldByCode('icp', $teamId);
 
-            if ($icpField instanceof BaseCustomField) {
-                $company->saveCustomFieldValue($icpField, false, $team);
-            }
+        if ($icpField instanceof BaseCustomField) {
+            $company->saveCustomFieldValue($icpField, false, $team);
         }
 
         return $company;
