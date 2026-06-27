@@ -64,7 +64,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $accountId = $account->getKey();
+        $accountId = (int) $account->getKey();
         $cursor = $data['cursor'];
 
         $jobs = collect($newIds)
