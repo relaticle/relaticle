@@ -81,7 +81,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             // re-attempted next sync (dedup makes the re-fetch cheap) instead of dropping
             // the unstored message.
             ->then(function () use ($accountId, $cursor): void {
-                ConnectedAccount::query()->find($accountId)?->update(['sync_cursor' => $cursor]);
+                ConnectedAccount::query()->whereKey($accountId)->first()?->update(['sync_cursor' => $cursor]);
             })
             ->dispatch();
     }

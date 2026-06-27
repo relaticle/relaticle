@@ -115,7 +115,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->onQueue('emails-sync')
             ->allowFailures()
             ->then(function () use ($accountId, $newCursor): void {
-                $account = ConnectedAccount::query()->find($accountId);
+                $account = ConnectedAccount::query()->whereKey($accountId)->first();
                 $account?->update([
                     'sync_cursor' => $newCursor,
                     'last_synced_at' => now(),
