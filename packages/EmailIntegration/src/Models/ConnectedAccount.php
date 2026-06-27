@@ -204,6 +204,20 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * Whether emails of the given direction should be synced, per the user's
+     * inbox/sent toggles. The single source of truth for direction gating —
+     * consulted on the store path so it covers both providers and both the
+     * initial backfill and incremental syncs.
+     */
+    public function syncsDirection(EmailDirection $direction): bool
+    {
+        return match ($direction) {
+            EmailDirection::INBOUND => $this->sync_inbox,
+            EmailDirection::OUTBOUND => $this->sync_sent,
+        };
+    }
+
+    /**
      * @return Attribute<string, string>
      */
     protected function label(): Attribute
