@@ -104,7 +104,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $accountId = $account->getKey();
+        $accountId = (int) $account->getKey();
         $newCursor = $delta->newCursor;
 
         Bus::batch(array_map(
