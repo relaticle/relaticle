@@ -13,7 +13,6 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
-use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -62,23 +61,16 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 
         $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
 
-        // Honor the account's per-folder sync toggles. Both providers' delta streams
-        // span all folders (Gmail history; Graph /me/messages/delta), so the folder
-        // gate lives here — the single point every sync path routes a message through.
-        if (! $this->shouldSyncFolder($fetched->folder)) {
+        // Honour the account's inbox/sent toggles. Gated here rather than in a
+        // provider service so it covers Gmail and Microsoft, and both the initial
+        // backfill and incremental syncs, in one place. Re-read from the DB on
+        // unserialize (SerializesModels), so a toggle change before this job runs
+        // takes effect.
+        if (! $this->connectedAccount->syncsDirection($fetched->direction)) {
             return;
         }
 
         $action->execute($this->connectedAccount, $fetched);
-    }
-
-    private function shouldSyncFolder(?EmailFolder $folder): bool
-    {
-        return match ($folder) {
-            EmailFolder::Inbox => $this->connectedAccount->sync_inbox,
-            EmailFolder::Sent => $this->connectedAccount->sync_sent,
-            default => true,
-        };
     }
 
     private function doesItAlreadyExists(): bool
