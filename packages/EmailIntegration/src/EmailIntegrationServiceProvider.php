@@ -16,8 +16,6 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Observers\EmailObserver;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
@@ -43,7 +41,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
 
-        Email::observe(EmailObserver::class);
+        // Email is already observed via #[ObservedBy(EmailObserver::class)] on the model.
+        // Registering it again here fires every listener twice (double metric increments,
+        // double auto-create) for any create path where participants exist at create time.
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->call(function (): void {

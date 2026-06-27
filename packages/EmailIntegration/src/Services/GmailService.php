@@ -249,14 +249,14 @@ final readonly class GmailService implements MailServiceInterface
             $data['to'] ?? []
         ));
 
-        if (filled($data['cc'])) {
+        if (filled($data['cc'] ?? null)) {
             $headers[] = 'Cc: '.implode(', ', array_map(
                 fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['cc']
             ));
         }
 
-        if (filled($data['bcc'])) {
+        if (filled($data['bcc'] ?? null)) {
             $headers[] = 'Bcc: '.implode(', ', array_map(
                 fn (array $recipient): string => $this->formatAddress($recipient['name'] ?? '', $recipient['email']),
                 $data['bcc']
