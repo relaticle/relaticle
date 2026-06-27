@@ -71,7 +71,9 @@ final class MassSendBulkAction extends BulkAction
                             return;
                         }
 
-                        $template = EmailTemplate::query()->find($state);
+                        $template = EmailTemplate::query()
+                            ->where('team_id', filament()->getTenant()?->getKey())
+                            ->find($state);
 
                         if ($template === null) {
                             return;
@@ -141,7 +143,10 @@ final class MassSendBulkAction extends BulkAction
                 }
 
                 /** @var EmailTemplate|null $template */
-                $template = isset($data['template_id']) ? EmailTemplate::query()->whereKey($data['template_id'])->first() : null;
+                $template = isset($data['template_id']) ? EmailTemplate::query()
+                    ->where('team_id', filament()->getTenant()?->getKey())
+                    ->whereKey($data['template_id'])
+                    ->first() : null;
 
                 resolve(SendEmailBatchAction::class)->execute(
                     user: $user,
