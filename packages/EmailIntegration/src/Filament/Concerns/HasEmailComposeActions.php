@@ -317,7 +317,10 @@ trait HasEmailComposeActions
                             }
 
                             /** @var EmailTemplate|null $template */
-                            $template = EmailTemplate::query()->whereKey($state)->first();
+                            $template = EmailTemplate::query()
+                                ->where('team_id', filament()->getTenant()?->getKey())
+                                ->whereKey($state)
+                                ->first();
 
                             if ($template === null) {
                                 return;

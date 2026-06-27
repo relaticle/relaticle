@@ -274,3 +274,40 @@ it('scopes the template dropdown to the current team', function (): void {
         ->toContain($teammateShared->id)
         ->not->toContain($foreignShared->id);
 });
+
+it('rejects a cross-team template id submitted on send', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Recipient',
+        'creator_id' => $this->user->id,
+    ]);
+    setPersonEmail($person, 'recipient@example.com');
+
+    // A crafted submit could carry another team's template id even though the
+    // dropdown never offered it. The template select must reject it (its options
+    // are team-scoped) rather than render the foreign template into the send.
+    $foreignUser = User::factory()->withTeam()->create();
+    $foreignTemplate = EmailTemplate::create([
+        'team_id' => $foreignUser->currentTeam->id,
+        'created_by' => $foreignUser->id,
+        'name' => 'Foreign template',
+        'subject' => 'LEAKED SUBJECT',
+        'body_html' => '<p>LEAKED BODY</p>',
+        'is_shared' => true,
+    ]);
+
+    livewire(ListPeople::class)
+        ->callTableBulkAction(
+            'massSend',
+            records: [$person],
+            data: [
+                'connected_account_id' => $this->account->id,
+                'template_id' => $foreignTemplate->id,
+                'subject' => 'Plain subject',
+                'body_html' => '<p>Plain body</p>',
+            ],
+        )
+        ->assertHasTableActionErrors(['template_id']);
+
+    expect(EmailBatch::where('team_id', $this->team->id)->exists())->toBeFalse();
+});
