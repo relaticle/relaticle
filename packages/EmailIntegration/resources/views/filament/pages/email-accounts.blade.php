@@ -1,6 +1,7 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <x-filament::section heading="Connected Email Accounts">
+            <div class="space-y-3">
             @forelse($this->connectedAccounts as $account)
                 <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg dark:border-gray-700">
                     <div class="flex items-center gap-3">
@@ -32,6 +33,7 @@
             @empty
                 <p class="text-sm text-gray-500 dark:text-gray-400">No email accounts connected yet.</p>
             @endforelse
+            </div>
         </x-filament::section>
 
         <x-filament::section heading="Connect an Account">
