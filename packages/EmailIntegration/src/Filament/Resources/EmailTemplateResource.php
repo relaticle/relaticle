@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Resources;
 
+use App\Models\User;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -19,6 +20,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Override;
+use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
@@ -116,10 +118,11 @@ final class EmailTemplateResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->action(function (Collection $records): void {
-                            $records
-                                ->filter(fn (mixed $record): bool => $record instanceof EmailTemplate && $record->created_by === auth()->id())
-                                ->each->delete();
+                        ->action(function (Collection $records, DeleteEmailTemplatesAction $deleteEmailTemplatesAction): void {
+                            /** @var User $user */
+                            $user = auth()->user();
+
+                            $deleteEmailTemplatesAction->execute($user, $records);
                         }),
                 ]),
             ]);

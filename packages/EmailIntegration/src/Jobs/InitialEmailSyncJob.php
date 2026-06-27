@@ -44,8 +44,6 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $data = $service->initialBackfill($daysBack);
 
-        $account->update(['sync_cursor' => $data['cursor']]);
-
         $allIds = $data['message_ids']->all();
 
         // Bulk dedup: exclude IDs that are already stored for this account
@@ -57,9 +55,17 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $newIds = array_values(array_diff($allIds, $storedIds));
 
+        // Persist the cursor only after the backfill batch has fully stored. Setting it
+        // up front means a StoreEmailJob that exhausts its retries is skipped forever:
+        // incremental sync starts from a cursor already past the unstored message.
         if ($newIds === []) {
+            $account->update(['sync_cursor' => $data['cursor']]);
+
             return;
         }
+
+        $accountId = (int) $account->getKey();
+        $cursor = $data['cursor'];
 
         $jobs = collect($newIds)
             ->chunk(Config::integer('email-integration.sync.batch_size', 50))
@@ -70,6 +76,13 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
+            // then() runs only when every job succeeded; with a failure the batch still
+            // completes (allowFailures) but the cursor stays null, so the backfill is
+            // re-attempted next sync (dedup makes the re-fetch cheap) instead of dropping
+            // the unstored message.
+            ->then(function () use ($accountId, $cursor): void {
+                ConnectedAccount::query()->whereKey($accountId)->first()?->update(['sync_cursor' => $cursor]);
+            })
             ->dispatch();
     }
 

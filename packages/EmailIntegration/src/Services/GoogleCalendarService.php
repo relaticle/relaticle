@@ -149,7 +149,11 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         // All-day events carry a bare Y-m-d with no zone; parse as UTC so a server in a
         // timezone behind UTC doesn't roll the stored date back a day.
         $startsAt = $isAllDay ? Date::parse($startDate, 'UTC') : Date::parse((string) $start->getDateTime());
-        $endsAt = $isAllDay ? Date::parse($endDate, 'UTC') : Date::parse((string) $end->getDateTime());
+        // Google's all-day end.date is EXCLUSIVE (the day after the last day), so a 1-day
+        // event spans start..start+1. Subtract a day to store the inclusive last day.
+        $endsAt = $isAllDay
+            ? Date::parse($endDate, 'UTC')->subDay()
+            : Date::parse((string) $end->getDateTime());
 
         $attendees = [];
         foreach ($event->getAttendees() as $attendee) {
@@ -162,6 +166,9 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         }
 
         $status = (string) $event->getStatus();
+        // Google omits the organizer on some events (holidays, birthdays, imported
+        // .ics), so getOrganizer() returns null at runtime despite its non-nullable
+        // vendor phpdoc (corrected in stubs/Google.stub). The DTO types both as ?string.
         $organizer = $event->getOrganizer();
 
         return new CalendarEventData(
@@ -177,8 +184,8 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             htmlLink: $event->getHtmlLink(),
             status: $status !== '' ? $status : 'confirmed',
             visibility: $event->getVisibility(),
-            organizerEmail: $organizer->getEmail(),
-            organizerName: $organizer->getDisplayName(),
+            organizerEmail: $organizer?->getEmail(),
+            organizerName: $organizer?->getDisplayName(),
             attendees: $attendees,
         );
     }

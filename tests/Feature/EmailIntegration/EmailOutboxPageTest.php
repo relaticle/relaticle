@@ -146,3 +146,25 @@ it('bulkCancel cancels selected queued rows', function (): void {
     expect($queuedA->refresh()->status)->toBe(EmailStatus::CANCELLED)
         ->and($queuedB->refresh()->status)->toBe(EmailStatus::CANCELLED);
 });
+
+it('bulkCancel skips a row that raced to SENDING and still cancels the rest', function (): void {
+    $queuedA = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $racing = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $queuedB = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+
+    $component = livewire(EmailOutboxPage::class)
+        ->selectTableRecords([$queuedA, $racing, $queuedB]);
+
+    // Simulate the row transitioning QUEUED -> SENDING between render and the
+    // bulk action firing. The action re-locks the row and throws RuntimeException;
+    // the loop must catch it, skip that row, and still cancel the others.
+    Email::withoutEvents(fn () => Email::whereKey($racing->getKey())->update(['status' => EmailStatus::SENDING]));
+
+    $component
+        ->callAction([['name' => 'bulkCancel', 'context' => ['table' => true, 'bulk' => true]]])
+        ->assertNotified();
+
+    expect($queuedA->refresh()->status)->toBe(EmailStatus::CANCELLED)
+        ->and($queuedB->refresh()->status)->toBe(EmailStatus::CANCELLED)
+        ->and($racing->refresh()->status)->toBe(EmailStatus::SENDING);
+});

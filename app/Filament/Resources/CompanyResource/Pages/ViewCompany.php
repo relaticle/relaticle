@@ -149,7 +149,7 @@ final class ViewCompany extends ViewRecord
                         TextEntry::make('days_since_last_email')
                             ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.label'))
                             ->getStateUsing(fn (Company $record): string => $record->last_email_at
-                                ? __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => now()->diffInDays($record->last_email_at)])
+                                ? __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => (int) now()->diffInDays($record->last_email_at, true)])
                                 : __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.empty')
                             ),
 
