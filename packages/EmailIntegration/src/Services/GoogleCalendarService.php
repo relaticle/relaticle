@@ -166,6 +166,9 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         }
 
         $status = (string) $event->getStatus();
+        // Google omits the organizer on some events (holidays, birthdays, imported
+        // .ics), so getOrganizer() returns null at runtime despite its non-nullable
+        // vendor phpdoc (corrected in stubs/Google.stub). The DTO types both as ?string.
         $organizer = $event->getOrganizer();
 
         return new CalendarEventData(
@@ -181,8 +184,6 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             htmlLink: $event->getHtmlLink(),
             status: $status !== '' ? $status : 'confirmed',
             visibility: $event->getVisibility(),
-            // Google omits the organizer on some events (holidays, birthdays, imported .ics),
-            // so getOrganizer() can be null — the DTO types both fields as ?string.
             organizerEmail: $organizer?->getEmail(),
             organizerName: $organizer?->getDisplayName(),
             attendees: $attendees,
