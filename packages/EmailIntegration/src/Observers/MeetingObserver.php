@@ -8,18 +8,8 @@ use Relaticle\EmailIntegration\Models\Meeting;
 
 final class MeetingObserver
 {
-    public function created(Meeting $meeting): void
-    {
-        activity()
-            ->performedOn($meeting)
-            ->withProperties([
-                'title' => $meeting->title,
-                'starts_at' => $meeting->starts_at->toIso8601String(),
-                'attendee_count' => $meeting->attendees()->count(),
-            ])
-            ->event('meeting.created')
-            ->log('meeting.created');
-    }
+    // meeting.created is logged from StoreMeetingAction once attendees are inserted, so the
+    // attendee_count is accurate — the observer's created() fired too early (count was 0).
 
     public function deleted(Meeting $meeting): void
     {

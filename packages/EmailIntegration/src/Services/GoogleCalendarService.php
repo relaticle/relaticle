@@ -181,8 +181,10 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             htmlLink: $event->getHtmlLink(),
             status: $status !== '' ? $status : 'confirmed',
             visibility: $event->getVisibility(),
-            organizerEmail: $organizer->getEmail(),
-            organizerName: $organizer->getDisplayName(),
+            // Google omits the organizer on some events (holidays, birthdays, imported .ics),
+            // so getOrganizer() can be null — the DTO types both fields as ?string.
+            organizerEmail: $organizer?->getEmail(),
+            organizerName: $organizer?->getDisplayName(),
             attendees: $attendees,
         );
     }

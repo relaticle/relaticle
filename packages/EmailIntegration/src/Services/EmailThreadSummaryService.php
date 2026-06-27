@@ -9,11 +9,16 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use RuntimeException;
 
 final readonly class EmailThreadSummaryService
 {
+    public function __construct(
+        private PrivacyService $privacy,
+    ) {}
+
     /**
      * Get or generate an AI summary for an email thread.
      * Only includes email bodies the viewer has access to.
@@ -33,7 +38,7 @@ final readonly class EmailThreadSummaryService
     private function generateAndCache(EmailThread $thread, User $viewer): AiSummary
     {
         $emails = $thread->emails()
-            ->with(['from', 'participants', 'body', 'labels'])
+            ->with(['from', 'participants', 'body', 'labels', 'shares'])
             ->oldest('sent_at')
             ->get();
 
@@ -46,23 +51,33 @@ final readonly class EmailThreadSummaryService
         foreach ($emails as $index => $email) {
             $n = $index + 1;
             // `from` is eager-loaded above to avoid an N+1 across the thread's emails.
+            // A malformed/draft message can carry no `from` participant, so the collection
+            // may be empty — default rather than dereference a missing row.
             $firstFrom = $email->from->first();
-            $from = $firstFrom->name ?? $firstFrom->email_address ?? 'Unknown';
+            $from = $firstFrom instanceof EmailParticipant
+                ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
+                : 'Unknown';
             $date = $email->sent_at?->toDateTimeString() ?? '—';
             $dir = $email->direction->getLabel();
 
             $lines[] = "--- Email {$n} ({$dir}) ---";
             $lines[] = "From: {$from}  |  Date: {$date}";
 
-            $isOwner = $email->user_id === $viewer->getKey();
+            // Single source of truth for visibility: PrivacyService::effectiveTier() also
+            // honours per-email shares, internal-email and protected-recipient hiding, which
+            // a raw privacy_tier read would leak into the AI prompt + cached summary.
+            $tier = $this->privacy->effectiveTier($email, $viewer);
 
-            if ($isOwner || $email->privacy_tier === EmailPrivacyTier::FULL) {
+            if ($tier === EmailPrivacyTier::FULL) {
                 $body = data_get($email, 'body.body_text', $email->snippet ?? '(no body)');
                 $lines[] = 'Body: '.mb_substr((string) $body, 0, 500);
-            } elseif ($email->privacy_tier === EmailPrivacyTier::SUBJECT) {
+            } elseif ($tier === EmailPrivacyTier::SUBJECT) {
                 $lines[] = "Subject: {$email->subject}  (body hidden)";
-            } else {
+            } elseif ($tier === EmailPrivacyTier::METADATA_ONLY) {
                 $lines[] = '(metadata only)';
+            } else {
+                // null tier — fully hidden from this viewer
+                $lines[] = '(restricted)';
             }
 
             $aiLabels = $email->labels->where('source', 'ai')->pluck('label')->implode(', ');
