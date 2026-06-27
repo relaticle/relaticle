@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\EmailIntegration\Notifications;
+
+use App\Models\Team;
+use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification as FilamentNotification;
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+
+final class EmailAccessRequestedNotification extends Notification
+{
+    use Queueable;
+
+    public function __construct(public readonly EmailAccessRequest $request) {}
+
+    /**
+     * @return list<string>
+     */
+    public function via(object $notifiable): array
+    {
+        return ['database'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toDatabase(User $notifiable): array
+    {
+        $email = $this->request->email;
+        $team = $email !== null ? Team::query()->find($email->team_id) : null;
+
+        $subject = $email !== null ? ($email->subject ?? '(subject hidden)') : '(subject hidden)';
+        $requesterName = $this->request->requester->name;
+
+        $notification = FilamentNotification::make()
+            ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
+            ->body(__('filament/notifications/email-access-requested.body', ['subject' => $subject]))
+            ->warning()
+            ->icon('heroicon-o-key');
+
+        if ($team !== null) {
+            $actions = [
+                Action::make('review')
+                    ->label(__('filament/notifications/email-access-requested.actions.review'))
+                    ->url(EmailAccessRequestsPage::getUrl(
+                        parameters: ['request' => $this->request->getKey()],
+                        tenant: $team,
+                    ))
+                    ->button(),
+            ];
+
+            $actions[] = Action::make('view')
+                ->label(__('filament/notifications/email-access-requested.actions.view'))
+                ->url(EmailInboxPage::getUrl(
+                    parameters: ['email' => $email->getKey()],
+                    tenant: $team,
+                ))
+                ->color('gray');
+
+            $notification->actions($actions);
+        }
+
+        return $notification->getDatabaseMessage();
+    }
+}

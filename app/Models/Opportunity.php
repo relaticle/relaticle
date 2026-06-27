@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
+use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
@@ -21,11 +22,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
-use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
+use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
@@ -37,20 +38,27 @@ use Spatie\EloquentSortable\SortableTrait;
 #[ObservedBy(OpportunityObserver::class)]
 #[Fillable([
     'creation_source',
+    'last_email_at',
+    'last_interaction_at',
+    'email_count',
+    'inbound_email_count',
+    'outbound_email_count',
 ])]
 final class Opportunity extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
+    use HasActivityTimeline;
     use HasAiSummary;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<OpportunityFactory> */
     use HasFactory;
 
+    use HasMeetings;
     use HasNotes;
     use HasTeam;
     use HasUlids;
-    use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
     use SortableTrait;
@@ -72,6 +80,8 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
     {
         return [
             'creation_source' => CreationSource::class,
+            'last_email_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
         ];
     }
 
@@ -111,10 +121,5 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
-    }
-
-    public function timeline(): TimelineBuilder
-    {
-        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }

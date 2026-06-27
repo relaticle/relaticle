@@ -7,6 +7,7 @@ use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\EmailAttachmentController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
@@ -59,6 +60,10 @@ Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('das
 Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::class)
     ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
     ->name('team-invitations.accept');
+
+Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
+    ->middleware(['auth', 'verified', AuthenticateSession::class])
+    ->name('email-attachments.download');
 
 Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
     ->group(function (): void {

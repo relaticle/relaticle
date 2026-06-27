@@ -20,6 +20,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -32,6 +33,11 @@ final class ViewCompany extends ViewRecord
     {
         return [
             GenerateRecordSummaryAction::make(),
+            Action::make('viewEmails')
+                ->label(__('filament/resources/company.pages.view.actions.view_emails.label'))
+                ->icon('heroicon-o-envelope')
+                ->color('gray')
+                ->url(fn (): string => CompanyResource::getUrl('emails', ['record' => $this->getRecord()])),
             Action::make('askAboutThis')
                 ->label(__('filament/resources/company.pages.view.actions.ask_about_this.label'))
                 ->icon('heroicon-o-chat-bubble-left-right')
@@ -126,6 +132,42 @@ final class ViewCompany extends ViewRecord
                             ->dateTime(),
                     ])->grow(false),
                 ])->columnSpan('full'),
+
+                Section::make('Communication Intelligence')
+                    ->icon(Heroicon::ChartBar)
+                    ->schema([
+                        TextEntry::make('last_interaction_at')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.last_interaction.label'))
+                            ->dateTime()
+                            ->placeholder(__('filament/resources/company.pages.view.communication_intelligence.fields.last_interaction.placeholder')),
+
+                        TextEntry::make('last_email_at')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.last_email.label'))
+                            ->dateTime()
+                            ->placeholder(__('filament/resources/company.pages.view.communication_intelligence.fields.last_email.placeholder')),
+
+                        TextEntry::make('days_since_last_email')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.label'))
+                            ->getStateUsing(fn (Company $record): string => $record->last_email_at
+                                ? __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => (int) now()->diffInDays($record->last_email_at, true)])
+                                : __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.empty')
+                            ),
+
+                        TextEntry::make('email_count')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.email_count.label'))
+                            ->default(0),
+
+                        TextEntry::make('inbound_email_count')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.inbound_email_count.label')),
+
+                        TextEntry::make('outbound_email_count')
+                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.outbound_email_count.label')),
+                    ])
+                    ->columns(3)
+                    ->columnSpanFull()
+                    ->collapsible()
+                    ->collapsed(fn (Company $record): bool => ($record->email_count ?? 0) === 0),
+
             ]);
     }
 

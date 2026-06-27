@@ -30,6 +30,7 @@ use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 
 /**
  * @property string $name
@@ -46,6 +47,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property Carbon|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property array<string, mixed>|null $ai_preferences
  * @property-read Team|null $currentTeam
  */
@@ -57,6 +59,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'timezone',
     'password',
+    'default_email_sharing_tier',
     'ai_preferences',
 ])]
 #[Hidden([
@@ -91,6 +94,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
             'ai_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
         ];
@@ -122,6 +126,16 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function inTeam(Builder $query, string $teamId): Builder
+    {
+        return $query->where('current_team_id', $teamId);
     }
 
     /**
