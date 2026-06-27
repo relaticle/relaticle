@@ -224,3 +224,53 @@ it('applies template variables per recipient', function (): void {
     expect(Email::where('batch_id', $batch->id)->where('subject', 'Hi Alice')->exists())->toBeTrue()
         ->and(Email::where('batch_id', $batch->id)->where('subject', 'Hi Bob')->exists())->toBeTrue();
 });
+
+it('scopes the template dropdown to the current team', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Recipient',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $ownPrivate = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'My private template',
+        'subject' => 'Mine',
+        'body_html' => '<p>Mine</p>',
+        'is_shared' => false,
+    ]);
+
+    $teammateShared = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => User::factory()->create()->id,
+        'name' => 'Teammate shared template',
+        'subject' => 'Shared',
+        'body_html' => '<p>Shared</p>',
+        'is_shared' => true,
+    ]);
+
+    // A shared template owned by a different team must never appear here.
+    $foreignUser = User::factory()->withTeam()->create();
+    $foreignShared = EmailTemplate::create([
+        'team_id' => $foreignUser->currentTeam->id,
+        'created_by' => $foreignUser->id,
+        'name' => 'Foreign shared template',
+        'subject' => 'Leaked',
+        'body_html' => '<p>Leaked</p>',
+        'is_shared' => true,
+    ]);
+
+    $component = livewire(ListPeople::class)
+        ->mountTableBulkAction('massSend', records: [$person]);
+
+    $options = $component->instance()
+        ->getMountedTableActionForm()
+        ->getComponent('template_id')
+        ->getOptions();
+
+    expect(array_keys($options))
+        ->toContain($ownPrivate->id)
+        ->toContain($teammateShared->id)
+        ->not->toContain($foreignShared->id);
+});

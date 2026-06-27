@@ -56,6 +56,7 @@ final class MassSendBulkAction extends BulkAction
                     ->label(__('filament/actions/mass-send.fields.template.label'))
                     ->placeholder(__('filament/actions/mass-send.fields.template.placeholder'))
                     ->options(fn (): array => EmailTemplate::query()
+                        ->where('team_id', filament()->getTenant()?->getKey())
                         ->where(fn (Builder $q) => $q
                             ->where('created_by', auth()->id())
                             ->orWhere('is_shared', true)
