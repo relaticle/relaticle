@@ -32,6 +32,19 @@ final class TeamInvitation extends JetstreamTeamInvitation
         return $this->belongsTo(Team::class);
     }
 
+    /**
+     * Whether the given email has at least one unexpired, pending invitation.
+     * Used to gate invitation-only account creation.
+     */
+    public static function hasValidInvitationFor(string $email): bool
+    {
+        return self::query()
+            ->where('email', $email)
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '>', now())
+            ->exists();
+    }
+
     public function isExpired(): bool
     {
         if ($this->expires_at === null) {

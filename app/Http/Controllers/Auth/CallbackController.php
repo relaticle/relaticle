@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Exceptions\RegistrationByInvitationOnlyException;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use Filament\Notifications\Notification;
@@ -35,6 +37,8 @@ final readonly class CallbackController
             return $this->loginAndRedirect($user);
         } catch (InvalidStateException) {
             return $this->handleError('Authentication state mismatch. Please try again.');
+        } catch (RegistrationByInvitationOnlyException $e) {
+            return $this->handleError($e->getMessage());
         } catch (Throwable $e) {
             report($e);
 
@@ -71,6 +75,8 @@ final readonly class CallbackController
             $user = $email ? User::query()->where('email', $email)->first() : null;
 
             if (! $user) {
+                $this->guardInvitationOnlyRegistration($this->extractEmail($socialUser, $provider));
+
                 $user = $this->createUser($socialUser, $creator, $provider);
             }
 
@@ -90,6 +96,23 @@ final readonly class CallbackController
             'email' => $this->extractEmail($socialUser, $provider),
             'terms' => 'on',
         ]);
+    }
+
+    /**
+     * Block creating a brand-new account for an uninvited email when
+     * registration is invitation-only.
+     *
+     * @throws RegistrationByInvitationOnlyException
+     */
+    private function guardInvitationOnlyRegistration(string $email): void
+    {
+        if (! config('relaticle.registration.invitation_only')) {
+            return;
+        }
+
+        if (! TeamInvitation::hasValidInvitationFor($email)) {
+            throw RegistrationByInvitationOnlyException::make();
+        }
     }
 
     private function linkSocialAccount(User $user, string $provider, string|int $providerId): void

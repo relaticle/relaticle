@@ -33,6 +33,12 @@ final readonly class TeamPolicy
      */
     public function create(User $user): bool
     {
+        // When enabled, only owners/administrators of an existing team may
+        // create new teams (so the first team can still be created by anyone).
+        if (config('relaticle.teams.creation_admins_only') && ! $user->administersAnyTeam()) {
+            return false;
+        }
+
         return $user->ownedTeams()->count() < 3;
     }
 
