@@ -1,0 +1,105 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Notifications\DigestCadence;
+use App\Features\OnboardSeed;
+use App\Features\TaskDigestEmails;
+use App\Mail\TaskDigestMail;
+use App\Models\Task;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
+
+beforeEach(function (): void {
+    Feature::define(OnboardSeed::class, false);
+    Feature::define(TaskDigestEmails::class, true);
+    Mail::fake();
+});
+
+function digestCmdSetDue(Task $task, string $teamId, DateTimeInterface $dueAt): void
+{
+    $field = DB::table('custom_fields')->where('tenant_id', $teamId)
+        ->where('entity_type', 'task')->where('code', 'due_date')->first();
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'entity_type' => 'task',
+        'entity_id' => $task->id,
+        'custom_field_id' => trim((string) $field->id),
+        'tenant_id' => $teamId,
+        'datetime_value' => $dueAt->format('Y-m-d H:i:s'),
+    ]);
+}
+
+function userWithDueTask(string $timezone, DigestCadence $cadence): User
+{
+    $user = User::factory()->withPersonalTeam()->create(['timezone' => $timezone]);
+    $user->update(['notification_preferences' => ['digestCadence' => $cadence->value]]);
+
+    $task = Task::factory()->for($user->currentTeam)->create(['title' => 'Due task']);
+    $task->assignees()->attach($user);
+    digestCmdSetDue($task, $user->currentTeam->id, now()->subDay());
+
+    return $user;
+}
+
+it('queues a digest for a user at 08:00 local time', function (): void {
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC')); // Monday
+    $user = userWithDueTask('UTC', DigestCadence::Daily);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($user->email));
+});
+
+it('does not queue outside 08:00 local time', function (): void {
+    $this->travelTo(Carbon::parse('2026-06-29 09:00:00', 'UTC'));
+    userWithDueTask('UTC', DigestCadence::Daily);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('suppresses the digest when the user has no due tasks', function (): void {
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('does not queue when cadence is off', function (): void {
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    userWithDueTask('UTC', DigestCadence::Off);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('sends the weekly digest on Monday but not Tuesday', function (): void {
+    $this->travelTo(Carbon::parse('2026-06-30 08:00:00', 'UTC')); // Tuesday
+    userWithDueTask('UTC', DigestCadence::Weekly);
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+    Mail::assertNothingQueued();
+
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC')); // Monday
+    userWithDueTask('UTC', DigestCadence::Weekly);
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+    Mail::assertQueued(TaskDigestMail::class);
+});
+
+it('does not send when the rollout feature is inactive', function (): void {
+    Feature::define(TaskDigestEmails::class, false);
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    userWithDueTask('UTC', DigestCadence::Daily);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
