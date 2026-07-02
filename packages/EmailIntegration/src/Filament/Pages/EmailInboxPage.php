@@ -220,7 +220,7 @@ final class EmailInboxPage extends Page
     #[Computed]
     public function pendingAccessRequests(): Collection
     {
-        $email = $this->selectedEmail;
+        $email = $this->selectedEmail();
 
         if ($email === null || $email->user_id !== $this->authUser()->getKey()) {
             return collect();
