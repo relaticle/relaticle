@@ -651,17 +651,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return this.mintAssistantStub({ invocationId });
     },
 
-    modelOptions: [
-        { value: 'auto', label: 'Auto', provider: null },
-        { value: 'claude-sonnet', label: 'Sonnet 4.6', provider: 'anthropic' },
-        { value: 'claude-opus', label: 'Opus 4.7', provider: 'anthropic' },
-        { value: 'gpt-5-5', label: 'GPT 5.5', provider: 'openai' },
-        { value: 'gpt-5-4', label: 'GPT 5.4', provider: 'openai' },
-    ],
+    modelOptions: @js(\Relaticle\Chat\Enums\AiModel::pickerOptions()),
 
     providerIcons: @js([
         'anthropic' => svg('ri-claude-fill')->toHtml(),
         'openai' => svg('ri-openai-fill')->toHtml(),
+        'ollama' => svg('ri-server-line')->toHtml(),
     ]),
 
     providerIconHtml(provider) {
@@ -673,6 +668,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return ({
             anthropic: 'text-[#D4763C]',
             openai: 'text-gray-900 dark:text-gray-200',
+            ollama: 'text-gray-500 dark:text-gray-400',
         })[provider] || '';
     },
 
