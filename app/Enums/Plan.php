@@ -48,7 +48,7 @@ enum Plan: string
     public function allowedModels(): array
     {
         return match ($this) {
-            self::Free => [AiModel::Auto, AiModel::ClaudeSonnet, AiModel::Gemini3Flash],
+            self::Free => [AiModel::Auto, AiModel::ClaudeSonnet, AiModel::Gemini3Flash, AiModel::Ollama],
             self::Pro, self::Enterprise => AiModel::cases(),
         };
     }

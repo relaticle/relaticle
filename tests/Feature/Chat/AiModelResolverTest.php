@@ -59,3 +59,74 @@ it('falls back to ClaudeSonnet when a Gemini model is requested', function (): v
     expect($resolved['provider'])->toBe('anthropic');
     expect($resolved['model'])->toBe(AiModel::ClaudeSonnet->modelId());
 });
+
+it('resolves an explicit Ollama request when Ollama is configured', function (): void {
+    config()->set('ai.providers.ollama.models.text.default', 'qwen3:14b');
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
+
+    expect($resolved['provider'])->toBe('ollama');
+    expect($resolved['model'])->toBe('qwen3:14b');
+});
+
+it('falls back to Sonnet when Ollama is requested but not configured', function (): void {
+    config()->set('ai.providers.ollama.models.text.default', null);
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
+
+    expect($resolved['provider'])->toBe('anthropic');
+    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+});
+
+it('resolves Auto to Ollama when no cloud provider is configured', function (): void {
+    config()->set('ai.providers.anthropic.key', null);
+    config()->set('ai.providers.openai.key', null);
+    config()->set('ai.providers.ollama.models.text.default', 'qwen3:14b');
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
+
+    expect($resolved['provider'])->toBe('ollama');
+    expect($resolved['model'])->toBe('qwen3:14b');
+});
+
+it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', function (): void {
+    config()->set('ai.providers.ollama.models.text.default', 'qwen3:14b');
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
+
+    expect($resolved['provider'])->toBe('anthropic');
+    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+});
+
+it('skips plan-disallowed models in the Auto chain and falls back to Sonnet', function (): void {
+    config()->set('ai.providers.anthropic.key', null);
+    config()->set('ai.providers.ollama.models.text.default', null);
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
+
+    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+});
+
+it('honors an Ollama default-model preference when configured', function (): void {
+    config()->set('ai.providers.ollama.models.text.default', 'llama3.1:70b');
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $user->ai_preferences = ['default_model' => 'ollama'];
+    $user->save();
+    $user->refresh();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, null);
+
+    expect($resolved['provider'])->toBe('ollama');
+    expect($resolved['model'])->toBe('llama3.1:70b');
+});

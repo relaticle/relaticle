@@ -13,9 +13,11 @@ final readonly class AiModelResolver
     /**
      * Resolve the provider and model for a chat request.
      *
-     * `Auto` always resolves to Claude Sonnet. Smaller models like Haiku
-     * cannot be trusted to call CRM write tools reliably -- they tend to
-     * hallucinate "task created" without invoking the tool.
+     * `Auto` (and any unavailable or plan-disallowed request) resolves to the
+     * first available, plan-allowed model in the priority chain: Claude
+     * Sonnet, then GPT-5.5, then Ollama. Smaller models like Haiku cannot be
+     * trusted to call CRM write tools reliably -- they tend to hallucinate
+     * "task created" without invoking the tool.
      *
      * @return array{provider: string|null, model: string|null}
      */
@@ -26,16 +28,12 @@ final readonly class AiModelResolver
         $team = $user->currentTeam;
         $plan = $team !== null ? $team->plan : Plan::default();
 
-        if (! $plan->allowsModel($aiModel)) {
-            $aiModel = AiModel::ClaudeSonnet;
-        }
-
-        if ($aiModel->provider() === 'gemini') {
-            $aiModel = AiModel::ClaudeSonnet;
+        if (! $plan->allowsModel($aiModel) || ! $aiModel->available()) {
+            $aiModel = AiModel::Auto;
         }
 
         if ($aiModel === AiModel::Auto) {
-            $aiModel = AiModel::ClaudeSonnet;
+            $aiModel = $this->defaultFor($plan);
         }
 
         return [
@@ -62,5 +60,16 @@ final readonly class AiModelResolver
         }
 
         return AiModel::Auto;
+    }
+
+    private function defaultFor(Plan $plan): AiModel
+    {
+        foreach ([AiModel::ClaudeSonnet, AiModel::Gpt5_5, AiModel::Ollama] as $candidate) {
+            if ($candidate->available() && $plan->allowsModel($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return AiModel::ClaudeSonnet;
     }
 }
