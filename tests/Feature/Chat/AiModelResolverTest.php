@@ -114,6 +114,7 @@ it('skips plan-disallowed models in the Auto chain and falls back to Sonnet', fu
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
 
+    expect($resolved['provider'])->toBe('anthropic');
     expect($resolved['model'])->toBe('claude-sonnet-4-6');
 });
 
