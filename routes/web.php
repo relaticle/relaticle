@@ -11,6 +11,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use App\Http\Controllers\Webhooks\PostmarkWebhookController;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
@@ -79,3 +80,5 @@ Route::get('/documentation/{slug?}', fn (string $slug = '') => redirect("/docs/{
 Route::get('/discord', function () {
     return redirect()->away(config('services.discord.invite_url'));
 })->name('discord');
+
+Route::post('/webhooks/postmark/{secret}', PostmarkWebhookController::class)->name('webhooks.postmark');

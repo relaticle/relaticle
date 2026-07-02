@@ -71,6 +71,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'signed' => ValidateSignature::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request): string {
             if ($request->routeIs('team-invitations.accept')) {
                 $invitation = TeamInvitation::query()
