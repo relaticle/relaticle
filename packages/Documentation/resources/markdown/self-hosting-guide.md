@@ -116,6 +116,24 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
+### AI Assistant
+
+The AI assistant works with cloud providers, a self-hosted [Ollama](https://ollama.com) server, or both. Models appear in the chat model picker only when their provider is configured — with none configured, the assistant cannot answer.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | (empty) | Enables the Claude models in the chat picker. |
+| `OPENAI_API_KEY` | (empty) | Enables the GPT models in the chat picker. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL of your Ollama server. From inside a Docker container, `localhost` is the container itself — use `http://host.docker.internal:11434` (or your host's LAN IP) to reach Ollama running on the host. |
+| `OLLAMA_MODEL` | (empty) | Ollama model tag (e.g. `qwen3:14b`). Setting this adds the model to the chat picker. |
+
+**Choosing an Ollama model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool.
+
+**Known limitations with Ollama:**
+
+- Cloud providers enforce one-write-proposal-at-a-time at the API level; Ollama has no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
+- Responses must complete within 120 seconds. On slow hardware a large model may hit this timeout — use a smaller model or a GPU.
+
 ### Feature Flags
 
 Toggle features on or off. All are enabled by default. Useful for forks and custom deployments that want to disable specific functionality without modifying code.
