@@ -222,7 +222,7 @@ final class EmailInboxPage extends Page
     {
         $email = $this->selectedEmail();
 
-        if ($email === null || $email->user_id !== $this->authUser()->getKey()) {
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
             return collect();
         }
 
