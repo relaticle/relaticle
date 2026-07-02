@@ -1,7 +1,7 @@
 <x-filament-panels::page>
 
     {{-- ── Tab switcher ─────────────────────────────────────────────── --}}
-    <x-filament::tabs label="Access request tabs" class="ei-tabs-segmented">
+    <x-filament::tabs :label="__('filament/pages/email-access-requests.tabs.aria')" class="ei-tabs-segmented">
         <x-filament::tabs.item
             :active="$tab === 'incoming'"
             :icon="\Filament\Support\Icons\Heroicon::OutlinedInboxArrowDown"
@@ -9,7 +9,7 @@
             badge-color="primary"
             wire:click="setTab('incoming')"
         >
-            Incoming
+            {{ __('filament/pages/email-access-requests.tabs.incoming') }}
         </x-filament::tabs.item>
 
         <x-filament::tabs.item
@@ -17,7 +17,7 @@
             :icon="\Filament\Support\Icons\Heroicon::OutlinedPaperAirplane"
             wire:click="setTab('outgoing')"
         >
-            Sent
+            {{ __('filament/pages/email-access-requests.tabs.outgoing') }}
         </x-filament::tabs.item>
     </x-filament::tabs>
 
@@ -25,10 +25,10 @@
     @php
         $counts = $this->statusCounts;
         $filters = [
-            ['key' => null,        'label' => 'All',      'count' => $counts['total']],
-            ['key' => 'pending',   'label' => 'Pending',  'count' => $counts['pending']],
-            ['key' => 'approved',  'label' => 'Approved', 'count' => $counts['approved']],
-            ['key' => 'denied',    'label' => 'Denied',   'count' => $counts['denied']],
+            ['key' => null,        'label' => __('filament/pages/email-access-requests.filters.all'),      'count' => $counts['total']],
+            ['key' => 'pending',   'label' => __('filament/pages/email-access-requests.filters.pending'),  'count' => $counts['pending']],
+            ['key' => 'approved',  'label' => __('filament/pages/email-access-requests.filters.approved'), 'count' => $counts['approved']],
+            ['key' => 'denied',    'label' => __('filament/pages/email-access-requests.filters.denied'),   'count' => $counts['denied']],
         ];
     @endphp
 
@@ -61,15 +61,12 @@
             <div class="relative w-full sm:w-64">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
                     <x-heroicon-o-magnifying-glass class="h-4 w-4 text-gray-400 dark:text-gray-500" wire:loading.remove wire:target="search" />
-                    <svg wire:loading wire:target="search" class="h-4 w-4 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
+                    <x-filament::loading-indicator class="h-4 w-4 text-primary-500" wire:loading wire:target="search" />
                 </div>
                 <input
                     wire:model.live.debounce.300ms="search"
                     type="text"
-                    placeholder="Search by name or subject…"
+                    placeholder="{{ __('filament/pages/email-access-requests.search.placeholder') }}"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1.5 pl-8 pr-8 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-500 dark:focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
                 @if (filled($search))
@@ -114,14 +111,8 @@
                 {{-- Avatar --}}
                 <div class="relative shrink-0">
                     @if ($person !== null)
-                        @php
-                            $photoPath = $person->profile_photo_path;
-                            $avatarUrl = filled($photoPath) && \Illuminate\Support\Facades\Storage::disk(config('jetstream.profile_photo_disk', 'public'))->exists($photoPath)
-                                ? \Illuminate\Support\Facades\Storage::disk(config('jetstream.profile_photo_disk', 'public'))->url($photoPath)
-                                : resolve(\App\Services\AvatarService::class)->generate($person->name);
-                        @endphp
                         <img
-                            src="{{ $avatarUrl }}"
+                            src="{{ $person->getFilamentAvatarUrl() }}"
                             alt="{{ $person->name }}"
                             class="h-8 w-8 rounded-full object-cover"
                         />
@@ -142,10 +133,12 @@
                 <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                         <span class="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                            {{ $person?->name ?? 'Unknown user' }}
+                            {{ $person?->name ?? __('filament/pages/email-access-requests.request.unknown_user') }}
                         </span>
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">
-                            {{ $tab === 'incoming' ? 'requested access' : 'you requested access' }}
+                            {{ $tab === 'incoming'
+                                ? __('filament/pages/email-access-requests.request.requested_incoming')
+                                : __('filament/pages/email-access-requests.request.requested_outgoing') }}
                         </span>
                         <span class="text-gray-300 dark:text-gray-600">·</span>
                         <span class="text-[11px] text-gray-400 dark:text-gray-500">
@@ -191,7 +184,7 @@
                         <x-heroicon-o-envelope class="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
-                                {{ $email->subject ?? '(No subject)' }}
+                                {{ $email->subject ?? __('filament/pages/email-access-requests.request.no_subject') }}
                             </p>
                             @if (filled($email->snippet))
                                 <p class="line-clamp-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -203,7 +196,7 @@
                 </div>
             @else
                 <p class="text-[11px] italic text-gray-400 dark:text-gray-500">
-                    The associated email is no longer available.
+                    {{ __('filament/pages/email-access-requests.request.email_unavailable') }}
                 </p>
             @endif
         </div>
@@ -213,25 +206,27 @@
                 <x-heroicon-o-key class="h-8 w-8 text-gray-400 dark:text-gray-500" />
             </div>
             @if ($statusFilter !== null)
-                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">No {{ $statusFilter }} requests</p>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ __('filament/pages/email-access-requests.empty.filtered_heading', ['status' => $statusFilter]) }}</p>
                 <p class="max-w-sm text-xs text-gray-400 dark:text-gray-500">
-                    Try a different filter or clear the active one.
+                    {{ __('filament/pages/email-access-requests.empty.filtered_description') }}
                 </p>
                 <button
                     wire:click="setStatusFilter(null)"
                     type="button"
                     class="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
                 >
-                    Show all
+                    {{ __('filament/pages/email-access-requests.empty.show_all') }}
                 </button>
             @else
                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {{ $tab === 'incoming' ? 'No incoming requests' : 'No sent requests' }}
+                    {{ $tab === 'incoming'
+                        ? __('filament/pages/email-access-requests.empty.incoming_heading')
+                        : __('filament/pages/email-access-requests.empty.outgoing_heading') }}
                 </p>
                 <p class="max-w-sm text-xs text-gray-400 dark:text-gray-500">
                     {{ $tab === 'incoming'
-                        ? 'When someone asks for access to one of your private emails, it will show up here.'
-                        : "You haven't asked for access to any emails yet." }}
+                        ? __('filament/pages/email-access-requests.empty.incoming_description')
+                        : __('filament/pages/email-access-requests.empty.outgoing_description') }}
                 </p>
             @endif
         </div>

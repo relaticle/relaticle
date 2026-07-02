@@ -8,6 +8,36 @@ return [
         'label' => 'Account',
         'all' => 'All accounts',
     ],
+    'folders' => [
+        'all' => 'All',
+        'inbox' => 'Inbox',
+        'sent' => 'Sent',
+    ],
+    'search' => [
+        'placeholder' => 'Search emails…',
+    ],
+    'unread_label' => ':count unread',
+    'pagination' => [
+        'previous' => 'Prev',
+        'next' => 'Next',
+        'range' => ':first–:last of :total',
+    ],
+    'list_empty' => [
+        'no_results' => 'No results for ":search"',
+        'all' => 'No emails',
+        'sent' => 'No sent emails',
+        'inbox' => 'No received emails',
+    ],
+    'detail_empty' => [
+        'heading' => 'Select an email to read',
+        'description' => 'Choose a message from the list on the left',
+    ],
+    'pending_access' => [
+        'heading' => '{1}1 pending access request|[2,*]:count pending access requests',
+        'unknown_user' => 'Unknown user',
+        'approve' => 'Approve',
+        'deny' => 'Deny',
+    ],
     'compose' => [
         'label' => 'Compose',
         'notifications' => [

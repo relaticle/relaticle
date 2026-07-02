@@ -36,6 +36,7 @@ use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -208,6 +209,28 @@ final class EmailInboxPage extends Page
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+    }
+
+    /**
+     * Pending access requests for the open email, but only when the viewer owns
+     * it — the detail pane shows an inline approve/deny strip for these.
+     *
+     * @return Collection<int, EmailAccessRequest>
+     */
+    #[Computed]
+    public function pendingAccessRequests(): Collection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
+            return collect();
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->where('email_id', $email->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->get();
     }
 
     #[Computed]
