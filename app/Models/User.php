@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Data\NotificationPreferences;
 use App\Models\Concerns\HasProfilePhoto;
 use Database\Factories\UserFactory;
 use Exception;
@@ -47,6 +48,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
+ * @property array<string, mixed>|null $notification_preferences
  * @property-read Team|null $currentTeam
  */
 #[Appends([
@@ -58,6 +60,7 @@ use Laravel\Sanctum\HasApiTokens;
     'timezone',
     'password',
     'ai_preferences',
+    'notification_preferences',
 ])]
 #[Hidden([
     'password',
@@ -92,8 +95,14 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'ai_preferences' => 'array',
+            'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
         ];
+    }
+
+    public function notificationPreferences(): NotificationPreferences
+    {
+        return NotificationPreferences::from($this->notification_preferences ?? []);
     }
 
     /**
