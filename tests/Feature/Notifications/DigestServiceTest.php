@@ -88,7 +88,7 @@ it('weekly digest extends the window to seven days', function (): void {
     $team = $user->currentTeam;
     $field = digestDueField($team->id);
 
-    foreach (['overdue' => now()->subDay(), 'today' => now()->setTime(9, 0), 'in_three' => now()->addDays(3)] as $title => $when) {
+    foreach (['overdue' => now()->subDay(), 'today' => now()->setTime(9, 0), 'in_three' => now()->addDays(3), 'out_of_window' => now()->addDays(8)] as $title => $when) {
         $t = Task::factory()->for($team)->create(['title' => $title]);
         $t->assignees()->attach($user);
         digestSetDue($t, $field, $when);
@@ -113,9 +113,14 @@ it('excludes done tasks and tasks without a due date', function (): void {
     $noDue = Task::factory()->for($team)->create(['title' => 'no_due']);
     $noDue->assignees()->attach($user);
 
+    $open = Task::factory()->for($team)->create(['title' => 'open']);
+    $open->assignees()->attach($user);
+    digestSetDue($open, $field, now()->subDay());
+
     $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
 
-    expect($payload->isEmpty())->toBeTrue();
+    expect($payload->taskCount())->toBe(1)
+        ->and(collect($payload->teams[0]->overdue)->pluck('title')->all())->toBe(['open']);
 });
 
 it('groups tasks by team for multi-team users', function (): void {
