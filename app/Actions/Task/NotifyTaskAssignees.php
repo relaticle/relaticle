@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Task;
 
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Mail\TaskAssignedMail;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Mail;
 
 final readonly class NotifyTaskAssignees
 {
@@ -34,19 +36,27 @@ final readonly class NotifyTaskAssignees
                 ->whereIn('id', $newIds)
                 ->get()
                 ->each(function (User $recipient) use ($taskTitle, $taskId, $taskUrl): void {
-                    Notification::make()
-                        ->title("New Task Assignment: {$taskTitle}")
-                        ->actions([
-                            Action::make('view')
-                                ->button()
-                                ->label('View Task')
-                                ->url($taskUrl)
-                                ->markAsRead(),
-                        ])
-                        ->icon(Heroicon::OutlinedCheckCircle)
-                        ->iconColor('primary')
-                        ->viewData(['task_id' => $taskId])
-                        ->sendToDatabase($recipient);
+                    $preferences = $recipient->notificationPreferences();
+
+                    if ($preferences->taskAssignedInApp) {
+                        Notification::make()
+                            ->title("New Task Assignment: {$taskTitle}")
+                            ->actions([
+                                Action::make('view')
+                                    ->button()
+                                    ->label('View Task')
+                                    ->url($taskUrl)
+                                    ->markAsRead(),
+                            ])
+                            ->icon(Heroicon::OutlinedCheckCircle)
+                            ->iconColor('primary')
+                            ->viewData(['task_id' => $taskId])
+                            ->sendToDatabase($recipient);
+                    }
+
+                    if ($preferences->taskAssignedEmail) {
+                        Mail::to($recipient)->send(new TaskAssignedMail($taskTitle, $taskUrl));
+                    }
                 });
         });
     }
