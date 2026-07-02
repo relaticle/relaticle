@@ -176,3 +176,35 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
     expect($response->json('error'))->toBe('model_not_allowed');
     expect($response->json('requested_model'))->toBe('gpt-5-5');
 });
+
+it('allows a Free user to pick Ollama when it is configured', function (): void {
+    Queue::fake();
+    config()->set('ai.providers.ollama.models.text.default', 'qwen3:14b');
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ChatDocument::fromText('hi'),
+        'model' => 'ollama',
+    ]);
+
+    $response->assertStatus(200);
+});
