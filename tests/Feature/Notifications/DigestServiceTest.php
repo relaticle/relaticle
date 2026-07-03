@@ -7,6 +7,7 @@ use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -141,4 +142,21 @@ it('groups tasks by team for multi-team users', function (): void {
 
     expect($payload->teams)->toHaveCount(2)
         ->and($payload->taskCount())->toBe(2);
+});
+
+it('computes the digest window in the recipient timezone, not the app timezone', function (): void {
+    $this->travelTo(Date::parse('2026-06-28 23:00:00', 'UTC'));
+
+    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $team = $user->currentTeam;
+    $field = digestDueField($team->id);
+
+    $task = Task::factory()->for($team)->create(['title' => 'tokyo_evening']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, $field, Date::parse('2026-06-29 10:00:00', 'UTC'));
+
+    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
+
+    expect($payload->taskCount())->toBe(1)
+        ->and(collect($payload->teams[0]->upcoming)->pluck('title')->all())->toBe(['tokyo_evening']);
 });
