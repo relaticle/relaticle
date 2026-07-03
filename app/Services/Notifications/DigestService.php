@@ -21,7 +21,8 @@ final readonly class DigestService
 {
     public function forUser(User $user, DigestCadence $cadence): DigestPayload
     {
-        $startOfToday = Date::now()->startOfDay();
+        $timezone = $user->timezone ?? (string) config('app.timezone');
+        $startOfToday = Date::now($timezone)->startOfDay()->utc();
         $windowEnd = $cadence === DigestCadence::Weekly
             ? $startOfToday->copy()->addDays(7)
             : $startOfToday->copy()->addDay();
