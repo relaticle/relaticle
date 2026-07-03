@@ -8,6 +8,7 @@ use App\Actions\User\UpdateNotificationPreferences as UpdateNotificationPreferen
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\DigestCadence;
 use App\Livewire\BaseLivewireComponent;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
@@ -65,6 +66,14 @@ final class UpdateNotificationPreferences extends BaseLivewireComponent
 
     public function save(): void
     {
+        try {
+            $this->rateLimit(5);
+        } catch (TooManyRequestsException $exception) {
+            $this->sendRateLimitedNotification($exception);
+
+            return;
+        }
+
         $data = $this->form->getState();
 
         resolve(UpdateNotificationPreferencesAction::class)->execute(
