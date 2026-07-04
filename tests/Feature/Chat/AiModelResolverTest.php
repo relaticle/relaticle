@@ -106,8 +106,21 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
     expect($resolved['model'])->toBe('claude-sonnet-4-6');
 });
 
-it('skips plan-disallowed models in the Auto chain and falls back to Sonnet', function (): void {
+it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
     config()->set('ai.providers.anthropic.key', null);
+    config()->set('ai.providers.ollama.models.text.default', null);
+
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
+
+    expect($resolved['provider'])->toBe('openai');
+    expect($resolved['model'])->toBe('gpt-5.5');
+});
+
+it('falls back to Sonnet when no provider is configured at all', function (): void {
+    config()->set('ai.providers.anthropic.key', null);
+    config()->set('ai.providers.openai.key', null);
     config()->set('ai.providers.ollama.models.text.default', null);
 
     $user = User::factory()->withPersonalTeam()->create();

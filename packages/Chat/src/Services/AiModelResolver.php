@@ -15,9 +15,13 @@ final readonly class AiModelResolver
      *
      * `Auto` (and any unavailable or plan-disallowed request) resolves to the
      * first available, plan-allowed model in the priority chain: Claude
-     * Sonnet, then GPT-5.5, then Ollama. Smaller models like Haiku cannot be
-     * trusted to call CRM write tools reliably -- they tend to hallucinate
-     * "task created" without invoking the tool.
+     * Sonnet, then GPT-5.5, then Ollama. When the plan allows none of the
+     * available models (a self-hosted install whose only configured provider
+     * is plan-gated, e.g. OpenAI-only on a Free team), the first available
+     * model wins regardless of plan -- self-hosted infrastructure is not
+     * plan-gated. Smaller models like Haiku cannot be trusted to call CRM
+     * write tools reliably -- they tend to hallucinate "task created" without
+     * invoking the tool.
      *
      * @return array{provider: string|null, model: string|null}
      */
@@ -64,8 +68,16 @@ final readonly class AiModelResolver
 
     private function defaultFor(Plan $plan): AiModel
     {
-        foreach ([AiModel::ClaudeSonnet, AiModel::Gpt5_5, AiModel::Ollama] as $candidate) {
+        $chain = [AiModel::ClaudeSonnet, AiModel::Gpt5_5, AiModel::Ollama];
+
+        foreach ($chain as $candidate) {
             if ($candidate->available() && $plan->allowsModel($candidate)) {
+                return $candidate;
+            }
+        }
+
+        foreach ($chain as $candidate) {
+            if ($candidate->available()) {
                 return $candidate;
             }
         }
