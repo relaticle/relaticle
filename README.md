@@ -97,4 +97,4 @@ Relaticle is open-source software licensed under the [AGPL-3.0 license](LICENSE)
 
 # Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Relaticle/relaticle&type=Date)](https://www.star-history.com/#Relaticle/relaticle&Date)
+[![Star History Chart](https://api.star-history.com/chart?repos=relaticle/relaticle&type=date&legend=top-left&sealed_token=c38GyCHd6M75Bak3QvcMoEfYHGDlV1lAIyuGyJoQ8AA1kyVwXhZR7A1qYLuGDZg9H0LsvERRX3YUEkOWkjt4q0N0y-mlHVm2NI3mDb74NKAka4KPxMrBBA)](https://www.star-history.com/?repos=relaticle%2Frelaticle&type=date&legend=top-left)
