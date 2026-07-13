@@ -39,11 +39,12 @@ jobs:
       - name: Configure Docker Hub pull-through mirror
         run: |
           config='/etc/docker/daemon.json'
+          sudo install -d -m 0755 /etc/docker
           existing='{}'
           if [ -f "$config" ]; then
-            existing=$(cat "$config")
+            existing=$(sudo cat "$config")
           fi
-          echo "$existing" | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' | sudo tee "$config" > /dev/null
+          printf '%s' "$existing" | jq '. + {"registry-mirrors": ((."registry-mirrors" // []) + ["https://mirror.gcr.io"] | unique)}' | sudo tee "$config" > /dev/null
           sudo systemctl restart docker
 
       - name: Log in to GitHub Container Registry
