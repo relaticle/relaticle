@@ -9,6 +9,8 @@ use Filament\Resources\Pages\ListRecords;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Widgets\Activity\ActivityOverviewStatsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\Activity\ActivityVolumeChartWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\Activity\TopActiveTeamsChartWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\Activity\TopActiveUsersChartWidget;
 
 final class ListActivities extends ListRecords
 {
@@ -21,6 +23,8 @@ final class ListActivities extends ListRecords
         return [
             ActivityOverviewStatsWidget::class,
             ActivityVolumeChartWidget::class,
+            TopActiveTeamsChartWidget::class,
+            TopActiveUsersChartWidget::class,
         ];
     }
 }

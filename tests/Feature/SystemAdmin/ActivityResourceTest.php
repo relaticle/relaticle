@@ -12,6 +12,8 @@ use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActiviti
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
 use Relaticle\SystemAdmin\Filament\Widgets\Activity\ActivityOverviewStatsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\Activity\ActivityVolumeChartWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\Activity\TopActiveTeamsChartWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\Activity\TopActiveUsersChartWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 /**
@@ -172,4 +174,13 @@ it('renders the activity volume chart', function (): void {
 
     livewire(ActivityVolumeChartWidget::class)
         ->assertOk();
+});
+
+it('renders the top-active teams and users charts', function (): void {
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamB, $this->ownerB);
+
+    livewire(TopActiveTeamsChartWidget::class)->assertOk();
+    livewire(TopActiveUsersChartWidget::class)->assertOk();
 });
