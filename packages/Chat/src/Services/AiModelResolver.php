@@ -6,82 +6,62 @@ namespace Relaticle\Chat\Services;
 
 use App\Enums\Plan;
 use App\Models\User;
-use Relaticle\Chat\Enums\AiModel;
+use Relaticle\Chat\Support\ModelDescriptor;
 
 final readonly class AiModelResolver
 {
+    public function __construct(private ModelRegistry $registry) {}
+
     /**
-     * Resolve the provider and model for a chat request.
-     *
-     * `Auto` (and any unavailable or plan-disallowed request) resolves to the
-     * first available, plan-allowed model in the priority chain: Claude
-     * Sonnet, then GPT-5.5, then Ollama. When the plan allows none of the
-     * available models (a self-hosted install whose only configured provider
-     * is plan-gated, e.g. OpenAI-only on a Free team), the first available
-     * model wins regardless of plan -- self-hosted infrastructure is not
-     * plan-gated. Smaller models like Haiku cannot be trusted to call CRM
-     * write tools reliably -- they tend to hallucinate "task created" without
-     * invoking the tool.
+     * Resolve the provider and model for a chat request. An available,
+     * plan-allowed explicit choice (or stored user preference) is honored;
+     * anything else falls to the configured `auto_chain`: first available +
+     * plan-allowed, then first available regardless of plan (self-hosted
+     * infrastructure is not plan-gated), then a safe cloud default.
      *
      * @return array{provider: string|null, model: string|null}
      */
     public function resolve(User $user, ?string $override = null): array
     {
-        $aiModel = $this->resolveModel($user, $override);
+        $descriptor = $this->pick($user, $override);
 
+        return ['provider' => $descriptor->provider, 'model' => $descriptor->model];
+    }
+
+    private function pick(User $user, ?string $override): ModelDescriptor
+    {
         $team = $user->currentTeam;
         $plan = $team !== null ? $team->plan : Plan::default();
 
-        if (! $plan->allowsModel($aiModel) || ! $aiModel->available()) {
-            $aiModel = AiModel::Auto;
+        $requested = $override ?? ($user->ai_preferences['default_model'] ?? 'auto');
+
+        if (is_string($requested) && $requested !== 'auto') {
+            $descriptor = $this->registry->find($requested);
+
+            if ($descriptor !== null && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+                return $descriptor;
+            }
         }
 
-        if ($aiModel === AiModel::Auto) {
-            $aiModel = $this->defaultFor($plan);
-        }
-
-        return [
-            'provider' => $aiModel->provider(),
-            'model' => $aiModel->modelId(),
-        ];
+        return $this->autoPick($plan);
     }
 
-    private function resolveModel(User $user, ?string $override): AiModel
+    private function autoPick(Plan $plan): ModelDescriptor
     {
-        if ($override !== null) {
-            $model = AiModel::tryFrom($override);
+        $chain = $this->registry->autoChain();
 
-            if ($model !== null && $model !== AiModel::Auto) {
-                return $model;
+        foreach ($chain as $descriptor) {
+            if ($descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+                return $descriptor;
             }
         }
 
-        $preference = $user->ai_preferences['default_model'] ?? 'auto';
-        $model = AiModel::tryFrom($preference);
-
-        if ($model !== null && $model !== AiModel::Auto) {
-            return $model;
-        }
-
-        return AiModel::Auto;
-    }
-
-    private function defaultFor(Plan $plan): AiModel
-    {
-        $chain = [AiModel::ClaudeSonnet, AiModel::Gpt5_5, AiModel::Ollama];
-
-        foreach ($chain as $candidate) {
-            if ($candidate->available() && $plan->allowsModel($candidate)) {
-                return $candidate;
+        foreach ($chain as $descriptor) {
+            if ($descriptor->isAvailable()) {
+                return $descriptor;
             }
         }
 
-        foreach ($chain as $candidate) {
-            if ($candidate->available()) {
-                return $candidate;
-            }
-        }
-
-        return AiModel::ClaudeSonnet;
+        return $this->registry->find('claude-sonnet') ?? $chain[0];
     }
 }
