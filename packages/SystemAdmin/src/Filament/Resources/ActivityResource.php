@@ -221,6 +221,21 @@ final class ActivityResource extends Resource
                 ->all();
         }
 
+        if (isset($properties['old']) && is_array($properties['old']) && ! isset($properties['attributes'])) {
+            /** @var array<string, mixed> $old */
+            $old = $properties['old'];
+
+            return collect($old)
+                ->map(fn (mixed $value, string $key): string => sprintf(
+                    '%s: %s → %s',
+                    $key,
+                    self::stringifyValue($value),
+                    self::stringifyValue(null),
+                ))
+                ->values()
+                ->all();
+        }
+
         return collect($properties)
             ->map(fn (mixed $value, string $key): string => "{$key}: ".self::stringifyValue($value))
             ->values()

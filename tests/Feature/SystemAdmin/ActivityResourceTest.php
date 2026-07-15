@@ -116,7 +116,7 @@ it('renders the view page for a custom-field-changes activity', function (): voi
             'code' => 'priority',
             'label' => 'Priority',
             'type' => 'select',
-            'old' => ['value' => null, 'label' => '—'],
+            'old' => ['value' => 'low', 'label' => 'Low'],
             'new' => ['value' => 'high', 'label' => 'High'],
         ]]],
     ]);
@@ -126,5 +126,21 @@ it('renders the view page for a custom-field-changes activity', function (): voi
     ])
         ->assertOk()
         ->assertSee('Priority')
+        ->assertSee('Low')
         ->assertSee('High');
+});
+
+it('renders the view page for a deleted activity with an itemized old→new diff', function (): void {
+    $activity = seedActivity($this->teamA, $this->ownerA, [
+        'event' => 'deleted',
+        'description' => 'deleted',
+        'properties' => ['old' => ['name' => 'Acme Co']],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Acme Co')
+        ->assertDontSee('{"name"');
 });
