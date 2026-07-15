@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
+use Relaticle\SystemAdmin\Filament\Widgets\Activity\ActivityOverviewStatsWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 /**
@@ -143,4 +144,23 @@ it('renders the view page for a deleted activity with an itemized old→new diff
         ->assertOk()
         ->assertSee('Acme Co')
         ->assertDontSee('{"name"');
+});
+
+it('overview stats reflect the active filter', function (): void {
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamA, $this->ownerA, ['event' => 'deleted']);
+    seedActivity($this->teamB, $this->ownerB);
+
+    $component = livewire(ActivityOverviewStatsWidget::class, [
+        'tableFilters' => ['team_id' => ['value' => (string) $this->teamA->id]],
+    ])
+        ->assertOk()
+        ->assertSee('Total Activities');
+
+    // teamA has 3 activities (2 created + 1 deleted); teamB's 1 is excluded by the filter.
+    // If the filter were ignored, the total would be 4 (both teams combined) and this
+    // pattern — the "Total Activities" stat's value div containing exactly "3" — would not match.
+    expect(preg_match('/Total Activities.*?fi-wi-stats-overview-stat-value">\s*3\s*</s', $component->html()))
+        ->toBe(1);
 });
