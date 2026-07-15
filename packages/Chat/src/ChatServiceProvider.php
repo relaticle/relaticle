@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
 use Livewire\Livewire;
+use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
@@ -61,6 +62,7 @@ final class ChatServiceProvider extends ServiceProvider
     private function registerCommands(): void
     {
         $this->commands([
+            ChatModelsCommand::class,
             ExpirePendingActionsCommand::class,
             ReleaseOrphanedReservationsCommand::class,
             ResetCreditsCommand::class,
