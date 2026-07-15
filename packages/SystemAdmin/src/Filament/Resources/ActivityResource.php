@@ -10,7 +10,10 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -18,6 +21,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
+use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
 
 final class ActivityResource extends Resource
 {
@@ -138,6 +142,101 @@ final class ActivityResource extends Resource
     {
         return [
             'index' => ListActivities::route('/'),
+            'view' => ViewActivity::route('/{record}'),
         ];
+    }
+
+    #[Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make([
+                    TextEntry::make('created_at')->dateTime(),
+                    TextEntry::make('event')
+                        ->badge()
+                        ->color(fn (?string $state): string => match ($state) {
+                            'created' => 'success',
+                            'deleted' => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('team.name')->label('Team')->placeholder('—'),
+                    TextEntry::make('causer.name')->label('User')->placeholder('System'),
+                    TextEntry::make('subject_type')
+                        ->label('Subject')
+                        ->formatStateUsing(fn (?string $state, Activity $record): string => $state === null
+                            ? '—'
+                            : ucfirst($state).' #'.$record->subject_id),
+                    TextEntry::make('description')->columnSpanFull(),
+                ])->columns(2)->columnSpanFull(),
+                Section::make('Changes')
+                    ->schema([
+                        TextEntry::make('changes')
+                            ->hiddenLabel()
+                            ->listWithLineBreaks()
+                            ->bulleted()
+                            ->placeholder('No field changes recorded.')
+                            ->state(fn (Activity $record): array => self::buildChangeSummary($record))
+                            ->columnSpanFull(),
+                    ])
+                    ->columnSpanFull(),
+            ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function buildChangeSummary(Activity $record): array
+    {
+        /** @var array<string, mixed> $properties */
+        $properties = $record->properties?->toArray() ?? [];
+
+        if (isset($properties['custom_field_changes']) && is_array($properties['custom_field_changes'])) {
+            return collect($properties['custom_field_changes'])
+                ->map(function (array $change): string {
+                    $label = (string) ($change['label'] ?? $change['code'] ?? 'Field');
+                    $old = self::stringifyValue($change['old'] ?? null);
+                    $new = self::stringifyValue($change['new'] ?? null);
+
+                    return "{$label}: {$old} → {$new}";
+                })
+                ->values()
+                ->all();
+        }
+
+        if (isset($properties['attributes']) && is_array($properties['attributes'])) {
+            /** @var array<string, mixed> $new */
+            $new = $properties['attributes'];
+            /** @var array<string, mixed> $old */
+            $old = is_array($properties['old'] ?? null) ? $properties['old'] : [];
+
+            return collect($new)
+                ->map(fn (mixed $value, string $key): string => sprintf(
+                    '%s: %s → %s',
+                    $key,
+                    self::stringifyValue($old[$key] ?? null),
+                    self::stringifyValue($value),
+                ))
+                ->values()
+                ->all();
+        }
+
+        return collect($properties)
+            ->map(fn (mixed $value, string $key): string => "{$key}: ".self::stringifyValue($value))
+            ->values()
+            ->all();
+    }
+
+    private static function stringifyValue(mixed $value): string
+    {
+        if (is_array($value)) {
+            return (string) ($value['label'] ?? json_encode($value));
+        }
+
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        return is_bool($value) ? ($value ? 'true' : 'false') : (string) $value;
     }
 }

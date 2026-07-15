@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
+use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 /**
@@ -90,4 +91,40 @@ it('filters activity by date range', function (): void {
         ->filterTable('created_at', ['from' => '2026-06-10', 'until' => '2026-06-20'])
         ->assertCanSeeTableRecords([$inRange])
         ->assertCanNotSeeTableRecords([$outOfRange]);
+});
+
+it('renders the view page with a standard attribute diff', function (): void {
+    $activity = seedActivity($this->teamA, $this->ownerA, [
+        'event' => 'updated',
+        'description' => 'updated',
+        'properties' => ['attributes' => ['name' => 'New Co'], 'old' => ['name' => 'Old Co']],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Old Co')
+        ->assertSee('New Co');
+});
+
+it('renders the view page for a custom-field-changes activity', function (): void {
+    $activity = seedActivity($this->teamA, $this->ownerA, [
+        'event' => 'custom_field_changes',
+        'description' => 'custom_field_changes',
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'priority',
+            'label' => 'Priority',
+            'type' => 'select',
+            'old' => ['value' => null, 'label' => '—'],
+            'new' => ['value' => 'high', 'label' => 'High'],
+        ]]],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Priority')
+        ->assertSee('High');
 });
