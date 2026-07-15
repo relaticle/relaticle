@@ -90,7 +90,7 @@ final readonly class ChatController
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor !== null && ! $descriptor->allowedForPlan($team->plan)) {
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($team->plan)) {
                 $isFree = $team->plan === Plan::Free;
 
                 return response()->json([

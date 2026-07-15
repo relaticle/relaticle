@@ -8,11 +8,10 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
-use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Services\ModelRegistry;
 
-mutates(AiModel::class, ModelRegistry::class);
+mutates(ModelRegistry::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);

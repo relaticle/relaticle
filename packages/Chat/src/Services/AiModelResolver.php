@@ -38,7 +38,7 @@ final readonly class AiModelResolver
         if (is_string($requested) && $requested !== 'auto') {
             $descriptor = $this->registry->find($requested);
 
-            if ($descriptor !== null && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+            if ($descriptor instanceof ModelDescriptor && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
                 return $descriptor;
             }
         }
