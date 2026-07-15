@@ -9,6 +9,7 @@ return [
 
     'user_menu' => [
         'profile' => 'Profile',
+        'settings' => 'Settings',
     ],
 
     'navigation_groups' => [
