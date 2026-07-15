@@ -89,11 +89,7 @@
             error: null,
             currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
             currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-            allowedModels: @js(
-                collect((auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())->allowedModels())
-                    ->map(fn ($m) => $m->value)
-                    ->all()
-            ),
+            allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
             selectedModel: 'auto',
             modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
             providerIcons: @js([

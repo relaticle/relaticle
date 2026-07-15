@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use Relaticle\Chat\Enums\AiModel;
-
 enum Plan: string
 {
     case Free = 'free';
@@ -51,19 +49,5 @@ enum Plan: string
             self::Pro => 1,
             self::Enterprise => 2,
         };
-    }
-
-    /** @return list<AiModel> */
-    public function allowedModels(): array
-    {
-        return match ($this) {
-            self::Free => [AiModel::Auto, AiModel::ClaudeSonnet, AiModel::Gemini3Flash, AiModel::Ollama],
-            self::Pro, self::Enterprise => AiModel::cases(),
-        };
-    }
-
-    public function allowsModel(AiModel $model): bool
-    {
-        return in_array($model, $this->allowedModels(), strict: true);
     }
 }

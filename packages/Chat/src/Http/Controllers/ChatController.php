@@ -21,13 +21,14 @@ use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
-use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
+use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 
@@ -36,14 +37,21 @@ final readonly class ChatController
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
+        private ModelRegistry $registry,
         private TipTapDocumentParser $documentParser,
     ) {}
+
+    /** @return list<string> */
+    private function modelIds(): array
+    {
+        return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
+    }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
         ]);
 
@@ -79,17 +87,17 @@ final readonly class ChatController
             403
         );
 
-        if (filled($validated['model'] ?? null) && $validated['model'] !== AiModel::Auto->value) {
-            $requestedModel = AiModel::from($validated['model']);
+        if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
+            $descriptor = $this->registry->find($validated['model']);
 
-            if (! $team->plan->allowsModel($requestedModel)) {
+            if ($descriptor !== null && ! $descriptor->allowedForPlan($team->plan)) {
                 $isFree = $team->plan === Plan::Free;
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => "The {$requestedModel->label()} model is not available on the {$team->plan->label()} plan.",
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->label()]),
                     'plan' => $team->plan->value,
-                    'requested_model' => $requestedModel->value,
+                    'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
                     'upgrade_url' => $isFree ? url('/app/billing') : null,
                 ], 403);
@@ -160,7 +168,7 @@ final readonly class ChatController
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
         ]);
 
         /** @var User $user */
