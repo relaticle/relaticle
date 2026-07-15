@@ -32,9 +32,22 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
 
     public function updatedCells(bool $value, string $key): void
     {
-        [$type, $channel] = explode('.', $key);
+        $parts = explode('.', $key);
 
-        $this->persist(NotificationType::from($type), NotificationChannel::from($channel), $value);
+        if (count($parts) !== 2) {
+            return;
+        }
+
+        [$type, $channel] = $parts;
+
+        $notificationType = NotificationType::tryFrom($type);
+        $notificationChannel = NotificationChannel::tryFrom($channel);
+
+        if (! $notificationType instanceof NotificationType || ! $notificationChannel instanceof NotificationChannel) {
+            return;
+        }
+
+        $this->persist($notificationType, $notificationChannel, $value);
     }
 
     public function updatedDigestEnabled(bool $value): void
@@ -46,6 +59,7 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
     {
         return view('livewire.app.notifications.manage-notification-preferences', [
             'types' => NotificationType::collaboration(),
+            'channels' => NotificationChannel::cases(),
         ]);
     }
 

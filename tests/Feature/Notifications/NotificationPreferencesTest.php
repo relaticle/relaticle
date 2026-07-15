@@ -53,3 +53,14 @@ it('does not dispatch reactivation when disabling the digest email', function ()
 
     Bus::assertNotDispatched(ReactivatePostmarkRecipient::class);
 });
+
+it('does not dispatch reactivation when the digest email was already enabled', function (): void {
+    Bus::fake();
+    $user = User::factory()->create();
+
+    resolve(UpdateNotificationPreferences::class)->execute(
+        $user, NotificationType::TaskDigest, NotificationChannel::Email, true,
+    );
+
+    Bus::assertNotDispatched(ReactivatePostmarkRecipient::class);
+});
