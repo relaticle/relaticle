@@ -505,7 +505,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     isStreaming: false,
     channel: null,
     streamTimeoutId: null,
-    streamTimeoutMs: 60000,
+    // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
+    // long with no stream event, reconcile the turn from the DB. It MUST exceed the
+    // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
+    // (Ollama/qwen3-class "thinking" models emit no client-visible delta during their
+    // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
+    // for a reply that is still generating server-side and does persist.
+    streamTimeoutMs: 125000,
     prependScrollAnchor: null,
     streamAbortController: null,
     currentToolStatus: null,
