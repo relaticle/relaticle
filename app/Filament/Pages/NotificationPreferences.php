@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Filament\Clusters\Settings;
+use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
@@ -14,11 +16,16 @@ final class NotificationPreferences extends Page
 
     protected static ?string $slug = 'notifications';
 
+    protected static ?int $navigationSort = 2;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bell';
 
-    public static function shouldRegisterNavigation(): bool
+    /** @var class-string<Cluster>|null */
+    protected static ?string $cluster = Settings::class;
+
+    public static function getNavigationLabel(): string
     {
-        return false;
+        return __('notifications.title');
     }
 
     public function getHeading(): string
