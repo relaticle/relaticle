@@ -6,8 +6,14 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
+use App\Models\Team;
+use App\Models\User;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Override;
@@ -57,6 +63,7 @@ final class ActivityResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer']))
             ->columns([
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -84,6 +91,45 @@ final class ActivityResource extends Resource
                 TextColumn::make('description')
                     ->limit(60)
                     ->wrap(),
+            ])
+            ->filters([
+                SelectFilter::make('team_id')
+                    ->label('Team')
+                    ->options(fn (): array => Team::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->searchable(),
+                SelectFilter::make('subject_type')
+                    ->label('Subject')
+                    ->options([
+                        'company' => 'Company',
+                        'people' => 'People',
+                        'opportunity' => 'Opportunity',
+                        'task' => 'Task',
+                        'note' => 'Note',
+                    ]),
+                SelectFilter::make('event')
+                    ->options([
+                        'created' => 'Created',
+                        'updated' => 'Updated',
+                        'deleted' => 'Deleted',
+                    ]),
+                SelectFilter::make('causer')
+                    ->label('User')
+                    ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->where('causer_type', 'user')->where('causer_id', $data['value'])
+                        : $query),
+                Filter::make('created_at')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->whereDate('created_at', '>=', $data['from']))
+                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('created_at', '<=', $data['until']))),
+            ])
+            ->recordActions([
+                ViewAction::make(),
             ]);
     }
 
