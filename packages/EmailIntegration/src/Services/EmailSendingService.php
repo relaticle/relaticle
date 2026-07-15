@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\SyncEmailThreadAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -102,7 +104,38 @@ final readonly class EmailSendingService
             $payload['thread_id'] = (string) $email->thread_id;
         }
 
+        $attachments = $this->resolveAttachments($email);
+
+        if ($attachments !== []) {
+            $payload['attachments'] = $attachments;
+        }
+
         return $service->sendMessage($payload);
+    }
+
+    /**
+     * Read the stored bytes for each attachment so the provider can serialize them
+     * into the outgoing message.
+     *
+     * @return array<int, array{filename: string, mime_type: string, content: string}>
+     */
+    private function resolveAttachments(Email $email): array
+    {
+        if (! $email->has_attachments) {
+            return [];
+        }
+
+        $disk = Storage::disk(EmailAttachment::DISK);
+
+        return $email->attachments
+            ->filter(fn (EmailAttachment $attachment): bool => $attachment->storage_path !== null && $disk->exists($attachment->storage_path))
+            ->map(fn (EmailAttachment $attachment): array => [
+                'filename' => (string) $attachment->filename,
+                'mime_type' => (string) $attachment->mime_type,
+                'content' => (string) $disk->get((string) $attachment->storage_path),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

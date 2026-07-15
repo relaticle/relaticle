@@ -18,6 +18,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Sentry\Laravel\Integration;
@@ -123,6 +124,15 @@ return Application::configure(basePath: dirname(__DIR__))
         })
             ->everyFiveMinutes()
             ->name('email:incremental-sync')
+            ->withoutOverlapping();
+
+        $schedule->call(function (): void {
+            ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
+                ->whereJsonContains('capabilities->calendar', true)
+                ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalCalendarSyncJob($account)));
+        })
+            ->everyFiveMinutes()
+            ->name('calendar:incremental-sync')
             ->withoutOverlapping();
 
         $schedule->command('email:dispatch-outbox')
