@@ -126,6 +126,17 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/docs` documentation module. Set to `false` to remove documentation routes and navigation links. |
 
+### Access Control
+
+Restrict who can sign up and who can create teams. Both default to `false` so the very first account and team can be created on a fresh instance; enable them once your initial team and administrators exist.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RELATICLE_REGISTRATION_INVITATION_ONLY` | `false` | When `true`, a new account can only be created for an email address that has an **unexpired pending team invitation**. Applies to both password registration and social login (Google/GitHub) — an uninvited email cannot create an account. Existing users are unaffected. |
+| `RELATICLE_TEAM_CREATION_ADMINS_ONLY` | `false` | When `true`, only a user who owns or is an Administrator of at least one existing team may create new teams. |
+
+> **Bootstrap note:** keep both flags at `false` until your first team and administrators exist, then enable them and restart. Turning them on against an empty instance would prevent anyone from creating the first account or team.
+
 ---
 
 ## Architecture
