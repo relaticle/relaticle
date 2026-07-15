@@ -118,7 +118,12 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 
 ### AI Assistant
 
-The AI assistant works with cloud providers, a self-hosted [Ollama](https://ollama.com) server, or both. Models appear in the chat model picker only when their provider is configured — with none configured, the assistant cannot answer.
+The AI assistant works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured — with none configured, the assistant cannot answer.
+
+There are two ways to run a self-hosted model, and you can use either or both:
+
+- **[Ollama](https://ollama.com)** (`OLLAMA_MODEL`) — the simplest path, with the best tool-calling support.
+- **Any OpenAI-compatible endpoint** (`SELF_HOSTED_AI_*`) — point at [vLLM](https://docs.vllm.ai) (best for many concurrent users), LM Studio, LocalAI, or a hosted gateway. Exposes multiple models at once.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -126,12 +131,15 @@ The AI assistant works with cloud providers, a self-hosted [Ollama](https://olla
 | `OPENAI_API_KEY` | (empty) | Enables the GPT models in the chat picker. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | URL of your Ollama server. From inside a Docker container, `localhost` is the container itself — use `http://host.docker.internal:11434` (or your host's LAN IP) to reach Ollama running on the host. |
 | `OLLAMA_MODEL` | (empty) | Ollama model tag (e.g. `qwen3:14b`). Setting this adds the model to the chat picker. |
+| `SELF_HOSTED_AI_URL` | (empty) | Base URL of an OpenAI-compatible endpoint (e.g. `http://localhost:8000/v1`). |
+| `SELF_HOSTED_AI_KEY` | (empty) | API key for that endpoint, if it requires one (blank for most local servers). |
+| `SELF_HOSTED_AI_MODELS` | (empty) | Comma-separated model tags to expose (e.g. `qwen3:14b,llama3.1:70b`). Each becomes a picker entry. |
 
-**Choosing an Ollama model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool.
+**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against the endpoint.
 
-**Known limitations with Ollama:**
+**Known limitations with self-hosted models:**
 
-- Cloud providers enforce one-write-proposal-at-a-time at the API level; Ollama has no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
+- Cloud providers enforce one-write-proposal-at-a-time at the API level; self-hosted models have no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
 - Responses must complete within 120 seconds. On slow hardware a large model may hit this timeout — use a smaller model or a GPU.
 
 ### Feature Flags
