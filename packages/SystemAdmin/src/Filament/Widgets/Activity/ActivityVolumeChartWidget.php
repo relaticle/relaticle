@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Widgets\Activity;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Filament\Widgets\ChartWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\Activity\Concerns\InteractsWithActivityTable;
 
@@ -82,7 +83,7 @@ final class ActivityVolumeChartWidget extends ChartWidget
         $unit = $start->diffInDays($end) > 62 ? 'week' : 'day';
 
         if ($unit === 'week') {
-            $start = $start->startOfWeek();
+            $start = $start->startOfWeek(CarbonInterface::MONDAY);
         }
 
         return [$start, $end, $unit];

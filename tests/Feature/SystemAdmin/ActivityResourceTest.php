@@ -168,6 +168,14 @@ it('overview stats reflect the active filter', function (): void {
         ->toBe(1);
 });
 
+it('does not error when sorting by the polymorphic user column', function (): void {
+    seedActivity($this->teamA, $this->ownerA);
+
+    livewire(ListActivities::class)
+        ->sortTable('causer.name')
+        ->assertOk();
+});
+
 it('renders the activity volume chart', function (): void {
     seedActivity($this->teamA, $this->ownerA);
     seedActivity($this->teamA, $this->ownerA);

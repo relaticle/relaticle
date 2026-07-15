@@ -78,8 +78,7 @@ final class ActivityResource extends Resource
                     ->sortable(),
                 TextColumn::make('causer.name')
                     ->label('User')
-                    ->placeholder('System')
-                    ->sortable(),
+                    ->placeholder('System'),
                 TextColumn::make('subject_type')
                     ->label('Subject')
                     ->badge()
