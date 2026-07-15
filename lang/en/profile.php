@@ -55,10 +55,6 @@ return [
             'description' => 'Schedule your account for deletion.',
             'notice' => 'Deleting your account will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion by logging back in at any time before that. After the grace period, all your data will be permanently deleted.',
         ],
-        'notifications' => [
-            'title' => 'Notifications',
-            'description' => 'Choose how you want to be notified.',
-        ],
     ],
 
     'actions' => [
@@ -79,14 +75,6 @@ return [
         ],
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',
-        ],
-        'task_assigned_in_app' => 'Task assigned to me (in-app)',
-        'task_assigned_email' => 'Task assigned to me (email)',
-        'digest_cadence' => 'Task digest email',
-        'cadence' => [
-            'daily' => 'Daily',
-            'weekly' => 'Weekly',
-            'off' => 'Off',
         ],
     ],
 

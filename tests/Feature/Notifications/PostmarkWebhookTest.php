@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\Notifications\DigestCadence;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Models\User;
 
 beforeEach(function (): void {
@@ -19,7 +20,7 @@ it('switches the digest off when Postmark reports a suppression', function (): v
         'SuppressionReason' => 'ManualSuppression',
     ])->assertOk();
 
-    expect($user->fresh()->notificationPreferences()->digestCadence)->toBe(DigestCadence::Off);
+    expect($user->fresh()->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email))->toBeFalse();
 });
 
 it('rejects an invalid secret', function (): void {

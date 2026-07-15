@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace App\Data;
 
-use App\Enums\Notifications\DigestCadence;
-use Spatie\LaravelData\Data;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 
-final class NotificationPreferences extends Data
+final readonly class NotificationPreferences
 {
-    public function __construct(
-        public bool $taskAssignedInApp = true,
-        public bool $taskAssignedEmail = false,
-        public DigestCadence $digestCadence = DigestCadence::Daily,
-    ) {}
+    /** @param array<string, array<string, bool>> $overrides */
+    public function __construct(public array $overrides = []) {}
 
-    public function withDigestCadence(DigestCadence $cadence): self
+    public function wants(NotificationType $type, NotificationChannel $channel): bool
     {
-        return new self(
-            taskAssignedInApp: $this->taskAssignedInApp,
-            taskAssignedEmail: $this->taskAssignedEmail,
-            digestCadence: $cadence,
-        );
+        return $this->overrides[$type->value][$channel->value] ?? $type->defaultEnabled($channel);
+    }
+
+    public function with(NotificationType $type, NotificationChannel $channel, bool $enabled): self
+    {
+        $overrides = $this->overrides;
+        $overrides[$type->value][$channel->value] = $enabled;
+
+        return new self($overrides);
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Task;
 
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Filament\Resources\TaskResource;
 use App\Mail\TaskAssignedMail;
 use App\Models\Task;
@@ -37,9 +39,7 @@ final readonly class NotifyTaskAssignees
                 ->whereIn('id', $newIds)
                 ->get()
                 ->each(function (User $recipient) use ($taskTitle, $taskId, $taskUrl): void {
-                    $preferences = $recipient->notificationPreferences();
-
-                    if ($preferences->taskAssignedInApp) {
+                    if ($recipient->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::InApp)) {
                         Notification::make()
                             ->title("New Task Assignment: {$taskTitle}")
                             ->actions([
@@ -55,7 +55,7 @@ final readonly class NotifyTaskAssignees
                             ->sendToDatabase($recipient);
                     }
 
-                    if ($preferences->taskAssignedEmail) {
+                    if ($recipient->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::Email)) {
                         Mail::to($recipient)->send(new TaskAssignedMail($taskTitle, $taskUrl));
                     }
                 });

@@ -19,7 +19,7 @@ it('emails a newly assigned user when their email channel is on', function (): v
     $owner = User::factory()->withPersonalTeam()->create();
     $assignee = User::factory()->create();
     $owner->currentTeam->users()->attach($assignee, ['role' => 'editor']);
-    $assignee->update(['notification_preferences' => ['taskAssignedEmail' => true]]);
+    $assignee->update(['notification_preferences' => ['task_assigned' => ['email' => true]]]);
 
     $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
@@ -48,7 +48,7 @@ it('skips the in-app notification when the in-app channel is off', function (): 
     $owner = User::factory()->withPersonalTeam()->create();
     $assignee = User::factory()->create();
     $owner->currentTeam->users()->attach($assignee, ['role' => 'editor']);
-    $assignee->update(['notification_preferences' => ['taskAssignedInApp' => false]]);
+    $assignee->update(['notification_preferences' => ['task_assigned' => ['in_app' => false]]]);
 
     $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'X']);
     $task->assignees()->attach($assignee);
