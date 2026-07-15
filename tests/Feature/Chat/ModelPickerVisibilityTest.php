@@ -73,3 +73,14 @@ it('drives the chat picker from the model registry', function (): void {
         ->assertDontSee('GPT 5.5', stripInitialData: false)   // openai key nulled → hidden
         ->assertDontSee('Gemini 3 Flash', stripInitialData: false); // supports_tools=false → never shown
 });
+
+it('shows env-configured self-hosted models in the picker', function (): void {
+    config()->set('chat.self_hosted.url', 'http://vllm.local/v1');
+    config()->set('chat.self_hosted.models', 'llama3.1:70b, qwen3:32b');
+    config()->set('ai.providers.selfhosted.url', 'http://vllm.local/v1');
+    app()->forgetInstance(ModelRegistry::class);
+
+    Livewire::test(ChatInterface::class)
+        ->assertSee('llama3.1:70b', stripInitialData: false)
+        ->assertSee('qwen3:32b', stripInitialData: false);
+});
