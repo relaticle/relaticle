@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\Notifications\DigestCadence;
 use App\Features\OnboardSeed;
 use App\Features\TaskDigestEmails;
 use App\Mail\TaskDigestMail;
@@ -34,10 +33,13 @@ function digestCmdSetDue(Task $task, string $teamId, DateTimeInterface $dueAt): 
     ]);
 }
 
-function userWithDueTask(string $timezone, DigestCadence $cadence): User
+function userWithDueTask(string $timezone, bool $digestEmail = true): User
 {
     $user = User::factory()->withPersonalTeam()->create(['timezone' => $timezone]);
-    $user->update(['notification_preferences' => ['digestCadence' => $cadence->value]]);
+
+    if (! $digestEmail) {
+        $user->update(['notification_preferences' => ['task_digest' => ['email' => false]]]);
+    }
 
     $task = Task::factory()->for($user->currentTeam)->create(['title' => 'Due task']);
     $task->assignees()->attach($user);
@@ -47,8 +49,8 @@ function userWithDueTask(string $timezone, DigestCadence $cadence): User
 }
 
 it('queues a digest for a user at 08:00 local time', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC')); // Monday
-    $user = userWithDueTask('UTC', DigestCadence::Daily);
+    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
@@ -59,7 +61,7 @@ it('queues a digest for a user at 08:00 local time', function (): void {
 
 it('does not queue outside 08:00 local time', function (): void {
     $this->travelTo(Carbon::parse('2026-06-29 09:00:00', 'UTC'));
-    userWithDueTask('UTC', DigestCadence::Daily);
+    userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
@@ -75,31 +77,19 @@ it('suppresses the digest when the user has no due tasks', function (): void {
     Mail::assertNothingQueued();
 });
 
-it('does not queue when cadence is off', function (): void {
+it('does not queue when the digest email channel is off', function (): void {
     $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
-    userWithDueTask('UTC', DigestCadence::Off);
+    userWithDueTask('UTC', digestEmail: false);
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
     Mail::assertNothingQueued();
-});
-
-it('sends the weekly digest on Monday but not Tuesday', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-30 08:00:00', 'UTC')); // Tuesday
-    userWithDueTask('UTC', DigestCadence::Weekly);
-    $this->artisan('notifications:send-task-digest')->assertSuccessful();
-    Mail::assertNothingQueued();
-
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC')); // Monday
-    userWithDueTask('UTC', DigestCadence::Weekly);
-    $this->artisan('notifications:send-task-digest')->assertSuccessful();
-    Mail::assertQueued(TaskDigestMail::class);
 });
 
 it('does not send when the rollout feature is inactive', function (): void {
     Feature::define(TaskDigestEmails::class, false);
     $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
-    userWithDueTask('UTC', DigestCadence::Daily);
+    userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 

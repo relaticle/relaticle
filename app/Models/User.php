@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Data\NotificationPreferences;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Models\Concerns\HasProfilePhoto;
 use Database\Factories\UserFactory;
 use Exception;
@@ -102,7 +104,12 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function notificationPreferences(): NotificationPreferences
     {
-        return NotificationPreferences::from($this->notification_preferences ?? []);
+        return new NotificationPreferences($this->notification_preferences ?? []);
+    }
+
+    public function wantsNotification(NotificationType $type, NotificationChannel $channel): bool
+    {
+        return $this->notificationPreferences()->wants($type, $channel);
     }
 
     /**

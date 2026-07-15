@@ -7,7 +7,6 @@ namespace App\Services\Notifications;
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestTeamSection;
-use App\Enums\Notifications\DigestCadence;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use App\Models\User;
@@ -19,13 +18,11 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class DigestService
 {
-    public function forUser(User $user, DigestCadence $cadence): DigestPayload
+    public function forUser(User $user): DigestPayload
     {
         $timezone = $user->timezone ?? (string) config('app.timezone');
         $startOfToday = Date::now($timezone)->startOfDay()->utc();
-        $windowEnd = $cadence === DigestCadence::Weekly
-            ? $startOfToday->copy()->addDays(7)
-            : $startOfToday->copy()->addDay();
+        $windowEnd = $startOfToday->copy()->addDay();
 
         $sections = [];
 

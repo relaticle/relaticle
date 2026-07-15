@@ -14,6 +14,7 @@ use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
@@ -137,6 +138,12 @@ final class AppPanelProvider extends PanelProvider
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
                         ? url(EditProfile::getUrl())
                         : url($panel->getPath())),
+                Action::make('notifications')
+                    ->label(__('notifications.title'))
+                    ->icon('heroicon-m-bell')
+                    ->url(fn (): string => $this->shouldRegisterMenuItem()
+                        ? url(NotificationPreferences::getUrl())
+                        : url($panel->getPath())),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,
@@ -151,6 +158,7 @@ final class AppPanelProvider extends PanelProvider
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->pages([
                 EditProfile::class,
+                NotificationPreferences::class,
                 AccessTokens::class,
             ])
             ->spa()

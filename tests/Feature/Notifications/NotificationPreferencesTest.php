@@ -3,41 +3,53 @@
 declare(strict_types=1);
 
 use App\Actions\User\UpdateNotificationPreferences;
-use App\Data\NotificationPreferences;
-use App\Enums\Notifications\DigestCadence;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
+use App\Jobs\ReactivatePostmarkRecipient;
 use App\Models\User;
+use Illuminate\Support\Facades\Bus;
 
-it('returns sensible defaults when no preferences are stored', function (): void {
+it('returns code defaults when no override is stored', function (): void {
     $user = User::factory()->create(['notification_preferences' => null]);
 
-    $prefs = $user->notificationPreferences();
-
-    expect($prefs->taskAssignedInApp)->toBeTrue()
-        ->and($prefs->taskAssignedEmail)->toBeFalse()
-        ->and($prefs->digestCadence)->toBe(DigestCadence::Daily);
+    expect($user->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::InApp))->toBeTrue()
+        ->and($user->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::Email))->toBeFalse()
+        ->and($user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email))->toBeTrue();
 });
 
-it('persists updated preferences through the action', function (): void {
+it('persists a single overridden cell through the action', function (): void {
+    Bus::fake();
     $user = User::factory()->create();
 
-    resolve(UpdateNotificationPreferences::class)->execute($user, new NotificationPreferences(
-        taskAssignedInApp: false,
-        taskAssignedEmail: true,
-        digestCadence: DigestCadence::Weekly,
-    ));
+    resolve(UpdateNotificationPreferences::class)->execute(
+        $user, NotificationType::TaskAssigned, NotificationChannel::Email, true,
+    );
 
-    $fresh = $user->fresh()->notificationPreferences();
-
-    expect($fresh->taskAssignedInApp)->toBeFalse()
-        ->and($fresh->taskAssignedEmail)->toBeTrue()
-        ->and($fresh->digestCadence)->toBe(DigestCadence::Weekly);
+    expect($user->fresh()->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::Email))->toBeTrue()
+        ->and($user->fresh()->notification_preferences)->toBe(['task_assigned' => ['email' => true]]);
 });
 
-it('switches the digest cadence off immutably', function (): void {
-    $prefs = new NotificationPreferences(digestCadence: DigestCadence::Daily);
+it('dispatches a Postmark reactivation only when the digest email is re-enabled', function (): void {
+    Bus::fake();
+    $user = User::factory()->create(['notification_preferences' => ['task_digest' => ['email' => false]]]);
 
-    $off = $prefs->withDigestCadence(DigestCadence::Off);
+    resolve(UpdateNotificationPreferences::class)->execute(
+        $user, NotificationType::TaskDigest, NotificationChannel::Email, true,
+    );
 
-    expect($off->digestCadence)->toBe(DigestCadence::Off)
-        ->and($prefs->digestCadence)->toBe(DigestCadence::Daily);
+    Bus::assertDispatched(
+        ReactivatePostmarkRecipient::class,
+        fn (ReactivatePostmarkRecipient $job): bool => $job->email === $user->email,
+    );
+});
+
+it('does not dispatch reactivation when disabling the digest email', function (): void {
+    Bus::fake();
+    $user = User::factory()->create();
+
+    resolve(UpdateNotificationPreferences::class)->execute(
+        $user, NotificationType::TaskDigest, NotificationChannel::Email, false,
+    );
+
+    Bus::assertNotDispatched(ReactivatePostmarkRecipient::class);
 });

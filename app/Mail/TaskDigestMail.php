@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Data\DigestPayload;
-use App\Enums\Notifications\DigestCadence;
+use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -22,16 +22,11 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     public function __construct(
         public User $user,
         public DigestPayload $payload,
-        public DigestCadence $cadence,
     ) {}
 
     public function envelope(): Envelope
     {
-        $subject = $this->cadence === DigestCadence::Weekly
-            ? 'Your tasks for the week ahead'
-            : 'Your tasks for today';
-
-        return new Envelope(subject: $subject);
+        return new Envelope(subject: 'Your tasks for today');
     }
 
     public function content(): Content
@@ -48,6 +43,10 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                         'tenant' => $this->user->currentTeam,
                     ],
                     panel: 'app',
+                ),
+                'manageSettingsUrl' => NotificationPreferences::getUrl(
+                    panel: 'app',
+                    tenant: $this->user->currentTeam,
                 ),
                 'companyName' => (string) config('relaticle.company.name'),
                 'companyAddress' => (string) config('relaticle.company.address'),

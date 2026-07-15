@@ -29,6 +29,6 @@ View all my tasks
 <x-slot:subcopy>
 {{ $companyName }}@if($companyAddress !== '') · {{ $companyAddress }}@endif
 
-{{-- Unsubscribe link + List-Unsubscribe headers are auto-added by Postmark's managed broadcast stream --}}
+[Manage notification settings]({{ $manageSettingsUrl }})
 </x-slot:subcopy>
 </x-mail::message>

@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Webhooks;
 
 use App\Actions\User\UpdateNotificationPreferences;
-use App\Enums\Notifications\DigestCadence;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,9 @@ final readonly class PostmarkWebhookController
 
         $this->updatePreferences->execute(
             $user,
-            $user->notificationPreferences()->withDigestCadence(DigestCadence::Off),
+            NotificationType::TaskDigest,
+            NotificationChannel::Email,
+            false,
         );
 
         return response()->json(['updated' => true]);

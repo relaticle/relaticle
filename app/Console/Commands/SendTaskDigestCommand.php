@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\Notifications\DigestCadence;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Features\TaskDigestEmails;
 use App\Mail\TaskDigestMail;
 use App\Models\User;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Pennant\Feature;
 
-#[Description('Send daily/weekly task digest emails to users whose local time is 08:00')]
+#[Description('Send daily task digest emails to users whose local time is 08:00')]
 #[Signature('notifications:send-task-digest')]
 final class SendTaskDigestCommand extends Command
 {
@@ -47,13 +48,7 @@ final class SendTaskDigestCommand extends Command
             return false;
         }
 
-        $cadence = $user->notificationPreferences()->digestCadence;
-
-        if ($cadence === DigestCadence::Off) {
-            return false;
-        }
-
-        if ($cadence === DigestCadence::Weekly && ! $localNow->isMonday()) {
+        if (! $user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email)) {
             return false;
         }
 
@@ -61,7 +56,7 @@ final class SendTaskDigestCommand extends Command
             return false;
         }
 
-        $payload = $digestService->forUser($user, $cadence);
+        $payload = $digestService->forUser($user);
 
         if ($payload->isEmpty()) {
             return false;
@@ -69,7 +64,7 @@ final class SendTaskDigestCommand extends Command
 
         Mail::mailer('postmark_broadcast')
             ->to($user)
-            ->send(new TaskDigestMail($user, $payload, $cadence));
+            ->send(new TaskDigestMail($user, $payload));
 
         return true;
     }

@@ -6,7 +6,6 @@ namespace App\Filament\Pages;
 
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
-use App\Livewire\App\Profile\UpdateNotificationPreferences;
 use App\Livewire\App\Profile\UpdatePassword;
 use App\Livewire\App\Profile\UpdateProfileInformation;
 use Filament\Pages\Page;
@@ -32,7 +31,6 @@ final class EditProfile extends Page
     {
         return $schema->components([
             Livewire::make(UpdateProfileInformation::class),
-            Livewire::make(UpdateNotificationPreferences::class),
             Livewire::make(UpdatePassword::class),
             Livewire::make(LogoutOtherBrowserSessions::class),
             Livewire::make(DeleteAccount::class),

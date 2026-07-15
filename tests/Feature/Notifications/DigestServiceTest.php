@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\Notifications\DigestCadence;
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
@@ -77,27 +76,11 @@ it('daily digest contains overdue and due-today tasks only', function (): void {
     $nextWeek->assignees()->attach($user);
     digestSetDue($nextWeek, $field, now()->addDays(3));
 
-    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
+    $payload = resolve(DigestService::class)->forUser($user);
 
     expect($payload->taskCount())->toBe(2)
         ->and(collect($payload->teams[0]->overdue)->pluck('title')->all())->toBe(['overdue'])
         ->and(collect($payload->teams[0]->upcoming)->pluck('title')->all())->toBe(['today']);
-});
-
-it('weekly digest extends the window to seven days', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $field = digestDueField($team->id);
-
-    foreach (['overdue' => now()->subDay(), 'today' => now()->setTime(9, 0), 'in_three' => now()->addDays(3), 'out_of_window' => now()->addDays(8)] as $title => $when) {
-        $t = Task::factory()->for($team)->create(['title' => $title]);
-        $t->assignees()->attach($user);
-        digestSetDue($t, $field, $when);
-    }
-
-    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Weekly);
-
-    expect($payload->taskCount())->toBe(3);
 });
 
 it('excludes done tasks and tasks without a due date', function (): void {
@@ -118,7 +101,7 @@ it('excludes done tasks and tasks without a due date', function (): void {
     $open->assignees()->attach($user);
     digestSetDue($open, $field, now()->subDay());
 
-    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
+    $payload = resolve(DigestService::class)->forUser($user);
 
     expect($payload->taskCount())->toBe(1)
         ->and(collect($payload->teams[0]->overdue)->pluck('title')->all())->toBe(['open']);
@@ -138,7 +121,7 @@ it('groups tasks by team for multi-team users', function (): void {
     $b->assignees()->attach($user);
     digestSetDue($b, digestDueField($teamB->id), now());
 
-    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
+    $payload = resolve(DigestService::class)->forUser($user);
 
     expect($payload->teams)->toHaveCount(2)
         ->and($payload->taskCount())->toBe(2);
@@ -155,7 +138,7 @@ it('computes the digest window in the recipient timezone, not the app timezone',
     $task->assignees()->attach($user);
     digestSetDue($task, $field, Date::parse('2026-06-29 10:00:00', 'UTC'));
 
-    $payload = resolve(DigestService::class)->forUser($user, DigestCadence::Daily);
+    $payload = resolve(DigestService::class)->forUser($user);
 
     expect($payload->taskCount())->toBe(1)
         ->and(collect($payload->teams[0]->upcoming)->pluck('title')->all())->toBe(['tokyo_evening']);
