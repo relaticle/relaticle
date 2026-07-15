@@ -657,7 +657,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return this.mintAssistantStub({ invocationId });
     },
 
-    modelOptions: @js(\Relaticle\Chat\Enums\AiModel::pickerOptions()),
+    modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 
     providerIcons: @js([
         'anthropic' => svg('ri-claude-fill')->toHtml(),

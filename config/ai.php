@@ -105,11 +105,12 @@ return [
             'driver' => 'ollama',
             'key' => env('OLLAMA_API_KEY', ''),
             'url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
-            'models' => [
-                'text' => [
-                    'default' => env('OLLAMA_MODEL'),
-                ],
-            ],
+        ],
+
+        'selfhosted' => [
+            'driver' => 'openai',
+            'key' => env('SELF_HOSTED_AI_KEY', ''),
+            'url' => env('SELF_HOSTED_AI_URL'),
         ],
 
         'openai' => [

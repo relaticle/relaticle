@@ -44,6 +44,15 @@ enum Plan: string
         };
     }
 
+    public function rank(): int
+    {
+        return match ($this) {
+            self::Free => 0,
+            self::Pro => 1,
+            self::Enterprise => 2,
+        };
+    }
+
     /** @return list<AiModel> */
     public function allowedModels(): array
     {

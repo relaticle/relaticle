@@ -95,7 +95,7 @@
                     ->all()
             ),
             selectedModel: 'auto',
-            modelOptions: @js(\Relaticle\Chat\Enums\AiModel::pickerOptions()),
+            modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
             providerIcons: @js([
                 'anthropic' => svg('ri-claude-fill')->toHtml(),
                 'openai' => svg('ri-openai-fill')->toHtml(),
