@@ -184,3 +184,14 @@ it('renders the top-active teams and users charts', function (): void {
     livewire(TopActiveTeamsChartWidget::class)->assertOk();
     livewire(TopActiveUsersChartWidget::class)->assertOk();
 });
+
+it('renders the top-active charts when the date filter is active', function (): void {
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamA, $this->ownerA);
+    seedActivity($this->teamB, $this->ownerB);
+
+    $filters = ['created_at' => ['from' => now()->subDay()->toDateString(), 'until' => null]];
+
+    livewire(TopActiveTeamsChartWidget::class, ['tableFilters' => $filters])->assertOk();
+    livewire(TopActiveUsersChartWidget::class, ['tableFilters' => $filters])->assertOk();
+});

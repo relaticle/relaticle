@@ -129,8 +129,8 @@ final class ActivityResource extends Resource
                         DatePicker::make('until')->label('Until'),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query
-                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->whereDate('created_at', '>=', $data['from']))
-                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('created_at', '<=', $data['until']))),
+                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '>=', $data['from']))
+                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '<=', $data['until']))),
             ])
             ->recordActions([
                 ViewAction::make(),
