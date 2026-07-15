@@ -21,8 +21,6 @@ interface ModelSeederInterface
 
     /**
      * Initialize the seeder with necessary dependencies
-     *
-     * @return $this
      */
     public function initialize(): self;
 }
