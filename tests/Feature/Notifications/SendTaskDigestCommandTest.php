@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
-use App\Features\TaskDigestEmails;
 use App\Mail\TaskDigestMail;
 use App\Models\Task;
 use App\Models\User;
@@ -15,7 +14,6 @@ use Laravel\Pennant\Feature;
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    Feature::define(TaskDigestEmails::class, true);
     Mail::fake();
 });
 
@@ -92,16 +90,6 @@ it('suppresses the digest when the user has no due tasks', function (): void {
 it('does not queue when the digest email channel is off', function (): void {
     $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
     userWithDueTask('UTC', digestEmail: false);
-
-    $this->artisan('notifications:send-task-digest')->assertSuccessful();
-
-    Mail::assertNothingQueued();
-});
-
-it('does not send when the rollout feature is inactive', function (): void {
-    Feature::define(TaskDigestEmails::class, false);
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
-    userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 

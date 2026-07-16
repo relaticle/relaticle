@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
-use App\Features\TaskDigestEmails;
 use App\Mail\TaskDigestMail;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
@@ -18,7 +17,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Pennant\Feature;
 
 #[Description('Send daily task digest emails to users whose local time is 08:00')]
 #[Signature('notifications:send-task-digest')]
@@ -85,10 +83,6 @@ final class SendTaskDigestCommand extends Command
         }
 
         if (! $user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email)) {
-            return false;
-        }
-
-        if (! Feature::for($user)->active(TaskDigestEmails::class)) {
             return false;
         }
 
