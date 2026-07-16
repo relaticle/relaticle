@@ -505,7 +505,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     isStreaming: false,
     channel: null,
     streamTimeoutId: null,
-    streamTimeoutMs: 60000,
+    // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
+    // long with no stream event, reconcile the turn from the DB. It MUST exceed the
+    // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
+    // (Ollama/qwen3-class "thinking" models emit no client-visible delta during their
+    // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
+    // for a reply that is still generating server-side and does persist.
+    streamTimeoutMs: 125000,
     prependScrollAnchor: null,
     streamAbortController: null,
     currentToolStatus: null,
@@ -513,11 +519,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     copyTickerId: null,
     currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
     currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-    allowedModels: @js(
-        collect((auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())->allowedModels())
-            ->map(fn ($m) => $m->value)
-            ->all()
-    ),
+    allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
     selectedModel: 'auto',
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
@@ -651,17 +653,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return this.mintAssistantStub({ invocationId });
     },
 
-    modelOptions: [
-        { value: 'auto', label: 'Auto', provider: null },
-        { value: 'claude-sonnet', label: 'Sonnet 4.6', provider: 'anthropic' },
-        { value: 'claude-opus', label: 'Opus 4.7', provider: 'anthropic' },
-        { value: 'gpt-5-5', label: 'GPT 5.5', provider: 'openai' },
-        { value: 'gpt-5-4', label: 'GPT 5.4', provider: 'openai' },
-    ],
+    modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 
     providerIcons: @js([
         'anthropic' => svg('ri-claude-fill')->toHtml(),
         'openai' => svg('ri-openai-fill')->toHtml(),
+        'ollama' => svg('ri-server-line')->toHtml(),
+        'selfhosted' => svg('ri-server-line')->toHtml(),
     ]),
 
     providerIconHtml(provider) {
@@ -673,6 +671,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return ({
             anthropic: 'text-[#D4763C]',
             openai: 'text-gray-900 dark:text-gray-200',
+            ollama: 'text-gray-500 dark:text-gray-400',
+            selfhosted: 'text-gray-500 dark:text-gray-400',
         })[provider] || '';
     },
 
