@@ -17,7 +17,6 @@ return new class extends Migration
                 $table->unsignedInteger('email_count')->default(0)->after('last_interaction_at');
                 $table->unsignedInteger('inbound_email_count')->default(0)->after('email_count');
                 $table->unsignedInteger('outbound_email_count')->default(0)->after('inbound_email_count');
-                $table->float('avg_response_time_hours')->nullable()->after('outbound_email_count');
             });
         }
     }

@@ -176,6 +176,15 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             $message['internetMessageId'] = $data['rfc_message_id'];
         }
 
+        if (($data['attachments'] ?? []) !== []) {
+            $message['attachments'] = array_map(fn (array $attachment): array => [
+                '@odata.type' => '#microsoft.graph.fileAttachment',
+                'name' => $attachment['filename'],
+                'contentType' => $attachment['mime_type'],
+                'contentBytes' => base64_encode($attachment['content']),
+            ], $data['attachments']);
+        }
+
         $this->clientFactory->make($this->account)
             ->post('/me/sendMail', ['message' => $message, 'saveToSentItems' => true])
             ->throw();

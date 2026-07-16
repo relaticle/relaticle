@@ -6,6 +6,8 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -238,4 +240,81 @@ it('throws when the user has hit the max queued limit', function (): void {
         'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]))->toThrow(RuntimeException::class, 'queued');
+});
+
+it('persists uploaded attachments and flags the email', function (): void {
+    Storage::fake('local');
+
+    $path = UploadedFile::fake()
+        ->createWithContent('quarterly-report.pdf', '%PDF-1.4 fake pdf bytes')
+        ->store('email-attachments', 'local');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Here is the report',
+        'body_html' => '<p>See attached.</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$path],
+        'attachment_file_names' => [$path => 'quarterly-report.pdf'],
+    ]);
+
+    $attachment = $email->attachments()->first();
+
+    expect($email->has_attachments)->toBeTrue()
+        ->and($email->attachments()->count())->toBe(1)
+        ->and($attachment->filename)->toBe('quarterly-report.pdf')
+        ->and($attachment->storage_path)->toBe($path)
+        ->and($attachment->size)->toBeGreaterThan(0)
+        ->and($attachment->mime_type)->not->toBeEmpty();
+});
+
+it('reads attachment bytes into the provider payload when sending', function (): void {
+    Storage::fake('local');
+
+    $path = UploadedFile::fake()
+        ->createWithContent('notes.txt', 'attachment body')
+        ->store('email-attachments', 'local');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'With file',
+        'body_html' => '<p>hi</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$path],
+        'attachment_file_names' => [$path => 'notes.txt'],
+    ]);
+
+    $captured = null;
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturnUsing(function (array $payload) use (&$captured): array {
+        $captured = $payload;
+
+        return [
+            'provider_message_id' => 'pm',
+            'thread_id' => 'th',
+            'rfc_message_id' => $payload['rfc_message_id'] ?? '<x@example.com>',
+        ];
+    });
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    app(EmailSendingService::class)->send($email->refresh());
+
+    expect($captured['attachments'])->toHaveCount(1)
+        ->and($captured['attachments'][0]['filename'])->toBe('notes.txt')
+        ->and($captured['attachments'][0]['mime_type'])->not->toBeEmpty()
+        ->and($captured['attachments'][0]['content'])->toBe('attachment body');
 });

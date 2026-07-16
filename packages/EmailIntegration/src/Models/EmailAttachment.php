@@ -19,6 +19,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class EmailAttachment extends Model
 {
     /**
+     * Filesystem disk that holds outbound attachment bytes between compose and send.
+     * Shared by the compose FileUpload, SendEmailAction (write) and EmailSendingService (read).
+     */
+    public const string DISK = 'local';
+
+    /**
      * @use HasFactory<EmailAttachmentFactory>
      */
     use HasFactory, HasUlids;

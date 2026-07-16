@@ -5,17 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Features\EmailIntegration;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
-use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
@@ -44,22 +38,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // Email is already observed via #[ObservedBy(EmailObserver::class)] on the model.
         // Registering it again here fires every listener twice (double metric increments,
         // double auto-create) for any create path where participants exist at create time.
-
-        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
-            $schedule->call(function (): void {
-                ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
-                    ->cursor()
-                    ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalEmailSyncJob($account)));
-            })->everyFiveMinutes()->name('email-incremental-sync');
-
-            $schedule->call(function (): void {
-                ConnectedAccount::query()
-                    ->where('status', EmailAccountStatus::ACTIVE)
-                    ->whereJsonContains('capabilities->calendar', true)
-                    ->cursor()
-                    ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalCalendarSyncJob($account)));
-            })->everyFiveMinutes()->name('calendar-incremental-sync');
-        });
+        //
+        // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
+        // scheduled work lives there); do not re-register them here.
 
         Route::middleware('web')
             ->group(function (): void {

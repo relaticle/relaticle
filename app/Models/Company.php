@@ -43,7 +43,6 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property int $email_count
  * @property int $inbound_email_count
  * @property int $outbound_email_count
- * @property float|null $avg_response_time_hours
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
@@ -145,7 +144,7 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
                 'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at', 'account_owner_id',
                 'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
-                'outbound_email_count', 'avg_response_time_hours',
+                'outbound_email_count',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

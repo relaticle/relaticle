@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -19,6 +20,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use RuntimeException;
@@ -41,6 +43,8 @@ final readonly class SendEmailAction
      *     batch_id?: ?string,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
+     *     attachments?: array<int, string>,
+     *     attachment_file_names?: array<string, string>,
      * }  $data
      * @param  class-string|null  $linkToType
      */
@@ -60,7 +64,10 @@ final readonly class SendEmailAction
 
         $scheduledFor = $this->resolveScheduledFor($data, $priority);
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId): Email {
+        /** @var array<int, string> $attachmentPaths */
+        $attachmentPaths = array_values($data['attachments'] ?? []);
+
+        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths): Email {
             // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives
             // from a client-controlled hidden field and Email has no team global scope,
             // so an unscoped lookup would let a user thread their outbound mail onto
@@ -95,7 +102,7 @@ final readonly class SendEmailAction
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
                 'privacy_tier' => $data['privacy_tier'],
-                'has_attachments' => false,
+                'has_attachments' => $attachmentPaths !== [],
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],
                 'batch_id' => $data['batch_id'] ?? null,
@@ -126,6 +133,8 @@ final readonly class SendEmailAction
                 }
             }
 
+            $this->storeAttachments($email, $attachmentPaths, $data['attachment_file_names'] ?? []);
+
             if ($linkToType !== null && $linkToId !== null) {
                 DB::table('emailables')->insert([
                     'email_id' => $email->getKey(),
@@ -139,6 +148,32 @@ final readonly class SendEmailAction
 
             return $email;
         });
+    }
+
+    /**
+     * Persist compose-uploaded attachments so the send job can attach their bytes.
+     * Paths point at temporary files on the compose disk written by the FileUpload.
+     *
+     * @param  array<int, string>  $paths
+     * @param  array<string, string>  $originalNames  storage path => original client filename
+     */
+    private function storeAttachments(Email $email, array $paths, array $originalNames): void
+    {
+        $disk = Storage::disk(EmailAttachment::DISK);
+
+        foreach ($paths as $path) {
+            if (! $disk->exists($path)) {
+                continue;
+            }
+
+            EmailAttachment::query()->create([
+                'email_id' => $email->getKey(),
+                'filename' => $originalNames[$path] ?? basename($path),
+                'mime_type' => $disk->mimeType($path) ?: 'application/octet-stream',
+                'size' => $disk->size($path),
+                'storage_path' => $path,
+            ]);
+        }
     }
 
     /**

@@ -263,9 +263,13 @@ final readonly class GmailService implements MailServiceInterface
             ));
         }
 
+        $attachments = $data['attachments'] ?? [];
+
         $headers[] = 'Subject: =?UTF-8?B?'.base64_encode((string) $data['subject']).'?=';
         $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: multipart/alternative; boundary="boundary_relaticle"';
+        $headers[] = $attachments === []
+            ? 'Content-Type: multipart/alternative; boundary="boundary_relaticle"'
+            : 'Content-Type: multipart/mixed; boundary="mixed_relaticle"';
         $headers[] = 'Date: '.now()->toRfc2822String();
 
         // Stamp our own Message-ID so a retry can find an already-sent copy via
@@ -281,15 +285,45 @@ final readonly class GmailService implements MailServiceInterface
 
         $bodyText = $data['body_text'] ?? strip_tags($data['body_html'] ?? '');
 
-        $raw = implode("\r\n", $headers)."\r\n\r\n";
-        $raw .= "--boundary_relaticle\r\n";
-        $raw .= "Content-Type: text/plain; charset=UTF-8\r\n\r\n";
-        $raw .= $bodyText."\r\n\r\n";
-        $raw .= "--boundary_relaticle\r\n";
-        $raw .= "Content-Type: text/html; charset=UTF-8\r\n\r\n";
-        $raw .= ($data['body_html'] ?? '')."\r\n\r\n";
+        $alternative = "--boundary_relaticle\r\n"
+            ."Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+            .$bodyText."\r\n\r\n"
+            ."--boundary_relaticle\r\n"
+            ."Content-Type: text/html; charset=UTF-8\r\n\r\n"
+            .($data['body_html'] ?? '')."\r\n\r\n"
+            .'--boundary_relaticle--';
 
-        return $raw.'--boundary_relaticle--';
+        if ($attachments === []) {
+            return implode("\r\n", $headers)."\r\n\r\n".$alternative;
+        }
+
+        // Attachments present: nest the alternative body inside a multipart/mixed
+        // envelope, then append each file as a base64 attachment part.
+        $raw = implode("\r\n", $headers)."\r\n\r\n";
+        $raw .= "--mixed_relaticle\r\n";
+        $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
+        $raw .= $alternative."\r\n\r\n";
+
+        foreach ($attachments as $attachment) {
+            $filename = $this->sanitizeAttachmentFilename($attachment['filename']);
+
+            $raw .= "--mixed_relaticle\r\n";
+            $raw .= 'Content-Type: '.$attachment['mime_type'].'; name="'.$filename."\"\r\n";
+            $raw .= "Content-Transfer-Encoding: base64\r\n";
+            $raw .= 'Content-Disposition: attachment; filename="'.$filename."\"\r\n\r\n";
+            $raw .= chunk_split(base64_encode($attachment['content']))."\r\n";
+        }
+
+        return $raw.'--mixed_relaticle--';
+    }
+
+    /**
+     * Strip characters that could break out of the quoted filename and inject
+     * MIME headers.
+     */
+    private function sanitizeAttachmentFilename(string $filename): string
+    {
+        return str_replace(['"', '\\', "\r", "\n"], '', $filename);
     }
 
     private function formatAddress(string $name, string $email): string
