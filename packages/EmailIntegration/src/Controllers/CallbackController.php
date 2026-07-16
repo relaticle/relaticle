@@ -36,7 +36,9 @@ final readonly class CallbackController
             return $this->redirectWithError($user, 'That email provider is not supported.');
         }
 
-        $driver = Socialite::driver($this->resolveDriver($provider));
+        // Both 'gmail' (registered in EmailIntegrationServiceProvider from services.gmail)
+        // and 'azure' resolve to their own OAuth clients + email-account redirects.
+        $driver = Socialite::driver($provider);
 
         try {
             $socialUser = $driver->user();
@@ -76,15 +78,6 @@ final readonly class CallbackController
         return redirect(EmailAccountsPage::getUrl([
             'tenant' => $user->currentTeam->slug,
         ]))->with('success', 'Account connected successfully.');
-    }
-
-    private function resolveDriver(string $provider): string
-    {
-        return match ($provider) {
-            'gmail' => 'google',
-            'azure' => 'azure',
-            default => $provider,
-        };
     }
 
     private function redirectWithError(User $user, string $message): RedirectResponse

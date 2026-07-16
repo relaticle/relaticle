@@ -76,7 +76,7 @@ it('preserves the stored refresh token when a reconnect returns none', function 
             'https://www.googleapis.com/auth/gmail.send',
         ];
 
-        Socialite::fake('google', $social);
+        Socialite::fake('gmail', $social);
 
         $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
 
@@ -111,7 +111,7 @@ it('makes the first connected account the default and leaves later connections n
             'https://www.googleapis.com/auth/gmail.send',
         ];
 
-        Socialite::fake('google', $social);
+        Socialite::fake('gmail', $social);
 
         $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
 
