@@ -296,14 +296,83 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $message = $this->isRateLimited($exception)
-            ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
-            : 'The assistant encountered an error. Please try again.';
+        $this->persistFailedTurn($exception);
+
+        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: $message,
+            message: $this->failureMessage($exception),
         ));
+    }
+
+    private function failureMessage(?Throwable $exception): string
+    {
+        if ($this->isRateLimited($exception)) {
+            return __('The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.');
+        }
+
+        return __('The assistant encountered an error. Please try again.');
+    }
+
+    /**
+     * Make a dead turn coherent: ensure the user's message is persisted (the
+     * ConversationStore flushes rows only on stream success, so a mid-stream
+     * death loses them) and append a visible assistant failure note that
+     * survives reload.
+     */
+    private function persistFailedTurn(?Throwable $exception): void
+    {
+        $now = now();
+        $table = DB::table('agent_conversation_messages');
+
+        $latest = $table->clone()
+            ->where('conversation_id', $this->conversationId)->latest()
+            ->orderByDesc('id')
+            ->first(['role', 'content']);
+
+        $storePersistedUser = $latest !== null
+            && $latest->role === 'user'
+            && $latest->content === $this->message;
+
+        if (! $storePersistedUser) {
+            $table->insert([
+                'id' => (string) Str::ulid(),
+                'conversation_id' => $this->conversationId,
+                'user_id' => (string) $this->user->getKey(),
+                'agent' => CrmAssistant::class,
+                'role' => 'user',
+                'content' => $this->message,
+                'attachments' => '[]',
+                'tool_calls' => '[]',
+                'tool_results' => '[]',
+                'usage' => '[]',
+                'meta' => '[]',
+                'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $text = $this->failureMessage($exception);
+        $document = $this->getParser()->buildFromText($text, [], $this->team);
+
+        $table->insert([
+            'id' => (string) Str::ulid(),
+            'conversation_id' => $this->conversationId,
+            'user_id' => (string) $this->user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => 'assistant',
+            'content' => $text,
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '[]',
+            'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
+            'document' => json_encode($document, JSON_THROW_ON_ERROR),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     /**
