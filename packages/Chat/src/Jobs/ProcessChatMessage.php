@@ -320,20 +320,56 @@ final class ProcessChatMessage implements ShouldQueue
      * ConversationStore flushes rows only on stream success, so a mid-stream
      * death loses them) and append a visible assistant failure note that
      * survives reload.
+     *
+     * The ConversationStore writes the user row then the assistant row,
+     * back-to-back, only once the stream fully succeeds. `handle()`'s
+     * post-stream `then()` callback (settleReservation / persistMentions /
+     * persistUserDocument / materializeAssistantDocument / broadcastFollowUps)
+     * then runs synchronously and un-guarded — if any of those steps throws,
+     * the job still fails even though both real rows already exist. Inspecting
+     * only the single latest row can't tell that case apart from "the stream
+     * died before the store wrote anything": the latest row would be the
+     * assistant reply, not the user message, so the old guard concluded the
+     * user message was never persisted and inserted a duplicate plus a false
+     * error note on a turn that actually succeeded. Looking at the last TWO
+     * rows lets us tell a truly complete turn (user then assistant, matching
+     * this message) apart from a genuinely dead one.
+     *
+     * Residual: if the user sends the IDENTICAL message in two consecutive
+     * turns and the first succeeds while the second later fails, the last-two
+     * check sees {user: this message, assistant: first reply} and treats the
+     * second turn as already complete, so it won't be backfilled. This
+     * degrades to the pre-existing "message lost" behavior for that one edge
+     * case — never a duplicate or a false error note — and is accepted rather
+     * than solved with more machinery.
      */
     private function persistFailedTurn(?Throwable $exception): void
     {
         $now = now();
         $table = DB::table('agent_conversation_messages');
 
-        $latest = $table->clone()
+        $lastTwo = $table->clone()
             ->where('conversation_id', $this->conversationId)->latest()
             ->orderByDesc('id')
-            ->first(['role', 'content']);
+            ->limit(2)
+            ->get(['role', 'content']);
 
-        $storePersistedUser = $latest !== null
-            && $latest->role === 'user'
-            && $latest->content === $this->message;
+        $last = $lastTwo->get(0);
+        $prev = $lastTwo->get(1);
+
+        $turnAlreadyComplete = $last !== null
+            && $last->role === 'assistant'
+            && $prev !== null
+            && $prev->role === 'user'
+            && $prev->content === $this->message;
+
+        if ($turnAlreadyComplete) {
+            return;
+        }
+
+        $storePersistedUser = $last !== null
+            && $last->role === 'user'
+            && $last->content === $this->message;
 
         if (! $storePersistedUser) {
             $table->insert([
