@@ -48,6 +48,8 @@ api.json
 /storage/app/scribe
 /tests/Feature/Scribe
 .context
+/bin/setup-preview.sh
+/packages/filament
 .gstack/
 test-results.xml
 

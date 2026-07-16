@@ -52,6 +52,9 @@ return [
                 'edit' => [
                     'label' => 'Edit',
                 ],
+                'view_emails' => [
+                    'label' => 'Emails',
+                ],
                 'ask_about_this' => [
                     'label' => 'Ask about this',
                 ],
@@ -72,6 +75,26 @@ return [
                     ],
                     'contact' => [
                         'label' => 'Point of Contact',
+                    ],
+                ],
+            ],
+            'communication_intelligence' => [
+                'fields' => [
+                    'last_interaction' => [
+                        'label' => 'Last Interaction',
+                        'placeholder' => 'Never',
+                    ],
+                    'last_email' => [
+                        'label' => 'Last Email',
+                        'placeholder' => 'Never',
+                    ],
+                    'days_since_last_email' => [
+                        'label' => 'Days Since Last Email',
+                        'value' => ':days days ago',
+                        'empty' => 'No emails yet',
+                    ],
+                    'email_count' => [
+                        'label' => 'Total Emails',
                     ],
                 ],
             ],

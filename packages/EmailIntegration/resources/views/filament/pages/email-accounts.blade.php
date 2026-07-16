@@ -1,0 +1,49 @@
+<x-filament-panels::page>
+    <div class="space-y-6">
+        <x-filament::section heading="Connected Email Accounts">
+            <div class="space-y-3">
+            @forelse($this->connectedAccounts as $account)
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg dark:border-gray-700">
+                    <div class="flex items-center gap-3">
+                        <x-filament::icon icon="heroicon-o-envelope" class="w-5 h-5 text-gray-400" />
+                        <div>
+                            <p class="font-medium text-sm text-gray-900 dark:text-white">{{ $account->email_address }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $account->provider->getLabel() }}</p>
+                        </div>
+                        <x-filament::badge :color="$account->status->getColor()">
+                            {{ $account->status->getLabel() }}
+                        </x-filament::badge>
+                        @if ($account->is_default)
+                            <x-filament::badge color="warning" icon="heroicon-s-star">
+                                {{ __('filament/pages/email-accounts.default_badge') }}
+                            </x-filament::badge>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-3">
+                        @if ($account->last_synced_at)
+                            <span class="text-xs text-gray-400">
+                                Synced {{ $account->last_synced_at->diffForHumans() }}
+                            </span>
+                        @endif
+                        <div class="flex shrink-0 items-center gap-2">
+                            {{ $this->accountActions($account) }}
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <p class="text-sm text-gray-500 dark:text-gray-400">No email accounts connected yet.</p>
+            @endforelse
+            </div>
+        </x-filament::section>
+
+        <x-filament::section heading="Connect an Account">
+            <div class="flex gap-3">
+                {{ $this->connectGmailAction }}
+                {{-- Outlook/Azure connection is hidden for now; re-enable when the provider is ready. --}}
+                {{-- {{ $this->connectAzureAction }} --}}
+            </div>
+        </x-filament::section>
+    </div>
+
+    <x-filament-actions::modals />
+</x-filament-panels::page>

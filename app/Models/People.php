@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
+use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
@@ -22,17 +23,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
-use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
+use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
+ * @property Carbon|null $last_email_at
+ * @property Carbon|null $last_interaction_at
+ * @property int $email_count
+ * @property int $inbound_email_count
+ * @property int $outbound_email_count
  */
 #[ObservedBy(PeopleObserver::class)]
 #[Fillable([
@@ -42,16 +48,18 @@ use Spatie\Activitylog\Support\LogOptions;
 final class People extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
+    use HasActivityTimeline;
     use HasAiSummary;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<PeopleFactory> */
     use HasFactory;
 
+    use HasMeetings;
     use HasNotes;
     use HasTeam;
     use HasUlids;
-    use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
@@ -72,6 +80,8 @@ final class People extends Model implements HasCustomFields, HasTimeline
     {
         return [
             'creation_source' => CreationSource::class,
+            'last_email_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
         ];
     }
 
@@ -105,13 +115,10 @@ final class People extends Model implements HasCustomFields, HasTimeline
             ->logExcept([
                 'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
+                'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
+                'outbound_email_count',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
-    }
-
-    public function timeline(): TimelineBuilder
-    {
-        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }
