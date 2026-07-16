@@ -62,6 +62,9 @@ final readonly class AiModelResolver
             }
         }
 
-        return $this->registry->find('claude-sonnet') ?? $chain[0];
+        return $this->registry->find('claude-sonnet')
+            ?? $chain[0]
+            ?? $this->registry->all()[0]
+            ?? throw new \RuntimeException('No chat model is configured; set at least one provider in config/chat.php.');
     }
 }

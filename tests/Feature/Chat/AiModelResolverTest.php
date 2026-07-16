@@ -151,3 +151,17 @@ it('honors an Ollama default-model preference when configured', function (): voi
     expect($resolved['provider'])->toBe('ollama');
     expect($resolved['model'])->toBe('llama3.1:70b');
 });
+
+it('throws a clear error when no chat model is configured', function (): void {
+    config([
+        'chat.models' => [],
+        'chat.auto_chain' => [],
+        'chat.self_hosted' => ['url' => null, 'key' => '', 'models' => null],
+    ]);
+
+    $resolver = new AiModelResolver(new ModelRegistry);
+    $user = User::factory()->withPersonalTeam()->create();
+
+    expect(fn (): array => $resolver->resolve($user))
+        ->toThrow(RuntimeException::class, 'No chat model is configured');
+});
