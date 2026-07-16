@@ -143,3 +143,32 @@ it('POSTs to /me/sendMail and returns provider ids', function (): void {
 
     Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
 });
+
+it('includes file attachments in the /me/sendMail payload', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $service->sendMessage([
+        'subject' => 'Hi',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'attachments' => [[
+            'filename' => 'report.pdf',
+            'mime_type' => 'application/pdf',
+            'content' => 'PDF-BYTES',
+        ]],
+    ]);
+
+    Http::assertSent(function (Request $r): bool {
+        $attachments = $r->data()['message']['attachments'] ?? [];
+
+        return $attachments !== []
+            && $attachments[0]['@odata.type'] === '#microsoft.graph.fileAttachment'
+            && $attachments[0]['name'] === 'report.pdf'
+            && $attachments[0]['contentType'] === 'application/pdf'
+            && $attachments[0]['contentBytes'] === base64_encode('PDF-BYTES');
+    });
+});

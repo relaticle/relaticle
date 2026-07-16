@@ -392,6 +392,7 @@ trait HasEmailComposeActions
                         ->disk('local')
                         ->directory('email-attachments')
                         ->maxSize(10240)
+                        ->storeFileNamesIn('attachment_file_names')
                         ->nullable(),
                 ]),
 
@@ -567,6 +568,8 @@ trait HasEmailComposeActions
             'batch_id' => null,
             'scheduled_for' => $scheduledFor,
             'priority' => EmailPriority::PRIORITY,
+            'attachments' => $data['attachments'] ?? [],
+            'attachment_file_names' => $data['attachment_file_names'] ?? [],
         ];
     }
 

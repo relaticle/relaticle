@@ -884,6 +884,7 @@ final class EmailInboxPage extends Page
                         ->disk('local')
                         ->directory('email-attachments')
                         ->maxSize(10240)
+                        ->storeFileNamesIn('attachment_file_names')
                         ->nullable(),
                 ]),
 
@@ -1041,6 +1042,8 @@ final class EmailInboxPage extends Page
             'creation_source' => $source,
             'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
+            'attachments' => $data['attachments'] ?? [],
+            'attachment_file_names' => $data['attachment_file_names'] ?? [],
         ];
     }
 

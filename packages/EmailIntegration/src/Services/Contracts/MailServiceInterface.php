@@ -33,6 +33,7 @@ interface MailServiceInterface
      *     in_reply_to?: string,
      *     thread_id?: string,
      *     rfc_message_id?: string,
+     *     attachments?: array<int, array{filename: string, mime_type: string, content: string}>,
      * } $data
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
      */
