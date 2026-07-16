@@ -48,6 +48,12 @@ final class ChatModelsCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $descriptor->selfHosted) {
+            $this->error("Probe is only supported for self-hosted endpoints (ollama / SELF_HOSTED_AI_*). '{$id}' runs on the {$descriptor->provider} SDK and can't be probed this way.");
+
+            return self::FAILURE;
+        }
+
         /** @var array<string, mixed> $connection */
         $connection = config("ai.providers.{$descriptor->provider}", []);
         $base = rtrim((string) ($connection['url'] ?? ''), '/');

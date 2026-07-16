@@ -12,3 +12,9 @@ it('lists the model registry via artisan', function (): void {
         ->expectsOutputToContain('ollama')
         ->assertExitCode(0);
 });
+
+it('declines to probe a cloud model without throwing', function (): void {
+    $this->artisan('chat:models', ['--probe' => 'claude-sonnet'])
+        ->expectsOutputToContain('only supported for self-hosted')
+        ->assertExitCode(1);
+});
