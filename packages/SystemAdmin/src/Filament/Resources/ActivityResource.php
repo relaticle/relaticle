@@ -187,8 +187,14 @@ final class ActivityResource extends Resource
      */
     public static function buildChangeSummary(Activity $record): array
     {
+        // Spatie activitylog v5 stores trait-logged native diffs in `attribute_changes`,
+        // while manual `activity()->withProperties()` calls (custom-field edits, etc.)
+        // use `properties`. Merge both, mirroring the timeline's ActivityLogSource.
         /** @var array<string, mixed> $properties */
-        $properties = $record->properties?->toArray() ?? [];
+        $properties = [
+            ...($record->properties?->toArray() ?? []),
+            ...($record->attribute_changes?->toArray() ?? []),
+        ];
 
         if (isset($properties['custom_field_changes']) && is_array($properties['custom_field_changes'])) {
             return collect($properties['custom_field_changes'])
