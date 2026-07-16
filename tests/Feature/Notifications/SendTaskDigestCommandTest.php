@@ -68,6 +68,18 @@ it('does not queue outside 08:00 local time', function (): void {
     Mail::assertNothingQueued();
 });
 
+it('filters recipients by timezone so only users at their local 08:00 are queued', function (): void {
+    // At 23:00 UTC, Asia/Tokyo (UTC+9) is 08:00 the next day, while UTC is 23:00.
+    $this->travelTo(Carbon::parse('2026-06-29 23:00:00', 'UTC'));
+    $tokyo = userWithDueTask('Asia/Tokyo');
+    $utc = userWithDueTask('UTC');
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($tokyo->email));
+    Mail::assertNotQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($utc->email));
+});
+
 it('suppresses the digest when the user has no due tasks', function (): void {
     $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
     User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
