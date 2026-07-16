@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -160,4 +161,31 @@ it('backfills a newly failed turn even when a prior completed turn exists', func
         ->and($messages->where('role', 'assistant')->contains(
             fn (object $message): bool => str_contains((string) $message->content, 'encountered an error'),
         ))->toBeTrue();
+});
+
+it('shows timeout-specific copy when the turn times out', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'BR timeout',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    makeFailedTurnJob($user, $conversationId)->failed(new TimeoutExceededException('timed out'));
+
+    $note = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->value('content');
+
+    expect($note)->toContain('respond within the time limit');
 });

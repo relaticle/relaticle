@@ -13,6 +13,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -308,6 +309,10 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function failureMessage(?Throwable $exception): string
     {
+        if ($exception instanceof TimeoutExceededException) {
+            return __("This model didn't respond within the time limit (120s). Try a shorter prompt, or switch to a faster model.");
+        }
+
         if ($this->isRateLimited($exception)) {
             return __('The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.');
         }
