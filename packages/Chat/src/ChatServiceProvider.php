@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
 use Livewire\Livewire;
+use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
@@ -28,6 +29,7 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidebarNav;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 
 final class ChatServiceProvider extends ServiceProvider
@@ -35,6 +37,8 @@ final class ChatServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/chat.php', 'chat');
+
+        $this->app->singleton(ModelRegistry::class);
 
         // Replace laravel/ai's store so superseded (regenerated/edited-away)
         // turns disappear from the agent's history, not just the UI.
@@ -58,6 +62,7 @@ final class ChatServiceProvider extends ServiceProvider
     private function registerCommands(): void
     {
         $this->commands([
+            ChatModelsCommand::class,
             ExpirePendingActionsCommand::class,
             ReleaseOrphanedReservationsCommand::class,
             ResetCreditsCommand::class,

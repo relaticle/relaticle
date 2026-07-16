@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\ModelRegistry;
 use Tests\Helpers\ChatDocument;
 
 mutates(ChatController::class);
@@ -175,4 +176,64 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
     $response->assertStatus(403);
     expect($response->json('error'))->toBe('model_not_allowed');
     expect($response->json('requested_model'))->toBe('gpt-5-5');
+});
+
+it('allows a Free user to pick Ollama when it is configured', function (): void {
+    Queue::fake();
+    config()->set('chat.models.6.model', 'qwen3:14b');
+    app()->forgetInstance(ModelRegistry::class);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ChatDocument::fromText('hi'),
+        'model' => 'ollama',
+    ]);
+
+    $response->assertStatus(200);
+});
+
+it('rejects an unknown model id with a 422', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ChatDocument::fromText('hi'),
+        'model' => 'not-a-real-model',
+    ])->assertStatus(422);
 });

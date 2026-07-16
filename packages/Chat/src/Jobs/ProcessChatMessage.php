@@ -13,6 +13,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -42,13 +43,15 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
 
-#[Timeout(120)]
+#[Timeout(self::TIMEOUT_SECONDS)]
 #[MaxExceptions(1)]
 final class ProcessChatMessage implements ShouldQueue
 {
     use Queueable;
 
     private const int MAX_RATE_LIMIT_RETRIES = 5;
+
+    private const int TIMEOUT_SECONDS = 120;
 
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
@@ -296,14 +299,132 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $message = $this->isRateLimited($exception)
-            ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
-            : 'The assistant encountered an error. Please try again.';
+        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
+
+        try {
+            $this->persistFailedTurn($exception);
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
+        }
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: $message,
+            message: $this->failureMessage($exception),
         ));
+    }
+
+    private function failureMessage(?Throwable $exception): string
+    {
+        if ($exception instanceof TimeoutExceededException) {
+            return __("This model didn't respond within the time limit (:seconds s). Try a shorter prompt, or switch to a faster model.", [
+                'seconds' => self::TIMEOUT_SECONDS,
+            ]);
+        }
+
+        if ($this->isRateLimited($exception)) {
+            return __('The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.');
+        }
+
+        return __('The assistant encountered an error. Please try again.');
+    }
+
+    /**
+     * Make a dead turn coherent: ensure the user's message is persisted (the
+     * ConversationStore flushes rows only on stream success, so a mid-stream
+     * death loses them) and append a visible assistant failure note that
+     * survives reload.
+     *
+     * The ConversationStore writes the user row then the assistant row,
+     * back-to-back, only once the stream fully succeeds. `handle()`'s
+     * post-stream `then()` callback (settleReservation / persistMentions /
+     * persistUserDocument / materializeAssistantDocument / broadcastFollowUps)
+     * then runs synchronously and un-guarded — if any of those steps throws,
+     * the job still fails even though both real rows already exist. Inspecting
+     * only the single latest row can't tell that case apart from "the stream
+     * died before the store wrote anything": the latest row would be the
+     * assistant reply, not the user message, so the old guard concluded the
+     * user message was never persisted and inserted a duplicate plus a false
+     * error note on a turn that actually succeeded. Looking at the last TWO
+     * rows lets us tell a truly complete turn (user then assistant, matching
+     * this message) apart from a genuinely dead one.
+     *
+     * Residual: if the user sends the IDENTICAL message in two consecutive
+     * turns and the first succeeds while the second later fails, the last-two
+     * check sees {user: this message, assistant: first reply} and treats the
+     * second turn as already complete, so it won't be backfilled. The same
+     * ambiguity applies when the prior turn was itself a failed+backfilled
+     * turn for that identical message: its `[user, assistant-note]` pair is
+     * indistinguishable from a completed one, so a second failure in a row
+     * is likewise skipped. Both degrade to the pre-existing "message lost"
+     * behavior for that one edge case — never a duplicate or a false error
+     * note — and are accepted rather than solved with more machinery.
+     */
+    private function persistFailedTurn(?Throwable $exception): void
+    {
+        $now = now();
+        $table = DB::table('agent_conversation_messages');
+
+        $lastTwo = $table->clone()
+            ->where('conversation_id', $this->conversationId)->latest()
+            ->orderByDesc('id')
+            ->limit(2)
+            ->get(['role', 'content']);
+
+        $last = $lastTwo->get(0);
+        $prev = $lastTwo->get(1);
+
+        $turnAlreadyComplete = $last !== null
+            && $last->role === 'assistant'
+            && $prev !== null
+            && $prev->role === 'user'
+            && $prev->content === $this->message;
+
+        if ($turnAlreadyComplete) {
+            return;
+        }
+
+        $storePersistedUser = $last !== null
+            && $last->role === 'user'
+            && $last->content === $this->message;
+
+        if (! $storePersistedUser) {
+            $table->insert([
+                'id' => (string) Str::uuid7(),
+                'conversation_id' => $this->conversationId,
+                'user_id' => (string) $this->user->getKey(),
+                'agent' => CrmAssistant::class,
+                'role' => 'user',
+                'content' => $this->message,
+                'attachments' => '[]',
+                'tool_calls' => '[]',
+                'tool_results' => '[]',
+                'usage' => '[]',
+                'meta' => '[]',
+                'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $text = $this->failureMessage($exception);
+        $document = $this->getParser()->buildFromText($text, [], $this->team);
+
+        $table->insert([
+            'id' => (string) Str::uuid7(),
+            'conversation_id' => $this->conversationId,
+            'user_id' => (string) $this->user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => 'assistant',
+            'content' => $text,
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '[]',
+            'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
+            'document' => json_encode($document, JSON_THROW_ON_ERROR),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     /**

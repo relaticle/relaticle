@@ -10,12 +10,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
-use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 
 final readonly class CreditService
 {
+    public function __construct(private ModelRegistry $registry) {}
+
     public function hasCredits(Team $team): bool
     {
         $balance = $this->ensureBalance($team);
@@ -255,7 +256,7 @@ final readonly class CreditService
 
     public function calculateCredits(string $model, int $toolCallsCount): int
     {
-        $multiplier = AiModel::multiplierForModelId($model);
+        $multiplier = $this->registry->multiplierFor($model);
         $toolBonus = (float) config('chat.tool_call_credit_bonus', 0.5);
 
         $raw = ($multiplier) + ($toolCallsCount * $toolBonus);

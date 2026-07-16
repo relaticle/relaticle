@@ -83,4 +83,35 @@ return [
 
     'max_field_options' => (int) env('CHAT_MAX_FIELD_OPTIONS', 50),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Model Registry
+    |--------------------------------------------------------------------------
+    |
+    | The user-facing model catalog. Each entry references a provider defined in
+    | config/ai.php. `auto` is synthetic (handled by the resolver) and is not
+    | listed here. Self-hosted custom models are merged in from SELF_HOSTED_AI_*
+    | env at boot. `supports_tools:false` hides a model (Gemini, until laravel/ai
+    | supports tool_config). `write_guard`: api = provider enforces one write per
+    | turn; prompt = relies on the prompt + the approval gate.
+    */
+
+    'self_hosted' => [
+        'url' => env('SELF_HOSTED_AI_URL'),
+        'key' => env('SELF_HOSTED_AI_KEY', ''),
+        'models' => env('SELF_HOSTED_AI_MODELS'),
+    ],
+
+    'auto_chain' => ['claude-sonnet', 'gpt-5-5', 'ollama'],
+
+    'models' => [
+        ['id' => 'claude-sonnet', 'label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'claude-opus', 'label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gpt-5-5', 'label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gpt-5-4', 'label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gemini-3-flash', 'label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
+        ['id' => 'gemini-3-1-pro', 'label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
+        ['id' => 'ollama', 'label' => 'Ollama', 'provider' => 'ollama', 'model' => env('OLLAMA_MODEL'), 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'prompt', 'self_hosted' => true],
+    ],
+
 ];
