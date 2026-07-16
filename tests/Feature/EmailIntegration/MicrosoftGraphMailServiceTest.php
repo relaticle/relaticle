@@ -172,3 +172,49 @@ it('includes file attachments in the /me/sendMail payload', function (): void {
             && $attachments[0]['contentBytes'] === base64_encode('PDF-BYTES');
     });
 });
+
+it('expands and maps inbound attachment metadata into FetchedEmailData', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
+            'value' => [['id' => 'inbox-folder-id', 'displayName' => 'Inbox']],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/AAA2*' => Http::response([
+            'id' => 'AAA2',
+            'internetMessageId' => '<rfc-att@example.com>',
+            'conversationId' => 'thread-2',
+            'subject' => 'With file',
+            'bodyPreview' => 'see attached',
+            'receivedDateTime' => '2026-01-15T10:00:00Z',
+            'isRead' => true,
+            'hasAttachments' => true,
+            'parentFolderId' => 'inbox-folder-id',
+            'from' => ['emailAddress' => ['address' => 'sender@example.com', 'name' => 'Sender']],
+            'toRecipients' => [['emailAddress' => ['address' => 'a@example.com', 'name' => 'Me']]],
+            'ccRecipients' => [],
+            'bccRecipients' => [],
+            'body' => ['contentType' => 'html', 'content' => '<p>Hi</p>'],
+            'attachments' => [[
+                '@odata.type' => '#microsoft.graph.fileAttachment',
+                'id' => 'att-1',
+                'name' => 'report.pdf',
+                'contentType' => 'application/pdf',
+                'size' => 2048,
+                'isInline' => false,
+                'contentId' => null,
+            ]],
+        ]),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('AAA2');
+
+    expect($email->hasAttachments)->toBeTrue()
+        ->and($email->attachments)->toHaveCount(1)
+        ->and($email->attachments[0]['filename'])->toBe('report.pdf')
+        ->and($email->attachments[0]['mime_type'])->toBe('application/pdf')
+        ->and($email->attachments[0]['size'])->toBe(2048)
+        ->and($email->attachments[0]['attachment_id'])->toBe('att-1')
+        ->and($email->attachments[0]['inline_data'])->toBeNull();
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/messages/AAA2')
+        && str_contains(urldecode((string) $r->url()), '$expand=attachments'));
+});

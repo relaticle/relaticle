@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
-use Google\Client as GoogleClient;
 use Google\Service\Calendar;
 use Google\Service\Calendar\Event as GoogleEvent;
 use Google\Service\Exception;
@@ -13,6 +12,7 @@ use Relaticle\EmailIntegration\Data;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
+use Relaticle\EmailIntegration\Services\Factories\GoogleClientFactory;
 
 final readonly class GoogleCalendarService implements CalendarServiceInterface
 {
@@ -23,35 +23,10 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
 
     public static function forAccount(ConnectedAccount $account): self
     {
-        $google = new GoogleClient;
-        $google->setClientId((string) config('services.gmail.client_id'));
-        $google->setClientSecret((string) config('services.gmail.client_secret'));
-
-        // `expires_in` must reflect seconds remaining from `created` (= now). If the stored token
-        // has already lapsed we pass 0 so `isAccessTokenExpired()` fires and refresh kicks in.
-        $secondsUntilExpiry = $account->token_expires_at !== null && $account->token_expires_at->isFuture()
-            ? (int) abs(now()->diffInSeconds($account->token_expires_at))
-            : 0;
-
-        $google->setAccessToken([
-            'access_token' => $account->access_token,
-            'refresh_token' => $account->refresh_token,
-            'expires_in' => $secondsUntilExpiry,
-            'created' => now()->timestamp,
-        ]);
-
-        if ($google->isAccessTokenExpired() && $account->refresh_token) {
-            $google->fetchAccessTokenWithRefreshToken($account->refresh_token);
-
-            $token = $google->getAccessToken();
-            $account->update([
-                'access_token' => $token['access_token'] ?? $account->access_token,
-                'refresh_token' => $token['refresh_token'] ?? $account->refresh_token,
-                'token_expires_at' => now()->addSeconds((int) ($token['expires_in'] ?? 3600)),
-            ]);
-        }
-
-        return new self($account, new Calendar($google));
+        // Reuse the shared client factory so calendar and mail refresh tokens exactly
+        // the same way — including surfacing a revoked/absent grant as an auth error
+        // (which flips the account to REAUTH_REQUIRED) instead of persisting a null token.
+        return new self($account, new Calendar((new GoogleClientFactory)->make($account)));
     }
 
     public function account(): ConnectedAccount

@@ -7,12 +7,28 @@ use Relaticle\EmailIntegration\Services\GoogleCalendarService;
 
 mutates(GoogleCalendarService::class);
 
-it('constructs from a ConnectedAccount', function (): void {
-    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+it('constructs from a ConnectedAccount with a live token', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
 
     $service = GoogleCalendarService::forAccount($account);
 
     expect($service)->toBeInstanceOf(GoogleCalendarService::class);
+});
+
+it('surfaces a revoked/absent grant as an auth error instead of persisting a null token', function (): void {
+    // Expired access token with no refresh token: the shared client factory throws
+    // invalid_grant so the calendar sync job flips the account to REAUTH_REQUIRED,
+    // matching the mail-sync behaviour.
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => null,
+        'token_expires_at' => now()->subHour(),
+    ]));
+
+    expect(fn () => GoogleCalendarService::forAccount($account))
+        ->toThrow(RuntimeException::class, 'invalid_grant');
 });
 
 it('paginates initialSync and returns nextSyncToken', function (): void {

@@ -90,6 +90,9 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         $message = $this->clientFactory->make($this->account)
             ->get("/me/messages/{$providerMessageId}", [
                 '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
+                // Pull attachment metadata (not bytes) alongside the message so has-attachment
+                // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
+                '$expand' => 'attachments($select=id,name,contentType,size,isInline,contentId)',
             ])
             ->throw()
             ->json();
@@ -123,10 +126,28 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             bodyText: $bodyText,
             bodyHtml: $bodyHtml,
             participants: $participants,
-            // NOTE: Azure attachment bytes are not fetched yet (would require a separate
-            // /messages/{id}/attachments call). hasAttachments is still surfaced for the UI.
-            attachments: [],
+            attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
         );
+    }
+
+    /**
+     * Map Graph attachment metadata to our attachment shape. Bytes are intentionally
+     * not fetched here; provider_attachment_id lets downloadAttachment() pull them
+     * on demand, mirroring how large Gmail attachments are handled.
+     *
+     * @param  array<int, array<string, mixed>>  $attachments
+     * @return array<int, array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null}>
+     */
+    private function mapInboundAttachments(array $attachments): array
+    {
+        return array_map(fn (array $attachment): array => [
+            'filename' => isset($attachment['name']) ? (string) $attachment['name'] : null,
+            'mime_type' => isset($attachment['contentType']) ? (string) $attachment['contentType'] : null,
+            'size' => (int) ($attachment['size'] ?? 0),
+            'content_id' => isset($attachment['contentId']) ? (string) $attachment['contentId'] : null,
+            'attachment_id' => isset($attachment['id']) ? (string) $attachment['id'] : null,
+            'inline_data' => null,
+        ], $attachments);
     }
 
     public function initialBackfill(int $daysBack): array
