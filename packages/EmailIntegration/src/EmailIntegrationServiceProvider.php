@@ -8,6 +8,9 @@ use App\Features\EmailIntegration;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\GoogleProvider;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
@@ -34,6 +37,11 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         }
 
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
+
+        // Dedicated Google OAuth driver for email/calendar connect, backed by the
+        // `services.gmail` client + redirect (separate from social login's `services.google`).
+        // Keeps the consent, token exchange and refresh all on the same OAuth client.
+        Socialite::extend('gmail', fn (): AbstractProvider => Socialite::buildProvider(GoogleProvider::class, (array) config('services.gmail')));
 
         // Email is already observed via #[ObservedBy(EmailObserver::class)] on the model.
         // Registering it again here fires every listener twice (double metric increments,

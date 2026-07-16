@@ -18,7 +18,7 @@ final readonly class RedirectController
         $includeCalendar = $capability === 'calendar';
 
         return match ($provider) {
-            'gmail' => $this->driver('google')
+            'gmail' => $this->driver('gmail')
                 ->scopes($this->gmailScopes($includeCalendar))
                 ->with(['access_type' => 'offline', 'prompt' => 'consent'])
                 ->redirect(),

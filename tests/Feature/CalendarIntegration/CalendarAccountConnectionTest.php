@@ -27,7 +27,7 @@ it('flips calendar capability and dispatches InitialCalendarSyncJob on calendar 
         'https://www.googleapis.com/auth/calendar.readonly',
     ];
 
-    Socialite::fake('google', $social);
+    Socialite::fake('gmail', $social);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']).'?capability=calendar')
         ->assertRedirect();
