@@ -112,6 +112,39 @@ it('renders the view page with a standard attribute diff', function (): void {
         ->assertSee('New Co');
 });
 
+it('renders the native diff stored in attribute_changes for an updated activity', function (): void {
+    $activity = seedActivity($this->teamA, $this->ownerA, [
+        'event' => 'updated',
+        'description' => 'updated',
+        'properties' => [],
+        'attribute_changes' => ['attributes' => ['name' => 'New Co'], 'old' => ['name' => 'Old Co']],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Old Co')
+        ->assertSee('New Co')
+        ->assertDontSee('No field changes recorded');
+});
+
+it('renders the native initial values stored in attribute_changes for a created activity', function (): void {
+    $activity = seedActivity($this->teamA, $this->ownerA, [
+        'event' => 'created',
+        'description' => 'created',
+        'properties' => [],
+        'attribute_changes' => ['attributes' => ['name' => 'Fresh Co']],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Fresh Co')
+        ->assertDontSee('No field changes recorded');
+});
+
 it('renders the view page for a custom-field-changes activity', function (): void {
     $activity = seedActivity($this->teamA, $this->ownerA, [
         'event' => 'custom_field_changes',
