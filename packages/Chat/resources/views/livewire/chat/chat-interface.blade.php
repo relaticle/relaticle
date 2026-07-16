@@ -659,6 +659,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         'anthropic' => svg('ri-claude-fill')->toHtml(),
         'openai' => svg('ri-openai-fill')->toHtml(),
         'ollama' => svg('ri-server-line')->toHtml(),
+        'selfhosted' => svg('ri-server-line')->toHtml(),
     ]),
 
     providerIconHtml(provider) {
@@ -671,6 +672,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             anthropic: 'text-[#D4763C]',
             openai: 'text-gray-900 dark:text-gray-200',
             ollama: 'text-gray-500 dark:text-gray-400',
+            selfhosted: 'text-gray-500 dark:text-gray-400',
         })[provider] || '';
     },
 
