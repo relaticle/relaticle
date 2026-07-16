@@ -7,6 +7,7 @@ namespace App\Providers\Filament;
 use App\Enums\SupportFormType;
 use App\Features\SocialAuth;
 use App\Features\SupportMenu;
+use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
@@ -14,6 +15,7 @@ use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
@@ -131,11 +133,11 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->userMenuItems([
-                Action::make('profile')
-                    ->label(__('filament/panel.user_menu.profile'))
-                    ->icon('heroicon-m-user-circle')
+                Action::make('settings')
+                    ->label(__('filament/panel.user_menu.settings'))
+                    ->icon('heroicon-m-cog-6-tooth')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
-                        ? url(EditProfile::getUrl())
+                        ? url(Settings::getUrl())
                         : url($panel->getPath())),
             ])
             ->renderHook(
@@ -151,6 +153,7 @@ final class AppPanelProvider extends PanelProvider
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->pages([
                 EditProfile::class,
+                NotificationPreferences::class,
                 AccessTokens::class,
             ])
             ->spa()
