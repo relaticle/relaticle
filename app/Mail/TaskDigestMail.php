@@ -31,6 +31,8 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        $tenant = $this->user->currentTeam ?? $this->user->allTeams()->first();
+
         return new Content(
             markdown: 'mail.task-digest',
             with: [
@@ -40,13 +42,13 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                     name: 'index',
                     parameters: [
                         'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
-                        'tenant' => $this->user->currentTeam,
+                        'tenant' => $tenant,
                     ],
                     panel: 'app',
                 ),
                 'manageSettingsUrl' => NotificationPreferences::getUrl(
                     panel: 'app',
-                    tenant: $this->user->currentTeam,
+                    tenant: $tenant,
                 ),
                 'companyName' => (string) config('relaticle.company.name'),
                 'companyAddress' => (string) config('relaticle.company.address'),
