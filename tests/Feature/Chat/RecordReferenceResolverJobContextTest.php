@@ -47,20 +47,24 @@ it('resolves an opportunity URL without Filament tenant bound', function (): voi
         ->and($ref['url'])->toContain('/opportunities/');
 });
 
-it('resolves task to an index URL without Filament tenant bound', function (): void {
+it('resolves task to a record edit deep-link without Filament tenant bound', function (): void {
     $ref = resolve(RecordReferenceResolver::class)->resolve('task', 'any-id');
 
     expect($ref)->not->toBeNull()
         ->and($ref['url'])->toBeString()
-        ->and($ref['url'])->toContain('/tasks');
+        ->and($ref['url'])->toContain('/tasks')
+        ->and($ref['url'])->toContain('tableAction=edit')
+        ->and($ref['url'])->toContain('tableActionRecord=any-id');
 });
 
-it('resolves note to an index URL without Filament tenant bound', function (): void {
+it('resolves note to a record edit deep-link without Filament tenant bound', function (): void {
     $ref = resolve(RecordReferenceResolver::class)->resolve('note', 'any-id');
 
     expect($ref)->not->toBeNull()
         ->and($ref['url'])->toBeString()
-        ->and($ref['url'])->toContain('/notes');
+        ->and($ref['url'])->toContain('/notes')
+        ->and($ref['url'])->toContain('tableAction=edit')
+        ->and($ref['url'])->toContain('tableActionRecord=any-id');
 });
 
 it('returns null when the user has no current team', function (): void {

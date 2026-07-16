@@ -15,6 +15,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use Filament\Actions\EditAction;
 use Throwable;
 
 final readonly class RecordReferenceResolver
@@ -80,8 +81,14 @@ final readonly class RecordReferenceResolver
                 'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-                'task' => TaskResource::getUrl('index', panel: 'app', tenant: $team),
-                'note' => NoteResource::getUrl('index', panel: 'app', tenant: $team),
+                'task' => TaskResource::getUrl('index', [
+                    'tableAction' => EditAction::getDefaultName(),
+                    'tableActionRecord' => $recordId,
+                ], panel: 'app', tenant: $team),
+                'note' => NoteResource::getUrl('index', [
+                    'tableAction' => EditAction::getDefaultName(),
+                    'tableActionRecord' => $recordId,
+                ], panel: 'app', tenant: $team),
                 default => null,
             };
         } catch (Throwable) {
