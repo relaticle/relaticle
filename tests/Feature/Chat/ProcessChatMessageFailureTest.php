@@ -34,7 +34,7 @@ function makeFailedTurnJob(User $user, string $conversationId): ProcessChatMessa
 function seedFailedTurnMessage(string $conversationId, User $user, string $role, string $content, Carbon $createdAt): void
 {
     DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::ulid(),
+        'id' => (string) Str::uuid7(),
         'conversation_id' => $conversationId,
         'user_id' => (string) $user->getKey(),
         'agent' => CrmAssistant::class,
@@ -188,4 +188,49 @@ it('shows timeout-specific copy when the turn times out', function (): void {
         ->value('content');
 
     expect($note)->toContain('respond within the time limit');
+});
+
+it('orders the backfilled failed turn before a later retried turn when sorted by id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'user_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'BR failed turn then retry ordering',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // Turn 1 dies mid-stream; failed() backfills [user, assistant-note].
+    makeFailedTurnJob($user, $conversationId)->failed(new TimeoutExceededException('timed out'));
+
+    // Turn 2 is the user's retry, persisted the way the real ConversationStore
+    // does it (uuid7 ids), generated strictly after the failed() call above.
+    seedFailedTurnMessage($conversationId, $user, 'user', 'Retry: create a task titled BR-Foo', now());
+    seedFailedTurnMessage($conversationId, $user, 'assistant', 'Done, I created the task.', now());
+
+    $messages = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->orderBy('id')
+        ->get(['role', 'content']);
+
+    expect($messages)->toHaveCount(4);
+
+    // True chronological order: the failed turn happened first, the retry
+    // happened second. If the backfilled rows used ULIDs (string-sorting
+    // after a current-era uuid7), they would jump to the end instead.
+    expect($messages[0]->role)->toBe('user')
+        ->and($messages[0]->content)->toBe('Create a task titled BR-Foo')
+        ->and($messages[1]->role)->toBe('assistant')
+        ->and($messages[1]->content)->toContain('respond within the time limit')
+        ->and($messages[2]->role)->toBe('user')
+        ->and($messages[2]->content)->toBe('Retry: create a task titled BR-Foo')
+        ->and($messages[3]->role)->toBe('assistant')
+        ->and($messages[3]->content)->toBe('Done, I created the task.');
 });

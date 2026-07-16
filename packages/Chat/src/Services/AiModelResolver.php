@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services;
 use App\Enums\Plan;
 use App\Models\User;
 use Relaticle\Chat\Support\ModelDescriptor;
+use RuntimeException;
 
 final readonly class AiModelResolver
 {
@@ -65,6 +66,6 @@ final readonly class AiModelResolver
         return $this->registry->find('claude-sonnet')
             ?? $chain[0]
             ?? $this->registry->all()[0]
-            ?? throw new \RuntimeException('No chat model is configured; set at least one provider in config/chat.php.');
+            ?? throw new RuntimeException('No chat model is configured; set at least one provider in config/chat.php.');
     }
 }

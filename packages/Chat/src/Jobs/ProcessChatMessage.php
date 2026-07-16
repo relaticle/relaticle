@@ -43,13 +43,15 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
 
-#[Timeout(120)]
+#[Timeout(self::TIMEOUT_SECONDS)]
 #[MaxExceptions(1)]
 final class ProcessChatMessage implements ShouldQueue
 {
     use Queueable;
 
     private const int MAX_RATE_LIMIT_RETRIES = 5;
+
+    private const int TIMEOUT_SECONDS = 120;
 
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
@@ -297,9 +299,13 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $this->persistFailedTurn($exception);
-
         resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
+
+        try {
+            $this->persistFailedTurn($exception);
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
+        }
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
@@ -310,7 +316,9 @@ final class ProcessChatMessage implements ShouldQueue
     private function failureMessage(?Throwable $exception): string
     {
         if ($exception instanceof TimeoutExceededException) {
-            return __("This model didn't respond within the time limit (120s). Try a shorter prompt, or switch to a faster model.");
+            return __("This model didn't respond within the time limit (:seconds s). Try a shorter prompt, or switch to a faster model.", [
+                'seconds' => self::TIMEOUT_SECONDS,
+            ]);
         }
 
         if ($this->isRateLimited($exception)) {
@@ -343,10 +351,13 @@ final class ProcessChatMessage implements ShouldQueue
      * Residual: if the user sends the IDENTICAL message in two consecutive
      * turns and the first succeeds while the second later fails, the last-two
      * check sees {user: this message, assistant: first reply} and treats the
-     * second turn as already complete, so it won't be backfilled. This
-     * degrades to the pre-existing "message lost" behavior for that one edge
-     * case — never a duplicate or a false error note — and is accepted rather
-     * than solved with more machinery.
+     * second turn as already complete, so it won't be backfilled. The same
+     * ambiguity applies when the prior turn was itself a failed+backfilled
+     * turn for that identical message: its `[user, assistant-note]` pair is
+     * indistinguishable from a completed one, so a second failure in a row
+     * is likewise skipped. Both degrade to the pre-existing "message lost"
+     * behavior for that one edge case — never a duplicate or a false error
+     * note — and are accepted rather than solved with more machinery.
      */
     private function persistFailedTurn(?Throwable $exception): void
     {
@@ -378,7 +389,7 @@ final class ProcessChatMessage implements ShouldQueue
 
         if (! $storePersistedUser) {
             $table->insert([
-                'id' => (string) Str::ulid(),
+                'id' => (string) Str::uuid7(),
                 'conversation_id' => $this->conversationId,
                 'user_id' => (string) $this->user->getKey(),
                 'agent' => CrmAssistant::class,
@@ -399,7 +410,7 @@ final class ProcessChatMessage implements ShouldQueue
         $document = $this->getParser()->buildFromText($text, [], $this->team);
 
         $table->insert([
-            'id' => (string) Str::ulid(),
+            'id' => (string) Str::uuid7(),
             'conversation_id' => $this->conversationId,
             'user_id' => (string) $this->user->getKey(),
             'agent' => CrmAssistant::class,
