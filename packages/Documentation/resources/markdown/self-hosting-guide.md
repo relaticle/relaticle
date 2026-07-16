@@ -135,12 +135,12 @@ There are two ways to run a self-hosted model, and you can use either or both:
 | `SELF_HOSTED_AI_KEY` | (empty) | API key for that endpoint, if it requires one (blank for most local servers). |
 | `SELF_HOSTED_AI_MODELS` | (empty) | Comma-separated model tags to expose (e.g. `qwen3:14b,llama3.1:70b`). Each becomes a picker entry. |
 
-**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against the endpoint.
+**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only — cloud models run through the vendor SDK and are declined).
 
 **Known limitations with self-hosted models:**
 
 - Cloud providers enforce one-write-proposal-at-a-time at the API level; self-hosted models have no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
-- Responses must complete within 120 seconds. On slow hardware a large model may hit this timeout — use a smaller model or a GPU.
+- Each response must complete within 120 seconds. If a slow model exceeds it, the turn stops cleanly — your message stays in the conversation with a "didn't respond within the time limit" note and nothing is silently lost, so you can just retry. To avoid the limit, use a smaller/faster model or a GPU; "thinking" models like `qwen3` reason before answering and reach it sooner, so a non-thinking model or a shorter prompt helps for interactive use.
 
 ### Feature Flags
 
