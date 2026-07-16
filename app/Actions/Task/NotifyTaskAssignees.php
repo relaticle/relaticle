@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Task;
 
-use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 
@@ -54,7 +55,10 @@ final readonly class NotifyTaskAssignees
     private function resolveTaskUrl(Task $task): string
     {
         try {
-            return ManageTasks::getUrl(['record' => $task]);
+            return TaskResource::getUrl('index', [
+                'tableAction' => EditAction::getDefaultName(),
+                'tableActionRecord' => $task,
+            ]);
         } catch (\Throwable) {
             return '#';
         }

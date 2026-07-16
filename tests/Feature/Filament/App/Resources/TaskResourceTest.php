@@ -115,6 +115,27 @@ it('can create a task', function (): void {
     ]);
 });
 
+it('notifies a newly assigned member with a deep-link that opens the task edit modal', function (): void {
+    $this->withoutDefer();
+
+    $assignee = User::factory()->create();
+    $this->team->users()->attach($assignee, ['role' => 'admin']);
+
+    livewire(ManageTasks::class)
+        ->callAction('create', data: [
+            'title' => 'Assigned Task',
+            'assignees' => [$assignee->id],
+        ])
+        ->assertHasNoActionErrors();
+
+    $task = Task::query()->where('title', 'Assigned Task')->sole();
+    $url = data_get($assignee->notifications()->sole()->data, 'actions.0.url');
+
+    expect($url)->toContain('/tasks')
+        ->and($url)->toContain('tableAction=edit')
+        ->and($url)->toContain('tableActionRecord='.$task->getKey());
+});
+
 it('can edit a task', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->team])->create();
 
