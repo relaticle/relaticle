@@ -8,6 +8,11 @@ return [
         'email' => env('CONTACT_EMAIL', 'hello@relaticle.com'),
     ],
 
+    'company' => [
+        'name' => env('RELATICLE_COMPANY_NAME', 'Relaticle'),
+        'address' => env('RELATICLE_COMPANY_ADDRESS', ''),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Feature Flags

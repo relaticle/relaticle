@@ -71,6 +71,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'signed' => ValidateSignature::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request): string {
             if ($request->routeIs('team-invitations.accept')) {
                 $invitation = TeamInvitation::query()
@@ -110,6 +114,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
         $schedule->command('app:purge-scheduled-deletions')->daily()->withoutOverlapping()->onOneServer();
+        $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
 
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();
