@@ -92,8 +92,7 @@ final class SendTaskDigestCommand extends Command
             return false;
         }
 
-        Mail::mailer('postmark_broadcast')
-            ->to($user)
+        Mail::to($user)
             ->send(new TaskDigestMail($user, $payload));
 
         return true;

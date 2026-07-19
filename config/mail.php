@@ -63,11 +63,6 @@ return [
             // ],
         ],
 
-        'postmark_broadcast' => [
-            'transport' => 'postmark',
-            'message_stream_id' => env('POSTMARK_BROADCAST_STREAM_ID'),
-        ],
-
         'resend' => [
             'transport' => 'resend',
         ],
