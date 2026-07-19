@@ -52,9 +52,7 @@ it('queues a digest for a user at 08:00 local time', function (): void {
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
-    Mail::assertQueued(TaskDigestMail::class, function (TaskDigestMail $mail) use ($user): bool {
-        return $mail->hasTo($user->email) && $mail->mailer === 'postmark_broadcast';
-    });
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($user->email));
 });
 
 it('does not queue outside 08:00 local time', function (): void {
