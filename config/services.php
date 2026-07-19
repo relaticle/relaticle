@@ -18,7 +18,6 @@ return [
 
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
-        'webhook_secret' => env('POSTMARK_WEBHOOK_SECRET'),
     ],
 
     'ses' => [
