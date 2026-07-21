@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Filament\Clusters\Settings;
+use App\Filament\Pages\EditProfile;
+use App\Filament\Pages\NotificationPreferences;
+use App\Providers\Filament\AppPanelProvider;
 use App\Providers\MacroServiceProvider;
 use Filament\Facades\Filament;
 
-mutates(MacroServiceProvider::class);
+mutates(MacroServiceProvider::class, AppPanelProvider::class);
 
 describe('app panel configuration - path mode (default)', function () {
     it('registers panel with path prefix and no domain constraint', function () {
@@ -19,6 +23,14 @@ describe('app panel configuration - path mode (default)', function () {
         $panelPath = config('app.app_panel_path', 'app');
 
         $this->get("/{$panelPath}/login")->assertOk();
+    });
+
+    it('registers each Settings cluster page once so sub-nav tabs are not duplicated', function () {
+        $components = Filament::getPanel('app')->getClusteredComponents(Settings::class);
+
+        expect($components)
+            ->toContain(EditProfile::class, NotificationPreferences::class)
+            ->and(array_count_values($components))->each->toBe(1);
     });
 });
 
