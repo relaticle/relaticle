@@ -1,0 +1,8 @@
+{
+  "name": "relaticle-crm-operator",
+  "description": "Agent plugin with Skills for operating Relaticle CRM through its MCP server.",
+  "version": "0.1.0",
+  "skills": "./skills",
+  "tags": ["relaticle", "crm", "mcp", "sales", "agent-skills"],
+  "defaultPrompt": "Use the Relaticle CRM Operator Skill to inspect CRM context, plan safe contact/company/opportunity changes, and require approval before mutating customer records."
+}
