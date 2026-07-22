@@ -65,4 +65,12 @@ return [
     'anthropic' => [
         'summary_model' => env('ANTHROPIC_SUMMARY_MODEL', 'claude-haiku-4-5'),
     ],
+
+    'stripe' => [
+        'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
+        'prices' => [
+            'pro_monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
+            'pro_yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
+        ],
+    ],
 ];

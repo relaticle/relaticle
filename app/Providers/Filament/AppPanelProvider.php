@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
+use App\Features\Billing as BillingFeature;
 use App\Features\SocialAuth;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditProfile;
@@ -20,6 +22,7 @@ use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
@@ -193,6 +196,7 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->tenantMiddleware(
                 [
+                    EnsureHostedWorkspaceAccess::class,
                     ApplyTenantScopes::class,
                 ],
                 isPersistent: true
@@ -249,6 +253,11 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
                     ->url(fn (): string => ImportHistory::getUrl()),
+                Action::make('billing')
+                    ->label(__('billing.title'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->url(fn (): string => Billing::getUrl())
+                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
 
         return $panel;
