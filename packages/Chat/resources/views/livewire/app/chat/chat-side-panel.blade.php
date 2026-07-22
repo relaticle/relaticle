@@ -154,9 +154,10 @@
                         {{ number_format($this->creditsRemaining) }}@unless ($exceedsAllowance) / {{ number_format($allowance) }}@endunless
                     </span>
                 </div>
-                @if ($this->plan === \App\Enums\Plan::Free)
+                @php($billingTeam = \Filament\Facades\Filament::getTenant())
+                @if ($billingTeam && $this->plan === \App\Enums\Plan::Free && \Laravel\Pennant\Feature::active(\App\Features\Billing::class))
                     <a
-                        href="{{ url('/app/billing') }}"
+                        href="{{ url("/app/{$billingTeam->slug}/billing") }}"
                         class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
                     >
                         Upgrade to Pro →

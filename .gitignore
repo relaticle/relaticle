@@ -41,6 +41,7 @@ yarn-error.log
 /.playwright-mcp
 /docs/*
 !/docs/i18n.md
+!/docs/billing.md
 api.json
 .scribe/
 /public/vendor/scribe

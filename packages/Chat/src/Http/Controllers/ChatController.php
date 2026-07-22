@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Http\Controllers;
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
@@ -99,7 +101,9 @@ final readonly class ChatController
                     'plan' => $team->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? url('/app/billing') : null,
+                    'upgrade_url' => $isFree && Feature::active(Billing::class)
+                        ? url("/app/{$team->slug}/billing")
+                        : null,
                 ], 403);
             }
         }
@@ -120,7 +124,9 @@ final readonly class ChatController
                 'allowance' => $team->plan->credits(),
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? url('/app/billing') : null,
+                'upgrade_url' => $isFree && Feature::active(Billing::class)
+                    ? url("/app/{$team->slug}/billing")
+                    : null,
             ], 402);
         }
 

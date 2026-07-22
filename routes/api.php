@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\NotesController;
 use App\Http\Controllers\Api\V1\OpportunitiesController;
 use App\Http\Controllers\Api\V1\PeopleController;
 use App\Http\Controllers\Api\V1\TasksController;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\EnsureTokenHasAbility;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetApiTeamContext;
@@ -16,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
-    ->middleware([ForceJsonResponse::class, 'auth:sanctum', 'throttle:api', EnsureTokenHasAbility::class, SetApiTeamContext::class])
+    ->middleware([ForceJsonResponse::class, 'auth:sanctum', 'throttle:api', EnsureTokenHasAbility::class, SetApiTeamContext::class, EnsureHostedWorkspaceAccess::class])
     ->group(function (): void {
         Route::get('user', function (Request $request) {
             return new UserResource($request->user());

@@ -47,6 +47,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $subscriber_recency_bucket
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
+ * @property Carbon|null $pro_trial_used_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
@@ -99,6 +100,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
         ];
     }
 
