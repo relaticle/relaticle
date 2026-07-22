@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
@@ -14,7 +15,20 @@ use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\Http;
 use Laravel\Pennant\Feature;
 
-mutates(OnboardSeed::class, SocialAuth::class, Documentation::class);
+mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class);
+
+describe('Billing', function (): void {
+    it('is off by default', function (): void {
+        expect(Feature::active(Billing::class))->toBeFalse();
+    });
+
+    it('activates via config', function (): void {
+        config()->set('relaticle.features.billing', true);
+        Feature::flushCache();
+
+        expect(Feature::active(Billing::class))->toBeTrue();
+    });
+});
 
 describe('OnboardSeed', function (): void {
     it('seeds demo data when feature is active', function (): void {

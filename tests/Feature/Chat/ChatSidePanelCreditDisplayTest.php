@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -41,7 +43,9 @@ it('renders the credit balance for the current user', function (): void {
         ->assertSee('300');
 });
 
-it('shows the Upgrade link for Free users', function (): void {
+it('shows the Upgrade link for Free users when billing is enabled', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentTeam);
@@ -49,6 +53,18 @@ it('shows the Upgrade link for Free users', function (): void {
     Livewire::test(ChatSidePanel::class)
         ->set('isOpen', true)
         ->assertSee('Upgrade to Pro');
+});
+
+it('hides the Upgrade link for Free users when billing is disabled', function (): void {
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    Livewire::test(ChatSidePanel::class)
+        ->set('isOpen', true)
+        ->assertDontSee('Upgrade to Pro');
 });
 
 it('does not show the Upgrade link for Pro users', function (): void {

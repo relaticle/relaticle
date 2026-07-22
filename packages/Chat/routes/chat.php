@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
 
-Route::middleware(['auth:web'])->group(function (): void {
+Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(function (): void {
     Route::get('/chat/mentions', [ChatController::class, 'mentions'])
         ->middleware('throttle:60,1')
         ->name('chat.mentions');

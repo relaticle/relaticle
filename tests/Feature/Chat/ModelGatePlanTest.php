@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\ModelRegistry;
@@ -14,9 +16,12 @@ use Tests\Helpers\ChatDocument;
 
 mutates(ChatController::class);
 
-it('rejects an Opus request from a Free user with a 403', function (): void {
+it('rejects an Opus request from a grandfathered Free user with a 403', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
+    $team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     expect($team->plan)->toBe(Plan::Free);
 
     AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
