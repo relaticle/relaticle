@@ -1,8 +1,5 @@
 {
     "preset": "laravel",
-    "exclude": [
-        ".cache"
-    ],
     "notPath": [
         "app/Models/PersonalAccessToken.php"
     ],

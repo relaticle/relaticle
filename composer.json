@@ -132,7 +132,7 @@
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "lint": "rector && pint --parallel",
-        "test:lint": "pint --test",
+        "test:lint": "pint --test --parallel",
         "test:refactor": "rector --dry-run",
         "test:types": "phpstan analyse",
         "test:arch": "pest tests/Arch/",
