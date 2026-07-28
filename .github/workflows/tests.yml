@@ -2,6 +2,12 @@ name: Tests
 
 on: [pull_request]
 
+# A new push to the same PR makes the in-flight run obsolete — cancel it so the
+# runners go to the newest commit instead of finishing work nobody will read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-static-analysis:
     runs-on: ubuntu-latest
@@ -30,6 +36,19 @@ jobs:
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      # PHPStan and Rector both do a full cold analysis without their result cache
+      # (~22s each). The key is deliberately stable — one entry per dependency and
+      # config set, reused by every PR — because the PHPStan cache is ~150MB and a
+      # per-commit key would churn through the repo's 10GB cache budget. Both tools
+      # revalidate changed files against a restored cache, so staleness is safe.
+      - name: Cache Static Analysis Results
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: ${{ runner.os }}-static-analysis-${{ hashFiles('composer.lock', 'phpstan.neon', 'rector.php') }}
+          restore-keys: |
+            ${{ runner.os }}-static-analysis-
 
       - name: Prepare Laravel Application
         run: |
@@ -99,11 +118,6 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Set up Node & NPM
-        uses: actions/setup-node@v5
-        with:
-          node-version: '22.x'
-
       - name: Setup Problem Matches
         run: |
           echo "::add-matcher::${{ runner.tool_cache }}/php.json"
@@ -112,25 +126,8 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
-      - name: Get NPM cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache dependencies
-        id: npm-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build dependencies
-        run: npm run build
+      # No Node here on purpose: TestCase calls withoutVite() for every non-Browser
+      # test, so these shards never read the Vite manifest. Only browser-tests builds.
 
       - name: Prepare Laravel
         run: |
@@ -188,22 +185,18 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+          cache: npm
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
-      - name: Get NPM cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache NPM dependencies
+      # Playwright re-downloads Chromium (~150MB) on every run without this.
+      - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Prepare Laravel
         run: |
@@ -218,6 +211,11 @@ jobs:
 
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       - name: Browser Tests
         run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml

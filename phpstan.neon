@@ -4,6 +4,10 @@ includes:
 parameters:
     level: 7
 
+    # Keep the result cache inside the project so CI can restore it between runs.
+    # PHPStan otherwise caches to the system temp dir, which GitHub Actions discards.
+    tmpDir: .cache/phpstan
+
     ignoreErrors:
         # Custom field model type covariance - App\Models\CustomField* extends Relaticle\CustomFields\Models\CustomField*
         # Runtime model swapping is configured in AppServiceProvider but PHPStan doesn't know about it
