@@ -26,7 +26,7 @@ final class CleanupImportsCommand extends Command
 
         $deleted += $this->cleanupTerminalImportFiles($completedHours);
         $deleted += $this->cleanupAbandonedImports($staleHours);
-        $deleted += $this->cleanupOrphanedDirectories();
+        $deleted += $this->cleanupOrphanedDirectories($staleHours);
 
         $this->comment("Cleaned up {$deleted} import(s).");
     }
@@ -74,7 +74,7 @@ final class CleanupImportsCommand extends Command
         return $deleted;
     }
 
-    private function cleanupOrphanedDirectories(): int
+    private function cleanupOrphanedDirectories(int $staleHours): int
     {
         $deleted = 0;
         $importsPath = storage_path('app/imports');
@@ -83,10 +83,27 @@ final class CleanupImportsCommand extends Command
             return 0;
         }
 
+        $staleBefore = now()->subHours($staleHours)->getTimestamp();
+
         foreach (File::directories($importsPath) as $directory) {
             $id = basename((string) $directory);
 
             if (Import::query()->where('id', $id)->exists()) {
+                continue;
+            }
+
+            // ImportStore::create() writes the directory before the Import row is
+            // committed, so a recent directory with no record is an in-flight
+            // import. Deleting it would pull the SQLite file out from under a
+            // running job, which then fails with "readonly database".
+            //
+            // The directory can also vanish between being listed and being
+            // stat'd, when a concurrent import finishes and destroys its store.
+            $lastModified = rescue(fn (): int => File::lastModified($directory), null, report: false);
+            if ($lastModified === null) {
+                continue;
+            }
+            if ($lastModified >= $staleBefore) {
                 continue;
             }
 
