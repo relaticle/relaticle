@@ -20,7 +20,7 @@ final readonly class TaskPolicy
 
     public function view(User $user, Task $task): bool
     {
-        return $user->belongsToTeam($task->team);
+        return $user->belongsToTeamId($task->team_id);
     }
 
     public function create(User $user): bool
@@ -30,12 +30,12 @@ final readonly class TaskPolicy
 
     public function update(User $user, Task $task): bool
     {
-        return $user->belongsToTeam($task->team);
+        return $user->belongsToTeamId($task->team_id);
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $user->belongsToTeam($task->team);
+        return $user->belongsToTeamId($task->team_id);
     }
 
     public function deleteAny(User $user): bool
@@ -45,7 +45,7 @@ final readonly class TaskPolicy
 
     public function restore(User $user, Task $task): bool
     {
-        return $user->belongsToTeam($task->team);
+        return $user->belongsToTeamId($task->team_id);
     }
 
     public function restoreAny(User $user): bool
@@ -55,7 +55,7 @@ final readonly class TaskPolicy
 
     public function forceDelete(User $user, Task $task): bool
     {
-        return $user->hasTeamRole($task->team, 'admin');
+        return $user->hasTeamRoleForTeamId($task->team_id, 'admin');
     }
 
     public function forceDeleteAny(User $user): bool

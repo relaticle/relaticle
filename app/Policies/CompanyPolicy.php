@@ -20,7 +20,7 @@ final readonly class CompanyPolicy
 
     public function view(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        return $user->belongsToTeamId($company->team_id);
     }
 
     public function create(User $user): bool
@@ -30,12 +30,12 @@ final readonly class CompanyPolicy
 
     public function update(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        return $user->belongsToTeamId($company->team_id);
     }
 
     public function delete(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        return $user->belongsToTeamId($company->team_id);
     }
 
     public function deleteAny(User $user): bool
@@ -45,7 +45,7 @@ final readonly class CompanyPolicy
 
     public function restore(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        return $user->belongsToTeamId($company->team_id);
     }
 
     public function restoreAny(User $user): bool

@@ -32,6 +32,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
+use Laravel\Jetstream\Jetstream;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -205,5 +206,72 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->belongsToTeam($tenant);
+    }
+
+    /**
+     * @return HasMany<Membership, $this>
+     */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(Membership::class);
+    }
+
+    /**
+     * Determine whether the user belongs to the team owning the given foreign key.
+     *
+     * Policies authorize once per table row, so reading a record's `team`
+     * relation there costs a query per row — and throws once a query hydrates
+     * more than one row, because that is when Eloquent arms its strict
+     * lazy-loading guard. Matching the foreign key against the user's own teams
+     * keeps authorization off the record's relations entirely.
+     */
+    public function belongsToTeamId(?string $teamId): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        if ($this->ownsTeamId($teamId)) {
+            return true;
+        }
+
+        return $this->membershipForTeamId($teamId) instanceof Membership;
+    }
+
+    /**
+     * Determine whether the user holds the given role on the team owning the
+     * given foreign key.
+     */
+    public function hasTeamRoleForTeamId(?string $teamId, string $role): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        if ($this->ownsTeamId($teamId)) {
+            return true;
+        }
+
+        $membership = $this->membershipForTeamId($teamId);
+
+        if ($membership?->role === null) {
+            return false;
+        }
+
+        return Jetstream::findRole($membership->role)?->key === $role;
+    }
+
+    private function ownsTeamId(string $teamId): bool
+    {
+        $this->loadMissing('ownedTeams');
+
+        return $this->ownedTeams->contains(fn (Model $team): bool => $team->getKey() === $teamId);
+    }
+
+    private function membershipForTeamId(string $teamId): ?Membership
+    {
+        $this->loadMissing('memberships');
+
+        return $this->memberships->first(fn (Membership $membership): bool => $membership->team_id === $teamId);
     }
 }
