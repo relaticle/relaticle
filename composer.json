@@ -79,13 +79,12 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
-        "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-browser": "^4.3",
-        "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-type-coverage": "^4.0",
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-browser": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0",
         "rector/rector": "^2.0",
-        "spatie/guidelines-skills": "dev-main",
-        "spatie/pest-plugin-route-testing": "^1.1"
+        "spatie/guidelines-skills": "dev-main"
     },
     "autoload": {
         "psr-4": {
@@ -140,7 +139,12 @@
         "test:type-coverage": "pest --type-coverage --min=100",
         "test:pest": "pest --parallel --exclude-testsuite=Browser",
         "test:pest:shard": "pest --parallel --shard=${SHARD} --exclude-testsuite=Browser",
-        "test:pest:ci": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:pest:ci": "pest --compact --parallel --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:pest:tia": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv XDEBUG_MODE=coverage",
+            "pest --parallel --tia --exclude-testsuite=Browser,PHPStan"
+        ],
         "test:update-shards": "pest --parallel --update-shards --exclude-testsuite=Browser",
         "test:browser": "pest tests/Browser/",
         "test": [
