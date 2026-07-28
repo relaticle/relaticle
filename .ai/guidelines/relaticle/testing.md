@@ -40,3 +40,18 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   to avoid flaky boundary failures
 - Match test organization to existing conventions: before creating a test file,
   search `tests/` for files covering the same class or feature and extend those
+
+## Running the suite
+
+- `composer test:pest` — the normal local run (parallel, excludes Browser).
+- `composer test:pest:tia` — Pest's **experimental** test-impact-analysis mode.
+  Records a coverage-backed dependency graph once (~3x a normal run), then
+  replays unaffected tests instead of executing them, so a no-op run drops from
+  ~3 minutes to a few seconds. **Local accelerator only — never a merge gate.**
+  It replays a cached *pass* whenever a test's edges are unchanged, so it cannot
+  see time-dependent failures (`travelTo`, expiring tokens), `.env` edits, or
+  dynamic dispatch it did not trace while recording. Always confirm with
+  `composer test:pest` before pushing.
+- After changing test timings materially, refresh the CI shard balance with
+  `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
+  file silently drops new test classes out of time-balancing.
