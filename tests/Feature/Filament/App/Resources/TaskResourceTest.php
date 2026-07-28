@@ -24,25 +24,28 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
-it('can render `:dataset` column', function (string $column): void {
-    livewire(ManageTasks::class)
-        ->assertCanRenderTableColumn($column);
-})->with(['title', 'creator.name']);
+// Column metadata is checked against a single mounted table rather than one
+// dataset case per column: mounting the page dominates the cost, and Filament's
+// assertion messages already name the offending column.
+it('exposes the expected table columns', function (): void {
+    $table = livewire(ManageTasks::class);
 
-it('cannot render `:dataset` column', function (string $column): void {
-    livewire(ManageTasks::class)
-        ->assertCanNotRenderTableColumn($column);
-})->with(['assignees.name', 'created_at', 'updated_at', 'deleted_at']);
+    foreach (['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
+        $table->assertTableColumnExists($column);
+    }
 
-it('has `:dataset` column', function (string $column): void {
-    livewire(ManageTasks::class)
-        ->assertTableColumnExists($column);
-})->with(['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
+    foreach (['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
+        $table->assertTableColumnVisible($column);
+    }
 
-it('shows `:dataset` column', function (string $column): void {
-    livewire(ManageTasks::class)
-        ->assertTableColumnVisible($column);
-})->with(['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
+    foreach (['title', 'creator.name'] as $column) {
+        $table->assertCanRenderTableColumn($column);
+    }
+
+    foreach (['assignees.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
+        $table->assertCanNotRenderTableColumn($column);
+    }
+});
 
 it('can sort `:dataset` column', function (string $column): void {
     $records = Task::factory(3)->recycle([$this->user, $this->team])->create();
