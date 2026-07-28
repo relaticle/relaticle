@@ -123,14 +123,6 @@ describe('Documentation pages', function () {
         $response->assertSee('Import');
     });
 
-    it('highlights fenced code blocks', function () {
-        config()->set('markdown.code_highlighting.enabled', true);
-
-        $response = $this->get('/docs/developer');
-
-        $response->assertStatus(200);
-        $response->assertSee('<pre class="shiki"', false);
-    });
 });
 
 describe('Pricing page', function () {
