@@ -20,7 +20,7 @@ final readonly class OpportunityPolicy
 
     public function view(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeam($opportunity->team);
+        return $user->belongsToTeamId($opportunity->team_id);
     }
 
     public function create(User $user): bool
@@ -30,12 +30,12 @@ final readonly class OpportunityPolicy
 
     public function update(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeam($opportunity->team);
+        return $user->belongsToTeamId($opportunity->team_id);
     }
 
     public function delete(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeam($opportunity->team);
+        return $user->belongsToTeamId($opportunity->team_id);
     }
 
     public function deleteAny(User $user): bool
@@ -45,7 +45,7 @@ final readonly class OpportunityPolicy
 
     public function restore(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeam($opportunity->team);
+        return $user->belongsToTeamId($opportunity->team_id);
     }
 
     public function restoreAny(User $user): bool

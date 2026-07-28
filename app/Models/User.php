@@ -32,6 +32,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
+use Laravel\Jetstream\Jetstream;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -205,5 +206,90 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->belongsToTeam($tenant);
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return HasMany<Team, $this>
+     */
+    public function ownedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return BelongsToMany<Team, $this, Membership, 'membership'>
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, Membership::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->as('membership');
+    }
+
+    /**
+     * The ids of every team the user can reach, owned or joined.
+     *
+     * Authorization runs once per table row, so resolving a record's `team`
+     * relation inside a policy costs a query per row — and throws once a query
+     * hydrates more than one row, because that is when Eloquent arms its strict
+     * lazy-loading guard. Matching the record's foreign key against this set
+     * keeps authorization off the record's relations entirely.
+     *
+     * Both relations are the ones Jetstream already defines and that
+     * `allTeams()` loads for the panel's tenant switcher, so inside a panel
+     * request this set costs nothing beyond what is already in memory.
+     *
+     * @return list<string>
+     */
+    public function accessibleTeamIds(): array
+    {
+        $this->loadMissing(['ownedTeams', 'teams']);
+
+        return array_map(
+            strval(...),
+            [...$this->ownedTeams->modelKeys(), ...$this->teams->modelKeys()],
+        );
+    }
+
+    public function belongsToTeamId(?string $teamId): bool
+    {
+        return $teamId !== null && in_array($teamId, $this->accessibleTeamIds(), true);
+    }
+
+    /**
+     * Determine whether the user holds the given role on the team owning the
+     * given foreign key.
+     */
+    public function hasTeamRoleForTeamId(?string $teamId, string $role): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return true;
+        }
+
+        $this->loadMissing('teams');
+
+        $membershipRole = $this->teams
+            ->first(fn (Team $team): bool => $team->getKey() === $teamId)
+            ?->membership
+            ?->role;
+
+        if ($membershipRole === null) {
+            return false;
+        }
+
+        return Jetstream::findRole($membershipRole)?->key === $role;
     }
 }

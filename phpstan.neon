@@ -160,6 +160,13 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: App\PHPStan\Rules\RelationAccessInPolicyRule
+        arguments:
+            guardedNamespaces:
+                - App\Policies
+        tags:
+            - phpstan.rules.rule
+    -
         class: App\PHPStan\Rules\HardcodedUserFacingStringRule
         arguments:
             guardedMethods:
