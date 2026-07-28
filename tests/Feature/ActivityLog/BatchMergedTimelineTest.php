@@ -155,7 +155,10 @@ it('labels a created event as created and hides the system-column diff', functio
     expect($html)
         ->not->toContain(__('activity-log::messages.entry.changed'))
         ->not->toContain('Email Count')
-        ->toContain($this->company->name);
+        // The renderer escapes the name, so a faker company carrying an
+        // apostrophe ("O'Connell-Jerde" -> "O&#039;Connell-Jerde") never
+        // matched raw. Compare against what is actually rendered.
+        ->toContain(e($this->company->name));
 })->mutates(MergedActivityRenderer::class);
 
 it('still labels an updated event as changed with its diff', function (): void {
