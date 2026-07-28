@@ -61,11 +61,16 @@ jobs:
       - name: Run Refactor Check
         run: composer test:refactor
 
-      # The type-coverage plugin writes a generated cache inside vendor/, which
-      # this workflow caches. Its fork runtime can leave that file truncated,
-      # and the broken copy is then restored on every later run until
-      # composer.lock changes. Clear it so the run always rebuilds from source.
+      # pest-plugin-type-coverage v5 corrupts its own cache under fork
+      # contention: Cache::withinLock() gives up after 100 failed flock attempts
+      # and writes anyway, unlocked, so concurrent forks interleave and the
+      # generated PHP file no longer parses. Pokio defaults to cores x3 forks;
+      # capping it at cores removes the contention and is measurably faster
+      # locally too (1s vs 9s). The rm guards against a corrupt copy having been
+      # captured in the cached vendor/ directory.
       - name: Run Type Coverage
+        env:
+          FORK_IO_FACTOR: 1
         run: |
           rm -rf vendor/pestphp/pest-plugin-type-coverage/.temp
           composer test:type-coverage
