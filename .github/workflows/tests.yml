@@ -63,16 +63,19 @@ jobs:
 
       # pest-plugin-type-coverage v5 corrupts its own cache under fork
       # contention: Cache::withinLock() gives up after 100 failed flock attempts
-      # and writes anyway, unlocked, so concurrent forks interleave and the
-      # generated PHP file no longer parses. Pokio defaults to cores x3 forks;
-      # capping it at cores removes the contention and is measurably faster
-      # locally too (1s vs 9s). The rm guards against a corrupt copy having been
-      # captured in the cached vendor/ directory.
+      # and runs the write anyway, unlocked, so parallel forks interleave
+      # file_put_contents and the generated PHP file stops parsing.
+      #
+      # The cache only helps repeat runs, and every CI run starts from a fresh
+      # checkout, so make it unwritable — the plugin already treats a failed
+      # write as a cache miss. Warnings about the unwritable path are expected.
+      # Lowering fork concurrency is not an alternative: Analyser.php divides
+      # the process count by 3, so anything not divisible by 3 hits a TypeError.
       - name: Run Type Coverage
-        env:
-          FORK_IO_FACTOR: 1
         run: |
           rm -rf vendor/pestphp/pest-plugin-type-coverage/.temp
+          mkdir -p vendor/pestphp/pest-plugin-type-coverage/.temp
+          chmod 555 vendor/pestphp/pest-plugin-type-coverage/.temp
           composer test:type-coverage
 
       - name: Run Static Analysis
