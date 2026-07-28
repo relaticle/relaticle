@@ -38,6 +38,8 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property Carbon|null $scheduled_deletion_at
+ * @property-read Membership|null $membership the `team_user` row, populated only when the team was
+ *     loaded through `User::teams()`; null on a team reached any other way
  */
 #[Fillable([
     'name',

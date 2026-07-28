@@ -67,7 +67,6 @@ abstract class BaseWriteDeleteTool implements Tool
         $models = $this->modelClass()::query()
             ->whereBelongsTo($user->currentTeam)
             ->whereKey($requestedIds)
-            ->with('team')
             ->get();
 
         $deletable = $models->filter(fn (Model $model): bool => $user->can('delete', $model))->values();

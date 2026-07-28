@@ -209,33 +209,58 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * @return HasMany<Membership, $this>
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return HasMany<Team, $this>
      */
-    public function memberships(): HasMany
+    public function ownedTeams(): HasMany
     {
-        return $this->hasMany(Membership::class);
+        return $this->hasMany(Team::class);
     }
 
     /**
-     * Determine whether the user belongs to the team owning the given foreign key.
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
      *
-     * Policies authorize once per table row, so reading a record's `team`
-     * relation there costs a query per row — and throws once a query hydrates
-     * more than one row, because that is when Eloquent arms its strict
-     * lazy-loading guard. Matching the foreign key against the user's own teams
-     * keeps authorization off the record's relations entirely.
+     * @return BelongsToMany<Team, $this, Membership, 'membership'>
      */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, Membership::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->as('membership');
+    }
+
+    /**
+     * The ids of every team the user can reach, owned or joined.
+     *
+     * Authorization runs once per table row, so resolving a record's `team`
+     * relation inside a policy costs a query per row — and throws once a query
+     * hydrates more than one row, because that is when Eloquent arms its strict
+     * lazy-loading guard. Matching the record's foreign key against this set
+     * keeps authorization off the record's relations entirely.
+     *
+     * Both relations are the ones Jetstream already defines and that
+     * `allTeams()` loads for the panel's tenant switcher, so inside a panel
+     * request this set costs nothing beyond what is already in memory.
+     *
+     * @return list<string>
+     */
+    public function accessibleTeamIds(): array
+    {
+        $this->loadMissing(['ownedTeams', 'teams']);
+
+        return array_map(
+            strval(...),
+            [...$this->ownedTeams->modelKeys(), ...$this->teams->modelKeys()],
+        );
+    }
+
     public function belongsToTeamId(?string $teamId): bool
     {
-        if ($teamId === null) {
-            return false;
-        }
-
-        if ($this->ownsTeamId($teamId)) {
-            return true;
-        }
-
-        return $this->membershipForTeamId($teamId) instanceof Membership;
+        return $teamId !== null && in_array($teamId, $this->accessibleTeamIds(), true);
     }
 
     /**
@@ -248,30 +273,23 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             return false;
         }
 
-        if ($this->ownsTeamId($teamId)) {
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
             return true;
         }
 
-        $membership = $this->membershipForTeamId($teamId);
+        $this->loadMissing('teams');
 
-        if ($membership?->role === null) {
+        $membershipRole = $this->teams
+            ->first(fn (Team $team): bool => $team->getKey() === $teamId)
+            ?->membership
+            ?->role;
+
+        if ($membershipRole === null) {
             return false;
         }
 
-        return Jetstream::findRole($membership->role)?->key === $role;
-    }
-
-    private function ownsTeamId(string $teamId): bool
-    {
-        $this->loadMissing('ownedTeams');
-
-        return $this->ownedTeams->contains(fn (Model $team): bool => $team->getKey() === $teamId);
-    }
-
-    private function membershipForTeamId(string $teamId): ?Membership
-    {
-        $this->loadMissing('memberships');
-
-        return $this->memberships->first(fn (Membership $membership): bool => $membership->team_id === $teamId);
+        return Jetstream::findRole($membershipRole)?->key === $role;
     }
 }

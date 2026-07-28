@@ -25,7 +25,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         self::creating(function (PersonalAccessToken $token): void {
             if ($token->team_id && $token->tokenable instanceof User) {
                 abort_unless(
-                    $token->tokenable->belongsToTeam(Team::query()->find($token->team_id)),
+                    $token->tokenable->belongsToTeamId($token->team_id),
                     403,
                     'Token team_id must belong to the tokenable user.',
                 );
@@ -38,7 +38,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
 
                 if ($token->team_id && $token->tokenable instanceof User) {
                     abort_unless(
-                        $token->tokenable->belongsToTeam(Team::query()->find($token->team_id)),
+                        $token->tokenable->belongsToTeamId($token->team_id),
                         403,
                         'Token team_id must belong to the tokenable user.',
                     );
