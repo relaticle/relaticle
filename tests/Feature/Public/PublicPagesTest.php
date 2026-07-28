@@ -53,6 +53,14 @@ describe('Legal pages', function () {
 });
 
 describe('Documentation pages', function () {
+    // Shiki highlights code by spawning a node subprocess per fenced block, and
+    // these pages carry ~59 between them — over half this file's runtime. None
+    // of the assertions here read highlighted output, so it is switched off and
+    // covered once, explicitly, at the end of this block.
+    beforeEach(function () {
+        config()->set('markdown.code_highlighting.enabled', false);
+    });
+
     it('displays the documentation index', function () {
         $response = $this->get('/docs');
 
@@ -113,6 +121,15 @@ describe('Documentation pages', function () {
 
         $response->assertStatus(200);
         $response->assertSee('Import');
+    });
+
+    it('highlights fenced code blocks', function () {
+        config()->set('markdown.code_highlighting.enabled', true);
+
+        $response = $this->get('/docs/developer');
+
+        $response->assertStatus(200);
+        $response->assertSee('<pre class="shiki"', false);
     });
 });
 
