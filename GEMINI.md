@@ -240,6 +240,21 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - Match test organization to existing conventions: before creating a test file,
   search `tests/` for files covering the same class or feature and extend those
 
+## Running the suite
+
+- `composer test:pest` — the normal local run (parallel, excludes Browser).
+- `composer test:pest:tia` — Pest's **experimental** test-impact-analysis mode.
+  Records a coverage-backed dependency graph once (~3x a normal run), then
+  replays unaffected tests instead of executing them, so a no-op run drops from
+  ~3 minutes to a few seconds. **Local accelerator only — never a merge gate.**
+  It replays a cached *pass* whenever a test's edges are unchanged, so it cannot
+  see time-dependent failures (`travelTo`, expiring tokens), `.env` edits, or
+  dynamic dispatch it did not trace while recording. Always confirm with
+  `composer test:pest` before pushing.
+- After changing test timings materially, refresh the CI shard balance with
+  `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
+  file silently drops new test classes out of time-balancing.
+
 === .ai/ui rules ===
 
 # UI
@@ -331,8 +346,8 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/pail (PAIL) - v1
 - laravel/pint (PINT) - v1
 - laravel/sail (SAIL) - v1
-- pestphp/pest (PEST) - v4
-- phpunit/phpunit (PHPUNIT) - v12
+- pestphp/pest (PEST) - v5
+- phpunit/phpunit (PHPUNIT) - v13
 - rector/rector (RECTOR) - v2
 - alpinejs (ALPINEJS) - v3
 - laravel-echo (ECHO) - v2
@@ -414,7 +429,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Always use curly braces for control structures, even for single-line bodies.
 - Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
 - Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
+- Follow existing application Enum naming conventions.
 - Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
 - Use array shape type definitions in PHPDoc blocks.
 

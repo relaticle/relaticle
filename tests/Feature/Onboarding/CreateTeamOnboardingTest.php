@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Features\OnboardSeed;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Listeners\CreateTeamCustomFields;
@@ -19,9 +20,16 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+
+// This file is the coverage for demo seeding itself, so it opts back into the
+// feature that TestCase switches off for the rest of the suite.
+beforeEach(function (): void {
+    Feature::define(OnboardSeed::class, true);
+});
 
 it('renders the create team page with wizard for teamless users', function (): void {
     $user = User::factory()->create();

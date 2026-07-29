@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -9,6 +10,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool;
@@ -32,6 +34,11 @@ mutates(GetNoteTool::class);
 mutates(ListNotesTool::class);
 
 beforeEach(function (): void {
+    // The List*Tool cases below assert over every row the tool returns, so demo
+    // records are part of what they cover. Keep seeding on here rather than let
+    // those loops quietly shrink to the handful of rows each test creates.
+    Feature::define(OnboardSeed::class, true);
+
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->user->switchTeam($this->user->ownedTeams()->first());
     $this->actingAs($this->user);
