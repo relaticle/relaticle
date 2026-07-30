@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\CustomFieldType;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\CustomFields\Models\CustomFieldValue;
+use stdClass;
 
 abstract class BaseReadShowTool implements Tool
 {
@@ -30,6 +33,24 @@ abstract class BaseReadShowTool implements Tool
      * it as much as the parent record does.
      */
     private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
+
+    /**
+     * Custom field types whose values are free-form prose that can run to
+     * kilobytes of markup (rich text) or long paragraphs (plain long text).
+     * Values on these fields are stripped of markup and capped for included
+     * (related) records — everything else (numbers, dates, booleans, choice
+     * labels, short text) passes through untouched. Mirrors the old
+     * `RecordContextBuilder::stripHtml()` behaviour.
+     *
+     * @var list<string>
+     */
+    private const array FREE_TEXT_FIELD_TYPES = [
+        CustomFieldType::RICH_EDITOR->value,
+        CustomFieldType::MARKDOWN_EDITOR->value,
+        CustomFieldType::TEXTAREA->value,
+    ];
+
+    private const int FREE_TEXT_LIMIT = 500;
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -132,7 +153,7 @@ abstract class BaseReadShowTool implements Tool
                 $payload,
                 $this->extraPayload($model),
                 ['url' => $ref['url'] ?? null],
-                $this->buildIncluded($model, $requestedIncludes),
+                $this->buildIncluded($model, $requestedIncludes, $user),
             ),
             JSON_PRETTY_PRINT,
         );
@@ -192,7 +213,7 @@ abstract class BaseReadShowTool implements Tool
      * @param  list<string>  $includes
      * @return array<string, array<string, array{total: int, showing: int, items: list<mixed>}>>
      */
-    private function buildIncluded(Model $model, array $includes): array
+    private function buildIncluded(Model $model, array $includes, User $user): array
     {
         if ($includes === []) {
             return [];
@@ -203,10 +224,11 @@ abstract class BaseReadShowTool implements Tool
 
         foreach ($includes as $relationName) {
             $model->loadCount($relationName);
-            $model->load([$relationName => function (Relation $query): void {
-                $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn() ?? 'created_at';
+            $model->load([$relationName => function (Relation $query) use ($user): void {
+                $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
-                $query->with(self::CUSTOM_FIELD_RELATION)
+                $query->whereBelongsTo($user->currentTeam)
+                    ->with(self::CUSTOM_FIELD_RELATION)
                     ->latest($orderColumn)
                     ->limit(self::INCLUDE_LIMIT);
             }]);
@@ -220,7 +242,10 @@ abstract class BaseReadShowTool implements Tool
             $items = [];
 
             foreach ($related as $item) {
-                $items[] = $this->flattenResource(new $resourceClass($item));
+                $items[] = $this->stripFreeTextCustomFields(
+                    $this->flattenResource(new $resourceClass($item)),
+                    $item,
+                );
             }
 
             $totalAttribute = $model->getAttribute(Str::snake($relationName).'_count');
@@ -233,5 +258,67 @@ abstract class BaseReadShowTool implements Tool
         }
 
         return ['included' => $included];
+    }
+
+    /**
+     * Strip HTML and cap the length of free-text custom field values on an
+     * included (related) record. Ten related notes with kilobytes of
+     * rich-text body each would otherwise blow up the tool payload that gets
+     * persisted to `tool_results` and replayed on every subsequent turn.
+     *
+     * Only applied to included records, not the primary record a tool call
+     * targets — a direct "get this note" call is the user asking for that
+     * note's full content, and should return it verbatim.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function stripFreeTextCustomFields(array $payload, Model $model): array
+    {
+        $attributes = $payload['attributes'] ?? null;
+
+        if (! $attributes instanceof stdClass) {
+            return $payload;
+        }
+
+        $customFields = $attributes->custom_fields ?? null;
+
+        if (! $customFields instanceof stdClass) {
+            return $payload;
+        }
+
+        if (! $model->relationLoaded('customFieldValues')) {
+            return $payload;
+        }
+
+        /** @var iterable<int, CustomFieldValue> $customFieldValues */
+        $customFieldValues = $model->getRelation('customFieldValues');
+
+        foreach ($customFieldValues as $fieldValue) {
+            if (! isset($fieldValue->getRelations()['customField'])) {
+                continue;
+            }
+
+            if (! in_array($fieldValue->customField->type, self::FREE_TEXT_FIELD_TYPES, true)) {
+                continue;
+            }
+
+            $code = $fieldValue->customField->code;
+
+            if (! isset($customFields->{$code}) || ! is_string($customFields->{$code})) {
+                continue;
+            }
+
+            $customFields->{$code} = $this->truncateFreeText($customFields->{$code});
+        }
+
+        return $payload;
+    }
+
+    private function truncateFreeText(string $html): string
+    {
+        $text = strip_tags($html);
+
+        return Str::limit(trim((string) preg_replace('/\s+/', ' ', $text)), self::FREE_TEXT_LIMIT);
     }
 }

@@ -272,9 +272,10 @@ injection produces a proposal the user can reject, not a silent write.
 
 - Unknown `include` value → error naming the valid values, so the agent
   self-corrects rather than silently omitting data.
-- Nested records inherit team scope via a team-scoped parent. Include loading
-  additionally checks `viewAny` on the related model class, matching what
-  `BaseReadListTool` relies on.
+- Nested records inherit team scope via a team-scoped parent, plus an explicit
+  `whereBelongsTo($user->currentTeam)` on the include query as defense in
+  depth. No `viewAny` policy check is run on the related model class —
+  `BaseReadListTool` does not run one either.
 - Record not found / not viewable → unchanged from current
   `BaseReadShowTool` behavior.
 

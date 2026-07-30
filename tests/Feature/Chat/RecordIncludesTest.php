@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Note\UpdateNote;
 use App\Actions\Task\UpdateTask;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
@@ -113,4 +114,78 @@ it('does not include records from another team', function (): void {
     ])), true);
 
     expect($payload)->toHaveKey('error');
+});
+
+it('excludes a related record that belongs to another team, even when attached via pivot', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $crossTeamNote = Note::factory()->for($otherUser->currentTeam)->create(['title' => 'Not yours']);
+    $acme->notes()->attach($crossTeamNote);
+
+    $ownNote = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $acme->notes()->attach($ownNote);
+
+    $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
+        'id' => (string) $acme->getKey(),
+        'include' => ['notes'],
+    ])), true);
+
+    expect($payload['included']['notes']['showing'])->toBe(1)
+        ->and(array_column(array_column($payload['included']['notes']['items'], 'attributes'), 'title'))
+        ->toBe(['Discovery call']);
+});
+
+it('strips HTML and truncates a long free-text custom field value on an included item', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $note = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $acme->notes()->attach($note);
+
+    $longBody = '<p>'.str_repeat('Onboarding takes six weeks and churn follows. ', 40).'</p>';
+    resolve(UpdateNote::class)->execute($this->user, $note, [
+        'custom_fields' => ['body' => $longBody],
+    ]);
+
+    $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
+        'id' => (string) $acme->getKey(),
+        'include' => ['notes'],
+    ])), true);
+
+    $body = $payload['included']['notes']['items'][0]['attributes']['custom_fields']['body'];
+
+    expect($body)->not->toContain('<p>')
+        ->and($body)->not->toContain('</p>')
+        ->and(mb_strlen($body))->toBeLessThanOrEqual(503)
+        ->and($body)->toEndWith('...');
+});
+
+it('does not strip or truncate a non-text custom field value on an included item', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $task = Task::factory()->for($this->team)->create(['title' => 'Send proposal']);
+    $acme->tasks()->attach($task);
+
+    $priorityField = CustomField::query()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->with('options')
+        ->firstOrFail();
+    $highOption = $priorityField->options->firstWhere('name', 'High');
+
+    resolve(UpdateTask::class)->execute($this->user, $task, [
+        'custom_fields' => ['priority' => (string) $highOption->getKey()],
+    ]);
+
+    $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
+        'id' => (string) $acme->getKey(),
+        'include' => ['tasks'],
+    ])), true);
+
+    expect($payload['included']['tasks']['items'][0]['attributes']['custom_fields']['priority'])
+        ->toBe([
+            'id' => (string) $highOption->getKey(),
+            'label' => 'High',
+        ]);
 });
