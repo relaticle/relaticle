@@ -8,6 +8,7 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Services\AvatarService;
+use App\Support\ReservedSlugAwareGenerateSlugAction;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -198,20 +199,9 @@ final class Team extends JetstreamTeam implements HasAvatar
             ->doNotGenerateSlugsOnUpdate();
     }
 
-    protected function otherRecordExistsWithSlug(string $slug): bool
+    protected function generateSlugAction(): ReservedSlugAwareGenerateSlugAction
     {
-        if (in_array($slug, self::RESERVED_SLUGS, true)) {
-            return true;
-        }
-
-        $query = self::query()->where($this->slugOptions->slugField, $slug)
-            ->withoutGlobalScopes();
-
-        if ($this->exists) {
-            $query->where($this->getKeyName(), '!=', $this->getKey());
-        }
-
-        return $query->exists();
+        return new ReservedSlugAwareGenerateSlugAction(self::RESERVED_SLUGS);
     }
 
     public function isPersonalTeam(): bool
