@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 
 mutates(ProcessChatMessage::class);
@@ -101,4 +102,23 @@ it('drops a page context with an unsupported type', function (): void {
         ProcessChatMessage::class,
         static fn (ProcessChatMessage $job): bool => $job->pageContext === null,
     );
+});
+
+it('renders the bound record into the agent dynamic instructions', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    $agent->withPageContext(['type' => 'company', 'id' => '01JABCDEF', 'label' => 'Acme']);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('Acme')
+        ->toContain('01JABCDEF')
+        ->toContain('untrusted');
+});
+
+it('renders nothing when no record is bound', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    $agent->withPageContext(null);
+
+    expect($agent->dynamicInstructions())->not->toContain('currently viewing');
 });

@@ -129,6 +129,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
+            $agent->withPageContext($this->pageContext);
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
                 $pendingActions->resolvedSinceLastAssistantMessage($this->conversationId),
