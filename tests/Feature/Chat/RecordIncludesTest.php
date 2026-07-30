@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Note\UpdateNote;
+use App\Actions\Task\UpdateTask;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Task;
@@ -72,6 +74,32 @@ it('returns an error naming the valid includes when given an unknown one', funct
     expect($payload)->toHaveKey('error')
         ->and($payload['error'])->toContain('invoices')
         ->and($payload['error'])->toContain('notes');
+});
+
+it('returns custom field values on included items, not just native columns', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $note = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $acme->notes()->attach($note);
+    resolve(UpdateNote::class)->execute($this->user, $note, [
+        'custom_fields' => ['body' => 'They churn because onboarding takes six weeks.'],
+    ]);
+
+    $task = Task::factory()->for($this->team)->create(['title' => 'Send proposal']);
+    $acme->tasks()->attach($task);
+    resolve(UpdateTask::class)->execute($this->user, $task, [
+        'custom_fields' => ['description' => 'Include the six-week onboarding fix.'],
+    ]);
+
+    $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
+        'id' => (string) $acme->getKey(),
+        'include' => ['notes', 'tasks'],
+    ])), true);
+
+    expect($payload['included']['notes']['items'][0]['attributes']['custom_fields']['body'])
+        ->toContain('onboarding takes six weeks')
+        ->and($payload['included']['tasks']['items'][0]['attributes']['custom_fields']['description'])
+        ->toContain('six-week onboarding fix');
 });
 
 it('does not include records from another team', function (): void {

@@ -23,6 +23,14 @@ abstract class BaseReadShowTool implements Tool
      */
     private const int INCLUDE_LIMIT = 10;
 
+    /**
+     * Most business content in this CRM lives in custom fields (note body,
+     * task status, opportunity stage). `FormatsCustomFields` serialises an
+     * empty object when this chain is not loaded, so included records need
+     * it as much as the parent record does.
+     */
+    private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
+
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
 
@@ -38,7 +46,7 @@ abstract class BaseReadShowTool implements Tool
     /** @return array<int, string> */
     protected function eagerLoad(): array
     {
-        return ['customFieldValues.customField.options'];
+        return [self::CUSTOM_FIELD_RELATION];
     }
 
     /**
@@ -198,7 +206,9 @@ abstract class BaseReadShowTool implements Tool
             $model->load([$relationName => function (Relation $query): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn() ?? 'created_at';
 
-                $query->latest($orderColumn)->limit(self::INCLUDE_LIMIT);
+                $query->with(self::CUSTOM_FIELD_RELATION)
+                    ->latest($orderColumn)
+                    ->limit(self::INCLUDE_LIMIT);
             }]);
 
             /** @var class-string<JsonResource> $resourceClass */
