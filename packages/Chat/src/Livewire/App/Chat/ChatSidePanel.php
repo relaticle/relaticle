@@ -18,6 +18,10 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     public ?string $conversationId = null;
 
+    public ?string $recordType = null;
+
+    public ?string $recordId = null;
+
     /** @var array<int, array{label: string, prompt: string}> */
     public array $suggestedPrompts = [];
 
@@ -66,16 +70,22 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     /**
      * Refresh context from ChatContextService.
-     * Called on mount and after SPA navigation.
+     *
+     * Runs regardless of panel state: the record binding is read at send
+     * time, which can happen on the very first open, before any navigation.
      */
     public function refreshContext(): void
     {
+        $contextService = resolve(ChatContextService::class);
+        $context = $contextService->getContext();
+
+        $this->recordType = $context['record_type'];
+        $this->recordId = $context['record_id'];
+
         if (! $this->isOpen) {
             return;
         }
 
-        $contextService = resolve(ChatContextService::class);
-        $context = $contextService->getContext();
         $this->suggestedPrompts = $contextService->getSuggestedPrompts($context);
     }
 
