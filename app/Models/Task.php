@@ -8,11 +8,8 @@ use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
-use App\Models\Concerns\InvalidatesRelatedAiSummaries;
-use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -39,7 +36,6 @@ use Spatie\EloquentSortable\SortableTrait;
  *
  * @method void saveCustomFieldValue(CustomField $field, mixed $value)
  */
-#[ObservedBy(TaskObserver::class)]
 #[Fillable([
     'user_id',
     'title',
@@ -56,7 +52,6 @@ final class Task extends Model implements HasCustomFields, HasTimeline
     use HasTeam;
     use HasUlids;
     use InteractsWithTimeline;
-    use InvalidatesRelatedAiSummaries;
     use LogsActivity;
     use SoftDeletes;
     use SortableTrait;

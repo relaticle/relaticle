@@ -18,8 +18,8 @@ abstract class BaseReadShowTool implements Tool
 {
     /**
      * Recent related records returned per include. Mirrors the limit the
-     * removed RecordContextBuilder used, keeping prompt size bounded on
-     * accounts with hundreds of notes.
+     * old record-summary context builder used, keeping prompt size bounded
+     * on accounts with hundreds of notes.
      */
     private const int INCLUDE_LIMIT = 10;
 
