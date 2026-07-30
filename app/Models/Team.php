@@ -26,7 +26,6 @@ use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
 use Relaticle\Chat\Models\AiCreditBalance;
-use Spatie\Sluggable\Actions\GenerateSlugAction;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -200,7 +199,7 @@ final class Team extends JetstreamTeam implements HasAvatar
             ->doNotGenerateSlugsOnUpdate();
     }
 
-    protected function generateSlugAction(): GenerateSlugAction
+    protected function generateSlugAction(): ReservedSlugAwareGenerateSlugAction
     {
         return new ReservedSlugAwareGenerateSlugAction(self::RESERVED_SLUGS);
     }
