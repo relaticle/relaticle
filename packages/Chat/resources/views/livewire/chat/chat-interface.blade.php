@@ -974,33 +974,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             }),
         ];
 
-        // Pre-seed a mention chip when "Ask about this" action stores a mention
-        // in sessionStorage before opening the side panel. The chat:focus-editor
-        // event fires after the panel becomes visible and the editor is mounted.
-        this.mentionHandler = (e) => {
-            if (e.detail?.context !== this.context) return;
-            try {
-                const raw = sessionStorage.getItem('chat:mention');
-                if (!raw) return;
-                sessionStorage.removeItem('chat:mention');
-                const m = JSON.parse(raw);
-                if (!m?.type || !m?.id || !m?.label) return;
-                this.$nextTick(() => {
-                    this.localEditor()?.setDocument?.({
-                        type: 'doc',
-                        content: [{
-                            type: 'paragraph',
-                            content: [{
-                                type: 'mention',
-                                attrs: { type: m.type, id: m.id, label: m.label },
-                            }],
-                        }],
-                    });
-                    this.localEditor()?.focus?.();
-                });
-            } catch (_) { /* sessionStorage unavailable or malformed payload */ }
-        };
-        window.addEventListener('chat:focus-editor', this.mentionHandler);
     },
 
     loadEarlier() {
@@ -1078,7 +1051,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
         window.removeEventListener('keydown', this.approvalKeyHandler);
-        window.removeEventListener('chat:focus-editor', this.mentionHandler);
         (this._proposalListeners || []).forEach((off) => typeof off === 'function' && off());
     },
 

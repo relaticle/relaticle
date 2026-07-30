@@ -52,9 +52,6 @@ return [
                 'edit' => [
                     'label' => 'Edit',
                 ],
-                'ask_about_this' => [
-                    'label' => 'Ask about this',
-                ],
                 'copy_page_url' => [
                     'label' => 'Copy page URL',
                 ],
