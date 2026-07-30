@@ -33,7 +33,7 @@
 .column-resize-handle-bar:hover::before,
 .column-resize-handle-bar.active::before {
     width: 2px;
-    background-color: rgb(var(--primary-500));
+    background-color: rgb(from var(--primary-500) r g b);
 }
 
 /* Active resize handle */
