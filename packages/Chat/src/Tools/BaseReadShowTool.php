@@ -114,7 +114,7 @@ abstract class BaseReadShowTool implements Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        $payload = new $resourceClass($model)->resolve();
+        $payload = $this->flattenResource(new $resourceClass($model));
 
         $id = (string) $model->getKey();
         $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
@@ -140,6 +140,29 @@ abstract class BaseReadShowTool implements Tool
     protected function extraPayload(Model $model): array
     {
         return [];
+    }
+
+    /**
+     * `JsonApiResource::resolve()` nests the resource object under a `data`
+     * key. Flatten it so `id`, `type`, and `attributes` sit alongside the
+     * tool's own `url` and `included` keys, giving the whole payload one
+     * shape. Resources that do not wrap are returned untouched.
+     *
+     * @return array<string, mixed>
+     */
+    private function flattenResource(JsonResource $resource): array
+    {
+        /** @var array<string, mixed> $resolved */
+        $resolved = $resource->resolve();
+
+        $data = $resolved['data'] ?? null;
+
+        if (! is_array($data)) {
+            return $resolved;
+        }
+
+        /** @var array<string, mixed> $data */
+        return $data;
     }
 
     /**
@@ -187,9 +210,7 @@ abstract class BaseReadShowTool implements Tool
             $items = [];
 
             foreach ($related as $item) {
-                /** @var array{data: array<string, mixed>} $resolved */
-                $resolved = new $resourceClass($item)->resolve();
-                $items[] = $resolved['data'];
+                $items[] = $this->flattenResource(new $resourceClass($item));
             }
 
             $totalAttribute = $model->getAttribute(Str::snake($relationName).'_count');
