@@ -122,6 +122,8 @@
                 @livewire('chat.chat-interface', [
                     'conversationId' => $conversationId,
                     'context' => 'side-panel',
+                    'pageContextType' => $recordType,
+                    'pageContextId' => $recordId,
                 ], key('side-panel-chat-' . ($conversationId ?? 'new')))
             </div>
 

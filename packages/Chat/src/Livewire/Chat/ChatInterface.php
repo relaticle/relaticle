@@ -27,6 +27,10 @@ final class ChatInterface extends BaseLivewireComponent
 
     public string $context = 'conversation';
 
+    public ?string $pageContextType = null;
+
+    public ?string $pageContextId = null;
+
     private const int PAGE_SIZE = 50;
 
     /**
@@ -34,10 +38,12 @@ final class ChatInterface extends BaseLivewireComponent
      */
     public array $messages = [];
 
-    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null): void
+    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null, ?string $pageContextType = null, ?string $pageContextId = null): void
     {
         $this->conversationId = $conversationId;
         $this->context = $context;
+        $this->pageContextType = $pageContextType;
+        $this->pageContextId = $pageContextId;
 
         /** @var string|null $promptQuery */
         $promptQuery = request()->query('prompt');

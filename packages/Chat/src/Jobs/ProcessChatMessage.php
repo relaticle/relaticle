@@ -57,6 +57,7 @@ final class ProcessChatMessage implements ShouldQueue
      * @param  array{provider: string|null, model: string|null}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
     public function __construct(
         private readonly User $user,
@@ -66,6 +67,7 @@ final class ProcessChatMessage implements ShouldQueue
         private readonly array $resolved,
         public readonly array $mentions = [],
         public readonly array $document = ['type' => 'doc', 'content' => []],
+        public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
     ) {
         $this->onQueue('chat');

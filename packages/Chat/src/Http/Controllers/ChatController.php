@@ -53,6 +53,9 @@ final readonly class ChatController
             'document' => ['required', 'array'],
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
+            'page_context' => ['nullable', 'array'],
+            'page_context.type' => ['required_with:page_context', 'string'],
+            'page_context.id' => ['required_with:page_context', 'string'],
         ]);
 
         /** @var User $user */
@@ -155,6 +158,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
+            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
             turnId: $turnId,
         ));
 
@@ -162,6 +166,61 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    /**
+     * Resolve the record the user was viewing when they sent the message.
+     *
+     * The client payload is untrusted: it names a type and id, and nothing
+     * more. Both are re-resolved here under team scope and the view policy,
+     * exactly as BaseReadShowTool does, so a forged id for another team's
+     * record yields null rather than leaking a label.
+     *
+     * @param  array<string, mixed>|null  $payload
+     * @return array{type: string, id: string, label: string}|null
+     */
+    private function resolvePageContext(?array $payload, User $user): ?array
+    {
+        if ($payload === null) {
+            return null;
+        }
+
+        $type = $payload['type'] ?? null;
+        $id = $payload['id'] ?? null;
+
+        if (! is_string($type) || ! is_string($id) || $type === '' || $id === '') {
+            return null;
+        }
+
+        $modelClass = match ($type) {
+            'company' => Company::class,
+            'people' => People::class,
+            'opportunity' => Opportunity::class,
+            'task' => Task::class,
+            'note' => Note::class,
+            default => null,
+        };
+
+        if ($modelClass === null) {
+            return null;
+        }
+
+        $record = $modelClass::query()
+            ->whereBelongsTo($user->currentTeam)
+            ->whereKey($id)
+            ->first();
+
+        if ($record === null || $user->cannot('view', $record)) {
+            return null;
+        }
+
+        $label = $record->getAttribute('name') ?? $record->getAttribute('title');
+
+        return [
+            'type' => $type,
+            'id' => (string) $record->getKey(),
+            'label' => is_string($label) ? $label : '(unnamed)',
+        ];
     }
 
     public function createConversation(Request $request): JsonResponse

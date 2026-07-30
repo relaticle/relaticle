@@ -521,6 +521,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
     allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
     selectedModel: 'auto',
+    pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -1586,6 +1587,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         document: payload,
                         conversation_id: newId,
                         model: this.selectedModel,
+                        page_context: this.pageContext,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -1666,6 +1668,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     document: payload,
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
+                    page_context: this.pageContext,
                 }),
                 signal: this.streamAbortController.signal,
             });
