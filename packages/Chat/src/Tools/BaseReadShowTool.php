@@ -305,7 +305,11 @@ abstract class BaseReadShowTool implements Tool
 
             $code = $fieldValue->customField->code;
 
-            if (! isset($customFields->{$code}) || ! is_string($customFields->{$code})) {
+            if (! isset($customFields->{$code})) {
+                continue;
+            }
+
+            if (! is_string($customFields->{$code})) {
                 continue;
             }
 
