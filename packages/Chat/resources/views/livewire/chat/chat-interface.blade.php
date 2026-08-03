@@ -7,6 +7,7 @@
         pageContextLabel = $event.detail.label ?? null;
         starterPrompts = ($event.detail.prompts && $event.detail.prompts.length) ? $event.detail.prompts : starterPrompts;
         pageContextDismissed = false;
+        pageContextConsumed = false;
     "
     data-chat-context="{{ $context ?? 'conversation' }}"
     data-chat-context-name="{{ $context ?? 'conversation' }}"
@@ -447,7 +448,7 @@
             {{-- Ambient context: the record the assistant treats as "this". Dismissible —
                  the record is only sent while this is visible. --}}
             <div
-                x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed"
+                x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed && !pageContextConsumed"
                 x-cloak
                 class="mb-2 flex items-center gap-1.5 text-xs"
             >
@@ -567,6 +568,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
     // applies to the record you dismissed it on, not to every record afterwards.
     pageContextDismissed: false,
+    // The pill behaves like a pre-filled attachment: it attaches to the NEXT message
+    // only, then this flips true and the pill disappears — subsequent messages carry
+    // no page_context until the bound record actually changes. Distinct from
+    // pageContextDismissed (explicit "stop referring to this"): chat:context-updated
+    // resets both, but only dismissal is a user action.
+    pageContextConsumed: false,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -627,7 +634,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // client-side, so the chip falls back to its non-clickable branch until
     // a reload fills it in from the server.
     activePageContext() {
-        if (this.pageContextDismissed || !this.pageContext?.type || !this.pageContext?.id) {
+        if (this.pageContextDismissed || this.pageContextConsumed || !this.pageContext?.type || !this.pageContext?.id) {
             return null;
         }
 
@@ -1547,10 +1554,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         const isFirstMessage = !this.conversationId;
         const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
+        // Captured once per send: the pill attaches to THIS message only. Both the
+        // optimistic bubble below and the request payload further down must read
+        // the SAME snapshot — re-reading activePageContext() after the consumed
+        // flag flips would silently drop it from the outgoing request.
+        const contextForSend = this.activePageContext();
 
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
-            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: this.activePageContext() }));
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+            this.pageContextConsumed = true;
             this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
@@ -1636,7 +1649,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         document: payload,
                         conversation_id: newId,
                         model: this.selectedModel,
-                        page_context: this.pageContextDismissed ? null : this.pageContext,
+                        page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -1690,7 +1703,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         const nowIso = new Date().toISOString();
-        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: this.activePageContext() }));
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+        this.pageContextConsumed = true;
         this.localEditor()?.clear();
         this.input = '';
         this.currentToolStatus = null;
@@ -1717,7 +1731,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     document: payload,
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
-                    page_context: this.pageContextDismissed ? null : this.pageContext,
+                    page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                 }),
                 signal: this.streamAbortController.signal,
             });

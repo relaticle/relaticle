@@ -53,6 +53,8 @@ final class ProcessChatMessage implements ShouldQueue
 
     private const int TIMEOUT_SECONDS = 120;
 
+    private const int CONTEXT_LEDGER_CAP = 10;
+
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
@@ -464,6 +466,14 @@ final class ProcessChatMessage implements ShouldQueue
     /**
      * Distinct records referenced earlier in this conversation, most recent first.
      *
+     * Unlike a typed @mention, a page-context record's name never enters the message
+     * text — so once it falls off this ledger the agent loses it entirely (no id, no
+     * name, nothing left to fall back on). The conversation's OLDEST page_context row
+     * is therefore exempt from the recency cap: it reserves the ledger's last slot
+     * instead of being evicted by more recent records, so the total handed to the
+     * agent stays bounded at the same cap regardless of how many distinct records
+     * the conversation has touched.
+     *
      * @return list<array{type: string, id: string, label: string}>
      */
     private function contextLedger(): array
@@ -472,7 +482,14 @@ final class ProcessChatMessage implements ShouldQueue
             ->join('agent_conversation_messages as m', 'm.id', '=', 'mm.message_id')
             ->where('m.conversation_id', $this->conversationId)
             ->latest('mm.created_at')
-            ->get(['mm.type', 'mm.record_id', 'mm.label']);
+            ->get(['mm.type', 'mm.record_id', 'mm.label', 'mm.source', 'mm.created_at']);
+
+        $anchor = $rows
+            ->filter(static fn (object $row): bool => (string) $row->source === 'page_context')
+            ->sortBy('created_at')
+            ->first();
+
+        $anchorKey = $anchor !== null ? $anchor->type.':'.$anchor->record_id : null;
 
         $seen = [];
         $ledger = [];
@@ -484,16 +501,35 @@ final class ProcessChatMessage implements ShouldQueue
                 continue;
             }
 
+            if (count($ledger) >= self::CONTEXT_LEDGER_CAP) {
+                break;
+            }
+
+            // One slot before the cap: stop unless this row IS the anchor, so the
+            // final slot stays reserved for it (appended below) rather than being
+            // taken by whatever is merely next in recency.
+            if (count($ledger) === self::CONTEXT_LEDGER_CAP - 1
+                && $anchorKey !== null
+                && $key !== $anchorKey
+                && ! isset($seen[$anchorKey])
+            ) {
+                break;
+            }
+
             $seen[$key] = true;
             $ledger[] = [
                 'type' => (string) $row->type,
                 'id' => (string) $row->record_id,
                 'label' => (string) $row->label,
             ];
+        }
 
-            if (count($ledger) >= 10) {
-                break;
-            }
+        if ($anchor !== null && $anchorKey !== null && ! isset($seen[$anchorKey])) {
+            $ledger[] = [
+                'type' => (string) $anchor->type,
+                'id' => (string) $anchor->record_id,
+                'label' => (string) $anchor->label,
+            ];
         }
 
         return $ledger;

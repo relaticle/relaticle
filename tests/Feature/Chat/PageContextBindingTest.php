@@ -171,6 +171,68 @@ it('persists the bound record as a page_context row on the user message', functi
 });
 
 /**
+ * The pill attaches like a pre-filled attachment: to the next message only. Once
+ * the client has sent it, `pageContextConsumed` clears the pill and the following
+ * turns carry `page_context: null` even while the user stays on the same record —
+ * this is what the Alpine layer now does. This test proves the server side of that
+ * contract: nothing here re-attaches a previously bound record on the caller's
+ * behalf, so a second turn that (correctly) omits page_context persists none.
+ */
+it('carries no page_context row on a second message in the same conversation once the pill is consumed', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok', 'ok']);
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'summarize this',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        mentions: [],
+        pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
+        turnId: 'turn-1',
+    ))->handle(resolve(CreditService::class));
+
+    // The client already sent the pill once; it is consumed now, so this turn
+    // (still on the same record) sends no page_context — exactly as the browser
+    // does after `pageContextConsumed` flips true.
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'and what else can you tell me',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        mentions: [],
+        pageContext: null,
+        turnId: 'turn-2',
+    ))->handle(resolve(CreditService::class));
+
+    $secondUserMessage = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->conversationId)
+        ->where('role', 'user')
+        ->where('content', 'and what else can you tell me')
+        ->first();
+
+    expect($secondUserMessage)->not->toBeNull();
+
+    $secondMessageContext = DB::table('agent_conversation_message_mentions')
+        ->where('message_id', $secondUserMessage->id)
+        ->where('source', 'page_context')
+        ->first();
+
+    expect($secondMessageContext)->toBeNull();
+
+    $allPageContextRows = DB::table('agent_conversation_message_mentions')
+        ->where('source', 'page_context')
+        ->get();
+
+    expect($allPageContextRows)->toHaveCount(1)
+        ->and($allPageContextRows->first()->record_id)->toBe((string) $company->getKey());
+});
+
+/**
  * The discriminating case: a message with BOTH a typed mention and a bound
  * page context must write TWO rows. The pre-fix `persistMentions()` guard
  * (`if ($this->mentions === []) return;`) only ever wrote the mention row and
@@ -393,6 +455,53 @@ it('caps the ledger at 10 distinct records without duplicate rows wasting a slot
     expect($ledger)->toHaveCount(10)
         ->and($ledgerIds)->toEqualCanonicalizing($distinctIds)
         ->and($ledgerIds)->not->toContain($oldestRecordId);
+});
+
+/**
+ * The gap this closes: a page-context record's name never enters the message
+ * text (unlike a typed @mention), so once attach-once stops re-sending it every
+ * turn, evicting it from the ledger loses it completely -- no id, no name,
+ * nothing for the agent to fall back on. The conversation's first message binds
+ * record A via page context; ten more distinct records follow, which alone would
+ * fill and evict everything older than the cap. A must still survive, and the
+ * ledger must still total exactly the cap (one of the ten later records gives up
+ * its slot instead of A).
+ */
+it('exempts the conversation\'s oldest page_context record from ledger eviction', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $userId = (string) $this->user->getKey();
+
+    $boundRecordId = (string) Str::ulid();
+    $firstMessage = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($firstMessage, 'company', $boundRecordId, 'Bound Co', 'page_context', now()->subMinutes(200));
+
+    $distinctIds = [];
+
+    foreach (range(1, 10) as $i) {
+        $recordId = (string) Str::ulid();
+        $distinctIds[] = $recordId;
+        $message = seedConversationMessage($this->conversationId, $userId);
+        seedMentionRow($message, 'company', $recordId, "Company {$i}", 'mention', now()->subMinutes(100 - $i));
+    }
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'anything',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+    );
+
+    $ledger = runAndCaptureLedger($job);
+    $ledgerIds = array_column($ledger, 'id');
+
+    // $distinctIds[0] (i=1) is the least recent of the ten later records --
+    // it gives up its slot so the bound record keeps its reserved one.
+    expect($ledger)->toHaveCount(10)
+        ->and($ledgerIds)->toContain($boundRecordId)
+        ->and($ledgerIds)->not->toContain($distinctIds[0]);
 });
 
 it('includes a record that was only ever bound as page context, never a typed mention', function (): void {
