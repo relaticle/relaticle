@@ -39,36 +39,6 @@
                 };
                 window.addEventListener('chat:send', this.chatSendHandler);
 
-                // Watches the URL rather than livewire:navigated. That event fires on the
-                // INITIAL load too, and its XHR resolves request()->route() to Livewire's
-                // update endpoint — which silently nulled the binding on every page load.
-                this.lastUrl = window.location.href;
-                this.urlCheckTimer = null;
-
-                this.checkUrl = () => {
-                    clearTimeout(this.urlCheckTimer);
-                    this.urlCheckTimer = setTimeout(() => {
-                        if (window.location.href === this.lastUrl) return;
-                        this.lastUrl = window.location.href;
-                        $wire.refreshContext(this.lastUrl);
-                    }, 150);
-                };
-
-                this.originalPushState = history.pushState;
-                this.originalReplaceState = history.replaceState;
-
-                history.pushState = (...args) => {
-                    this.originalPushState.apply(history, args);
-                    this.checkUrl();
-                };
-                history.replaceState = (...args) => {
-                    this.originalReplaceState.apply(history, args);
-                    this.checkUrl();
-                };
-
-                window.addEventListener('popstate', this.checkUrl);
-                document.addEventListener('livewire:navigated', this.checkUrl);
-
                 this.resizeHandler = () => { this.viewportWidth = window.innerWidth; };
                 window.addEventListener('resize', this.resizeHandler);
             },
@@ -76,11 +46,6 @@
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
                 window.removeEventListener('chat:send', this.chatSendHandler);
-                clearTimeout(this.urlCheckTimer);
-                if (this.originalPushState) history.pushState = this.originalPushState;
-                if (this.originalReplaceState) history.replaceState = this.originalReplaceState;
-                window.removeEventListener('popstate', this.checkUrl);
-                document.removeEventListener('livewire:navigated', this.checkUrl);
                 window.removeEventListener('resize', this.resizeHandler);
             },
 
