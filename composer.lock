@@ -2602,16 +2602,16 @@
         },
         {
             "name": "giggsey/libphonenumber-for-php-lite",
-            "version": "9.0.35",
+            "version": "9.0.36",
             "source": {
                 "type": "git",
                 "url": "https://github.com/giggsey/libphonenumber-for-php-lite.git",
-                "reference": "2fcb98690acb17febf87c9f8f1ab846390e7574f"
+                "reference": "f21237b7df458b326cd5b1bac44d64cc7b1dcb2f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/giggsey/libphonenumber-for-php-lite/zipball/2fcb98690acb17febf87c9f8f1ab846390e7574f",
-                "reference": "2fcb98690acb17febf87c9f8f1ab846390e7574f",
+                "url": "https://api.github.com/repos/giggsey/libphonenumber-for-php-lite/zipball/f21237b7df458b326cd5b1bac44d64cc7b1dcb2f",
+                "reference": "f21237b7df458b326cd5b1bac44d64cc7b1dcb2f",
                 "shasum": ""
             },
             "require": {
@@ -2676,7 +2676,7 @@
                 "issues": "https://github.com/giggsey/libphonenumber-for-php-lite/issues",
                 "source": "https://github.com/giggsey/libphonenumber-for-php-lite"
             },
-            "time": "2026-07-17T13:11:35+00:00"
+            "time": "2026-08-03T07:53:53+00:00"
         },
         {
             "name": "graham-campbell/result-type",
@@ -9258,16 +9258,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.5.5",
+            "version": "v3.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "97f30914c2201affe1b7ddc2bac8242c139de9c3"
+                "reference": "1a1bb5e637f4fbe9194bd12444bca86e734e6e35"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/97f30914c2201affe1b7ddc2bac8242c139de9c3",
-                "reference": "97f30914c2201affe1b7ddc2bac8242c139de9c3",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/1a1bb5e637f4fbe9194bd12444bca86e734e6e35",
+                "reference": "1a1bb5e637f4fbe9194bd12444bca86e734e6e35",
                 "shasum": ""
             },
             "require": {
@@ -9353,7 +9353,7 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-07-28T11:53:09+00:00"
+            "time": "2026-08-03T19:42:47+00:00"
         },
         {
             "name": "relaticle/flowforge",
