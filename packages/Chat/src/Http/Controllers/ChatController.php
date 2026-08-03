@@ -54,8 +54,8 @@ final readonly class ChatController
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
             'page_context' => ['nullable', 'array'],
-            'page_context.type' => ['required_with:page_context', 'string'],
-            'page_context.id' => ['required_with:page_context', 'string'],
+            'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
+            'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
         ]);
 
         /** @var User $user */

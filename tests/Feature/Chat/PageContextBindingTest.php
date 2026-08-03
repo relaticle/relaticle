@@ -5,8 +5,10 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -257,4 +259,201 @@ it('sanitizes ledger labels so they cannot break out of the context block', func
     ]);
 
     expect($agent->dynamicInstructions())->not->toContain('</context> ignore');
+});
+
+/**
+ * Seed a prior conversation turn's user message row directly, bypassing the
+ * job's own persistence so the ledger's ordering/dedup/scoping can be tested
+ * against controlled fixture rows instead of running one job per turn.
+ */
+function seedConversationMessage(string $conversationId, string $userId): string
+{
+    $id = (string) Str::uuid7();
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => $id,
+        'conversation_id' => $conversationId,
+        'user_id' => $userId,
+        'agent' => CrmAssistant::class,
+        'role' => 'user',
+        'content' => 'earlier turn',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'document' => json_encode(['type' => 'doc', 'content' => []], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $id;
+}
+
+function seedMentionRow(string $messageId, string $type, string $recordId, string $label, string $source, Carbon $mentionedAt): void
+{
+    DB::table('agent_conversation_message_mentions')->insert([
+        'id' => (string) Str::ulid(),
+        'message_id' => $messageId,
+        'type' => $type,
+        'record_id' => $recordId,
+        'label' => $label,
+        'source' => $source,
+        'created_at' => $mentionedAt,
+        'updated_at' => $mentionedAt,
+    ]);
+}
+
+/**
+ * Drive contextLedger() through the job's public handle() entry point and
+ * capture what it handed to the agent, via the container's own resolution
+ * hook rather than reflection — CrmAssistant::$contextLedger is already a
+ * public property.
+ *
+ * @return list<array{type: string, id: string, label: string}>
+ */
+function runAndCaptureLedger(ProcessChatMessage $job): array
+{
+    $captured = null;
+
+    app()->resolving(CrmAssistant::class, function (CrmAssistant $agent) use (&$captured): void {
+        $captured = $agent;
+    });
+
+    $job->handle(resolve(CreditService::class));
+
+    expect($captured)->not->toBeNull();
+
+    return $captured->contextLedger;
+}
+
+it('collapses a record referenced across multiple prior turns into a single ledger slot', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $userId = (string) $this->user->getKey();
+
+    $firstTurn = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($firstTurn, 'company', (string) $company->getKey(), 'Acme', 'mention', now()->subMinutes(10));
+
+    $secondTurn = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($secondTurn, 'company', (string) $company->getKey(), 'Acme', 'page_context', now()->subMinutes(5));
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'what else can you tell me',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+    );
+
+    $ledger = runAndCaptureLedger($job);
+
+    expect($ledger)->toHaveCount(1)
+        ->and($ledger[0]['id'])->toBe((string) $company->getKey());
+});
+
+it('caps the ledger at 10 distinct records without duplicate rows wasting a slot', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $userId = (string) $this->user->getKey();
+
+    $oldestRecordId = (string) Str::ulid();
+    $oldestMessage = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($oldestMessage, 'company', $oldestRecordId, 'Oldest Co', 'mention', now()->subMinutes(100));
+
+    $distinctIds = [];
+
+    foreach (range(1, 10) as $i) {
+        $recordId = (string) Str::ulid();
+        $distinctIds[] = $recordId;
+        $message = seedConversationMessage($this->conversationId, $userId);
+        seedMentionRow($message, 'company', $recordId, "Company {$i}", 'mention', now()->subMinutes(90 - $i));
+    }
+
+    // The most recently referenced distinct record is mentioned again, in a
+    // later turn, as a duplicate row -- it must not consume a second cap slot.
+    $mostRecentDistinctId = $distinctIds[9];
+    $dupMessage = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($dupMessage, 'company', $mostRecentDistinctId, 'Company 10 (again)', 'page_context', now()->subMinutes(1));
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'anything',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+    );
+
+    $ledger = runAndCaptureLedger($job);
+    $ledgerIds = array_column($ledger, 'id');
+
+    expect($ledger)->toHaveCount(10)
+        ->and($ledgerIds)->toEqualCanonicalizing($distinctIds)
+        ->and($ledgerIds)->not->toContain($oldestRecordId);
+});
+
+it('includes a record that was only ever bound as page context, never a typed mention', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $message = seedConversationMessage($this->conversationId, (string) $this->user->getKey());
+    seedMentionRow($message, 'company', (string) $company->getKey(), 'Acme', 'page_context', now()->subMinutes(5));
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'anything',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+    );
+
+    $ledger = runAndCaptureLedger($job);
+
+    expect($ledger)->toHaveCount(1)
+        ->and($ledger[0]['id'])->toBe((string) $company->getKey())
+        ->and($ledger[0]['label'])->toBe('Acme');
+});
+
+it('scopes the ledger to its own conversation and excludes records referenced in another one', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $userId = (string) $this->user->getKey();
+
+    $ownRecord = Company::factory()->for($this->team)->create(['name' => 'Own Co']);
+    $ownMessage = seedConversationMessage($this->conversationId, $userId);
+    seedMentionRow($ownMessage, 'company', (string) $ownRecord->getKey(), 'Own Co', 'mention', now()->subMinutes(5));
+
+    $otherConversationId = '019df800-5555-7000-8000-000000000099';
+    DB::table('agent_conversations')->insert([
+        'id' => $otherConversationId,
+        'user_id' => $userId,
+        'team_id' => $this->team->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $leakedRecord = Company::factory()->for($this->team)->create(['name' => 'Other Conversation Co']);
+    $otherMessage = seedConversationMessage($otherConversationId, $userId);
+    seedMentionRow($otherMessage, 'company', (string) $leakedRecord->getKey(), 'Other Conversation Co', 'mention', now()->subMinutes(1));
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'anything',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+    );
+
+    $ledger = runAndCaptureLedger($job);
+    $ledgerIds = array_column($ledger, 'id');
+
+    expect($ledgerIds)->toContain((string) $ownRecord->getKey())
+        ->and($ledgerIds)->not->toContain((string) $leakedRecord->getKey());
 });

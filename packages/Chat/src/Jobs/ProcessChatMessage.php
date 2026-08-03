@@ -508,7 +508,8 @@ final class ProcessChatMessage implements ShouldQueue
         $userMessageId = DB::table('agent_conversation_messages')
             ->where('conversation_id', $this->conversationId)
             ->where('role', 'user')
-            ->latest('created_at')
+            ->latest()
+            ->orderByDesc('id')
             ->value('id');
 
         if ($userMessageId === null) {

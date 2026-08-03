@@ -38,12 +38,11 @@ final readonly class ChatContextService
      * The URL is client-supplied, so the resolved record is team-scoped and
      * policy-checked here. The send path re-validates independently.
      *
-     * @return array{page: string|null, record_type: string|null, record_id: string|null, record_name: string|null}
+     * @return array{record_type: string|null, record_id: string|null, record_name: string|null}
      */
     public function getContextForUrl(string $url): array
     {
         $context = [
-            'page' => null,
             'record_type' => null,
             'record_id' => null,
             'record_name' => null,
@@ -68,8 +67,6 @@ final readonly class ChatContextService
         if (! is_string($routeName)) {
             return $context;
         }
-
-        $context['page'] = $routeName;
 
         foreach (self::ENTITY_MAP as $segment => $info) {
             if (! str_contains($routeName, ".{$segment}.")) {
@@ -110,21 +107,11 @@ final readonly class ChatContextService
 
     private function extractRecordId(mixed $recordParam): ?string
     {
-        if (is_object($recordParam) && method_exists($recordParam, 'getKey')) {
-            $key = (string) $recordParam->getKey();
-
-            return $key === '' ? null : $key;
-        }
-
-        if (is_string($recordParam) && $recordParam !== '') {
-            return $recordParam;
-        }
-
-        return null;
+        return is_string($recordParam) && $recordParam !== '' ? $recordParam : null;
     }
 
     /**
-     * @param  array{page: string|null, record_type: string|null, record_id: string|null, record_name: string|null}  $context
+     * @param  array{record_type: string|null, record_id: string|null, record_name: string|null}  $context
      * @return array<int, array{label: string, prompt: string}>
      */
     public function getSuggestedPrompts(array $context): array

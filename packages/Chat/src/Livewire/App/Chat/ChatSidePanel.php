@@ -87,7 +87,7 @@ final class ChatSidePanel extends BaseLivewireComponent
         $contextService = resolve(ChatContextService::class);
 
         $context = $url === null
-            ? ['page' => null, 'record_type' => null, 'record_id' => null, 'record_name' => null]
+            ? ['record_type' => null, 'record_id' => null, 'record_name' => null]
             : $contextService->getContextForUrl($url);
 
         $this->recordType = $context['record_type'];
