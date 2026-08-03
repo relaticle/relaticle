@@ -1297,7 +1297,7 @@ it('imports tags-input custom field with comma-separated values', function (): v
         ->toContain('tag3');
 });
 
-it('skips blank custom field values without creating custom_field_values row', function (): void {
+it('persists a blank mapped custom field value on create as carried, not skipped', function (): void {
     $cf = createTestCustomField($this, 'optional_notes', 'text');
 
     createImportReadyStore($this, ['Name', 'Notes'], [
@@ -1313,7 +1313,8 @@ it('skips blank custom field values without creating custom_field_values row', f
     expect($person)->not->toBeNull();
 
     $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
-    expect($cfv)->toBeNull();
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBeEmpty();
 });
 
 it('updates existing custom field value on record update', function (): void {
@@ -1348,6 +1349,40 @@ it('updates existing custom field value on record update', function (): void {
     $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->text_value)->toBe('new value');
+});
+
+it('clears existing custom field value when mapped column is blank on update', function (): void {
+    $cf = createTestCustomField($this, 'note_field_blank', 'text');
+
+    $person = People::factory()->create([
+        'name' => 'John',
+        'team_id' => $this->team->id,
+    ]);
+
+    CustomFieldValue::forceCreate([
+        'custom_field_id' => $cf->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'text_value' => 'old value',
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name', 'Notes'], [
+        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => ''], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->text_value)->toBeEmpty();
 });
 
 it('imports email custom field with comma-separated addresses as array', function (): void {

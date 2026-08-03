@@ -595,6 +595,13 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
+     * Every key in $prepared that carries the custom-field prefix originated from
+     * buildDataFromRow(), which only emits keys for columns the row actually mapped —
+     * an unmapped custom field never appears here at all. So presence of the key is
+     * the only "carried" signal; a blank value must still be extracted (and later
+     * written) rather than dropped, or a mapped-but-blank cell would look identical
+     * to a column the row never carried and silently leave a stale value in place.
+     *
      * @param  array<string, mixed>  $prepared
      * @return array<string, mixed>
      */
@@ -608,10 +615,6 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             unset($prepared[$key]);
-
-            if (blank($value)) {
-                continue;
-            }
 
             $customFieldData[Str::after($key, self::CUSTOM_FIELD_PREFIX)] = $value;
         }
