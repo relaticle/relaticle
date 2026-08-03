@@ -53,10 +53,13 @@ final class ProcessChatMessage implements ShouldQueue
 
     private const int TIMEOUT_SECONDS = 120;
 
+    private const int CONTEXT_LEDGER_CAP = 10;
+
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
     public function __construct(
         private readonly User $user,
@@ -66,6 +69,7 @@ final class ProcessChatMessage implements ShouldQueue
         private readonly array $resolved,
         public readonly array $mentions = [],
         public readonly array $document = ['type' => 'doc', 'content' => []],
+        public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
     ) {
         $this->onQueue('chat');
@@ -127,6 +131,8 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
+            $agent->withPageContext($this->pageContext);
+            $agent->withContextLedger($this->contextLedger());
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
                 $pendingActions->resolvedSinceLastAssistantMessage($this->conversationId),
@@ -457,16 +463,89 @@ final class ProcessChatMessage implements ShouldQueue
         }, $superseded);
     }
 
+    /**
+     * Distinct records referenced earlier in this conversation, most recent first.
+     *
+     * Unlike a typed @mention, a page-context record's name never enters the message
+     * text — so once it falls off this ledger the agent loses it entirely (no id, no
+     * name, nothing left to fall back on). The conversation's OLDEST page_context row
+     * is therefore exempt from the recency cap: it reserves the ledger's last slot
+     * instead of being evicted by more recent records, so the total handed to the
+     * agent stays bounded at the same cap regardless of how many distinct records
+     * the conversation has touched.
+     *
+     * @return list<array{type: string, id: string, label: string}>
+     */
+    private function contextLedger(): array
+    {
+        $rows = DB::table('agent_conversation_message_mentions as mm')
+            ->join('agent_conversation_messages as m', 'm.id', '=', 'mm.message_id')
+            ->where('m.conversation_id', $this->conversationId)
+            ->latest('mm.created_at')
+            ->get(['mm.type', 'mm.record_id', 'mm.label', 'mm.source', 'mm.created_at']);
+
+        $anchor = $rows
+            ->filter(static fn (object $row): bool => (string) $row->source === 'page_context')
+            ->sortBy('created_at')
+            ->first();
+
+        $anchorKey = $anchor !== null ? $anchor->type.':'.$anchor->record_id : null;
+
+        $seen = [];
+        $ledger = [];
+
+        foreach ($rows as $row) {
+            $key = $row->type.':'.$row->record_id;
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            if (count($ledger) >= self::CONTEXT_LEDGER_CAP) {
+                break;
+            }
+
+            // One slot before the cap: stop unless this row IS the anchor, so the
+            // final slot stays reserved for it (appended below) rather than being
+            // taken by whatever is merely next in recency.
+            if (count($ledger) === self::CONTEXT_LEDGER_CAP - 1
+                && $anchorKey !== null
+                && $key !== $anchorKey
+                && ! isset($seen[$anchorKey])
+            ) {
+                break;
+            }
+
+            $seen[$key] = true;
+            $ledger[] = [
+                'type' => (string) $row->type,
+                'id' => (string) $row->record_id,
+                'label' => (string) $row->label,
+            ];
+        }
+
+        if ($anchor !== null && $anchorKey !== null && ! isset($seen[$anchorKey])) {
+            $ledger[] = [
+                'type' => (string) $anchor->type,
+                'id' => (string) $anchor->record_id,
+                'label' => (string) $anchor->label,
+            ];
+        }
+
+        return $ledger;
+    }
+
     private function persistMentions(): void
     {
-        if ($this->mentions === []) {
+        if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
 
         $userMessageId = DB::table('agent_conversation_messages')
             ->where('conversation_id', $this->conversationId)
             ->where('role', 'user')
-            ->latest('created_at')
+            ->latest()
+            ->orderByDesc('id')
             ->value('id');
 
         if ($userMessageId === null) {
@@ -479,9 +558,23 @@ final class ProcessChatMessage implements ShouldQueue
             'type' => $m['type'],
             'record_id' => $m['id'],
             'label' => $m['label'],
+            'source' => 'mention',
             'created_at' => now(),
             'updated_at' => now(),
         ], $this->mentions);
+
+        if ($this->pageContext !== null) {
+            $rows[] = [
+                'id' => (string) Str::ulid(),
+                'message_id' => $userMessageId,
+                'type' => $this->pageContext['type'],
+                'record_id' => $this->pageContext['id'],
+                'label' => $this->pageContext['label'],
+                'source' => 'page_context',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
 
         DB::table('agent_conversation_message_mentions')->insert($rows);
     }

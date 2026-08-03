@@ -10,6 +10,10 @@ use Relaticle\Chat\Models\AiCreditBalance;
 mutates(ResetCreditsCommand::class);
 
 it('resets credits for teams whose billing period has ended', function (): void {
+    // Pinned mid-month: on the 31st, now()->subMonth() overflows forward (31 Jul -> 1 Jul),
+    // so ->endOfMonth() lands on the CURRENT month end -- a period that has not ended yet.
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
 
@@ -30,6 +34,8 @@ it('resets credits for teams whose billing period has ended', function (): void 
 });
 
 it('does not reset credits for teams whose period has not yet ended', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
 

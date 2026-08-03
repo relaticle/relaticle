@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
-use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
@@ -42,7 +41,6 @@ use Spatie\Activitylog\Support\LogOptions;
 final class People extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
-    use HasAiSummary;
     use HasCreator;
 
     /** @use HasFactory<PeopleFactory> */

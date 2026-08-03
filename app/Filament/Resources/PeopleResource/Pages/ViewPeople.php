@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
-use App\Filament\Actions\GenerateRecordSummaryAction;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
@@ -29,22 +28,6 @@ final class ViewPeople extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            GenerateRecordSummaryAction::make(),
-            Action::make('askAboutThis')
-                ->label(__('filament/resources/person.pages.view.actions.ask_about_this.label'))
-                ->icon('heroicon-o-chat-bubble-left-right')
-                ->color('gray')
-                ->action(function (People $record): void {
-                    $mention = Js::from([
-                        'type' => 'people',
-                        'id' => (string) $record->getKey(),
-                        'label' => $record->name,
-                    ]);
-                    $this->js("
-                        sessionStorage.setItem('chat:mention', JSON.stringify({$mention}));
-                        window.Livewire.dispatch('chat:open-panel');
-                    ");
-                }),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
