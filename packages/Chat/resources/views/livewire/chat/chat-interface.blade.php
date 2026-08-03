@@ -444,23 +444,23 @@
                 </div>
             </template>
 
-            {{-- Shows which record the assistant will treat as "this". Dismissible: the
-                 record is only sent while the pill is visible. --}}
+            {{-- Ambient context: the record the assistant treats as "this". Dismissible —
+                 the record is only sent while this is visible. --}}
             <div
                 x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed"
                 x-cloak
                 class="mb-2 flex items-center gap-1.5 text-xs"
             >
-                <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 font-medium text-primary-700 ring-1 ring-primary-600/20 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30">
-                    <x-heroicon-m-at-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-primary-50 px-2 py-1 font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/30">
+                    <span class="shrink-0" x-html="pageContextIcon()"></span>
 
-                    <span class="truncate">Talking about <span class="font-semibold" x-text="pageContextLabel"></span></span>
+                    <span class="truncate" x-text="pageContextLabel"></span>
 
                     <button
                         type="button"
                         x-on:click="pageContextDismissed = true"
                         x-bind:aria-label="'Stop referring to ' + pageContextLabel"
-                        class="-me-1 shrink-0 rounded-full p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
+                        class="-me-0.5 shrink-0 rounded p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
                     >
                         <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
@@ -637,6 +637,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             label: this.pageContextLabel || this.pageContext.id,
             url: null,
         };
+    },
+
+    pageContextIcon() {
+        const icons = {
+            company: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 16.5v-13h-.25a.75.75 0 0 1 0-1.5h12.5a.75.75 0 0 1 0 1.5H16v13h.25a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75v-2.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v2.5a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5H4Zm3-11a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 5.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 8.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 8.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 11.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z" clip-rule="evenodd" /></svg>',
+            people: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" /></svg>',
+            opportunity: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 10.818v2.614A3.13 3.13 0 0 0 11.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 0 0-1.138-.432ZM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 0 0-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.202.592.037.051.08.102.128.152Z" /><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-6a.75.75 0 0 1 .75.75v.316a3.78 3.78 0 0 1 1.653.713c.426.33.744.74.925 1.2a.75.75 0 0 1-1.395.55 1.35 1.35 0 0 0-.447-.563 2.187 2.187 0 0 0-.736-.363V9.3c.698.093 1.383.32 1.891.66.533.359 1.017.937 1.017 1.723 0 .74-.4 1.32-.923 1.709a3.945 3.945 0 0 1-1.985.752v.316a.75.75 0 0 1-1.5 0v-.316a3.76 3.76 0 0 1-1.79-.813 3.187 3.187 0 0 1-.933-1.216.75.75 0 1 1 1.38-.59c.09.211.224.4.394.552.28.25.63.418 1 .486V9.7a3.68 3.68 0 0 1-1.786-.756C7.185 8.581 6.75 8 6.75 7.25c0-.79.44-1.377.972-1.79a3.712 3.712 0 0 1 1.528-.694V4.75A.75.75 0 0 1 10 4Z" clip-rule="evenodd" /></svg>',
+            task: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>',
+            note: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25ZM6 6.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 6.25Zm.75 3.25a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6 13.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>',
+        };
+
+        return icons[this.pageContext?.type] ?? icons.company;
     },
 
     localEditor() {

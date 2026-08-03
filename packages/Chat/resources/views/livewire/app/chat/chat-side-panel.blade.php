@@ -158,13 +158,6 @@
                 ], key('side-panel-chat-' . ($conversationId ?? 'new')))
             </div>
 
-            {{-- Context-Aware Suggested Prompts --}}
-            @if(!empty($suggestedPrompts))
-                <div class="border-t border-gray-200 px-4 py-2 dark:border-gray-700">
-                    <x-chat.suggested-prompts :prompts="$suggestedPrompts" />
-                </div>
-            @endif
-
             {{-- Credit balance footer --}}
             @php
                 $allowance = $this->plan->credits();
