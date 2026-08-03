@@ -130,6 +130,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
+            $agent->withContextLedger($this->contextLedger());
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
                 $pendingActions->resolvedSinceLastAssistantMessage($this->conversationId),
@@ -458,6 +459,44 @@ final class ProcessChatMessage implements ShouldQueue
                 'label' => $label,
             ];
         }, $superseded);
+    }
+
+    /**
+     * Distinct records referenced earlier in this conversation, most recent first.
+     *
+     * @return list<array{type: string, id: string, label: string}>
+     */
+    private function contextLedger(): array
+    {
+        $rows = DB::table('agent_conversation_message_mentions as mm')
+            ->join('agent_conversation_messages as m', 'm.id', '=', 'mm.message_id')
+            ->where('m.conversation_id', $this->conversationId)
+            ->latest('mm.created_at')
+            ->get(['mm.type', 'mm.record_id', 'mm.label']);
+
+        $seen = [];
+        $ledger = [];
+
+        foreach ($rows as $row) {
+            $key = $row->type.':'.$row->record_id;
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $ledger[] = [
+                'type' => (string) $row->type,
+                'id' => (string) $row->record_id,
+                'label' => (string) $row->label,
+            ];
+
+            if (count($ledger) >= 10) {
+                break;
+            }
+        }
+
+        return $ledger;
     }
 
     private function persistMentions(): void
