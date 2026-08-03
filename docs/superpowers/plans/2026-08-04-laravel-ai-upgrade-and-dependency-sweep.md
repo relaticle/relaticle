@@ -153,7 +153,7 @@ Expected: all pass.
 Tests do not cover column resizing — it is JS behavior. Check it in a real browser. Use a unique session name; agent-browser sessions are machine-global.
 
 ```bash
-agent-browser --session hitl-pr1 open https://relaticle.test/app/login
+agent-browser --session hitl-pr1 open https://miami.test/app/login
 agent-browser --session hitl-pr1 snapshot -i
 ```
 
@@ -973,7 +973,7 @@ A sync queue hides the ordering bugs a store rewrite can introduce. Bring up the
 ```bash
 php artisan horizon &
 php artisan reverb:start &
-agent-browser --session hitl-pr1 open https://relaticle.test/app/login
+agent-browser --session hitl-pr1 open https://miami.test/app/login
 ```
 
 Log in, open the chat panel, then verify by hand:

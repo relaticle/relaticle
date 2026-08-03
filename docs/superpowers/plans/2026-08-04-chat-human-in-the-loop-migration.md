@@ -1773,7 +1773,7 @@ If jobs vanish, check that no other Herd app's Horizon is running against the sa
 - [ ] **Step 3: Walk the full loop in a browser**
 
 ```bash
-agent-browser --session hitl-pr2 open https://relaticle.test/app/login
+agent-browser --session hitl-pr2 open https://miami.test/app/login
 agent-browser --session hitl-pr2 snapshot -i
 ```
 
