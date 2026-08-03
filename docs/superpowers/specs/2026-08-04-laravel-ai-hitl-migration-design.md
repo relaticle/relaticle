@@ -34,6 +34,7 @@ We are on v0.6.8. The feature does not exist in our vendor tree.
 | Proposal expiry | Dropped | Guards stale `action_data`, but the tool re-reads the record at execute time under HITL |
 | Transcript audit cards | Derived from conversation history | The tool controls its own return payload; no audit table needed |
 | Shipping | **Two PRs** — upgrade first, migration second | The upgrade alone carries two High-impact DB migrations and a store rewrite whose failure mode is silent |
+| Dependency sweep | Folded into PR 1, risky upgrades as separate commits | Seven of nine outdated packages are patch/minor; bundling costs little and bisectability is preserved commit-wise |
 
 ## What the framework provides
 
@@ -185,7 +186,29 @@ of approval decisions. One path, all callers migrated, no dual old/new route.
 
 ## PR 1 — the upgrade (ships alone, green on main)
 
-`laravel/ai` 0.6.8 → 0.10.2, plus:
+### Dependency sweep
+
+PR 1 also refreshes every outdated direct dependency, composer and npm. As of
+2026-08-04:
+
+| Package | From → To | Handling |
+|---|---|---|
+| `laravel/ai` | 0.6.8 → 0.10.2 | the main event, below |
+| `asmit/resized-column` | 3.0.2 → 4.0.2 | **major** — own commit, constraint bump, visual check |
+| `relaticle/custom-fields` | 3.5.5 → 3.6.0 | own commit — core to the write path this design depends on |
+| `filament/filament` | 5.7.4 → 5.7.5 | batched |
+| `livewire/livewire` | 4.3.3 → 4.3.5 | batched |
+| `pestphp/pest` | 5.0.2 → 5.0.3 | batched |
+| `rector/rector` | 2.5.8 → 2.6.1 | batched (dev) |
+| `laravel/pint` | 1.30.0 → 1.30.3 | batched (dev) |
+| `spatie/laravel-query-builder` | 7.3.0 → 7.3.1 | batched |
+| npm `dompurify`, `shiki` | 3.4.12 → 3.4.13, 4.3.1 → 4.4.1 | in-range, `npm update` |
+
+The three risk-bearing upgrades — `laravel/ai`, `asmit/resized-column`, and
+`relaticle/custom-fields` — each land as their own commit so a regression stays
+bisectable inside the PR. The remaining patch releases batch into one commit.
+
+### laravel/ai 0.6.8 → 0.10.2
 
 1. Migration: rename `user_id` → `participant_id`, add `participant_type`,
    reindex both conversation tables, backfill the `App\Models\User` morph; add
