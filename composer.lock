@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "30013083bed34d7a6877e7358c770141",
+    "content-hash": "66e3f1d646c543c4c894fd7d29f4faa8",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -203,20 +203,26 @@
         },
         {
             "name": "asmit/resized-column",
-            "version": "v3.0.2",
+            "version": "4.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/AsmitNepali/resized-column.git",
-                "reference": "1edff6faea4e2acb228dae07893de96207ca25f6"
+                "reference": "7743d92b8d3b8935e2bdb5e99018e544f279f72e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/AsmitNepali/resized-column/zipball/1edff6faea4e2acb228dae07893de96207ca25f6",
-                "reference": "1edff6faea4e2acb228dae07893de96207ca25f6",
+                "url": "https://api.github.com/repos/AsmitNepali/resized-column/zipball/7743d92b8d3b8935e2bdb5e99018e544f279f72e",
+                "reference": "7743d92b8d3b8935e2bdb5e99018e544f279f72e",
                 "shasum": ""
             },
             "require": {
                 "filament/support": "^3.2|^4.0|^5.0"
+            },
+            "require-dev": {
+                "filament/filament": "^4.0",
+                "filament/tables": "^4.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.0 || ^4.0"
             },
             "type": "library",
             "extra": {
@@ -244,19 +250,15 @@
             "description": "Resizeable column for filament",
             "support": {
                 "issues": "https://github.com/AsmitNepali/resized-column/issues",
-                "source": "https://github.com/AsmitNepali/resized-column/tree/v3.0.2"
+                "source": "https://github.com/AsmitNepali/resized-column/tree/v4.0.2"
             },
             "funding": [
-                {
-                    "url": "https://www.buymeacoffee.com/asmitnepali",
-                    "type": "buy_me_a_coffee"
-                },
                 {
                     "url": "https://github.com/asmitnepali",
                     "type": "github"
                 }
             ],
-            "time": "2026-07-22T01:51:41+00:00"
+            "time": "2026-07-31T23:55:44+00:00"
         },
         {
             "name": "aws/aws-crt-php",
