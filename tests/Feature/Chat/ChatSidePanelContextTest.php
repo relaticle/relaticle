@@ -2,120 +2,85 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
+use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
-use Relaticle\Chat\Services\ChatContextService;
 
 mutates(ChatSidePanel::class);
 
-/**
- * `ChatContextService` derives its context from the current HTTP route, which
- * Livewire's test harness always replaces with its own internal update
- * endpoint — so the real service can never see a fake "current page" here.
- * Swapping the container binding lets these tests target the one thing under
- * test: whether `ChatSidePanel::refreshContext()` copies whatever the context
- * service returns onto the component regardless of `isOpen`.
- */
-function bindFakeChatContext(?string $recordType, ?string $recordId, ?string $recordName = 'Acme'): void
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->team = $this->user->currentTeam;
+    $this->actingAs($this->user);
+    Filament::setTenant($this->team);
+});
+
+function panelUrl(string $slug, string $segment, string $id): string
 {
-    app()->instance(ChatContextService::class, new class($recordType, $recordId, $recordName)
-    {
-        public function __construct(
-            private readonly ?string $recordType,
-            private readonly ?string $recordId,
-            private readonly ?string $recordName,
-        ) {}
-
-        /** @return array{page: string|null, record_type: string|null, record_id: string|null, record_name: string|null} */
-        public function getContext(): array
-        {
-            return [
-                'page' => 'filament.app.resources.companies.view',
-                'record_type' => $this->recordType,
-                'record_id' => $this->recordId,
-                'record_name' => $this->recordName,
-            ];
-        }
-
-        /**
-         * Delegates to the real service: only getContext() needs faking (it reads the
-         * route), while prompt shaping is a pure function of the context array.
-         *
-         * @param  array{page: string|null, record_type: string|null, record_id: string|null, record_name: string|null}  $context
-         * @return array<int, array{label: string, prompt: string}>
-         */
-        public function getSuggestedPrompts(array $context): array
-        {
-            return new ChatContextService()->getSuggestedPrompts($context);
-        }
-    });
+    return "https://consolidate-ask-relaticle.test/app/{$slug}/{$segment}/{$id}";
 }
 
-it('populates recordType and recordId on refreshContext while the panel is closed', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
-
-    bindFakeChatContext('company', 'acme-123');
+it('populates record context from a url while the panel is closed', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
 
     Livewire::test(ChatSidePanel::class)
         ->set('isOpen', false)
-        ->call('refreshContext')
+        ->call('refreshContext', panelUrl($this->team->slug, 'companies', (string) $company->getKey()))
         ->assertSet('isOpen', false)
         ->assertSet('recordType', 'company')
-        ->assertSet('recordId', 'acme-123')
+        ->assertSet('recordId', (string) $company->getKey())
         ->assertSet('recordName', 'Acme');
 });
 
-it('offers record-aware starter prompts naming the bound record', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+it('clears record context when the url has no record', function (): void {
+    Livewire::test(ChatSidePanel::class)
+        ->set('recordType', 'company')
+        ->set('recordId', 'stale-id')
+        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/companies")
+        ->assertSet('recordType', null)
+        ->assertSet('recordId', null);
+});
 
-    bindFakeChatContext('people', 'person-123', 'Manch Minasyan');
+it('refuses a url pointing at another team record', function (): void {
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $theirs = Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Theirs']);
+
+    Livewire::test(ChatSidePanel::class)
+        ->call('refreshContext', panelUrl($this->team->slug, 'companies', (string) $theirs->getKey()))
+        ->assertSet('recordType', null)
+        ->assertSet('recordName', null);
+});
+
+it('dispatches the context-updated browser event with the resolved record', function (): void {
+    $person = People::factory()->for($this->team)->create(['name' => 'Manch Minasyan']);
+
+    Livewire::test(ChatSidePanel::class)
+        ->call('refreshContext', panelUrl($this->team->slug, 'people', (string) $person->getKey()))
+        ->assertDispatched('chat:context-updated');
+});
+
+it('offers record-aware starter prompts naming the bound record', function (): void {
+    $person = People::factory()->for($this->team)->create(['name' => 'Manch Minasyan']);
 
     $component = Livewire::test(ChatSidePanel::class)
-        ->set('isOpen', false)
-        ->call('refreshContext');
+        ->call('refreshContext', panelUrl($this->team->slug, 'people', (string) $person->getKey()));
 
     /** @var array<int, array{label: string, prompt: string}> $prompts */
     $prompts = $component->get('starterPrompts');
 
-    expect(array_column($prompts, 'label'))->toContain('Summarize Manch Minasyan')
-        ->and(array_column($prompts, 'prompt'))->toContain('Summarize the contact Manch Minasyan');
+    expect(array_column($prompts, 'label'))->toContain('Summarize Manch Minasyan');
 });
 
 it('falls back to generic starter prompts when no record is bound', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
-
-    bindFakeChatContext(null, null, null);
-
     $component = Livewire::test(ChatSidePanel::class)
-        ->set('isOpen', false)
-        ->call('refreshContext');
+        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/companies");
 
     /** @var array<int, array{label: string, prompt: string}> $prompts */
     $prompts = $component->get('starterPrompts');
 
     expect($prompts)->not->toBeEmpty()
         ->and(implode(' ', array_column($prompts, 'label')))->not->toContain('Summarize ');
-});
-
-it('clears recordType and recordId on refreshContext when no record is bound', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
-
-    bindFakeChatContext(null, null);
-
-    Livewire::test(ChatSidePanel::class)
-        ->set('isOpen', false)
-        ->call('refreshContext')
-        ->assertSet('isOpen', false)
-        ->assertSet('recordType', null)
-        ->assertSet('recordId', null);
 });

@@ -9,7 +9,11 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Throwable;
 
 final readonly class ChatContextService
 {
@@ -25,57 +29,94 @@ final readonly class ChatContextService
     ];
 
     /**
+     * Resolve CRM record context from an explicit URL.
+     *
+     * Takes a URL rather than reading the ambient request: this runs inside
+     * Livewire XHRs, where request()->route() is Livewire's own update
+     * endpoint and never the record page the user is looking at.
+     *
+     * The URL is client-supplied, so the resolved record is team-scoped and
+     * policy-checked here. The send path re-validates independently.
+     *
      * @return array{page: string|null, record_type: string|null, record_id: string|null, record_name: string|null}
      */
-    public function getContext(): array
+    public function getContextForUrl(string $url): array
     {
-        $route = request()->route();
-        $routeName = $route?->getName();
-        $recordParam = $route?->parameter('record');
-
         $context = [
-            'page' => $routeName,
+            'page' => null,
             'record_type' => null,
             'record_id' => null,
             'record_name' => null,
         ];
 
-        if (! is_string($recordParam) && ! is_object($recordParam)) {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if (! $user instanceof User || $user->currentTeam === null) {
             return $context;
         }
+
+        try {
+            $route = Route::getRoutes()->match(Request::create($url));
+        } catch (Throwable) {
+            return $context;
+        }
+
+        $routeName = $route->getName();
 
         if (! is_string($routeName)) {
             return $context;
         }
+
+        $context['page'] = $routeName;
 
         foreach (self::ENTITY_MAP as $segment => $info) {
             if (! str_contains($routeName, ".{$segment}.")) {
                 continue;
             }
 
-            $recordId = is_object($recordParam)
-                ? (string) (method_exists($recordParam, 'getKey') ? $recordParam->getKey() : '')
-                : $recordParam;
+            $recordId = $this->extractRecordId($route->parameter('record'));
 
-            if ($recordId === '') {
+            if ($recordId === null) {
                 return $context;
             }
 
             /** @var class-string<Model> $modelClass */
             $modelClass = $info['class'];
-            $model = $modelClass::query()->find($recordId);
 
-            if ($model !== null) {
-                $context['record_type'] = $info['type'];
-                $context['record_id'] = (string) $model->getKey();
-                $name = $model->getAttribute('name') ?? $model->getAttribute('title');
-                $context['record_name'] = is_string($name) ? $name : null;
+            $model = $modelClass::query()
+                ->whereBelongsTo($user->currentTeam)
+                ->whereKey($recordId)
+                ->first();
+
+            if (! $model instanceof Model || $user->cannot('view', $model)) {
+                return $context;
             }
+
+            $context['record_type'] = $info['type'];
+            $context['record_id'] = (string) $model->getKey();
+            $name = $model->getAttribute('name') ?? $model->getAttribute('title');
+            $context['record_name'] = is_string($name) ? $name : null;
 
             break;
         }
 
         return $context;
+    }
+
+    private function extractRecordId(mixed $recordParam): ?string
+    {
+        if (is_object($recordParam) && method_exists($recordParam, 'getKey')) {
+            $key = (string) $recordParam->getKey();
+
+            return $key === '' ? null : $key;
+        }
+
+        if (is_string($recordParam) && $recordParam !== '') {
+            return $recordParam;
+        }
+
+        return null;
     }
 
     /**

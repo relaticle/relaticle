@@ -26,15 +26,12 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     /**
      * Prompts for the chat interface's empty state. Computed regardless of panel
-     * state, unlike $suggestedPrompts, because the interface renders them the
-     * moment the panel opens rather than on the next navigation.
+     * state, because the interface renders them the moment the panel opens
+     * rather than on the next navigation.
      *
      * @var array<int, array{label: string, prompt: string}>
      */
     public array $starterPrompts = [];
-
-    /** @var array<int, array{label: string, prompt: string}> */
-    public array $suggestedPrompts = [];
 
     /**
      * @var array<string, string>
@@ -47,7 +44,7 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $this->refreshContext();
+        $this->refreshContext(request()->fullUrl());
     }
 
     public function openPanel(?string $conversationId = null): void
@@ -80,26 +77,31 @@ final class ChatSidePanel extends BaseLivewireComponent
     }
 
     /**
-     * Refresh context from ChatContextService.
+     * Resolve context for a URL supplied by the browser.
      *
-     * Runs regardless of panel state: the record binding is read at send
-     * time, which can happen on the very first open, before any navigation.
+     * Null means "no URL available" (a direct call outside a page context),
+     * which clears the binding rather than guessing.
      */
-    public function refreshContext(): void
+    public function refreshContext(?string $url = null): void
     {
         $contextService = resolve(ChatContextService::class);
-        $context = $contextService->getContext();
+
+        $context = $url === null
+            ? ['page' => null, 'record_type' => null, 'record_id' => null, 'record_name' => null]
+            : $contextService->getContextForUrl($url);
 
         $this->recordType = $context['record_type'];
         $this->recordId = $context['record_id'];
         $this->recordName = $context['record_name'];
         $this->starterPrompts = $contextService->getSuggestedPrompts($context);
 
-        if (! $this->isOpen) {
-            return;
-        }
-
-        $this->suggestedPrompts = $this->starterPrompts;
+        $this->dispatch(
+            'chat:context-updated',
+            type: $this->recordType,
+            id: $this->recordId,
+            label: $this->recordName,
+            prompts: $this->starterPrompts,
+        );
     }
 
     #[Computed]

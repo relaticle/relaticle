@@ -2,6 +2,12 @@
     x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
+    x-on:chat:context-updated.window="
+        pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
+        pageContextLabel = $event.detail.label ?? null;
+        starterPrompts = ($event.detail.prompts && $event.detail.prompts.length) ? $event.detail.prompts : starterPrompts;
+        pageContextDismissed = false;
+    "
     data-chat-context="{{ $context ?? 'conversation' }}"
     data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
