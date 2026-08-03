@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use ReflectionMethod;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 
@@ -121,4 +122,76 @@ it('renders nothing when no record is bound', function (): void {
     $agent->withPageContext(null);
 
     expect($agent->dynamicInstructions())->not->toContain('currently viewing');
+});
+
+it('persists the bound record as a page_context row on the user message', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => '019df800-7777-7000-8000-000000000001',
+        'conversation_id' => $this->conversationId,
+        'user_id' => (string) $this->user->getKey(),
+        'agent' => CrmAssistant::class,
+        'role' => 'user',
+        'content' => 'summarize this',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    new ReflectionMethod(ProcessChatMessage::class, 'persistMentions')->invoke(
+        new ProcessChatMessage(
+            user: $this->user,
+            team: $this->team,
+            message: 'summarize this',
+            conversationId: $this->conversationId,
+            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+            mentions: [],
+            pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
+        ),
+    );
+
+    $row = DB::table('agent_conversation_message_mentions')
+        ->where('record_id', (string) $company->getKey())
+        ->first();
+
+    expect($row)->not->toBeNull()
+        ->and($row->source)->toBe('page_context')
+        ->and($row->label)->toBe('Acme');
+});
+
+it('writes no page_context row when no record is bound', function (): void {
+    DB::table('agent_conversation_messages')->insert([
+        'id' => '019df800-7777-7000-8000-000000000002',
+        'conversation_id' => $this->conversationId,
+        'user_id' => (string) $this->user->getKey(),
+        'agent' => CrmAssistant::class,
+        'role' => 'user',
+        'content' => 'hello',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    new ReflectionMethod(ProcessChatMessage::class, 'persistMentions')->invoke(
+        new ProcessChatMessage(
+            user: $this->user,
+            team: $this->team,
+            message: 'hello',
+            conversationId: $this->conversationId,
+            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+            mentions: [],
+            pageContext: null,
+        ),
+    );
+
+    expect(DB::table('agent_conversation_message_mentions')->count())->toBe(0);
 });

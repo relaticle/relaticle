@@ -462,7 +462,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function persistMentions(): void
     {
-        if ($this->mentions === []) {
+        if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
 
@@ -482,9 +482,23 @@ final class ProcessChatMessage implements ShouldQueue
             'type' => $m['type'],
             'record_id' => $m['id'],
             'label' => $m['label'],
+            'source' => 'mention',
             'created_at' => now(),
             'updated_at' => now(),
         ], $this->mentions);
+
+        if ($this->pageContext !== null) {
+            $rows[] = [
+                'id' => (string) Str::ulid(),
+                'message_id' => $userMessageId,
+                'type' => $this->pageContext['type'],
+                'record_id' => $this->pageContext['id'],
+                'label' => $this->pageContext['label'],
+                'source' => 'page_context',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
 
         DB::table('agent_conversation_message_mentions')->insert($rows);
     }

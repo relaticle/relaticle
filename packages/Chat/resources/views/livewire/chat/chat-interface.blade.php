@@ -81,6 +81,18 @@
                                     </div>
                                 </template>
 
+                                {{-- Grounding trace: the record this message was bound to. --}}
+                                <template x-if="msg.page_context && !msg.editing">
+                                    <a
+                                        :href="msg.page_context.url || '#'"
+                                        :class="msg.page_context.url ? '' : 'pointer-events-none'"
+                                        class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 ring-1 ring-primary-600/20 transition hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20"
+                                    >
+                                        <x-heroicon-m-at-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span class="truncate" x-text="msg.page_context.label"></span>
+                                    </a>
+                                </template>
+
                                 <template x-if="msg.editing">
                                     <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-600 p-2">
                                         <label :for="'chat-edit-' + index" class="sr-only">Edit message</label>
