@@ -31,11 +31,11 @@
                         Ask about your CRM data, or try one of these:
                     </p>
                     <div class="mt-4 flex flex-wrap justify-center gap-2">
-                        <template x-for="prompt in starterPrompts" :key="prompt">
+                        <template x-for="starter in starterPrompts" :key="starter.label">
                             <button
                                 type="button"
-                                x-on:click="input = prompt; localEditor()?.setText(prompt); $nextTick(() => sendMessage())"
-                                x-text="prompt"
+                                x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
+                                x-text="starter.label"
                                 class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                             ></button>
                         </template>
@@ -426,6 +426,29 @@
                 </div>
             </template>
 
+            {{-- Shows which record the assistant will treat as "this". Dismissible: the
+                 record is only sent while the pill is visible. --}}
+            <div
+                x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed"
+                x-cloak
+                class="mb-2 flex items-center gap-1.5 text-xs"
+            >
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 font-medium text-primary-700 ring-1 ring-primary-600/20 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30">
+                    <x-heroicon-m-at-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+
+                    <span class="truncate">Talking about <span class="font-semibold" x-text="pageContextLabel"></span></span>
+
+                    <button
+                        type="button"
+                        x-on:click="pageContextDismissed = true"
+                        x-bind:aria-label="'Stop referring to ' + pageContextLabel"
+                        class="-me-1 shrink-0 rounded-full p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
+                    >
+                        <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                </span>
+            </div>
+
             <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
@@ -522,6 +545,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
     selectedModel: 'auto',
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
+    pageContextLabel: @js($pageContextLabel),
+    // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
+    // applies to the record you dismissed it on, not to every record afterwards.
+    pageContextDismissed: false,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -698,12 +725,14 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
     },
 
-    starterPrompts: [
-        'Give me a CRM overview',
-        'Show overdue tasks',
-        'Recent companies',
-        'Pipeline summary',
-    ],
+    // Record-aware when the side panel supplies them (so the chips name the record
+    // you are looking at); generic fallback on the full-page chat, which has no record.
+    starterPrompts: @js($contextPrompts !== [] ? $contextPrompts : [
+        ['label' => 'Give me a CRM overview', 'prompt' => 'Give me a CRM overview'],
+        ['label' => 'Show overdue tasks', 'prompt' => 'Show overdue tasks'],
+        ['label' => 'Recent companies', 'prompt' => 'Recent companies'],
+        ['label' => 'Pipeline summary', 'prompt' => 'Pipeline summary'],
+    ]),
 
     autosize(el) {
         el.style.height = 'auto';
@@ -1559,7 +1588,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         document: payload,
                         conversation_id: newId,
                         model: this.selectedModel,
-                        page_context: this.pageContext,
+                        page_context: this.pageContextDismissed ? null : this.pageContext,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -1640,7 +1669,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     document: payload,
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
-                    page_context: this.pageContext,
+                    page_context: this.pageContextDismissed ? null : this.pageContext,
                 }),
                 signal: this.streamAbortController.signal,
             });

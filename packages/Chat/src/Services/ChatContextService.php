@@ -91,11 +91,26 @@ final readonly class ChatContextService
             ['label' => 'Pipeline summary', 'prompt' => 'Show my opportunity pipeline summary'],
         ];
 
-        if ($context['record_type'] === 'company' && $context['record_name']) {
-            array_unshift($prompts,
-                ['label' => "Summarize {$context['record_name']}", 'prompt' => "Summarize the company {$context['record_name']}"],
-                ['label' => 'Find contacts', 'prompt' => "Find contacts at {$context['record_name']}"],
-            );
+        $name = $context['record_name'];
+
+        if (is_string($name) && $name !== '') {
+            $recordPrompts = match ($context['record_type']) {
+                'company' => [
+                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the company {$name}"],
+                    ['label' => 'Find contacts', 'prompt' => "Find contacts at {$name}"],
+                ],
+                'people' => [
+                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the contact {$name}"],
+                    ['label' => 'Recent activity', 'prompt' => "What has happened recently with {$name}?"],
+                ],
+                'opportunity' => [
+                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the opportunity {$name}"],
+                    ['label' => 'Next steps', 'prompt' => "What are the next steps to move {$name} forward?"],
+                ],
+                default => [],
+            };
+
+            array_unshift($prompts, ...$recordPrompts);
         }
 
         if ($context['record_type'] === 'task') {
