@@ -3,13 +3,15 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
-use ReflectionMethod;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
 
 mutates(ProcessChatMessage::class);
 
@@ -124,74 +126,102 @@ it('renders nothing when no record is bound', function (): void {
     expect($agent->dynamicInstructions())->not->toContain('currently viewing');
 });
 
+function seedCreditBalance(Team $team): void
+{
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'team_id' => $team->getKey(),
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+}
+
 it('persists the bound record as a page_context row on the user message', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
 
-    DB::table('agent_conversation_messages')->insert([
-        'id' => '019df800-7777-7000-8000-000000000001',
-        'conversation_id' => $this->conversationId,
-        'user_id' => (string) $this->user->getKey(),
-        'agent' => CrmAssistant::class,
-        'role' => 'user',
-        'content' => 'summarize this',
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '[]',
-        'meta' => '[]',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
 
-    new ReflectionMethod(ProcessChatMessage::class, 'persistMentions')->invoke(
-        new ProcessChatMessage(
-            user: $this->user,
-            team: $this->team,
-            message: 'summarize this',
-            conversationId: $this->conversationId,
-            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
-            mentions: [],
-            pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
-        ),
-    );
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'summarize this',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        mentions: [],
+        pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
+    ))->handle(resolve(CreditService::class));
+
+    $userMessage = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->conversationId)
+        ->where('role', 'user')
+        ->first();
 
     $row = DB::table('agent_conversation_message_mentions')
-        ->where('record_id', (string) $company->getKey())
+        ->where('message_id', $userMessage->id)
         ->first();
 
     expect($row)->not->toBeNull()
         ->and($row->source)->toBe('page_context')
+        ->and($row->record_id)->toBe((string) $company->getKey())
         ->and($row->label)->toBe('Acme');
 });
 
-it('writes no page_context row when no record is bound', function (): void {
-    DB::table('agent_conversation_messages')->insert([
-        'id' => '019df800-7777-7000-8000-000000000002',
-        'conversation_id' => $this->conversationId,
-        'user_id' => (string) $this->user->getKey(),
-        'agent' => CrmAssistant::class,
-        'role' => 'user',
-        'content' => 'hello',
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '[]',
-        'meta' => '[]',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+/**
+ * The discriminating case: a message with BOTH a typed mention and a bound
+ * page context must write TWO rows. The pre-fix `persistMentions()` guard
+ * (`if ($this->mentions === []) return;`) only ever wrote the mention row and
+ * silently dropped page context — asserting a bare "no row" absence can't
+ * tell that apart from the feature simply not existing yet, so this is the
+ * test that actually fails against the old code.
+ */
+it('writes both a mention row and a page_context row when a message has each', function (): void {
+    $mentioned = Company::factory()->for($this->team)->create(['name' => 'Widgets Inc']);
+    $viewed = Company::factory()->for($this->team)->create(['name' => 'Acme']);
 
-    new ReflectionMethod(ProcessChatMessage::class, 'persistMentions')->invoke(
-        new ProcessChatMessage(
-            user: $this->user,
-            team: $this->team,
-            message: 'hello',
-            conversationId: $this->conversationId,
-            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
-            mentions: [],
-            pageContext: null,
-        ),
-    );
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'Tell me about @Widgets_Inc',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        mentions: [['type' => 'company', 'id' => (string) $mentioned->getKey(), 'label' => 'Widgets Inc']],
+        pageContext: ['type' => 'company', 'id' => (string) $viewed->getKey(), 'label' => 'Acme'],
+    ))->handle(resolve(CreditService::class));
+
+    $userMessage = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->conversationId)
+        ->where('role', 'user')
+        ->first();
+
+    $rows = DB::table('agent_conversation_message_mentions')
+        ->where('message_id', $userMessage->id)
+        ->get()
+        ->keyBy('source');
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows['mention']->record_id)->toBe((string) $mentioned->getKey())
+        ->and($rows['page_context']->record_id)->toBe((string) $viewed->getKey())
+        ->and($rows['page_context']->label)->toBe('Acme');
+});
+
+it('writes no page_context row when no record is bound', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'hello',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        mentions: [],
+        pageContext: null,
+    ))->handle(resolve(CreditService::class));
 
     expect(DB::table('agent_conversation_message_mentions')->count())->toBe(0);
 });

@@ -621,6 +621,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return m;
     },
 
+    // Snapshot of the record this message is bound to, in the same shape
+    // ListConversationMessages returns after a reload — the optimistic bubble
+    // and the reloaded one must render identically. `url` isn't resolvable
+    // client-side, so the chip falls back to its non-clickable branch until
+    // a reload fills it in from the server.
+    activePageContext() {
+        if (this.pageContextDismissed || !this.pageContext?.type || !this.pageContext?.id) {
+            return null;
+        }
+
+        return {
+            type: this.pageContext.type,
+            id: this.pageContext.id,
+            label: this.pageContextLabel || this.pageContext.id,
+            url: null,
+        };
+    },
+
     localEditor() {
         const ctx = (this.$root || this.$el)?.getAttribute?.('data-chat-context') ?? 'conversation';
         const wrapper = document.querySelector(`[data-chat-context="${ctx}"][x-data*="chatEditor"]`);
@@ -1520,7 +1538,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
-            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: this.activePageContext() }));
             this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
@@ -1660,7 +1678,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         const nowIso = new Date().toISOString();
-        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: this.activePageContext() }));
         this.localEditor()?.clear();
         this.input = '';
         this.currentToolStatus = null;
