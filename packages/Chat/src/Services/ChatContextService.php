@@ -57,7 +57,8 @@ final readonly class ChatContextService
         }
 
         try {
-            $route = Route::getRoutes()->match(Request::create($url));
+            $request = Request::create($url);
+            $route = Route::getRoutes()->match($request);
         } catch (Throwable) {
             return $context;
         }
@@ -75,7 +76,10 @@ final readonly class ChatContextService
                 continue;
             }
 
-            $recordId = $this->extractRecordId($route->parameter('record'));
+            // Task and Note records open as Filament modals on index routes, so the id
+            // rides in the query string rather than as a route parameter.
+            $recordId = $this->extractRecordId($route->parameter('record'))
+                ?? $this->extractRecordId($request->query('tableActionRecord'));
 
             if ($recordId === null) {
                 return $context;
