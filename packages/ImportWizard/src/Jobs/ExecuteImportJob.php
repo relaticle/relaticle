@@ -351,6 +351,12 @@ final class ExecuteImportJob implements ShouldQueue
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
             $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
 
+            // SafeValueConverter nulls a blank string for every data type except DATE and
+            // DATE_TIME, and PostgreSQL rejects '' for a date/timestamp column.
+            if ($safeValue === '' && $cf->typeData->dataType->isDateOrDateTime()) {
+                $safeValue = null;
+            }
+
             if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
             }

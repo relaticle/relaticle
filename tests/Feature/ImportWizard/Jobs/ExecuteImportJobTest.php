@@ -1385,6 +1385,62 @@ it('clears existing custom field value when mapped column is blank on update', f
         ->and($cfv->text_value)->toBeEmpty();
 });
 
+it('stores a blank mapped date custom field as null instead of failing the import', function (): void {
+    $date = createTestCustomField($this, 'blank_start_date', 'date');
+    $dateTime = createTestCustomField($this, 'blank_start_datetime', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Start', 'StartAt'], [
+        makeRow(2, ['Name' => 'John', 'Start' => '', 'StartAt' => ''], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Start', target: "custom_fields_{$date->code}"),
+        ColumnData::toField(source: 'StartAt', target: "custom_fields_{$dateTime->code}"),
+    ]);
+
+    runImportJob($this);
+
+    expect($this->import->fresh()->status)->toBe(ImportStatus::Completed);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    expect($person)->not->toBeNull()
+        ->and(getTestCustomFieldValue($this, (string) $person->id, (string) $date->id)->date_value)->toBeNull()
+        ->and(getTestCustomFieldValue($this, (string) $person->id, (string) $dateTime->id)->datetime_value)->toBeNull();
+});
+
+it('clears an existing date custom field value when the mapped column is blank on update', function (): void {
+    $cf = createTestCustomField($this, 'clearable_start_date', 'date');
+
+    $person = People::factory()->create([
+        'name' => 'John',
+        'team_id' => $this->team->id,
+    ]);
+
+    CustomFieldValue::forceCreate([
+        'custom_field_id' => $cf->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->team->id,
+        'date_value' => '2024-05-15',
+    ]);
+
+    createImportReadyStore($this, ['ID', 'Name', 'Start'], [
+        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Start' => ''], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->date_value)->toBeNull();
+});
+
 it('imports email custom field with comma-separated addresses as array', function (): void {
     $cf = createTestCustomField($this, 'contact_emails', 'email');
 
