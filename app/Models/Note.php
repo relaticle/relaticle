@@ -8,11 +8,8 @@ use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
-use App\Models\Concerns\InvalidatesRelatedAiSummaries;
-use App\Observers\NoteObserver;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -33,7 +30,6 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
  */
-#[ObservedBy(NoteObserver::class)]
 #[Fillable([
     'creation_source',
 ])]
@@ -48,7 +44,6 @@ final class Note extends Model implements HasCustomFields, HasTimeline
     use HasTeam;
     use HasUlids;
     use InteractsWithTimeline;
-    use InvalidatesRelatedAiSummaries;
     use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;

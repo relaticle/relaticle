@@ -34,25 +34,26 @@ it('can render the view page', function (): void {
         ->assertOk();
 });
 
-it('can render `:dataset` column', function (string $column): void {
-    livewire(ListCompanies::class)
-        ->assertCanRenderTableColumn($column);
-})->with(['name', 'accountOwner.name', 'creator.name', 'created_at', 'updated_at']);
+// Column metadata is checked against a single mounted table rather than one
+// dataset case per column: mounting the page dominates the cost, and Filament's
+// assertion messages already name the offending column.
+it('exposes the expected table columns', function (): void {
+    $columns = ['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at'];
+    $renderable = ['name', 'accountOwner.name', 'creator.name', 'created_at', 'updated_at'];
 
-it('cannot render `:dataset` column', function (string $column): void {
-    livewire(ListCompanies::class)
-        ->assertCanNotRenderTableColumn($column);
-})->with(['deleted_at']);
+    $table = livewire(ListCompanies::class);
 
-it('has `:dataset` column', function (string $column): void {
-    livewire(ListCompanies::class)
-        ->assertTableColumnExists($column);
-})->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+    foreach ($columns as $column) {
+        $table->assertTableColumnExists($column)
+            ->assertTableColumnVisible($column);
+    }
 
-it('shows `:dataset` column', function (string $column): void {
-    livewire(ListCompanies::class)
-        ->assertTableColumnVisible($column);
-})->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+    foreach ($renderable as $column) {
+        $table->assertCanRenderTableColumn($column);
+    }
+
+    $table->assertCanNotRenderTableColumn('deleted_at');
+});
 
 it('can sort `:dataset` column', function (string $column): void {
     $records = Company::factory(3)->recycle([$this->user, $this->team])->create();

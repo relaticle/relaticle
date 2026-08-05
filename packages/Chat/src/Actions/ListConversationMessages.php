@@ -19,7 +19,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -45,7 +45,7 @@ final readonly class ListConversationMessages
 
         $mentionsByMessage = DB::table('agent_conversation_message_mentions')
             ->whereIn('message_id', $messages->pluck('id'))
-            ->get(['message_id', 'type', 'record_id', 'label'])
+            ->get(['message_id', 'type', 'record_id', 'label', 'source'])
             ->groupBy('message_id');
 
         $feedbackByMessage = DB::table('chat_message_feedback')
@@ -101,6 +101,7 @@ final readonly class ListConversationMessages
             ] : null,
             'mentions' => array_values(
                 ($mentionsByMessage[$msg->id] ?? collect())
+                    ->filter(fn (object $row): bool => (string) $row->source !== 'page_context')
                     ->map(fn (object $row): array => [
                         'type' => (string) $row->type,
                         'id' => (string) $row->record_id,
@@ -109,6 +110,15 @@ final readonly class ListConversationMessages
                     ])
                     ->all()
             ),
+            'page_context' => ($mentionsByMessage[$msg->id] ?? collect())
+                ->filter(fn (object $row): bool => (string) $row->source === 'page_context')
+                ->map(fn (object $row): array => [
+                    'type' => (string) $row->type,
+                    'id' => (string) $row->record_id,
+                    'label' => (string) $row->label,
+                    'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
+                ])
+                ->first(),
         ])->values()->all();
     }
 

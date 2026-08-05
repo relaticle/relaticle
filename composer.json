@@ -17,7 +17,7 @@
         "ext-intl": "*",
         "andreiio/blade-remix-icon": "^3.9",
         "ashallendesign/favicon-fetcher": "^3.8",
-        "asmit/resized-column": "^2.1",
+        "asmit/resized-column": "^3.0",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
         "doctrine/dbal": "^4.4",
@@ -28,7 +28,7 @@
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
-        "laravel/mcp": "^0.7.0",
+        "laravel/mcp": "^0.9.1",
         "laravel/pennant": "^1.23",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
@@ -59,15 +59,15 @@
         "spatie/laravel-prefixed-ids": "^1.4",
         "spatie/laravel-query-builder": "^7.0",
         "spatie/laravel-settings": "^3.3",
-        "spatie/laravel-sitemap": "^7.3",
-        "spatie/laravel-sluggable": "^3.8",
+        "spatie/laravel-sitemap": "^8.2",
+        "spatie/laravel-sluggable": "^4.0",
         "spatie/schema-org": "^4.0",
         "spatie/security-advisories-health-check": "^1.3",
         "spatie/simple-excel": "^3.8",
         "symfony/html-sanitizer": "^7.2|^8.0",
-        "symfony/http-client": "^7.2",
-        "symfony/postmark-mailer": "^7.2",
-        "symfony/yaml": "^7.2"
+        "symfony/http-client": "^8.1",
+        "symfony/postmark-mailer": "^8.1",
+        "symfony/yaml": "^8.1"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.0",
@@ -82,13 +82,12 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
-        "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-browser": "^4.3",
-        "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-type-coverage": "^4.0",
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-browser": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0",
         "rector/rector": "^2.0",
-        "spatie/guidelines-skills": "dev-main",
-        "spatie/pest-plugin-route-testing": "^1.1"
+        "spatie/guidelines-skills": "dev-main"
     },
     "autoload": {
         "psr-4": {
@@ -137,14 +136,19 @@
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "lint": "rector && pint --parallel",
-        "test:lint": "pint --test",
+        "test:lint": "pint --test --parallel",
         "test:refactor": "rector --dry-run",
         "test:types": "phpstan analyse",
         "test:arch": "pest tests/Arch/",
         "test:type-coverage": "pest --type-coverage --min=100",
         "test:pest": "pest --parallel --exclude-testsuite=Browser",
         "test:pest:shard": "pest --parallel --shard=${SHARD} --exclude-testsuite=Browser",
-        "test:pest:ci": "pest --compact --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:pest:ci": "pest --compact --parallel --configuration phpunit.ci.xml --shard=${SHARD} --exclude-testsuite=Browser",
+        "test:pest:tia": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv XDEBUG_MODE=coverage",
+            "pest --parallel --tia --exclude-testsuite=Browser,PHPStan"
+        ],
         "test:update-shards": "pest --parallel --update-shards --exclude-testsuite=Browser",
         "test:browser": "pest tests/Browser/",
         "test": [

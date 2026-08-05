@@ -201,7 +201,7 @@ final class PeopleResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['team', 'customFieldValues.customField.options'])
+            ->with(['customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

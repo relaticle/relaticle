@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasActivityTimeline;
-use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
@@ -54,7 +53,6 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
 {
     use BelongsToTeamCreator;
     use HasActivityTimeline;
-    use HasAiSummary;
     use HasCreator;
     use HasEmails;
 

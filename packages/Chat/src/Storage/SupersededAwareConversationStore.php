@@ -14,6 +14,7 @@ use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Storage\DatabaseConversationStore;
 use Relaticle\Chat\Support\AssistantText;
+use Relaticle\Chat\Support\FirstChatUsageTagger;
 use stdClass;
 
 /**
@@ -26,6 +27,21 @@ use stdClass;
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
+    /**
+     * Tag the "has-ai-usage" marketing segment on the subscriber's first
+     * chat message. This is the real write path for user turns (see
+     * RememberConversation middleware in laravel/ai), unlike the
+     * AgentConversationMessage Eloquent model, which never receives writes.
+     */
+    public function storeUserMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt): string
+    {
+        $messageId = parent::storeUserMessage($conversationId, $userId, $prompt);
+
+        FirstChatUsageTagger::tagIfFirstMessage($messageId);
+
+        return $messageId;
+    }
+
     /**
      * Collapse a fully-repeated combined assistant text before persisting.
      *

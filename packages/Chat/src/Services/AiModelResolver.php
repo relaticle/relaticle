@@ -6,61 +6,66 @@ namespace Relaticle\Chat\Services;
 
 use App\Enums\Plan;
 use App\Models\User;
-use Relaticle\Chat\Enums\AiModel;
+use Relaticle\Chat\Support\ModelDescriptor;
+use RuntimeException;
 
 final readonly class AiModelResolver
 {
+    public function __construct(private ModelRegistry $registry) {}
+
     /**
-     * Resolve the provider and model for a chat request.
-     *
-     * `Auto` always resolves to Claude Sonnet. Smaller models like Haiku
-     * cannot be trusted to call CRM write tools reliably -- they tend to
-     * hallucinate "task created" without invoking the tool.
+     * Resolve the provider and model for a chat request. An available,
+     * plan-allowed explicit choice (or stored user preference) is honored;
+     * anything else falls to the configured `auto_chain`: first available +
+     * plan-allowed, then first available regardless of plan (self-hosted
+     * infrastructure is not plan-gated), then a safe cloud default.
      *
      * @return array{provider: string|null, model: string|null}
      */
     public function resolve(User $user, ?string $override = null): array
     {
-        $aiModel = $this->resolveModel($user, $override);
+        $descriptor = $this->pick($user, $override);
 
+        return ['provider' => $descriptor->provider, 'model' => $descriptor->model];
+    }
+
+    private function pick(User $user, ?string $override): ModelDescriptor
+    {
         $team = $user->currentTeam;
         $plan = $team !== null ? $team->plan : Plan::default();
 
-        if (! $plan->allowsModel($aiModel)) {
-            $aiModel = AiModel::ClaudeSonnet;
-        }
+        $requested = $override ?? ($user->ai_preferences['default_model'] ?? 'auto');
 
-        if ($aiModel->provider() === 'gemini') {
-            $aiModel = AiModel::ClaudeSonnet;
-        }
+        if (is_string($requested) && $requested !== 'auto') {
+            $descriptor = $this->registry->find($requested);
 
-        if ($aiModel === AiModel::Auto) {
-            $aiModel = AiModel::ClaudeSonnet;
-        }
-
-        return [
-            'provider' => $aiModel->provider(),
-            'model' => $aiModel->modelId(),
-        ];
-    }
-
-    private function resolveModel(User $user, ?string $override): AiModel
-    {
-        if ($override !== null) {
-            $model = AiModel::tryFrom($override);
-
-            if ($model !== null && $model !== AiModel::Auto) {
-                return $model;
+            if ($descriptor instanceof ModelDescriptor && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+                return $descriptor;
             }
         }
 
-        $preference = $user->ai_preferences['default_model'] ?? 'auto';
-        $model = AiModel::tryFrom($preference);
+        return $this->autoPick($plan);
+    }
 
-        if ($model !== null && $model !== AiModel::Auto) {
-            return $model;
+    private function autoPick(Plan $plan): ModelDescriptor
+    {
+        $chain = $this->registry->autoChain();
+
+        foreach ($chain as $descriptor) {
+            if ($descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+                return $descriptor;
+            }
         }
 
-        return AiModel::Auto;
+        foreach ($chain as $descriptor) {
+            if ($descriptor->isAvailable()) {
+                return $descriptor;
+            }
+        }
+
+        return $this->registry->find('claude-sonnet')
+            ?? $chain[0]
+            ?? $this->registry->all()[0]
+            ?? throw new RuntimeException('No chat model is configured; set at least one provider in config/chat.php.');
     }
 }
