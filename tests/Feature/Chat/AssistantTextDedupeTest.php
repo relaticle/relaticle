@@ -36,7 +36,7 @@ function storeAssistantTextFixture(User $user, string $text): string
     $response = new AgentResponse('inv-'.Str::random(8), $text, new Usage, new Meta);
 
     resolve(SupersededAwareConversationStore::class)
-        ->storeAssistantMessage($conversationId, (string) $user->getKey(), $prompt, $response);
+        ->storeAssistantMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt, $response);
 
     return $conversationId;
 }

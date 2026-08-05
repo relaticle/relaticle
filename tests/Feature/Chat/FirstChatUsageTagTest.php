@@ -24,7 +24,7 @@ function storeChatUserMessage(User $user, string $conversationId, string $text):
     $prompt = new AgentPrompt($agent, $text, [], $provider, $provider->defaultTextModel());
 
     return resolve(SupersededAwareConversationStore::class)
-        ->storeUserMessage($conversationId, (string) $user->getKey(), $prompt);
+        ->storeUserMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt);
 }
 
 function seedChatConversation(User $user): string

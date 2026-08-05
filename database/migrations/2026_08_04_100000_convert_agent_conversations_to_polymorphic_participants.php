@@ -32,11 +32,16 @@ return new class extends Migration
             $table->renameColumn('user_id', 'participant_id');
         });
 
+        // The column was char(26) to fit a User ULID. A polymorphic key has no fixed
+        // width, and char() blank-pads shorter keys on read, which would break the
+        // strict participant comparisons in the chat authorization paths.
         Schema::table('agent_conversations', function (Blueprint $table): void {
+            $table->string('participant_id')->nullable()->change();
             $table->string('participant_type')->nullable();
         });
 
         Schema::table('agent_conversation_messages', function (Blueprint $table): void {
+            $table->string('participant_id')->nullable()->change();
             $table->string('participant_type')->nullable();
             $table->text('approval_state')->nullable();
         });
