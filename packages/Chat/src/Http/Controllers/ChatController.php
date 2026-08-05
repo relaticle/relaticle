@@ -87,7 +87,8 @@ final readonly class ChatController
         abort_if($existing === null, 404);
 
         abort_if(
-            $existing->user_id !== (string) $user->getKey()
+            $existing->participant_type !== $user->getMorphClass()
+                || $existing->participant_id !== (string) $user->getKey()
                 || ($existing->team_id !== null && $existing->team_id !== $team->getKey()),
             403
         );
@@ -143,7 +144,11 @@ final readonly class ChatController
                 return;
             }
 
-            abort_if($row->user_id !== (string) $user->getKey(), 403);
+            abort_if(
+                $row->participant_type !== $user->getMorphClass()
+                    || $row->participant_id !== (string) $user->getKey(),
+                403
+            );
 
             if ($row->team_id !== null) {
                 return;
@@ -260,7 +265,8 @@ final readonly class ChatController
 
         DB::table('agent_conversations')->insert([
             'id' => $conversationId,
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => (string) $user->getKey(),
             'team_id' => $team->getKey(),
             'title' => TitleSanitizer::clean($parsed['text']),
             'created_at' => now(),
@@ -280,7 +286,8 @@ final readonly class ChatController
 
         abort_if($row === null, 404);
         abort_if(
-            $row->user_id !== (string) $user->getKey()
+            $row->participant_type !== $user->getMorphClass()
+                || $row->participant_id !== (string) $user->getKey()
                 || ($row->team_id !== null && $row->team_id !== $team->getKey()),
             404,
         );
@@ -319,7 +326,8 @@ final readonly class ChatController
 
         abort_if(
             $conversation === null
-                || $conversation->user_id !== (string) $user->getKey()
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
                 || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
             404,
         );

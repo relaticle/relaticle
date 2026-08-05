@@ -27,7 +27,8 @@ function seedAdminMessage(string $role = 'user', ?string $supersededAt = null): 
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'msg test',
         'created_at' => now(),
@@ -38,7 +39,8 @@ function seedAdminMessage(string $role = 'user', ?string $supersededAt = null): 
         'id' => $messageId,
         'conversation_id' => $conversationId,
         'agent' => 'crm-assistant',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'role' => $role,
         'content' => 'hello from the probe',
         'attachments' => '[]',

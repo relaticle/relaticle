@@ -21,7 +21,8 @@ function storeAssistantTextFixture(User $user, string $text): string
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),

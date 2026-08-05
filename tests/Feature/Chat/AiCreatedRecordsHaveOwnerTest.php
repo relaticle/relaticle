@@ -56,7 +56,8 @@ it('AI-created company through pending-action approval gets owner set', function
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

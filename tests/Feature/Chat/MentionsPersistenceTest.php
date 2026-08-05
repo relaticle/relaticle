@@ -29,7 +29,8 @@ it('persists a clean user message even when mentions are resolved', function ():
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -80,7 +81,8 @@ it('still gives the LLM the mention context via the system prompt', function ():
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

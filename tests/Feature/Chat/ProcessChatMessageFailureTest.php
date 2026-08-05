@@ -36,7 +36,8 @@ function seedFailedTurnMessage(string $conversationId, User $user, string $role,
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => CrmAssistant::class,
         'role' => $role,
         'content' => $content,
@@ -63,7 +64,8 @@ it('makes a failed turn coherent: user message, failure note, superseded proposa
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'BR failure',
         'created_at' => now(),
@@ -109,7 +111,8 @@ it('does not duplicate a completed turn or add an error note when a post-stream 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'BR completed turn, post-stream step failed',
         'created_at' => now(),
@@ -142,7 +145,8 @@ it('backfills a newly failed turn even when a prior completed turn exists', func
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'BR backfill after unrelated completed turn',
         'created_at' => now(),
@@ -173,7 +177,8 @@ it('shows timeout-specific copy when the turn times out', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'BR timeout',
         'created_at' => now(),
@@ -200,7 +205,8 @@ it('orders the backfilled failed turn before a later retried turn when sorted by
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'BR failed turn then retry ordering',
         'created_at' => now(),

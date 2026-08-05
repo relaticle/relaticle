@@ -15,8 +15,8 @@ it('matches conversations by title', function (): void {
     $team = $user->currentTeam;
 
     DB::table('agent_conversations')->insert([
-        ['id' => 'a', 'user_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'About Acme', 'created_at' => now(), 'updated_at' => now()],
-        ['id' => 'b', 'user_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Pipeline review', 'created_at' => now(), 'updated_at' => now()],
+        ['id' => 'a', 'participant_type' => 'user', 'participant_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'About Acme', 'created_at' => now(), 'updated_at' => now()],
+        ['id' => 'b', 'participant_type' => 'user', 'participant_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Pipeline review', 'created_at' => now(), 'updated_at' => now()],
     ]);
 
     $hits = (new SearchConversations)->execute($user, 'acme');
@@ -30,7 +30,8 @@ it('matches by message content', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'c',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Generic title',
         'created_at' => now(),
@@ -39,7 +40,8 @@ it('matches by message content', function (): void {
     DB::table('agent_conversation_messages')->insert([
         'id' => 'm1',
         'conversation_id' => 'c',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'user',
         'content' => 'Show me companies in Berlin',
@@ -64,7 +66,8 @@ it('scopes results to current team', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'd',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $otherTeam->getKey(),
         'title' => 'About Acme',
         'created_at' => now(),
@@ -82,7 +85,8 @@ it('returns empty for blank query', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'e',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Not relevant',
         'created_at' => now(),

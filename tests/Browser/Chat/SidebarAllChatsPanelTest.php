@@ -13,13 +13,14 @@ it('opens the all-chats flyout from the sidebar trigger and lists chats', functi
     $team = $user->ownedTeams()->first();
 
     $rows = [
-        ['id' => 'cb1', 'user_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Acme onboarding', 'created_at' => now()->subMinutes(20), 'updated_at' => now()->subMinutes(20)],
-        ['id' => 'cb2', 'user_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Q3 pipeline review', 'created_at' => now()->subMinutes(19), 'updated_at' => now()->subMinutes(19)],
+        ['id' => 'cb1', 'participant_type' => 'user', 'participant_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Acme onboarding', 'created_at' => now()->subMinutes(20), 'updated_at' => now()->subMinutes(20)],
+        ['id' => 'cb2', 'participant_type' => 'user', 'participant_id' => $user->getKey(), 'team_id' => $team->getKey(), 'title' => 'Q3 pipeline review', 'created_at' => now()->subMinutes(19), 'updated_at' => now()->subMinutes(19)],
     ];
     for ($i = 3; $i <= 8; $i++) {
         $rows[] = [
             'id' => "cb{$i}",
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $team->getKey(),
             'title' => "Filler {$i}",
             'created_at' => now()->subMinutes(20 - $i),
@@ -52,7 +53,8 @@ it('navigates to a chat when clicked from the panel', function (): void {
 
     $rows = [[
         'id' => 'cnav1',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Navigate to me',
         'created_at' => now(),
@@ -61,7 +63,8 @@ it('navigates to a chat when clicked from the panel', function (): void {
     for ($i = 2; $i <= 8; $i++) {
         $rows[] = [
             'id' => "cnav{$i}",
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $team->getKey(),
             'title' => "Filler {$i}",
             'created_at' => now()->subMinutes($i),

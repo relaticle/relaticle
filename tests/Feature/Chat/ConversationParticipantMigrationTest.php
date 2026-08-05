@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Actions\ListConversations;
 
 it('exposes polymorphic participant columns on both conversation tables', function (): void {
     expect(Schema::hasColumns('agent_conversations', ['participant_type', 'participant_id']))->toBeTrue()
@@ -39,4 +40,34 @@ it('stores a conversation participant using the enforced morph alias', function 
     ]);
 
     expect(DB::table('agent_conversations')->value('participant_type'))->toBe('user');
+});
+
+it('scopes a conversation listing to the participant, not just the id', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    $conversationId = (string) Str::uuid();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => $user->getKey(),
+        'team_id' => $user->current_team_id,
+        'title' => 'Mine',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => (string) Str::uuid(),
+        'participant_type' => 'team',
+        'participant_id' => $user->getKey(),
+        'team_id' => $user->current_team_id,
+        'title' => 'Not a user conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $listed = resolve(ListConversations::class)->execute($user);
+
+    expect($listed->pluck('id')->all())->toBe([$conversationId]);
 });

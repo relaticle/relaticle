@@ -13,7 +13,8 @@ it('rename endpoint returns the conversation_id and the new title', function ():
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'Old title',
         'created_at' => now(),

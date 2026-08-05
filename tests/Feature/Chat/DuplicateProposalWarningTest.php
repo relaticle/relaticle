@@ -27,7 +27,8 @@ beforeEach(function (): void {
     $this->convId = '019df900-6666-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
-        'user_id' => (string) $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
         'team_id' => $this->user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

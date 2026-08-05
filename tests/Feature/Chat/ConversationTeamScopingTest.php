@@ -16,7 +16,8 @@ it('lists only conversations scoped to the current team', function (): void {
     DB::table('agent_conversations')->insert([
         [
             'id' => 'conv-current',
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $user->current_team_id,
             'title' => 'Current team',
             'created_at' => now(),
@@ -24,7 +25,8 @@ it('lists only conversations scoped to the current team', function (): void {
         ],
         [
             'id' => 'conv-other',
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $otherTeam->getKey(),
             'title' => 'Other team',
             'created_at' => now(),
@@ -45,7 +47,8 @@ it('returns null from FindConversation for cross-team conversation ids', functio
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-foreign',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $otherTeam->getKey(),
         'title' => 'Foreign',
         'created_at' => now(),

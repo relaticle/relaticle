@@ -16,7 +16,8 @@ it('returns the document column on each message from ListConversationMessages', 
     $conversationId = (string) Str::uuid7();
     AgentConversation::query()->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test',
         'created_at' => now(),
@@ -35,7 +36,8 @@ it('returns the document column on each message from ListConversationMessages', 
     DB::table('agent_conversation_messages')->insert([
         'id' => $messageId,
         'conversation_id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'agent' => 'crm',
         'role' => 'user',
         'content' => 'Hello world',
@@ -69,7 +71,8 @@ it('attaches a server-resolved url to each mention', function (): void {
     $conversationId = (string) Str::uuid7();
     AgentConversation::query()->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test',
         'created_at' => now(),
@@ -80,7 +83,8 @@ it('attaches a server-resolved url to each mention', function (): void {
     DB::table('agent_conversation_messages')->insert([
         'id' => $messageId,
         'conversation_id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'agent' => 'crm',
         'role' => 'user',
         'content' => '@Acme Corp tell me about this',

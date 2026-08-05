@@ -28,7 +28,8 @@ it('writes a row to agent_conversation_message_mentions for each mention', funct
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -78,7 +79,8 @@ it('writes no mention rows when the mentions list is empty', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

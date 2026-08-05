@@ -16,7 +16,8 @@ it('hides synthetic [approval] user messages from the visible message list', fun
     $convId = '019df800-2222-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -25,7 +26,8 @@ it('hides synthetic [approval] user messages from the visible message list', fun
 
     $base = [
         'conversation_id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',

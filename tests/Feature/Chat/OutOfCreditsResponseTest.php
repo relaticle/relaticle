@@ -28,7 +28,8 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -73,7 +74,8 @@ it('marks upgrade_available false for Pro users', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -109,7 +111,8 @@ it('marks upgrade_available false for Enterprise users', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -142,7 +145,8 @@ it('mentions the plan name in the message', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

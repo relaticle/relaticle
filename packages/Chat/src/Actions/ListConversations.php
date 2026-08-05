@@ -17,7 +17,8 @@ final readonly class ListConversations
     public function execute(User $user, int $limit = 50): Collection
     {
         return DB::table('agent_conversations')
-            ->where('user_id', $user->getKey())
+            ->where('participant_type', $user->getMorphClass())
+            ->where('participant_id', $user->getKey())
             ->where('team_id', $user->current_team_id)
             ->latest('updated_at')
             ->limit($limit)

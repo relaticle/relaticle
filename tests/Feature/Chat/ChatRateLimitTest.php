@@ -19,7 +19,8 @@ function seedRateLimitConversation(string $id, User $user): void
 {
     DB::table('agent_conversations')->insert([
         'id' => $id,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),

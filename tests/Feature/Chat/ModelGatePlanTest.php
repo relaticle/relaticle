@@ -34,7 +34,8 @@ it('rejects an Opus request from a grandfathered Free user with a 403', function
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -73,7 +74,8 @@ it('allows an Opus request from a Pro user', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -105,7 +107,8 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -137,7 +140,8 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -166,7 +170,8 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -201,7 +206,8 @@ it('allows a Free user to pick Ollama when it is configured', function (): void 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -230,7 +236,8 @@ it('rejects an unknown model id with a 422', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

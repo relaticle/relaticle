@@ -47,7 +47,8 @@ function createToolConversationFor(User $owner, string $conversationId): CreateC
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $owner->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $owner->getKey(),
         'team_id' => $owner->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

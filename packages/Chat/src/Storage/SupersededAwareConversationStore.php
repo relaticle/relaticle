@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Storage;
 
+use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Laravel\Ai\Messages\AssistantMessage;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Messages\ToolResultMessage;
@@ -28,6 +30,38 @@ use stdClass;
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
     /**
+     * The conversation tables carry a polymorphic participant_type +
+     * participant_id pair; laravel/ai 0.6 still reads and writes the user_id
+     * column the migration renamed, so every inherited write is reimplemented
+     * here against the participant pair. Deleting these four overrides is part
+     * of the laravel/ai 0.10 upgrade, whose own store writes the pair natively.
+     */
+    public function latestConversationId(string|int $userId): ?string
+    {
+        return $this->table($this->conversationsTable())
+            ->where('participant_type', $this->participantType())
+            ->where('participant_id', $userId)
+            ->latest('updated_at')
+            ->first()?->id;
+    }
+
+    public function storeConversation(string|int|null $userId, string $title): string
+    {
+        $conversationId = (string) Str::uuid7();
+
+        $this->table($this->conversationsTable())->insert([
+            'id' => $conversationId,
+            'participant_type' => $userId === null ? null : $this->participantType(),
+            'participant_id' => $userId,
+            'title' => $title,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $conversationId;
+    }
+
+    /**
      * Tag the "has-ai-usage" marketing segment on the subscriber's first
      * chat message. This is the real write path for user turns (see
      * RememberConversation middleware in laravel/ai), unlike the
@@ -35,7 +69,19 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      */
     public function storeUserMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt): string
     {
-        $messageId = parent::storeUserMessage($conversationId, $userId, $prompt);
+        $messageId = (string) Str::uuid7();
+
+        $this->table($this->messagesTable())->insert([
+            ...$this->messageRow($conversationId, $userId, $prompt),
+            'id' => $messageId,
+            'role' => 'user',
+            'content' => $prompt->prompt,
+            'attachments' => $prompt->attachments->toJson(),
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '[]',
+            'meta' => '[]',
+        ]);
 
         FirstChatUsageTagger::tagIfFirstMessage($messageId);
 
@@ -52,9 +98,41 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      */
     public function storeAssistantMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt, AgentResponse $response): string
     {
-        $response->text = AssistantText::collapseRepeated($response->text);
+        $messageId = (string) Str::uuid7();
 
-        return parent::storeAssistantMessage($conversationId, $userId, $prompt, $response);
+        $this->table($this->messagesTable())->insert([
+            ...$this->messageRow($conversationId, $userId, $prompt),
+            'id' => $messageId,
+            'role' => 'assistant',
+            'content' => AssistantText::collapseRepeated($response->text),
+            'attachments' => '[]',
+            'tool_calls' => json_encode($response->toolCalls->values()),
+            'tool_results' => json_encode($response->toolResults->values()),
+            'usage' => json_encode($response->usage),
+            'meta' => json_encode($response->meta),
+        ]);
+
+        return $messageId;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function messageRow(string $conversationId, string|int|null $userId, AgentPrompt $prompt): array
+    {
+        return [
+            'conversation_id' => $conversationId,
+            'participant_type' => $userId === null ? null : $this->participantType(),
+            'participant_id' => $userId,
+            'agent' => $prompt->agent::class,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    private function participantType(): string
+    {
+        return (new User)->getMorphClass();
     }
 
     /**

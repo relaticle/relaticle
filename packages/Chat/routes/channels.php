@@ -18,6 +18,7 @@ Broadcast::channel('chat.conversation.{conversationId}', function (User $user, s
         return false;
     }
 
-    return $row->user_id === (string) $user->getKey()
+    return $row->participant_type === $user->getMorphClass()
+        && $row->participant_id === (string) $user->getKey()
         && ($row->team_id === null || $row->team_id === $user->current_team_id);
 });

@@ -19,7 +19,8 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $conversation_id
- * @property string|null $user_id
+ * @property string|null $participant_type
+ * @property string|null $participant_id
  * @property string|null $agent
  * @property string $role
  * @property string|null $content
@@ -57,6 +58,6 @@ final class AgentConversationMessage extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'participant_id');
     }
 }
