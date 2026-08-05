@@ -33,8 +33,6 @@ use Spatie\EloquentSortable\SortableTrait;
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
  * @property string $createdBy
- *
- * @method void saveCustomFieldValue(CustomField $field, mixed $value)
  */
 #[Fillable([
     'user_id',
