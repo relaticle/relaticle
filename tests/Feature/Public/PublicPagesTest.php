@@ -441,8 +441,33 @@ describe('Blog pages', function () {
             ->assertStatus(200)
             ->assertSee('Why we built it')
             ->assertSee('Using artisan commands')
-            ->assertSee('Ampersands & more', escape: false)
+            // Rendered HTML carries the single-escaped entity, which the reader sees
+            // as "Ampersands & more"; the double-escaped form is the bug this guards.
+            ->assertSee('Ampersands &amp; more', escape: false)
             ->assertDontSee('&amp;amp;', escape: false);
+    });
+
+    it('keeps the JSON-LD block intact when a post title closes the script tag', function () {
+        $title = 'Breakout </script><script>window.pwned=true</script>';
+
+        $post = Post::factory()->published()->create([
+            'title' => $title,
+            'content' => 'Body copy.',
+        ]);
+
+        $html = $this->get("/blog/{$post->slug}")->assertStatus(200)->getContent();
+
+        $opening = '<script type="application/ld+json">';
+        $start = (int) mb_strpos($html, $opening) + mb_strlen($opening);
+
+        // A browser ends the block at the first literal </script>, so a clean parse
+        // here is the proof that the title could not terminate it and spill the rest
+        // of the schema into the visible page.
+        $block = trim(mb_substr($html, $start, (int) mb_strpos($html, '</script>', $start) - $start));
+        $decoded = json_decode($block, true);
+
+        expect(json_last_error())->toBe(JSON_ERROR_NONE, "JSON-LD block was truncated: {$block}")
+            ->and($decoded['headline'])->toBe($title);
     });
 
     it('404s a preview request whose post segment is not numeric', function () {
