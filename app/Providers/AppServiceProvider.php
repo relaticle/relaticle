@@ -28,9 +28,6 @@ use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
-use App\Policies\Blog\CategoryPolicy;
-use App\Policies\Blog\PostPolicy;
-use App\Policies\Blog\TagPolicy;
 use App\Services\GitHubService;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -64,7 +61,6 @@ use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
-use Relaticle\Ink\Models\Tag;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
@@ -144,10 +140,6 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configurePolicies(): void
     {
-        Gate::policy(Post::class, PostPolicy::class);
-        Gate::policy(Category::class, CategoryPolicy::class);
-        Gate::policy(Tag::class, TagPolicy::class);
-
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {
                 $currentPanelId = Filament::getCurrentPanel()?->getId();

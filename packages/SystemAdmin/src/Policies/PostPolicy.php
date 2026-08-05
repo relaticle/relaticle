@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\SystemAdmin\Policies;
+
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
+
+final class PostPolicy
+{
+    public function viewAny(SystemAdministrator $admin): bool
+    {
+        return true;
+    }
+
+    public function view(SystemAdministrator $admin): bool
+    {
+        return true;
+    }
+
+    public function create(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function update(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function delete(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function deleteAny(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function restore(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function restoreAny(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function forceDelete(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+
+    public function forceDeleteAny(SystemAdministrator $admin): bool
+    {
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+    }
+}
