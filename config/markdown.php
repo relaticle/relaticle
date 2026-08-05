@@ -39,6 +39,14 @@ return [
      * More info: https://spatie.be/docs/laravel-markdown/v1/using-the-blade-component/passing-options-to-commonmark
      */
     'commonmark_options' => [
+        /*
+         * Blog posts are authored through the panel and stored in the database, so
+         * their markdown is untrusted input. Escaping raw HTML stops a stored
+         * <script> (or an <img onerror>) from executing on the public marketing site.
+         */
+        'html_input' => 'escape',
+        'allow_unsafe_links' => false,
+
         'heading_permalink' => [
             'html_class' => 'heading-permalink',
             'id_prefix' => '',

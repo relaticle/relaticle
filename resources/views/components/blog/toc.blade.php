@@ -1,10 +1,7 @@
 @props(['post'])
 
 @php
-    preg_match_all('/<h2[^>]*><a[^>]*id="([^"]+)"[^>]*>#<\/a>([^<]+)/', $post->toHtml(), $matches);
-    $toc = (! empty($matches[1]) && ! empty($matches[2]))
-        ? array_combine($matches[1], $matches[2])
-        : [];
+    $toc = \App\Support\Blog\TableOfContents::fromHtml($post->toHtml());
 @endphp
 
 @if(count($toc))

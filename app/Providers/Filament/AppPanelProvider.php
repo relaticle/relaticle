@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
+use App\Features\Blog;
 use App\Features\SocialAuth;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -80,8 +81,18 @@ final class AppPanelProvider extends PanelProvider
             SwitchTeam::class,
         );
 
-        CategoryResource::scopeToTenant(false);
-        PostResource::scopeToTenant(false);
+        /**
+         * WARNING: `$isScopedToTenant` is declared once on Filament's BelongsToTenant
+         * trait, so these calls write a static shared by EVERY resource — they disable
+         * Filament tenant scoping panel-wide, not just for the blog. The CRM stays
+         * isolated only because App\Models\Concerns\ApplyTenantScopes registers a
+         * separate global scope that Filament does not strip. Keep the blog admin
+         * behind the feature flag until it is moved off the tenant panel.
+         */
+        if (Feature::active(Blog::class)) {
+            CategoryResource::scopeToTenant(false);
+            PostResource::scopeToTenant(false);
+        }
 
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
@@ -204,7 +215,7 @@ final class AppPanelProvider extends PanelProvider
                 CustomFieldsPlugin::make()
                     ->authorize(fn () => Gate::check('update', Filament::getTenant())),
                 ResizedColumnPlugin::make(),
-                InkPlugin::make(),
+                ...(Feature::active(Blog::class) ? [InkPlugin::make()] : []),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,

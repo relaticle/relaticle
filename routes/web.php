@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\Blog;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\Auth\CallbackController;
@@ -59,14 +60,16 @@ Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
     Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
 });
 
-Route::middleware(ProvideMarkdownResponse::class)->prefix('blog')->name('blog.')->group(function (): void {
-    Route::get('/', [BlogController::class, 'index'])->name('index');
-    Route::get('/feed', BlogFeedController::class)->name('feed');
-    Route::get('/category/{slug}', BlogCategoryController::class)->name('category');
-    Route::get('/tag/{slug}', BlogTagController::class)->name('tag');
-    Route::get('/preview/{post}', BlogPreviewController::class)->name('preview')->middleware('signed');
-    Route::get('/{slug}', [BlogController::class, 'show'])->name('show');
-});
+if (Feature::active(Blog::class)) {
+    Route::middleware(ProvideMarkdownResponse::class)->prefix('blog')->name('blog.')->group(function (): void {
+        Route::get('/', [BlogController::class, 'index'])->name('index');
+        Route::get('/feed', BlogFeedController::class)->name('feed');
+        Route::get('/category/{slug}', BlogCategoryController::class)->name('category');
+        Route::get('/tag/{slug}', BlogTagController::class)->name('tag');
+        Route::get('/preview/{post}', BlogPreviewController::class)->name('preview')->middleware('signed')->whereNumber('post');
+        Route::get('/{slug}', [BlogController::class, 'show'])->name('show');
+    });
+}
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 

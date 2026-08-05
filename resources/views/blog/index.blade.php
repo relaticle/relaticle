@@ -43,8 +43,17 @@
             </div>
 
             @if($posts->isEmpty())
-                <div class="text-center py-16">
-                    <p class="text-gray-500 dark:text-gray-400">No posts yet. Check back soon.</p>
+                <div class="text-center py-16 space-y-4">
+                    @if($posts->total() > 0)
+                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist — the archive only goes up to page {{ $posts->lastPage() }}.</p>
+                        <a href="{{ $posts->url(1) }}"
+                           class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
+                            <x-ri-arrow-left-line class="w-4 h-4" />
+                            Back to the first page
+                        </a>
+                    @else
+                        <p class="text-gray-500 dark:text-gray-400">No posts yet. Check back soon.</p>
+                    @endif
                 </div>
             @else
                 <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
@@ -53,8 +62,8 @@
                     @endforeach
                 </div>
 
-                <div class="mt-12">
-                    {{ $posts->links() }}
+                <div class="mt-12 pt-8 border-t border-gray-200/60 dark:border-white/[0.04]">
+                    {{ $posts->links('blog.pagination') }}
                 </div>
             @endif
         </div>

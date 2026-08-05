@@ -414,6 +414,51 @@ describe('Blog pages', function () {
             ->assertStatus(200)
             ->assertSee(route('blog.index'));
     });
+
+    it('escapes raw HTML embedded in post markdown instead of executing it', function () {
+        $post = Post::factory()->published()->create([
+            'content' => "## Intro\nSafe copy.\n\n<script>window.pwned = true</script>\n<img src=x onerror=\"window.pwned = true\">",
+        ]);
+
+        $html = $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->getContent();
+
+        $article = mb_substr($html, (int) mb_strpos($html, '<article'), (int) mb_strpos($html, '</article>') - (int) mb_strpos($html, '<article'));
+
+        expect($article)->not->toContain('<script>window.pwned')
+            ->and($article)->not->toContain('<img src=x onerror')
+            ->and($article)->toContain('&lt;script&gt;')
+            ->and($article)->toContain('&lt;img src=x onerror');
+    });
+
+    it('keeps the table of contents label intact when a heading contains inline markup', function () {
+        $post = Post::factory()->published()->create([
+            'content' => "## Why **we** built it\n\nBody.\n\n## Using `artisan` commands\n\nBody.\n\n## Ampersands & more\n\nBody.",
+        ]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee('Why we built it')
+            ->assertSee('Using artisan commands')
+            ->assertSee('Ampersands & more', escape: false)
+            ->assertDontSee('&amp;amp;', escape: false);
+    });
+
+    it('404s a preview request whose post segment is not numeric', function () {
+        $this->get('/blog/preview/not-a-post-id')
+            ->assertStatus(404);
+    });
+
+    it('offers a way back when a visitor requests a page beyond the last one', function () {
+        Post::factory()->published()->count(3)->create();
+
+        $this->get('/blog?page=99')
+            ->assertStatus(200)
+            ->assertDontSee('No posts yet')
+            ->assertSee('archive only goes up to page 1', escape: false)
+            ->assertSee(route('blog.index'));
+    });
 });
 
 describe('Error handling', function () {

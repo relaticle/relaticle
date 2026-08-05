@@ -56,12 +56,14 @@
                         </a>
                     </li>
                     @endfeature
+                    @feature(App\Features\Blog::class)
                     <li>
                         <a href="{{ route('blog.index') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
                             Blog
                         </a>
                     </li>
+                    @endfeature
                     <li>
                         <a href="{{ url('/#features') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
