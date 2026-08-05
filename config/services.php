@@ -61,4 +61,12 @@ return [
         'key' => env('TURNSTILE_SITE_KEY'),
         'secret' => env('TURNSTILE_SECRET_KEY'),
     ],
+
+    'stripe' => [
+        'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
+        'prices' => [
+            'pro_monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
+            'pro_yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
+        ],
+    ],
 ];

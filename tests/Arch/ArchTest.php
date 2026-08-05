@@ -93,6 +93,10 @@ arch('avoid mutation')
         'App\Filament',
         'App\Health',
         'App\Http\Controllers\Chat',
+        // Extends Cashier's WebhookController — its documented handler
+        // extension point; PHP forbids a readonly class extending a
+        // non-readonly one.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -128,6 +132,9 @@ arch('avoid inheritance')
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
+        // Overrides Cashier's subscription-created handler so an abandoned
+        // checkout does not consume the workspace's generic trial.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',

@@ -24,6 +24,7 @@
         "filament/filament": "^5.0",
         "knuckleswtf/scribe": "^5.8",
         "laravel/ai": "~0.6.8",
+        "laravel/cashier": "^16.5",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
