@@ -11,12 +11,12 @@ final class CategoryPolicy
 {
     public function viewAny(SystemAdministrator $admin): bool
     {
-        return true;
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
     }
 
     public function view(SystemAdministrator $admin): bool
     {
-        return true;
+        return $admin->role === SystemAdministratorRole::SuperAdministrator;
     }
 
     public function create(SystemAdministrator $admin): bool
