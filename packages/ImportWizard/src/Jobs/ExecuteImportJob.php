@@ -351,9 +351,9 @@ final class ExecuteImportJob implements ShouldQueue
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
             $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
 
-            // SafeValueConverter nulls a blank string for every data type except DATE and
-            // DATE_TIME, and PostgreSQL rejects '' for a date/timestamp column.
-            if ($safeValue === '' && $cf->typeData->dataType->isDateOrDateTime()) {
+            // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
+            // rejects a blank string for a date/timestamp column.
+            if (is_string($safeValue) && trim($safeValue) === '' && $cf->typeData->dataType->isDateOrDateTime()) {
                 $safeValue = null;
             }
 
@@ -594,6 +594,8 @@ final class ExecuteImportJob implements ShouldQueue
     private function buildDataFromRow(ImportRow $row, Collection $fieldMappings): array
     {
         return $fieldMappings
+            ->reject(fn (ColumnData $mapping): bool => $row->isValueSkipped($mapping->source)
+                || $row->hasValidationError($mapping->source))
             ->mapWithKeys(fn (ColumnData $mapping): array => [
                 $mapping->target => $row->getFinalValue($mapping->source),
             ])
@@ -601,12 +603,12 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
-     * Every key in $prepared that carries the custom-field prefix originated from
-     * buildDataFromRow(), which only emits keys for columns the row actually mapped —
-     * an unmapped custom field never appears here at all. So presence of the key is
-     * the only "carried" signal; a blank value must still be extracted (and later
-     * written) rather than dropped, or a mapped-but-blank cell would look identical
-     * to a column the row never carried and silently leave a stale value in place.
+     * Presence of a prefixed key is the "carried" signal: buildDataFromRow() emits a key
+     * only for a mapped column the reviewer neither skipped nor left in error — exactly the
+     * two cases where getFinalValue() would have withheld the cell by returning null. So a
+     * blank value here means the row genuinely carried an empty cell and must be extracted
+     * (and later written to clear the field), while an unmapped or withheld column never
+     * appears and leaves the stored value untouched.
      *
      * @param  array<string, mixed>  $prepared
      * @return array<string, mixed>
