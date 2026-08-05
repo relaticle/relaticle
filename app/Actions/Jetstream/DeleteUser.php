@@ -25,10 +25,31 @@ final readonly class DeleteUser implements DeletesUsers
     {
         DB::transaction(function () use ($user): void {
             $this->deleteTeams($user);
+            $this->anonymiseChatParticipation($user);
             $user->deleteProfilePhoto();
             $user->tokens->each->delete();
             $user->delete();
         });
+    }
+
+    /**
+     * Conversations in teams the user merely belonged to survive the purge, and
+     * participant_id carries no foreign key that could null itself on delete.
+     */
+    private function anonymiseChatParticipation(User $user): void
+    {
+        $participant = [
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => $user->getKey(),
+        ];
+
+        $anonymised = [
+            'participant_type' => null,
+            'participant_id' => null,
+        ];
+
+        DB::table('agent_conversations')->where($participant)->update($anonymised);
+        DB::table('agent_conversation_messages')->where($participant)->update($anonymised);
     }
 
     /**
