@@ -192,3 +192,32 @@ it('rejects a webhook with an invalid signature', function (): void {
         ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->exists())->toBeFalse()
         ->and($team->refresh()->plan)->toBe(Plan::Free);
 });
+
+it('rejects an unsigned webhook when no webhook secret is configured', function (): void {
+    config()->set('cashier.webhook.secret', null);
+
+    $team = stripeBillingTeam();
+    $body = json_encode(stripeSubscriptionEvent($team, 'created'), JSON_THROW_ON_ERROR);
+
+    $response = test()->call('POST', '/stripe/webhook', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+    ], $body);
+
+    expect($response->getStatusCode())->toBeGreaterThanOrEqual(400)
+        ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->exists())->toBeFalse()
+        ->and($team->refresh()->plan)->toBe(Plan::Free);
+});
+
+it('does not consume the generic trial when a checkout is abandoned as incomplete', function (): void {
+    $team = stripeBillingTeam();
+    $trialEndsAt = now()->addDays(10)->startOfSecond();
+    $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => $trialEndsAt])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($team, 'created', ['status' => 'incomplete']))->assertSuccessful();
+
+    $team->refresh();
+
+    expect($team->plan)->toBe(Plan::Pro)
+        ->and($team->trial_ends_at?->timestamp)->toBe($trialEndsAt->timestamp)
+        ->and($team->onGenericTrial())->toBeTrue();
+});

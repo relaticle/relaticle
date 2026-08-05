@@ -5,9 +5,7 @@ declare(strict_types=1);
 return [
     'title' => 'Billing',
     'subtitle' => 'Manage Cloud access, billing, and AI usage for this workspace.',
-    'plan_section' => 'Current plan',
     'plans' => [
-        'free' => 'Free',
         'pro' => 'Pro',
         'cloud_pro' => 'Cloud Pro',
         'legacy_free' => 'Legacy Cloud Free',
@@ -22,12 +20,8 @@ return [
         'grandfathered' => 'Grandfathered',
         'managed' => 'Managed',
     ],
-    'current' => 'Current plan',
     'usage' => [
         'title' => 'AI credits this period',
-        'of' => ':used of :allowance used',
-        'count' => ':used / :allowance',
-        'remaining' => ':count left',
         'resets' => 'Resets :date',
     ],
     'trial' => [
@@ -69,9 +63,9 @@ return [
         'button' => 'Upgrade to Pro',
         'unlock' => 'Unlock workspace with Pro',
         'now' => 'Upgrade now instead',
-        'monthly' => '$24 / month',
-        'yearly' => '$228 / year — save 21%',
         'activating' => 'Payment received — activating Pro…',
+        'activation_delayed_title' => 'Activation is taking longer than usual',
+        'activation_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if Pro still is not active.',
     ],
     'subscribe' => [
         'button' => 'Subscribe now',
@@ -80,7 +74,6 @@ return [
         'title' => "You're on Pro",
         'body' => 'Update your payment method, download invoices, or change your plan in the billing portal.',
         'button' => 'Manage subscription',
-        'renews' => 'Renews :date',
         'auto_renews' => 'Renews automatically',
         'cancel_scheduled_title' => 'Cancellation scheduled',
         'cancel_scheduled_body' => 'Cloud Pro stays active until :date. After that, workspace access pauses.',

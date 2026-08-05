@@ -77,6 +77,16 @@ it('starts a trial via the page action', function (): void {
         ->and($team->onGenericTrial())->toBeTrue();
 });
 
+it('refuses a manual trial to a new hosted workspace even when called directly', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
+
+    livewire(Billing::class)->call('startTrial');
+
+    expect($team->refresh()->plan)->toBe(Plan::Free)
+        ->and($team->onGenericTrial())->toBeFalse();
+});
+
 it('shows a graceful error instead of 500 when checkout cannot start', function (): void {
     // No Stripe secret configured in tests → the checkout call throws; the page must
     // catch it, notify, and stay put rather than surfacing a 500.

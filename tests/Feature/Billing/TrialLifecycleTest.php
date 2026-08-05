@@ -132,3 +132,15 @@ it('does not email when the trial is outside the three-day window', function ():
 
     Mail::assertNothingQueued();
 });
+
+it('keeps a sysadmin-granted plan when a stale trial timestamp expires', function (): void {
+    [, $team] = trialOwnerAndTeam();
+    $team->forceFill(['plan' => Plan::Enterprise, 'trial_ends_at' => now()->subDay()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    $team->refresh();
+
+    expect($team->plan)->toBe(Plan::Enterprise)
+        ->and($team->trial_ends_at)->toBeNull();
+});

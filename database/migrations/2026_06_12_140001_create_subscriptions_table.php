@@ -22,6 +22,7 @@ return new class extends Migration
             $table->timestamp('ends_at')->nullable();
             $table->timestamps();
 
+            $table->foreign('team_id')->references('id')->on('teams')->cascadeOnDelete();
             $table->index(['team_id', 'stripe_status']);
         });
     }

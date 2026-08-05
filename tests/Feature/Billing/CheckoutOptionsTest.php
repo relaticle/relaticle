@@ -38,8 +38,12 @@ it('builds monthly checkout options with managed payments enabled', function ():
     config()->set('services.stripe.managed_payments', true);
 
     expect(invokeCheckout('priceId', ['monthly']))->toBe('price_pro_monthly_test')
-        ->and(invokeCheckout('sessionOptions', [checkoutTeam()]))->toHaveKey('managed_payments.enabled', true)
-        ->and(invokeCheckout('sessionOptions', [checkoutTeam()]))->toHaveKey('allow_promotion_codes', true);
+        ->and(invokeCheckout('sessionOptions', [checkoutTeam()]))->toHaveKey('managed_payments.enabled', true);
+});
+
+it('rejects an interval that is not a configured billing period', function (): void {
+    expect(fn (): mixed => invokeCheckout('priceId', ['weekly']))
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('omits managed payments when the switch is off', function (): void {

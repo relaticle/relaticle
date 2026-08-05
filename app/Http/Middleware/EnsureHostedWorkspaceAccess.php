@@ -17,7 +17,7 @@ final readonly class EnsureHostedWorkspaceAccess
     /** @var list<string> */
     private const array SELF_SERVICE_ROUTES = [
         'filament.app.pages.billing',
-        'filament.app.pages.profile',
+        'filament.app.settings.pages.profile',
         'filament.app.pages.access-tokens',
         'filament.app.tenant.profile',
     ];

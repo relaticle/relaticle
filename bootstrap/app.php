@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ValidateSignature;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
+use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
@@ -27,6 +29,14 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
         then: function (): void {
+            // Registered here rather than by Cashier (see AppServiceProvider):
+            // signature verification must apply whether or not the webhook
+            // secret is configured, otherwise an unset secret silently turns
+            // this into an unauthenticated, plan-mutating endpoint.
+            Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
+                ->middleware(VerifyWebhookSignature::class)
+                ->name('cashier.webhook');
+
             $apiDomain = config('app.api_domain');
 
             $routes = Route::middleware('api');
@@ -43,10 +53,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trimStrings(except: [
             'document.*',
-        ]);
-
-        $middleware->validateCsrfTokens(except: [
-            'stripe/*',
         ]);
 
         $middleware->convertEmptyStringsToNull(except: [

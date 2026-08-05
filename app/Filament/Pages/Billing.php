@@ -56,6 +56,14 @@ final class Billing extends Page
 
     public function startTrial(StartProTrial $startProTrial): void
     {
+        // The button is only rendered for a grandfathered workspace, but the
+        // Livewire method is reachable regardless — enforce it server-side.
+        if (! $this->trialAvailable()) {
+            Notification::make()->title(__('billing.trial.not_available'))->danger()->send();
+
+            return;
+        }
+
         try {
             $started = $startProTrial->execute($this->user(), $this->team());
         } catch (AuthorizationException $exception) {
@@ -131,15 +139,26 @@ final class Billing extends Page
             'subscription' => $subscription,
             'pastDue' => $subscription?->pastDue() ?? false,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
-            'trialAvailable' => $isGrandfathered
-                && $team->plan === Plan::Free
-                && $this->user()->pro_trial_used_at === null
-                && ! $team->subscriptions()->exists(),
+            'trialAvailable' => $this->trialAvailable(),
             'hasHostedAccess' => $hasHostedAccess,
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('team_id', $team->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $team->subscribed(),
         ];
+    }
+
+    /**
+     * A manual trial is offered only to a grandfathered workspace — a new
+     * hosted workspace receives its trial automatically at creation.
+     */
+    private function trialAvailable(): bool
+    {
+        $team = $this->team();
+
+        return $team->hosted_free_grandfathered_at !== null
+            && $team->plan === Plan::Free
+            && $this->user()->pro_trial_used_at === null
+            && ! $team->subscriptions()->exists();
     }
 
     private function team(): Team

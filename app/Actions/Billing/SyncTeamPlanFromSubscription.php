@@ -13,6 +13,14 @@ use Relaticle\Chat\Services\CreditService;
 
 final readonly class SyncTeamPlanFromSubscription
 {
+    /**
+     * Stripe statuses a subscription can hold without ever having granted
+     * access — a checkout whose first payment failed or was abandoned.
+     *
+     * @var list<string>
+     */
+    private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
+
     public function __construct(private CreditService $credits) {}
 
     public function execute(Team $team, Subscription $subscription): void
@@ -57,6 +65,18 @@ final readonly class SyncTeamPlanFromSubscription
     {
         if ($subscription->valid()) {
             return $subscriptionPlan;
+        }
+
+        // A subscription that never charged (abandoned or failed checkout) has
+        // granted nothing, so it must not take anything away either.
+        if (in_array($subscription->stripe_status, self::NON_GRANTING_STATUSES, true)) {
+            return null;
+        }
+
+        // A running trial grants the same plan a subscription would, so plan
+        // equality alone cannot prove this subscription is what granted it.
+        if ($team->onGenericTrial()) {
+            return null;
         }
 
         // Only downgrade a plan this subscription granted — a sysadmin-assigned

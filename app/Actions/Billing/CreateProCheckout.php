@@ -9,6 +9,9 @@ use InvalidArgumentException;
 
 final readonly class CreateProCheckout
 {
+    /** @var list<string> */
+    private const array INTERVALS = ['monthly', 'yearly'];
+
     /**
      * Create the hosted Stripe Checkout session and return its redirect URL.
      * Stripe round-trip — covered by the staging E2E checklist, not unit tests.
@@ -25,6 +28,10 @@ final readonly class CreateProCheckout
 
     private function priceId(string $interval): string
     {
+        // $interval arrives from the browser — pin it to the known intervals so
+        // an arbitrary string never reaches a config lookup.
+        throw_unless(in_array($interval, self::INTERVALS, true), InvalidArgumentException::class, "Unsupported billing interval [{$interval}].");
+
         $priceId = config("services.stripe.prices.pro_{$interval}");
 
         throw_if(! is_string($priceId) || $priceId === '', InvalidArgumentException::class, "No Stripe price configured for interval [{$interval}].");
@@ -40,7 +47,6 @@ final readonly class CreateProCheckout
         $options = [
             'success_url' => "{$billingUrl}?checkout=success",
             'cancel_url' => $billingUrl,
-            'allow_promotion_codes' => true,
         ];
 
         if (config('services.stripe.managed_payments')) {

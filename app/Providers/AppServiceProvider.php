@@ -77,6 +77,12 @@ final class AppServiceProvider extends ServiceProvider
         Cashier::useCustomerModel(Team::class);
         Cashier::keepPastDueSubscriptionsActive();
 
+        // Cashier attaches signature verification only when the webhook secret
+        // happens to be set, and also exposes an unauthenticated payment route
+        // this app never links to. Register the webhook ourselves instead so
+        // verification is unconditional — see routes/web.php.
+        Cashier::ignoreRoutes();
+
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them — the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);

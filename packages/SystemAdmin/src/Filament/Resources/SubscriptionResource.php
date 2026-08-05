@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Cashier\Subscription;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
@@ -30,6 +31,12 @@ final class SubscriptionResource extends Resource
     protected static ?string $pluralModelLabel = 'Subscriptions';
 
     protected static ?string $slug = 'billing/subscriptions';
+
+    #[Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with('owner');
+    }
 
     #[Override]
     public static function table(Table $table): Table
