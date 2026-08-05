@@ -126,6 +126,9 @@ arch('avoid mutation')
         // Request-scoped batch_uuid holder — mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
+        // Extends the non-readonly sluggable GenerateSlugAction to hook slug
+        // uniqueness; PHP forbids a readonly class extending a non-readonly one.
+        'App\Support\ReservedSlugAwareGenerateSlugAction',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -156,6 +159,9 @@ arch('avoid inheritance')
         'App\Scribe',
         'App\View',
         'App\Support\ActivityLog\CleanActivityLogAction',
+        // Hooks slug uniqueness by extending sluggable's GenerateSlugAction,
+        // which is the package's documented extension point.
+        'App\Support\ReservedSlugAwareGenerateSlugAction',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

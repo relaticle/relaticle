@@ -13,20 +13,20 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentTeam);
 });
 
-it('does not assemble suggested prompts when panel is closed', function (): void {
+it('assembles starter prompts regardless of panel state when closed', function (): void {
     $component = Livewire::test(ChatSidePanel::class)
-        ->set('suggestedPrompts', [])
+        ->set('starterPrompts', [])
         ->set('isOpen', false)
         ->call('refreshContext');
 
-    expect($component->get('suggestedPrompts'))->toBe([]);
+    expect($component->get('starterPrompts'))->not->toBeEmpty();
 });
 
-it('assembles suggested prompts when panel is open', function (): void {
+it('assembles starter prompts regardless of panel state when open', function (): void {
     $component = Livewire::test(ChatSidePanel::class)
-        ->set('suggestedPrompts', [])
+        ->set('starterPrompts', [])
         ->set('isOpen', true)
         ->call('refreshContext');
 
-    expect($component->get('suggestedPrompts'))->not->toBeEmpty();
+    expect($component->get('starterPrompts'))->not->toBeEmpty();
 });

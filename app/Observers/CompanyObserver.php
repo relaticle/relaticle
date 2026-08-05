@@ -20,7 +20,6 @@ final readonly class CompanyObserver
 
     public function saved(Company $company): void
     {
-        $company->invalidateAiSummary();
         $this->dispatchFaviconFetchIfNeeded($company);
     }
 

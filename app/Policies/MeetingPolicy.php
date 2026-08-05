@@ -19,6 +19,6 @@ final readonly class MeetingPolicy
 
     public function view(User $user, Meeting $meeting): bool
     {
-        return $user->belongsToTeam($meeting->team);
+        return $user->belongsToTeamId($meeting->team_id);
     }
 }

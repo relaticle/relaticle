@@ -19,7 +19,7 @@ final readonly class EmailTemplatePolicy
 
     public function view(User $user, EmailTemplate $template): bool
     {
-        return $user->belongsToTeam($template->team)
+        return $user->belongsToTeamId($template->team_id)
             && ($template->is_shared || $template->created_by === $user->getKey());
     }
 

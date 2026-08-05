@@ -55,7 +55,6 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 | `HasTeam` | Workspace isolation |
 | `HasCreator` | Tracks record creator |
 | `HasNotes` | Polymorphic notes relationship |
-| `HasAiSummary` | AI-generated summaries |
 
 ---
 

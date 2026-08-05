@@ -14,7 +14,7 @@ final class AnthropicModelCheck extends Check
 {
     public function run(): Result
     {
-        $model = config('services.anthropic.summary_model');
+        $model = $this->defaultAnthropicModel();
 
         $result = Result::make()
             ->meta(['model' => $model])
@@ -31,5 +31,34 @@ final class AnthropicModelCheck extends Check
         } catch (Throwable $e) {
             return $result->failed("Anthropic model '{$model}' is unavailable: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * The chat model catalogue is user-selectable, so there is no single
+     * configured model. Health-check the Anthropic entry available on every
+     * plan, which is the one most turns actually use.
+     */
+    private function defaultAnthropicModel(): string
+    {
+        /** @var list<array<string, mixed>> $models */
+        $models = config('chat.models', []);
+
+        foreach ($models as $entry) {
+            if (($entry['provider'] ?? null) !== 'anthropic') {
+                continue;
+            }
+
+            if (($entry['min_plan'] ?? null) !== 'free') {
+                continue;
+            }
+
+            $model = $entry['model'] ?? null;
+
+            if (is_string($model) && $model !== '') {
+                return $model;
+            }
+        }
+
+        return 'claude-sonnet-4-6';
     }
 }

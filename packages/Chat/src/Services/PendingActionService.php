@@ -24,7 +24,6 @@ use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Models\Company;
-use App\Models\Concerns\InvalidatesRelatedAiSummaries;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -405,7 +404,7 @@ final readonly class PendingActionService
         throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in delete batch item');
 
         $model = $modelClass::query()
-            ->with($this->deleteEagerLoads($modelClass))
+            ->with(['team'])
             ->where('team_id', $pendingAction->team_id)
             ->find($recordId);
 
@@ -671,32 +670,11 @@ final readonly class PendingActionService
 
         return array_values(
             $modelClass::query()
-                ->with($this->deleteEagerLoads($modelClass))
+                ->with(['team'])
                 ->where('team_id', $pendingAction->team_id)
                 ->findOrFail($ids)
                 ->all(),
         );
-    }
-
-    /**
-     * Relations to load before deleting so model observers (AI-summary
-     * invalidation) don't trip Model::preventLazyLoading() in dev/test.
-     *
-     * @param  class-string<Model>  $modelClass
-     * @return list<string>
-     */
-    private function deleteEagerLoads(string $modelClass): array
-    {
-        $relations = ['team'];
-
-        if (in_array(InvalidatesRelatedAiSummaries::class, class_uses_recursive($modelClass), true)) {
-            return array_merge($relations, array_values(array_filter(
-                InvalidatesRelatedAiSummaries::summaryRelations(),
-                static fn (string $relation): bool => method_exists($modelClass, $relation),
-            )));
-        }
-
-        return $relations;
     }
 
     /**

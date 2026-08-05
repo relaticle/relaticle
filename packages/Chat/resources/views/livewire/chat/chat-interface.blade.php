@@ -2,6 +2,13 @@
     x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
+    x-on:chat:context-updated.window="
+        pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
+        pageContextLabel = $event.detail.label ?? null;
+        starterPrompts = ($event.detail.prompts && $event.detail.prompts.length) ? $event.detail.prompts : starterPrompts;
+        pageContextDismissed = false;
+        pageContextConsumed = false;
+    "
     data-chat-context="{{ $context ?? 'conversation' }}"
     data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
@@ -31,11 +38,11 @@
                         Ask about your CRM data, or try one of these:
                     </p>
                     <div class="mt-4 flex flex-wrap justify-center gap-2">
-                        <template x-for="prompt in starterPrompts" :key="prompt">
+                        <template x-for="starter in starterPrompts" :key="starter.label">
                             <button
                                 type="button"
-                                x-on:click="input = prompt; localEditor()?.setText(prompt); $nextTick(() => sendMessage())"
-                                x-text="prompt"
+                                x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
+                                x-text="starter.label"
                                 class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                             ></button>
                         </template>
@@ -73,6 +80,18 @@
                                     >
                                         <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
                                     </div>
+                                </template>
+
+                                {{-- Grounding trace: the record this message was bound to. --}}
+                                <template x-if="msg.page_context && !msg.editing">
+                                    <a
+                                        :href="msg.page_context.url || '#'"
+                                        :class="msg.page_context.url ? '' : 'pointer-events-none'"
+                                        class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 ring-1 ring-primary-600/20 transition hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20"
+                                    >
+                                        <x-heroicon-m-at-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span class="truncate" x-text="msg.page_context.label"></span>
+                                    </a>
                                 </template>
 
                                 <template x-if="msg.editing">
@@ -426,6 +445,29 @@
                 </div>
             </template>
 
+            {{-- Ambient context: the record the assistant treats as "this". Dismissible —
+                 the record is only sent while this is visible. --}}
+            <div
+                x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed && !pageContextConsumed"
+                x-cloak
+                class="mb-2 flex items-center gap-1.5 text-xs"
+            >
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-primary-50 px-2 py-1 font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/30">
+                    <span class="shrink-0" x-html="pageContextIcon()"></span>
+
+                    <span class="truncate" x-text="pageContextLabel"></span>
+
+                    <button
+                        type="button"
+                        x-on:click="pageContextDismissed = true"
+                        x-bind:aria-label="'Stop referring to ' + pageContextLabel"
+                        class="-me-0.5 shrink-0 rounded p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
+                    >
+                        <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                </span>
+            </div>
+
             <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
@@ -505,7 +547,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     isStreaming: false,
     channel: null,
     streamTimeoutId: null,
-    streamTimeoutMs: 60000,
+    // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
+    // long with no stream event, reconcile the turn from the DB. It MUST exceed the
+    // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
+    // (Ollama/qwen3-class "thinking" models emit no client-visible delta during their
+    // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
+    // for a reply that is still generating server-side and does persist.
+    streamTimeoutMs: 125000,
     prependScrollAnchor: null,
     streamAbortController: null,
     currentToolStatus: null,
@@ -513,12 +561,19 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     copyTickerId: null,
     currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
     currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-    allowedModels: @js(
-        collect((auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())->allowedModels())
-            ->map(fn ($m) => $m->value)
-            ->all()
-    ),
+    allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
     selectedModel: 'auto',
+    pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
+    pageContextLabel: @js($pageContextLabel),
+    // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
+    // applies to the record you dismissed it on, not to every record afterwards.
+    pageContextDismissed: false,
+    // The pill behaves like a pre-filled attachment: it attaches to the NEXT message
+    // only, then this flips true and the pill disappears — subsequent messages carry
+    // no page_context until the bound record actually changes. Distinct from
+    // pageContextDismissed (explicit "stop referring to this"): chat:context-updated
+    // resets both, but only dismissal is a user action.
+    pageContextConsumed: false,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -571,6 +626,36 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
         }
         return m;
+    },
+
+    // Snapshot of the record this message is bound to, in the same shape
+    // ListConversationMessages returns after a reload — the optimistic bubble
+    // and the reloaded one must render identically. `url` isn't resolvable
+    // client-side, so the chip falls back to its non-clickable branch until
+    // a reload fills it in from the server.
+    activePageContext() {
+        if (this.pageContextDismissed || this.pageContextConsumed || !this.pageContext?.type || !this.pageContext?.id) {
+            return null;
+        }
+
+        return {
+            type: this.pageContext.type,
+            id: this.pageContext.id,
+            label: this.pageContextLabel || this.pageContext.id,
+            url: null,
+        };
+    },
+
+    pageContextIcon() {
+        const icons = {
+            company: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 16.5v-13h-.25a.75.75 0 0 1 0-1.5h12.5a.75.75 0 0 1 0 1.5H16v13h.25a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75v-2.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v2.5a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5H4Zm3-11a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 5.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 8.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 8.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 11.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z" clip-rule="evenodd" /></svg>',
+            people: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" /></svg>',
+            opportunity: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 10.818v2.614A3.13 3.13 0 0 0 11.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 0 0-1.138-.432ZM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 0 0-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.202.592.037.051.08.102.128.152Z" /><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-6a.75.75 0 0 1 .75.75v.316a3.78 3.78 0 0 1 1.653.713c.426.33.744.74.925 1.2a.75.75 0 0 1-1.395.55 1.35 1.35 0 0 0-.447-.563 2.187 2.187 0 0 0-.736-.363V9.3c.698.093 1.383.32 1.891.66.533.359 1.017.937 1.017 1.723 0 .74-.4 1.32-.923 1.709a3.945 3.945 0 0 1-1.985.752v.316a.75.75 0 0 1-1.5 0v-.316a3.76 3.76 0 0 1-1.79-.813 3.187 3.187 0 0 1-.933-1.216.75.75 0 1 1 1.38-.59c.09.211.224.4.394.552.28.25.63.418 1 .486V9.7a3.68 3.68 0 0 1-1.786-.756C7.185 8.581 6.75 8 6.75 7.25c0-.79.44-1.377.972-1.79a3.712 3.712 0 0 1 1.528-.694V4.75A.75.75 0 0 1 10 4Z" clip-rule="evenodd" /></svg>',
+            task: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>',
+            note: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25ZM6 6.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 6.25Zm.75 3.25a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6 13.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>',
+        };
+
+        return icons[this.pageContext?.type] ?? icons.company;
     },
 
     localEditor() {
@@ -651,17 +736,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return this.mintAssistantStub({ invocationId });
     },
 
-    modelOptions: [
-        { value: 'auto', label: 'Auto', provider: null },
-        { value: 'claude-sonnet', label: 'Sonnet 4.6', provider: 'anthropic' },
-        { value: 'claude-opus', label: 'Opus 4.7', provider: 'anthropic' },
-        { value: 'gpt-5-5', label: 'GPT 5.5', provider: 'openai' },
-        { value: 'gpt-5-4', label: 'GPT 5.4', provider: 'openai' },
-    ],
+    modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 
     providerIcons: @js([
         'anthropic' => svg('ri-claude-fill')->toHtml(),
         'openai' => svg('ri-openai-fill')->toHtml(),
+        'ollama' => svg('ri-server-line')->toHtml(),
+        'selfhosted' => svg('ri-server-line')->toHtml(),
     ]),
 
     providerIconHtml(provider) {
@@ -673,6 +754,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return ({
             anthropic: 'text-[#D4763C]',
             openai: 'text-gray-900 dark:text-gray-200',
+            ollama: 'text-gray-500 dark:text-gray-400',
+            selfhosted: 'text-gray-500 dark:text-gray-400',
         })[provider] || '';
     },
 
@@ -697,12 +780,14 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
     },
 
-    starterPrompts: [
-        'Give me a CRM overview',
-        'Show overdue tasks',
-        'Recent companies',
-        'Pipeline summary',
-    ],
+    // Record-aware when the side panel supplies them (so the chips name the record
+    // you are looking at); generic fallback on the full-page chat, which has no record.
+    starterPrompts: @js($contextPrompts !== [] ? $contextPrompts : [
+        ['label' => 'Give me a CRM overview', 'prompt' => 'Give me a CRM overview'],
+        ['label' => 'Show overdue tasks', 'prompt' => 'Show overdue tasks'],
+        ['label' => 'Recent companies', 'prompt' => 'Recent companies'],
+        ['label' => 'Pipeline summary', 'prompt' => 'Pipeline summary'],
+    ]),
 
     autosize(el) {
         el.style.height = 'auto';
@@ -973,33 +1058,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             }),
         ];
 
-        // Pre-seed a mention chip when "Ask about this" action stores a mention
-        // in sessionStorage before opening the side panel. The chat:focus-editor
-        // event fires after the panel becomes visible and the editor is mounted.
-        this.mentionHandler = (e) => {
-            if (e.detail?.context !== this.context) return;
-            try {
-                const raw = sessionStorage.getItem('chat:mention');
-                if (!raw) return;
-                sessionStorage.removeItem('chat:mention');
-                const m = JSON.parse(raw);
-                if (!m?.type || !m?.id || !m?.label) return;
-                this.$nextTick(() => {
-                    this.localEditor()?.setDocument?.({
-                        type: 'doc',
-                        content: [{
-                            type: 'paragraph',
-                            content: [{
-                                type: 'mention',
-                                attrs: { type: m.type, id: m.id, label: m.label },
-                            }],
-                        }],
-                    });
-                    this.localEditor()?.focus?.();
-                });
-            } catch (_) { /* sessionStorage unavailable or malformed payload */ }
-        };
-        window.addEventListener('chat:focus-editor', this.mentionHandler);
     },
 
     loadEarlier() {
@@ -1077,7 +1135,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
         window.removeEventListener('keydown', this.approvalKeyHandler);
-        window.removeEventListener('chat:focus-editor', this.mentionHandler);
         (this._proposalListeners || []).forEach((off) => typeof off === 'function' && off());
     },
 
@@ -1497,10 +1554,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         const isFirstMessage = !this.conversationId;
         const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
+        // Captured once per send: the pill attaches to THIS message only. Both the
+        // optimistic bubble below and the request payload further down must read
+        // the SAME snapshot — re-reading activePageContext() after the consumed
+        // flag flips would silently drop it from the outgoing request.
+        const contextForSend = this.activePageContext();
 
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
-            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+            this.pageContextConsumed = true;
             this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
@@ -1586,6 +1649,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         document: payload,
                         conversation_id: newId,
                         model: this.selectedModel,
+                        page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -1639,7 +1703,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         const nowIso = new Date().toISOString();
-        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+        this.pageContextConsumed = true;
         this.localEditor()?.clear();
         this.input = '';
         this.currentToolStatus = null;
@@ -1666,6 +1731,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     document: payload,
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
+                    page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                 }),
                 signal: this.streamAbortController.signal,
             });

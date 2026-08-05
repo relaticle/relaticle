@@ -21,13 +21,14 @@ use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
-use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
+use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 
@@ -36,15 +37,25 @@ final readonly class ChatController
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
+        private ModelRegistry $registry,
         private TipTapDocumentParser $documentParser,
     ) {}
+
+    /** @return list<string> */
+    private function modelIds(): array
+    {
+        return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
+    }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
+            'page_context' => ['nullable', 'array'],
+            'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
+            'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
         ]);
 
         /** @var User $user */
@@ -79,17 +90,17 @@ final readonly class ChatController
             403
         );
 
-        if (filled($validated['model'] ?? null) && $validated['model'] !== AiModel::Auto->value) {
-            $requestedModel = AiModel::from($validated['model']);
+        if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
+            $descriptor = $this->registry->find($validated['model']);
 
-            if (! $team->plan->allowsModel($requestedModel)) {
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($team->plan)) {
                 $isFree = $team->plan === Plan::Free;
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => "The {$requestedModel->label()} model is not available on the {$team->plan->label()} plan.",
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->label()]),
                     'plan' => $team->plan->value,
-                    'requested_model' => $requestedModel->value,
+                    'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
                     'upgrade_url' => $isFree ? url('/app/billing') : null,
                 ], 403);
@@ -147,6 +158,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
+            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
             turnId: $turnId,
         ));
 
@@ -156,11 +168,66 @@ final readonly class ChatController
         ]);
     }
 
+    /**
+     * Resolve the record the user was viewing when they sent the message.
+     *
+     * The client payload is untrusted: it names a type and id, and nothing
+     * more. Both are re-resolved here under team scope and the view policy,
+     * exactly as BaseReadShowTool does, so a forged id for another team's
+     * record yields null rather than leaking a label.
+     *
+     * @param  array<string, mixed>|null  $payload
+     * @return array{type: string, id: string, label: string}|null
+     */
+    private function resolvePageContext(?array $payload, User $user): ?array
+    {
+        if ($payload === null) {
+            return null;
+        }
+
+        $type = $payload['type'] ?? null;
+        $id = $payload['id'] ?? null;
+
+        if (! is_string($type) || ! is_string($id) || $type === '' || $id === '') {
+            return null;
+        }
+
+        $modelClass = match ($type) {
+            'company' => Company::class,
+            'people' => People::class,
+            'opportunity' => Opportunity::class,
+            'task' => Task::class,
+            'note' => Note::class,
+            default => null,
+        };
+
+        if ($modelClass === null) {
+            return null;
+        }
+
+        $record = $modelClass::query()
+            ->whereBelongsTo($user->currentTeam)
+            ->whereKey($id)
+            ->first();
+
+        if ($record === null || $user->cannot('view', $record)) {
+            return null;
+        }
+
+        $label = $record->getAttribute('name') ?? $record->getAttribute('title');
+
+        return [
+            'type' => $type,
+            'id' => (string) $record->getKey(),
+            'label' => is_string($label) ? $label : '(unnamed)',
+        ];
+    }
+
     public function createConversation(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
         ]);
 
         /** @var User $user */
@@ -312,7 +379,6 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (People $r): bool => $user->can('view', $r))
                 ->values()
@@ -327,7 +393,6 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Company $r): bool => $user->can('view', $r))
                 ->values()
@@ -342,7 +407,6 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Opportunity $r): bool => $user->can('view', $r))
                 ->values()
@@ -357,7 +421,6 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(title) ASC')
                 ->orderBy('title')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Task $r): bool => $user->can('view', $r))
                 ->values()
@@ -372,7 +435,6 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(title) ASC')
                 ->orderBy('title')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Note $r): bool => $user->can('view', $r))
                 ->values()

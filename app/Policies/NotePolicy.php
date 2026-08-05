@@ -20,7 +20,7 @@ final readonly class NotePolicy
 
     public function view(User $user, Note $note): bool
     {
-        return $user->belongsToTeam($note->team);
+        return $user->belongsToTeamId($note->team_id);
     }
 
     public function create(User $user): bool
@@ -30,12 +30,12 @@ final readonly class NotePolicy
 
     public function update(User $user, Note $note): bool
     {
-        return $user->belongsToTeam($note->team);
+        return $user->belongsToTeamId($note->team_id);
     }
 
     public function delete(User $user, Note $note): bool
     {
-        return $user->belongsToTeam($note->team);
+        return $user->belongsToTeamId($note->team_id);
     }
 
     public function deleteAny(User $user): bool
@@ -45,7 +45,7 @@ final readonly class NotePolicy
 
     public function restore(User $user, Note $note): bool
     {
-        return $user->belongsToTeam($note->team);
+        return $user->belongsToTeamId($note->team_id);
     }
 
     public function restoreAny(User $user): bool

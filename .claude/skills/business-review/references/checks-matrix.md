@@ -56,7 +56,6 @@ When `change_types` includes `mutation`, `form`, or `table` on a resource path, 
 | Bulk delete | Select N rows, trigger bulk delete | All N rows removed in single action | deterministic |
 | Audit trail (activity log) | After any write, check `activity_log` table | New entry references the record + acting user | deterministic |
 | Custom fields preserved | Edit record with custom fields populated | Custom field values round-trip on save | deterministic |
-| AI summary regenerate | If model uses `AiSummary`, trigger regenerate | New summary row; old credit balance debited correctly | deterministic |
 
 ---
 
