@@ -27,6 +27,10 @@ return [
             'label' => 'Task Assignments',
             'description' => 'Notify me when I\'m assigned a task.',
         ],
+        'task_digest' => [
+            'label' => 'Daily Digest',
+            'description' => 'Notify me every morning about tasks overdue and due today.',
+        ],
     ],
 
     'saved' => 'Notification preferences updated.',
