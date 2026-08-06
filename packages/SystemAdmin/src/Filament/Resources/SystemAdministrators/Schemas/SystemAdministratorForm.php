@@ -50,7 +50,7 @@ final class SystemAdministratorForm
                         TextInput::make('password')
                             ->password()
                             ->dehydrateStateUsing(fn (?string $state): ?string => in_array($state, [null, '', '0'], true) ? null : Hash::make($state))
-                            ->dehydrated(filled(...))
+                            ->dehydrated(fn (?string $state): bool => filled($state))
                             ->required(fn (Get $get): bool => ! $get('id'))
                             ->maxLength(255)
                             ->confirmed()

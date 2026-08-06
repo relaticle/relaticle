@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use Filament\Actions\BulkActionGroup;
@@ -13,9 +15,11 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
@@ -72,12 +76,38 @@ final class UserResource extends Resource
                 TextInput::make('password')
                     ->password()
                     ->maxLength(255)
-                    ->dehydrated(filled(...))
+                    ->dehydrated(fn (?string $state): bool => filled($state))
                     ->required(fn (string $operation): bool => $operation === 'create'),
                 Select::make('current_team_id')
                     ->searchable()
                     ->relationship('currentTeam', 'name'),
+                Section::make('Notifications')
+                    ->description('Overrides what this user receives. Mirrors their own notification settings page.')
+                    ->schema(self::notificationPreferenceFields())
+                    ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * @return array<int, Fieldset>
+     */
+    private static function notificationPreferenceFields(): array
+    {
+        return array_map(
+            fn (NotificationType $type): Fieldset => Fieldset::make($type->label())
+                ->schema(array_map(
+                    fn (NotificationChannel $channel): Toggle => Toggle::make(
+                        "notification_preferences.{$type->value}.{$channel->value}"
+                    )
+                        ->label($channel->label())
+                        ->formatStateUsing(
+                            fn (?User $record): bool => $record?->wantsNotification($type, $channel)
+                                ?? $type->defaultEnabled($channel)
+                        ),
+                    $type->channels(),
+                )),
+            NotificationType::cases(),
+        );
     }
 
     #[Override]
