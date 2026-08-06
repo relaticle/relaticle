@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
+use App\Support\DetectsPublicMarkdownRequest;
 use Spatie\MarkdownResponse\Actions\GeneratesCacheKey;
 use Spatie\MarkdownResponse\Postprocessors\CollapseBlankLinesPostprocessor;
 use Spatie\MarkdownResponse\Postprocessors\RemoveHtmlTagsPostprocessor;
@@ -25,10 +25,10 @@ return [
 
         /*
          * The class responsible for detecting whether a request wants
-         * a markdown response. You can extend the default class to
-         * customize the detection logic.
+         * a markdown response. Ours declines on access-gated routes, whose
+         * responses the middleware must not cache or replay.
          */
-        'detector' => DetectsMarkdownRequest::class,
+        'detector' => DetectsPublicMarkdownRequest::class,
 
         /*
          * When enabled, requests with an `Accept: text/markdown` header

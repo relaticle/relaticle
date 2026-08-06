@@ -49,7 +49,9 @@ return [
     'publisher' => [
         'name' => 'Relaticle',
         'url' => 'https://relaticle.com',
-        'logo' => 'images/logo.png',
+        // Must resolve to a real, fetchable raster image: Google drops the whole
+        // Article rich result when the publisher logo 404s.
+        'logo' => 'web-app-manifest-512x512.png',
     ],
 
     'tables' => [

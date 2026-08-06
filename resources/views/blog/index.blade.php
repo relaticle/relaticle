@@ -8,12 +8,24 @@
         isset($tag) => 'Posts tagged "'.$tag->name.'" from the Relaticle engineering team.',
         default => 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.',
     };
+
+    // Listings paginate, so page 2+ must self-canonicalise or a post reachable only
+    // from there has no canonical page pointing at it. Only `page` is carried over —
+    // search and tracking params stay out. Search results are noindex,follow: they
+    // are an infinite, low-value URL space that should not be indexed.
+    $searchQuery = request()->query('q');
+    $currentPage = (int) request()->query('page', 1);
+    $canonical = $currentPage > 1
+        ? url()->current().'?page='.$currentPage
+        : url()->current();
 @endphp
 
 <x-guest-layout
     :title="$title"
     :description="$description"
-    :ogTitle="$title">
+    :ogTitle="$title"
+    :canonical="$canonical"
+    :robots="$searchQuery ? 'noindex,follow' : null">
     @push('header')
         <x-ink::feed-link />
     @endpush
@@ -50,6 +62,15 @@
                            class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
                             <x-ri-arrow-left-line class="w-4 h-4" />
                             Back to the first page
+                        </a>
+                    @elseif($searchQuery || isset($category) || isset($tag))
+                        {{-- total() counts the filtered set, so "no posts yet" would be a
+                             lie here: the archive has posts, this filter just matched none. --}}
+                        <p class="text-gray-500 dark:text-gray-400">Nothing matched. Try another search or browse everything.</p>
+                        <a href="{{ route('blog.index') }}"
+                           class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
+                            <x-ri-arrow-left-line class="w-4 h-4" />
+                            All posts
                         </a>
                     @else
                         <p class="text-gray-500 dark:text-gray-400">No posts yet. Check back soon.</p>

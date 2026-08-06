@@ -7,6 +7,15 @@
 @import "./fonts.css";
 @import "./theme.css";
 
+/*
+ * The blog renders through ink's Blade components, but /vendor is gitignored and
+ * Tailwind v4's automatic source detection skips ignored paths — so the classes
+ * that only ever appear in those components (the whole prose-* wrapper on the
+ * post body, the amber draft-preview banner) were missing from the built CSS.
+ * Broken in production, invisible in `npm run dev`, where the JIT rescans.
+ */
+@source "../../vendor/relaticle/ink/resources/views";
+
 [x-cloak] {
     display: none !important;
 }

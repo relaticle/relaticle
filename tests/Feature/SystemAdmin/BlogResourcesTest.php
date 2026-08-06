@@ -7,6 +7,9 @@ use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Laravel\Jetstream\Contracts\DeletesUsers;
 use Relaticle\Ink\Filament\Resources\CategoryResource;
 use Relaticle\Ink\Filament\Resources\CategoryResource\Pages\ListCategories;
 use Relaticle\Ink\Filament\Resources\PostResource;
@@ -50,6 +53,37 @@ it('leaves filament tenant scoping enabled for the crm resources', function (): 
     expect(CompanyResource::isScopedToTenant())->toBeTrue()
         ->and(PeopleResource::isScopedToTenant())->toBeTrue()
         ->and(TaskResource::isScopedToTenant())->toBeTrue();
+});
+
+it('keeps published posts when the account that authored them is deleted', function (): void {
+    // Ink ships author_id as ON DELETE CASCADE. Users are hard-deleted (no SoftDeletes)
+    // by app:purge-scheduled-deletions on a daily schedule, so an author closing their
+    // account silently took the company's marketing content with it.
+    $author = User::factory()->withPersonalTeam()->create();
+    $post = Post::factory()->published()->create(['author_id' => $author->id]);
+
+    app(DeletesUsers::class)->delete($author);
+
+    expect(Post::query()->whereKey($post->id)->exists())->toBeTrue()
+        ->and(Post::query()->whereKey($post->id)->value('author_id'))->toBeNull();
+});
+
+it('allows only one seo row per post', function (): void {
+    $post = Post::factory()->published()->create();
+
+    expect(fn () => $post->addSEO())->toThrow(QueryException::class);
+});
+
+it('cleans up the seo row when a post is force deleted but keeps it on a soft delete', function (): void {
+    $post = Post::factory()->published()->create();
+
+    $post->delete();
+
+    expect(DB::table('seo')->where('model_id', $post->id)->exists())->toBeTrue();
+
+    $post->forceDelete();
+
+    expect(DB::table('seo')->where('model_id', $post->id)->exists())->toBeFalse();
 });
 
 it('denies blog authoring to a signed-in customer', function (): void {

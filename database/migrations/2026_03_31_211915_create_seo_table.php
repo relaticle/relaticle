@@ -13,7 +13,12 @@ return new class extends Migration
         Schema::create('seo', function (Blueprint $table): void {
             $table->id();
 
+            // One SEO row per model. HasSEO::addSEO() is public and also fires on
+            // `created`, and morphOne()->withDefault() silently returns the first
+            // match — so a duplicate would let the panel edit one row while the
+            // site renders another, with nothing to surface the split.
             $table->morphs('model');
+            $table->unique(['model_type', 'model_id']);
 
             $table->longText('description')->nullable();
             $table->string('title')->nullable();

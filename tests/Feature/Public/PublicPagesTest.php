@@ -2,21 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Blog\BlogCategoryController;
-use App\Http\Controllers\Blog\BlogFeedController;
-use App\Http\Controllers\Blog\BlogPreviewController;
-use App\Http\Controllers\BlogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Models\User;
+use App\Support\DetectsPublicMarkdownRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
 
-mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, BlogController::class, BlogCategoryController::class, BlogFeedController::class, BlogPreviewController::class);
+mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, DetectsPublicMarkdownRequest::class);
 
 beforeEach(function () {
     Http::fake([
@@ -356,6 +353,78 @@ describe('Blog pages', function () {
             ->assertSee('<link rel="canonical" href="'.url('/blog').'" />', false);
     });
 
+    it('leaves the canonical on non-paginating marketing pages query-free', function (string $path) {
+        // The page-aware canonical belongs to the blog listing, not to the shared
+        // guest layout: a crawler-discovered ?page=N on pricing or the homepage
+        // used to self-canonicalise into an indexable duplicate.
+        $this->get($path.'?page=7')
+            ->assertStatus(200)
+            ->assertSee('<link rel="canonical" href="'.url($path).'" />', false);
+    })->with(['/pricing', '/terms-of-service', '/privacy-policy']);
+
+    it('marks blog search results noindex but leaves the plain listing indexable', function () {
+        $this->get('/blog?q=laravel')
+            ->assertStatus(200)
+            ->assertSee('<meta name="robots" content="noindex,follow">', false);
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertDontSee('name="robots"', false);
+    });
+
+    it('emits exactly one canonical and one og:type on a post page', function () {
+        $post = Post::factory()->published()->create();
+
+        $html = $this->get("/blog/{$post->slug}")->assertStatus(200)->getContent();
+
+        expect(substr_count($html, '<link rel="canonical"'))->toBe(1)
+            ->and(substr_count($html, 'property="og:type"'))->toBe(1)
+            ->and(substr_count($html, 'property="og:title"'))->toBe(1)
+            ->and(substr_count($html, 'name="twitter:card"'))->toBe(1)
+            ->and($html)->toContain('<meta property="og:type" content="article" />');
+    });
+
+    it('lets the panel SEO fields override the post title and excerpt', function () {
+        $post = Post::factory()->published()->create([
+            'title' => 'Original Title',
+            'excerpt' => 'Original excerpt.',
+        ]);
+        $post->seo->update(['title' => 'Search Title', 'description' => 'Search description.']);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee('<meta property="og:title" content="Search Title"/>', false)
+            ->assertSee('<meta name="description" content="Search description.">', false);
+    });
+
+    it('falls back to the post body when a post has no excerpt or SEO description', function () {
+        $post = Post::factory()->published()->create([
+            'excerpt' => null,
+            'content' => 'A distinctive sentence that should end up in the meta description.',
+        ]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee('<meta property="og:description" content="A distinctive sentence that should end up in the meta description."/>', false)
+            ->assertDontSee('<meta property="og:description" content=""/>', false);
+    });
+
+    it('says nothing matched, not "no posts yet", when a filter comes up empty', function () {
+        Post::factory()->published()->count(3)->create();
+
+        $this->get('/blog?q=zzzznomatchzzzz')
+            ->assertStatus(200)
+            ->assertSee('Nothing matched')
+            ->assertDontSee('No posts yet');
+
+        $emptyCategory = Category::factory()->create();
+
+        $this->get("/blog/category/{$emptyCategory->slug}")
+            ->assertStatus(200)
+            ->assertSee('Nothing matched')
+            ->assertDontSee('No posts yet');
+    });
+
     it('does not display draft posts on the index', function () {
         $post = Post::factory()->draft()->create();
 
@@ -498,6 +567,35 @@ describe('Blog pages', function () {
             ->get(URL::temporarySignedRoute('blog.preview', now()->addHour(), ['post' => $post]))
             ->assertStatus(200)
             ->assertSee($post->title);
+    });
+
+    it('stops honouring a preview link once its signature expires, even as markdown', function () {
+        // ProvideMarkdownResponse serves a cached body without calling $next(), so a
+        // markdown hit used to skip ValidateSignature entirely and keep serving the
+        // draft for the rest of the 1h cache TTL. AI crawler user agents are detected
+        // as markdown requests, so ordinary crawl traffic warmed that cache.
+        $post = Post::factory()->draft()->create(['content' => 'Unpublished body copy.']);
+
+        $url = URL::temporarySignedRoute('blog.preview', now()->addHour(), ['post' => $post]);
+
+        // Warm the cache late in the signature window: the 1h cache TTL starts here,
+        // so it outlives the signature by 59 minutes.
+        $this->travel(59)->minutes();
+        $this->get($url, ['Accept' => 'text/markdown'])->assertStatus(200);
+
+        $this->travel(2)->minutes();
+
+        $this->get($url, ['Accept' => 'text/markdown'])->assertStatus(403);
+        $this->get($url, ['User-Agent' => 'ClaudeBot/1.0'])->assertStatus(403);
+    });
+
+    it('still serves markdown for published posts, which are ungated', function () {
+        $post = Post::factory()->published()->create();
+
+        $response = $this->get("/blog/{$post->slug}", ['Accept' => 'text/markdown'])
+            ->assertStatus(200);
+
+        expect($response->headers->get('Content-Type'))->toStartWith('text/markdown');
     });
 
     it('404s a preview request whose post segment is not numeric', function () {

@@ -141,6 +141,11 @@ final class AppServiceProvider extends ServiceProvider
         Ink::resolvePreviewEditUrlUsing(fn (Post $post): ?string => auth('sysadmin')->check()
             ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
             : null);
+
+        // HasSEO creates a row per post but never removes it. A soft delete should
+        // keep it — the post can come back — but a force delete from the panel
+        // would otherwise leave the seo row behind for good.
+        Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
     }
 
     /**
