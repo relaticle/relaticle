@@ -59,6 +59,10 @@ use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\Ink\Filament\Resources\PostResource;
+use Relaticle\Ink\Ink;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
@@ -73,6 +77,12 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
+
+        // Ink registers its public routes from packageBooted(), which runs after every
+        // provider's register(). Read the config key App\Features\Blog resolves from
+        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
+        // bound this early. Same source of truth, so the flag stays the single switch.
+        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
 
         Cashier::useCustomerModel(Team::class);
         Cashier::keepPastDueSubscriptionsActive();
@@ -118,6 +128,24 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureScribe();
 
         $this->configureActivityLog();
+        $this->configureBlog();
+    }
+
+    /**
+     * The blog admin lives in the sysadmin panel, which has no tenancy, so only a
+     * signed-in system administrator gets an edit link on a draft preview. Which
+     * panel and guard own the admin is ours to decide, not the package's.
+     */
+    private function configureBlog(): void
+    {
+        Ink::resolvePreviewEditUrlUsing(fn (Post $post): ?string => auth('sysadmin')->check()
+            ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
+            : null);
+
+        // HasSEO creates a row per post but never removes it. A soft delete should
+        // keep it — the post can come back — but a force delete from the panel
+        // would otherwise leave the seo row behind for good.
+        Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
     }
 
     /**
@@ -309,6 +337,8 @@ final class AppServiceProvider extends ServiceProvider
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
+            'blog_post' => Post::class,
+            'blog_category' => Category::class,
         ]);
 
         // Use custom models for custom-fields package

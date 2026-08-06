@@ -116,6 +116,9 @@ arch('avoid mutation')
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // Same shape: laravel-markdown-response resolves its detector through an
+        // is_a() check against its own class, so extending it is mandatory.
+        'App\Support\DetectsPublicMarkdownRequest',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -152,6 +155,9 @@ arch('avoid inheritance')
         // Hooks slug uniqueness by extending sluggable's GenerateSlugAction,
         // which is the package's documented extension point.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // laravel-markdown-response validates the configured detector with
+        // is_a($class, DetectsMarkdownRequest::class), so it must extend it.
+        'App\Support\DetectsPublicMarkdownRequest',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

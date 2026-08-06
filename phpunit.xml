@@ -56,5 +56,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
+        <env name="RELATICLE_FEATURE_BLOG" value="true"/>
     </php>
 </phpunit>
