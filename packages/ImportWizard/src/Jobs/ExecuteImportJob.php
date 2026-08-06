@@ -353,7 +353,7 @@ final class ExecuteImportJob implements ShouldQueue
 
             // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
             // rejects a blank string for a date/timestamp column.
-            if (is_string($safeValue) && trim($safeValue) === '' && $cf->typeData->dataType->isDateOrDateTime()) {
+            if (is_string($safeValue) && blank($safeValue) && $cf->typeData->dataType->isDateOrDateTime()) {
                 $safeValue = null;
             }
 
@@ -588,14 +588,18 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
+     * Emit a key only for a mapped column whose cell the row actually carried, so that key
+     * presence downstream means "carried" and a blank value means "carried empty" rather
+     * than "withheld". Without the reject, a skipped or errored cell would arrive as null
+     * and read as an instruction to clear the field.
+     *
      * @param  Collection<int, ColumnData>  $fieldMappings
      * @return array<string, mixed>
      */
     private function buildDataFromRow(ImportRow $row, Collection $fieldMappings): array
     {
         return $fieldMappings
-            ->reject(fn (ColumnData $mapping): bool => $row->isValueSkipped($mapping->source)
-                || $row->hasValidationError($mapping->source))
+            ->reject(fn (ColumnData $mapping): bool => $row->isValueWithheld($mapping->source))
             ->mapWithKeys(fn (ColumnData $mapping): array => [
                 $mapping->target => $row->getFinalValue($mapping->source),
             ])
@@ -603,13 +607,6 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
-     * Presence of a prefixed key is the "carried" signal: buildDataFromRow() emits a key
-     * only for a mapped column the reviewer neither skipped nor left in error — exactly the
-     * two cases where getFinalValue() would have withheld the cell by returning null. So a
-     * blank value here means the row genuinely carried an empty cell and must be extracted
-     * (and later written to clear the field), while an unmapped or withheld column never
-     * appears and leaves the stored value untouched.
-     *
      * @param  array<string, mixed>  $prepared
      * @return array<string, mixed>
      */
