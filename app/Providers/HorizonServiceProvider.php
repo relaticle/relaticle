@@ -28,9 +28,24 @@ final class HorizonServiceProvider extends HorizonApplicationServiceProvider
      * Register the Horizon gate.
      *
      * This gate determines who can access Horizon in non-local environments.
+     * The allowlist comes from HORIZON_ADMIN_EMAILS and defaults to empty, so
+     * a deployment that has not opted anyone in denies everyone.
      */
     protected function gate(): void
     {
-        Gate::define('viewHorizon', fn (User $user): bool => $user->email === 'manuk.minasyan1@gmail.com');
+        Gate::define('viewHorizon', function (User $user): bool {
+            /** @var array<int, string> $adminEmails */
+            $adminEmails = config('relaticle.horizon.admin_emails', []);
+
+            if ($adminEmails === []) {
+                return false;
+            }
+
+            return in_array(
+                mb_strtolower($user->email),
+                array_map(mb_strtolower(...), $adminEmails),
+                strict: true,
+            );
+        });
     }
 }
