@@ -27,8 +27,12 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      * The filter lives here rather than in a getLatestConversationMessages()
      * override so that history rebuilding — attachment rehydration, paused
      * tool-turn reconstruction, approval-result bookkeeping — stays owned by
-     * the parent and cannot drift from it. Wheres are ignored by insert(),
-     * so writes are unaffected.
+     * the parent and cannot drift from it.
+     *
+     * Inserts are unaffected (insert() ignores wheres), but the approval-result
+     * update in DatabaseConversationStore::storeApprovalResults() does go
+     * through here, so a superseded turn cannot have approvals written back to
+     * it — deliberate, and consistent with its lookup query being filtered too.
      */
     protected function table(string $table): Builder
     {
