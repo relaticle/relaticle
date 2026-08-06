@@ -38,7 +38,8 @@ it('writes a reservation ledger row with the key and conversation', function ():
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-x',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'reservation ledger',
         'created_at' => now(),

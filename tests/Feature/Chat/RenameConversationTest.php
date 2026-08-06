@@ -15,7 +15,8 @@ it('renames a conversation', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-1',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'Old title',
         'created_at' => now(),
@@ -38,7 +39,8 @@ it('rejects rename of conversation belonging to another user', function (): void
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-2',
-        'user_id' => $owner->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $owner->getKey(),
         'team_id' => $owner->currentTeam->getKey(),
         'title' => 'Owner title',
         'created_at' => now(),
@@ -60,7 +62,8 @@ it('validates title length', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-3',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'Title',
         'created_at' => now(),

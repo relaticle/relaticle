@@ -14,7 +14,8 @@ it('refuses to execute a pending action whose class is not allowlisted', functio
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-allowlist-test',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

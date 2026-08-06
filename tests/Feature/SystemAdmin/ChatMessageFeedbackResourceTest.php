@@ -22,7 +22,8 @@ function seedAdminFeedbackRow(): ChatMessageFeedback
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'admin feedback test',
         'created_at' => now(),
@@ -34,7 +35,8 @@ function seedAdminFeedbackRow(): ChatMessageFeedback
     DB::table('agent_conversation_messages')->insert([
         'id' => $messageId,
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'test',
         'role' => 'assistant',
         'content' => 'answer',

@@ -30,7 +30,8 @@ beforeEach(function (): void {
     $this->conversationId = (string) Str::uuid7();
     AgentConversation::query()->insert([
         'id' => $this->conversationId,
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => '',
         'created_at' => now(),

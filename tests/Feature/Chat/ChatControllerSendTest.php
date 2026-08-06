@@ -46,7 +46,8 @@ it('rejects a client-supplied conversation_id that already belongs to another us
 
     DB::table('agent_conversations')->insert([
         'id' => $sharedId,
-        'user_id' => $owner->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $owner->getKey(),
         'team_id' => $owner->currentTeam->getKey(),
         'title' => 'private',
         'created_at' => now(),
@@ -67,7 +68,8 @@ it('rejects a client-supplied conversation_id pinned to a different team', funct
 
     DB::table('agent_conversations')->insert([
         'id' => $crossTeamId,
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $otherTeam->getKey(),
         'title' => 'cross-team',
         'created_at' => now(),
@@ -106,7 +108,8 @@ it('accepts a valid mentions array', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'seed',
         'created_at' => now(),
@@ -137,7 +140,8 @@ it('silently drops mentions whose records do not belong to the current team', fu
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'seed',
         'created_at' => now(),

@@ -19,7 +19,8 @@ beforeEach(function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-perf',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Perf',
         'created_at' => now(),
@@ -30,7 +31,8 @@ beforeEach(function (): void {
         DB::table('agent_conversation_messages')->insert([
             'id' => "m-{$i}",
             'conversation_id' => 'c-perf',
-            'user_id' => $this->user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $this->user->getKey(),
             'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
             'role' => 'assistant',
             'content' => "message {$i}",

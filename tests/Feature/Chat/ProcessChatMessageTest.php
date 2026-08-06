@@ -17,7 +17,8 @@ function seedConversation(User $user, string $conversationId): void
 {
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),

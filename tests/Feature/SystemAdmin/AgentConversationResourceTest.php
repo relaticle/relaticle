@@ -26,7 +26,8 @@ function seedAdminConversation(string $title = 'Probe chat', int $messages = 0):
 
     DB::table('agent_conversations')->insert([
         'id' => $id,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => $title,
         'created_at' => now(),
@@ -38,7 +39,8 @@ function seedAdminConversation(string $title = 'Probe chat', int $messages = 0):
             'id' => (string) Str::uuid7(),
             'conversation_id' => $id,
             'agent' => 'crm-assistant',
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
             'role' => $i % 2 === 0 ? 'user' : 'assistant',
             'content' => "message {$i}",
             'attachments' => '[]',

@@ -31,7 +31,8 @@ it('materializes the assistant message document at stream end', function (): voi
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Test',
         'created_at' => now(),

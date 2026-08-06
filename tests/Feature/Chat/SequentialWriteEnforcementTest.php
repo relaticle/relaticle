@@ -29,7 +29,8 @@ it('passes disable_parallel_tool_use to Anthropic via tool_choice', function ():
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-0000-7000-8000-000000000001',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -62,7 +63,8 @@ it('write tool result includes agent_should_stop=true in meta', function (): voi
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-0000-7000-8000-000000000010',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

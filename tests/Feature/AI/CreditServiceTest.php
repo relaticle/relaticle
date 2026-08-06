@@ -59,7 +59,8 @@ it('deducts credits and logs a transaction', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-123',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Deduct test',
         'created_at' => now(),

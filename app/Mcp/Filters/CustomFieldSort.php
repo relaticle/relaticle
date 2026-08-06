@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Cache;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Spatie\QueryBuilder\Sorts\Sort;
 
+/**
+ * @implements Sort<Model>
+ */
 final readonly class CustomFieldSort implements Sort
 {
     public function __construct(

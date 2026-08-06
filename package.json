@@ -37,7 +37,7 @@
         "dompurify": "^3.4.11",
         "laravel-echo": "^2.3.4",
         "marked": "^18.0.2",
-        "motion": "^12.39.0",
+        "motion": "^13.0.0",
         "pusher-js": "^8.5.0",
         "shiki": "^4.1.0"
     }

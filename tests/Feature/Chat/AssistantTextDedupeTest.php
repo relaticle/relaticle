@@ -21,7 +21,8 @@ function storeAssistantTextFixture(User $user, string $text): string
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -35,7 +36,7 @@ function storeAssistantTextFixture(User $user, string $text): string
     $response = new AgentResponse('inv-'.Str::random(8), $text, new Usage, new Meta);
 
     resolve(SupersededAwareConversationStore::class)
-        ->storeAssistantMessage($conversationId, (string) $user->getKey(), $prompt, $response);
+        ->storeAssistantMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt, $response);
 
     return $conversationId;
 }

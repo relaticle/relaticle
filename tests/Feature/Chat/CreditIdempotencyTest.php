@@ -22,7 +22,8 @@ it('does not double-charge when settle is called twice with the same idempotency
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv_1',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Credit idempotency',
         'created_at' => now(),

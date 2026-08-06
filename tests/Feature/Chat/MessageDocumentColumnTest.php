@@ -27,7 +27,8 @@ it('rejects null document on insert', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => null,
+        'participant_type' => 'user',
+        'participant_id' => null,
         'team_id' => null,
         'title' => 'test',
         'created_at' => now(),

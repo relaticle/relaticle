@@ -19,7 +19,8 @@ it('settles the reserved minimum (does not refund) when the job fails', function
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-1',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),

@@ -414,7 +414,8 @@ final class ProcessChatMessage implements ShouldQueue
             $table->insert([
                 'id' => (string) Str::uuid7(),
                 'conversation_id' => $this->conversationId,
-                'user_id' => (string) $this->user->getKey(),
+                'participant_type' => $this->user->getMorphClass(),
+                'participant_id' => (string) $this->user->getKey(),
                 'agent' => CrmAssistant::class,
                 'role' => 'user',
                 'content' => $this->message,
@@ -435,7 +436,8 @@ final class ProcessChatMessage implements ShouldQueue
         $table->insert([
             'id' => (string) Str::uuid7(),
             'conversation_id' => $this->conversationId,
-            'user_id' => (string) $this->user->getKey(),
+            'participant_type' => $this->user->getMorphClass(),
+            'participant_id' => (string) $this->user->getKey(),
             'agent' => CrmAssistant::class,
             'role' => 'assistant',
             'content' => $text,

@@ -25,7 +25,8 @@ it('approved actions expose record.url after conversation reload', function (): 
     $convId = '019df800-4444-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -64,7 +65,8 @@ it('approved actions expose record.url after conversation reload', function (): 
 
     $base = [
         'conversation_id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
@@ -105,7 +107,8 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
     $convId = '019df800-4444-7000-8000-000000000003';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -144,7 +147,8 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
 
     $base = [
         'conversation_id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
@@ -191,7 +195,8 @@ it('does not expose record on pending or rejected actions', function (): void {
     $convId = '019df800-4444-7000-8000-000000000002';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -226,7 +231,8 @@ it('does not expose record on pending or rejected actions', function (): void {
 
     $base = [
         'conversation_id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
