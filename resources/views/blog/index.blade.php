@@ -13,11 +13,20 @@
     // from there has no canonical page pointing at it. Only `page` is carried over —
     // search and tracking params stay out. Search results are noindex,follow: they
     // are an infinite, low-value URL space that should not be indexed.
-    $searchQuery = request()->query('q');
+    // Trim-and-compare rather than a truthiness test: "0" is a real search term that
+    // ink's controller filters on, but PHP reads it as falsy — which left /blog?q=0
+    // an indexable results page and mislabelled its empty state.
+    $searchQuery = trim((string) request()->query('q', ''));
     $currentPage = (int) request()->query('page', 1);
     $canonical = $currentPage > 1
         ? url()->current().'?page='.$currentPage
         : url()->current();
+
+    // A page past the end still answers 200 with a "that page doesn't exist" body —
+    // a soft 404. Keep those out of the index rather than letting a crawler bank an
+    // unbounded set of empty URLs.
+    $isBeyondLastPage = $posts->isEmpty() && $posts->total() > 0;
+    $robots = ($searchQuery !== '' || $isBeyondLastPage) ? 'noindex,follow' : null;
 @endphp
 
 <x-guest-layout
@@ -25,7 +34,7 @@
     :description="$description"
     :ogTitle="$title"
     :canonical="$canonical"
-    :robots="$searchQuery ? 'noindex,follow' : null">
+    :robots="$robots">
     @push('header')
         <x-ink::feed-link />
     @endpush
@@ -63,7 +72,7 @@
                             <x-ri-arrow-left-line class="w-4 h-4" />
                             Back to the first page
                         </a>
-                    @elseif($searchQuery || isset($category) || isset($tag))
+                    @elseif($searchQuery !== '' || isset($category) || isset($tag))
                         {{-- total() counts the filtered set, so "no posts yet" would be a
                              lie here: the archive has posts, this filter just matched none. --}}
                         <p class="text-gray-500 dark:text-gray-400">Nothing matched. Try another search or browse everything.</p>

@@ -5,6 +5,24 @@
         $currentClasses = $baseClasses.' bg-primary text-white';
         $disabledClasses = $baseClasses.' text-gray-300 dark:text-gray-700 cursor-not-allowed';
         $separatorClasses = $baseClasses.' text-gray-400 dark:text-gray-600';
+
+        // Page 1 canonicalises to the bare listing URL, so linking it as `?page=1`
+        // publishes a URL that points somewhere else — which the sitemap crawler
+        // then picks up. Emit the canonical form instead.
+        $pageUrl = function (?string $url): ?string {
+            if ($url === null) {
+                return null;
+            }
+
+            [$path, $query] = array_pad(explode('?', $url, 2), 2, '');
+            parse_str($query, $params);
+
+            if ((int) ($params['page'] ?? 0) === 1) {
+                unset($params['page']);
+            }
+
+            return $params === [] ? $path : $path.'?'.http_build_query($params);
+        };
     @endphp
 
     <nav role="navigation" aria-label="{{ __('Pagination Navigation') }}"
@@ -23,7 +41,7 @@
                     <x-ri-arrow-left-s-line class="w-4 h-4" aria-hidden="true" />
                 </span>
             @else
-                <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="{{ $linkClasses }}"
+                <a href="{{ $pageUrl($paginator->previousPageUrl()) }}" rel="prev" class="{{ $linkClasses }}"
                    aria-label="{{ __('Previous page') }}">
                     <x-ri-arrow-left-s-line class="w-4 h-4" aria-hidden="true" />
                 </a>
@@ -39,7 +57,7 @@
                         @if ($page == $paginator->currentPage())
                             <span class="{{ $currentClasses }}" aria-current="page">{{ $page }}</span>
                         @else
-                            <a href="{{ $url }}" class="{{ $linkClasses }}"
+                            <a href="{{ $pageUrl($url) }}" class="{{ $linkClasses }}"
                                aria-label="{{ __('Go to page :page', ['page' => $page]) }}">{{ $page }}</a>
                         @endif
                     @endforeach
@@ -47,7 +65,7 @@
             @endforeach
 
             @if ($paginator->hasMorePages())
-                <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="{{ $linkClasses }}"
+                <a href="{{ $pageUrl($paginator->nextPageUrl()) }}" rel="next" class="{{ $linkClasses }}"
                    aria-label="{{ __('Next page') }}">
                     <x-ri-arrow-right-s-line class="w-4 h-4" aria-hidden="true" />
                 </a>

@@ -6,6 +6,7 @@ namespace App\Support;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
 use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
 use Spatie\MarkdownResponse\Enums\DetectionMethod;
 
@@ -53,8 +54,28 @@ final class DetectsPublicMarkdownRequest extends DetectsMarkdownRequest
             if (in_array($alias, self::GATING_MIDDLEWARE, true)) {
                 return true;
             }
+
+            // A route may name the class instead of the alias — this codebase mixes
+            // both styles — so resolve aliases to classes and compare those too,
+            // otherwise a class-form gate would silently reopen the cache bypass.
+            if (in_array($alias, $this->gatingMiddlewareClasses(), true)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function gatingMiddlewareClasses(): array
+    {
+        $aliases = resolve(Router::class)->getMiddleware();
+
+        return array_values(array_filter(array_map(
+            fn (string $alias): ?string => is_string($aliases[$alias] ?? null) ? $aliases[$alias] : null,
+            self::GATING_MIDDLEWARE,
+        )));
     }
 }

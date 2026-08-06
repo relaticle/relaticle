@@ -362,6 +362,18 @@ describe('Blog pages', function () {
             ->assertSee('<link rel="canonical" href="'.url($path).'" />', false);
     })->with(['/pricing', '/terms-of-service', '/privacy-policy']);
 
+    it('treats "0" as a real search term, not an absent one', function () {
+        // request()->query('q') === '0' is falsy in PHP, but ink's controller filters on
+        // it — so a truthiness test left this an indexable results page labelled as if
+        // the blog were empty.
+        Post::factory()->published()->count(2)->create();
+
+        $this->get('/blog?q=0')
+            ->assertStatus(200)
+            ->assertSee('<meta name="robots" content="noindex,follow">', false)
+            ->assertDontSee('No posts yet');
+    });
+
     it('marks blog search results noindex but leaves the plain listing indexable', function () {
         $this->get('/blog?q=laravel')
             ->assertStatus(200)
@@ -601,6 +613,27 @@ describe('Blog pages', function () {
     it('404s a preview request whose post segment is not numeric', function () {
         $this->get('/blog/preview/not-a-post-id')
             ->assertStatus(404);
+    });
+
+    it('keeps out-of-range listing pages out of the index', function () {
+        // A page past the end answers 200 with a "that page doesn't exist" body — a soft
+        // 404 that would otherwise let a crawler bank an unbounded set of empty URLs.
+        Post::factory()->published()->count(3)->create();
+
+        $this->get('/blog?page=99')
+            ->assertStatus(200)
+            ->assertSee('<meta name="robots" content="noindex,follow">', false);
+    });
+
+    it('links page one as the bare listing url, not ?page=1', function () {
+        // Page 1 canonicalises to /blog, so publishing a ?page=1 link advertises a URL
+        // that points elsewhere — and the sitemap crawler picks it up from here.
+        Post::factory()->published()->count(config('ink.per_page') + 1)->create();
+
+        $this->get('/blog?page=2')
+            ->assertStatus(200)
+            ->assertSee('href="'.url('/blog').'"', false)
+            ->assertDontSee('page=1"', false);
     });
 
     it('offers a way back when a visitor requests a page beyond the last one', function () {

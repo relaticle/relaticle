@@ -41,3 +41,23 @@
 .blog-prose h1 .heading-permalink {
     @apply hidden;
 }
+
+/*
+ * Ink's draft-preview banner is `sticky top-0 z-[60]`, which parks it on top of the
+ * marketing header (fixed, 65px, z-50) — clipping the logo and the sign-in buttons.
+ * Sticky resolves against the scroll container, so a wrapper alone can't move it;
+ * override the offset and drop it below the header in the stack.
+ */
+.blog-preview-banner {
+    /* Not a box of its own: a wrapper only as tall as the banner would give the
+       sticky child no travel, so it would scroll away instead of pinning. */
+    display: contents;
+}
+
+.blog-preview-banner > * {
+    /* The header is fixed, so page content starts at y=0 underneath it — push the
+       banner clear of it in flow, and pin it there once scrolling starts. */
+    margin-top: 65px;
+    top: 65px;
+    z-index: 40;
+}
