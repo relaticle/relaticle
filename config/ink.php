@@ -1,7 +1,9 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Models\User;
+use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
 return [
     'prefix' => 'blog',
@@ -11,12 +13,32 @@ return [
     'per_page' => 12,
 
     'features' => [
+        // Overwritten in AppServiceProvider::register() from the Pennant Blog flag,
+        // which runs before ink registers its routes. Off here so a missed override
+        // fails closed rather than publishing the blog.
         'public_routes' => false,
-        'feed' => false,
+        'feed' => true,
         'sitemap' => false,
         'tags' => true,
         'media_library' => false,
+        'mcp' => false,
     ],
+
+    /*
+     * Our own marketing views render through ink's controllers, so we get the
+     * package's listing SEO, search and pagination without duplicating it. These
+     * are app views, not published copies of ink's — nothing to drift.
+     */
+    'views' => [
+        'index' => 'blog.index',
+        'show' => 'blog.show',
+        'category' => 'blog.index',
+        'tag' => 'blog.index',
+        'preview' => 'blog.preview',
+        'feed' => 'blog.feed',
+    ],
+
+    'middleware' => ['web', ProvideMarkdownResponse::class],
 
     'feed' => [
         'title' => 'Relaticle Engineering Blog',

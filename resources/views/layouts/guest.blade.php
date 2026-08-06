@@ -8,7 +8,16 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <meta name="description" content="{{ $description }}">
-    <link rel="canonical" href="{{ url()->current() }}" />
+    @php
+        // Paginated listings must self-canonicalise: without the page number a
+        // post reachable only from page 2 has no canonical page pointing at it.
+        // Only `page` is carried over — search and tracking params stay out.
+        $canonicalPage = (int) request()->query('page', 1);
+        $canonicalUrl = $canonicalPage > 1
+            ? url()->current().'?page='.$canonicalPage
+            : url()->current();
+    @endphp
+    <link rel="canonical" href="{{ $canonicalUrl }}" />
 
     @php
         // Bump the version whenever public/images/open-graph.jpg is regenerated

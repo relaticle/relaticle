@@ -1,7 +1,7 @@
 @props(['post'])
 
 @php
-    $toc = \App\Support\Blog\TableOfContents::fromHtml($post->toHtml());
+    $toc = $post->tableOfContents();
 @endphp
 
 @if(count($toc))

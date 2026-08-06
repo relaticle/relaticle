@@ -342,6 +342,20 @@ describe('Blog pages', function () {
             ->assertSee($post->title);
     });
 
+    it('canonicalises a paginated listing to its own page', function () {
+        Post::factory()->published()->count(config('ink.per_page') + 1)->create();
+
+        $this->get('/blog?page=2')
+            ->assertStatus(200)
+            ->assertSee('<link rel="canonical" href="'.url('/blog').'?page=2" />', false);
+    });
+
+    it('drops junk and non-page query params from the canonical', function () {
+        $this->get('/blog?page=abc&q=laravel')
+            ->assertStatus(200)
+            ->assertSee('<link rel="canonical" href="'.url('/blog').'" />', false);
+    });
+
     it('does not display draft posts on the index', function () {
         $post = Post::factory()->draft()->create();
 
@@ -406,9 +420,12 @@ describe('Blog pages', function () {
     it('returns RSS feed', function () {
         Post::factory()->published()->create();
 
-        $this->get('/blog/feed')
-            ->assertStatus(200)
-            ->assertHeader('Content-Type', 'application/rss+xml');
+        $response = $this->get('/blog/feed')->assertStatus(200);
+
+        // Match the media type, not the full header: ink appends `; charset=UTF-8`,
+        // which the app's old feed controller omitted. Both are valid RSS.
+        expect($response->headers->get('Content-Type'))
+            ->toStartWith('application/rss+xml');
     });
 
     it('includes blog link in navigation', function () {
