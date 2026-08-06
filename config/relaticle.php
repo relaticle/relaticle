@@ -42,7 +42,7 @@ return [
 
     'horizon' => [
         'admin_emails' => array_values(array_filter(array_map(
-            'trim',
+            trim(...),
             explode(',', (string) env('HORIZON_ADMIN_EMAILS', '')),
         ))),
     ],
