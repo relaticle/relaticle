@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Blog;
 
-use App\Models\User;
 use Illuminate\View\View;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Models\Post;
@@ -17,10 +16,10 @@ final readonly class BlogPreviewController
 
         $relatedPosts = $post->relatedPosts()->with(['category'])->get();
 
-        $user = auth()->user();
-
-        $editUrl = $user instanceof User && $user->currentTeam
-            ? PostResource::getUrl('edit', ['record' => $post, 'tenant' => $user->currentTeam])
+        // The blog admin lives in the sysadmin panel, which has no tenancy — only a
+        // signed-in system administrator gets an edit link, and it carries no tenant.
+        $editUrl = auth('sysadmin')->check()
+            ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
             : null;
 
         return view('blog.preview', ['post' => $post, 'relatedPosts' => $relatedPosts, 'editUrl' => $editUrl]);

@@ -9,7 +9,9 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
@@ -468,6 +470,17 @@ describe('Blog pages', function () {
 
         expect(json_last_error())->toBe(JSON_ERROR_NONE, "JSON-LD block was truncated: {$block}")
             ->and($decoded['headline'])->toBe($title);
+    });
+
+    it('renders the signed preview for a signed-in app user without an edit link', function () {
+        // The blog admin lives in the sysadmin panel; building an app-panel URL here
+        // used to throw RouteNotFoundException and 500 the page for any logged-in user.
+        $post = Post::factory()->create();
+
+        $this->actingAs(User::factory()->withPersonalTeam()->create())
+            ->get(URL::temporarySignedRoute('blog.preview', now()->addHour(), ['post' => $post]))
+            ->assertStatus(200)
+            ->assertSee($post->title);
     });
 
     it('404s a preview request whose post segment is not numeric', function () {
