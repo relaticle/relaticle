@@ -1166,16 +1166,16 @@
         },
         {
             "name": "danharrin/livewire-rate-limiting",
-            "version": "v2.2.0",
+            "version": "v2.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danharrin/livewire-rate-limiting.git",
-                "reference": "c03e649220089f6e5a52d422e24e3f98c73e456d"
+                "reference": "69436717dc70e30f80d7f8fd02504c22992a9ad5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/danharrin/livewire-rate-limiting/zipball/c03e649220089f6e5a52d422e24e3f98c73e456d",
-                "reference": "c03e649220089f6e5a52d422e24e3f98c73e456d",
+                "url": "https://api.github.com/repos/danharrin/livewire-rate-limiting/zipball/69436717dc70e30f80d7f8fd02504c22992a9ad5",
+                "reference": "69436717dc70e30f80d7f8fd02504c22992a9ad5",
                 "shasum": ""
             },
             "require": {
@@ -1183,7 +1183,7 @@
                 "php": "^8.0"
             },
             "require-dev": {
-                "livewire/livewire": "^3.0",
+                "livewire/livewire": "^3.0|^4.0",
                 "livewire/volt": "^1.3",
                 "orchestra/testbench": "^7.0|^8.0|^9.0|^10.0|^11.0",
                 "phpunit/phpunit": "^9.0|^10.0|^11.5.3|^12.5.12"
@@ -1216,7 +1216,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-16T11:29:23+00:00"
+            "time": "2026-08-06T08:41:51+00:00"
         },
         {
             "name": "dasprid/enum",
@@ -9674,35 +9674,40 @@
         },
         {
             "name": "relaticle/ink",
-            "version": "v2.1.1",
+            "version": "v2.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/ink.git",
-                "reference": "e5621ebf80eab6ed01b2bef6b3c332e45644caef"
+                "reference": "6a2d63b3ebce432bea6cf9181dfc8fec9294f358"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/ink/zipball/e5621ebf80eab6ed01b2bef6b3c332e45644caef",
-                "reference": "e5621ebf80eab6ed01b2bef6b3c332e45644caef",
+                "url": "https://api.github.com/repos/relaticle/ink/zipball/6a2d63b3ebce432bea6cf9181dfc8fec9294f358",
+                "reference": "6a2d63b3ebce432bea6cf9181dfc8fec9294f358",
                 "shasum": ""
             },
             "require": {
                 "filament/filament": "^5.0",
-                "illuminate/contracts": "^12.0|^13.0",
+                "illuminate/contracts": "^13.0",
+                "league/html-to-markdown": "^5.1",
                 "php": "^8.4",
-                "ralphjsmit/laravel-filament-seo": "^2.0",
-                "ralphjsmit/laravel-seo": "^1.7",
-                "spatie/laravel-markdown": "^2.7",
-                "spatie/laravel-package-tools": "^1.15",
-                "spatie/laravel-sitemap": "^7.0 || ^8.0",
-                "spatie/laravel-sluggable": "^3.0 || ^4.0"
+                "ralphjsmit/laravel-filament-seo": "^2.2",
+                "ralphjsmit/laravel-seo": "^1.8",
+                "spatie/laravel-markdown": "^2.8",
+                "spatie/laravel-package-tools": "^1.93",
+                "spatie/laravel-sitemap": "^8.2",
+                "spatie/laravel-sluggable": "^4.0"
             },
             "require-dev": {
-                "laravel/mcp": "^0.5",
-                "laravel/pint": "^1.14",
-                "orchestra/testbench": "^10.0|^11.0",
-                "pestphp/pest": "^3.0",
-                "pestphp/pest-plugin-laravel": "^3.0"
+                "laravel/mcp": "^0.9",
+                "laravel/pint": "^1.30",
+                "laravel/sanctum": "^4.0",
+                "orchestra/testbench": "^11.0",
+                "pestphp/pest": "^5.0",
+                "pestphp/pest-plugin-laravel": "^5.0"
+            },
+            "suggest": {
+                "laravel/mcp": "Required to expose the blog MCP tools (^0.9)."
             },
             "type": "library",
             "extra": {
@@ -9740,7 +9745,7 @@
                 "issues": "https://github.com/relaticle/ink/issues",
                 "source": "https://github.com/relaticle/ink"
             },
-            "time": "2026-08-04T12:49:08+00:00"
+            "time": "2026-08-06T12:58:23+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",
