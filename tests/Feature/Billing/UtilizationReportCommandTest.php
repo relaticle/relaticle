@@ -75,7 +75,7 @@ it('prints per-plan utilization and pack-purchase metrics sourced from the credi
     $this->artisan('billing:utilization-report', ['--month' => '2026-07'])
         ->expectsOutputToContain('rows below cover only workspaces with recorded usage')
         ->expectsTable(
-            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'],
+            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At/over 100%'],
             [['pro', 2, '1%', '100%', '100%', 1]],
         )
         ->expectsTable(
@@ -124,7 +124,7 @@ it('reports historical utilization for a past month after the balance row has ro
 
     $this->artisan('billing:utilization-report', ['--month' => '2026-04'])
         ->expectsTable(
-            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'],
+            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At/over 100%'],
             [
                 ['enterprise', 1, '20%', '20%', '20%', 0],
                 ['free', 1, '50%', '50%', '50%', 0],
@@ -162,9 +162,47 @@ it('excludes usage recorded outside the reported month and falls back to the cur
 
     $this->artisan('billing:utilization-report', ['--month' => '2026-07'])
         ->expectsTable(
-            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'],
+            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At/over 100%'],
             [['enterprise', 1, '10%', '10%', '10%', 0]],
         )
         ->expectsOutputToContain('1 workspace(s) had no historical period-reset record')
+        ->assertSuccessful();
+});
+
+it('reports utilization past 100% instead of clamping away pack-driven overage', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-07-10 12:00:00', new DateTimeZone('UTC')));
+
+    $credits = app(CreditService::class);
+
+    // Two Pro workspaces that bought packs and burned well past the 2,000
+    // monthly allowance. Clamping these to 100% would hide the only number
+    // that says how much bigger the allowance or the packs need to be.
+    $heavy = User::factory()->withPersonalTeam()->create()->currentTeam;
+    $heavy->forceFill(['plan' => Plan::Pro])->save();
+    $credits->resetPeriod($heavy->refresh());
+
+    AiCreditTransaction::factory()->create([
+        'team_id' => $heavy->getKey(),
+        'type' => AiCreditType::Chat,
+        'credits_charged' => 7_000, // 350% of the Pro allowance
+        'created_at' => now(),
+    ]);
+
+    $modest = User::factory()->withPersonalTeam()->create()->currentTeam;
+    $modest->forceFill(['plan' => Plan::Pro])->save();
+    $credits->resetPeriod($modest->refresh());
+
+    AiCreditTransaction::factory()->create([
+        'team_id' => $modest->getKey(),
+        'type' => AiCreditType::Chat,
+        'credits_charged' => 3_000, // 150% of the Pro allowance
+        'created_at' => now(),
+    ]);
+
+    $this->artisan('billing:utilization-report', ['--month' => '2026-07'])
+        ->expectsTable(
+            ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At/over 100%'],
+            [['pro', 2, '150%', '350%', '350%', 2]],
+        )
         ->assertSuccessful();
 });

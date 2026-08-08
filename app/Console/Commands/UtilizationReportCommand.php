@@ -94,8 +94,11 @@ final class UtilizationReportCommand extends Command
                 $fallbackCount++;
             }
 
+            // Deliberately unclamped: prepaid packs let a workspace spend well
+            // past its monthly allowance, and how far past is exactly the demand
+            // signal this report exists to size packs and tiers against.
             $creditsUsed = (int) $usageByTeam[$teamId];
-            $ratiosByPlan[$plan->value][] = min(100, (int) round($creditsUsed / $allowance * 100));
+            $ratiosByPlan[$plan->value][] = (int) round($creditsUsed / $allowance * 100);
         }
 
         ksort($ratiosByPlan);
@@ -115,7 +118,7 @@ final class UtilizationReportCommand extends Command
         }
 
         $this->comment('Note: rows below cover only workspaces with recorded usage in the reported month. Workspaces on an active plan with zero usage that month are not represented.');
-        $this->table(['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'], $rows);
+        $this->table(['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At/over 100%'], $rows);
 
         if ($fallbackCount > 0) {
             $this->comment("{$fallbackCount} workspace(s) had no historical period-reset record for {$start->format('F Y')}; used their current plan allowance as a fallback.");
