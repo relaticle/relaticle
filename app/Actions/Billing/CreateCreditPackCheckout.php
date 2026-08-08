@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Filament\Pages\Billing;
 use App\Models\Team;
 use App\Services\Billing\CreditPackCatalog;
 use InvalidArgumentException;
@@ -41,7 +42,7 @@ final readonly class CreateCreditPackCheckout
     /** @return array<string, mixed> */
     private function sessionOptions(Team $team, string $priceId): array
     {
-        $billingUrl = url("/app/{$team->slug}/billing");
+        $billingUrl = Billing::getUrl(panel: 'app', tenant: $team);
 
         $options = [
             'success_url' => "{$billingUrl}?credits=success",
