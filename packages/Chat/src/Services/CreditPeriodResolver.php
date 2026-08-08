@@ -27,6 +27,12 @@ final readonly class CreditPeriodResolver
      */
     public function boundsFor(Team $team): array
     {
+        // Load explicitly rather than relying on the caller: strict lazy loading
+        // arms only on multi-row hydrations, so a bulk caller that forgets to
+        // eager-load would otherwise fail in tests and silently N+1 in production.
+        // Callers that do eager-load pay nothing here.
+        $team->loadMissing('subscriptions');
+
         $subscription = $team->subscription();
 
         if ($subscription?->valid() === true) {
@@ -64,23 +70,17 @@ final readonly class CreditPeriodResolver
     private function anniversaryCycle(Carbon $anchor): array
     {
         $now = now();
-
         $elapsed = max(0, (int) $anchor->diffInMonths($now));
-        $start = $anchor->copy()->addMonthsNoOverflow($elapsed);
-        $end = $anchor->copy()->addMonthsNoOverflow($elapsed + 1);
 
-        for ($i = 0; $i < self::MAX_CYCLE_ADJUSTMENTS; $i++) {
+        for ($i = 0; $i <= self::MAX_CYCLE_ADJUSTMENTS; $i++) {
+            $start = $anchor->copy()->addMonthsNoOverflow($elapsed);
+            $end = $anchor->copy()->addMonthsNoOverflow($elapsed + 1);
+
             if ($start->lessThanOrEqualTo($now) && $now->lessThan($end)) {
                 return ['start' => $start, 'end' => $end];
             }
 
             $elapsed = max(0, $elapsed + ($start->greaterThan($now) ? -1 : 1));
-            $start = $anchor->copy()->addMonthsNoOverflow($elapsed);
-            $end = $anchor->copy()->addMonthsNoOverflow($elapsed + 1);
-        }
-
-        if ($start->lessThanOrEqualTo($now) && $now->lessThan($end)) {
-            return ['start' => $start, 'end' => $end];
         }
 
         // Exhausting the cap without converging must fail loudly: silently

@@ -231,11 +231,8 @@ it('does not consume the generic trial when a checkout is abandoned as incomplet
 it('never double-grants across a mid-trial conversion', function (): void {
     test()->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_convert_anchor'])->save();
-    app(StartProTrial::class)->execute($user, $team);
+    $team = stripeBillingTeam();
+    app(StartProTrial::class)->execute($team->owner, $team);
 
     // Convert mid-trial. The plan is already Pro, so SyncTeamPlanFromSubscription
     // short-circuits: NO new grant at conversion — the trial allowance keeps running.
@@ -293,10 +290,7 @@ function checkoutSessionAsyncPaymentSucceededEvent(Team $team, array $overrides 
 it('grants pack credits exactly once on checkout session completed', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_test'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk();
     sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk(); // replay
@@ -308,10 +302,7 @@ it('grants pack credits exactly once on checkout session completed', function ()
 it('grants nothing for an unpaid checkout session completed event', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_unpaid'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
 
@@ -321,10 +312,7 @@ it('grants nothing for an unpaid checkout session completed event', function ():
 it('grants pack credits once the delayed payment confirms asynchronously', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_async'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
 
@@ -335,10 +323,7 @@ it('grants pack credits once the delayed payment confirms asynchronously', funct
 it('grants exactly once when an unpaid checkout later confirms asynchronously', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_delayed'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
     sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
@@ -357,10 +342,7 @@ it('grants exactly once when an unpaid checkout later confirms asynchronously', 
 it('ignores subscription-mode checkout sessions', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_sub'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team, ['mode' => 'subscription']))->assertOk();
 
@@ -370,10 +352,7 @@ it('ignores subscription-mode checkout sessions', function (): void {
 it('grants nothing when the session customer does not match the team', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_real'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team, ['customer' => 'cus_attacker']))->assertOk();
 
@@ -381,10 +360,7 @@ it('grants nothing when the session customer does not match the team', function 
 });
 
 it('grants nothing for an unknown pack price', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_unknown'])->save();
+    $team = stripeBillingTeam();
 
     sendStripeWebhook(checkoutSessionCompletedEvent($team, [
         'metadata' => ['team_id' => (string) $team->getKey(), 'credit_pack_price' => 'price_nonexistent'],
@@ -396,10 +372,7 @@ it('grants nothing for an unknown pack price', function (): void {
 it('logs and grants nothing when a payment-mode session is missing pack metadata', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_pack_missing_meta'])->save();
+    $team = stripeBillingTeam();
 
     Log::spy();
 

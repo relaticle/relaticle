@@ -154,10 +154,9 @@
                         @if($isOwner && $availablePacks !== [])
                             <div class="mt-4 flex flex-wrap gap-2">
                                 @foreach($availablePacks as $key => $pack)
-                                    <button type="button" wire:click="buyCredits('{{ $key }}')"
-                                        class="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200">
+                                    <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
                                         {{ __('billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
-                                    </button>
+                                    </x-filament::button>
                                 @endforeach
                             </div>
                         @endif

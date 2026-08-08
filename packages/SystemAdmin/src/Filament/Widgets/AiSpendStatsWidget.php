@@ -53,26 +53,21 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
 
         $delta = $currentMonthCredits - $previousMonthCredits;
 
-        $topModelRow = AiCreditTransaction::query()
-            ->selectRaw('model, SUM(credits_charged) AS total')
-            ->whereIn('type', self::SPENDABLE_TYPES)
-            ->where('created_at', '>=', $monthStart)
-            ->where('created_at', '<', $nextMonthStart)
-            ->groupBy('model')
-            ->orderByDesc('total')
-            ->first();
-
-        $topModelLabel = $topModelRow !== null
-            ? "{$topModelRow->model} ({$topModelRow->total})"
-            : '—';
-
+        // One grouped pass over the month serves both the top-model stat and the
+        // dollar-cost stat; they share the same filter and differ only in aggregates.
         $tokenRows = AiCreditTransaction::query()
-            ->selectRaw('model, SUM(input_tokens) AS input_sum, SUM(output_tokens) AS output_sum')
+            ->selectRaw('model, SUM(credits_charged) AS total, SUM(input_tokens) AS input_sum, SUM(output_tokens) AS output_sum')
             ->whereIn('type', self::SPENDABLE_TYPES)
             ->where('created_at', '>=', $monthStart)
             ->where('created_at', '<', $nextMonthStart)
             ->groupBy('model')
             ->get();
+
+        $topModelRow = $tokenRows->sortByDesc(fn (AiCreditTransaction $row): int => (int) $row->total)->first();
+
+        $topModelLabel = $topModelRow !== null
+            ? "{$topModelRow->model} ({$topModelRow->total})"
+            : '—';
 
         /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> $rates */
         $rates = config('chat.model_costs', []);
