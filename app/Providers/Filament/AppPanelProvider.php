@@ -141,10 +141,6 @@ final class AppPanelProvider extends PanelProvider
                         ? url(Settings::getUrl())
                         : url($panel->getPath())),
             ])
-            ->renderHook(
-                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
-                fn (): View => view('filament.app.help-menu', ['items' => $this->supportMenuItems()]),
-            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -233,6 +229,8 @@ final class AppPanelProvider extends PanelProvider
             ]);
         }
 
+        $panel->userMenuItems($this->supportMenuItems());
+
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
@@ -257,38 +255,36 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
-     * Help launcher entries — every support form type that resolves to a URL,
-     * rendered in the topbar Help dropdown and opening its Maxforms form in a
-     * new tab. Empty when nothing is configured, so the control hides itself.
+     * Support entries for the user menu — every support form type that resolves
+     * to a URL, opening its Maxforms form in a new tab. Empty when nothing is
+     * configured, so the user menu simply shows no support entries.
      *
-     * @return list<array{label: string, icon: string, url: string}>
+     * Everything is resolved lazily: the URL carries the signed-in user and
+     * workspace as prefill, and the feature flag is only decided per request —
+     * neither is known while the panel is being configured.
+     *
+     * @return list<Action>
      */
     private function supportMenuItems(): array
     {
+        return array_map(
+            fn (SupportFormType $type): Action => Action::make("support_{$type->value}")
+                ->label(fn (): string => $type->label())
+                ->icon($type->icon())
+                ->url(fn (): ?string => $this->supportFormUrl($type))
+                ->visible(fn (): bool => $this->supportFormUrl($type) !== null)
+                ->openUrlInNewTab(),
+            SupportFormType::cases(),
+        );
+    }
+
+    private function supportFormUrl(SupportFormType $type): ?string
+    {
         if (! Feature::active(SupportMenu::class)) {
-            return [];
+            return null;
         }
 
-        $support = resolve(SupportForms::class);
-        $prefill = $this->supportPrefill();
-
-        $items = [];
-
-        foreach (SupportFormType::cases() as $type) {
-            $url = $support->publicUrl($type, $prefill);
-
-            if ($url === null) {
-                continue;
-            }
-
-            $items[] = [
-                'label' => $type->label(),
-                'icon' => $type->icon(),
-                'url' => $url,
-            ];
-        }
-
-        return $items;
+        return resolve(SupportForms::class)->publicUrl($type, $this->supportPrefill());
     }
 
     /**
