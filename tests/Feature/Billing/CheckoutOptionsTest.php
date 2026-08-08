@@ -106,6 +106,18 @@ it('rejects a pack whose price is not configured', function (): void {
 });
 
 /**
+ * The domain-mode block below rebuilds the application so the panel registers its
+ * routes against a domain. That reboot drops Laravel's parallel-testing database
+ * override, pointing the fresh app at the base test database instead of this
+ * worker's — so these cases must not touch the database at all. An in-memory Team
+ * is enough: the URL builders only read the tenant slug.
+ */
+function unsavedTeam(): Team
+{
+    return new Team(['slug' => 'acme', 'name' => 'Acme']);
+}
+
+/**
  * A subdomain-routed app panel (APP_PANEL_DOMAIN, as production runs) serves the
  * billing page at {domain}/{slug}/billing — there is no "/app" path prefix. Any
  * URL handed to Stripe has to follow the registered route, otherwise returning
@@ -131,27 +143,21 @@ describe('domain-routed app panel', function (): void {
     });
 
     it('returns from pro checkout to the billing route without a panel path prefix', function (): void {
-        $team = Team::factory()->make(['slug' => 'acme']);
-
-        $options = invokeCheckout('sessionOptions', [$team]);
+        $options = invokeCheckout('sessionOptions', [unsavedTeam()]);
 
         expect($options['cancel_url'])->toBe('http://app.example.com/acme/billing')
             ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?checkout=success');
     });
 
     it('returns from credit pack checkout to the billing route without a panel path prefix', function (): void {
-        $team = Team::factory()->make(['slug' => 'acme']);
-
-        $options = invokePackCheckout('sessionOptions', [$team, 'price_credits_1k_test']);
+        $options = invokePackCheckout('sessionOptions', [unsavedTeam(), 'price_credits_1k_test']);
 
         expect($options['cancel_url'])->toBe('http://app.example.com/acme/billing')
             ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?credits=success');
     });
 
     it('links the trial reminder email at the billing route without a panel path prefix', function (): void {
-        $team = Team::factory()->make(['slug' => 'acme', 'name' => 'Acme']);
-
-        expect((string) (new ProTrialEndingSoonMail($team))->render())
+        expect((string) (new ProTrialEndingSoonMail(unsavedTeam()))->render())
             ->toContain('http://app.example.com/acme/billing')
             ->not->toContain('/app/acme/billing');
     });
