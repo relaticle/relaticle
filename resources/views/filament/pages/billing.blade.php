@@ -6,6 +6,11 @@
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
+        $purchased = (int) ($balance?->purchased_credits ?? 0);
+        $availablePacks = collect(config('services.stripe.credit_packs', []))
+            ->filter(fn (array $pack): bool => filled($pack['price']))
+            ->all();
+
         $isSubscribed = $subscription?->valid() ?? false;
         $canManageSubscription = $subscription && ($subscription->valid() || $pastDue);
         $onTrial = $team->onGenericTrial();
@@ -136,6 +141,21 @@
 
                         @if($balance?->period_ends_at)
                             <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                        @endif
+
+                        @if($purchased > 0)
+                            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
+                        @endif
+
+                        @if(! $isPaused && $availablePacks !== [])
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                @foreach($availablePacks as $key => $pack)
+                                    <button type="button" wire:click="buyCredits('{{ $key }}')"
+                                        class="inline-flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200">
+                                        {{ __('billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
+                                    </button>
+                                @endforeach
+                            </div>
                         @endif
                     </div>
                 @endif

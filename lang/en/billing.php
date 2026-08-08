@@ -24,6 +24,12 @@ return [
         'title' => 'AI credits this period',
         'resets' => 'Resets :date',
     ],
+    'packs' => [
+        'title' => 'Need more credits?',
+        'buy' => 'Buy :credits credits',
+        'balance_split' => 'Includes :purchased purchased credits — they never expire',
+        'buy_more' => 'Buy more credits',
+    ],
     'trial' => [
         'start_button' => 'Start 14-day Pro trial — no card needed',
         'active_title' => 'Pro trial active',

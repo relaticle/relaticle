@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
@@ -109,6 +110,24 @@ final class Billing extends Page
 
         try {
             return $team->redirectToBillingPortal(url("/app/{$team->slug}/billing"));
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->notifyCheckoutFailed();
+
+            return null;
+        }
+    }
+
+    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): ?RedirectResponse
+    {
+        $team = $this->team();
+
+        if (! $this->user()->ownsTeam($team) || ! resolve(HostedWorkspaceAccess::class)->allows($team)) {
+            return null;
+        }
+
+        try {
+            return redirect()->away($createCheckout->execute($team, $pack));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
