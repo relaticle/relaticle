@@ -68,5 +68,9 @@ return [
             'pro_monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
             'pro_yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
         ],
+        'credit_packs' => [
+            'small' => ['price' => env('STRIPE_PRICE_CREDITS_1K'), 'credits' => 1_000],
+            'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
+        ],
     ],
 ];
