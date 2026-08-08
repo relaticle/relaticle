@@ -1669,7 +1669,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         assistantMsg.paywall = {
                             heading: "You've used all your AI credits",
                             body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                            upgrade_url: body.upgrade_url || '/app',
+                            upgrade_url: body.top_up_url || body.upgrade_url || '/app',
                         };
                         assistantMsg.content = '';
                     } else {
@@ -1762,7 +1762,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     assistantMsg.paywall = {
                         heading: "You've used all your AI credits",
                         body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                        upgrade_url: body.upgrade_url || '/app',
+                        upgrade_url: body.top_up_url || body.upgrade_url || '/app',
                     };
                     assistantMsg.content = '';
                 } else {

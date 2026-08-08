@@ -131,6 +131,10 @@ final readonly class ChatController
                 'upgrade_url' => $isFree && Feature::active(Billing::class)
                     ? url("/app/{$team->slug}/billing")
                     : null,
+                'top_up_available' => ! $isFree,
+                'top_up_url' => ! $isFree && Feature::active(Billing::class)
+                    ? url("/app/{$team->slug}/billing")
+                    : null,
             ], 402);
         }
 
