@@ -75,3 +75,19 @@ it('writes plan metadata in the seed audit transaction', function (): void {
     expect($audit->metadata['plan'])->toBe('enterprise');
     expect($audit->metadata['allowance_granted'])->toBe(Plan::Enterprise->credits());
 });
+
+it('seeds trial teams with the trial span as the credit period', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(10)])->save();
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
+
+    resolve(SeedTeamCreditBalance::class)->execute($team->refresh());
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->period_ends_at->toDateTimeString())->toBe(now()->addDays(10)->toDateTimeString())
+        ->and($balance->period_starts_at->toDateTimeString())->toBe(now()->addDays(10)->subDays(14)->toDateTimeString());
+});
