@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Billing;
 
+use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\RestoreWorkspaceTrial;
 use App\Models\Team;
+use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -19,7 +21,7 @@ final class StripeWebhookController extends CashierWebhookController
      */
     private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
 
-    public function __construct(private readonly RestoreWorkspaceTrial $restoreTrial)
+    public function __construct(private readonly RestoreWorkspaceTrial $restoreTrial, private readonly GrantPurchasedCredits $grantCredits)
     {
         parent::__construct();
     }
@@ -51,5 +53,47 @@ final class StripeWebhookController extends CashierWebhookController
         }
 
         return $response;
+    }
+
+    /**
+     * Fulfill credit-pack purchases. Subscription checkouts emit the same event
+     * and are ignored here (mode filter) — customer.subscription.* handles them.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleCheckoutSessionCompleted(array $payload): Response
+    {
+        /** @var array<string, mixed> $session */
+        $session = $payload['data']['object'] ?? [];
+
+        if (($session['mode'] ?? null) !== 'payment') {
+            return $this->successMethod();
+        }
+
+        $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
+        $priceId = $metadata['credit_pack_price'] ?? null;
+        $teamId = $metadata['team_id'] ?? null;
+        $sessionId = $session['id'] ?? null;
+        $customerId = $session['customer'] ?? null;
+
+        if (! is_string($priceId) || ! is_string($teamId) || ! is_string($sessionId)) {
+            return $this->successMethod();
+        }
+
+        $team = Team::query()->find($teamId);
+
+        if (! $team instanceof Team || ! is_string($customerId) || $team->stripe_id !== $customerId) {
+            Log::warning('Credit pack checkout ignored: team/customer mismatch', [
+                'team_id' => $teamId,
+                'customer' => $customerId,
+                'session_id' => $sessionId,
+            ]);
+
+            return $this->successMethod();
+        }
+
+        $this->grantCredits->execute($team, $priceId, $sessionId);
+
+        return $this->successMethod();
     }
 }

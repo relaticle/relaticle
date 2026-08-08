@@ -255,3 +255,76 @@ it('never double-grants across a mid-trial conversion', function (): void {
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
         ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle — never a third
 });
+
+/** @return array<string, mixed> */
+function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
+{
+    return [
+        'id' => 'evt_checkout_test',
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => array_merge([
+            'id' => 'cs_test_pack_1',
+            'object' => 'checkout.session',
+            'mode' => 'payment',
+            'customer' => $team->stripe_id,
+            'metadata' => [
+                'team_id' => (string) $team->getKey(),
+                'credit_pack_price' => 'price_credits_1k_test',
+            ],
+        ], $overrides)],
+    ];
+}
+
+it('grants pack credits exactly once on checkout session completed', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_test'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk();
+    sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk(); // replay
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->purchased_credits)->toBe(1000);
+});
+
+it('ignores subscription-mode checkout sessions', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_sub'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['mode' => 'subscription']))->assertOk();
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+});
+
+it('grants nothing when the session customer does not match the team', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_real'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['customer' => 'cus_attacker']))->assertOk();
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+});
+
+it('grants nothing for an unknown pack price', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_unknown'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, [
+        'metadata' => ['team_id' => (string) $team->getKey(), 'credit_pack_price' => 'price_nonexistent'],
+    ]))->assertOk();
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+});
