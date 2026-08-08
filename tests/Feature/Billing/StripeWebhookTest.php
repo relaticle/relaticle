@@ -6,6 +6,7 @@ use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncTeamPlanFromSubscription;
 use App\Enums\Plan;
+use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Models\Team;
 use App\Models\User;
@@ -419,4 +420,23 @@ it('logs and grants nothing when a payment-mode session is missing pack metadata
             && in_array('metadata.team_id', $context['missing_fields'], true)
             && ! in_array('metadata.credit_pack_price', $context['missing_fields'], true)
         );
+});
+
+it('subscribes the Stripe endpoint to every checkout event the controller handles', function (): void {
+    // `cashier:webhook` provisions the endpoint from config('cashier.webhook.events').
+    // A handler that isn't in that list never fires in production, however well
+    // it is covered here — these tests POST to the route directly.
+    $handled = collect((new ReflectionClass(StripeWebhookController::class))->getMethods(ReflectionMethod::IS_PROTECTED))
+        ->map(fn (ReflectionMethod $method): string => $method->getName())
+        ->filter(fn (string $name): bool => str_starts_with($name, 'handleCheckoutSession'))
+        ->map(fn (string $name): string => Str::replaceFirst(
+            'checkout_session_',
+            'checkout.session.',
+            Str::snake(Str::replaceFirst('handle', '', $name)),
+        ))
+        ->values()
+        ->all();
+
+    expect($handled)->toContain('checkout.session.completed', 'checkout.session.async_payment_succeeded')
+        ->and(config('cashier.webhook.events'))->toContain(...$handled);
 });
