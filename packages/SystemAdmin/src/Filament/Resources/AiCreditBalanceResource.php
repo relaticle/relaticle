@@ -57,7 +57,8 @@ final class AiCreditBalanceResource extends Resource
             ->components([
                 TextInput::make('credits_remaining')
                     ->numeric()
-                    ->minValue(0)
+                    ->minValue(fn (?AiCreditBalance $record): int => $record?->purchased_credits ?? 0)
+                    ->helperText('Cannot go below purchased credits — the DB enforces purchased_credits <= credits_remaining.')
                     ->required(),
                 TextInput::make('credits_used')
                     ->numeric()
@@ -80,6 +81,10 @@ final class AiCreditBalanceResource extends Resource
                     TextEntry::make('team.name')->label('Team'),
                     TextEntry::make('credits_remaining')->numeric(),
                     TextEntry::make('credits_used')->numeric(),
+                    TextEntry::make('purchased_credits')
+                        ->numeric()
+                        ->label('Purchased credits')
+                        ->helperText('Floor for credits_remaining — the DB rejects a lower value.'),
                     TextEntry::make('period_starts_at')->dateTime(),
                     TextEntry::make('period_ends_at')->dateTime(),
                     TextEntry::make('updated_at')->dateTime(),
@@ -128,6 +133,11 @@ final class AiCreditBalanceResource extends Resource
                 TextColumn::make('credits_used')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('purchased_credits')
+                    ->label('Purchased')
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('period_starts_at')
                     ->date()
                     ->sortable(),
