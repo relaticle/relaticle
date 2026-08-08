@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
@@ -204,4 +205,29 @@ it('keeps calendar-month periods for teams with no subscription and no trial', f
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
     expect($balance->period_starts_at->toDateTimeString())->toBe(now()->startOfMonth()->toDateTimeString())
         ->and($balance->period_ends_at->toDateTimeString())->toBe(now()->endOfMonth()->toDateTimeString());
+});
+
+it('resets credits for two or more expired teams processed in the same run', function (): void {
+    // Unlike ProcessTrialsCommand's chunkById(), this command fetches each team
+    // with a per-iteration find() -- a single-row query never arms Eloquent's
+    // strict lazy-loading guard, so this loop shape stays safe as team count grows.
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+
+    $teamA = Team::factory()->create();
+    $teamB = Team::factory()->create();
+
+    foreach ([$teamA, $teamB] as $team) {
+        AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+            'team_id' => $team->getKey(),
+            'credits_remaining' => 0,
+            'credits_used' => 100,
+            'period_starts_at' => now()->subMonths(2)->startOfMonth(),
+            'period_ends_at' => now()->subMonth()->endOfMonth(),
+        ]);
+    }
+
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect(AiCreditBalance::query()->where('team_id', $teamA->getKey())->value('credits_remaining'))->toBe(Plan::Free->credits())
+        ->and(AiCreditBalance::query()->where('team_id', $teamB->getKey())->value('credits_remaining'))->toBe(Plan::Free->credits());
 });

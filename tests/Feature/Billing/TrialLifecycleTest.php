@@ -164,3 +164,26 @@ it('grants exactly one allowance for a trial that crosses a month boundary', fun
         ->count();
     expect($grants)->toBe(1);
 });
+
+it('downgrades two or more expired trials in a single chunked run', function (): void {
+    // chunkById() hydrates both teams in one query, which is what arms Eloquent's
+    // strict lazy-loading guard (a single find() never does) -- a one-team test
+    // cannot catch a resolver call that lazy loads the subscriptions relation.
+    [, $teamA] = trialOwnerAndTeam();
+    $teamA->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    [, $teamB] = trialOwnerAndTeam();
+    $teamB->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    $balanceA = AiCreditBalance::query()->where('team_id', $teamA->getKey())->sole();
+    $balanceB = AiCreditBalance::query()->where('team_id', $teamB->getKey())->sole();
+
+    expect($teamA->refresh()->plan)->toBe(Plan::Free)
+        ->and($teamA->trial_ends_at)->toBeNull()
+        ->and($balanceA->credits_remaining)->toBe(Plan::Free->credits())
+        ->and($teamB->refresh()->plan)->toBe(Plan::Free)
+        ->and($teamB->trial_ends_at)->toBeNull()
+        ->and($balanceB->credits_remaining)->toBe(Plan::Free->credits());
+});

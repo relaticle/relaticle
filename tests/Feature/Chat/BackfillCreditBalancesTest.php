@@ -21,6 +21,7 @@ it('backfills credit balances for teams that have none', function (): void {
     $action = app(SeedTeamCreditBalance::class);
     Team::query()
         ->whereDoesntHave('aiCreditBalance')
+        ->with('subscriptions')
         ->chunkById(200, function ($teams) use ($action): void {
             foreach ($teams as $team) {
                 $action->execute($team);
