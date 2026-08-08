@@ -147,7 +147,7 @@
                             <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
                         @endif
 
-                        @if(! $isPaused && $availablePacks !== [])
+                        @if($availablePacks !== [])
                             <div class="mt-4 flex flex-wrap gap-2">
                                 @foreach($availablePacks as $key => $pack)
                                     <button type="button" wire:click="buyCredits('{{ $key }}')"

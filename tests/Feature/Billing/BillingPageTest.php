@@ -58,6 +58,7 @@ it('hides the trial CTA once the user used a trial', function (): void {
 });
 
 it('does not offer a manual trial to a new hosted workspace', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $team] = billingPageOwner();
     $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
@@ -66,7 +67,8 @@ it('does not offer a manual trial to a new hosted workspace', function (): void 
         ->assertSee(__('billing.paused.title'))
         ->assertSee(__('billing.upgrade.unlock'))
         ->assertSee('$19')
-        ->assertSee(__('billing.pro_plan.billed_yearly'));
+        ->assertSee(__('billing.pro_plan.billed_yearly'))
+        ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
 });
 
 it('starts a trial via the page action', function (): void {
@@ -215,9 +217,23 @@ it('refuses buyCredits for a paused workspace', function (): void {
 
     livewire(Billing::class)
         ->call('buyCredits', 'small')
-        ->assertNoRedirect();
+        ->assertNoRedirect()
+        ->assertNotNotified();
+});
 
-    // No Stripe call was attempted; the guard returned before checkout.
+it('refuses buyCredits for a non-owner', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+    [, $team] = billingPageOwner();
+    $member = User::factory()->create();
+    $team->users()->attach($member, ['role' => 'admin']);
+
+    test()->actingAs($member);
+    Filament::setTenant($team->refresh());
+
+    livewire(Billing::class)
+        ->call('buyCredits', 'small')
+        ->assertNoRedirect()
+        ->assertNotNotified();
 });
 
 it('shows the purchased portion of the balance', function (): void {

@@ -25,7 +25,6 @@ return [
         'resets' => 'Resets :date',
     ],
     'packs' => [
-        'title' => 'Need more credits?',
         'buy' => 'Buy :credits credits',
         'balance_split' => 'Includes :purchased purchased credits — they never expire',
         'buy_more' => 'Buy more credits',
