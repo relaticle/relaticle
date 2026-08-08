@@ -82,7 +82,11 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
         foreach ($tokenRows as $row) {
             $rate = $rates[$row->model] ?? null;
 
-            if ($rate === null) {
+            if (
+                ! is_array($rate)
+                || ! is_numeric($rate['input_per_mtok'] ?? null)
+                || ! is_numeric($rate['output_per_mtok'] ?? null)
+            ) {
                 $unpriced[] = $row->model;
 
                 continue;
@@ -92,9 +96,11 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 + ((int) $row->output_sum / 1_000_000) * $rate['output_per_mtok'];
         }
 
-        $costDescription = $unpriced === []
-            ? 'Upper bound — prompt caching not deducted'
-            : 'Unpriced models: '.implode(', ', $unpriced);
+        $costDescription = 'Upper bound — prompt caching not deducted';
+
+        if ($unpriced !== []) {
+            $costDescription .= '. Unpriced models: '.implode(', ', $unpriced);
+        }
 
         return [
             Stat::make('Credits this month', number_format($currentMonthCredits))

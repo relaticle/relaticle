@@ -115,3 +115,47 @@ it('surfaces models with no configured rate as unpriced instead of silently trea
         ->assertSee('$0.00')
         ->assertSee('Unpriced models: qwen-2.5');
 });
+
+it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'gpt-5.5',
+        'input_tokens' => 1_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 5,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$21.00')
+        ->assertSee('Upper bound')
+        ->assertSee('Unpriced models: gpt-5.5');
+});
+
+it('treats a malformed rate entry as unpriced instead of coercing it to zero cost', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertSee('Unpriced models: claude-sonnet-4-6');
+});
