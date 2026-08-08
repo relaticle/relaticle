@@ -83,3 +83,57 @@ it('keeps purchased credits when the plan changes', function (): void {
     expect($balance->purchased_credits)->toBe(500)
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits() + 500);
 });
+
+it('returns a refunded reservation to the purchased bucket once the allowance is spent', function (): void {
+    [, $team] = packOwnerAndTeam();
+    $service = app(CreditService::class);
+    $service->addPurchasedCredits($team, 10, 'pack-refund-restore');
+
+    // Burn the whole Free allowance so every further spend eats purchased credits.
+    foreach (range(1, Plan::Free->credits()) as $ignored) {
+        expect($service->reserveCredit($team))->toBeTrue();
+    }
+
+    expect($service->reserveCredit($team, 'reserve-turn-1'))->toBeTrue();
+    $service->refundReservation($team, 1, 'resolve-turn-1');
+
+    // Without restoring the prepaid bucket the credit survives as an allowance
+    // credit and resetPeriod() wipes it — the customer silently loses a credit
+    // they paid for on every crashed turn.
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->credits_remaining)->toBe(10)
+        ->and($balance->purchased_credits)->toBe(10);
+
+    $service->resetPeriod($team);
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining'))
+        ->toBe(Plan::Free->credits() + 10);
+});
+
+it('credits a refund to the allowance while allowance credits remain', function (): void {
+    [, $team] = packOwnerAndTeam();
+    $service = app(CreditService::class);
+    $service->addPurchasedCredits($team, 10, 'pack-refund-allowance');
+
+    expect($service->reserveCredit($team, 'reserve-turn-2'))->toBeTrue();
+    $service->refundReservation($team, 1, 'resolve-turn-2');
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->credits_remaining)->toBe(Plan::Free->credits() + 10)
+        ->and($balance->purchased_credits)->toBe(10);
+});
+
+it('does not invent purchased credits when a refund lands on an empty balance', function (): void {
+    [, $team] = packOwnerAndTeam();
+    $service = app(CreditService::class);
+
+    foreach (range(1, Plan::Free->credits()) as $ignored) {
+        expect($service->reserveCredit($team))->toBeTrue();
+    }
+
+    $service->refundReservation($team, 1, 'resolve-turn-3');
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->credits_remaining)->toBe(1)
+        ->and($balance->purchased_credits)->toBe(0);
+});

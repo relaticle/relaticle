@@ -64,7 +64,7 @@ final readonly class CreditService
             $balance->update([
                 'credits_remaining' => $newRemaining,
                 'credits_used' => $balance->credits_used + 1,
-                'purchased_credits' => min($balance->purchased_credits, $newRemaining),
+                'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
             ]);
 
             if ($reservationKey !== null) {
@@ -169,6 +169,29 @@ final readonly class CreditService
         });
     }
 
+    /**
+     * The prepaid portion of a balance once `credits_remaining` moves to
+     * $newRemaining, keeping the `purchased_credits <= credits_remaining`
+     * invariant the DB enforces.
+     *
+     * Spending drains the monthly allowance first, so the prepaid bucket only
+     * shrinks once the allowance is gone. A refund has to reverse that: when
+     * every remaining credit was prepaid, the credit came out of the prepaid
+     * bucket and must go back there — otherwise it silently becomes an
+     * allowance credit that the next period reset wipes.
+     */
+    private function purchasedAfter(AiCreditBalance $balance, int $newRemaining): int
+    {
+        $wasFullyPrepaid = $balance->purchased_credits > 0
+            && $balance->purchased_credits === $balance->credits_remaining;
+
+        if ($wasFullyPrepaid && $newRemaining > $balance->credits_remaining) {
+            return $newRemaining;
+        }
+
+        return min($balance->purchased_credits, $newRemaining);
+    }
+
     private function ensureBalance(Team $team): AiCreditBalance
     {
         $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
@@ -225,7 +248,7 @@ final readonly class CreditService
             $balance->update([
                 'credits_remaining' => $newRemaining,
                 'credits_used' => $balance->credits_used + $creditsCharged,
-                'purchased_credits' => min($balance->purchased_credits, $newRemaining),
+                'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
             ]);
 
             AiCreditTransaction::query()->create([
@@ -387,7 +410,7 @@ final readonly class CreditService
                 $balance->update([
                     'credits_remaining' => $newRemaining,
                     'credits_used' => max($balance->credits_used + $usedDelta, 0),
-                    'purchased_credits' => min($balance->purchased_credits, $newRemaining),
+                    'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
                 ]);
             }
 
@@ -478,7 +501,7 @@ final readonly class CreditService
 
                 $balance->update([
                     'credits_remaining' => $newRemaining,
-                    'purchased_credits' => min($balance->purchased_credits, $newRemaining),
+                    'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
                 ]);
             }
 
