@@ -114,6 +114,7 @@ final class UtilizationReportCommand extends Command
             ];
         }
 
+        $this->comment('Note: rows below cover only workspaces with recorded usage in the reported month. Workspaces on an active plan with zero usage that month are not represented.');
         $this->table(['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'], $rows);
 
         if ($fallbackCount > 0) {

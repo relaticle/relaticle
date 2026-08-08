@@ -73,6 +73,7 @@ it('prints per-plan utilization and pack-purchase metrics sourced from the credi
     ]);
 
     $this->artisan('billing:utilization-report', ['--month' => '2026-07'])
+        ->expectsOutputToContain('rows below cover only workspaces with recorded usage')
         ->expectsTable(
             ['Plan', 'Workspaces', 'p50', 'p90', 'p99', 'At 100%'],
             [['pro', 2, '1%', '100%', '100%', 1]],
