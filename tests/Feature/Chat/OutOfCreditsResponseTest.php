@@ -174,6 +174,19 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
     $team->plan = Plan::Pro;
     $team->save();
 
+    // A valid Cashier subscription is how a real paying customer reaches this
+    // plan/state (SyncTeamPlanFromSubscription only sets Plan::Pro when the
+    // subscription is valid()); it also satisfies HostedWorkspaceAccess::allows()
+    // via subscription()?->valid(), so the request isn't paused before reaching
+    // ChatController.
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_top_up',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
     AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
         'team_id' => $team->getKey(),
         'credits_remaining' => 0,

@@ -80,6 +80,69 @@ it('does not show the Upgrade link for Pro users', function (): void {
         ->assertDontSee('Upgrade to Pro');
 });
 
+it('shows the Buy more credits link for Pro users when billing is enabled', function (): void {
+    Feature::define(Billing::class, true);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->plan = Plan::Pro;
+    $team->save();
+
+    // A valid Cashier subscription is how a real paying customer reaches
+    // Plan::Pro (SyncTeamPlanFromSubscription only sets it when the
+    // subscription is valid()).
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_side_panel',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    Livewire::test(ChatSidePanel::class)
+        ->set('isOpen', true)
+        ->assertSee('Buy more credits');
+});
+
+it('hides the Buy more credits link for Pro users when billing is disabled', function (): void {
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->plan = Plan::Pro;
+    $team->save();
+
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_side_panel_disabled',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    Livewire::test(ChatSidePanel::class)
+        ->set('isOpen', true)
+        ->assertDontSee('Buy more credits');
+});
+
+it('hides the Buy more credits link for Free users', function (): void {
+    Feature::define(Billing::class, true);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    Livewire::test(ChatSidePanel::class)
+        ->set('isOpen', true)
+        ->assertDontSee('Buy more credits');
+});
+
 it('shows the Pro plan label and Pro allowance', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
