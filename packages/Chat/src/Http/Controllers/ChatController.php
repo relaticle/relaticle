@@ -6,11 +6,13 @@ namespace Relaticle\Chat\Http\Controllers;
 
 use App\Enums\Plan;
 use App\Features\Billing;
+use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
 use Illuminate\Http\JsonResponse;
@@ -48,6 +50,20 @@ final readonly class ChatController
     private function modelIds(): array
     {
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
+    }
+
+    /**
+     * Billing page URL for the workspace, or null when billing is switched off.
+     * Resolved through the panel route so it stays correct whether the app panel
+     * is served from a path prefix or its own subdomain.
+     */
+    private function billingUrl(Team $team): ?string
+    {
+        if (! Feature::active(Billing::class)) {
+            return null;
+        }
+
+        return BillingPage::getUrl(panel: 'app', tenant: $team);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -106,9 +122,7 @@ final readonly class ChatController
                     'plan' => $team->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree && Feature::active(Billing::class)
-                        ? url("/app/{$team->slug}/billing")
-                        : null,
+                    'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
                 ], 403);
             }
         }
@@ -130,15 +144,11 @@ final readonly class ChatController
                 'allowance' => $team->plan->credits(),
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree && Feature::active(Billing::class)
-                    ? url("/app/{$team->slug}/billing")
-                    : null,
+                'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
                 // A top-up is only offered when a pack can actually be bought —
                 // otherwise the CTA lands on a billing page with nothing to buy.
                 'top_up_available' => $canTopUp,
-                'top_up_url' => $canTopUp && Feature::active(Billing::class)
-                    ? url("/app/{$team->slug}/billing")
-                    : null,
+                'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
             ], 402);
         }
 

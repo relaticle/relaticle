@@ -113,7 +113,7 @@ final class Billing extends Page
         }
 
         try {
-            return $team->redirectToBillingPortal(url("/app/{$team->slug}/billing"));
+            return $team->redirectToBillingPortal(self::getUrl(panel: 'app', tenant: $team));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();

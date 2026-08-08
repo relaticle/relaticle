@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Filament\Pages\Billing;
 use App\Models\Team;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,9 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
     {
         return new Content(
             markdown: 'mail.pro-trial-ending-soon',
+            with: [
+                'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->team),
+            ],
         );
     }
 }
