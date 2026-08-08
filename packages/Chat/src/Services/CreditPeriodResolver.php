@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services;
 use App\Actions\Billing\StartProTrial;
 use App\Models\Team;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 final readonly class CreditPeriodResolver
 {
@@ -70,7 +71,7 @@ final readonly class CreditPeriodResolver
 
         for ($i = 0; $i < self::MAX_CYCLE_ADJUSTMENTS; $i++) {
             if ($start->lessThanOrEqualTo($now) && $now->lessThan($end)) {
-                break;
+                return ['start' => $start, 'end' => $end];
             }
 
             $elapsed = max(0, $elapsed + ($start->greaterThan($now) ? -1 : 1));
@@ -78,6 +79,18 @@ final readonly class CreditPeriodResolver
             $end = $anchor->copy()->addMonthsNoOverflow($elapsed + 1);
         }
 
-        return ['start' => $start, 'end' => $end];
+        if ($start->lessThanOrEqualTo($now) && $now->lessThan($end)) {
+            return ['start' => $start, 'end' => $end];
+        }
+
+        // Exhausting the cap without converging must fail loudly: silently
+        // returning a window may already be in the past, which would make
+        // chat:reset-credits re-grant a full allowance every night.
+        throw new RuntimeException(sprintf(
+            'CreditPeriodResolver failed to converge on an anniversary cycle for anchor %s (now %s) after %d adjustments.',
+            $anchor->toIso8601String(),
+            $now->toIso8601String(),
+            self::MAX_CYCLE_ADJUSTMENTS,
+        ));
     }
 }
