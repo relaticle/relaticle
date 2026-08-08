@@ -181,6 +181,7 @@ it('shows enterprise manual state without upgrade actions', function (): void {
 });
 
 it('renders read-only info for members', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $team] = billingPageOwner();
     $member = User::factory()->create();
     $team->users()->attach($member, ['role' => 'editor']);
@@ -190,7 +191,8 @@ it('renders read-only info for members', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('billing.member.ask_owner', ['owner' => $team->owner->name]))
-        ->assertDontSee(__('billing.trial.start_button'));
+        ->assertDontSee(__('billing.trial.start_button'))
+        ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
 });
 
 it('shows buy-credit buttons to an owner with hosted access', function (): void {
@@ -250,8 +252,24 @@ it('shows the purchased portion of the balance', function (): void {
     livewire(Billing::class)->assertSee(__('billing.packs.balance_split', ['purchased' => number_format(200)]));
 });
 
-it('excludes purchased credits from the period allowance denominator', function (): void {
+it('shows a fulfilment-pending notice after a credit pack checkout', function (): void {
+    billingPageOwner();
+
+    livewire(Billing::class)
+        ->set('credits', 'success')
+        ->assertSee(__('billing.packs.fulfilling_title'));
+});
+
+it('does not show the fulfilment-pending notice without the credits query param', function (): void {
+    billingPageOwner();
+
+    livewire(Billing::class)
+        ->assertDontSee(__('billing.packs.fulfilling_title'));
+});
+
+it('uses the plan allowance as the meter denominator, not remaining plus used', function (): void {
     [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Pro])->save();
 
     AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
         'credits_remaining' => 500,
@@ -262,6 +280,26 @@ it('excludes purchased credits from the period allowance denominator', function 
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(375))
-        ->assertDontSee('/ '.number_format(575));
+        ->assertSee('/ '.number_format(Plan::Pro->credits()))
+        ->assertDontSee('/ '.number_format(575))
+        ->assertDontSee('/ '.number_format(375));
+});
+
+it('keeps the plan allowance as the denominator once the monthly allowance is exhausted and purchased credits are being spent', function (): void {
+    // Old formula (remaining + used - purchased) collapsed to `used` here,
+    // rendering "N / N" at 100% with the plan's real allowance nowhere in sight.
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'credits_remaining' => 50,
+        'credits_used' => 2050,
+        'purchased_credits' => 50,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee('/ '.number_format(Plan::Pro->credits()))
+        ->assertDontSee('/ '.number_format(2050));
 });

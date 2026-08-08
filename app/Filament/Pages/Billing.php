@@ -34,6 +34,9 @@ final class Billing extends Page
     #[Url]
     public ?string $checkout = null;
 
+    #[Url]
+    public ?string $credits = null;
+
     #[Override]
     public static function shouldRegisterNavigation(): bool
     {
@@ -163,6 +166,7 @@ final class Billing extends Page
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('team_id', $team->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $team->subscribed(),
+            'creditsFulfilling' => $this->credits === 'success',
         ];
     }
 

@@ -28,6 +28,8 @@ return [
         'buy' => 'Buy :credits credits',
         'balance_split' => 'Includes :purchased purchased credits — they never expire',
         'buy_more' => 'Buy more credits',
+        'fulfilling_title' => 'Payment received — credits are on their way',
+        'fulfilling_body' => 'It can take a minute for your new credits to appear. Refresh this page if the balance below still looks unchanged shortly.',
     ],
     'trial' => [
         'start_button' => 'Start 14-day Pro trial — no card needed',
