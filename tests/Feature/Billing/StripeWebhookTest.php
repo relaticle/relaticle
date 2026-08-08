@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncTeamPlanFromSubscription;
 use App\Enums\Plan;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
@@ -17,6 +19,7 @@ use Relaticle\Chat\Services\CreditService;
 
 mutates(SyncTeamPlanFromSubscription::class);
 mutates(SyncPlanOnStripeSubscriptionChange::class);
+mutates(GrantPurchasedCredits::class);
 
 beforeEach(function (): void {
     config()->set('cashier.webhook.secret', 'whsec_test_secret');
@@ -327,4 +330,33 @@ it('grants nothing for an unknown pack price', function (): void {
     ]))->assertOk();
 
     expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+});
+
+it('logs and grants nothing when a payment-mode session is missing pack metadata', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_missing_meta'])->save();
+
+    Log::spy();
+
+    // credit_pack_price is well-formed and configured; team_id is missing. This
+    // must trip the metadata guard specifically, not the unknown-price branch
+    // (which is never reached) or the customer-mismatch branch (which requires
+    // a resolved team, and this metadata never resolves one).
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, [
+        'metadata' => ['credit_pack_price' => 'price_credits_1k_test'],
+    ]))->assertOk();
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => str_contains($message, 'missing or malformed metadata')
+            && $context['session_id'] === 'cs_test_pack_1'
+            && in_array('metadata.team_id', $context['missing_fields'], true)
+            && ! in_array('metadata.credit_pack_price', $context['missing_fields'], true)
+        );
 });

@@ -77,6 +77,15 @@ final class StripeWebhookController extends CashierWebhookController
         $customerId = $session['customer'] ?? null;
 
         if (! is_string($priceId) || ! is_string($teamId) || ! is_string($sessionId)) {
+            Log::warning('Credit pack checkout ignored: missing or malformed metadata', [
+                'session_id' => is_string($sessionId) ? $sessionId : null,
+                'missing_fields' => array_keys(array_filter([
+                    'metadata.team_id' => ! is_string($teamId),
+                    'metadata.credit_pack_price' => ! is_string($priceId),
+                    'session.id' => ! is_string($sessionId),
+                ])),
+            ]);
+
             return $this->successMethod();
         }
 
@@ -86,6 +95,7 @@ final class StripeWebhookController extends CashierWebhookController
             Log::warning('Credit pack checkout ignored: team/customer mismatch', [
                 'team_id' => $teamId,
                 'customer' => $customerId,
+                'expected_customer' => $team?->stripe_id,
                 'session_id' => $sessionId,
             ]);
 
