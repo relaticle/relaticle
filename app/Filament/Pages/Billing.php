@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -32,6 +34,9 @@ final class Billing extends Page
 
     #[Url]
     public ?string $checkout = null;
+
+    #[Url]
+    public ?string $credits = null;
 
     #[Override]
     public static function shouldRegisterNavigation(): bool
@@ -117,6 +122,24 @@ final class Billing extends Page
         }
     }
 
+    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): ?RedirectResponse
+    {
+        $team = $this->team();
+
+        if (! $this->user()->ownsTeam($team) || ! resolve(HostedWorkspaceAccess::class)->allows($team)) {
+            return null;
+        }
+
+        try {
+            return redirect()->away($createCheckout->execute($team, $pack));
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->notifyCheckoutFailed();
+
+            return null;
+        }
+    }
+
     private function notifyCheckoutFailed(): void
     {
         Notification::make()
@@ -144,6 +167,8 @@ final class Billing extends Page
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('team_id', $team->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $team->subscribed(),
+            'creditsFulfilling' => $this->credits === 'success',
+            'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
         ];
     }
 

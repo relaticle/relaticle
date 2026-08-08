@@ -30,6 +30,7 @@ final class AiCreditBalanceFactory extends Factory
             'team_id' => $team->getKey(),
             'credits_remaining' => $allowance - $used,
             'credits_used' => $used,
+            'purchased_credits' => 0,
             'period_starts_at' => now()->startOfMonth(),
             'period_ends_at' => now()->endOfMonth(),
         ];

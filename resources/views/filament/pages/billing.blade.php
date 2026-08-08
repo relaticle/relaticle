@@ -1,8 +1,7 @@
 <x-filament-panels::page>
     @php
-        $allowance = $balance
-            ? max(0, (int) $balance->credits_remaining + (int) $balance->credits_used)
-            : $team->plan->credits();
+        $purchased = (int) ($balance?->purchased_credits ?? 0);
+        $allowance = $team->plan->credits();
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
@@ -64,6 +63,16 @@
                         <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('billing.upgrade.activation_delayed_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">{{ __('billing.upgrade.activation_delayed_body') }}</p>
                     </div>
+                </div>
+            </div>
+        @endif
+
+        @if($creditsFulfilling)
+            <div class="{{ $card }} flex items-center gap-3 p-5">
+                <x-filament::loading-indicator class="h-5 w-5 text-primary" />
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('billing.packs.fulfilling_title') }}</h3>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.packs.fulfilling_body') }}</p>
                 </div>
             </div>
         @endif
@@ -136,6 +145,20 @@
 
                         @if($balance?->period_ends_at)
                             <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                        @endif
+
+                        @if($purchased > 0)
+                            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
+                        @endif
+
+                        @if($isOwner && $availablePacks !== [])
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                @foreach($availablePacks as $key => $pack)
+                                    <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
+                                        {{ __('billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
+                                    </x-filament::button>
+                                @endforeach
+                            </div>
                         @endif
                     </div>
                 @endif

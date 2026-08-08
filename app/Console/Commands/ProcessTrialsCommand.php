@@ -61,6 +61,7 @@ final class ProcessTrialsCommand extends Command
         Team::query()
             ->whereNotNull('trial_ends_at')
             ->where('trial_ends_at', '<', now())
+            ->with('subscriptions')
             ->chunkById(100, function (Collection $teams) use ($credits, &$count): void {
                 $teams->each(function (Team $team) use ($credits, &$count): void {
                     $hasLiveSubscription = $team->subscriptions()

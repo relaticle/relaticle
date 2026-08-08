@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 
 mutates(StartProTrial::class);
 mutates(ProcessTrialsCommand::class);
@@ -143,4 +144,46 @@ it('keeps a sysadmin-granted plan when a stale trial timestamp expires', functio
 
     expect($team->plan)->toBe(Plan::Enterprise)
         ->and($team->trial_ends_at)->toBeNull();
+});
+
+it('grants exactly one allowance for a trial that crosses a month boundary', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
+
+    [$user, $team] = trialOwnerAndTeam();
+    app(StartProTrial::class)->execute($user, $team);
+
+    $this->travelTo(new DateTimeImmutable('2026-07-02 12:00:00', new DateTimeZone('UTC')));
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->period_ends_at->toDateTimeString())->toBe('2026-07-09 12:00:00');
+
+    $grants = AiCreditTransaction::query()
+        ->where('team_id', $team->getKey())
+        ->where('metadata->action', 'reset_period')
+        ->count();
+    expect($grants)->toBe(1);
+});
+
+it('downgrades two or more expired trials in a single chunked run', function (): void {
+    // chunkById() hydrates both teams in one query, which is what arms Eloquent's
+    // strict lazy-loading guard (a single find() never does) -- a one-team test
+    // cannot catch a resolver call that lazy loads the subscriptions relation.
+    [, $teamA] = trialOwnerAndTeam();
+    $teamA->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    [, $teamB] = trialOwnerAndTeam();
+    $teamB->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    $balanceA = AiCreditBalance::query()->where('team_id', $teamA->getKey())->sole();
+    $balanceB = AiCreditBalance::query()->where('team_id', $teamB->getKey())->sole();
+
+    expect($teamA->refresh()->plan)->toBe(Plan::Free)
+        ->and($teamA->trial_ends_at)->toBeNull()
+        ->and($balanceA->credits_remaining)->toBe(Plan::Free->credits())
+        ->and($teamB->refresh()->plan)->toBe(Plan::Free)
+        ->and($teamB->trial_ends_at)->toBeNull()
+        ->and($balanceB->credits_remaining)->toBe(Plan::Free->credits());
 });

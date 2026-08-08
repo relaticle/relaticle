@@ -15,7 +15,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 
 final readonly class CreditService
 {
-    public function __construct(private ModelRegistry $registry) {}
+    public function __construct(private ModelRegistry $registry, private CreditPeriodResolver $periods) {}
 
     public function hasCredits(Team $team): bool
     {
@@ -59,9 +59,12 @@ final readonly class CreditService
                 return false;
             }
 
+            $newRemaining = $balance->credits_remaining - 1;
+
             $balance->update([
-                'credits_remaining' => $balance->credits_remaining - 1,
+                'credits_remaining' => $newRemaining,
                 'credits_used' => $balance->credits_used + 1,
+                'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
             ]);
 
             if ($reservationKey !== null) {
@@ -121,6 +124,74 @@ final readonly class CreditService
         return $balance->credits_remaining;
     }
 
+    /**
+     * Grant prepaid credits from a completed pack checkout. Idempotent on
+     * $idempotencyKey (the Stripe checkout session id) via the ledger's
+     * (team_id, idempotency_key) unique index — webhook replays are a no-op.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function addPurchasedCredits(Team $team, int $credits, string $idempotencyKey, array $metadata = []): bool
+    {
+        $this->ensureBalance($team);
+
+        return DB::transaction(function () use ($team, $credits, $idempotencyKey, $metadata): bool {
+            $inserted = AiCreditTransaction::query()->insertOrIgnore([
+                'id' => (string) Str::ulid(),
+                'team_id' => $team->getKey(),
+                'user_id' => null,
+                'conversation_id' => null,
+                'idempotency_key' => $idempotencyKey,
+                'type' => AiCreditType::Purchase->value,
+                'model' => 'stripe',
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'credits_charged' => $credits,
+                'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+            ]);
+
+            if ($inserted === 0) {
+                return false;
+            }
+
+            $balance = AiCreditBalance::query()
+                ->where('team_id', $team->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $balance->update([
+                'credits_remaining' => $balance->credits_remaining + $credits,
+                'purchased_credits' => $balance->purchased_credits + $credits,
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * The prepaid portion of a balance once `credits_remaining` moves to
+     * $newRemaining, keeping the `purchased_credits <= credits_remaining`
+     * invariant the DB enforces.
+     *
+     * Spending drains the monthly allowance first, so the prepaid bucket only
+     * shrinks once the allowance is gone. A refund has to reverse that: when
+     * every remaining credit was prepaid, the credit came out of the prepaid
+     * bucket and must go back there — otherwise it silently becomes an
+     * allowance credit that the next period reset wipes.
+     */
+    private function purchasedAfter(AiCreditBalance $balance, int $newRemaining): int
+    {
+        $wasFullyPrepaid = $balance->purchased_credits > 0
+            && $balance->purchased_credits === $balance->credits_remaining;
+
+        if ($wasFullyPrepaid && $newRemaining > $balance->credits_remaining) {
+            return $newRemaining;
+        }
+
+        return min($balance->purchased_credits, $newRemaining);
+    }
+
     private function ensureBalance(Team $team): AiCreditBalance
     {
         $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
@@ -160,18 +231,24 @@ final readonly class CreditService
                 ->first();
 
             if (! $balance instanceof AiCreditBalance) {
+                $bounds = $this->periods->boundsFor($team);
+
                 $balance = AiCreditBalance::query()->create([
                     'team_id' => $team->getKey(),
                     'credits_remaining' => 0,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'purchased_credits' => 0,
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ]);
             }
 
+            $newRemaining = max($balance->credits_remaining - $creditsCharged, 0);
+
             $balance->update([
-                'credits_remaining' => max($balance->credits_remaining - $creditsCharged, 0),
+                'credits_remaining' => $newRemaining,
                 'credits_used' => $balance->credits_used + $creditsCharged,
+                'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
             ]);
 
             AiCreditTransaction::query()->create([
@@ -316,18 +393,24 @@ final readonly class CreditService
                     ->first();
 
                 if (! $balance instanceof AiCreditBalance) {
+                    $bounds = $this->periods->boundsFor($team);
+
                     $balance = AiCreditBalance::query()->create([
                         'team_id' => $team->getKey(),
                         'credits_remaining' => 0,
                         'credits_used' => 0,
-                        'period_starts_at' => now()->startOfMonth(),
-                        'period_ends_at' => now()->endOfMonth(),
+                        'purchased_credits' => 0,
+                        'period_starts_at' => $bounds['start'],
+                        'period_ends_at' => $bounds['end'],
                     ]);
                 }
 
+                $newRemaining = max($balance->credits_remaining + $remainingDelta, 0);
+
                 $balance->update([
-                    'credits_remaining' => max($balance->credits_remaining + $remainingDelta, 0),
+                    'credits_remaining' => $newRemaining,
                     'credits_used' => max($balance->credits_used + $usedDelta, 0),
+                    'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
                 ]);
             }
 
@@ -346,13 +429,17 @@ final readonly class CreditService
                 ->lockForUpdate()
                 ->first();
 
+            $bounds = $this->periods->boundsFor($team);
+            $purchased = $previous instanceof AiCreditBalance ? $previous->purchased_credits : 0;
+
             AiCreditBalance::query()->updateOrCreate(
                 ['team_id' => $team->getKey()],
                 [
-                    'credits_remaining' => $allowance,
+                    'credits_remaining' => $allowance + $purchased,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'purchased_credits' => $purchased,
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ],
             );
 
@@ -392,12 +479,15 @@ final readonly class CreditService
                 ->first();
 
             if (! $balance instanceof AiCreditBalance) {
+                $bounds = $this->periods->boundsFor($team);
+
                 $balance = AiCreditBalance::query()->create([
                     'team_id' => $team->getKey(),
                     'credits_remaining' => 0,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'purchased_credits' => 0,
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ]);
             }
 
@@ -407,8 +497,11 @@ final readonly class CreditService
                 ]);
             } else {
                 $revoke = abs($delta);
+                $newRemaining = max($balance->credits_remaining - $revoke, 0);
+
                 $balance->update([
-                    'credits_remaining' => max($balance->credits_remaining - $revoke, 0),
+                    'credits_remaining' => $newRemaining,
+                    'purchased_credits' => $this->purchasedAfter($balance, $newRemaining),
                 ]);
             }
 

@@ -154,6 +154,14 @@
                         Upgrade to Pro →
                     </a>
                 @endif
+                @if ($billingTeam && $this->canBuyCredits)
+                    <a
+                        href="{{ url("/app/{$billingTeam->slug}/billing") }}"
+                        class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                        {{ __('billing.packs.buy_more') }}
+                    </a>
+                @endif
             </div>
         </div>
     </div>

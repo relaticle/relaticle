@@ -12,6 +12,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -120,6 +121,7 @@ final readonly class ChatController
                 ->first();
 
             $isFree = $team->plan === Plan::Free;
+            $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
 
             return response()->json([
                 'error' => 'credits_exhausted',
@@ -129,6 +131,12 @@ final readonly class ChatController
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
                 'upgrade_url' => $isFree && Feature::active(Billing::class)
+                    ? url("/app/{$team->slug}/billing")
+                    : null,
+                // A top-up is only offered when a pack can actually be bought —
+                // otherwise the CTA lands on a billing page with nothing to buy.
+                'top_up_available' => $canTopUp,
+                'top_up_url' => $canTopUp && Feature::active(Billing::class)
                     ? url("/app/{$team->slug}/billing")
                     : null,
             ], 402);

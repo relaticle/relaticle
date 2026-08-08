@@ -53,18 +53,59 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
 
         $delta = $currentMonthCredits - $previousMonthCredits;
 
-        $topModelRow = AiCreditTransaction::query()
-            ->selectRaw('model, SUM(credits_charged) AS total')
+        // One grouped pass over the month serves both the top-model stat and the
+        // dollar-cost stat; they share the same filter and differ only in aggregates.
+        $tokenRows = AiCreditTransaction::query()
+            ->selectRaw('model, SUM(credits_charged) AS total, SUM(input_tokens) AS input_sum, SUM(output_tokens) AS output_sum')
             ->whereIn('type', self::SPENDABLE_TYPES)
             ->where('created_at', '>=', $monthStart)
             ->where('created_at', '<', $nextMonthStart)
             ->groupBy('model')
-            ->orderByDesc('total')
-            ->first();
+            ->get();
+
+        $topModelRow = $tokenRows->sortByDesc(fn (AiCreditTransaction $row): int => (int) $row->total)->first();
 
         $topModelLabel = $topModelRow !== null
             ? "{$topModelRow->model} ({$topModelRow->total})"
             : '—';
+
+        /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> $rates */
+        $rates = config('chat.model_costs', []);
+        $totalCost = 0.0;
+        $unpriced = [];
+
+        foreach ($tokenRows as $row) {
+            $inputTokens = (int) $row->input_sum;
+            $outputTokens = (int) $row->output_sum;
+
+            // Cancelled and timed-out turns settle at the reserved minimum under
+            // the synthetic model 'incomplete' with zero tokens. They cost
+            // nothing, so listing them as unpriced is a false alarm.
+            if ($inputTokens === 0 && $outputTokens === 0) {
+                continue;
+            }
+
+            $rate = $rates[$row->model] ?? null;
+
+            if (
+                ! is_array($rate)
+                || ! is_numeric($rate['input_per_mtok'] ?? null)
+                || ! is_numeric($rate['output_per_mtok'] ?? null)
+            ) {
+                $unpriced[] = $row->model;
+
+                continue;
+            }
+
+            $totalCost += ($inputTokens / 1_000_000) * $rate['input_per_mtok']
+                + ($outputTokens / 1_000_000) * $rate['output_per_mtok'];
+        }
+
+        $costDescription = 'Upper bound — prompt caching not deducted';
+
+        if ($unpriced !== []) {
+            $costDescription .= '. Unpriced models: '.implode(', ', $unpriced);
+        }
 
         return [
             Stat::make('Credits this month', number_format($currentMonthCredits))
@@ -81,6 +122,11 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 ->description('Highest credit consumer')
                 ->descriptionIcon('heroicon-o-cpu-chip')
                 ->color('info'),
+
+            Stat::make('AI cost this month', '$'.number_format($totalCost, 2))
+                ->description($costDescription)
+                ->descriptionIcon('heroicon-o-currency-dollar')
+                ->color('warning'),
         ];
     }
 }

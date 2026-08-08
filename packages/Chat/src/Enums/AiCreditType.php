@@ -15,6 +15,7 @@ enum AiCreditType: string implements HasColor, HasLabel
     case Adjustment = 'adjustment';
     case Refund = 'refund';
     case Reservation = 'reservation';
+    case Purchase = 'purchase';
 
     public function getColor(): string
     {
@@ -24,6 +25,7 @@ enum AiCreditType: string implements HasColor, HasLabel
             self::Embedding, self::Reservation => 'gray',
             self::Adjustment => 'warning',
             self::Refund => 'success',
+            self::Purchase => 'success',
         };
     }
 
