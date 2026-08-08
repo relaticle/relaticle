@@ -269,6 +269,7 @@ function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
             'id' => 'cs_test_pack_1',
             'object' => 'checkout.session',
             'mode' => 'payment',
+            'payment_status' => 'paid',
             'customer' => $team->stripe_id,
             'metadata' => [
                 'team_id' => (string) $team->getKey(),
@@ -276,6 +277,16 @@ function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
             ],
         ], $overrides)],
     ];
+}
+
+/** @return array<string, mixed> */
+function checkoutSessionAsyncPaymentSucceededEvent(Team $team, array $overrides = []): array
+{
+    $event = checkoutSessionCompletedEvent($team, $overrides);
+    $event['type'] = 'checkout.session.async_payment_succeeded';
+    $event['data']['object']['payment_status'] = 'paid';
+
+    return $event;
 }
 
 it('grants pack credits exactly once on checkout session completed', function (): void {
@@ -291,6 +302,55 @@ it('grants pack credits exactly once on checkout session completed', function ()
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
     expect($balance->purchased_credits)->toBe(1000);
+});
+
+it('grants nothing for an unpaid checkout session completed event', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_unpaid'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+});
+
+it('grants pack credits once the delayed payment confirms asynchronously', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_async'])->save();
+
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->purchased_credits)->toBe(1000);
+});
+
+it('grants exactly once when an unpaid checkout later confirms asynchronously', function (): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_pack_delayed'])->save();
+
+    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk(); // replay
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->purchased_credits)->toBe(1000);
+
+    $grantsQuery = AiCreditTransaction::query()
+        ->where('team_id', $team->getKey())
+        ->where('idempotency_key', 'pack-cs_test_pack_1');
+
+    expect($grantsQuery->count())->toBe(1);
 });
 
 it('ignores subscription-mode checkout sessions', function (): void {

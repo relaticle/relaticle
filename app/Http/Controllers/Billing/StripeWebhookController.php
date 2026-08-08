@@ -56,8 +56,11 @@ final class StripeWebhookController extends CashierWebhookController
     }
 
     /**
-     * Fulfill credit-pack purchases. Subscription checkouts emit the same event
-     * and are ignored here (mode filter) — customer.subscription.* handles them.
+     * Fulfill credit-pack purchases for a checkout that settled synchronously.
+     * Delayed-notification payment methods complete with payment_status
+     * 'unpaid' and settle later via checkout.session.async_payment_succeeded —
+     * fulfilling here without the gate would grant credits before the money
+     * arrives, with nothing to reverse them if payment ultimately fails.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -66,6 +69,38 @@ final class StripeWebhookController extends CashierWebhookController
         /** @var array<string, mixed> $session */
         $session = $payload['data']['object'] ?? [];
 
+        if (($session['payment_status'] ?? null) !== 'paid') {
+            return $this->successMethod();
+        }
+
+        return $this->fulfillCreditPackCheckout($session);
+    }
+
+    /**
+     * Fulfill a credit-pack purchase whose payment settled asynchronously after
+     * an initial 'unpaid' checkout.session.completed. Reuses the same
+     * "pack-{sessionId}" idempotency key as the completed handler, so a session
+     * that both completes as paid and later confirms async grants exactly once.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleCheckoutSessionAsyncPaymentSucceeded(array $payload): Response
+    {
+        /** @var array<string, mixed> $session */
+        $session = $payload['data']['object'] ?? [];
+
+        return $this->fulfillCreditPackCheckout($session);
+    }
+
+    /**
+     * Fulfill credit-pack purchases for a settled (payment_status=paid)
+     * checkout session. Subscription checkouts emit the same events and are
+     * ignored here (mode filter) — customer.subscription.* handles them.
+     *
+     * @param  array<string, mixed>  $session
+     */
+    private function fulfillCreditPackCheckout(array $session): Response
+    {
         if (($session['mode'] ?? null) !== 'payment') {
             return $this->successMethod();
         }
