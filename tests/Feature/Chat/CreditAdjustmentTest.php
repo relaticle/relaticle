@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Team;
+use App\Models\User;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -71,4 +72,18 @@ it('creates a balance row if the team has none yet', function (): void {
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
     expect($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);
+});
+
+it('clamps purchased credits when a revoke shrinks the balance below them', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $service = app(CreditService::class);
+    $service->addPurchasedCredits($team, 200, 'pack-adjust-clamp');
+
+    // Balance: 300 allowance + 200 purchased = 500. Revoke 400 -> 100 remaining, purchased clamps to 100.
+    $service->adjust($team, -400, 'clamp test', 'sysadmin-1');
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->purchased_credits)->toBe(100);
 });

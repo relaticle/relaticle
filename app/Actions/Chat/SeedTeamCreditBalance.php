@@ -38,6 +38,7 @@ final readonly class SeedTeamCreditBalance
                 'team_id' => $team->getKey(),
                 'credits_remaining' => $allowance,
                 'credits_used' => 0,
+                'purchased_credits' => 0,
                 'period_starts_at' => $bounds['start'],
                 'period_ends_at' => $bounds['end'],
             ]);
