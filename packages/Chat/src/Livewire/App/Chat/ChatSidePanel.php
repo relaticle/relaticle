@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Livewire\App\Chat;
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\ChatContextService;
@@ -112,6 +115,19 @@ final class ChatSidePanel extends BaseLivewireComponent
         $team = $user?->currentTeam;
 
         return $team !== null ? $team->plan : Plan::default();
+    }
+
+    /**
+     * Whether to offer a prepaid top-up: a paid plan, billing live, and at
+     * least one pack with a configured Stripe price. Without the last check the
+     * link lands on a billing page that has nothing to sell.
+     */
+    #[Computed]
+    public function canBuyCredits(): bool
+    {
+        return $this->plan() !== Plan::Free
+            && Feature::active(Billing::class)
+            && resolve(CreditPackCatalog::class)->hasPurchasable();
     }
 
     #[Computed]

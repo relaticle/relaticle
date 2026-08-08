@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Models\Team;
+use App\Services\Billing\CreditPackCatalog;
 use InvalidArgumentException;
 
 final readonly class CreateCreditPackCheckout
 {
+    public function __construct(private CreditPackCatalog $catalog) {}
+
     /**
      * Create a one-time Stripe Checkout session for a prepaid credit pack and
      * return its redirect URL. Stripe round-trip — covered by the staging E2E
@@ -25,17 +28,14 @@ final readonly class CreateCreditPackCheckout
 
     private function priceId(string $pack): string
     {
-        // $pack arrives from the browser — pin it to the configured pack keys so
-        // an arbitrary string never reaches a config lookup.
-        $config = config("services.stripe.credit_packs.{$pack}");
+        // $pack arrives from the browser — pin it to the purchasable pack keys
+        // so neither an arbitrary string nor a pack without a configured Stripe
+        // price ever reaches checkout.
+        $config = $this->catalog->find($pack);
 
-        throw_unless(is_array($config), InvalidArgumentException::class, "Unknown credit pack [{$pack}].");
+        throw_unless(is_array($config), InvalidArgumentException::class, "Unknown or unpurchasable credit pack [{$pack}].");
 
-        $priceId = $config['price'] ?? null;
-
-        throw_if(! is_string($priceId) || $priceId === '', InvalidArgumentException::class, "No Stripe price configured for credit pack [{$pack}].");
-
-        return $priceId;
+        return $config['price'];
     }
 
     /** @return array<string, mixed> */

@@ -82,6 +82,7 @@ it('does not show the Upgrade link for Pro users', function (): void {
 
 it('shows the Buy more credits link for Pro users when billing is enabled', function (): void {
     Feature::define(Billing::class, true);
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
@@ -109,6 +110,7 @@ it('shows the Buy more credits link for Pro users when billing is enabled', func
 
 it('hides the Buy more credits link for Pro users when billing is disabled', function (): void {
     Feature::define(Billing::class, false);
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
@@ -163,4 +165,32 @@ it('shows the Pro plan label and Pro allowance', function (): void {
         ->set('isOpen', true)
         ->assertSee('Pro')
         ->assertSee(number_format(Plan::Pro->credits()));
+});
+
+it('hides the Buy more credits link when no credit pack has a configured price', function (): void {
+    Feature::define(Billing::class, true);
+    config()->set('services.stripe.credit_packs', [
+        'small' => ['price' => null, 'credits' => 1000],
+        'large' => ['price' => null, 'credits' => 5000],
+    ]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->plan = Plan::Pro;
+    $team->save();
+
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_side_panel_no_packs',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    Livewire::test(ChatSidePanel::class)
+        ->set('isOpen', true)
+        ->assertDontSee('Buy more credits');
 });

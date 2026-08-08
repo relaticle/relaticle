@@ -5,10 +5,6 @@
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
-        $availablePacks = collect(config('services.stripe.credit_packs', []))
-            ->filter(fn (array $pack): bool => filled($pack['price']))
-            ->all();
-
         $isSubscribed = $subscription?->valid() ?? false;
         $canManageSubscription = $subscription && ($subscription->valid() || $pastDue);
         $onTrial = $team->onGenericTrial();

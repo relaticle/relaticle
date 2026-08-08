@@ -154,7 +154,7 @@
                         Upgrade to Pro →
                     </a>
                 @endif
-                @if ($billingTeam && $this->plan !== \App\Enums\Plan::Free && \Laravel\Pennant\Feature::active(\App\Features\Billing::class))
+                @if ($billingTeam && $this->canBuyCredits)
                     <a
                         href="{{ url("/app/{$billingTeam->slug}/billing") }}"
                         class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"

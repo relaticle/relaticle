@@ -11,6 +11,7 @@ use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -167,6 +168,7 @@ final class Billing extends Page
             'balance' => AiCreditBalance::query()->where('team_id', $team->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $team->subscribed(),
             'creditsFulfilling' => $this->credits === 'success',
+            'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
         ];
     }
 
