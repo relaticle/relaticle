@@ -15,7 +15,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 
 final readonly class CreditService
 {
-    public function __construct(private ModelRegistry $registry) {}
+    public function __construct(private ModelRegistry $registry, private CreditPeriodResolver $periods) {}
 
     public function hasCredits(Team $team): bool
     {
@@ -160,12 +160,14 @@ final readonly class CreditService
                 ->first();
 
             if (! $balance instanceof AiCreditBalance) {
+                $bounds = $this->periods->boundsFor($team);
+
                 $balance = AiCreditBalance::query()->create([
                     'team_id' => $team->getKey(),
                     'credits_remaining' => 0,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ]);
             }
 
@@ -316,12 +318,14 @@ final readonly class CreditService
                     ->first();
 
                 if (! $balance instanceof AiCreditBalance) {
+                    $bounds = $this->periods->boundsFor($team);
+
                     $balance = AiCreditBalance::query()->create([
                         'team_id' => $team->getKey(),
                         'credits_remaining' => 0,
                         'credits_used' => 0,
-                        'period_starts_at' => now()->startOfMonth(),
-                        'period_ends_at' => now()->endOfMonth(),
+                        'period_starts_at' => $bounds['start'],
+                        'period_ends_at' => $bounds['end'],
                     ]);
                 }
 
@@ -346,13 +350,15 @@ final readonly class CreditService
                 ->lockForUpdate()
                 ->first();
 
+            $bounds = $this->periods->boundsFor($team);
+
             AiCreditBalance::query()->updateOrCreate(
                 ['team_id' => $team->getKey()],
                 [
                     'credits_remaining' => $allowance,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ],
             );
 
@@ -392,12 +398,14 @@ final readonly class CreditService
                 ->first();
 
             if (! $balance instanceof AiCreditBalance) {
+                $bounds = $this->periods->boundsFor($team);
+
                 $balance = AiCreditBalance::query()->create([
                     'team_id' => $team->getKey(),
                     'credits_remaining' => 0,
                     'credits_used' => 0,
-                    'period_starts_at' => now()->startOfMonth(),
-                    'period_ends_at' => now()->endOfMonth(),
+                    'period_starts_at' => $bounds['start'],
+                    'period_ends_at' => $bounds['end'],
                 ]);
             }
 
