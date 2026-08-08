@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncTeamPlanFromSubscription;
 use App\Enums\Plan;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
@@ -11,6 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
 mutates(SyncTeamPlanFromSubscription::class);
@@ -220,4 +222,36 @@ it('does not consume the generic trial when a checkout is abandoned as incomplet
     expect($team->plan)->toBe(Plan::Pro)
         ->and($team->trial_ends_at?->timestamp)->toBe($trialEndsAt->timestamp)
         ->and($team->onGenericTrial())->toBeTrue();
+});
+
+it('never double-grants across a mid-trial conversion', function (): void {
+    test()->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
+
+    $user = User::factory()->withPersonalTeam()->create();
+    /** @var Team $team */
+    $team = $user->currentTeam;
+    $team->forceFill(['stripe_id' => 'cus_convert_anchor'])->save();
+    app(StartProTrial::class)->execute($user, $team);
+
+    // Convert mid-trial. The plan is already Pro, so SyncTeamPlanFromSubscription
+    // short-circuits: NO new grant at conversion — the trial allowance keeps running.
+    test()->travelTo(new DateTimeImmutable('2026-07-01 12:00:00', new DateTimeZone('UTC')));
+    sendStripeWebhook(stripeSubscriptionEvent($team->refresh(), 'created'))->assertSuccessful();
+
+    $grantsQuery = AiCreditTransaction::query()
+        ->where('team_id', $team->getKey())
+        ->where('metadata->action', 'reset_period');
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->period_ends_at->toDateTimeString())->toBe('2026-07-09 12:00:00')
+        ->and($grantsQuery->count())->toBe(1);
+
+    // When the trial-shaped period lapses, the sweep re-anchors to the subscription.
+    test()->travelTo(new DateTimeImmutable('2026-07-10 12:00:00', new DateTimeZone('UTC')));
+    test()->artisan('chat:reset-credits')->assertSuccessful();
+
+    $balance->refresh();
+    expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
+        ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
+        ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle — never a third
 });

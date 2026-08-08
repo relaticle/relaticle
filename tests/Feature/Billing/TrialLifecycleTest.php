@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 
 mutates(StartProTrial::class);
 mutates(ProcessTrialsCommand::class);
@@ -143,4 +144,23 @@ it('keeps a sysadmin-granted plan when a stale trial timestamp expires', functio
 
     expect($team->plan)->toBe(Plan::Enterprise)
         ->and($team->trial_ends_at)->toBeNull();
+});
+
+it('grants exactly one allowance for a trial that crosses a month boundary', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
+
+    [$user, $team] = trialOwnerAndTeam();
+    app(StartProTrial::class)->execute($user, $team);
+
+    $this->travelTo(new DateTimeImmutable('2026-07-02 12:00:00', new DateTimeZone('UTC')));
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    expect($balance->period_ends_at->toDateTimeString())->toBe('2026-07-09 12:00:00');
+
+    $grants = AiCreditTransaction::query()
+        ->where('team_id', $team->getKey())
+        ->where('metadata->action', 'reset_period')
+        ->count();
+    expect($grants)->toBe(1);
 });
