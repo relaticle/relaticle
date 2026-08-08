@@ -1,12 +1,12 @@
 <x-filament-panels::page>
     @php
+        $purchased = (int) ($balance?->purchased_credits ?? 0);
         $allowance = $balance
-            ? max(0, (int) $balance->credits_remaining + (int) $balance->credits_used)
+            ? max(0, (int) $balance->credits_remaining + (int) $balance->credits_used - $purchased)
             : $team->plan->credits();
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
-        $purchased = (int) ($balance?->purchased_credits ?? 0);
         $availablePacks = collect(config('services.stripe.credit_packs', []))
             ->filter(fn (array $pack): bool => filled($pack['price']))
             ->all();

@@ -249,3 +249,19 @@ it('shows the purchased portion of the balance', function (): void {
 
     livewire(Billing::class)->assertSee(__('billing.packs.balance_split', ['purchased' => number_format(200)]));
 });
+
+it('excludes purchased credits from the period allowance denominator', function (): void {
+    [, $team] = billingPageOwner();
+
+    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+        'credits_remaining' => 500,
+        'credits_used' => 75,
+        'purchased_credits' => 200,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee('/ '.number_format(375))
+        ->assertDontSee('/ '.number_format(575));
+});
