@@ -66,6 +66,36 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
             ? "{$topModelRow->model} ({$topModelRow->total})"
             : '—';
 
+        $tokenRows = AiCreditTransaction::query()
+            ->selectRaw('model, SUM(input_tokens) AS input_sum, SUM(output_tokens) AS output_sum')
+            ->whereIn('type', self::SPENDABLE_TYPES)
+            ->where('created_at', '>=', $monthStart)
+            ->where('created_at', '<', $nextMonthStart)
+            ->groupBy('model')
+            ->get();
+
+        /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> $rates */
+        $rates = config('chat.model_costs', []);
+        $totalCost = 0.0;
+        $unpriced = [];
+
+        foreach ($tokenRows as $row) {
+            $rate = $rates[$row->model] ?? null;
+
+            if ($rate === null) {
+                $unpriced[] = $row->model;
+
+                continue;
+            }
+
+            $totalCost += ((int) $row->input_sum / 1_000_000) * $rate['input_per_mtok']
+                + ((int) $row->output_sum / 1_000_000) * $rate['output_per_mtok'];
+        }
+
+        $costDescription = $unpriced === []
+            ? 'Upper bound — prompt caching not deducted'
+            : 'Unpriced models: '.implode(', ', $unpriced);
+
         return [
             Stat::make('Credits this month', number_format($currentMonthCredits))
                 ->description($monthStart->format('M Y'))
@@ -81,6 +111,11 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 ->description('Highest credit consumer')
                 ->descriptionIcon('heroicon-o-cpu-chip')
                 ->color('info'),
+
+            Stat::make('AI cost this month', '$'.number_format($totalCost, 2))
+                ->description($costDescription)
+                ->descriptionIcon('heroicon-o-currency-dollar')
+                ->color('warning'),
         ];
     }
 }

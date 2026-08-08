@@ -81,3 +81,37 @@ it('uses a half-open range so the previous-month boundary is not double-counted'
     expect($stats[0]->getValue())->toBe(number_format(3))
         ->and($stats[1]->getDescription())->toContain(number_format(7));
 });
+
+it('reports monthly ai cost in dollars from token usage', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    // 2M input x $3 + 1M output x $15 = $21.00
+    livewire(AiSpendStatsWidget::class)->assertSee('$21.00');
+});
+
+it('surfaces models with no configured rate as unpriced instead of silently treating them as free', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'qwen-2.5',
+        'input_tokens' => 1_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 5,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertSee('Unpriced models: qwen-2.5');
+});

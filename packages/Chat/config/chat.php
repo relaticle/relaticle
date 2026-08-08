@@ -114,4 +114,19 @@ return [
         ['id' => 'ollama', 'label' => 'Ollama', 'provider' => 'ollama', 'model' => env('OLLAMA_MODEL'), 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'prompt', 'self_hosted' => true],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Model Cost Rates (USD per million tokens)
+    |--------------------------------------------------------------------------
+    |
+    | Keys must match the `model` values above and any historical model strings
+    | in ai_credit_transactions. Models without an entry are surfaced as
+    | "unpriced" in the sysadmin cost widget — never silently zero.
+    */
+
+    'model_costs' => [
+        'claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
+        'claude-opus-4-7' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+    ],
+
 ];
