@@ -159,3 +159,38 @@ it('treats a malformed rate entry as unpriced instead of coercing it to zero cos
         ->assertSee('$0.00')
         ->assertSee('Unpriced models: claude-sonnet-4-6');
 });
+
+it('ignores zero-token settlement rows instead of listing them as unpriced models', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    // settleReservedMinimum() books cancelled and timed-out turns under this
+    // synthetic model with zero tokens — they cost nothing to serve.
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'incomplete',
+        'input_tokens' => 0,
+        'output_tokens' => 0,
+        'credits_charged' => 1,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertDontSee('Unpriced models');
+});
+
+it('has a configured cost rate for every hosted model the app can select', function (): void {
+    /** @var array<string, mixed> $rates */
+    $rates = config('chat.model_costs');
+
+    $hostedModels = collect(config('chat.models'))
+        ->reject(fn (array $model): bool => (bool) ($model['self_hosted'] ?? false))
+        ->pluck('model')
+        ->all();
+
+    expect($hostedModels)->not->toBeEmpty();
+
+    foreach ($hostedModels as $model) {
+        expect($rates)->toHaveKey($model);
+    }
+});

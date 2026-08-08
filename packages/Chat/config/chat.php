@@ -122,11 +122,21 @@ return [
     | Keys must match the `model` values above and any historical model strings
     | in ai_credit_transactions. Models without an entry are surfaced as
     | "unpriced" in the sysadmin cost widget — never silently zero.
+    |
+    | Vendor list prices, short-context tier. Long-context requests bill higher
+    | (gpt-5.x above 272k input, gemini-3.1-pro above 200k), so the widget's
+    | figure is an estimate rather than an invoice. Re-check when a vendor
+    | changes its price list. Ollama is self-hosted (no per-token API cost) and
+    | its model id is env-driven, so it has no entry.
     */
 
     'model_costs' => [
         'claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
         'claude-opus-4-7' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+        'gpt-5.5' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 30.00],
+        'gpt-5.4' => ['input_per_mtok' => 2.50, 'output_per_mtok' => 15.00],
+        'gemini-3-flash' => ['input_per_mtok' => 0.50, 'output_per_mtok' => 3.00],
+        'gemini-3.1-pro' => ['input_per_mtok' => 2.00, 'output_per_mtok' => 12.00],
     ],
 
 ];

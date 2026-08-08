@@ -80,6 +80,16 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
         $unpriced = [];
 
         foreach ($tokenRows as $row) {
+            $inputTokens = (int) $row->input_sum;
+            $outputTokens = (int) $row->output_sum;
+
+            // Cancelled and timed-out turns settle at the reserved minimum under
+            // the synthetic model 'incomplete' with zero tokens. They cost
+            // nothing, so listing them as unpriced is a false alarm.
+            if ($inputTokens === 0 && $outputTokens === 0) {
+                continue;
+            }
+
             $rate = $rates[$row->model] ?? null;
 
             if (
@@ -92,8 +102,8 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 continue;
             }
 
-            $totalCost += ((int) $row->input_sum / 1_000_000) * $rate['input_per_mtok']
-                + ((int) $row->output_sum / 1_000_000) * $rate['output_per_mtok'];
+            $totalCost += ($inputTokens / 1_000_000) * $rate['input_per_mtok']
+                + ($outputTokens / 1_000_000) * $rate['output_per_mtok'];
         }
 
         $costDescription = 'Upper bound — prompt caching not deducted';
