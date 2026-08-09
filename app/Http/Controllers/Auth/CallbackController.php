@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -35,6 +36,8 @@ final readonly class CallbackController
             return $this->loginAndRedirect($user);
         } catch (InvalidStateException) {
             return $this->handleError('Authentication state mismatch. Please try again.');
+        } catch (ValidationException $e) {
+            return $this->handleError($e->validator->errors()->first());
         } catch (Throwable $e) {
             report($e);
 

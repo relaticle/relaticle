@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -121,6 +122,8 @@ test('callback from socialite provider handles missing code parameter', function
 });
 
 test('callback from socialite provider rejects a disposable email address', function () {
+    Exceptions::fake();
+
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,
         makeSocialiteUser('987654321', 'Burner User', 'burner@mailinator.com'),
@@ -132,8 +135,10 @@ test('callback from socialite provider rejects a disposable email address', func
     ]));
 
     $response->assertRedirect(route('login'));
-    $response->assertSessionHasErrors(['login']);
+    $response->assertSessionHasErrors(['login' => 'Disposable email addresses are not allowed.']);
 
     $this->assertDatabaseMissing('users', ['email' => 'burner@mailinator.com']);
     $this->assertGuest();
+
+    Exceptions::assertNothingReported();
 });
