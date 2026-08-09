@@ -64,3 +64,17 @@ it('keeps panel auth pages out of tenant-slug normalization', function (): void 
         ->and($html)->toContain("'/login'")
         ->and($html)->toContain("'/email-verification'");
 });
+
+it('rejects registration from a disposable email domain', function (): void {
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Burner User',
+            'email' => 'burner@mailinator.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['email']);
+
+    expect(User::where('email', 'burner@mailinator.com')->exists())->toBeFalse();
+});

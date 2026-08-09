@@ -6,6 +6,7 @@ namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
 use App\Models\User;
+use App\Rules\RegistrableEmail;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
@@ -37,7 +38,7 @@ final class Register extends BaseRegister
         return TextInput::make('email')
             ->label(__('filament-panels::auth/pages/register.form.email.label'))
             ->email()
-            ->rules(['email:rfc,dns'])
+            ->rules(RegistrableEmail::rules())
             ->required()
             ->maxLength(255)
             ->unique($this->getUserModel());
