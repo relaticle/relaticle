@@ -75,7 +75,8 @@ test('team members cannot be invited with a disposable email address', function 
             'email' => 'burner@mailinator.com',
             'role' => 'admin',
         ])
-        ->call('addTeamMember', $this->team);
+        ->call('addTeamMember', $this->team)
+        ->assertNotified('Disposable email addresses are not allowed.');
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
