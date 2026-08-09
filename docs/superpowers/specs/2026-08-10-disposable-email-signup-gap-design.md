@@ -2,7 +2,19 @@
 
 **Date:** 2026-08-10
 **Branch:** `ManukMinasyan/disposable-email-signup-gap`
-**Status:** Design approved, pending implementation plan
+**Status:** Design approved; one amendment pending confirmation (see below)
+
+> **Amendment (2026-08-10, during planning).** Component 1 below specifies the
+> shared rule set as `['email:rfc,dns', 'indisposable']` for all three paths.
+> Verification proved the `dns` check breaks the suite: `fake()->safeEmail()`
+> emits reserved `example.*` domains with no MX record, and 102 fixture
+> addresses across 21 test files use them. `dns` also adds a live lookup to the
+> invite and social request paths while contributing nothing to this threat —
+> every disposable provider publishes valid MX records. The plan therefore
+> parameterises it: `rules()` keeps `dns` for registration,
+> `rules(checkDns: false)` is used for invitations and social signup. See the
+> "DECISION REQUIRED" block in
+> `docs/superpowers/plans/2026-08-10-disposable-email-signup-gap.md`.
 
 ## Summary
 
