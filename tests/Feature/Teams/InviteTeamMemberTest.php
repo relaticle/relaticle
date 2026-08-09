@@ -68,3 +68,14 @@ test('team member invitations can be revoked', function () {
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
+
+test('team members cannot be invited with a disposable email address', function () {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'burner@mailinator.com',
+            'role' => 'admin',
+        ])
+        ->call('addTeamMember', $this->team);
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
