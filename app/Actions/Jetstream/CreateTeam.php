@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Actions\Billing\StartProTrial;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ValidTeamSlug;
@@ -17,9 +19,12 @@ use Illuminate\Validation\Validator as ValidatorInstance;
 use Laravel\Jetstream\Contracts\CreatesTeams;
 use Laravel\Jetstream\Events\AddingTeam;
 use Laravel\Jetstream\Jetstream;
+use Laravel\Pennant\Feature;
 
 final readonly class CreateTeam implements CreatesTeams
 {
+    public function __construct(private StartProTrial $startProTrial) {}
+
     /**
      * Validate and create a new team for the given user.
      *
@@ -80,17 +85,23 @@ final readonly class CreateTeam implements CreatesTeams
 
         event(new AddingTeam($user));
 
-        $user->switchTeam($team = $user->ownedTeams()->create([
+        $team = new Team([
             'name' => $input['name'],
             'slug' => $input['slug'],
             'personal_team' => $isFirstTeam,
-            'plan' => Plan::default(),
             'onboarding_use_case' => $input['onboarding_use_case'] ?? null,
             'onboarding_context' => $input['onboarding_context'] ?? null,
             'onboarding_referral_source' => $input['onboarding_referral_source'] ?? null,
-        ]));
+        ]);
+        $team->plan = Plan::default();
 
-        /** @var Team $team */
+        $user->ownedTeams()->save($team);
+        $user->switchTeam($team);
+
+        if (Feature::active(Billing::class)) {
+            $this->startProTrial->execute($user, $team);
+        }
+
         return $team;
     }
 }

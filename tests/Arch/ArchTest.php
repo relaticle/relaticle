@@ -110,6 +110,10 @@ arch('avoid mutation')
         'App\Filament',
         'App\Health',
         'App\Http\Controllers\Chat',
+        // Extends Cashier's WebhookController — its documented handler
+        // extension point; PHP forbids a readonly class extending a
+        // non-readonly one.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -129,6 +133,9 @@ arch('avoid mutation')
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // Same shape: laravel-markdown-response resolves its detector through an
+        // is_a() check against its own class, so extending it is mandatory.
+        'App\Support\DetectsPublicMarkdownRequest',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -145,6 +152,9 @@ arch('avoid inheritance')
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
+        // Overrides Cashier's subscription-created handler so an abandoned
+        // checkout does not consume the workspace's generic trial.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -162,6 +172,9 @@ arch('avoid inheritance')
         // Hooks slug uniqueness by extending sluggable's GenerateSlugAction,
         // which is the package's documented extension point.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // laravel-markdown-response validates the configured detector with
+        // is_a($class, DetectsMarkdownRequest::class), so it must extend it.
+        'App\Support\DetectsPublicMarkdownRequest',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

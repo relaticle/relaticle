@@ -26,7 +26,8 @@ it('marks a conversation as cancelled when cancel endpoint hit', function (): vo
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
@@ -110,7 +111,8 @@ it('settles the reserved minimum (not refund) when a stream is cancelled mid-fli
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),

@@ -14,7 +14,8 @@ function seedFeedbackConversation(User $user): array
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'feedback test',
         'created_at' => now(),
@@ -30,7 +31,8 @@ function seedFeedbackConversation(User $user): array
         DB::table('agent_conversation_messages')->insert([
             'id' => $id,
             'conversation_id' => $conversationId,
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
             'agent' => 'test',
             'role' => $role,
             'content' => $content,

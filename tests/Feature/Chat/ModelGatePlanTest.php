@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\ModelRegistry;
@@ -14,9 +16,12 @@ use Tests\Helpers\ChatDocument;
 
 mutates(ChatController::class);
 
-it('rejects an Opus request from a Free user with a 403', function (): void {
+it('rejects an Opus request from a grandfathered Free user with a 403', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
+    $team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     expect($team->plan)->toBe(Plan::Free);
 
     AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
@@ -29,7 +34,8 @@ it('rejects an Opus request from a Free user with a 403', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -68,7 +74,8 @@ it('allows an Opus request from a Pro user', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -100,7 +107,8 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -132,7 +140,8 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -161,7 +170,8 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -196,7 +206,8 @@ it('allows a Free user to pick Ollama when it is configured', function (): void 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -225,7 +236,8 @@ it('rejects an unknown model id with a 422', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

@@ -104,7 +104,8 @@ it('continues an existing conversation', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-existing',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Existing conversation',
         'created_at' => now(),
@@ -123,7 +124,8 @@ it('continues an existing conversation', function (): void {
 it('lists conversations for current user', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-1',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
@@ -141,7 +143,8 @@ it('does not list conversations of other users', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-other',
-        'user_id' => $otherUser->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $otherUser->getKey(),
         'team_id' => $otherUser->currentTeam->getKey(),
         'title' => 'Not mine',
         'created_at' => now(),
@@ -156,7 +159,8 @@ it('does not list conversations of other users', function (): void {
 it('deletes own conversation', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-to-delete',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Delete me',
         'created_at' => now(),
@@ -174,7 +178,8 @@ it('cannot delete another user conversation', function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-other',
-        'user_id' => $otherUser->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $otherUser->getKey(),
         'team_id' => $otherUser->currentTeam->getKey(),
         'title' => 'Not yours',
         'created_at' => now(),
@@ -313,7 +318,8 @@ it('dispatches a chat job on the chat queue when chat.send is called', function 
 it('cleans up messages when deleting a conversation', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-cleanup',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Cleanup test',
         'created_at' => now(),
@@ -323,7 +329,8 @@ it('cleans up messages when deleting a conversation', function (): void {
     DB::table('agent_conversation_messages')->insert([
         'id' => 'msg-1',
         'conversation_id' => 'conv-cleanup',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'agent' => CrmAssistant::class,
         'role' => 'user',
         'content' => 'Hello',

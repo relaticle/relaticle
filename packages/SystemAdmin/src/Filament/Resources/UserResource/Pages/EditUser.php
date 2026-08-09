@@ -7,7 +7,6 @@ namespace Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Support\Facades\Hash;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
 final class EditUser extends EditRecord
@@ -20,16 +19,5 @@ final class EditUser extends EditRecord
             ViewAction::make(),
             DeleteAction::make(),
         ];
-    }
-
-    protected function mutateFormDataBeforeSave(array $data): array
-    {
-        if (filled($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
-        }
-
-        return $data;
     }
 }

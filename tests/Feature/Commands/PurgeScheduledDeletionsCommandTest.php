@@ -18,6 +18,56 @@ test('expired users are permanently deleted', function () {
     expect(User::query()->find($userId))->toBeNull();
 });
 
+test('purging a user anonymises their chat participation in teams that survive', function () {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $member = User::factory()->scheduledForDeletion(-1)->create();
+    $team->users()->attach($member, ['role' => 'editor']);
+
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => $member->getMorphClass(),
+        'participant_id' => (string) $member->id,
+        'team_id' => (string) $team->id,
+        'title' => 'Member conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $member->getMorphClass(),
+        'participant_id' => (string) $member->id,
+        'agent' => 'test-agent',
+        'role' => 'user',
+        'content' => 'hello',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->artisan('app:purge-scheduled-deletions')
+        ->assertExitCode(0);
+
+    expect(User::query()->find($member->id))->toBeNull()
+        ->and(DB::table('agent_conversations')->where('participant_id', (string) $member->id)->exists())->toBeFalse()
+        ->and(DB::table('agent_conversation_messages')->where('participant_id', (string) $member->id)->exists())->toBeFalse();
+
+    $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+    expect($conversation)->not->toBeNull()
+        ->and($conversation->participant_id)->toBeNull()
+        ->and($conversation->participant_type)->toBeNull();
+});
+
 test('non-expired users are not deleted', function () {
     $user = User::factory()->withPersonalTeam()->scheduledForDeletion(15)->create();
 

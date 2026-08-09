@@ -24,7 +24,8 @@ it('multi-step workflow: create person -> approve -> create linked task -> appro
     $convId = '019df800-5555-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),

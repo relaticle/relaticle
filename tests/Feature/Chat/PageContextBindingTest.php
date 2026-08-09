@@ -25,7 +25,8 @@ beforeEach(function (): void {
 
     DB::table('agent_conversations')->insert([
         'id' => $this->conversationId,
-        'user_id' => (string) $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -335,7 +336,8 @@ function seedConversationMessage(string $conversationId, string $userId): string
     DB::table('agent_conversation_messages')->insert([
         'id' => $id,
         'conversation_id' => $conversationId,
-        'user_id' => $userId,
+        'participant_type' => 'user',
+        'participant_id' => $userId,
         'agent' => CrmAssistant::class,
         'role' => 'user',
         'content' => 'earlier turn',
@@ -541,7 +543,8 @@ it('scopes the ledger to its own conversation and excludes records referenced in
     $otherConversationId = '019df800-5555-7000-8000-000000000099';
     DB::table('agent_conversations')->insert([
         'id' => $otherConversationId,
-        'user_id' => $userId,
+        'participant_type' => 'user',
+        'participant_id' => $userId,
         'team_id' => $this->team->getKey(),
         'title' => '',
         'created_at' => now(),

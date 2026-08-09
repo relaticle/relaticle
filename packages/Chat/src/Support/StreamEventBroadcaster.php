@@ -63,12 +63,6 @@ final readonly class StreamEventBroadcaster
             return self::payloadForToolCall($event);
         }
 
-        // The abstract StreamEvent doesn't declare toArray(); every concrete
-        // laravel/ai event implements it (type() depends on it internally).
-        if (! method_exists($event, 'toArray')) {
-            return null;
-        }
-
         return [
             'as' => $event->type(),
             'with' => $event->toArray(),

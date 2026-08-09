@@ -21,6 +21,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Relaticle\Ink\InkPlugin;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -76,7 +77,21 @@ final class SystemAdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->widgets([])
-            ->plugins([])
+            /**
+             * The blog is Relaticle's own marketing content, not tenant data, so it is
+             * administered here rather than in the customer panel. This panel has no
+             * tenancy, which means the Ink resources need no scopeToTenant() opt-out —
+             * that call writes a static shared by every Filament resource and would
+             * disable tenant scoping app-wide.
+             *
+             * Staff always have the authoring surface; the Blog feature flag gates the
+             * PUBLIC side (routes, marketing nav, sitemap), so posts can be written
+             * before launch. Post::getUrl() already falls back to '#' when the public
+             * routes are not registered.
+             */
+            ->plugins([
+                InkPlugin::make(),
+            ])
             ->databaseNotifications()
             ->middleware([
                 EncryptCookies::class,

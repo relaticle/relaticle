@@ -19,7 +19,8 @@ function seedResolvedConv(string $id, User $user): void
 {
     DB::table('agent_conversations')->insert([
         'id' => $id,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -32,7 +33,8 @@ function seedResolvedAssistantMsg(string $conversationId, User $user, DateTimeIn
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'agent' => 'crm',
         'role' => 'assistant',
         'content' => 'ok',

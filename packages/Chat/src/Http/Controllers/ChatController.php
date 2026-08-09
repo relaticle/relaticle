@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Http\Controllers;
 
 use App\Enums\Plan;
+use App\Features\Billing;
+use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
@@ -45,6 +50,20 @@ final readonly class ChatController
     private function modelIds(): array
     {
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
+    }
+
+    /**
+     * Billing page URL for the workspace, or null when billing is switched off.
+     * Resolved through the panel route so it stays correct whether the app panel
+     * is served from a path prefix or its own subdomain.
+     */
+    private function billingUrl(Team $team): ?string
+    {
+        if (! Feature::active(Billing::class)) {
+            return null;
+        }
+
+        return BillingPage::getUrl(panel: 'app', tenant: $team);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -85,7 +104,8 @@ final readonly class ChatController
         abort_if($existing === null, 404);
 
         abort_if(
-            $existing->user_id !== (string) $user->getKey()
+            $existing->participant_type !== $user->getMorphClass()
+                || $existing->participant_id !== (string) $user->getKey()
                 || ($existing->team_id !== null && $existing->team_id !== $team->getKey()),
             403
         );
@@ -102,7 +122,7 @@ final readonly class ChatController
                     'plan' => $team->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? url('/app/billing') : null,
+                    'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
                 ], 403);
             }
         }
@@ -115,6 +135,7 @@ final readonly class ChatController
                 ->first();
 
             $isFree = $team->plan === Plan::Free;
+            $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
 
             return response()->json([
                 'error' => 'credits_exhausted',
@@ -123,7 +144,11 @@ final readonly class ChatController
                 'allowance' => $team->plan->credits(),
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? url('/app/billing') : null,
+                'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
+                // A top-up is only offered when a pack can actually be bought —
+                // otherwise the CTA lands on a billing page with nothing to buy.
+                'top_up_available' => $canTopUp,
+                'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
             ], 402);
         }
 
@@ -137,7 +162,11 @@ final readonly class ChatController
                 return;
             }
 
-            abort_if($row->user_id !== (string) $user->getKey(), 403);
+            abort_if(
+                $row->participant_type !== $user->getMorphClass()
+                    || $row->participant_id !== (string) $user->getKey(),
+                403
+            );
 
             if ($row->team_id !== null) {
                 return;
@@ -254,7 +283,8 @@ final readonly class ChatController
 
         DB::table('agent_conversations')->insert([
             'id' => $conversationId,
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => (string) $user->getKey(),
             'team_id' => $team->getKey(),
             'title' => TitleSanitizer::clean($parsed['text']),
             'created_at' => now(),
@@ -274,7 +304,8 @@ final readonly class ChatController
 
         abort_if($row === null, 404);
         abort_if(
-            $row->user_id !== (string) $user->getKey()
+            $row->participant_type !== $user->getMorphClass()
+                || $row->participant_id !== (string) $user->getKey()
                 || ($row->team_id !== null && $row->team_id !== $team->getKey()),
             404,
         );
@@ -313,7 +344,8 @@ final readonly class ChatController
 
         abort_if(
             $conversation === null
-                || $conversation->user_id !== (string) $user->getKey()
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
                 || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
             404,
         );

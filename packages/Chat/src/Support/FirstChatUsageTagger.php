@@ -36,7 +36,8 @@ final readonly class FirstChatUsageTagger
         }
 
         $alreadyUsedChat = DB::table('agent_conversation_messages')
-            ->where('user_id', (string) $user->getKey())
+            ->where('participant_type', $user->getMorphClass())
+            ->where('participant_id', (string) $user->getKey())
             ->where('role', 'user')
             ->where('id', '!=', $currentMessageId)
             ->exists();

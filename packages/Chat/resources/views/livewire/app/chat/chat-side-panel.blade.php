@@ -145,12 +145,20 @@
                         {{ number_format($this->creditsRemaining) }}@unless ($exceedsAllowance) / {{ number_format($allowance) }}@endunless
                     </span>
                 </div>
-                @if ($this->plan === \App\Enums\Plan::Free)
+                @if ($this->billingUrl && $this->plan === \App\Enums\Plan::Free)
                     <a
-                        href="{{ url('/app/billing') }}"
+                        href="{{ $this->billingUrl }}"
                         class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
                     >
                         Upgrade to Pro →
+                    </a>
+                @endif
+                @if ($this->billingUrl && $this->canBuyCredits)
+                    <a
+                        href="{{ $this->billingUrl }}"
+                        class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                        {{ __('billing.packs.buy_more') }}
                     </a>
                 @endif
             </div>

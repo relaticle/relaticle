@@ -9,6 +9,7 @@ use App\ActivityLog\AppEventRenderer;
 use App\ActivityLog\MeetingEventPalette;
 use App\ActivityLog\MeetingEventRenderer;
 use App\Enums\SupportFormType;
+use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Features\SocialAuth;
 use App\Features\SupportMenu;
@@ -16,6 +17,7 @@ use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
@@ -23,6 +25,7 @@ use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
@@ -147,10 +150,6 @@ final class AppPanelProvider extends PanelProvider
                         ? url(Settings::getUrl())
                         : url($panel->getPath())),
             ])
-            ->renderHook(
-                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
-                fn (): View => view('filament.app.help-menu', ['items' => $this->supportMenuItems()]),
-            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -197,6 +196,7 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->tenantMiddleware(
                 [
+                    EnsureHostedWorkspaceAccess::class,
                     ApplyTenantScopes::class,
                 ],
                 isPersistent: true
@@ -256,6 +256,8 @@ final class AppPanelProvider extends PanelProvider
             ]);
         }
 
+        $panel->userMenuItems($this->supportMenuItems());
+
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
@@ -274,44 +276,47 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
                     ->url(fn (): string => ImportHistory::getUrl()),
+                Action::make('billing')
+                    ->label(__('billing.title'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->url(fn (): string => Billing::getUrl())
+                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
 
         return $panel;
     }
 
     /**
-     * Help launcher entries — every support form type that resolves to a URL,
-     * rendered in the topbar Help dropdown and opening its Maxforms form in a
-     * new tab. Empty when nothing is configured, so the control hides itself.
+     * Support entries for the user menu — every support form type that resolves
+     * to a URL, opening its Maxforms form in a new tab. Empty when nothing is
+     * configured, so the user menu simply shows no support entries.
      *
-     * @return list<array{label: string, icon: string, url: string}>
+     * Everything is resolved lazily: the URL carries the signed-in user and
+     * workspace as prefill, and the feature flag is only decided per request —
+     * neither is known while the panel is being configured.
+     *
+     * @return list<Action>
      */
     private function supportMenuItems(): array
     {
+        return array_map(
+            fn (SupportFormType $type): Action => Action::make("support_{$type->value}")
+                ->label(fn (): string => $type->label())
+                ->icon($type->icon())
+                ->url(fn (): ?string => $this->supportFormUrl($type))
+                ->visible(fn (): bool => $this->supportFormUrl($type) !== null)
+                ->openUrlInNewTab(),
+            SupportFormType::cases(),
+        );
+    }
+
+    private function supportFormUrl(SupportFormType $type): ?string
+    {
         if (! Feature::active(SupportMenu::class)) {
-            return [];
+            return null;
         }
 
-        $support = resolve(SupportForms::class);
-        $prefill = $this->supportPrefill();
-
-        $items = [];
-
-        foreach (SupportFormType::cases() as $type) {
-            $url = $support->publicUrl($type, $prefill);
-
-            if ($url === null) {
-                continue;
-            }
-
-            $items[] = [
-                'label' => $type->label(),
-                'icon' => $type->icon(),
-                'url' => $url,
-            ];
-        }
-
-        return $items;
+        return resolve(SupportForms::class)->publicUrl($type, $this->supportPrefill());
     }
 
     /**

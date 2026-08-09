@@ -8,6 +8,7 @@ use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
 use Exception;
 use Filament\Models\Contracts\FilamentUser;
@@ -19,6 +20,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -49,6 +51,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $subscriber_recency_bucket
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
+ * @property Carbon|null $pro_trial_used_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property EmailPrivacyTier|null $default_email_sharing_tier
@@ -76,6 +79,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
     'mailcoach_subscriber_uuid',
     'subscriber_recency_bucket',
 ])]
+#[ObservedBy(UserObserver::class)]
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
 {
     use HasApiTokens;
@@ -104,6 +108,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
         ];
     }
 

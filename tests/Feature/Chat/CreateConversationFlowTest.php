@@ -53,6 +53,6 @@ it('create returns 422 for an empty document without inserting a row', function 
         'document' => $emptyDoc,
     ])->assertStatus(422);
 
-    expect(DB::table('agent_conversations')->where('user_id', (string) $this->user->getKey())->count())->toBe(0);
+    expect(DB::table('agent_conversations')->where('participant_type', 'user')->where('participant_id', (string) $this->user->getKey())->count())->toBe(0);
     Queue::assertNotPushed(ProcessChatMessage::class);
 });

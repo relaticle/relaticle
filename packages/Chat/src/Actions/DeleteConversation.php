@@ -15,7 +15,8 @@ final readonly class DeleteConversation
         return DB::transaction(function () use ($user, $conversationId): bool {
             $deleted = DB::table('agent_conversations')
                 ->where('id', $conversationId)
-                ->where('user_id', $user->getKey())
+                ->where('participant_type', $user->getMorphClass())
+                ->where('participant_id', $user->getKey())
                 ->where('team_id', $user->current_team_id)
                 ->delete();
 

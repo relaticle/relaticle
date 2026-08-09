@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property string $team_id
  * @property int $credits_remaining
  * @property int $credits_used
+ * @property int $purchased_credits
  * @property Carbon $period_starts_at
  * @property Carbon $period_ends_at
  */
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
     'team_id',
     'credits_remaining',
     'credits_used',
+    'purchased_credits',
     'period_starts_at',
     'period_ends_at',
 ])]
@@ -41,6 +43,7 @@ final class AiCreditBalance extends Model
         return [
             'credits_remaining' => 'integer',
             'credits_used' => 'integer',
+            'purchased_credits' => 'integer',
             'period_starts_at' => 'datetime',
             'period_ends_at' => 'datetime',
         ];

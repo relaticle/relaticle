@@ -26,7 +26,8 @@ final readonly class ListConversationMessages
         $query = DB::table('agent_conversation_messages as m')
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('m.conversation_id', $conversationId)
-            ->where('m.user_id', $user->getKey())
+            ->where('m.participant_type', $user->getMorphClass())
+            ->where('m.participant_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
             ->whereNull('m.superseded_at');
 

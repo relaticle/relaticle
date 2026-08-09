@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
+use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
@@ -12,9 +14,23 @@ use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(OnboardSeed::class, SocialAuth::class, Documentation::class);
+mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class);
+
+describe('Billing', function (): void {
+    it('is off by default', function (): void {
+        expect(Feature::active(Billing::class))->toBeFalse();
+    });
+
+    it('activates via config', function (): void {
+        config()->set('relaticle.features.billing', true);
+        Feature::flushCache();
+
+        expect(Feature::active(Billing::class))->toBeTrue();
+    });
+});
 
 describe('OnboardSeed', function (): void {
     it('seeds demo data when feature is active', function (): void {
@@ -107,5 +123,42 @@ describe('Documentation', function (): void {
         putenv('RELATICLE_FEATURE_DOCUMENTATION');
         CachedState::$cachedRoutes = null;
         CachedState::$cachedConfig = null;
+    });
+});
+
+describe('Blog', function (): void {
+    it('serves the blog when the feature is active', function (): void {
+        $this->get(route('blog.index'))
+            ->assertOk();
+    });
+
+    it('does not register blog routes when the feature is inactive', function (): void {
+        putenv('RELATICLE_FEATURE_BLOG=false');
+        unset($_ENV['RELATICLE_FEATURE_BLOG'], $_SERVER['RELATICLE_FEATURE_BLOG']);
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+
+        $this->get('/blog')
+            ->assertNotFound();
+
+        $this->get('/blog/feed')
+            ->assertNotFound();
+
+        putenv('RELATICLE_FEATURE_BLOG=true');
+        $_ENV['RELATICLE_FEATURE_BLOG'] = $_SERVER['RELATICLE_FEATURE_BLOG'] = 'true';
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('keeps the blog admin in the sysadmin panel and out of the customer panel', function (): void {
+        // The flag gates the PUBLIC blog; staff keep the authoring surface either way,
+        // so posts can be written before launch.
+        expect(Route::has('filament.sysadmin.resources.posts.index'))->toBeTrue()
+            ->and(Route::has('filament.app.resources.posts.index'))->toBeFalse()
+            ->and(Route::has('filament.app.resources.categories.index'))->toBeFalse()
+            ->and(Route::has('filament.app.resources.tags.index'))->toBeFalse();
     });
 });

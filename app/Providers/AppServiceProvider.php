@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
 use App\Http\Responses\LoginResponse;
+use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
@@ -53,6 +54,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Ai\AiManager;
+use Laravel\Cashier\Cashier;
+use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Sanctum\Sanctum;
@@ -66,6 +69,10 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\Ink\Filament\Resources\PostResource;
+use Relaticle\Ink\Ink;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
@@ -82,6 +89,21 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
+
+        // Ink registers its public routes from packageBooted(), which runs after every
+        // provider's register(). Read the config key App\Features\Blog resolves from
+        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
+        // bound this early. Same source of truth, so the flag stays the single switch.
+        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
+
+        Cashier::useCustomerModel(Team::class);
+        Cashier::keepPastDueSubscriptionsActive();
+
+        // Cashier attaches signature verification only when the webhook secret
+        // happens to be set, and also exposes an unauthenticated payment route
+        // this app never links to. Register the webhook ourselves instead so
+        // verification is unconditional — see routes/web.php.
+        Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them — the key the activity timeline groups a single save's rows on.
@@ -105,6 +127,8 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
+        Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Event::listen(
@@ -122,6 +146,24 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureScribe();
 
         $this->configureActivityLog();
+        $this->configureBlog();
+    }
+
+    /**
+     * The blog admin lives in the sysadmin panel, which has no tenancy, so only a
+     * signed-in system administrator gets an edit link on a draft preview. Which
+     * panel and guard own the admin is ours to decide, not the package's.
+     */
+    private function configureBlog(): void
+    {
+        Ink::resolvePreviewEditUrlUsing(fn (Post $post): ?string => auth('sysadmin')->check()
+            ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
+            : null);
+
+        // HasSEO creates a row per post but never removes it. A soft delete should
+        // keep it — the post can come back — but a force delete from the panel
+        // would otherwise leave the seo row behind for good.
+        Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
     }
 
     /**
@@ -322,6 +364,8 @@ final class AppServiceProvider extends ServiceProvider
             'email_access_request' => EmailAccessRequest::class,
             'meeting' => Meeting::class,
             'custom_field' => CustomField::class,
+            'blog_post' => Post::class,
+            'blog_category' => Category::class,
         ]);
 
         // Use custom models for custom-fields package

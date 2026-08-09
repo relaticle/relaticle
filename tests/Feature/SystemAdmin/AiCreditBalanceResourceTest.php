@@ -6,6 +6,7 @@ use App\Models\Team;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource;
+use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\EditAiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ViewAiCreditBalance;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -73,4 +74,17 @@ it('shows the balance detail page', function (): void {
 
     livewire(ViewAiCreditBalance::class, ['record' => $balance->getKey()])
         ->assertSuccessful();
+});
+
+it('rejects an edit that would drop credits_remaining below purchased_credits', function (): void {
+    $team = Team::factory()->create();
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance->update(['credits_remaining' => 500, 'purchased_credits' => 200]);
+
+    livewire(EditAiCreditBalance::class, ['record' => $balance->getKey()])
+        ->fillForm(['credits_remaining' => 100])
+        ->call('save')
+        ->assertHasFormErrors(['credits_remaining']);
+
+    expect($balance->refresh()->credits_remaining)->toBe(500);
 });
