@@ -119,3 +119,21 @@ test('callback from socialite provider handles missing code parameter', function
     $errors = session('errors')->getBag('default');
     expect($errors->first('login'))->toBe('Authorization was cancelled or failed. Please try again.');
 });
+
+test('callback from socialite provider rejects a disposable email address', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('987654321', 'Burner User', 'burner@mailinator.com'),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login']);
+
+    $this->assertDatabaseMissing('users', ['email' => 'burner@mailinator.com']);
+    $this->assertGuest();
+});
