@@ -656,7 +656,7 @@ it('does not expose a fortify registration endpoint', function (): void {
         'email' => 'burner-fortify@mailinator.com',
         'password' => 'Password123!',
         'password_confirmation' => 'Password123!',
-    ])->assertNotFound();
+    ])->assertStatus(405);
 
     expect(User::where('email', 'burner-fortify@mailinator.com')->exists())->toBeFalse();
 });
@@ -669,7 +669,14 @@ it('redirects the bare register path to the panel register page', function (): v
 - [ ] **Step 2: Run the tests to verify the first fails**
 
 Run: `php artisan test --compact --filter="fortify registration endpoint"`
-Expected: FAIL — returns 500, not 404.
+Expected: FAIL — returns 500, not 405.
+
+**405, not 404, is correct here and is verified behaviour.** The `GET /register`
+shim at `routes/web.php:43` keeps the URI registered, so once Fortify's `POST`
+handler is gone the router matches the path but not the method and raises
+`MethodNotAllowedHttpException`. Confirmed against the running app: `POST` to a
+GET-only route returns 405, `POST` to an unrouted path returns 404. Do not
+"fix" this to `assertNotFound()`.
 
 Run: `php artisan test --compact --filter="redirects the bare register path"`
 Expected: PASS already. This is the guard that the removal does not break the shim.
