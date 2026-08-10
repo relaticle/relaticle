@@ -70,6 +70,7 @@ return RectorConfig::configure()
         AddHasFactoryToModelsRector::class => [
             __DIR__.'/app/Models/PersonalAccessToken.php',
             __DIR__.'/app/Models/ActivityLog/Activity.php',
+            __DIR__.'/app/Models/Passport/*',
             __DIR__.'/packages/ImportWizard/src/Models/*',
         ],
     ])

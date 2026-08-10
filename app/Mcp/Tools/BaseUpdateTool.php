@@ -56,7 +56,9 @@ abstract class BaseUpdateTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $this->ensureTokenCan('update');
+        if (($denied = $this->denyIfTokenCannot('update')) instanceof Response) {
+            return $denied;
+        }
 
         /** @var User $user */
         $user = auth()->user();

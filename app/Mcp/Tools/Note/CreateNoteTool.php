@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Description('Create a new note in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[IsOpenWorld(false)]
 final class CreateNoteTool extends BaseCreateTool
 {
     protected function actionClass(): string

@@ -48,7 +48,9 @@ abstract class BaseShowTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $this->ensureTokenCan('read');
+        if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
+            return $denied;
+        }
 
         /** @var User $user */
         $user = auth()->user();

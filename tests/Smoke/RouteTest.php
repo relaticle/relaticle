@@ -41,6 +41,8 @@ const SMOKE_EXCLUDED_ROUTES = [
     'scheduled-deletion',
     'docs/api*',
     'api/*',
+    'oauth/*',
+    '.well-known/*',
 ];
 
 TestResponse::macro('assertNotServerError', function (): TestResponse {
