@@ -351,6 +351,12 @@ final class ExecuteImportJob implements ShouldQueue
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
             $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
 
+            // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
+            // rejects a blank string for a date/timestamp column.
+            if (is_string($safeValue) && blank($safeValue) && $cf->typeData->dataType->isDateOrDateTime()) {
+                $safeValue = null;
+            }
+
             if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
                 $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
             }
@@ -477,7 +483,7 @@ final class ExecuteImportJob implements ShouldQueue
     private function flushTagOptions(): void
     {
         foreach ($this->pendingTagOptions as $pending) {
-            resolve(EnsureTagOptionsExist::class)->handle($pending['field'], $pending['values']);
+            resolve(EnsureTagOptionsExist::class)->execute($pending['field'], $pending['values']);
         }
 
         $this->pendingTagOptions = [];
@@ -582,12 +588,18 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
+     * Emit a key only for a mapped column whose cell the row actually carried, so that key
+     * presence downstream means "carried" and a blank value means "carried empty" rather
+     * than "withheld". Without the reject, a skipped or errored cell would arrive as null
+     * and read as an instruction to clear the field.
+     *
      * @param  Collection<int, ColumnData>  $fieldMappings
      * @return array<string, mixed>
      */
     private function buildDataFromRow(ImportRow $row, Collection $fieldMappings): array
     {
         return $fieldMappings
+            ->reject(fn (ColumnData $mapping): bool => $row->isValueWithheld($mapping->source))
             ->mapWithKeys(fn (ColumnData $mapping): array => [
                 $mapping->target => $row->getFinalValue($mapping->source),
             ])
@@ -608,10 +620,6 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             unset($prepared[$key]);
-
-            if (blank($value)) {
-                continue;
-            }
 
             $customFieldData[Str::after($key, self::CUSTOM_FIELD_PREFIX)] = $value;
         }

@@ -30,6 +30,12 @@
                     {{ $link['label'] }}
                 </a>
             @endforeach
+            @feature(App\Features\Blog::class)
+                <a href="{{ route('blog.index') }}" @click="mobileMenu = false"
+                   class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">
+                    Blog
+                </a>
+            @endfeature
             @feature(App\Features\Documentation::class)
                 <a href="{{ route('documentation.index') }}" @click="mobileMenu = false"
                    class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">

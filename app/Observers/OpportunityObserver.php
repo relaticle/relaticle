@@ -15,9 +15,4 @@ final readonly class OpportunityObserver
     {
         $this->tagFirstCrmDataIfNeeded($opportunity);
     }
-
-    public function saved(Opportunity $opportunity): void
-    {
-        $opportunity->invalidateAiSummary();
-    }
 }

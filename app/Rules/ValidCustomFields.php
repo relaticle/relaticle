@@ -44,7 +44,6 @@ final readonly class ValidCustomFields implements ValidationRule
                 $fieldRules = $validationService->getValidationRules($customField);
 
                 if ($fieldRules !== []) {
-                    $fieldRules = $this->ensureNullableForDateFields($customField->type, $fieldRules);
                     $rules["custom_fields.{$customField->code}"] = $fieldRules;
                 }
 
@@ -89,30 +88,6 @@ final readonly class ValidCustomFields implements ValidationRule
         $unknownList = implode(', ', $unknownKeys);
 
         $fail("Unknown custom field keys: {$unknownList}.");
-    }
-
-    /**
-     * Prepend 'nullable' to validation rules for date/date_time fields so null clears the value.
-     *
-     * The vendor package's ValidationService does not include 'nullable', causing
-     * the 'date' rule to reject null. We fix this at the application layer.
-     *
-     * @param  array<int, mixed>  $fieldRules
-     * @return array<int, mixed>
-     */
-    private function ensureNullableForDateFields(string $fieldType, array $fieldRules): array
-    {
-        $fieldTypeData = CustomFieldsType::getFieldType($fieldType);
-
-        if ($fieldTypeData === null || ! $fieldTypeData->dataType->isDateOrDateTime()) {
-            return $fieldRules;
-        }
-
-        if (in_array('nullable', $fieldRules, true)) {
-            return $fieldRules;
-        }
-
-        return ['nullable', ...$fieldRules];
     }
 
     /**

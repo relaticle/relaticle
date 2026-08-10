@@ -44,7 +44,8 @@ it('registers chat:conversation-renamed listener', function (): void {
 it('deletes a conversation via livewire action', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'c-del',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->user->current_team_id,
         'title' => 'Kill me',
         'created_at' => now(),
@@ -68,7 +69,8 @@ it('renders an "All chats" trigger when more than 7 chats exist', function (): v
     for ($i = 1; $i <= 8; $i++) {
         $rows[] = [
             'id' => "all-{$i}",
-            'user_id' => $this->user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $this->user->getKey(),
             'team_id' => $this->user->current_team_id,
             'title' => "Chat {$i}",
             'created_at' => now()->subMinutes($i),
@@ -87,7 +89,8 @@ it('hides the "All chats" trigger when 7 or fewer chats exist', function (): voi
     for ($i = 1; $i <= 7; $i++) {
         $rows[] = [
             'id' => "few-{$i}",
-            'user_id' => $this->user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $this->user->getKey(),
             'team_id' => $this->user->current_team_id,
             'title' => "Chat {$i}",
             'created_at' => now()->subMinutes($i),

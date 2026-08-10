@@ -1,5 +1,5 @@
 name: Benchmark
 custom_fields:
-  domains: https://benchmark.com
+  domains: www.benchmark.com
   icp: true
-  linkedin: https://www.linkedin.com/company/benchmark
+  linkedin: www.linkedin.com/company/benchmark

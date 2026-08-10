@@ -18,7 +18,10 @@ use App\Rules\ArrayExistsForTeam;
 
 arch()->preset()->php();
 
-// arch()->preset()->strict();
+// The strict preset is deliberately NOT enabled (evaluated 2026-06-12): its
+// no-protected-methods rule fights core Laravel idioms (Model::casts(),
+// provider hooks, base-tool templates), and pint already enforces final
+// classes + strict types repo-wide.
 
 arch()->preset()->security()->ignoring('assert');
 
@@ -32,11 +35,14 @@ arch()->preset()
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
         'App\Http\Controllers\Mcp',
+        'App\Models\ActivityLog\Scopes\TeamScope',
+        // Chat tools intentionally reuse App\Http\Resources (consistent
+        // LLM-facing payloads); the preset forbids resources outside Http.
         'Relaticle\Chat',
     ]);
 
 arch('strict types')
-    ->expect('App')
+    ->expect(['App', 'Relaticle'])
     ->toUseStrictTypes();
 
 arch('avoid open for extension')
@@ -89,6 +95,10 @@ arch('avoid mutation')
         'App\Health',
         'App\Http\Controllers\Chat',
         'App\Http\Controllers\Mcp',
+        // Extends Cashier's WebhookController — its documented handler
+        // extension point; PHP forbids a readonly class extending a
+        // non-readonly one.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -97,9 +107,20 @@ arch('avoid mutation')
         'App\Mail',
         'App\Mcp',
         'App\Models',
+        'App\Observers',
         'App\Data',
         'App\Notifications',
         'App\Providers',
+        'App\Support\ActivityLog\CleanActivityLogAction',
+        // Request-scoped batch_uuid holder — mutable by design (lazily caches the
+        // per-request id), like a value cache rather than a service.
+        'App\Support\ActivityLog\RequestActivityBatch',
+        // Extends the non-readonly sluggable GenerateSlugAction to hook slug
+        // uniqueness; PHP forbids a readonly class extending a non-readonly one.
+        'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // Same shape: laravel-markdown-response resolves its detector through an
+        // is_a() check against its own class, so extending it is mandatory.
+        'App\Support\DetectsPublicMarkdownRequest',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -117,6 +138,9 @@ arch('avoid inheritance')
         'App\Exceptions',
         'App\Filament',
         'App\Http\Controllers\Mcp',
+        // Overrides Cashier's subscription-created handler so an abandoned
+        // checkout does not consume the workspace's generic trial.
+        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -130,7 +154,63 @@ arch('avoid inheritance')
         'App\Providers',
         'App\Scribe',
         'App\View',
+        'App\Support\ActivityLog\CleanActivityLogAction',
+        // Hooks slug uniqueness by extending sluggable's GenerateSlugAction,
+        // which is the package's documented extension point.
+        'App\Support\ReservedSlugAwareGenerateSlugAction',
+        // laravel-markdown-response validates the configured detector with
+        // is_a($class, DetectsMarkdownRequest::class), so it must extend it.
+        'App\Support\DetectsPublicMarkdownRequest',
     ]);
+
+// Packages are kept final by pint (final_class, repo-wide) and strict-typed by
+// the rule above. Readonly/no-inheritance is enforced only on their plain-PHP
+// service layers — the rest of each package is framework-shaped (Filament,
+// Livewire, Models, Tools, Jobs) and would be ignored wholesale anyway, exactly
+// as the App rules above ignore those namespaces.
+// (tests/Arch/ConventionsTest.php forces this list to be revisited when a
+// package is added.)
+$packageServiceLayers = [
+    'Relaticle\Chat\Actions',
+    'Relaticle\Chat\Agents',
+    'Relaticle\Chat\Services',
+    'Relaticle\Chat\Support',
+    'Relaticle\Documentation\Services',
+    'Relaticle\ImportWizard\Support',
+    'Relaticle\OnboardSeed\Support',
+];
+
+arch('package service layers avoid mutation')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toBeReadonly()
+    ->ignoring([
+        // Grandfathered (2026-06-12) — make each readonly, then unlist:
+        'Relaticle\Chat\Agents\CrmAssistant',
+        'Relaticle\Chat\Services\TipTapDocumentParser',
+        'Relaticle\Chat\Support\ChatTelemetry',
+        'Relaticle\Chat\Support\LikePattern',
+        'Relaticle\Chat\Support\PromptText',
+        'Relaticle\Chat\Support\ProviderRateGate',
+        'Relaticle\Chat\Support\TitleSanitizer',
+        'Relaticle\Documentation\Services\DocumentationService',
+        'Relaticle\ImportWizard\Support\DataTypeInferencer',
+        'Relaticle\ImportWizard\Support\EntityLinkResolver',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\ForeignKeyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkStorage\MorphToManyStorage',
+        'Relaticle\ImportWizard\Support\EntityLinkValidator',
+        'Relaticle\ImportWizard\Support\Validation\ColumnValidator',
+        'Relaticle\OnboardSeed\Support\BaseModelSeeder',
+        'Relaticle\OnboardSeed\Support\BulkCustomFieldValueWriter',
+        'Relaticle\OnboardSeed\Support\FixtureLoader',
+        'Relaticle\OnboardSeed\Support\FixtureRegistry',
+    ]);
+
+arch('package service layers avoid inheritance')
+    ->expect($packageServiceLayers)
+    ->classes()
+    ->toExtendNothing();
 
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
@@ -178,6 +258,28 @@ arch('MCP tools must not use DB facade directly')
     ->not
     ->toUse([
         'Illuminate\Support\Facades\DB',
+    ]);
+
+arch('UI surfaces must not use the DB facade directly')
+    ->expect([
+        'App\Filament',
+        'App\Livewire',
+        'Relaticle\Chat\Livewire',
+        'Relaticle\Chat\Tools',
+    ])
+    ->not
+    ->toUse([
+        'Illuminate\Support\Facades\DB',
+    ])
+    ->ignoring([
+        // Grandfathered (2026-06-12) — move these writes into actions, then unlist:
+        'App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard',
+        'App\Filament\Resources\TaskResource\Pages\TasksBoard',
+        'App\Livewire\App\AccessTokens\CreateAccessToken',
+        // Session-table infrastructure (no Eloquent model) — legitimate DB facade use:
+        'App\Livewire\App\Profile\LogoutOtherBrowserSessions',
+        // Read-only aggregate join for stream recovery:
+        'Relaticle\Chat\Livewire\Chat\ChatInterface',
     ]);
 
 arch('must not use custom-fields package models directly')

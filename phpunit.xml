@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Local test configuration. phpunit.ci.xml is the CI overlay: identical
+    testsuites and base env plus CI-only overrides. When adding a testsuite or
+    an env key here, mirror it there — enforced by
+    tests/Arch/TestSuiteIntegrityTest.php.
+-->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
@@ -38,6 +44,8 @@
         <env name="APP_ENV" value="testing"/>
         <env name="APP_DEBUG" value="false"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="ANTHROPIC_API_KEY" value="fake-anthropic-key"/>
+        <env name="OPENAI_API_KEY" value="fake-openai-key"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
@@ -48,5 +56,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
+        <env name="RELATICLE_FEATURE_BLOG" value="true"/>
     </php>
 </phpunit>

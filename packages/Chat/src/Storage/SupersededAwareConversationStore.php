@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Storage;
 
-use Illuminate\Support\Collection;
-use Laravel\Ai\Messages\AssistantMessage;
-use Laravel\Ai\Messages\Message;
-use Laravel\Ai\Messages\ToolResultMessage;
-use Laravel\Ai\Responses\Data\ToolCall;
-use Laravel\Ai\Responses\Data\ToolResult;
+use Illuminate\Database\Query\Builder;
+use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Storage\DatabaseConversationStore;
-use stdClass;
+use Relaticle\Chat\Support\AssistantText;
+use Relaticle\Chat\Support\FirstChatUsageTagger;
 
 /**
  * Conversation store that hides superseded turns from the agent's history.
@@ -24,63 +22,56 @@ use stdClass;
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
     /**
-     * @return Collection<int, Message>
+     * Scope every message query the store makes to the non-superseded rows.
+     *
+     * The filter lives here rather than in a getLatestConversationMessages()
+     * override so that history rebuilding — attachment rehydration, paused
+     * tool-turn reconstruction, approval-result bookkeeping — stays owned by
+     * the parent and cannot drift from it.
+     *
+     * Inserts are unaffected (insert() ignores wheres), but the approval-result
+     * update in DatabaseConversationStore::storeApprovalResults() does go
+     * through here, so a superseded turn cannot have approvals written back to
+     * it — deliberate, and consistent with its lookup query being filtered too.
      */
-    public function getLatestConversationMessages(string $conversationId, int $limit): Collection
+    protected function table(string $table): Builder
     {
-        return $this->table($this->messagesTable())
-            ->where('conversation_id', $conversationId)
-            ->whereNull('superseded_at')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get()
-            ->reverse()
-            ->values()
-            ->flatMap(fn (stdClass $record): array => $this->mapRecordToMessages($record));
+        $builder = parent::table($table);
+
+        if ($table === $this->messagesTable()) {
+            $builder->whereNull('superseded_at');
+        }
+
+        return $builder;
     }
 
     /**
-     * @return list<Message>
+     * Tag the "has-ai-usage" marketing segment on the subscriber's first
+     * chat message. This is the real write path for user turns (see
+     * RememberConversation middleware in laravel/ai), unlike the
+     * AgentConversationMessage Eloquent model, which never receives writes.
      */
-    private function mapRecordToMessages(stdClass $record): array
+    public function storeUserMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt): string
     {
-        $toolCalls = collect((array) json_decode((string) $record->tool_calls, true))->values();
-        $toolResults = collect((array) json_decode((string) $record->tool_results, true))->values();
+        $messageId = parent::storeUserMessage($conversationId, $participantType, $participantId, $prompt);
 
-        if ($record->role === 'user') {
-            return [new Message('user', $record->content)];
-        }
+        FirstChatUsageTagger::tagIfFirstMessage($messageId);
 
-        if ($toolCalls->isNotEmpty()) {
-            $messages = [];
+        return $messageId;
+    }
 
-            $messages[] = new AssistantMessage(
-                $record->content ?: '',
-                $toolCalls->map(fn (array $toolCall): ToolCall => new ToolCall(
-                    id: $toolCall['id'],
-                    name: $toolCall['name'],
-                    arguments: $toolCall['arguments'],
-                    resultId: $toolCall['result_id'] ?? null,
-                    reasoningId: $toolCall['reasoning_id'] ?? null,
-                    reasoningSummary: $toolCall['reasoning_summary'] ?? null,
-                ))
-            );
+    /**
+     * Collapse a fully-repeated combined assistant text before persisting.
+     *
+     * laravel/ai concatenates the model's text deltas across every agent step,
+     * so a model that echoes the same acknowledgment in both the tool-call step
+     * and the post-tool-result step yields that text repeated back-to-back. We
+     * store the single copy instead of the duplicate.
+     */
+    public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response): ?string
+    {
+        $response->text = AssistantText::collapseRepeated($response->text);
 
-            if ($toolResults->isNotEmpty()) {
-                $messages[] = new ToolResultMessage(
-                    $toolResults->map(fn (array $toolResult): ToolResult => new ToolResult(
-                        id: $toolResult['id'],
-                        name: $toolResult['name'],
-                        arguments: $toolResult['arguments'],
-                        result: $toolResult['result'],
-                        resultId: $toolResult['result_id'] ?? null,
-                    ))
-                );
-            }
-
-            return $messages;
-        }
-
-        return [new AssistantMessage($record->content)];
+        return parent::storeAssistantMessage($conversationId, $participantType, $participantId, $prompt, $response);
     }
 }

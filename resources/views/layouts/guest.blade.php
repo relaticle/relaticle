@@ -1,4 +1,13 @@
-@props(['title', 'description' => 'Relaticle - The open-source CRM built for people and AI-powered work. Self-hosted with MCP server, REST API, and 22 custom field types.', 'ogTitle' => null, 'ogDescription' => null, 'ogImage' => null])
+@props([
+    'title',
+    'description' => 'Relaticle - The open-source CRM built for people and AI-powered work. Self-hosted with MCP server, REST API, and 22 custom field types.',
+    'ogTitle' => null,
+    'ogDescription' => null,
+    'ogImage' => null,
+    'ogType' => 'website',
+    'canonical' => null,
+    'robots' => null,
+])
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -8,7 +17,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <meta name="description" content="{{ $description }}">
-    <link rel="canonical" href="{{ url()->current() }}" />
+    {{-- Defaults to the query-stripped URL, which is what consolidates the marketing
+         pages. Pages that genuinely paginate pass their own page-aware canonical. --}}
+    <link rel="canonical" href="{{ $canonical ?? url()->current() }}" />
+    @if($robots)
+        <meta name="robots" content="{{ $robots }}">
+    @endif
 
     @php
         // Bump the version whenever public/images/open-graph.jpg is regenerated
@@ -24,7 +38,7 @@
     <meta property="og:image:height" content="630"/>
     <meta property="og:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
     <meta property="og:url" content="{{ request()->getUri() }}"/>
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="{{ $ogType }}" />
     <meta property="og:site_name" content="{{ config('app.name', 'Relaticle') }}" />
     <meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}" />
 

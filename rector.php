@@ -26,6 +26,9 @@ use RectorLaravel\Set\LaravelSetProvider;
 return RectorConfig::configure()
     ->withSetProviders(LaravelSetProvider::class)
     ->withComposerBased(laravel: true)
+    // Keep the result cache inside the project so CI can restore it between runs.
+    // Rector otherwise caches to the system temp dir, which GitHub Actions discards.
+    ->withCache(cacheDirectory: __DIR__.'/.cache/rector')
     ->withPaths([
         __DIR__.'/app',
         __DIR__.'/packages',
@@ -66,6 +69,7 @@ return RectorConfig::configure()
         ],
         AddHasFactoryToModelsRector::class => [
             __DIR__.'/app/Models/PersonalAccessToken.php',
+            __DIR__.'/app/Models/ActivityLog/Activity.php',
             __DIR__.'/app/Models/Passport/*',
             __DIR__.'/packages/ImportWizard/src/Models/*',
         ],

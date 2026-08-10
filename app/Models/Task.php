@@ -8,11 +8,8 @@ use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasTeam;
-use App\Models\Concerns\InvalidatesRelatedAiSummaries;
-use App\Observers\TaskObserver;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -22,8 +19,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
+use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
@@ -31,16 +33,13 @@ use Spatie\EloquentSortable\SortableTrait;
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
  * @property string $createdBy
- *
- * @method void saveCustomFieldValue(CustomField $field, mixed $value)
  */
-#[ObservedBy(TaskObserver::class)]
 #[Fillable([
     'user_id',
     'title',
     'creation_source',
 ])]
-final class Task extends Model implements HasCustomFields
+final class Task extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasCreator;
@@ -50,7 +49,8 @@ final class Task extends Model implements HasCustomFields
 
     use HasTeam;
     use HasUlids;
-    use InvalidatesRelatedAiSummaries;
+    use InteractsWithTimeline;
+    use LogsActivity;
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;
@@ -133,5 +133,24 @@ final class Task extends Model implements HasCustomFields
     protected function forOpportunity(Builder $query, string $opportunityId): void
     {
         $query->whereHas('opportunities', fn (Builder $q) => $q->where('opportunities.id', $opportunityId));
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->logExcept([
+                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
+                'created_at', 'updated_at', 'deleted_at', 'order_column',
+            ])
+            ->useLogName('crm')
+            ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
+    }
+
+    public function timeline(): TimelineBuilder
+    {
+        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }

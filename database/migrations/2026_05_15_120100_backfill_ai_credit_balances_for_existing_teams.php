@@ -14,9 +14,10 @@ return new class extends Migration
 
         Team::query()
             ->whereDoesntHave('aiCreditBalance')
+            ->with('subscriptions')
             ->chunkById(200, function ($teams) use ($action): void {
                 foreach ($teams as $team) {
-                    $action->handle($team);
+                    $action->execute($team);
                 }
             });
     }

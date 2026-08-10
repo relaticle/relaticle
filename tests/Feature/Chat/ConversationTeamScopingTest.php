@@ -16,7 +16,8 @@ it('lists only conversations scoped to the current team', function (): void {
     DB::table('agent_conversations')->insert([
         [
             'id' => 'conv-current',
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $user->current_team_id,
             'title' => 'Current team',
             'created_at' => now(),
@@ -24,7 +25,8 @@ it('lists only conversations scoped to the current team', function (): void {
         ],
         [
             'id' => 'conv-other',
-            'user_id' => $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
             'team_id' => $otherTeam->getKey(),
             'title' => 'Other team',
             'created_at' => now(),
@@ -45,7 +47,8 @@ it('returns null from FindConversation for cross-team conversation ids', functio
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-foreign',
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $otherTeam->getKey(),
         'title' => 'Foreign',
         'created_at' => now(),
@@ -53,4 +56,31 @@ it('returns null from FindConversation for cross-team conversation ids', functio
     ]);
 
     expect((new FindConversation)->execute($user, 'conv-foreign'))->toBeNull();
+});
+
+it('scopes a conversation listing to the participant type, not just the id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    DB::table('agent_conversations')->insert([
+        [
+            'id' => 'conv-mine',
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => $user->getKey(),
+            'team_id' => $user->current_team_id,
+            'title' => 'Mine',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'id' => 'conv-other-morph',
+            'participant_type' => 'team',
+            'participant_id' => $user->getKey(),
+            'team_id' => $user->current_team_id,
+            'title' => 'Not a user conversation',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    expect((new ListConversations)->execute($user)->pluck('id')->all())->toBe(['conv-mine']);
 });

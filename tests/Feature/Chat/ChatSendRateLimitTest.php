@@ -24,7 +24,8 @@ it('rejects an 11th request from a Free user within a minute with a 429', functi
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -60,7 +61,8 @@ it('isolates rate limits per team — different teams do not share the bucket', 
     $convA = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $convA,
-        'user_id' => (string) $userA->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $userA->getKey(),
         'team_id' => $teamA->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -91,7 +93,8 @@ it('isolates rate limits per team — different teams do not share the bucket', 
     $convB = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $convB,
-        'user_id' => (string) $userB->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $userB->getKey(),
         'team_id' => $teamB->getKey(),
         'title' => 'test',
         'created_at' => now(),
@@ -114,7 +117,8 @@ it('allows Pro users 30 requests per minute', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'test',
         'created_at' => now(),

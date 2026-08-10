@@ -15,9 +15,4 @@ final readonly class PeopleObserver
     {
         $this->tagFirstCrmDataIfNeeded($people);
     }
-
-    public function saved(People $people): void
-    {
-        $people->invalidateAiSummary();
-    }
 }

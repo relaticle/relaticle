@@ -299,7 +299,7 @@
                         Start for free
                     </x-marketing.button>
                     <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-500">
-                        <span>No credit card</span><span>&middot;</span><span>1,100+ tests</span><span>&middot;</span><span>AGPL-3.0</span>
+                        <span>No credit card</span><span>&middot;</span><span>2,000+ tests</span><span>&middot;</span><span>AGPL-3.0</span>
                     </div>
                 </div>
             </div>

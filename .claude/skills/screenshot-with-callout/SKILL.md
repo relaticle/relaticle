@@ -38,7 +38,7 @@ When in doubt, pass a label argument of `null` to the annotation helper to skip 
 
 Write the one-sentence purpose first, before touching the browser: *"the Partner Housed Configuration section with the services-only banner visible"*. If you can't say it in one sentence, you don't yet understand what the case is supposed to prove and you're not ready to shoot.
 
-For business reviews, this should match the `evidence:` field from your Phase 4 plan (see `business-review-task` skill). If it doesn't match, stop and update the plan first — improvising at capture time is how shots go wrong.
+For business reviews, this should match the `evidence:` field from your Phase 4 plan (see `business-review` skill). If it doesn't match, stop and update the plan first — improvising at capture time is how shots go wrong.
 
 ### Step 2. Scroll the target into the middle of the viewport
 
@@ -264,8 +264,8 @@ If you can't reliably frame a full-viewport shot, give up on the full viewport a
 ## What this skill does NOT cover
 
 This skill is just about the capture sequence. It doesn't cover:
-- **Where the resulting PNG goes** (uploading to ClickUp, embedding in a doc, attaching to a PR comment) — that's in the calling skill, e.g. `business-review-task` Phase 5 step 8 handles uploading to the ClickUp attachment endpoint.
-- **What to capture for a given case** — that's planned at Phase 4 of `business-review-task`. By the time you invoke this skill, the `selector` / `callout_target` / `callout_label` / `evidence` should already be in your plan.
+- **Where the resulting PNG goes** (uploading to ClickUp, embedding in a doc, attaching to a PR comment) — that's in the calling skill, e.g. `business-review` Phase 5 step 8 handles uploading to the ClickUp attachment endpoint.
+- **What to capture for a given case** — that's planned at Phase 4 of `business-review`. By the time you invoke this skill, the `selector` / `callout_target` / `callout_label` / `evidence` should already be in your plan.
 - **General agent-browser quirks** (login, tenant switching, Filament Select, action modals, etc.) — those are in `agent-browser-journey`.
 
 This skill is intentionally narrow: it's the 9-step sequence you walk through in the moment of capture, nothing more. That's the whole point — it's small enough to re-load every time you need it.

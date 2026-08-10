@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Jobs;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -13,6 +14,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -35,13 +37,14 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Throwable;
 
-#[Timeout(120)]
+#[Timeout(self::TIMEOUT_SECONDS)]
 #[MaxExceptions(1)]
 final class ProcessChatMessage implements ShouldQueue
 {
@@ -49,10 +52,15 @@ final class ProcessChatMessage implements ShouldQueue
 
     private const int MAX_RATE_LIMIT_RETRIES = 5;
 
+    private const int TIMEOUT_SECONDS = 120;
+
+    private const int CONTEXT_LEDGER_CAP = 10;
+
     /**
      * @param  array{provider: string|null, model: string|null}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
     public function __construct(
         private readonly User $user,
@@ -62,6 +70,7 @@ final class ProcessChatMessage implements ShouldQueue
         private readonly array $resolved,
         public readonly array $mentions = [],
         public readonly array $document = ['type' => 'doc', 'content' => []],
+        public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
     ) {
         $this->onQueue('chat');
@@ -92,6 +101,22 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
+        $this->team->refresh();
+
+        if (resolve(HostedWorkspaceAccess::class)->isPaused($this->team)) {
+            $creditService->refundReservation(
+                $this->team,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+            $this->broadcastSafely(new ChatStreamFailed(
+                conversationId: $this->conversationId,
+                message: __('billing.access.paused_chat'),
+            ));
+
+            return;
+        }
+
         $this->bindAuth();
 
         ChatTelemetry::tagCurrentScope(
@@ -123,6 +148,8 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withMentions($this->mentions);
+            $agent->withPageContext($this->pageContext);
+            $agent->withContextLedger($this->contextLedger());
             $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
             $agent->withResolvedActions(
                 $pendingActions->resolvedSinceLastAssistantMessage($this->conversationId),
@@ -295,14 +322,134 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $message = $this->isRateLimited($exception)
-            ? 'The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.'
-            : 'The assistant encountered an error. Please try again.';
+        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
+
+        try {
+            $this->persistFailedTurn($exception);
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
+        }
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: $message,
+            message: $this->failureMessage($exception),
         ));
+    }
+
+    private function failureMessage(?Throwable $exception): string
+    {
+        if ($exception instanceof TimeoutExceededException) {
+            return __("This model didn't respond within the time limit (:seconds s). Try a shorter prompt, or switch to a faster model.", [
+                'seconds' => self::TIMEOUT_SECONDS,
+            ]);
+        }
+
+        if ($this->isRateLimited($exception)) {
+            return __('The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.');
+        }
+
+        return __('The assistant encountered an error. Please try again.');
+    }
+
+    /**
+     * Make a dead turn coherent: ensure the user's message is persisted (the
+     * ConversationStore flushes rows only on stream success, so a mid-stream
+     * death loses them) and append a visible assistant failure note that
+     * survives reload.
+     *
+     * The ConversationStore writes the user row then the assistant row,
+     * back-to-back, only once the stream fully succeeds. `handle()`'s
+     * post-stream `then()` callback (settleReservation / persistMentions /
+     * persistUserDocument / materializeAssistantDocument / broadcastFollowUps)
+     * then runs synchronously and un-guarded — if any of those steps throws,
+     * the job still fails even though both real rows already exist. Inspecting
+     * only the single latest row can't tell that case apart from "the stream
+     * died before the store wrote anything": the latest row would be the
+     * assistant reply, not the user message, so the old guard concluded the
+     * user message was never persisted and inserted a duplicate plus a false
+     * error note on a turn that actually succeeded. Looking at the last TWO
+     * rows lets us tell a truly complete turn (user then assistant, matching
+     * this message) apart from a genuinely dead one.
+     *
+     * Residual: if the user sends the IDENTICAL message in two consecutive
+     * turns and the first succeeds while the second later fails, the last-two
+     * check sees {user: this message, assistant: first reply} and treats the
+     * second turn as already complete, so it won't be backfilled. The same
+     * ambiguity applies when the prior turn was itself a failed+backfilled
+     * turn for that identical message: its `[user, assistant-note]` pair is
+     * indistinguishable from a completed one, so a second failure in a row
+     * is likewise skipped. Both degrade to the pre-existing "message lost"
+     * behavior for that one edge case — never a duplicate or a false error
+     * note — and are accepted rather than solved with more machinery.
+     */
+    private function persistFailedTurn(?Throwable $exception): void
+    {
+        $now = now();
+        $table = DB::table('agent_conversation_messages');
+
+        $lastTwo = $table->clone()
+            ->where('conversation_id', $this->conversationId)->latest()
+            ->orderByDesc('id')
+            ->limit(2)
+            ->get(['role', 'content']);
+
+        $last = $lastTwo->get(0);
+        $prev = $lastTwo->get(1);
+
+        $turnAlreadyComplete = $last !== null
+            && $last->role === 'assistant'
+            && $prev !== null
+            && $prev->role === 'user'
+            && $prev->content === $this->message;
+
+        if ($turnAlreadyComplete) {
+            return;
+        }
+
+        $storePersistedUser = $last !== null
+            && $last->role === 'user'
+            && $last->content === $this->message;
+
+        if (! $storePersistedUser) {
+            $table->insert([
+                'id' => (string) Str::uuid7(),
+                'conversation_id' => $this->conversationId,
+                'participant_type' => $this->user->getMorphClass(),
+                'participant_id' => (string) $this->user->getKey(),
+                'agent' => CrmAssistant::class,
+                'role' => 'user',
+                'content' => $this->message,
+                'attachments' => '[]',
+                'tool_calls' => '[]',
+                'tool_results' => '[]',
+                'usage' => '[]',
+                'meta' => '[]',
+                'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $text = $this->failureMessage($exception);
+        $document = $this->getParser()->buildFromText($text, [], $this->team);
+
+        $table->insert([
+            'id' => (string) Str::uuid7(),
+            'conversation_id' => $this->conversationId,
+            'participant_type' => $this->user->getMorphClass(),
+            'participant_id' => (string) $this->user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => 'assistant',
+            'content' => $text,
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '[]',
+            'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
+            'document' => json_encode($document, JSON_THROW_ON_ERROR),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     /**
@@ -335,16 +482,89 @@ final class ProcessChatMessage implements ShouldQueue
         }, $superseded);
     }
 
+    /**
+     * Distinct records referenced earlier in this conversation, most recent first.
+     *
+     * Unlike a typed @mention, a page-context record's name never enters the message
+     * text — so once it falls off this ledger the agent loses it entirely (no id, no
+     * name, nothing left to fall back on). The conversation's OLDEST page_context row
+     * is therefore exempt from the recency cap: it reserves the ledger's last slot
+     * instead of being evicted by more recent records, so the total handed to the
+     * agent stays bounded at the same cap regardless of how many distinct records
+     * the conversation has touched.
+     *
+     * @return list<array{type: string, id: string, label: string}>
+     */
+    private function contextLedger(): array
+    {
+        $rows = DB::table('agent_conversation_message_mentions as mm')
+            ->join('agent_conversation_messages as m', 'm.id', '=', 'mm.message_id')
+            ->where('m.conversation_id', $this->conversationId)
+            ->latest('mm.created_at')
+            ->get(['mm.type', 'mm.record_id', 'mm.label', 'mm.source', 'mm.created_at']);
+
+        $anchor = $rows
+            ->filter(static fn (object $row): bool => (string) $row->source === 'page_context')
+            ->sortBy('created_at')
+            ->first();
+
+        $anchorKey = $anchor !== null ? $anchor->type.':'.$anchor->record_id : null;
+
+        $seen = [];
+        $ledger = [];
+
+        foreach ($rows as $row) {
+            $key = $row->type.':'.$row->record_id;
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            if (count($ledger) >= self::CONTEXT_LEDGER_CAP) {
+                break;
+            }
+
+            // One slot before the cap: stop unless this row IS the anchor, so the
+            // final slot stays reserved for it (appended below) rather than being
+            // taken by whatever is merely next in recency.
+            if (count($ledger) === self::CONTEXT_LEDGER_CAP - 1
+                && $anchorKey !== null
+                && $key !== $anchorKey
+                && ! isset($seen[$anchorKey])
+            ) {
+                break;
+            }
+
+            $seen[$key] = true;
+            $ledger[] = [
+                'type' => (string) $row->type,
+                'id' => (string) $row->record_id,
+                'label' => (string) $row->label,
+            ];
+        }
+
+        if ($anchor !== null && $anchorKey !== null && ! isset($seen[$anchorKey])) {
+            $ledger[] = [
+                'type' => (string) $anchor->type,
+                'id' => (string) $anchor->record_id,
+                'label' => (string) $anchor->label,
+            ];
+        }
+
+        return $ledger;
+    }
+
     private function persistMentions(): void
     {
-        if ($this->mentions === []) {
+        if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
 
         $userMessageId = DB::table('agent_conversation_messages')
             ->where('conversation_id', $this->conversationId)
             ->where('role', 'user')
-            ->latest('created_at')
+            ->latest()
+            ->orderByDesc('id')
             ->value('id');
 
         if ($userMessageId === null) {
@@ -357,9 +577,23 @@ final class ProcessChatMessage implements ShouldQueue
             'type' => $m['type'],
             'record_id' => $m['id'],
             'label' => $m['label'],
+            'source' => 'mention',
             'created_at' => now(),
             'updated_at' => now(),
         ], $this->mentions);
+
+        if ($this->pageContext !== null) {
+            $rows[] = [
+                'id' => (string) Str::ulid(),
+                'message_id' => $userMessageId,
+                'type' => $this->pageContext['type'],
+                'record_id' => $this->pageContext['id'],
+                'label' => $this->pageContext['label'],
+                'source' => 'page_context',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
 
         DB::table('agent_conversation_message_mentions')->insert($rows);
     }
@@ -400,7 +634,10 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
     {
-        $assistantContent = $streamedResponse->text;
+        // Collapse here too so the `document` column owns its own correctness — the
+        // store fixes `content`, but the document is built independently. Idempotent
+        // if the store already collapsed the shared response instance.
+        $assistantContent = AssistantText::collapseRepeated($streamedResponse->text);
 
         if ($assistantContent === '') {
             return;

@@ -7,6 +7,37 @@
 @import "./fonts.css";
 @import "./theme.css";
 
+/*
+ * The blog renders through ink's Blade components, but /vendor is gitignored and
+ * Tailwind v4's automatic source detection skips ignored paths — so the classes
+ * that only ever appear in those components (the whole prose-* wrapper on the
+ * post body, the amber draft-preview banner) were missing from the built CSS.
+ * Broken in production, invisible in `npm run dev`, where the JIT rescans.
+ */
+@source "../../vendor/relaticle/ink/resources/views";
+
 [x-cloak] {
     display: none !important;
+}
+
+/*
+ * The markdown renderer injects a "#" permalink anchor into every heading. The
+ * documentation bundle hides it until hover; the blog renders through the main
+ * bundle, where it was showing as a stray underlined hash fused to the heading
+ * text ("#Why we built it").
+ */
+.blog-prose :is(h2, h3, h4) {
+    @apply relative w-fit;
+}
+
+.blog-prose .heading-permalink {
+    @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
+}
+
+.blog-prose :is(h2, h3, h4):hover .heading-permalink {
+    @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
+}
+
+.blog-prose h1 .heading-permalink {
+    @apply hidden;
 }

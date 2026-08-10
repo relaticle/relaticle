@@ -2,7 +2,15 @@
     x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
     x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
+    x-on:chat:context-updated.window="
+        pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
+        pageContextLabel = $event.detail.label ?? null;
+        starterPrompts = ($event.detail.prompts && $event.detail.prompts.length) ? $event.detail.prompts : starterPrompts;
+        pageContextDismissed = false;
+        pageContextConsumed = false;
+    "
     data-chat-context="{{ $context ?? 'conversation' }}"
+    data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
 >
     {{-- Messages --}}
@@ -30,11 +38,11 @@
                         Ask about your CRM data, or try one of these:
                     </p>
                     <div class="mt-4 flex flex-wrap justify-center gap-2">
-                        <template x-for="prompt in starterPrompts" :key="prompt">
+                        <template x-for="starter in starterPrompts" :key="starter.label">
                             <button
                                 type="button"
-                                x-on:click="input = prompt; localEditor()?.setText(prompt); $nextTick(() => sendMessage())"
-                                x-text="prompt"
+                                x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
+                                x-text="starter.label"
                                 class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                             ></button>
                         </template>
@@ -72,6 +80,18 @@
                                     >
                                         <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
                                     </div>
+                                </template>
+
+                                {{-- Grounding trace: the record this message was bound to. --}}
+                                <template x-if="msg.page_context && !msg.editing">
+                                    <a
+                                        :href="msg.page_context.url || '#'"
+                                        :class="msg.page_context.url ? '' : 'pointer-events-none'"
+                                        class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 ring-1 ring-primary-600/20 transition hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20"
+                                    >
+                                        <x-heroicon-m-at-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span class="truncate" x-text="msg.page_context.label"></span>
+                                    </a>
                                 </template>
 
                                 <template x-if="msg.editing">
@@ -180,19 +200,6 @@
                                         class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
                                     >
                                         Retry
-                                    </button>
-                                </div>
-                            </template>
-
-                            <template x-if="msg.pausedResume">
-                                <div class="mt-2">
-                                    <button
-                                        type="button"
-                                        x-show="!isStreaming"
-                                        x-on:click="msg.pausedResume = false; retryTurn(Object.assign(msg, { isContinuation: true, rendered: false, prerendered: false, content: '' }))"
-                                        class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-                                    >
-                                        Continue
                                     </button>
                                 </div>
                             </template>
@@ -341,117 +348,27 @@
                         </div>
                     </template>
 
-                    {{-- Pending action cards --}}
+                    {{-- Action cards: resolved cards stay inline as the audit trail.
+                         A still-pending batch that already has some resolved items
+                         ALSO renders inline as a compact progress card (the editor
+                         for the unresolved items lives docked at the composer; see
+                         input area). A fully-unresolved proposal is dock-only. --}}
                     <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                         <div class="mt-3 space-y-3">
                             <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
-                                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                                    <div class="flex items-center gap-2">
-                                        <span
-                                            class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
-                                            :class="{
-                                                'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400': action.operation === 'create',
-                                                'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400': action.operation === 'update',
-                                                'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.operation === 'delete',
-                                            }"
-                                            x-text="action.operation.charAt(0).toUpperCase() + action.operation.slice(1)"
-                                        ></span>
-                                        <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="action.display?.summary"></span>
-                                    </div>
-
-                                    <template x-if="action.display?.duplicate_warning">
-                                        <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" x-text="action.display.duplicate_warning"></div>
+                                <div class="space-y-2">
+                                    <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                        @include('chat::livewire.chat.partials._proposal-card')
                                     </template>
 
-                                    <div class="mt-2 space-y-1">
-                                        <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                                            <div class="flex gap-2 text-sm">
-                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                <span class="text-gray-900 dark:text-white" x-text="field.new || field.value"></span>
-                                                <template x-if="field.old">
-                                                    <span class="text-gray-400 line-through" x-text="field.old"></span>
-                                                </template>
+                                    {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
+                                         derived from the persisted action by proposalOutcome(), not a stored message. --}}
+                                    <template x-if="action.status !== 'pending' && proposalOutcome(action)">
+                                        <div class="flex justify-start">
+                                            <div class="inline-flex max-w-[85%] items-start gap-1.5 rounded-2xl rounded-bl-md bg-white px-3 py-2 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700">
+                                                <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
+                                                <span x-text="proposalOutcome(action)"></span>
                                             </div>
-                                        </template>
-                                    </div>
-
-                                    {{-- Batch items (records[] proposals) --}}
-                                    <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-                                        <div class="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
-                                            <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
-                                                <div class="py-2 first:pt-0 last:pb-0">
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
-                                                    <div class="mt-1 space-y-0.5">
-                                                        <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                                            <div class="flex gap-2 text-xs">
-                                                                <span class="font-medium text-gray-500 dark:text-gray-400" x-text="field.label + ':'"></span>
-                                                                <span class="text-gray-700 dark:text-gray-300" x-text="field.new || field.value"></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </template>
-
-                                    {{-- Action buttons --}}
-                                    <template x-if="action.status === 'pending'">
-                                        <div class="mt-3 flex gap-2">
-                                            <button
-                                                x-on:click="approveAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                                            >
-                                                <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                                Approve
-                                            </button>
-                                            <button
-                                                x-on:click="rejectAction(action)"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                                            >
-                                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </template>
-
-                                    {{-- Error state --}}
-                                    <template x-if="action.error">
-                                        <div class="mt-2 text-xs text-red-600 dark:text-red-400" x-text="action.error"></div>
-                                    </template>
-
-                                    {{-- Resolved state --}}
-                                    <template x-if="action.status !== 'pending' && !action.error">
-                                        <div class="mt-3 flex items-center gap-2">
-                                            <span
-                                                class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
-                                                :class="{
-                                                    'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400': action.status === 'approved',
-                                                    'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400': action.status === 'rejected',
-                                                    'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                                                    'bg-gradient-to-r from-green-50 to-blue-50 text-blue-700 dark:from-green-900/20 dark:to-blue-900/20 dark:text-blue-300': action.status === 'restored',
-                                                }"
-                                                x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
-                                            ></span>
-                                            <template x-if="(action.status === 'approved' || action.status === 'restored') && action.record && action.record.url">
-                                                <a
-                                                    :href="action.record.url"
-                                                    wire:navigate
-                                                    class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                                                >
-                                                    View
-                                                    <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                                </a>
-                                            </template>
-                                            <template x-if="(action.status === 'approved' || action.status === 'restored') && Array.isArray(action.records) && action.records.length > 0">
-                                                <span class="flex flex-wrap gap-2">
-                                                    <template x-for="ref in action.records" :key="ref.id">
-                                                        <a :href="ref.url" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                                            View
-                                                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                                        </a>
-                                                    </template>
-                                                </span>
-                                            </template>
                                         </div>
                                     </template>
                                 </div>
@@ -492,28 +409,22 @@
         </div>
     </template>
 
-    {{-- Undo toast --}}
-    <template x-if="undoToast">
-        <div class="pointer-events-auto fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-             role="status"
-             aria-live="polite"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 translate-y-2"
-             x-transition:enter-end="opacity-100 translate-y-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Deleted. Undo?</span>
-            <button type="button" x-on:click="undoLastAction()"
-                    class="rounded-md bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700">
-                Undo
-            </button>
-        </div>
-    </template>
-
     {{-- Input area --}}
     <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900">
         <div class="mx-auto max-w-3xl">
+            {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
+                 render real Filament field editors in place (Phase C). Alpine stays the source of truth for
+                 whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
+            <div x-show="hasPendingProposal" x-effect="syncActiveProposal()" class="mb-3">
+                <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Review before continuing</span>
+                </div>
+                <div class="max-h-[55vh] overflow-y-auto">
+                    <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />
+                </div>
+            </div>
+
             {{-- Send-throttle countdown: the message is kept and auto-sends --}}
             <template x-if="rateLimit">
                 <div class="mb-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20" role="status" aria-live="polite">
@@ -534,7 +445,30 @@
                 </div>
             </template>
 
-            <form x-on:submit.prevent="sendMessage()">
+            {{-- Ambient context: the record the assistant treats as "this". Dismissible —
+                 the record is only sent while this is visible. --}}
+            <div
+                x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed && !pageContextConsumed"
+                x-cloak
+                class="mb-2 flex items-center gap-1.5 text-xs"
+            >
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-primary-50 px-2 py-1 font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/30">
+                    <span class="shrink-0" x-html="pageContextIcon()"></span>
+
+                    <span class="truncate" x-text="pageContextLabel"></span>
+
+                    <button
+                        type="button"
+                        x-on:click="pageContextDismissed = true"
+                        x-bind:aria-label="'Stop referring to ' + pageContextLabel"
+                        class="-me-0.5 shrink-0 rounded p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
+                    >
+                        <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                </span>
+            </div>
+
+            <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
                 <div
                     x-data="chatEditor({
                         initialDocument: { type: 'doc', content: [] },
@@ -606,13 +540,20 @@
 <script>
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
     conversationId: initialConversationId,
+    context: 'conversation',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     input: '',
     isStreaming: false,
     channel: null,
     streamTimeoutId: null,
-    streamTimeoutMs: 60000,
+    // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
+    // long with no stream event, reconcile the turn from the DB. It MUST exceed the
+    // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
+    // (Ollama/qwen3-class "thinking" models emit no client-visible delta during their
+    // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
+    // for a reply that is still generating server-side and does persist.
+    streamTimeoutMs: 125000,
     prependScrollAnchor: null,
     streamAbortController: null,
     currentToolStatus: null,
@@ -620,13 +561,23 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     copyTickerId: null,
     currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
     currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-    allowedModels: @js(
-        collect((auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())->allowedModels())
-            ->map(fn ($m) => $m->value)
-            ->all()
-    ),
+    allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
     selectedModel: 'auto',
-    undoToast: null,
+    pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
+    pageContextLabel: @js($pageContextLabel),
+    // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
+    // applies to the record you dismissed it on, not to every record afterwards.
+    pageContextDismissed: false,
+    // The pill behaves like a pre-filled attachment: it attaches to the NEXT message
+    // only, then this flips true and the pill disappears — subsequent messages carry
+    // no page_context until the bound record actually changes. Distinct from
+    // pageContextDismissed (explicit "stop referring to this"): chat:context-updated
+    // resets both, but only dismissal is a user action.
+    pageContextConsumed: false,
+
+    // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
+    // dedupes proposal:set-active dispatches.
+    _lastActiveProposalId: null,
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
     // and auto-flush this on handleStreamEnd / cancel / failure.
@@ -677,6 +628,36 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return m;
     },
 
+    // Snapshot of the record this message is bound to, in the same shape
+    // ListConversationMessages returns after a reload — the optimistic bubble
+    // and the reloaded one must render identically. `url` isn't resolvable
+    // client-side, so the chip falls back to its non-clickable branch until
+    // a reload fills it in from the server.
+    activePageContext() {
+        if (this.pageContextDismissed || this.pageContextConsumed || !this.pageContext?.type || !this.pageContext?.id) {
+            return null;
+        }
+
+        return {
+            type: this.pageContext.type,
+            id: this.pageContext.id,
+            label: this.pageContextLabel || this.pageContext.id,
+            url: null,
+        };
+    },
+
+    pageContextIcon() {
+        const icons = {
+            company: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 16.5v-13h-.25a.75.75 0 0 1 0-1.5h12.5a.75.75 0 0 1 0 1.5H16v13h.25a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75v-2.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v2.5a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5H4Zm3-11a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 5.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 8.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 8.5Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM7 11.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75Zm4.75-.75a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z" clip-rule="evenodd" /></svg>',
+            people: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" /></svg>',
+            opportunity: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 10.818v2.614A3.13 3.13 0 0 0 11.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 0 0-1.138-.432ZM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 0 0-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.202.592.037.051.08.102.128.152Z" /><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-6a.75.75 0 0 1 .75.75v.316a3.78 3.78 0 0 1 1.653.713c.426.33.744.74.925 1.2a.75.75 0 0 1-1.395.55 1.35 1.35 0 0 0-.447-.563 2.187 2.187 0 0 0-.736-.363V9.3c.698.093 1.383.32 1.891.66.533.359 1.017.937 1.017 1.723 0 .74-.4 1.32-.923 1.709a3.945 3.945 0 0 1-1.985.752v.316a.75.75 0 0 1-1.5 0v-.316a3.76 3.76 0 0 1-1.79-.813 3.187 3.187 0 0 1-.933-1.216.75.75 0 1 1 1.38-.59c.09.211.224.4.394.552.28.25.63.418 1 .486V9.7a3.68 3.68 0 0 1-1.786-.756C7.185 8.581 6.75 8 6.75 7.25c0-.79.44-1.377.972-1.79a3.712 3.712 0 0 1 1.528-.694V4.75A.75.75 0 0 1 10 4Z" clip-rule="evenodd" /></svg>',
+            task: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>',
+            note: '<svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25ZM6 6.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 6.25Zm.75 3.25a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6 13.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>',
+        };
+
+        return icons[this.pageContext?.type] ?? icons.company;
+    },
+
     localEditor() {
         const ctx = (this.$root || this.$el)?.getAttribute?.('data-chat-context') ?? 'conversation';
         const wrapper = document.querySelector(`[data-chat-context="${ctx}"][x-data*="chatEditor"]`);
@@ -703,7 +684,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             invocationId: null,
             streamError: null,
             retryable: false,
-            isContinuation: false,
             _needsSeparator: false,
             feedback: null,
             feedbackPanelOpen: false,
@@ -756,17 +736,13 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return this.mintAssistantStub({ invocationId });
     },
 
-    modelOptions: [
-        { value: 'auto', label: 'Auto', provider: null },
-        { value: 'claude-sonnet', label: 'Sonnet 4.6', provider: 'anthropic' },
-        { value: 'claude-opus', label: 'Opus 4.7', provider: 'anthropic' },
-        { value: 'gpt-5-5', label: 'GPT 5.5', provider: 'openai' },
-        { value: 'gpt-5-4', label: 'GPT 5.4', provider: 'openai' },
-    ],
+    modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 
     providerIcons: @js([
         'anthropic' => svg('ri-claude-fill')->toHtml(),
         'openai' => svg('ri-openai-fill')->toHtml(),
+        'ollama' => svg('ri-server-line')->toHtml(),
+        'selfhosted' => svg('ri-server-line')->toHtml(),
     ]),
 
     providerIconHtml(provider) {
@@ -778,6 +754,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return ({
             anthropic: 'text-[#D4763C]',
             openai: 'text-gray-900 dark:text-gray-200',
+            ollama: 'text-gray-500 dark:text-gray-400',
+            selfhosted: 'text-gray-500 dark:text-gray-400',
         })[provider] || '';
     },
 
@@ -802,12 +780,14 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
     },
 
-    starterPrompts: [
-        'Give me a CRM overview',
-        'Show overdue tasks',
-        'Recent companies',
-        'Pipeline summary',
-    ],
+    // Record-aware when the side panel supplies them (so the chips name the record
+    // you are looking at); generic fallback on the full-page chat, which has no record.
+    starterPrompts: @js($contextPrompts !== [] ? $contextPrompts : [
+        ['label' => 'Give me a CRM overview', 'prompt' => 'Give me a CRM overview'],
+        ['label' => 'Show overdue tasks', 'prompt' => 'Show overdue tasks'],
+        ['label' => 'Recent companies', 'prompt' => 'Recent companies'],
+        ['label' => 'Pipeline summary', 'prompt' => 'Pipeline summary'],
+    ]),
 
     autosize(el) {
         el.style.height = 'auto';
@@ -818,31 +798,76 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (!message.document || (Array.isArray(message.document.content) && message.document.content.length === 0)) {
             return this.escapeHtml(message.content ?? '');
         }
-        return this.walkDocumentToHtml(message.document);
+
+        // Server-resolved mention URLs are authoritative. When a message carries a
+        // `mentions` array (loaded from the backend) links are rendered ONLY from
+        // it — never from the client-controlled document. A just-sent (optimistic)
+        // message has no server mentions yet, so it falls back to the picker URL
+        // stored on the node, which is still scheme-validated before use.
+        const serverMentions = Array.isArray(message.mentions) ? message.mentions : null;
+        const mentionUrls = {};
+        (serverMentions ?? []).forEach((m) => {
+            if (m && m.id != null && m.url) {
+                mentionUrls[String(m.id)] = m.url;
+            }
+        });
+
+        return this.walkDocumentToHtml(message.document, { mentionUrls, allowNodeUrl: serverMentions === null });
     },
 
-    walkDocumentToHtml(node) {
+    walkDocumentToHtml(node, ctx = {}) {
         if (!node) return '';
         if (node.type === 'doc') {
-            return (node.content ?? []).map((c) => this.walkDocumentToHtml(c)).join('');
+            return (node.content ?? []).map((c) => this.walkDocumentToHtml(c, ctx)).join('');
         }
         if (node.type === 'paragraph') {
-            const children = (node.content ?? []).map((c) => this.walkDocumentToHtml(c)).join('');
+            const children = (node.content ?? []).map((c) => this.walkDocumentToHtml(c, ctx)).join('');
             return `<p>${children}</p>`;
         }
         if (node.type === 'text') {
             return this.escapeHtml(node.text ?? '');
         }
         if (node.type === 'mention') {
-            const id = this.escapeAttr(node.attrs?.id ?? '');
-            const type = this.escapeAttr(node.attrs?.type ?? '');
-            const label = this.escapeHtml(node.attrs?.label ?? '');
-            return `<span data-mention-id="${id}" data-mention-type="${type}" class="inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">@${label}</span>`;
+            return this.renderMentionNode(node, ctx);
         }
         if (node.type === 'hardBreak') {
             return '<br>';
         }
         return '';
+    },
+
+    renderMentionNode(node, ctx = {}) {
+        const id = node.attrs?.id ?? '';
+        const idAttr = this.escapeAttr(id);
+        const type = this.escapeAttr(node.attrs?.type ?? '');
+        const label = this.escapeHtml(node.attrs?.label ?? '');
+        const baseClass = 'inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200';
+
+        let url = ctx.mentionUrls?.[String(id)] ?? null;
+        if (!url && ctx.allowNodeUrl) {
+            url = node.attrs?.url ?? null;
+        }
+
+        if (url && this.isSafeUrl(url)) {
+            const href = this.escapeAttr(url);
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer" data-mention-id="${idAttr}" data-mention-type="${type}" class="${baseClass} no-underline transition-colors hover:bg-primary-200 dark:hover:bg-primary-900/60">@${label}</a>`;
+        }
+
+        return `<span data-mention-id="${idAttr}" data-mention-type="${type}" class="${baseClass}">@${label}</span>`;
+    },
+
+    isSafeUrl(url) {
+        if (typeof url !== 'string' || url === '') return false;
+        // Root-relative ("/app/...") URLs are same-origin and safe; reject the
+        // protocol-relative "//host" form which would point off-origin.
+        if (url.startsWith('//')) return false;
+        if (url.startsWith('/')) return true;
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
     },
 
     escapeHtml(str) {
@@ -859,6 +884,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     init() {
+        this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
+
         const validModels = this.modelOptions
             .map((o) => o.value)
             .filter((v) => this.allowedModels.includes(v));
@@ -950,6 +977,20 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         };
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
 
+        this.approvalKeyHandler = (e) => {
+            if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
+
+            const pending = this.visiblePendingActions();
+            if (pending.length !== 1 || this.isStreaming) return;
+            if (this.input.trim().length > 0) return; // composer draft wins
+
+            e.preventDefault();
+            if (window.Livewire?.dispatch) {
+                window.Livewire.dispatch('proposal:create-current', { context: this.context });
+            }
+        };
+        window.addEventListener('keydown', this.approvalKeyHandler);
+
         this.renamedHandler = (e) => {
             const detail = e.detail || {};
             if (!detail.conversationId || detail.conversationId !== this.conversationId) return;
@@ -1001,6 +1042,22 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.prependScrollAnchor = null;
             });
         });
+
+        // Bridge the docked livewire proposal-card's resolution lifecycle back
+        // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
+        // named-arg dispatches arrive as a single params object (e.detail).
+        this._proposalListeners = [
+            window.Livewire.on('proposal:resolved', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                this.applyProposalResolution(payload);
+            }),
+            window.Livewire.on('proposal:resolve-failed', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                const action = this.findPendingAction(payload?.pendingActionId);
+                if (action) action.error = 'Could not complete the action. Please try again.';
+            }),
+        ];
+
     },
 
     loadEarlier() {
@@ -1009,17 +1066,76 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.$wire.loadEarlierMessages();
     },
 
+    visiblePendingActions() {
+        return this.messages
+            .flatMap((m) => m.pending_actions || [])
+            .filter((a) => a.status === 'pending');
+    },
+
+    activePendingActionId() {
+        const pending = this.visiblePendingActions();
+        return pending.length > 0 ? pending[0].pending_action_id : null;
+    },
+
+    syncActiveProposal() {
+        const id = this.activePendingActionId();
+        if (id === this._lastActiveProposalId) return;
+        this._lastActiveProposalId = id;
+        if (window.Livewire?.dispatch) {
+            window.Livewire.dispatch('proposal:set-active', { id, context: this.context });
+        }
+    },
+
+    get hasPendingProposal() {
+        return this.visiblePendingActions().length > 0;
+    },
+
+    findPendingAction(id) {
+        for (const m of this.messages) {
+            const found = (m.pending_actions || []).find((a) => a.pending_action_id === id);
+            if (found) return found;
+        }
+        return null;
+    },
+
+    applyProposalResolution(payload) {
+        const action = this.findPendingAction(payload.pendingActionId);
+        if (!action) return;
+        action.error = null;
+
+        if (payload.index === null || payload.index === undefined) {
+            // Single proposal.
+            action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
+            if (payload.record) action.record = payload.record;
+        } else {
+            // Batch item: the transcript renders per-item status 'approved'/'skipped'.
+            action.itemResults = {
+                ...action.itemResults,
+                [payload.index]: {
+                    status: payload.decision === 'approved' ? 'approved' : 'skipped',
+                    record: payload.record || null,
+                },
+            };
+            if (payload.finalized) action.status = 'approved';
+        }
+
+        if (payload.decision === 'approved' && window.Livewire?.dispatch) {
+            window.Livewire.dispatch('ai-write-completed', {
+                entityType: action.entity_type ?? null,
+                operation: action.operation ?? null,
+            });
+        }
+    },
+
     destroy() {
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();
         this.unsubscribe();
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = null;
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
+        window.removeEventListener('keydown', this.approvalKeyHandler);
+        (this._proposalListeners || []).forEach((off) => typeof off === 'function' && off());
     },
 
     startCopyTicker() {
@@ -1289,8 +1405,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
-            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
-            .listen('.chat.paused', (e) => this.handleChatPaused(e));
+            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
 
         return readyPromise;
     },
@@ -1406,6 +1521,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     async sendMessage() {
+        if (this.hasPendingProposal) return;
         if (this.rateLimit) return;
 
         const editor = this.localEditor();
@@ -1438,10 +1554,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         const isFirstMessage = !this.conversationId;
         const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
+        // Captured once per send: the pill attaches to THIS message only. Both the
+        // optimistic bubble below and the request payload further down must read
+        // the SAME snapshot — re-reading activePageContext() after the consumed
+        // flag flips would silently drop it from the outgoing request.
+        const contextForSend = this.activePageContext();
 
         if (isFirstMessage) {
             const nowIso = new Date().toISOString();
-            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+            this.pageContextConsumed = true;
             this.mintAssistantStub();
             this.localEditor()?.clear();
             this.input = '';
@@ -1527,6 +1649,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         document: payload,
                         conversation_id: newId,
                         model: this.selectedModel,
+                        page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -1546,7 +1669,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         assistantMsg.paywall = {
                             heading: "You've used all your AI credits",
                             body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                            upgrade_url: body.upgrade_url || '/app',
+                            upgrade_url: body.top_up_url || body.upgrade_url || '/app',
                         };
                         assistantMsg.content = '';
                     } else {
@@ -1580,7 +1703,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         const nowIso = new Date().toISOString();
-        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso }));
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+        this.pageContextConsumed = true;
         this.localEditor()?.clear();
         this.input = '';
         this.currentToolStatus = null;
@@ -1607,6 +1731,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     document: payload,
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
+                    page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                 }),
                 signal: this.streamAbortController.signal,
             });
@@ -1637,7 +1762,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                     assistantMsg.paywall = {
                         heading: "You've used all your AI credits",
                         body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                        upgrade_url: body.upgrade_url || '/app',
+                        upgrade_url: body.top_up_url || body.upgrade_url || '/app',
                     };
                     assistantMsg.content = '';
                 } else {
@@ -1709,48 +1834,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (this.isStreaming) return;
         if (msg._retrying) return;
 
-        if (msg.isContinuation) {
-            // Async path — guard with _retrying and clear in finally.
-            msg._retrying = true;
-            msg.streamError = null;
-            msg.retryable = false;
-            msg.rendered = false;
-            this.isStreaming = true;
-            this.startStreamTimeout();
-            this.restoreInputFocus();
-            try {
-                const res = await fetch(@js(url('/chat/conversations')) + '/' + this.conversationId + '/resume', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    msg.streamError = body.error || 'Could not resume. Please try again.';
-                    if (res.status === 409 && body.code === 'resume_in_progress') {
-                        msg.retryable = true;
-                    } else if (res.status === 409) {
-                        msg.retryable = false;
-                    } else {
-                        msg.retryable = true;
-                    }
-                    msg.rendered = true;
-                    this.isStreaming = false;
-                    this.clearStreamTimeout();
-                }
-            } catch {
-                msg.streamError = 'Network error. Please try again.';
-                msg.retryable = true;
-                msg.rendered = true;
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            } finally {
-                msg._retrying = false;
-            }
-            return;
-        }
-
         // Failed user turn: the server never stored the message — re-send the
         // preceding user message from local state (same flow as edit-resend).
         // Compute userIndex BEFORE committing to any state change so the no-op
@@ -1790,39 +1873,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         assistantMsg.content += delta;
         this.scrollToBottom();
-    },
-
-    // Approve/reject triggers a backend continuation that streams a fresh
-    // assistant turn on the same channel. We mint an empty assistant stub so
-    // the incoming text_delta/tool_result events land in a new bubble instead
-    // of being appended to the message that originally proposed the action.
-    //
-    // Call this BEFORE the /approve|/reject POST resolves — the backend
-    // dispatches ContinueChatMessage as part of the request handler, so
-    // text_delta events can start arriving on the broadcast channel before
-    // the HTTP response returns. If we wait, the first deltas land in the
-    // proposal bubble and a short continuation can finish before we even
-    // mint the stub (leaving isStreaming permanently true on an empty bubble).
-    // Returns a revert handle for use when the POST fails.
-    beginContinuationTurn() {
-        const stub = this.mintAssistantStub({ isContinuation: true });
-        this.currentToolStatus = null;
-        this.isStreaming = true;
-        this.startStreamTimeout();
-        this.scrollToBottom(true);
-
-        return () => {
-            // Only revert if the stub is still untouched (no deltas arrived
-            // before the POST's failure path ran). If the backend already
-            // streamed into it, the user's better off seeing whatever did
-            // land than a flicker that erases it.
-            const last = this.messages[this.messages.length - 1];
-            if (last === stub && stub.content === '' && stub.pending_actions.length === 0) {
-                this.messages.pop();
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-            }
-        };
     },
 
     handleToolCall(event) {
@@ -1933,6 +1983,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.scrollToBottom();
         this.restoreInputFocus();
         this.flushQueuedSend();
+        this.maybeSyncTitle();
+    },
+
+    // A brand-new chat is auto-titled server-side after its first turn, but the
+    // Filament page header (H1 + tab title) was rendered at mount and still reads
+    // "New chat". Pull the freshly generated title and reuse the existing
+    // chat:renamed handler to update the header without a reload.
+    async maybeSyncTitle() {
+        if (!this.conversationId) return;
+        if (!document.title.startsWith('New chat')) return;
+        try {
+            const title = await this.$wire.conversationTitle(this.conversationId);
+            if (title) {
+                window.dispatchEvent(new CustomEvent('chat:renamed', {
+                    detail: { conversationId: this.conversationId, title },
+                }));
+            }
+        } catch (_) { /* non-fatal: header just stays generic until reload */ }
     },
 
     // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
@@ -2060,16 +2128,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.startStreamTimeout(((event?.delaySeconds ?? 0) * 1000) + this.streamTimeoutMs);
     },
 
-    handleChatPaused(event) {
-        this.mintAssistantStub({
-            content: event?.message || 'Paused. Press Continue to keep going.',
-            rendered: true,
-            pausedResume: true,
-        });
-        this.isStreaming = false;
-        this.$nextTick(() => this.restoreInputFocus());
-    },
-
     restoreInputFocus() {
         this.$nextTick(() => {
             if (this.messages.some((m) => m.editing)) return;
@@ -2084,127 +2142,84 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
     },
 
-    async approveAction(action) {
-        const previousStatus = action.status;
-        action.status = 'approved';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST so text_delta events that
-        // arrive during the fetch land in a fresh bubble, not the proposal.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/approve', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                if (body.record) {
-                    action.record = body.record;
-                }
-                if (body.records) {
-                    action.records = body.records;
-                }
-                if (action.operation === 'delete') {
-                    this.showUndoToast(action);
-                }
-                if (window.Livewire?.dispatch) {
-                    window.Livewire.dispatch('ai-write-completed', {
-                        entityType: action.entity_type ?? null,
-                        operation: action.operation ?? null,
-                    });
-                }
-            } else {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to approve';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
-            action.error = 'Network error';
-        }
+    // The transcript renders batch cards with per-item Created/Skipped chips.
+    // applyProposalResolution() (the docked card's resolution bridge) writes
+    // action.itemResults; the _proposal-card partial reads them through this
+    // getter in both its compact-while-pending and full resolved modes.
+    itemResult(action, index) {
+        return (action.itemResults && action.itemResults[index]) || null;
     },
 
-    showUndoToast(action) {
-        if (this.undoToast?.timeoutId) {
-            clearTimeout(this.undoToast.timeoutId);
-        }
-        this.undoToast = {
-            action,
-            startedAt: Date.now(),
-            timeoutId: null,
-        };
-        this.undoToast.timeoutId = setTimeout(() => {
-            this.undoToast = null;
-        }, 5000);
+    // Past-tense verb for a resolved item's chip, by operation.
+    itemVerb(action) {
+        const op = action?.operation;
+        return op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
     },
 
-    async undoLastAction() {
-        if (!this.undoToast) return;
-        const action = this.undoToast.action;
-        clearTimeout(this.undoToast.timeoutId);
-        this.undoToast = null;
+    // Reload-safe agent outcome summary for a finalized proposal. Built purely from
+    // the persisted action (status, itemResults, record refs, display) so it survives
+    // a conversation reload exactly like the audit card — no stored message and no AI
+    // continuation (both intentionally removed). Returns null while still pending.
+    proposalOutcome(action) {
+        if (!action || action.status === 'pending') return null;
 
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/restore', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
+        const op = action.operation;
+        const verb = op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+        const items = action.display?.items;
+
+        if (Array.isArray(items) && items.length > 0) {
+            const created = [];
+            const skipped = [];
+            items.forEach((item, i) => {
+                const res = this.itemResult(action, i) || this.itemResult(action, String(i));
+                if (!res) return;
+                const name = res.record?.label || this.proposalItemName(item) || 'record';
+                if (res.status === 'approved') created.push(name);
+                else if (res.status === 'skipped') skipped.push(name);
             });
-
-            if (res.ok) {
-                const body = await res.json().catch(() => ({}));
-                action.status = 'restored';
-                action.error = null;
-                if (body.record) {
-                    action.record = body.record;
-                }
-            } else {
-                const body = await res.json().catch(() => ({}));
-                action.error = body.error || 'Failed to restore';
-            }
-        } catch {
-            action.error = 'Network error';
+            const skippedVerb = op === 'delete' ? 'kept' : 'skipped';
+            const parts = [];
+            if (created.length) parts.push(`${verb} ${this.joinNames(created)}`);
+            if (skipped.length) parts.push(`${skippedVerb} ${this.joinNames(skipped)}`);
+            if (parts.length === 0) return null;
+            const sentence = parts.join('; ') + '.';
+            return sentence.charAt(0).toUpperCase() + sentence.slice(1);
         }
+
+        if (action.status === 'approved') {
+            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || 'the record';
+            return `${verb} ${label}.`;
+        }
+        if (action.status === 'rejected') {
+            const label = this.extractQuotedName(action.display?.summary);
+            if (op === 'delete') return label ? `Kept ${label} — deletion discarded.` : 'Deletion discarded.';
+            return label ? `Discarded ${label}.` : 'Proposal discarded.';
+        }
+        return null;
     },
 
-    async rejectAction(action) {
-        const previousStatus = action.status;
-        action.status = 'rejected';
-        action.error = null;
-
-        // Mint the continuation stub BEFORE the POST — see approveAction for why.
-        const revertContinuation = this.beginContinuationTurn();
-
-        try {
-            const res = await fetch(@js(url('/chat/actions')) + '/' + action.pending_action_id + '/reject', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (! res.ok) {
-                revertContinuation();
-                const body = await res.json().catch(() => ({}));
-                action.status = previousStatus;
-                action.error = body.error || 'Failed to reject';
-            }
-        } catch {
-            revertContinuation();
-            action.status = previousStatus;
-            action.error = 'Network error';
+    proposalItemName(item) {
+        if (!item) return null;
+        const fields = item.fields;
+        if (Array.isArray(fields) && fields.length > 0) {
+            const value = fields[0].value ?? fields[0].new;
+            if (typeof value === 'string' && value !== '') return value;
         }
+        return this.extractQuotedName(item.summary);
+    },
+
+    extractQuotedName(text) {
+        if (typeof text !== 'string') return null;
+        const match = text.match(/"([^"]+)"/);
+        return match ? match[1] : null;
+    },
+
+    joinNames(names) {
+        const list = names.filter(Boolean);
+        if (list.length === 0) return '';
+        if (list.length === 1) return list[0];
+        if (list.length === 2) return `${list[0]} and ${list[1]}`;
+        return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
     },
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they

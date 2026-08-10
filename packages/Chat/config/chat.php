@@ -6,6 +6,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Batch Write Cap
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of records that may be created or deleted in a single
+    | tool call. Enforced server-side in the tool layer (never via prompt text).
+    | Override with CHAT_MAX_BATCH_SIZE in .env for local testing.
+    */
+
+    'max_batch_size' => (int) env('CHAT_MAX_BATCH_SIZE', 25),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tool Call Credit Bonus
     |--------------------------------------------------------------------------
     */
@@ -56,5 +68,75 @@ return [
     */
 
     'provider_starts_per_second' => (int) env('CHAT_PROVIDER_STARTS_PER_SECOND', 8),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Field Schema Caps
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of custom fields per entity type (across all entities of
+    | that type for a tenant) and maximum options per choice field. Enforced
+    | server-side in the action layer — never via prompt text only.
+    */
+
+    'max_custom_fields_per_entity' => (int) env('CHAT_MAX_CUSTOM_FIELDS_PER_ENTITY', 50),
+
+    'max_field_options' => (int) env('CHAT_MAX_FIELD_OPTIONS', 50),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Model Registry
+    |--------------------------------------------------------------------------
+    |
+    | The user-facing model catalog. Each entry references a provider defined in
+    | config/ai.php. `auto` is synthetic (handled by the resolver) and is not
+    | listed here. Self-hosted custom models are merged in from SELF_HOSTED_AI_*
+    | env at boot. `supports_tools:false` hides a model (Gemini, until laravel/ai
+    | supports tool_config). `write_guard`: api = provider enforces one write per
+    | turn; prompt = relies on the prompt + the approval gate.
+    */
+
+    'self_hosted' => [
+        'url' => env('SELF_HOSTED_AI_URL'),
+        'key' => env('SELF_HOSTED_AI_KEY', ''),
+        'models' => env('SELF_HOSTED_AI_MODELS'),
+    ],
+
+    'auto_chain' => ['claude-sonnet', 'gpt-5-5', 'ollama'],
+
+    'models' => [
+        ['id' => 'claude-sonnet', 'label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'claude-opus', 'label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gpt-5-5', 'label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gpt-5-4', 'label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
+        ['id' => 'gemini-3-flash', 'label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
+        ['id' => 'gemini-3-1-pro', 'label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
+        ['id' => 'ollama', 'label' => 'Ollama', 'provider' => 'ollama', 'model' => env('OLLAMA_MODEL'), 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'prompt', 'self_hosted' => true],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Model Cost Rates (USD per million tokens)
+    |--------------------------------------------------------------------------
+    |
+    | Keys must match the `model` values above and any historical model strings
+    | in ai_credit_transactions. Models without an entry are surfaced as
+    | "unpriced" in the sysadmin cost widget — never silently zero.
+    |
+    | Vendor list prices, short-context tier. Long-context requests bill higher
+    | (gpt-5.x above 272k input, gemini-3.1-pro above 200k), so the widget's
+    | figure is an estimate rather than an invoice. Re-check when a vendor
+    | changes its price list. Ollama is self-hosted (no per-token API cost) and
+    | its model id is env-driven, so it has no entry.
+    */
+
+    'model_costs' => [
+        'claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
+        'claude-opus-4-7' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
+        'gpt-5.5' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 30.00],
+        'gpt-5.4' => ['input_per_mtok' => 2.50, 'output_per_mtok' => 15.00],
+        'gemini-3-flash' => ['input_per_mtok' => 0.50, 'output_per_mtok' => 3.00],
+        'gemini-3.1-pro' => ['input_per_mtok' => 2.00, 'output_per_mtok' => 12.00],
+    ],
 
 ];

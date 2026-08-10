@@ -111,7 +111,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
     public function removeProfilePhoto(): void
     {
         try {
-            resolve(RemoveUserProfilePhoto::class)->remove($this->authUser());
+            resolve(RemoveUserProfilePhoto::class)->execute($this->authUser());
         } catch (Throwable $e) {
             Log::withContext(['user_id' => $this->authUser()->getKey()]);
 

@@ -15,7 +15,8 @@ it('cascades agent_conversations when the team is hard-deleted', function (): vo
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $team->getKey(),
         'title' => 'Test',
         'created_at' => now(),

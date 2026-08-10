@@ -13,6 +13,10 @@ it('has a plan column on teams', function (): void {
     expect(Schema::hasColumn('teams', 'plan'))->toBeTrue();
 });
 
+it('has an explicit hosted Free grandfathering column', function (): void {
+    expect(Schema::hasColumn('teams', 'hosted_free_grandfathered_at'))->toBeTrue();
+});
+
 it('defaults new teams to the Free plan value', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 

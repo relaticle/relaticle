@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Livewire\App\Chat;
 
 use App\Enums\Plan;
+use App\Features\Billing;
+use App\Filament\Pages\Billing as BillingPage;
 use App\Livewire\BaseLivewireComponent;
+use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
+use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\ChatContextService;
@@ -18,8 +24,20 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     public ?string $conversationId = null;
 
-    /** @var array<int, array{label: string, prompt: string}> */
-    public array $suggestedPrompts = [];
+    public ?string $recordType = null;
+
+    public ?string $recordId = null;
+
+    public ?string $recordName = null;
+
+    /**
+     * Prompts for the chat interface's empty state. Computed regardless of panel
+     * state, because the interface renders them the moment the panel opens
+     * rather than on the next navigation.
+     *
+     * @var array<int, array{label: string, prompt: string}>
+     */
+    public array $starterPrompts = [];
 
     /**
      * @var array<string, string>
@@ -32,7 +50,7 @@ final class ChatSidePanel extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $this->refreshContext();
+        $this->refreshContext(request()->fullUrl());
     }
 
     public function openPanel(?string $conversationId = null): void
@@ -65,18 +83,31 @@ final class ChatSidePanel extends BaseLivewireComponent
     }
 
     /**
-     * Refresh context from ChatContextService.
-     * Called on mount and after SPA navigation.
+     * Resolve context for a URL supplied by the browser.
+     *
+     * Null means "no URL available" (a direct call outside a page context),
+     * which clears the binding rather than guessing.
      */
-    public function refreshContext(): void
+    public function refreshContext(?string $url = null): void
     {
-        if (! $this->isOpen) {
-            return;
-        }
-
         $contextService = resolve(ChatContextService::class);
-        $context = $contextService->getContext();
-        $this->suggestedPrompts = $contextService->getSuggestedPrompts($context);
+
+        $context = $url === null
+            ? ['record_type' => null, 'record_id' => null, 'record_name' => null]
+            : $contextService->getContextForUrl($url);
+
+        $this->recordType = $context['record_type'];
+        $this->recordId = $context['record_id'];
+        $this->recordName = $context['record_name'];
+        $this->starterPrompts = $contextService->getSuggestedPrompts($context);
+
+        $this->dispatch(
+            'chat:context-updated',
+            type: $this->recordType,
+            id: $this->recordId,
+            label: $this->recordName,
+            prompts: $this->starterPrompts,
+        );
     }
 
     #[Computed]
@@ -87,6 +118,36 @@ final class ChatSidePanel extends BaseLivewireComponent
         $team = $user?->currentTeam;
 
         return $team !== null ? $team->plan : Plan::default();
+    }
+
+    /**
+     * Whether to offer a prepaid top-up: a paid plan, billing live, and at
+     * least one pack with a configured Stripe price. Without the last check the
+     * link lands on a billing page that has nothing to sell.
+     */
+    #[Computed]
+    public function canBuyCredits(): bool
+    {
+        return $this->plan() !== Plan::Free
+            && Feature::active(Billing::class)
+            && resolve(CreditPackCatalog::class)->hasPurchasable();
+    }
+
+    /**
+     * Billing page URL for the current workspace, or null when there is no
+     * tenant or billing is switched off. Resolved through the panel route so it
+     * holds for both a path-prefixed and a subdomain-routed app panel.
+     */
+    #[Computed]
+    public function billingUrl(): ?string
+    {
+        $team = Filament::getTenant();
+
+        if (! $team instanceof Team || ! Feature::active(Billing::class)) {
+            return null;
+        }
+
+        return BillingPage::getUrl(panel: 'app', tenant: $team);
     }
 
     #[Computed]

@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Models\Concerns\BelongsToTeamCreator;
-use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
@@ -22,8 +21,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
+use Relaticle\ActivityLog\Contracts\HasTimeline;
+use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * @property Carbon|null $deleted_at
@@ -34,10 +38,9 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
     'name',
     'creation_source',
 ])]
-final class People extends Model implements HasCustomFields
+final class People extends Model implements HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
-    use HasAiSummary;
     use HasCreator;
 
     /** @use HasFactory<PeopleFactory> */
@@ -46,6 +49,8 @@ final class People extends Model implements HasCustomFields
     use HasNotes;
     use HasTeam;
     use HasUlids;
+    use InteractsWithTimeline;
+    use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
 
@@ -87,5 +92,24 @@ final class People extends Model implements HasCustomFields
     public function tasks(): MorphToMany
     {
         return $this->morphToMany(Task::class, 'taskable');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->logExcept([
+                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
+                'created_at', 'updated_at', 'deleted_at',
+            ])
+            ->useLogName('crm')
+            ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
+    }
+
+    public function timeline(): TimelineBuilder
+    {
+        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }

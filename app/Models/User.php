@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Data\NotificationPreferences;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
 use Exception;
 use Filament\Models\Contracts\FilamentUser;
@@ -16,6 +20,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -30,6 +35,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
+use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
@@ -47,9 +53,11 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $subscriber_recency_bucket
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
+ * @property Carbon|null $pro_trial_used_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
+ * @property array<string, mixed>|null $notification_preferences
  * @property-read Team|null $currentTeam
  */
 #[Appends([
@@ -61,6 +69,7 @@ use Laravel\Sanctum\HasApiTokens;
     'timezone',
     'password',
     'ai_preferences',
+    'notification_preferences',
 ])]
 #[Hidden([
     'password',
@@ -70,6 +79,7 @@ use Laravel\Sanctum\HasApiTokens;
     'mailcoach_subscriber_uuid',
     'subscriber_recency_bucket',
 ])]
+#[ObservedBy(UserObserver::class)]
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
 {
     use HasApiTokens;
@@ -95,8 +105,20 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'ai_preferences' => 'array',
+            'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
         ];
+    }
+
+    public function notificationPreferences(): NotificationPreferences
+    {
+        return new NotificationPreferences($this->notification_preferences ?? []);
+    }
+
+    public function wantsNotification(NotificationType $type, NotificationChannel $channel): bool
+    {
+        return $this->notificationPreferences()->wants($type, $channel);
     }
 
     /**
@@ -205,5 +227,90 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function getProviderName(): string
     {
         return 'users';
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return HasMany<Team, $this>
+     */
+    public function ownedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return BelongsToMany<Team, $this, Membership, 'membership'>
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, Membership::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->as('membership');
+    }
+
+    /**
+     * The ids of every team the user can reach, owned or joined.
+     *
+     * Authorization runs once per table row, so resolving a record's `team`
+     * relation inside a policy costs a query per row — and throws once a query
+     * hydrates more than one row, because that is when Eloquent arms its strict
+     * lazy-loading guard. Matching the record's foreign key against this set
+     * keeps authorization off the record's relations entirely.
+     *
+     * Both relations are the ones Jetstream already defines and that
+     * `allTeams()` loads for the panel's tenant switcher, so inside a panel
+     * request this set costs nothing beyond what is already in memory.
+     *
+     * @return list<string>
+     */
+    public function accessibleTeamIds(): array
+    {
+        $this->loadMissing(['ownedTeams', 'teams']);
+
+        return array_map(
+            strval(...),
+            [...$this->ownedTeams->modelKeys(), ...$this->teams->modelKeys()],
+        );
+    }
+
+    public function belongsToTeamId(?string $teamId): bool
+    {
+        return $teamId !== null && in_array($teamId, $this->accessibleTeamIds(), true);
+    }
+
+    /**
+     * Determine whether the user holds the given role on the team owning the
+     * given foreign key.
+     */
+    public function hasTeamRoleForTeamId(?string $teamId, string $role): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return true;
+        }
+
+        $this->loadMissing('teams');
+
+        $membershipRole = $this->teams
+            ->first(fn (Team $team): bool => $team->getKey() === $teamId)
+            ?->membership
+            ?->role;
+
+        if ($membershipRole === null) {
+            return false;
+        }
+
+        return Jetstream::findRole($membershipRole)?->key === $role;
     }
 }

@@ -1,6 +1,6 @@
 @php
     $faqs = [
-        ['Is Relaticle production-ready?', 'Yes. Relaticle has 1,100+ automated tests, 5-layer authorization, 56+ MCP-specific tests, and is used in production. The codebase is continuously tested with PHPStan static analysis and Pest mutation testing.'],
+        ['Is Relaticle production-ready?', 'Yes. Relaticle has 2,000+ automated tests, 5-layer authorization, 56+ MCP-specific tests, and is used in production. The codebase is continuously tested with PHPStan static analysis and Pest mutation testing.'],
         ['What can the built-in AI chat do?', 'Ask anything about your CRM and the chat works on your data: list and search records, draft follow-ups, summarize a deal, create a task, update or delete a record. @-mention any record (people, companies, deals, tasks, notes) to scope a question. Voice input, persistent searchable history, and dashboard insight cards are included.'],
         ['Can the AI chat delete or change my CRM data without my approval?', 'No. Destructive operations (delete, update existing records) show an approval card with Approve and Reject buttons — nothing happens until you click. Approved destructive actions can be undone for 5 seconds via a toast. Read-only and create operations don\'t require approval.'],
         ['Does the built-in chat send my data to OpenAI or Anthropic?', 'Inference runs through whichever AI provider your team configures (Anthropic Claude, Google Gemini, or any OpenAI-compatible endpoint). Conversation history is stored only in your Relaticle database — Relaticle never trains on your data. Self-hosted teams supply their own provider keys, so the destination is yours to choose.'],
@@ -46,7 +46,7 @@
                     '22 custom field types with conditional visibility and encryption',
                     'Self-hosted with full data ownership',
                     'Multi-team isolation with 5-layer authorization',
-                    '1,100+ automated tests',
+                    '2,000+ automated tests',
                     'CSV import and export',
                 ])
                 ->license('https://www.gnu.org/licenses/agpl-3.0.html')

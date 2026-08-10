@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Jobs\ContinueChatMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
@@ -20,7 +19,8 @@ function seedResolvedConv(string $id, User $user): void
 {
     DB::table('agent_conversations')->insert([
         'id' => $id,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -33,7 +33,8 @@ function seedResolvedAssistantMsg(string $conversationId, User $user, DateTimeIn
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
         'agent' => 'crm',
         'role' => 'assistant',
         'content' => 'ok',
@@ -100,7 +101,7 @@ it('returns an empty list for another conversation', function (): void {
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
-    Bus::fake([ContinueChatMessage::class]);
+    Bus::fake();
 
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);

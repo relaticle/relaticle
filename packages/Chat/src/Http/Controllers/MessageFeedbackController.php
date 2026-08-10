@@ -88,7 +88,8 @@ final class MessageFeedbackController
         return DB::table('agent_conversation_messages as m')
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('m.id', $messageId)
-            ->where('m.user_id', $user->getKey())
+            ->where('m.participant_type', $user->getMorphClass())
+            ->where('m.participant_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
             ->where('m.role', 'assistant')
             ->first(['m.id', 'm.conversation_id', 'm.meta']);

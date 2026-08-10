@@ -29,7 +29,8 @@ it('passes disable_parallel_tool_use to Anthropic via tool_choice', function ():
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-0000-7000-8000-000000000001',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -62,7 +63,8 @@ it('write tool result includes agent_should_stop=true in meta', function (): voi
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-0000-7000-8000-000000000010',
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => '',
         'created_at' => now(),
@@ -89,5 +91,5 @@ it('system prompt instructs the agent to stop after writes and handle approvals'
         ->toContain('After ANY write tool call')
         ->toContain('STOP your turn immediately')
         ->toContain('[approval]')
-        ->toContain('automatically be prompted to continue');
+        ->not->toContain('automatically be prompted to continue');
 });

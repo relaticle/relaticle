@@ -20,7 +20,8 @@ it('returns the persisted latest assistant message for reconciliation', function
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -29,7 +30,8 @@ it('returns the persisted latest assistant message for reconciliation', function
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant',
         'content' => 'Final answer',
@@ -56,7 +58,8 @@ it('returns still-pending proposal cards so a dropped tool_result can be reconci
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -65,7 +68,8 @@ it('returns still-pending proposal cards so a dropped tool_result can be reconci
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant',
         'content' => 'Proposed it',
@@ -106,13 +110,14 @@ it('does not return resolved or expired cards for reconciliation', function (): 
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
-        'id' => $conversationId, 'user_id' => (string) $user->getKey(),
+        'id' => $conversationId, 'participant_type' => 'user', 'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(), 'title' => 'T',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(), 'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(), 'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(), 'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant', 'content' => 'x', 'document' => ChatDocument::emptyJson(),
         'attachments' => '[]', 'tool_calls' => '[]', 'tool_results' => '[]', 'usage' => '{}', 'meta' => '{}',
         'created_at' => now(), 'updated_at' => now(),
@@ -139,7 +144,8 @@ it('returns the most recent assistant message when several exist', function (): 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -148,7 +154,8 @@ it('returns the most recent assistant message when several exist', function (): 
 
     $base = [
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
@@ -189,7 +196,8 @@ it('returns null when the conversation has no assistant message', function (): v
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => 'T',
         'created_at' => now(),
@@ -198,7 +206,8 @@ it('returns null when the conversation has no assistant message', function (): v
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'user',
         'content' => 'A question',
@@ -233,7 +242,8 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'user_id' => (string) $owner->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $owner->getKey(),
         'team_id' => $owner->currentTeam->getKey(),
         'title' => 'Secret',
         'created_at' => now(),
@@ -242,7 +252,8 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
-        'user_id' => (string) $owner->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $owner->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant',
         'content' => 'Confidential answer',
@@ -260,4 +271,67 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
     $component = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId]);
 
     expect($component->instance()->latestAssistantMessage())->toBeNull();
+});
+
+it('exposes the conversation title for header sync', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => 'Create 3 random companies',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->call('conversationTitle')
+        ->assertReturned('Create 3 random companies');
+});
+
+it('resolves the title from a client-supplied id when the server property is unset (first turn)', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => 'What companies do I have?',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Livewire::test(ChatInterface::class)
+        ->assertSet('conversationId', null)
+        ->call('conversationTitle', $conversationId)
+        ->assertReturned('What companies do I have?');
+});
+
+it('does not leak another tenant conversation title via a client-supplied id', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $attacker = User::factory()->withPersonalTeam()->create();
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $owner->getKey(),
+        'team_id' => $owner->currentTeam->getKey(),
+        'title' => 'Secret title',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($attacker);
+
+    Livewire::test(ChatInterface::class)
+        ->call('conversationTitle', $conversationId)
+        ->assertReturned(null);
 });

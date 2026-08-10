@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Features\Blog;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Laravel\Pennant\Feature;
+use Relaticle\Ink\BlogSitemapGenerator;
 use Spatie\Sitemap\SitemapGenerator;
 
 #[Description('Generate the sitemap')]
@@ -18,7 +21,12 @@ final class GenerateSitemapCommand extends Command
      */
     public function handle(): void
     {
-        SitemapGenerator::create(config('app.url'))
-            ->writeToFile(public_path('sitemap.xml'));
+        $sitemap = SitemapGenerator::create(config('app.url'))->getSitemap();
+
+        if (Feature::active(Blog::class)) {
+            BlogSitemapGenerator::addToSitemap($sitemap);
+        }
+
+        $sitemap->writeToFile(public_path('sitemap.xml'));
     }
 }

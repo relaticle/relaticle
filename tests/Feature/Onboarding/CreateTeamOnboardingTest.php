@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
+use App\Features\Billing as BillingFeature;
+use App\Features\OnboardSeed;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Listeners\CreateTeamCustomFields;
@@ -19,9 +23,17 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
-mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+
+// This file is the coverage for demo seeding itself, so it opts back into the
+// feature that TestCase switches off for the rest of the suite.
+beforeEach(function (): void {
+    Feature::define(OnboardSeed::class, true);
+});
 
 it('renders the create team page with wizard for teamless users', function (): void {
     $user = User::factory()->create();
@@ -62,6 +74,55 @@ it('creates a team with onboarding fields', function (): void {
     expect($team)->not->toBeNull()
         ->and($team->slug)->toBe('acme-corp')
         ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Sales);
+});
+
+it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'name' => 'Trial Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Team $team */
+    $team = $user->refresh()->currentTeam;
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+
+    expect($team->plan)->toBe(Plan::Pro)
+        ->and($team->onGenericTrial())->toBeTrue()
+        ->and($team->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue()
+        ->and($user->pro_trial_used_at)->not->toBeNull()
+        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('creates a later hosted workspace paused when the owner already used a trial', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $user = User::factory()->withPersonalTeam()->create([
+        'pro_trial_used_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'name' => 'Second Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Team $team */
+    $team = $user->refresh()->currentTeam;
+
+    expect($team->plan)->toBe(Plan::Free)
+        ->and($team->trial_ends_at)->toBeNull()
+        ->and($team->hosted_free_grandfathered_at)->toBeNull();
 });
 
 it('creates a team with a custom slug', function (): void {
@@ -427,9 +488,9 @@ it('seeds custom field values correctly for sales', function (): void {
         ->get()
         ->keyBy('custom_field_id');
 
-    expect($appleValues[$companyFields['domains']]->json_value)->toContain('https://apple.com')
+    expect($appleValues[$companyFields['domains']]->json_value)->toContain('www.apple.com')
         ->and($appleValues[$companyFields['icp']]->boolean_value)->toBeTrue()
-        ->and($appleValues[$companyFields['linkedin']]->json_value)->toContain('https://www.linkedin.com/company/apple');
+        ->and($appleValues[$companyFields['linkedin']]->json_value)->toContain('www.linkedin.com/company/apple');
 });
 
 it('subsequent teams still require use case selection', function (): void {

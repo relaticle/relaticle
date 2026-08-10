@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Http\Controllers;
 
 use App\Enums\Plan;
+use App\Features\Billing;
+use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -18,19 +22,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
-use Relaticle\Chat\Enums\AiModel;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
-use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
-use Relaticle\Chat\Services\ApprovalContinuationService;
 use Relaticle\Chat\Services\CreditService;
-use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\LikePattern;
+use Relaticle\Chat\Support\ModelDescriptor;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 
 final readonly class ChatController
@@ -38,15 +42,39 @@ final readonly class ChatController
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
+        private ModelRegistry $registry,
         private TipTapDocumentParser $documentParser,
     ) {}
+
+    /** @return list<string> */
+    private function modelIds(): array
+    {
+        return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
+    }
+
+    /**
+     * Billing page URL for the workspace, or null when billing is switched off.
+     * Resolved through the panel route so it stays correct whether the app panel
+     * is served from a path prefix or its own subdomain.
+     */
+    private function billingUrl(Team $team): ?string
+    {
+        if (! Feature::active(Billing::class)) {
+            return null;
+        }
+
+        return BillingPage::getUrl(panel: 'app', tenant: $team);
+    }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
+            'page_context' => ['nullable', 'array'],
+            'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
+            'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
         ]);
 
         /** @var User $user */
@@ -76,24 +104,25 @@ final readonly class ChatController
         abort_if($existing === null, 404);
 
         abort_if(
-            $existing->user_id !== (string) $user->getKey()
+            $existing->participant_type !== $user->getMorphClass()
+                || $existing->participant_id !== (string) $user->getKey()
                 || ($existing->team_id !== null && $existing->team_id !== $team->getKey()),
             403
         );
 
-        if (filled($validated['model'] ?? null) && $validated['model'] !== AiModel::Auto->value) {
-            $requestedModel = AiModel::from($validated['model']);
+        if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
+            $descriptor = $this->registry->find($validated['model']);
 
-            if (! $team->plan->allowsModel($requestedModel)) {
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($team->plan)) {
                 $isFree = $team->plan === Plan::Free;
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => "The {$requestedModel->label()} model is not available on the {$team->plan->label()} plan.",
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->label()]),
                     'plan' => $team->plan->value,
-                    'requested_model' => $requestedModel->value,
+                    'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? url('/app/billing') : null,
+                    'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
                 ], 403);
             }
         }
@@ -106,6 +135,7 @@ final readonly class ChatController
                 ->first();
 
             $isFree = $team->plan === Plan::Free;
+            $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
 
             return response()->json([
                 'error' => 'credits_exhausted',
@@ -114,7 +144,11 @@ final readonly class ChatController
                 'allowance' => $team->plan->credits(),
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? url('/app/billing') : null,
+                'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
+                // A top-up is only offered when a pack can actually be bought —
+                // otherwise the CTA lands on a billing page with nothing to buy.
+                'top_up_available' => $canTopUp,
+                'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
             ], 402);
         }
 
@@ -128,7 +162,11 @@ final readonly class ChatController
                 return;
             }
 
-            abort_if($row->user_id !== (string) $user->getKey(), 403);
+            abort_if(
+                $row->participant_type !== $user->getMorphClass()
+                    || $row->participant_id !== (string) $user->getKey(),
+                403
+            );
 
             if ($row->team_id !== null) {
                 return;
@@ -149,6 +187,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
+            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
             turnId: $turnId,
         ));
 
@@ -158,11 +197,66 @@ final readonly class ChatController
         ]);
     }
 
+    /**
+     * Resolve the record the user was viewing when they sent the message.
+     *
+     * The client payload is untrusted: it names a type and id, and nothing
+     * more. Both are re-resolved here under team scope and the view policy,
+     * exactly as BaseReadShowTool does, so a forged id for another team's
+     * record yields null rather than leaking a label.
+     *
+     * @param  array<string, mixed>|null  $payload
+     * @return array{type: string, id: string, label: string}|null
+     */
+    private function resolvePageContext(?array $payload, User $user): ?array
+    {
+        if ($payload === null) {
+            return null;
+        }
+
+        $type = $payload['type'] ?? null;
+        $id = $payload['id'] ?? null;
+
+        if (! is_string($type) || ! is_string($id) || $type === '' || $id === '') {
+            return null;
+        }
+
+        $modelClass = match ($type) {
+            'company' => Company::class,
+            'people' => People::class,
+            'opportunity' => Opportunity::class,
+            'task' => Task::class,
+            'note' => Note::class,
+            default => null,
+        };
+
+        if ($modelClass === null) {
+            return null;
+        }
+
+        $record = $modelClass::query()
+            ->whereBelongsTo($user->currentTeam)
+            ->whereKey($id)
+            ->first();
+
+        if ($record === null || $user->cannot('view', $record)) {
+            return null;
+        }
+
+        $label = $record->getAttribute('name') ?? $record->getAttribute('title');
+
+        return [
+            'type' => $type,
+            'id' => (string) $record->getKey(),
+            'label' => is_string($label) ? $label : '(unnamed)',
+        ];
+    }
+
     public function createConversation(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'document' => ['required', 'array'],
-            'model' => ['nullable', 'string', Rule::enum(AiModel::class)],
+            'model' => ['nullable', 'string', Rule::in($this->modelIds())],
         ]);
 
         /** @var User $user */
@@ -189,7 +283,8 @@ final readonly class ChatController
 
         DB::table('agent_conversations')->insert([
             'id' => $conversationId,
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => (string) $user->getKey(),
             'team_id' => $team->getKey(),
             'title' => TitleSanitizer::clean($parsed['text']),
             'created_at' => now(),
@@ -209,7 +304,8 @@ final readonly class ChatController
 
         abort_if($row === null, 404);
         abort_if(
-            $row->user_id !== (string) $user->getKey()
+            $row->participant_type !== $user->getMorphClass()
+                || $row->participant_id !== (string) $user->getKey()
                 || ($row->team_id !== null && $row->team_id !== $team->getKey()),
             404,
         );
@@ -221,45 +317,6 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
-    }
-
-    public function resume(Request $request, string $conversationId): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
-
-        // 404 (not 403) for a missing OR foreign conversation so the endpoint
-        // never confirms a conversation id exists to a different tenant — same
-        // hide-existence posture as the /chat/actions/* endpoints.
-        abort_if(
-            $conversation === null
-                || $conversation->user_id !== (string) $user->getKey()
-                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
-            404,
-        );
-
-        $action = resolve(PendingActionService::class)->latestUnjournaledResolvedAction($conversationId);
-
-        if (! $action instanceof PendingAction) {
-            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
-        }
-
-        if ($action->user_id !== $user->getKey()) {
-            return response()->json(['error' => 'Nothing to resume — send a new message instead.'], 409);
-        }
-
-        if (! Cache::add("chat:resume:{$conversationId}", 1, 30)) {
-            return response()->json([
-                'error' => 'A resume is already in progress — try again in a moment.',
-                'code' => 'resume_in_progress',
-            ], 409);
-        }
-
-        resolve(ApprovalContinuationService::class)->dispatchContinuation($action, $action->status->value);
-
-        return response()->json(['status' => 'resuming']);
     }
 
     /**
@@ -287,7 +344,8 @@ final readonly class ChatController
 
         abort_if(
             $conversation === null
-                || $conversation->user_id !== (string) $user->getKey()
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
                 || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
             404,
         );
@@ -330,7 +388,7 @@ final readonly class ChatController
         return response()->json(['superseded' => $superseded]);
     }
 
-    public function mentions(Request $request): JsonResponse
+    public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
@@ -353,11 +411,10 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (People $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people'])
+                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people', 'url' => $resolver->urlFor('people', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -368,11 +425,10 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Company $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company'])
+                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company', 'url' => $resolver->urlFor('company', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -383,11 +439,10 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(name) ASC')
                 ->orderBy('name')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'name', 'team_id'])
                 ->filter(fn (Opportunity $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity'])
+                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity', 'url' => $resolver->urlFor('opportunity', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -398,11 +453,10 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(title) ASC')
                 ->orderBy('title')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Task $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task'])
+                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task', 'url' => $resolver->urlFor('task', (string) $r->id)])
         );
 
         $results = $results->merge(
@@ -413,11 +467,10 @@ final readonly class ChatController
                 ->orderByRaw('LENGTH(title) ASC')
                 ->orderBy('title')
                 ->limit($limit)
-                ->with('team')
                 ->get(['id', 'title', 'team_id'])
                 ->filter(fn (Note $r): bool => $user->can('view', $r))
                 ->values()
-                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note'])
+                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note', 'url' => $resolver->urlFor('note', (string) $r->id)])
         );
 
         return response()->json(['data' => $results->take(15)->values()]);

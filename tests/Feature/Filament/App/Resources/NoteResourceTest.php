@@ -24,25 +24,28 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
-it('can render `:dataset` column', function (string $column): void {
-    livewire(ManageNotes::class)
-        ->assertCanRenderTableColumn($column);
-})->with(['title', 'companies.name', 'people.name', 'creator.name', 'created_at']);
+// Column metadata is checked against a single mounted table rather than one
+// dataset case per column: mounting the page dominates the cost, and Filament's
+// assertion messages already name the offending column.
+it('exposes the expected table columns', function (): void {
+    $table = livewire(ManageNotes::class);
 
-it('cannot render `:dataset` column', function (string $column): void {
-    livewire(ManageNotes::class)
-        ->assertCanNotRenderTableColumn($column);
-})->with(['deleted_at', 'updated_at']);
+    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
+        $table->assertTableColumnExists($column);
+    }
 
-it('has `:dataset` column', function (string $column): void {
-    livewire(ManageNotes::class)
-        ->assertTableColumnExists($column);
-})->with(['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
+        $table->assertTableColumnVisible($column);
+    }
 
-it('shows `:dataset` column', function (string $column): void {
-    livewire(ManageNotes::class)
-        ->assertTableColumnVisible($column);
-})->with(['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
+    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'created_at'] as $column) {
+        $table->assertCanRenderTableColumn($column);
+    }
+
+    foreach (['deleted_at', 'updated_at'] as $column) {
+        $table->assertCanNotRenderTableColumn($column);
+    }
+});
 
 it('can sort `:dataset` column', function (string $column): void {
     $records = Note::factory(3)->recycle([$this->user, $this->team])->create();

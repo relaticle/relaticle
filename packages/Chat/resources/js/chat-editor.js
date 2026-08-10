@@ -50,6 +50,10 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
                         id: { default: null },
                         type: { default: null },
                         label: { default: null },
+                        // Server-resolved record URL captured from the mention picker.
+                        // Persisted in the document JSON so a just-sent message can render
+                        // a clickable chip before the authoritative server mentions arrive.
+                        url: { default: null },
                     };
                 },
                 parseHTML() {

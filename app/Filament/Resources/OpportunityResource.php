@@ -33,6 +33,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
+use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 
 final class OpportunityResource extends Resource
 {
@@ -109,6 +110,7 @@ final class OpportunityResource extends Resource
         return [
             TasksRelationManager::class,
             NotesRelationManager::class,
+            ActivityLogRelationManager::class,
         ];
     }
 
@@ -140,7 +142,7 @@ final class OpportunityResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['team', 'customFieldValues.customField.options'])
+            ->with(['customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

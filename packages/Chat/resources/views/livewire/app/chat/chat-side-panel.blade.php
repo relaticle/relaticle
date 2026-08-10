@@ -39,11 +39,6 @@
                 };
                 window.addEventListener('chat:send', this.chatSendHandler);
 
-                this.navigatedHandler = () => {
-                    $wire.refreshContext();
-                };
-                document.addEventListener('livewire:navigated', this.navigatedHandler);
-
                 this.resizeHandler = () => { this.viewportWidth = window.innerWidth; };
                 window.addEventListener('resize', this.resizeHandler);
             },
@@ -51,7 +46,6 @@
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
                 window.removeEventListener('chat:send', this.chatSendHandler);
-                document.removeEventListener('livewire:navigated', this.navigatedHandler);
                 window.removeEventListener('resize', this.resizeHandler);
             },
 
@@ -122,15 +116,12 @@
                 @livewire('chat.chat-interface', [
                     'conversationId' => $conversationId,
                     'context' => 'side-panel',
+                    'pageContextType' => $recordType,
+                    'pageContextId' => $recordId,
+                    'pageContextLabel' => $recordName,
+                    'contextPrompts' => $starterPrompts,
                 ], key('side-panel-chat-' . ($conversationId ?? 'new')))
             </div>
-
-            {{-- Context-Aware Suggested Prompts --}}
-            @if(!empty($suggestedPrompts))
-                <div class="border-t border-gray-200 px-4 py-2 dark:border-gray-700">
-                    <x-chat.suggested-prompts :prompts="$suggestedPrompts" />
-                </div>
-            @endif
 
             {{-- Credit balance footer --}}
             @php
@@ -154,12 +145,20 @@
                         {{ number_format($this->creditsRemaining) }}@unless ($exceedsAllowance) / {{ number_format($allowance) }}@endunless
                     </span>
                 </div>
-                @if ($this->plan === \App\Enums\Plan::Free)
+                @if ($this->billingUrl && $this->plan === \App\Enums\Plan::Free)
                     <a
-                        href="{{ url('/app/billing') }}"
+                        href="{{ $this->billingUrl }}"
                         class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
                     >
                         Upgrade to Pro →
+                    </a>
+                @endif
+                @if ($this->billingUrl && $this->canBuyCredits)
+                    <a
+                        href="{{ $this->billingUrl }}"
+                        class="mt-1 inline-block text-xs text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                        {{ __('billing.packs.buy_more') }}
                     </a>
                 @endif
             </div>

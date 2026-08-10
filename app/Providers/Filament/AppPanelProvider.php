@@ -4,21 +4,27 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Enums\SupportFormType;
+use App\Features\Billing as BillingFeature;
 use App\Features\SocialAuth;
+use App\Features\SupportMenu;
+use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
+use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
 use Filament\Actions\Action;
@@ -128,11 +134,11 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->userMenuItems([
-                Action::make('profile')
-                    ->label(__('filament/panel.user_menu.profile'))
-                    ->icon('heroicon-m-user-circle')
+                Action::make('settings')
+                    ->label(__('filament/panel.user_menu.settings'))
+                    ->icon('heroicon-m-cog-6-tooth')
                     ->url(fn (): string => $this->shouldRegisterMenuItem()
-                        ? url(EditProfile::getUrl())
+                        ? url(Settings::getUrl())
                         : url($panel->getPath())),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
@@ -142,10 +148,6 @@ final class AppPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
-            ->pages([
-                EditProfile::class,
-                AccessTokens::class,
-            ])
             ->spa()
             ->routes(function (): void {
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
@@ -183,6 +185,7 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->tenantMiddleware(
                 [
+                    EnsureHostedWorkspaceAccess::class,
                     ApplyTenantScopes::class,
                 ],
                 isPersistent: true
@@ -226,6 +229,8 @@ final class AppPanelProvider extends PanelProvider
             ]);
         }
 
+        $panel->userMenuItems($this->supportMenuItems());
+
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
@@ -239,9 +244,66 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
                     ->url(fn (): string => ImportHistory::getUrl()),
+                Action::make('billing')
+                    ->label(__('billing.title'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->url(fn (): string => Billing::getUrl())
+                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
 
         return $panel;
+    }
+
+    /**
+     * Support entries for the user menu — every support form type that resolves
+     * to a URL, opening its Maxforms form in a new tab. Empty when nothing is
+     * configured, so the user menu simply shows no support entries.
+     *
+     * Everything is resolved lazily: the URL carries the signed-in user and
+     * workspace as prefill, and the feature flag is only decided per request —
+     * neither is known while the panel is being configured.
+     *
+     * @return list<Action>
+     */
+    private function supportMenuItems(): array
+    {
+        return array_map(
+            fn (SupportFormType $type): Action => Action::make("support_{$type->value}")
+                ->label(fn (): string => $type->label())
+                ->icon($type->icon())
+                ->url(fn (): ?string => $this->supportFormUrl($type))
+                ->visible(fn (): bool => $this->supportFormUrl($type) !== null)
+                ->openUrlInNewTab(),
+            SupportFormType::cases(),
+        );
+    }
+
+    private function supportFormUrl(SupportFormType $type): ?string
+    {
+        if (! Feature::active(SupportMenu::class)) {
+            return null;
+        }
+
+        return resolve(SupportForms::class)->publicUrl($type, $this->supportPrefill());
+    }
+
+    /**
+     * Context carried into the support form as prefilled hidden fields. Blank
+     * values are stripped at the boundary in SupportForms::publicUrl().
+     *
+     * @return array<string, string>
+     */
+    private function supportPrefill(): array
+    {
+        $user = Auth::user();
+
+        return [
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+            'workspace_id' => (string) (Filament::getTenant()?->getKey() ?? ''),
+            'source_url' => url()->current(),
+            'app_version' => (string) config('app.version', ''),
+        ];
     }
 
     public function shouldRegisterMenuItem(): bool

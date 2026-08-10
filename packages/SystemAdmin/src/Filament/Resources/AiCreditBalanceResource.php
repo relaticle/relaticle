@@ -57,7 +57,8 @@ final class AiCreditBalanceResource extends Resource
             ->components([
                 TextInput::make('credits_remaining')
                     ->numeric()
-                    ->minValue(0)
+                    ->minValue(fn (?AiCreditBalance $record): int => $record?->purchased_credits ?? 0)
+                    ->helperText('Cannot go below purchased credits — the DB enforces purchased_credits <= credits_remaining.')
                     ->required(),
                 TextInput::make('credits_used')
                     ->numeric()
@@ -80,6 +81,10 @@ final class AiCreditBalanceResource extends Resource
                     TextEntry::make('team.name')->label('Team'),
                     TextEntry::make('credits_remaining')->numeric(),
                     TextEntry::make('credits_used')->numeric(),
+                    TextEntry::make('purchased_credits')
+                        ->numeric()
+                        ->label('Purchased credits')
+                        ->helperText('Floor for credits_remaining — the DB rejects a lower value.'),
                     TextEntry::make('period_starts_at')->dateTime(),
                     TextEntry::make('period_ends_at')->dateTime(),
                     TextEntry::make('updated_at')->dateTime(),
@@ -97,6 +102,25 @@ final class AiCreditBalanceResource extends Resource
                     ->label('Team')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('origin')
+                    ->label('Origin')
+                    ->state(function (AiCreditBalance $record): string {
+                        $team = $record->team;
+
+                        return match (true) {
+                            $team->subscription()?->valid() ?? false => 'subscription',
+                            $team->trial_ends_at?->isFuture() ?? false => 'trial',
+                            $team->plan !== Plan::default() => 'manual',
+                            default => '—',
+                        };
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'subscription' => 'success',
+                        'trial' => 'info',
+                        'manual' => 'warning',
+                        default => 'gray',
+                    }),
                 TextColumn::make('credits_remaining')
                     ->numeric()
                     ->sortable()
@@ -109,6 +133,11 @@ final class AiCreditBalanceResource extends Resource
                 TextColumn::make('credits_used')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('purchased_credits')
+                    ->label('Purchased')
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('period_starts_at')
                     ->date()
                     ->sortable(),
@@ -154,6 +183,15 @@ final class AiCreditBalanceResource extends Resource
             'view' => ViewAiCreditBalance::route('/{record}'),
             'edit' => EditAiCreditBalance::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * @return Builder<AiCreditBalance>
+     */
+    #[Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with('team.subscriptions');
     }
 
     private static function adjustAction(): Action
@@ -202,7 +240,10 @@ final class AiCreditBalanceResource extends Resource
             ->authorize('update')
             ->requiresConfirmation()
             ->modalHeading('Reset billing period')
-            ->modalDescription('Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.')
+            ->modalDescription(fn (AiCreditBalance $record): string => 'Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.'
+                .(($record->team->subscription()?->valid() ?? false)
+                    ? ' WARNING: this team has an active Stripe subscription — webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
+                    : ''))
             ->schema([
                 Select::make('plan')
                     ->options(self::planOptions())

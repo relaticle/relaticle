@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Company;
 
 use App\Http\Resources\V1\CompanyResource;
+use App\Http\Resources\V1\NoteResource;
+use App\Http\Resources\V1\OpportunityResource;
+use App\Http\Resources\V1\PeopleResource;
+use App\Http\Resources\V1\TaskResource;
 use App\Models\Company;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Relaticle\Chat\Tools\BaseReadShowTool;
 
 final class GetCompanyTool extends BaseReadShowTool
@@ -31,9 +36,25 @@ final class GetCompanyTool extends BaseReadShowTool
         return 'Company';
     }
 
+    protected function citationType(): string
+    {
+        return 'company';
+    }
+
     protected function eagerLoad(): array
     {
         return [...parent::eagerLoad(), 'accountOwner'];
+    }
+
+    /** @return array<string, class-string<JsonResource>> */
+    protected function availableIncludes(): array
+    {
+        return [
+            'people' => PeopleResource::class,
+            'opportunities' => OpportunityResource::class,
+            'notes' => NoteResource::class,
+            'tasks' => TaskResource::class,
+        ];
     }
 
     protected function extraPayload(Model $model): array

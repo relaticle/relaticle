@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Mcp\Servers\RelaticleServer;
 use Illuminate\Support\Facades\Route;
@@ -10,7 +11,7 @@ use Laravel\Mcp\Facades\Mcp;
 
 $mcpDomain = config('app.mcp_domain');
 $mcpPath = $mcpDomain ? '/' : '/mcp';
-$mcpMiddleware = ['auth:sanctum,api', 'throttle:mcp', SetApiTeamContext::class];
+$mcpMiddleware = ['auth:sanctum,api', 'throttle:mcp', SetApiTeamContext::class, EnsureHostedWorkspaceAccess::class];
 
 Route::middleware('throttle:mcp-oauth')->group(static fn () => Mcp::oauthRoutes());
 

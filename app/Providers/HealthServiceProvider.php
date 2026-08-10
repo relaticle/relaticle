@@ -86,7 +86,7 @@ final class HealthServiceProvider extends ServiceProvider
             CacheCheck::new(),
 
             AnthropicModelCheck::new()
-                ->name('Anthropic: Summary Model'),
+                ->name('Anthropic: Chat Model'),
         ]);
     }
 

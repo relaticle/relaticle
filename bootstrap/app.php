@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ValidateSignature;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
+use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
@@ -27,6 +29,14 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
         then: function (): void {
+            // Registered here rather than by Cashier (see AppServiceProvider):
+            // signature verification must apply whether or not the webhook
+            // secret is configured, otherwise an unset secret silently turns
+            // this into an unauthenticated, plan-mutating endpoint.
+            Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
+                ->middleware(VerifyWebhookSignature::class)
+                ->name('cashier.webhook');
+
             $apiDomain = config('app.api_domain');
 
             $routes = Route::middleware('api');
@@ -71,6 +81,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'signed' => ValidateSignature::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request): string {
             if ($request->routeIs('team-invitations.accept')) {
                 $invitation = TeamInvitation::query()
@@ -102,9 +116,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('import:cleanup')->hourly();
         $schedule->command('queue:prune-batches --hours=24')->daily();
         $schedule->command('invitations:cleanup')->daily();
+        $schedule->command('activitylog:clean --force')->daily();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes();
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
-        $schedule->command('chat:reset-credits')->dailyAt('00:05')->withoutOverlapping()->onOneServer();
+        $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
+        $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:sync-recency-tags')->dailyAt('02:00')
             ->withoutOverlapping()
             ->onOneServer();
@@ -113,6 +129,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('03:00')
             ->onOneServer()
             ->environments(['local', 'staging']);
+
+        $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
 
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();

@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
 use App\Http\Responses\LoginResponse;
+use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\TeamCreatedTagListener;
@@ -14,6 +15,7 @@ use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
+use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -29,6 +31,8 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\GitHubService;
+use App\Support\ActivityLog\MergedActivityRenderer;
+use App\Support\ActivityLog\RequestActivityBatch;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -48,15 +52,23 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Ai\AiManager;
+use Laravel\Cashier\Cashier;
+use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\Ink\Filament\Resources\PostResource;
+use Relaticle\Ink\Ink;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -69,6 +81,25 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
 
         $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
+
+        // Ink registers its public routes from packageBooted(), which runs after every
+        // provider's register(). Read the config key App\Features\Blog resolves from
+        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
+        // bound this early. Same source of truth, so the flag stays the single switch.
+        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
+
+        Cashier::useCustomerModel(Team::class);
+        Cashier::keepPastDueSubscriptionsActive();
+
+        // Cashier attaches signature verification only when the webhook secret
+        // happens to be set, and also exposes an unauthenticated payment route
+        // this app never links to. Register the webhook ourselves instead so
+        // verification is unconditional — see routes/web.php.
+        Cashier::ignoreRoutes();
+
+        // One batch_uuid per request/job, lazily generated and forgotten between
+        // them — the key the activity timeline groups a single save's rows on.
+        $this->app->scoped(RequestActivityBatch::class);
     }
 
     /**
@@ -87,6 +118,8 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
+
+        Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
@@ -112,6 +145,42 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureLivewire();
         $this->configureRateLimiting();
         $this->configureScribe();
+
+        $this->configureActivityLog();
+        $this->configureBlog();
+    }
+
+    /**
+     * The blog admin lives in the sysadmin panel, which has no tenancy, so only a
+     * signed-in system administrator gets an edit link on a draft preview. Which
+     * panel and guard own the admin is ours to decide, not the package's.
+     */
+    private function configureBlog(): void
+    {
+        Ink::resolvePreviewEditUrlUsing(fn (Post $post): ?string => auth('sysadmin')->check()
+            ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
+            : null);
+
+        // HasSEO creates a row per post but never removes it. A soft delete should
+        // keep it — the post can come back — but a force delete from the panel
+        // would otherwise leave the seo row behind for good.
+        Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
+    }
+
+    /**
+     * Stamp every activity row written during one request/job with that request's
+     * shared batch_uuid, and render a same-save group (native columns + custom
+     * fields) as a single merged timeline entry.
+     */
+    private function configureActivityLog(): void
+    {
+        ActivityLogger::beforeLogging(function (ActivityModel $activity): void {
+            if (blank($activity->getAttribute('batch_uuid'))) {
+                $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
+            }
+        });
+
+        Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
     }
 
     private function configurePolicies(): void
@@ -291,6 +360,9 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
+            'custom_field' => CustomField::class,
+            'blog_post' => Post::class,
+            'blog_category' => Category::class,
         ]);
 
         // Use custom models for custom-fields package

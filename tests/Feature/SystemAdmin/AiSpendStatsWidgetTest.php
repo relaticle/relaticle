@@ -81,3 +81,116 @@ it('uses a half-open range so the previous-month boundary is not double-counted'
     expect($stats[0]->getValue())->toBe(number_format(3))
         ->and($stats[1]->getDescription())->toContain(number_format(7));
 });
+
+it('reports monthly ai cost in dollars from token usage', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    // 2M input x $3 + 1M output x $15 = $21.00
+    livewire(AiSpendStatsWidget::class)->assertSee('$21.00');
+});
+
+it('surfaces models with no configured rate as unpriced instead of silently treating them as free', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'qwen-2.5',
+        'input_tokens' => 1_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 5,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertSee('Unpriced models: qwen-2.5');
+});
+
+it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'gpt-5.5',
+        'input_tokens' => 1_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 5,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$21.00')
+        ->assertSee('Upper bound')
+        ->assertSee('Unpriced models: gpt-5.5');
+});
+
+it('treats a malformed rate entry as unpriced instead of coercing it to zero cost', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00]]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'input_tokens' => 2_000_000,
+        'output_tokens' => 1_000_000,
+        'credits_charged' => 10,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertSee('Unpriced models: claude-sonnet-4-6');
+});
+
+it('ignores zero-token settlement rows instead of listing them as unpriced models', function (): void {
+    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+
+    // settleReservedMinimum() books cancelled and timed-out turns under this
+    // synthetic model with zero tokens — they cost nothing to serve.
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'incomplete',
+        'input_tokens' => 0,
+        'output_tokens' => 0,
+        'credits_charged' => 1,
+        'created_at' => now(),
+    ]);
+
+    livewire(AiSpendStatsWidget::class)
+        ->assertSee('$0.00')
+        ->assertDontSee('Unpriced models');
+});
+
+it('has a configured cost rate for every hosted model the app can select', function (): void {
+    /** @var array<string, mixed> $rates */
+    $rates = config('chat.model_costs');
+
+    $hostedModels = collect(config('chat.models'))
+        ->reject(fn (array $model): bool => (bool) ($model['self_hosted'] ?? false))
+        ->pluck('model')
+        ->all();
+
+    expect($hostedModels)->not->toBeEmpty();
+
+    foreach ($hostedModels as $model) {
+        expect($rates)->toHaveKey($model);
+    }
+});

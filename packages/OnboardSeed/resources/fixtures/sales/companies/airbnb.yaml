@@ -1,5 +1,5 @@
 name: Airbnb
 custom_fields:
-  domains: https://airbnb.com
+  domains: www.airbnb.com
   icp: true
-  linkedin: https://www.linkedin.com/company/airbnb
+  linkedin: www.linkedin.com/company/airbnb

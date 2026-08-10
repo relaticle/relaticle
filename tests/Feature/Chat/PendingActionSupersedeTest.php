@@ -36,7 +36,8 @@ function makePendingAction(User $user, string $conversationId, string $name = 'A
 it('marks every still-pending action on the conversation as superseded and returns the pre-update snapshot', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-supersede',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Test',
         'created_at' => now(),
@@ -59,7 +60,8 @@ it('marks every still-pending action on the conversation as superseded and retur
 it('does not touch already-resolved actions on the same conversation', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-mixed',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Test',
         'created_at' => now(),
@@ -81,7 +83,8 @@ it('does not touch already-resolved actions on the same conversation', function 
 it('returns an empty list when there are no pending actions on the conversation', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-empty',
-        'user_id' => $this->user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
         'team_id' => $this->team->getKey(),
         'title' => 'Test',
         'created_at' => now(),

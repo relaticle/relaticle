@@ -10,6 +10,7 @@ use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
@@ -24,6 +25,8 @@ abstract class BaseReadListTool implements Tool
     abstract protected function resourceClass(): string;
 
     abstract protected function searchFilterName(): string;
+
+    abstract protected function citationType(): string;
 
     abstract public function description(): string;
 
@@ -74,7 +77,32 @@ abstract class BaseReadListTool implements Tool
         $resourceClass = $this->resourceClass();
         $collection = $resourceClass::collection($results);
 
-        return $collection->toJson(JSON_PRETTY_PRINT);
+        $items = json_decode($collection->toJson(), true);
+
+        if (! is_array($items)) {
+            return $collection->toJson(JSON_PRETTY_PRINT);
+        }
+
+        $citationType = $this->citationType();
+        $items = array_map(function (mixed $item) use ($citationType): mixed {
+            if (! is_array($item)) {
+                return $item;
+            }
+
+            $id = isset($item['id']) && (is_string($item['id']) || is_int($item['id']))
+                ? (string) $item['id']
+                : null;
+
+            $ref = $id !== null
+                ? resolve(RecordReferenceResolver::class)->resolve($citationType, $id)
+                : null;
+
+            $item['url'] = $ref['url'] ?? null;
+
+            return $item;
+        }, $items);
+
+        return (string) json_encode($items, JSON_PRETTY_PRINT);
     }
 
     private function buildHttpRequest(Request $request): HttpRequest

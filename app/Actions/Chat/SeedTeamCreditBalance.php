@@ -11,10 +11,13 @@ use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Services\CreditPeriodResolver;
 
 final readonly class SeedTeamCreditBalance
 {
-    public function handle(Team $team): AiCreditBalance
+    public function __construct(private CreditPeriodResolver $periods) {}
+
+    public function execute(Team $team): AiCreditBalance
     {
         return DB::transaction(function () use ($team): AiCreditBalance {
             $existing = AiCreditBalance::query()
@@ -29,12 +32,15 @@ final readonly class SeedTeamCreditBalance
             $plan = $team->plan ?? Plan::default();
             $allowance = $plan->credits();
 
+            $bounds = $this->periods->boundsFor($team);
+
             $balance = AiCreditBalance::query()->create([
                 'team_id' => $team->getKey(),
                 'credits_remaining' => $allowance,
                 'credits_used' => 0,
-                'period_starts_at' => now()->startOfMonth(),
-                'period_ends_at' => now()->endOfMonth(),
+                'purchased_credits' => 0,
+                'period_starts_at' => $bounds['start'],
+                'period_ends_at' => $bounds['end'],
             ]);
 
             AiCreditTransaction::query()->create([

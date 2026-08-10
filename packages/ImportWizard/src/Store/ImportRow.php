@@ -277,11 +277,7 @@ final class ImportRow extends Model
 
     public function getFinalValue(string $column): mixed
     {
-        if ($this->isValueSkipped($column)) {
-            return null;
-        }
-
-        if ($this->hasValidationError($column)) {
+        if ($this->isValueWithheld($column)) {
             return null;
         }
 
@@ -290,6 +286,21 @@ final class ImportRow extends Model
         }
 
         return $this->raw_data->get($column);
+    }
+
+    /**
+     * Whether the reviewer withheld this cell, either by skipping it or by
+     * leaving it in error. getFinalValue() returns null for a withheld cell
+     * exactly as it does for a genuinely empty one, so callers that need to
+     * tell "no value carried" from "carried an empty value" must ask here.
+     */
+    public function isValueWithheld(string $column): bool
+    {
+        if ($this->isValueSkipped($column)) {
+            return true;
+        }
+
+        return $this->hasValidationError($column);
     }
 
     public function isValueSkipped(string $column): bool

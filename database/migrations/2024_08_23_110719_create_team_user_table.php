@@ -23,12 +23,4 @@ return new class extends Migration
             $table->unique(['team_id', 'user_id']);
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('team_user');
-    }
 };

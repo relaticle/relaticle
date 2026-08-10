@@ -161,28 +161,4 @@ return new class extends Migration
                 ->update(['order_column' => $position['position']]);
         }
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        // Revert tasks table
-        Schema::table('tasks', function (Blueprint $table): void {
-            $table->dropColumn('order_column');
-        });
-
-        Schema::table('tasks', function (Blueprint $table): void {
-            $table->integer('order_column')->nullable();
-        });
-
-        // Revert opportunities table
-        Schema::table('opportunities', function (Blueprint $table): void {
-            $table->dropColumn('order_column');
-        });
-
-        Schema::table('opportunities', function (Blueprint $table): void {
-            $table->integer('order_column')->nullable();
-        });
-    }
 };

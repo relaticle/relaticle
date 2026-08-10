@@ -107,6 +107,12 @@ return [
             'url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
         ],
 
+        'selfhosted' => [
+            'driver' => 'openai',
+            'key' => env('SELF_HOSTED_AI_KEY', ''),
+            'url' => env('SELF_HOSTED_AI_URL'),
+        ],
+
         'openai' => [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),

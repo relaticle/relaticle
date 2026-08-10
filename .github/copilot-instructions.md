@@ -4,7 +4,7 @@
 
 Multi-tenant SaaS CRM with paying customers. Tenant isolation is the highest-priority concern — a single cross-tenant data leak is a critical security incident. The app uses Filament panels with a per-request `TeamScope` global scope applied via middleware, not in model boot. `Model::unguard()` is enabled globally.
 
-Stack: PHP 8.4, Laravel 12, Filament 5, Livewire 4, Pest 4, Tailwind CSS 4.
+Stack: PHP 8.4, Laravel 13, Filament 5, Livewire 4, Pest 4, Tailwind CSS 4.
 
 CI enforces: PHPStan level 7, Pint formatting, Rector, 99.9% type coverage, full test suite. CI does **not** enforce: code coverage percentage, mutation testing, or required reviewer count.
 

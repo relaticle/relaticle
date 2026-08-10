@@ -26,7 +26,8 @@ function seedAdminConversation(string $title = 'Probe chat', int $messages = 0):
 
     DB::table('agent_conversations')->insert([
         'id' => $id,
-        'user_id' => (string) $user->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
         'title' => $title,
         'created_at' => now(),
@@ -38,7 +39,8 @@ function seedAdminConversation(string $title = 'Probe chat', int $messages = 0):
             'id' => (string) Str::uuid7(),
             'conversation_id' => $id,
             'agent' => 'crm-assistant',
-            'user_id' => (string) $user->getKey(),
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
             'role' => $i % 2 === 0 ? 'user' : 'assistant',
             'content' => "message {$i}",
             'attachments' => '[]',
@@ -70,4 +72,23 @@ it('shows a conversation detail page', function (): void {
 
     livewire(ViewAgentConversation::class, ['record' => $conversation->getKey()])
         ->assertSuccessful();
+});
+
+it('renders the stored title in the table without an Untitled placeholder', function (): void {
+    $conversation = seedAdminConversation('Real conversation title');
+
+    livewire(ListAgentConversations::class)
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$conversation])
+        ->assertTableColumnStateSet('title', 'Real conversation title', record: $conversation)
+        ->assertDontSee('Untitled');
+});
+
+it('renders the stored title on the detail page without an Untitled placeholder', function (): void {
+    $conversation = seedAdminConversation('Detail page title');
+
+    livewire(ViewAgentConversation::class, ['record' => $conversation->getKey()])
+        ->assertSuccessful()
+        ->assertSee('Detail page title')
+        ->assertDontSee('Untitled');
 });

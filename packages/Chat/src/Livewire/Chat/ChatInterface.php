@@ -7,9 +7,11 @@ namespace Relaticle\Chat\Livewire\Chat;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\TitleSanitizer;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -25,6 +27,20 @@ final class ChatInterface extends BaseLivewireComponent
 
     public string $context = 'conversation';
 
+    public ?string $pageContextType = null;
+
+    public ?string $pageContextId = null;
+
+    public ?string $pageContextLabel = null;
+
+    /**
+     * Record-aware starter prompts supplied by the side panel. Empty on the
+     * full-page chat, where the interface falls back to a generic list.
+     *
+     * @var array<int, array{label: string, prompt: string}>
+     */
+    public array $contextPrompts = [];
+
     private const int PAGE_SIZE = 50;
 
     /**
@@ -32,10 +48,17 @@ final class ChatInterface extends BaseLivewireComponent
      */
     public array $messages = [];
 
-    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null): void
+    /**
+     * @param  array<int, array{label: string, prompt: string}>  $contextPrompts
+     */
+    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null, ?string $pageContextType = null, ?string $pageContextId = null, ?string $pageContextLabel = null, array $contextPrompts = []): void
     {
         $this->conversationId = $conversationId;
         $this->context = $context;
+        $this->pageContextType = $pageContextType;
+        $this->pageContextId = $pageContextId;
+        $this->pageContextLabel = $pageContextLabel;
+        $this->contextPrompts = $contextPrompts;
 
         /** @var string|null $promptQuery */
         $promptQuery = request()->query('prompt');
@@ -107,7 +130,8 @@ final class ChatInterface extends BaseLivewireComponent
         $row = DB::table('agent_conversation_messages as m')
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('m.conversation_id', $this->conversationId)
-            ->where('m.user_id', $user->getKey())
+            ->where('m.participant_type', $user->getMorphClass())
+            ->where('m.participant_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
             ->where('m.role', 'assistant')
             ->whereNull('m.superseded_at')
@@ -152,6 +176,33 @@ final class ChatInterface extends BaseLivewireComponent
             'display' => $action->display_data,
             'status' => 'pending',
         ], $actions->all()));
+    }
+
+    /**
+     * The conversation's current (possibly auto-generated) title, used by the
+     * client to sync the Filament page header and tab title after a turn ends
+     * without requiring a full page reload.
+     *
+     * On a brand-new chat the conversation is created client-side via a fetch,
+     * so the server-side $conversationId stays null until a reload — the client
+     * therefore passes its own id, scoped to the authed user and team by
+     * FindConversation.
+     */
+    public function conversationTitle(?string $conversationId = null): ?string
+    {
+        $conversationId ??= $this->conversationId;
+
+        if ($conversationId === null) {
+            return null;
+        }
+
+        $title = resolve(FindConversation::class)->execute($this->authUser(), $conversationId)?->title;
+
+        if (! is_string($title) || trim($title) === '') {
+            return null;
+        }
+
+        return TitleSanitizer::clean($title);
     }
 
     public function render(): View

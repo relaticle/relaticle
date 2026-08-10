@@ -19,6 +19,9 @@
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';
 @source '../../../../vendor/relaticle/custom-fields/resources';
 
+/* Activity Log */
+@source '../../../../vendor/relaticle/activity-log/resources/views/**/*';
+
 /* ===================================
    Relaticle Brand Theme Customization
    Pure Tailwind CSS Classes Only

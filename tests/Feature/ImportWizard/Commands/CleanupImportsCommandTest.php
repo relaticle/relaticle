@@ -20,8 +20,6 @@ beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
     $this->team = $this->user->currentTeam;
     $this->imports = [];
-
-    File::cleanDirectory(storage_path('app/imports'));
 });
 
 afterEach(function (): void {
@@ -107,12 +105,28 @@ it('preserves active in-progress imports', function (): void {
 it('deletes orphaned directories without DB records', function (): void {
     $path = storage_path('app/imports/orphaned-dir');
     File::ensureDirectoryExists($path);
+    touch($path, now()->subHours(25)->getTimestamp());
 
     $this->artisan('import:cleanup')
         ->expectsOutputToContain('Cleaned up 1 import(s)')
         ->assertExitCode(0);
 
     expect(File::isDirectory($path))->toBeFalse();
+});
+
+it('preserves orphaned directories younger than the staleness threshold', function (): void {
+    // ImportStore::create() writes the directory before the Import row is
+    // committed, so a freshly created directory with no DB record is an
+    // in-flight import, not garbage. The hourly schedule would otherwise
+    // delete it out from under the running job.
+    $path = storage_path('app/imports/just-created-dir');
+    File::ensureDirectoryExists($path);
+
+    $this->artisan('import:cleanup')->assertExitCode(0);
+
+    expect(File::isDirectory($path))->toBeTrue();
+
+    File::deleteDirectory($path);
 });
 
 it('respects custom hours option', function (): void {
