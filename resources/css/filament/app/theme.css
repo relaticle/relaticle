@@ -2,7 +2,12 @@
 @import '../../fonts.css';
 @import '../../theme.css';
 
+/* EmailIntegration package styles */
+@import '../../../../packages/EmailIntegration/resources/css/email-integration.css';
+
 @plugin "@tailwindcss/typography";
+
+@source not '../../../../vendor/laravel/horizon';
 
 @source '../../../../app/Filament';
 @source '../../../../resources/views';
@@ -14,6 +19,9 @@
 /* ImportWizard */
 @source '../../../../packages/ImportWizard/resources';
 @source '../../../../packages/ImportWizardNew/resources';
+
+/* EmailIntegration */
+@source '../../../../packages/EmailIntegration/*';
 
 /* Custom Fields */
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';

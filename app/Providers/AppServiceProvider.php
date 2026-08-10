@@ -30,6 +30,9 @@ use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use App\Policies\EmailPolicy;
+use App\Policies\EmailTemplatePolicy;
+use App\Policies\MeetingPolicy;
 use App\Services\GitHubService;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -42,6 +45,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
@@ -63,11 +67,19 @@ use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Azure\AzureExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
 final class AppServiceProvider extends ServiceProvider
@@ -123,6 +135,11 @@ final class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
+        Event::listen(
+            SocialiteWasCalled::class,
+            [AzureExtendSocialite::class, 'handle'],
+        );
+
         Passport::useAuthCodeModel(McpAuthCode::class);
         Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
 
@@ -143,6 +160,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureFilament();
         $this->configureGitHubStars();
         $this->configureLivewire();
+        $this->configureMacros();
         $this->configureRateLimiting();
         $this->configureScribe();
 
@@ -185,6 +203,10 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configurePolicies(): void
     {
+        Gate::policy(Email::class, EmailPolicy::class);
+        Gate::policy(EmailTemplate::class, EmailTemplatePolicy::class);
+        Gate::policy(Meeting::class, MeetingPolicy::class);
+
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {
                 $currentPanelId = Filament::getCurrentPanel()?->getId();
@@ -360,6 +382,11 @@ final class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'note' => Note::class,
             'system_administrator' => SystemAdministrator::class,
+            'email' => Email::class,
+            'connected_account' => ConnectedAccount::class,
+            'email_thread' => EmailThread::class,
+            'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
@@ -402,6 +429,13 @@ final class AppServiceProvider extends ServiceProvider
                 'githubStars' => $starsCount,
                 'formattedGithubStars' => $formattedStarsCount,
             ]);
+        });
+    }
+
+    private function configureMacros(): void
+    {
+        Blueprint::macro('teams', function (): void {
+            $this->foreignUlid('team_id')->constrained()->cascadeOnDelete();
         });
     }
 }

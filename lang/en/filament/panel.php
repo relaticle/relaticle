@@ -18,6 +18,7 @@ return [
 
     'tenant_menu' => [
         'custom_fields' => 'Custom Fields',
+        'email_settings' => 'Email Settings',
         'import_history' => 'Import History',
     ],
 ];

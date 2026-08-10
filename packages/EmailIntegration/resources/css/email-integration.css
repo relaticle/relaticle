@@ -1,0 +1,22 @@
+/* ===================================
+   Email & Calendar Integration styles
+   Opt-in classes used across the
+   EmailIntegration package views.
+   =================================== */
+
+/* Segmented pill-style tabs (opt-in via .ei-tabs-segmented on the <x-filament::tabs>) */
+.fi-tabs.ei-tabs-segmented {
+    @apply mx-0 w-fit bg-gray-100 p-1 shadow-none ring-0 dark:bg-gray-800;
+
+    & .fi-tabs-item.fi-active {
+        @apply bg-white shadow-sm dark:bg-gray-900;
+
+        & .fi-tabs-item-label {
+            @apply text-gray-900 dark:text-gray-100;
+        }
+
+        & > .fi-icon {
+            @apply text-gray-700 dark:text-gray-200;
+        }
+    }
+}

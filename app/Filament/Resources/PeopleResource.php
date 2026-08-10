@@ -7,7 +7,10 @@ namespace App\Filament\Resources;
 use App\Enums\CreationSource;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
+use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
 use App\Models\Company;
@@ -39,6 +42,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class PeopleResource extends Resource
 {
@@ -149,6 +153,7 @@ final class PeopleResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    MassSendBulkAction::make(),
                     ExportBulkAction::make()
                         ->exporter(PeopleExporter::class),
                     DeleteBulkAction::make(),
@@ -161,9 +166,11 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
-            ActivityLogRelationManager::class,
+            EmailsRelationManager::class,
+            MeetingsRelationManager::class,
         ];
     }
 
@@ -172,6 +179,7 @@ final class PeopleResource extends Resource
         return [
             'index' => ListPeople::route('/'),
             'view' => ViewPeople::route('/{record}'),
+            'emails' => PeopleEmailsPage::route('/{record}/emails'),
         ];
     }
 

@@ -27,12 +27,14 @@ use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
 /**
  * @property string $name
  * @property string $slug
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?Carbon $invite_link_token_expires_at
@@ -52,6 +54,7 @@ use Spatie\Sluggable\SlugOptions;
     'name',
     'slug',
     'personal_team',
+    'default_email_sharing_tier',
     'onboarding_use_case',
     'onboarding_context',
     'onboarding_referral_source',
@@ -127,6 +130,9 @@ final class Team extends JetstreamTeam implements HasAvatar
 
         // Misc
         'null', 'undefined', 'error', 'test', 'staging', 'preview',
+
+        // Email Integration
+        'email-accounts', 'email-attachments',
     ];
 
     /**
@@ -154,6 +160,7 @@ final class Team extends JetstreamTeam implements HasAvatar
     {
         return [
             'personal_team' => 'boolean',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',

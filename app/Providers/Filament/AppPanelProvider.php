@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\ActivityLog\AppEventPalette;
+use App\ActivityLog\AppEventRenderer;
+use App\ActivityLog\MeetingEventPalette;
+use App\ActivityLog\MeetingEventRenderer;
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
+use App\Features\EmailIntegration;
 use App\Features\SocialAuth;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -39,6 +44,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Size;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -58,8 +64,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
+use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
+use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -149,6 +158,8 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
+            ->sidebarWidth('67')
+            ->maxContentWidth(Width::Full)
             ->routes(function (): void {
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
@@ -194,6 +205,15 @@ final class AppPanelProvider extends PanelProvider
                 CustomFieldsPlugin::make()
                     ->authorize(fn () => Gate::check('update', Filament::getTenant())),
                 ResizedColumnPlugin::make(),
+                ActivityLogPlugin::make()
+                    ->renderers(array_fill_keys(
+                        array_column(AppEventPalette::cases(), 'value'),
+                        AppEventRenderer::class,
+                    ))
+                    ->renderers(array_fill_keys(
+                        array_column(MeetingEventPalette::cases(), 'value'),
+                        MeetingEventRenderer::class,
+                    )),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
@@ -210,6 +230,13 @@ final class AppPanelProvider extends PanelProvider
                     PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
                     fn (): View|Factory => view('filament.auth.social_login_buttons')
                 );
+        }
+
+        if (Feature::active(EmailIntegration::class)) {
+            $panel
+                ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
+                ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
+                ->discoverClusters(in: base_path('packages/EmailIntegration/src/Filament/Clusters'), for: 'Relaticle\\EmailIntegration\\Filament\\Clusters');
         }
 
         $panel
@@ -240,6 +267,11 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.tenant_menu.custom_fields'))
                     ->icon(Heroicon::OutlinedCube)
                     ->url(fn (): string => CustomFieldsManagementPage::getUrl()),
+                Action::make('email_settings')
+                    ->label(__('filament/panel.tenant_menu.email_settings'))
+                    ->icon(Heroicon::OutlinedEnvelope)
+                    ->visible(fn (): bool => EmailSettings::canAccess())
+                    ->url(fn (): string => EmailAccountsPage::getUrl()),
                 Action::make('import_history')
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
