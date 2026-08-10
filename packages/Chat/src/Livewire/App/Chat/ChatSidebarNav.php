@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\App\Chat;
 
-use App\Filament\Pages\ChatConversation;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -50,7 +49,6 @@ final class ChatSidebarNav extends BaseLivewireComponent
         return view('chat::livewire.app.chat.chat-sidebar-nav', [
             'conversations' => $conversations->take(self::SIDEBAR_LIMIT),
             'hasMore' => $hasMore,
-            'newChatUrl' => ChatConversation::getUrl(),
         ]);
     }
 }

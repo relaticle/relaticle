@@ -60,6 +60,74 @@
     }
 }
 
+/* Search row (AppSidebar): the search field and the notifications trigger,
+   inset to exactly the gutter the navigation items sit in — the nav's `px-6`
+   less the groups' `-mx-2`. Padding rather than margin, so the rule separating
+   it from the workspace switcher runs the full width of the sidebar. */
+.fi-sidebar-search-ctn {
+    /* 12px above and below the rule; the field then gets a wider gap before the
+       navigation starts (`.fi-sidebar-nav` already opens with 10px of its own). */
+    @apply mt-3 flex items-center justify-center gap-x-2 border-t border-gray-200 px-4 pt-3 pb-2.5 dark:border-white/10;
+}
+
+.fi-sidebar-search {
+    @apply min-w-0 flex-1;
+
+    /* The panel gutters global search itself when it owns the sidebar slot; the
+       row owns it here. */
+    .fi-global-search-ctn {
+        @apply mx-0 mt-0;
+    }
+
+    /* Compact, flat field: the panel default is taller and stacks a drop shadow
+       on top of its ring, which reads as a double edge at this size. */
+    .fi-input-wrp {
+        @apply h-8 rounded-[0.625rem] bg-gray-100 shadow-none ring-gray-950/[0.06] dark:bg-white/5 dark:ring-white/10;
+    }
+
+    .fi-input-wrp-prefix {
+        @apply ps-2.5;
+
+        .fi-icon {
+            @apply h-4 w-4 text-gray-400;
+        }
+    }
+
+    /* Fill the row rather than dropping the panel's padding: the input is only
+       as tall as its line box, so stripping the padding leaves the text sitting
+       above the prefix icon instead of centred on it. */
+    .fi-input {
+        @apply h-full py-0 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400;
+    }
+
+    /* Keyboard hint reads as a key cap rather than trailing text */
+    .fi-input-wrp-suffix {
+        @apply pe-1.5;
+
+        .fi-input-wrp-label {
+            @apply rounded-md bg-white px-1.5 py-px text-[0.6875rem]/[1.125rem] font-medium text-gray-500 ring-1 ring-gray-950/[0.06] dark:bg-white/10 dark:text-gray-400 dark:ring-white/10;
+        }
+    }
+}
+
+.fi-sidebar-notifications-btn {
+    @apply relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.625rem] text-gray-500 ring-1 ring-gray-950/[0.06] transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/5;
+
+    .fi-icon {
+        @apply h-4 w-4;
+    }
+}
+
+.fi-sidebar-notifications-btn-badge {
+    @apply absolute -end-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[0.625rem] font-semibold leading-4 text-white;
+}
+
+/* Collapsed rail: only the trigger remains (the search field is hidden by the
+   sidebar store), so drop the gutter and let it centre. */
+.fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-search-ctn {
+    @apply mx-0;
+}
+
 .fi-sidebar-nav {
     @apply space-y-1 pt-2.5;
 }

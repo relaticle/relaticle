@@ -8,7 +8,7 @@
 
             if (e.key === 'n') {
                 e.preventDefault();
-                window.location = @js(\App\Filament\Pages\ChatConversation::getUrl());
+                window.location = @js(\App\Filament\Pages\Dashboard::getUrl());
                 return;
             }
 

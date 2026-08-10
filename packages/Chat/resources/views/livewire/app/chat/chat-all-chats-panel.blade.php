@@ -2,6 +2,7 @@
     <div
         x-data="{
             open: @entangle('isOpen'),
+            viewportWidth: window.innerWidth,
             init() {
                 this.keydownHandler = (e) => {
                     if (e.key === 'Escape' && this.open) {
@@ -10,11 +11,29 @@
                     }
                 };
                 window.addEventListener('keydown', this.keydownHandler);
+
+                this.resizeHandler = () => { this.viewportWidth = window.innerWidth; };
+                window.addEventListener('resize', this.resizeHandler);
             },
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
-            }
+                window.removeEventListener('resize', this.resizeHandler);
+            },
+
+            {{-- Sit flush against the sidebar, whichever width it currently has.
+                 Below Filament's `lg` breakpoint the sidebar is an overlay, so
+                 the panel starts at the viewport edge instead. --}}
+            get sidebarOffset() {
+                if (this.viewportWidth < 1024) {
+                    return '0px';
+                }
+
+                return $store.sidebar.isOpen
+                    ? 'var(--sidebar-width)'
+                    : 'var(--collapsed-sidebar-width)';
+            },
         }"
+        :style="{ insetInlineStart: sidebarOffset }"
         x-effect="if (open) $nextTick(() => $el.querySelector('input[type=search]')?.focus())"
         x-show="open"
         x-cloak
@@ -22,7 +41,7 @@
         aria-modal="false"
         aria-label="All chats"
         tabindex="-1"
-        class="fi-chat-all-chats-panel fixed inset-y-0 left-[var(--fi-sidebar-width,_280px)] z-40 flex w-[360px] max-w-full"
+        class="fi-chat-all-chats-panel fixed inset-y-0 z-40 flex w-[360px] max-w-full"
         data-chat-all-chats-panel
     >
         {{-- Panel body --}}

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
+use Relaticle\Chat\Services\ChatContextService;
 use Relaticle\Chat\Services\MyTasksService;
 
 final class Dashboard extends Page
@@ -66,6 +67,22 @@ final class Dashboard extends Page
             $this->recentChatId = $recentChat->id;
             $this->recentChatTitle = $recentChat->title;
         }
+    }
+
+    /**
+     * Prompt suggestions under the composer. Same source as the chat drawer's,
+     * so the two surfaces never drift apart.
+     *
+     * @return array<int, array{label: string, prompt: string}>
+     */
+    #[Computed]
+    public function starterPrompts(): array
+    {
+        return resolve(ChatContextService::class)->getSuggestedPrompts([
+            'record_type' => null,
+            'record_id' => null,
+            'record_name' => null,
+        ]);
     }
 
     public function getGreeting(): string
