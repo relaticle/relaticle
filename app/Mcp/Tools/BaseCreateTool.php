@@ -48,7 +48,9 @@ abstract class BaseCreateTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $this->ensureTokenCan('create');
+        if (($denied = $this->denyIfTokenCannot('create')) instanceof Response) {
+            return $denied;
+        }
 
         /** @var User $user */
         $user = auth()->user();

@@ -41,6 +41,7 @@ arch()->preset()
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
+        'App\Http\Controllers\Mcp',
         'App\ActivityLog',
         'App\Models\ActivityLog\Scopes\TeamScope',
         // Chat tools intentionally reuse App\Http\Resources (consistent
@@ -110,6 +111,7 @@ arch('avoid mutation')
         'App\Filament',
         'App\Health',
         'App\Http\Controllers\Chat',
+        'App\Http\Controllers\Mcp',
         // Extends Cashier's WebhookController — its documented handler
         // extension point; PHP forbids a readonly class extending a
         // non-readonly one.
@@ -152,6 +154,7 @@ arch('avoid inheritance')
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
+        'App\Http\Controllers\Mcp',
         // Overrides Cashier's subscription-created handler so an abandoned
         // checkout does not consume the workspace's generic trial.
         'App\Http\Controllers\Billing\StripeWebhookController',

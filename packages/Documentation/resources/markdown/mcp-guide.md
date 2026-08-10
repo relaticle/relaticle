@@ -33,6 +33,25 @@ The token scopes your access to the team you select when creating it. All MCP op
 
 ---
 
+## Authentication
+
+Relaticle's MCP server supports two authentication methods:
+
+### OAuth 2.1 (recommended for end users)
+
+The MCP endpoint advertises OAuth metadata at:
+
+- `https://mcp.relaticle.com/.well-known/oauth-authorization-server`
+- `https://mcp.relaticle.com/.well-known/oauth-protected-resource`
+
+Clients that support Dynamic Client Registration (RFC 7591) — including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors — register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`).
+
+### Personal access tokens (recommended for developer tools)
+
+For Cursor, VS Code, MCP Inspector, or any client without OAuth support, create a personal access token from your account settings and pass it as `Authorization: Bearer YOUR_TOKEN`.
+
+---
+
 ## Setup by Client
 
 The MCP server endpoint is `https://mcp.relaticle.com`. Replace `YOUR_TOKEN` in the examples below with the access token you created above.
@@ -106,7 +125,14 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 30 tools: one account tool plus full CRUD across five CRM entities, with link management for tasks and notes.
+The server provides 32 tools: one account tool, two cross-entity discovery tools (search/fetch), full CRUD across five CRM entities, and link management for tasks and notes.
+
+### Cross-entity discovery
+
+| Tool | Description |
+|------|-------------|
+| `search` | Search across companies, people, opportunities, tasks, and notes. Returns canonical URLs for citation. |
+| `fetch` | Fetch a single record by canonical URL. Pair with `search` for ChatGPT Company Knowledge integration. |
 
 ### Account
 

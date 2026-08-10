@@ -95,10 +95,26 @@ We do not use tracking cookies or third-party advertising cookies.
 
 Our services are not directed to children under 16. We do not knowingly collect personal data from children.
 
-## 9. Changes to This Policy
+## 9. AI Connectors / MCP Server
+
+When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protocol (MCP) client, the connector accesses the same CRM data you can already see in your account.
+
+**What the connector can read.** Companies, people, opportunities, tasks, notes, custom-field values, and team-member metadata for the team you authorize. The connector cannot read other teams' data or any user files outside the CRM.
+
+**What the connector can write.** Create, update, delete, and link/unlink companies, people, opportunities, tasks, and notes — the same actions you can perform in the Relaticle UI. Writes are scoped to the team you authorize.
+
+**OAuth tokens.** When you connect via OAuth (Claude Connectors Directory, ChatGPT App Directory), Relaticle stores an access token and refresh token in the `oauth_access_tokens` and `oauth_refresh_tokens` tables. You can revoke any connector at any time from your account settings; revocation immediately invalidates the connector.
+
+**Personal access tokens.** If you connect using a personal access token created from the Access Tokens page, you control its lifetime. Tokens are hashed at rest. You can revoke individual tokens at any time.
+
+**Conversation data.** The MCP server does not log, store, or process the conversation context of your AI assistant. It only sees the specific tool arguments your assistant sends and the records it requests.
+
+**Telemetry.** Relaticle does not include telemetry, request IDs, internal timestamps, or session identifiers in MCP tool responses. Tool outputs are limited to fields documented in the public MCP guide.
+
+## 10. Changes to This Policy
 
 We may update this Privacy Policy from time to time. We will notify registered users of material changes via email or in-app notification.
 
-## 10. Contact
+## 11. Contact
 
 Questions about this Privacy Policy? Reach us at [Contact Us](/contact).

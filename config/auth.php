@@ -45,6 +45,11 @@ return [
             'provider' => 'users',
         ],
 
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+        ],
+
         'sysadmin' => [
             'driver' => 'session',
             'provider' => 'system_administrators',

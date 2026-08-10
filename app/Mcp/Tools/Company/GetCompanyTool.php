@@ -9,8 +9,14 @@ use App\Mcp\Tools\BaseShowTool;
 use App\Models\Company;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Description('Get a single company by ID with full details and relationships.')]
+#[IsReadOnly]
+#[IsIdempotent]
+#[IsOpenWorld(false)]
 final class GetCompanyTool extends BaseShowTool
 {
     protected function modelClass(): string

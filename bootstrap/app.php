@@ -130,6 +130,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
         $schedule->command('app:purge-scheduled-deletions')->daily()->withoutOverlapping()->onOneServer();
+        $schedule->command('app:refresh-demo-account')
+            ->dailyAt('03:00')
+            ->onOneServer()
+            ->environments(['local', 'staging']);
+
         $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
 
         // TODO::Separate it in different command class
