@@ -1,6 +1,8 @@
-@push('turnstile')
-    <x-turnstile.scripts />
-@endpush
+@if($turnstileEnabled)
+    @push('turnstile')
+        <x-turnstile.scripts />
+    @endpush
+@endif
 
 <x-guest-layout
     title="Contact Us - Relaticle"
@@ -63,10 +65,12 @@
 
                             <x-marketing.textarea label="How can we help?" :required="true" name="message" id="message" rows="5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message') }}</x-marketing.textarea>
 
-                            <x-turnstile data-action="contact" data-theme="auto" />
-                            @error('cf-turnstile-response')
-                                <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                            @enderror
+                            @if($turnstileEnabled)
+                                <x-turnstile data-action="contact" data-theme="auto" />
+                                @error('cf-turnstile-response')
+                                    <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                                @enderror
+                            @endif
 
                             <x-marketing.button type="submit">
                                 Send message

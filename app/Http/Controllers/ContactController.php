@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ContactRequest;
 use App\Mail\NewContactSubmissionMail;
+use App\Rules\TurnstileChallenge;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
@@ -14,7 +15,9 @@ final readonly class ContactController
 {
     public function show(): View
     {
-        return view('contact');
+        return view('contact', [
+            'turnstileEnabled' => TurnstileChallenge::isConfigured(),
+        ]);
     }
 
     public function store(ContactRequest $request): RedirectResponse
