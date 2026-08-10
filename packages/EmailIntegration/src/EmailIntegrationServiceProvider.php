@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Features\EmailIntegration;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
@@ -54,6 +60,22 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             ->group(function (): void {
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
             });
+
+        Livewire::component('email-integration.composer', EmailComposer::class);
+
+        // The feature flag is already checked above (config-based, stable for the
+        // request), so the closure only needs to gate on per-request context: the
+        // active panel, an authenticated user, and a resolved tenant.
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            function (): string {
+                if (filament()->getId() !== 'app' || ! auth()->check() || ! filament()->getTenant() instanceof Model) {
+                    return '';
+                }
+
+                return Blade::render('@livewire(\'email-integration.composer\')');
+            },
+        );
 
         if ($this->app->runningInConsole()) {
             $this->commands([
