@@ -71,6 +71,18 @@ it('renders the consent view with the user\'s teams', function (): void {
     $response->assertSee('name="team_id"', false);
 });
 
+it('spells out what the connector will be able to do, including deletion', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client));
+
+    $response->assertOk();
+    $response->assertSee('Read and search your records');
+    $response->assertSee('Create and update them');
+    $response->assertSee('Delete them');
+    $response->assertSee('Companies, people, opportunities, tasks and notes.');
+});
+
 it('rejects the approve POST without a team_id', function (): void {
     $this->actingAs($this->user);
 
