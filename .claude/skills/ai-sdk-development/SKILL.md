@@ -278,6 +278,20 @@ class MyAgent implements Agent
 
 The `#[UseCheapestModel]` and `#[UseSmartestModel]` attributes are also available for automatic model selection.
 
+The `#[WithoutBroadcasting]` attribute stops the given stream event types from broadcasting (e.g. data-heavy `ToolResult` payloads that exceed the WebSocket frame limit). The events are still streamed and persisted; they just never hit the channel:
+
+```php
+use Laravel\Ai\Attributes\WithoutBroadcasting;
+use Laravel\Ai\Streaming\Events\{ToolCall, ToolResult};
+
+#[WithoutBroadcasting(ToolResult::class, ToolCall::class)]
+class SearchAgent implements Agent, HasTools
+{
+    use Promptable;
+    // ...
+}
+```
+
 ### Tools
 
 Implement the `HasTools` interface and scaffold tools with `php artisan make:tool`:
@@ -391,6 +405,38 @@ $store->assertAdded('file_id');
 - Artisan commands: `php artisan make:agent`, `php artisan make:tool`
 - Global helper: `agent()` for anonymous agents
 
+## OpenAI-Compatible Provider
+
+Point the SDK at any OpenAI-compatible endpoint (LM Studio, vLLM, Together, etc.) with the config-driven `openai-compatible` driver. Define named instances in `config/ai.php`, no code required:
+
+```php
+'my-llm' => [
+    'driver' => 'openai-compatible',
+    'url' => env('MY_LLM_URL'),        // required
+    'key' => env('MY_LLM_API_KEY'),    // optional Bearer token
+    'models' => [
+        'text' => ['default' => 'some-chat-model'],
+        'embeddings' => [
+            'default' => 'some-embedding-model',
+            'dimensions' => 1024, // optional; omit to use native dimensions
+        ],
+    ],
+],
+```
+
+Reference it by config key (or `Lab::OpenAiCompatible`). A model is required via the corresponding `models` configuration or per-call `model:`:
+
+```php
+agent()->prompt('Hello', provider: 'my-llm', model: 'some-model');
+
+Embeddings::for(['Hello'])->generate(
+    provider: 'my-llm',
+    model: 'some-embedding-model',
+);
+```
+
+It uses OpenAI-standard shapes and supports text, streaming, tools, structured output, image attachments, and text embeddings. Embedding dimensions are optional; omit them to use the model's native dimensions. For extra request-body fields, implement `HasProviderOptions` — the returned array is merged into the body.
+
 ## Common Pitfalls
 
 ### Wrong Namespace
@@ -416,11 +462,11 @@ Calling a capability not supported by a provider throws a `LogicException`. Refe
 
 | Feature    | Providers                                                       |
 | ---------- | --------------------------------------------------------------- |
-| Text       | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
+| Text       | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama, OpenRouter, OpenAI-compatible |
 | Images     | OpenAI, Gemini, xAI                                            |
 | TTS        | OpenAI, ElevenLabs                                              |
 | STT        | OpenAI, ElevenLabs, Mistral                                     |
-| Embeddings | OpenAI, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI         |
+| Embeddings | OpenAI, OpenAI-compatible, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
 | Reranking  | Cohere, Jina                                                    |
 | Files      | OpenAI, Anthropic, Gemini                                       |
 
@@ -432,5 +478,6 @@ use Laravel\Ai\Enums\Lab;
 Lab::Anthropic;
 Lab::OpenAI;
 Lab::Gemini;
+Lab::OpenAiCompatible; // configurable OpenAI-compatible endpoint
 // ...
 ```
