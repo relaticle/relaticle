@@ -7,8 +7,11 @@ use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -16,7 +19,7 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -186,4 +189,93 @@ it('rejects a client-posted accountId that does not belong to the user', functio
         ->dispatch('composer:open')
         ->set('accountId', $otherAccount->id)
         ->assertSet('accountId', null);
+});
+
+it('saves a draft when minimized and reopens it with state intact', function (): void {
+    $component = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['draft@example.com'])
+        ->set('subject', 'Half-written')
+        ->set('bodyHtml', '<p>wip</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    expect($draft->subject)->toBe('Half-written')
+        ->and($draft->user_id)->toBe($this->user->id);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('subject', 'Half-written')
+        ->assertSet('to', ['draft@example.com'])
+        ->assertSet('draftId', $draft->id);
+});
+
+it('deletes the draft after a successful send', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'From draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send');
+
+    expect(Email::query()->whereKey($draft->id)->exists())->toBeFalse()
+        ->and(Email::query()->where('subject', 'From draft')->where('status', EmailStatus::QUEUED)->exists())->toBeTrue();
+});
+
+it('does not save empty drafts on close', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('close');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+});
+
+it('never lists drafts in the mail panes', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['d@example.com'])
+        ->set('subject', 'Hidden draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    Livewire::test(EmailInboxPage::class)
+        ->call('setFolder', 'all')
+        ->assertDontSee('Hidden draft');
+});
+
+it('does not load another user\'s draft into the composer', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+
+    actingAs($otherUser);
+    Filament::setTenant($otherUser->currentTeam);
+
+    $foreignDraft = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['victim@example.com'])
+        ->set('subject', 'Confidential draft')
+        ->set('bodyHtml', '<p>secret</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Confidential draft')->sole();
+    expect($draft->connected_account_id)->toBe($otherAccount->id);
+
+    actingAs($this->user);
+    Filament::setTenant($this->user->currentTeam);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', null)
+        ->assertSet('subject', null)
+        ->assertSet('to', []);
 });
