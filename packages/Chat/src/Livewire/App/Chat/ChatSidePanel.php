@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\App\Chat;
 
-use App\Enums\Plan;
-use App\Features\Billing;
-use App\Filament\Pages\Billing as BillingPage;
+use App\Filament\Pages\ChatConversation;
 use App\Livewire\BaseLivewireComponent;
-use App\Models\Team;
 use App\Models\User;
-use App\Services\Billing\CreditPackCatalog;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
-use Laravel\Pennant\Feature;
-use Livewire\Attributes\Computed;
-use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Services\ChatContextService;
 
 final class ChatSidePanel extends BaseLivewireComponent
 {
+    /**
+     * Stands in for the conversation id while building the full-page chat URL.
+     * The panel only learns the id of a brand-new conversation client-side, so
+     * the header menu swaps this out in the browser instead of round-tripping.
+     */
+    private const string CONVERSATION_URL_PLACEHOLDER = '__CONVERSATION_ID__';
+
     public bool $isOpen = false;
 
     public ?string $conversationId = null;
@@ -110,64 +111,60 @@ final class ChatSidePanel extends BaseLivewireComponent
         );
     }
 
-    #[Computed]
-    public function plan(): Plan
+    /**
+     * Load an existing conversation into the panel. The embedded chat interface
+     * is keyed by conversation, so changing this remounts it against the picked
+     * transcript.
+     */
+    public function openConversation(string $conversationId): void
     {
-        /** @var User|null $user */
-        $user = auth()->user();
-        $team = $user?->currentTeam;
-
-        return $team !== null ? $team->plan : Plan::default();
+        $this->conversationId = $conversationId;
     }
 
     /**
-     * Whether to offer a prepaid top-up: a paid plan, billing live, and at
-     * least one pack with a configured Stripe price. Without the last check the
-     * link lands on a billing page that has nothing to sell.
+     * Start a fresh transcript in the panel, leaving the record context intact.
      */
-    #[Computed]
-    public function canBuyCredits(): bool
+    public function startNewConversation(): void
     {
-        return $this->plan() !== Plan::Free
-            && Feature::active(Billing::class)
-            && resolve(CreditPackCatalog::class)->hasPurchasable();
+        $this->conversationId = null;
     }
 
-    /**
-     * Billing page URL for the current workspace, or null when there is no
-     * tenant or billing is switched off. Resolved through the panel route so it
-     * holds for both a path-prefixed and a subdomain-routed app panel.
-     */
-    #[Computed]
-    public function billingUrl(): ?string
+    public function deleteConversation(string $conversationId): void
     {
-        $team = Filament::getTenant();
+        $user = Filament::auth()->user();
 
-        if (! $team instanceof Team || ! Feature::active(Billing::class)) {
-            return null;
+        if (! $user instanceof User) {
+            return;
         }
 
-        return BillingPage::getUrl(panel: 'app', tenant: $team);
-    }
-
-    #[Computed]
-    public function creditsRemaining(): int
-    {
-        /** @var User|null $user */
-        $user = auth()->user();
-        $teamId = $user?->currentTeam?->getKey();
-
-        if ($teamId === null) {
-            return 0;
+        if (! (new DeleteConversation)->execute($user, $conversationId)) {
+            return;
         }
 
-        return AiCreditBalance::query()
-            ->where('team_id', $teamId)
-            ->value('credits_remaining') ?? 0;
+        if ($this->conversationId === $conversationId) {
+            $this->conversationId = null;
+        }
+
+        $this->dispatch('chat:conversation-deleted');
     }
 
     public function render(): View
     {
-        return view('chat::livewire.app.chat.chat-side-panel');
+        /**
+         * The panel also renders on tenant-less pages (workspace creation, email
+         * verification), where the chat routes have no URL to resolve — the
+         * header's full-page link hides itself when these are null.
+         */
+        $tenant = Filament::getTenant();
+
+        return view('chat::livewire.app.chat.chat-side-panel', [
+            'newChatUrl' => $tenant === null
+                ? null
+                : ChatConversation::getUrl(panel: 'app', tenant: $tenant),
+            'conversationUrlTemplate' => $tenant === null
+                ? null
+                : ChatConversation::getUrl(['conversationId' => self::CONVERSATION_URL_PLACEHOLDER], panel: 'app', tenant: $tenant),
+            'conversationUrlPlaceholder' => self::CONVERSATION_URL_PLACEHOLDER,
+        ]);
     }
 }

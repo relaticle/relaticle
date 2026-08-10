@@ -22,6 +22,8 @@ use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
+use App\Livewire\App\AppDatabaseNotifications;
+use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
 use App\Support\SupportForms;
@@ -29,6 +31,8 @@ use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Enums\DatabaseNotificationsPosition;
+use Filament\Enums\GlobalSearchPosition;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
@@ -38,6 +42,7 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
+use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -115,7 +120,20 @@ final class AppPanelProvider extends PanelProvider
             ->emailVerification(isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
-            ->databaseNotifications()
+            /**
+             * Search and notifications share one row at the top of the sidebar,
+             * above the navigation. Both are placed in the sidebar here; AppSidebar
+             * is what puts them on the same row rather than in separate slots.
+             */
+            ->sidebarLivewireComponent(AppSidebar::class)
+            ->globalSearch(position: GlobalSearchPosition::Sidebar)
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
+            /** Filament's own suffix helper renders "⌘+K"; the key cap reads better without the plus. */
+            ->globalSearchFieldSuffix(fn (): string => Platform::detect() === Platform::Mac ? '⌘K' : 'Ctrl K')
+            ->databaseNotifications(
+                livewireComponent: AppDatabaseNotifications::class,
+                position: DatabaseNotificationsPosition::Sidebar,
+            )
             ->colors([
                 'primary' => [
                     50 => 'oklch(0.969 0.016 293.756)',

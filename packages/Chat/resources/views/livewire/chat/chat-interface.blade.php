@@ -34,19 +34,28 @@
                     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                         How can I help?
                     </h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Ask about your CRM data, or try one of these:
-                    </p>
-                    <div class="mt-4 flex flex-wrap justify-center gap-2">
-                        <template x-for="starter in starterPrompts" :key="starter.label">
-                            <button
-                                type="button"
-                                x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
-                                x-text="starter.label"
-                                class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                            ></button>
-                        </template>
-                    </div>
+                    {{-- The side panel keeps its empty state to the greeting: the record
+                         it is bound to already frames what to ask, so the starter chips
+                         are noise there. --}}
+                    @if (($context ?? 'conversation') === 'side-panel')
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Ask about your CRM data.
+                        </p>
+                    @else
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Ask about your CRM data, or try one of these:
+                        </p>
+                        <div class="mt-4 flex flex-wrap justify-center gap-2">
+                            <template x-for="starter in starterPrompts" :key="starter.label">
+                                <button
+                                    type="button"
+                                    x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
+                                    x-text="starter.label"
+                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                ></button>
+                            </template>
+                        </div>
+                    @endif
                 </div>
             </div>
         </template>
