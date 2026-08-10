@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
@@ -10,6 +11,8 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
@@ -224,7 +227,9 @@ it('deletes the draft after a successful send', function (): void {
         ->dispatch('composer:open', draftId: $draft->id)
         ->call('send');
 
-    expect(Email::query()->whereKey($draft->id)->exists())->toBeFalse()
+    // Email uses SoftDeletes — assert the row is actually gone (forceDelete()),
+    // not merely soft-deleted, which a plain ->whereKey()->exists() would miss.
+    expect(Email::query()->withTrashed()->whereKey($draft->id)->exists())->toBeFalse()
         ->and(Email::query()->where('subject', 'From draft')->where('status', EmailStatus::QUEUED)->exists())->toBeTrue();
 });
 
@@ -278,4 +283,130 @@ it('does not load another user\'s draft into the composer', function (): void {
         ->assertSet('draftId', null)
         ->assertSet('subject', null)
         ->assertSet('to', []);
+});
+
+it('closes and queues exactly once even when the draft row was already deleted before send completes', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Racing draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $reopened = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', $draft->id);
+
+    // Simulate a second tab on the same draft (or a retried request) having
+    // already cleaned it up by the time this instance's send() runs.
+    Email::query()->whereKey($draft->id)->forceDelete();
+
+    $reopened->call('send')
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->where('subject', 'Racing draft')->count())->toBe(1);
+});
+
+it('does not load a draft that belongs to a different team of the same user', function (): void {
+    $otherTeam = Team::factory()->create(['user_id' => $this->user->getKey()]);
+    $this->user->teams()->attach($otherTeam, ['role' => 'admin']);
+
+    $otherTeamAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $otherTeam->id,
+        'status' => 'active',
+    ]));
+
+    $draft = Email::factory()->create([
+        'team_id' => $otherTeam->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $otherTeamAccount->id,
+        'status' => EmailStatus::DRAFT,
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Drafts,
+        'sent_at' => null,
+        'subject' => 'Other-team draft',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', null)
+        ->assertSet('subject', null)
+        ->assertSet('to', []);
+});
+
+it('excludes a teammate\'s unsent draft recipients from recipient suggestions', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->user->current_team_id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+
+    resolve(SaveEmailDraftAction::class)->execute(
+        user: $teammate,
+        data: [
+            'connected_account_id' => $teammateAccount->id,
+            'subject' => 'Teammate secret draft',
+            'body_html' => '<p>hi</p>',
+            'to' => ['hidden-recipient@example.com'],
+            'cc' => [],
+            'bcc' => [],
+        ],
+    );
+
+    $suggestions = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientSuggestions();
+
+    expect($suggestions)->not->toContain('hidden-recipient@example.com');
+});
+
+it('warns instead of silently discarding pending attachments when the composer is closed', function (): void {
+    Storage::fake('local');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Has an attachment')
+        ->set('bodyHtml', '<p>b</p>')
+        ->set('attachments', [UploadedFile::fake()->create('quote.pdf', 12)])
+        ->call('close')
+        ->assertNotified('Attachments won\'t be saved');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Has an attachment')->sole();
+    expect($draft->has_attachments)->toBeFalse();
+});
+
+it('falls back to the default account and warns when a draft\'s connected account is no longer active', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Stale account draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $fallbackAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+
+    $this->account->update(['status' => EmailAccountStatus::DISCONNECTED]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', $draft->id)
+        ->assertSet('subject', 'Stale account draft')
+        ->assertSet('accountId', $fallbackAccount->id)
+        ->assertNotified('Original account no longer connected');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->whereKey($draft->id)->value('connected_account_id'))
+        ->toBe($this->account->id);
 });

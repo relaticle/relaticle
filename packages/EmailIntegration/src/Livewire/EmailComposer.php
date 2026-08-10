@@ -81,13 +81,16 @@ final class EmailComposer extends Component implements HasSchemas
     public array $attachments = [];
 
     /**
-     * `$draftId` is a dedicated parameter, not a `$payload` key: Livewire's
-     * container-based event-argument binding only matches an incoming named
-     * argument (`dispatch('composer:open', draftId: $id)`, from a PHP-side
-     * `$this->dispatch()` or the test helper) to a parameter of that exact
-     * name — a same-named `$payload['draftId']` entry would never be
-     * populated that way. A JS-side `$dispatch()` positional payload object
-     * still binds to `$payload` as before.
+     * `$draftId` is its own parameter, not a `$payload` key. Livewire resolves
+     * `#[On]` listener arguments by matching each incoming event parameter to
+     * a method parameter BY NAME (`Livewire\ImplicitlyBoundMethod`, layered on
+     * Laravel's container method-call binding), and this applies uniformly
+     * whether the event came from a PHP-side `$this->dispatch('composer:open',
+     * draftId: $id)` / the test helper, or a JS-side `$wire.dispatch('composer:open',
+     * { draftId: id })` — the browser CustomEvent's `detail` object is decoded
+     * into the exact same string-keyed shape server-side, it is NOT positional.
+     * A same-named `$payload['draftId']` entry is never populated by either
+     * caller; only a literal `draftId` parameter is.
      *
      * @param  array{mode?: string, emailId?: string, to?: list<string>}  $payload
      */
@@ -175,7 +178,13 @@ final class EmailComposer extends Component implements HasSchemas
         ]);
 
         if ($this->draftId !== null) {
-            resolve(DeleteEmailDraftAction::class)->execute($this->authUser(), $this->draftId);
+            // Best-effort: two tabs open on the same draft, or a retried request,
+            // can mean the draft row is already gone by now. SendEmailAction has
+            // already committed the queued email above — a 403 here must never
+            // abort this method (it would leave the composer open and populated
+            // with no feedback, inviting the user to press Send again and queue
+            // a duplicate). executeIfExists() is a no-op when the draft is gone.
+            resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
         }
 
         Notification::make()
@@ -201,6 +210,7 @@ final class EmailComposer extends Component implements HasSchemas
     public function close(): void
     {
         $this->persistDraft();
+        $this->warnIfAttachmentsWillBeDiscarded();
         $this->closeComposer();
     }
 
@@ -240,7 +250,12 @@ final class EmailComposer extends Component implements HasSchemas
 
         /** @var list<string> */
         return EmailParticipant::query()
-            ->whereHas('email', fn (Builder $q): Builder => $q->where('team_id', $teamId))
+            // Drafts are private (never-sent, PRIVATE tier) — without this, a
+            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
+            // everyone else's recipient autocomplete via this team-wide query.
+            ->whereHas('email', fn (Builder $q): Builder => $q
+                ->where('team_id', $teamId)
+                ->where('status', '!=', EmailStatus::DRAFT))
             ->whereNotNull('email_address')
             ->select('email_address')
             ->distinct()
@@ -417,15 +432,18 @@ final class EmailComposer extends Component implements HasSchemas
      * `$draftId` arrives from the same client-controlled `composer:open` event
      * payload as any other `open()` argument (see {@see self::open()}), so it
      * must be re-verified here rather than trusted — scope the lookup to this
-     * user's own DRAFT rows so a foreign id can never leak another user's
-     * draft content into the composer. A miss (foreign, deleted, or already
-     * sent) is silently ignored and the composer opens blank.
+     * user's own DRAFT rows *within their current team* (a multi-team user has
+     * one `user_id` but no cross-team access; Email has no team global scope)
+     * so a foreign or cross-team id can never leak draft content into the
+     * composer. A miss (foreign, cross-team, deleted, or already sent) is
+     * silently ignored and the composer opens blank.
      */
     private function loadDraft(string $draftId): void
     {
         $draft = Email::query()
             ->with(['body', 'participants'])
             ->where('user_id', $this->authUser()->getKey())
+            ->where('team_id', $this->authUser()->current_team_id)
             ->where('status', EmailStatus::DRAFT)
             ->whereKey($draftId)
             ->first();
@@ -435,7 +453,22 @@ final class EmailComposer extends Component implements HasSchemas
         }
 
         $this->draftId = (string) $draft->getKey();
-        $this->accountId = (string) $draft->connected_account_id;
+
+        if ($this->isOwnedAccountId((string) $draft->connected_account_id)) {
+            $this->accountId = (string) $draft->connected_account_id;
+        } else {
+            // The account this draft was composed from was disconnected since
+            // it was saved. `open()` already selected a default active account
+            // above — keep that rather than loading a stale, unowned account id
+            // that would crash `send()` inside SendEmailAction's ownedBy()
+            // lookup with an unhandled ModelNotFoundException.
+            Notification::make()
+                ->warning()
+                ->title(__('filament/emails/composer.notifications.draft_account_disconnected.title'))
+                ->body(__('filament/emails/composer.notifications.draft_account_disconnected.body'))
+                ->send();
+        }
+
         $this->subject = $draft->subject;
         $this->setBodyHtml((string) $draft->body?->body_html);
 
@@ -445,6 +478,21 @@ final class EmailComposer extends Component implements HasSchemas
 
         $this->showCc = $this->cc !== [];
         $this->showBcc = $this->bcc !== [];
+    }
+
+    private function warnIfAttachmentsWillBeDiscarded(): void
+    {
+        if ($this->attachments === []) {
+            return;
+        }
+
+        // Attachment persistence for drafts is explicitly out of v1 scope — the
+        // fix here is only to stop discarding pending uploads silently.
+        Notification::make()
+            ->warning()
+            ->title(__('filament/emails/composer.notifications.attachments_not_saved.title'))
+            ->body(__('filament/emails/composer.notifications.attachments_not_saved.body'))
+            ->send();
     }
 
     /**

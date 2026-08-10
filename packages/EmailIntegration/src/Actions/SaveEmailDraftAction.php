@@ -44,6 +44,7 @@ final readonly class SaveEmailDraftAction
             $existing = $draftId !== null
                 ? Email::query()
                     ->where('user_id', $user->getKey())
+                    ->where('team_id', $account->team_id)
                     ->where('status', EmailStatus::DRAFT)
                     ->whereKey($draftId)
                     ->first()
