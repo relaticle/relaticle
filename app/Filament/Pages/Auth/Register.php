@@ -57,7 +57,7 @@ final class Register extends BaseRegister
             ->required()
             ->validationMessages(['required' => __('auth.turnstile.required')])
             ->rules([new TurnstileChallenge])
-            ->visible(fn (): bool => filled(config('services.turnstile.key')) && filled(config('services.turnstile.secret')));
+            ->visible(TurnstileChallenge::isConfigured(...));
     }
 
     public function form(Schema $schema): Schema

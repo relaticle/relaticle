@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
+use App\Rules\TurnstileChallenge;
+use App\Services\TurnstileClient;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
@@ -11,9 +13,10 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
+use Psr\Http\Message\RequestInterface;
 use RyanChandler\LaravelCloudflareTurnstile\Facades\Turnstile;
 
-mutates(Register::class);
+mutates(Register::class, TurnstileChallenge::class, TurnstileClient::class);
 
 it('registers a new user without creating a team', function (): void {
     livewire(Register::class)
@@ -284,6 +287,159 @@ it('degrades to a readable error when cloudflare siteverify is unreachable', fun
 })->with([
     'server error' => [fn (): PromiseInterface => Http::response('', 500)],
     'connection failure' => [fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')],
+]);
+
+it('rejects a siteverify verdict that is not explicitly successful', function (mixed $body): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Http::fake(['challenges.cloudflare.com/*' => Http::response($body)]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-siteverify-bypass@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-token-cloudflare-refused',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response' => __('auth.turnstile.failed')]);
+
+    expect(User::where('email', 'jane-siteverify-bypass@gmail.com')->exists())->toBeFalse();
+})->with([
+    'unsuccessful with an empty error-codes array' => [['success' => false, 'error-codes' => []]],
+    'unsuccessful with no error-codes key' => [['success' => false]],
+    'no success key at all' => [[]],
+    'not json' => ['<html>we are down</html>'],
+]);
+
+it('reports the error code cloudflare returned', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Http::fake(['challenges.cloudflare.com/*' => Http::response([
+        'success' => false,
+        'error-codes' => ['timeout-or-duplicate'],
+    ])]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-siteverify-replay@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-spent-token',
+        ])
+        ->call('register')
+        ->assertHasFormErrors([
+            'cf_turnstile_response' => __('cloudflare-turnstile::errors.timeout-or-duplicate'),
+        ]);
+});
+
+it('accepts a genuine siteverify success', function (mixed $body): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Http::fake(['challenges.cloudflare.com/*' => Http::response($body)]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-siteverify-ok@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-token-cloudflare-accepted',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'jane-siteverify-ok@gmail.com')->exists())->toBeTrue();
+})->with([
+    'with an empty error-codes array' => [['success' => true, 'error-codes' => []]],
+    'without an error-codes key' => [['success' => true]],
+]);
+
+it('bounds the siteverify call with a connect and a request timeout', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+
+    $sentOptions = [];
+
+    Http::globalMiddleware(function (callable $handler) use (&$sentOptions): Closure {
+        return function (RequestInterface $request, array $options) use ($handler, &$sentOptions): mixed {
+            $sentOptions = $options;
+
+            return $handler($request, $options);
+        };
+    });
+    Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true, 'error-codes' => []])]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-siteverify-timeout@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-token-cloudflare-accepted',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($sentOptions['connect_timeout'])->toBeGreaterThan(0)->toBeLessThanOrEqual(5)
+        ->and($sentOptions['timeout'])->toBeGreaterThan(0)->toBeLessThanOrEqual(10);
+});
+
+it('renders the turnstile challenge prompt in the active locale', function (): void {
+    app()->setLocale('fr');
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-fr@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response' => 'Veuillez compléter la vérification de sécurité.']);
+});
+
+it('reports a turnstile failure in the active locale', function (callable $stub, string $expected): void {
+    app()->setLocale('fr');
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Http::fake(['challenges.cloudflare.com/*' => $stub]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-fr-failure@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-token',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response' => $expected]);
+})->with([
+    'unsuccessful verdict' => [
+        fn (): PromiseInterface => Http::response(['success' => false, 'error-codes' => []]),
+        'La vérification a échoué. Veuillez réessayer.',
+    ],
+    'siteverify unreachable' => [
+        fn (): PromiseInterface => Http::response('', 500),
+        'La vérification est temporairement indisponible. Veuillez réessayer dans un instant.',
+    ],
 ]);
 
 it('skips the turnstile challenge when no site key is configured', function (): void {
