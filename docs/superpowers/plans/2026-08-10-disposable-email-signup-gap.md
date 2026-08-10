@@ -22,9 +22,11 @@
 - No AI attribution in commit messages.
 - Pre-commit order: `vendor/bin/pint --dirty --format agent` → `vendor/bin/rector --dry-run` → `vendor/bin/phpstan analyse` → `composer test:type-coverage` → `php artisan test --compact --filter=...`.
 
-## DECISION REQUIRED BEFORE TASK 1
+## DECISION RESOLVED (was: required before Task 1)
 
-The spec says the shared rule set is `['email:rfc,dns', 'indisposable']` applied to all three paths. **Verification during planning proved that breaks the suite**, so this plan implements a corrected version. Confirm before starting.
+**Resolved — the parameterised `rules(bool $checkDns = true)` below was confirmed and is what shipped.** No further action; this block is kept for the rationale.
+
+The spec originally said the shared rule set is `['email:rfc,dns', 'indisposable']` applied to all three paths. **Verification during planning proved that breaks the suite**, so this plan implemented a corrected version.
 
 Measured facts:
 
@@ -52,11 +54,8 @@ RegistrableEmail::rules(checkDns: false)  // ['email:rfc', 'indisposable']     �
 One source of truth, no dual code path, registration keeps the DNS strictness it
 has today, and no existing fixture breaks.
 
-If you would rather drop `dns` everywhere — simpler, but it removes a control
-registration has today — the edit is: in **Task 1 Step 4**, make `rules()` a
-no-argument method returning `['email:rfc', 'indisposable']`; then drop the
-`checkDns: false` argument in **Task 2 Step 3** and **Task 3 Step 3**. No test
-in this plan changes, because none of them depend on the DNS check.
+The alternative that was offered and **not** taken: dropping `dns` everywhere,
+which would have removed a control registration already had.
 
 ## File Structure
 

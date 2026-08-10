@@ -2,19 +2,19 @@
 
 **Date:** 2026-08-10
 **Branch:** `ManukMinasyan/disposable-email-signup-gap`
-**Status:** Design approved; one amendment pending confirmation (see below)
+**Status:** Shipped. Design approved with one amendment, confirmed and
+implemented (see below).
 
-> **Amendment (2026-08-10, during planning).** Component 1 below specifies the
-> shared rule set as `['email:rfc,dns', 'indisposable']` for all three paths.
-> Verification proved the `dns` check breaks the suite: `fake()->safeEmail()`
-> emits reserved `example.*` domains with no MX record, and 102 fixture
-> addresses across 21 test files use them. `dns` also adds a live lookup to the
-> invite and social request paths while contributing nothing to this threat —
-> every disposable provider publishes valid MX records. The plan therefore
-> parameterises it: `rules()` keeps `dns` for registration,
-> `rules(checkDns: false)` is used for invitations and social signup. See the
-> "DECISION REQUIRED" block in
-> `docs/superpowers/plans/2026-08-10-disposable-email-signup-gap.md`.
+> **Amendment (2026-08-10, during planning) — confirmed and shipped.** Component
+> 1 originally specified the shared rule set as `['email:rfc,dns',
+> 'indisposable']` for all three paths. Verification proved the `dns` check
+> breaks the suite: `fake()->safeEmail()` emits reserved `example.*` domains
+> with no MX record, and 102 fixture addresses across 21 test files use them.
+> `dns` also adds a live lookup to the invite and social request paths while
+> contributing nothing to this threat — every disposable provider publishes
+> valid MX records. The parameterised form was confirmed and is what shipped:
+> `rules()` keeps `dns` for registration, `rules(checkDns: false)` is used for
+> invitations and social signup. Component 1 below reflects the shipped code.
 
 ## Summary
 
@@ -107,55 +107,117 @@ Add the dependency that provides the `indisposable` rule:
 composer require propaganistas/laravel-disposable-email:^2.5
 ```
 
-The service provider is auto-discovered; no config publish is required for the
-default behaviour. Only `composer.json` and `composer.lock` change.
+The service provider is auto-discovered, but the config **is** published to
+`config/disposable-email.php` — the package's shipped defaults are unsafe for
+this threat (see "Blocklist configuration" below).
 
 New `app/Rules/RegistrableEmail.php`. A `final readonly` class exposing the
 canonical rule list, **not** a `ValidationRule` implementation — the set has to
-compose with each call site's own uniqueness constraint.
+compose with each call site's own uniqueness constraint. The DNS check is
+opt-out because it performs a live lookup: registration can afford it, the
+invitation and social paths sit in request paths where it buys nothing.
 
 ```php
 final readonly class RegistrableEmail
 {
     /** @return list<string> */
-    public static function rules(): array
+    public static function rules(bool $checkDns = true): array
     {
-        return ['email:rfc,dns', 'indisposable'];
+        return [
+            $checkDns ? 'email:rfc,dns' : 'email:rfc',
+            'indisposable',
+        ];
     }
 }
 ```
 
 Applied at three sites, each keeping its existing uniqueness rule:
 
-- `Register.php:40` — replaces `['email:rfc,dns']`, keeps `->unique()`
-- `CreateNewSocialUser.php:28` — replaces `'email'`, keeps `'unique:users'`
-- `InviteTeamMember.php:74` — replaces `'email'`, keeps the `Rule::unique` closure
+- `Register.php` — `rules()`, replaces `['email:rfc,dns']`, keeps `->unique()`
+- `CreateNewSocialUser.php` — `rules(checkDns: false)`, replaces `'email'`, keeps `'unique:users'`
+- `InviteTeamMember.php` — `rules(checkDns: false)`, replaces `'email'`, keeps the `Rule::unique` closure
 
-Social and invitation paths gain DNS validation they did not have. OAuth
-identities are provider-verified, but a Google Workspace account can carry any
-verified address, so the rule applies there too.
+OAuth identities are provider-verified, but a Google Workspace account can carry
+any verified address, so the rule applies there too.
+
+The rejection message is ours, not the vendor's: the `indisposable` key lives in
+`lang/en/validation.php` and `lang/fr/validation.php`, which Laravel resolves
+ahead of the package's hardcoded English fallback.
+
+### Blocklist configuration
+
+`config/disposable-email.php` is published and two defaults are overridden. Both
+are load-bearing; leaving either at its shipped value defeats the feature.
+
+**`include_subdomains => true`** (ships as `false`). With the default, only
+exact-domain matches are blocked — but Mailinator and Yopmail run wildcard DNS,
+so `burner@anything.mailinator.com` and `burner@sub.yopmail.com` deliver exactly
+like the bare domain. Off, the entire blocklist is a one-character bypass.
+
+**`whitelist => [...]`** (ships empty). Populated with `relaticle.com` and the
+mainstream consumer providers (gmail, outlook, hotmail, live, yahoo, icloud, me,
+proton.me, protonmail, fastmail, zoho, gmx, yandex, aol, msn). This is the
+guardrail for Component 4's weekly `disposable:update`, which overwrites the
+local list from a community GitHub repository at branch HEAD with no validation.
+Without it, one bad upstream entry locks a mainstream provider out of
+registration *and* team invitations product-wide. Whitelisted domains are
+removed from the list at load, so they can never be treated as disposable.
 
 ## Component 2 — Turnstile on registration
 
 Filament forms are Livewire; there is no form POST to carry
 `cf-turnstile-response`. The widget renders through a `ViewField` whose JS
-callback pushes the token into Livewire state, validated by the package's
-existing `Rules\Turnstile`, which validates the passed value (confirmed in
-`vendor/ryangjchandler/laravel-cloudflare-turnstile/src/Rules/Turnstile.php`).
+callback pushes the token into Livewire state, validated by `App\Rules\
+TurnstileChallenge` — a thin wrapper over the package's `Rules\Turnstile`.
 
-**The field renders and is required only when `config('services.turnstile.key')`
-is filled.**
+**The field renders and is required only when both
+`config('services.turnstile.key')` and `config('services.turnstile.secret')` are
+filled.** A site key without a secret cannot be verified server-side, so
+requiring only the key would present a challenge that can never pass.
 
-- CI defines no `TURNSTILE_*` vars (`phpunit.xml:44-59`), so the four existing
+- CI defines no `TURNSTILE_*` vars (`phpunit.xml`), so the pre-existing
   registration tests keep passing unmodified
 - Self-hosted instances without keys keep working, and are not the abuse target
   since the 2000 credits are a hosted cost
-- Production has keys, so it is enforced
+- Production has both, so it is enforced
 
-Accepted risk: if production loses that env var, bot protection disappears
-silently. The alternative — hard-requiring it as `ContactRequest.php:21` does —
-fails loudly but breaks self-hosters and forces `Turnstile::fake()` into every
+Accepted risk: if production loses those env vars, bot protection disappears
+silently. The alternative — hard-requiring them as `ContactRequest.php:21` does
+— fails loudly but breaks self-hosters and forces `Turnstile::fake()` into every
 test that creates a user. Conditional was chosen deliberately.
+
+### Single-use tokens
+
+Cloudflare tokens are single-use and Laravel validates every field on every
+submit, so the token is spent on the first submit even when a *different* field
+fails. Livewire keeps the spent token behind the widget's `wire:ignore`, and the
+next submit replays it — `timeout-or-duplicate` beside a widget showing a green
+tick, recoverable only by reloading and losing all typed input.
+
+`Register::register()` therefore catches `ValidationException`, nulls
+`data.cf_turnstile_response`, and rethrows. The vendor view already registers a
+Livewire watcher that calls `window.turnstile.reset()` when the bound value goes
+from set to empty, so blanking the state is all that is needed. Verified in a
+real browser with Cloudflare's always-pass test credentials: with the fix,
+`window.turnstile.reset()` fires once and the bound value transitions
+`token → null → fresh token`; with it reverted, zero resets and the spent token
+is retained.
+
+### Cloudflare outages
+
+`App\Rules\TurnstileChallenge` exists because the vendor client issues its
+siteverify call through `Http::retry(3, 100)` with throwing left on — which makes
+its own `if (! $response->ok()) return SiteverifyResponse::success()` fail-open
+branch unreachable, and lets any Cloudflare hiccup escape as an unhandled
+exception, i.e. a 500 on a public page. The wrapper catches
+`Illuminate\Http\Client\RequestException` and `ConnectionException`, logs a
+warning, and **fails closed** with `__('auth.turnstile.unavailable')`. Failing
+open was rejected: it would hand an attacker a bypass they can trigger at will.
+
+Residual: the vendor client sets no `->timeout()`, so a black-holed connection
+can still take up to three default 30s attempts before the "try again" message
+appears. Fixing that requires replacing the package's `ClientInterface` binding
+and is left as a follow-up.
 
 ## Component 3 — remove the dead Fortify route
 
@@ -187,9 +249,14 @@ testing conventions.
 | Test | Asserts |
 |---|---|
 | Register with `@mailinator.com` | form error on `email`, zero `User` rows |
-| Register with `@gmail.com` | still succeeds — regression guard on the 4 existing tests |
+| Register with `@anything.mailinator.com`, `@sub.yopmail.com` | `indisposable` rule fails — subdomain bypass is closed |
+| Register with an upstream-listed whitelisted domain | still succeeds — whitelist survives a bad list update |
+| Disposable rejection under `fr` locale | the French message renders, not the vendor's English |
+| Register with `@gmail.com` | still succeeds — regression guard on the pre-existing tests |
 | Turnstile required when key configured | `config()` + `Turnstile::fake()->fail()` → form error |
-| Turnstile absent when key unset | form submits, no error — protects CI and self-host |
+| Turnstile absent when key unset, or secret unset | form submits, no error — protects CI and self-host |
+| Turnstile token cleared after any validation failure | `data.cf_turnstile_response` is null, so the widget resets |
+| Siteverify 500 and connection failure | no exception escapes; `auth.turnstile.unavailable` on the field; warning logged |
 | `GET /register` redirects to `/app/register` | route removal did not break the shim |
 
 `tests/Feature/Auth/SocialiteLoginTest.php` — social path: a disposable address
@@ -200,8 +267,9 @@ one.
 disposable address fails validation with no `TeamInvitation` row; a normal
 address still invites.
 
-No new test files and no new test classes, so `tests/.pest/shards.json` needs no
-refresh.
+No new test files and no new test classes, but `RegistrationTest` roughly
+tripled in size, so `tests/.pest/shards.json` is refreshed with
+`composer test:update-shards` — a stale entry silently unbalances CI sharding.
 
 `Turnstile::fake()` / `::dummy()` follow the precedent in
 `tests/Feature/ContactFormTest.php:19-59`.
