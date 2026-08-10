@@ -326,3 +326,40 @@ it('refuses an MCP call when a Passport token carries no team binding', function
         ])
         ->assertForbidden();
 });
+
+it('keeps the consented team when the client re-authorizes and Passport skips consent', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->otherTeam);
+
+    // Passport short-circuits the consent screen (and so our team picker) when the
+    // user already holds an active token for the client, so the second grant never
+    // records a team of its own.
+    $verifier = Str::random(64);
+    $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+
+    $this->actingAs($this->user);
+
+    $location = $this->get('/oauth/authorize?'.http_build_query([
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'response_type' => 'code',
+        'scope' => 'mcp:use',
+        'state' => 'again',
+        'code_challenge' => $challenge,
+        'code_challenge_method' => 'S256',
+    ]))->assertRedirect()->headers->get('Location');
+
+    parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'code_verifier' => $verifier,
+        'code' => $query['code'],
+    ])->assertOk();
+
+    $tokens = DB::table('oauth_access_tokens')->where('user_id', $this->user->getKey())->get();
+
+    expect($tokens)->toHaveCount(2);
+    expect($tokens->pluck('team_id')->unique()->all())->toBe([$this->otherTeam->getKey()]);
+});

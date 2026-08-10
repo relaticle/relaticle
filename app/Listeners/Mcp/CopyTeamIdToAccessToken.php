@@ -49,7 +49,7 @@ final class CopyTeamIdToAccessToken
             ->where('user_id', $userId)
             ->where('client_id', $clientId)
             ->whereNotNull('team_id')
-            ->orderByDesc('expires_at')
+            ->latest('expires_at')
             ->value('team_id');
 
         return is_string($teamId) ? $teamId : null;
@@ -69,7 +69,7 @@ final class CopyTeamIdToAccessToken
             ->where('client_id', $clientId)
             ->where('id', '!=', $tokenId)
             ->whereNotNull('team_id')
-            ->orderByDesc('created_at')
+            ->latest()
             ->value('team_id');
 
         return is_string($teamId) ? $teamId : null;
