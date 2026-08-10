@@ -80,6 +80,23 @@ it('rejects registration from a disposable email domain', function (): void {
     expect(User::where('email', 'burner@mailinator.com')->exists())->toBeFalse();
 });
 
+it('rejects registration from a subdomain of a disposable email domain', function (string $email): void {
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Burner User',
+            'email' => $email,
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['email' => 'indisposable']);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+})->with([
+    'burner@anything.mailinator.com',
+    'burner@sub.yopmail.com',
+]);
+
 it('requires a passing turnstile challenge when a site key is configured', function (): void {
     config([
         'services.turnstile.key' => 'test-site-key',
