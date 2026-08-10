@@ -73,4 +73,8 @@ return [
             'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
         ],
     ],
+
+    'demo_account' => [
+        'password' => env('DEMO_ACCOUNT_PASSWORD'),
+    ],
 ];

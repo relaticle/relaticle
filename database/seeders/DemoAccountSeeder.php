@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 final class DemoAccountSeeder extends Seeder
 {
@@ -21,7 +22,11 @@ final class DemoAccountSeeder extends Seeder
 
     public function run(): void
     {
-        DB::transaction(function (): void {
+        $password = (string) config('services.demo_account.password');
+
+        throw_if($password === '', RuntimeException::class, 'DEMO_ACCOUNT_PASSWORD is not set; refusing to seed the demo account with a repository-visible password.');
+
+        DB::transaction(function () use ($password): void {
             $user = User::query()->where('email', self::EMAIL)->first();
 
             if (! $user instanceof User) {
@@ -29,7 +34,7 @@ final class DemoAccountSeeder extends Seeder
                 $user = User::factory()->withPersonalTeam()->create([
                     'email' => self::EMAIL,
                     'name' => 'Relaticle Demo',
-                    'password' => Hash::make('Demo!2026Relaticle'),
+                    'password' => Hash::make($password),
                     'email_verified_at' => now(),
                     'two_factor_secret' => null,
                     'two_factor_recovery_codes' => null,
@@ -37,7 +42,7 @@ final class DemoAccountSeeder extends Seeder
             } else {
                 $user->forceFill([
                     'name' => 'Relaticle Demo',
-                    'password' => Hash::make('Demo!2026Relaticle'),
+                    'password' => Hash::make($password),
                     'email_verified_at' => now(),
                     'two_factor_secret' => null,
                     'two_factor_recovery_codes' => null,
@@ -51,6 +56,15 @@ final class DemoAccountSeeder extends Seeder
                 $this->command->error('Demo user has no personal team — onboarding may have failed.');
 
                 return;
+            }
+
+            // The factory builds the team directly rather than through
+            // App\Actions\Jetstream\CreateTeam, so it never receives the Pro trial a real
+            // signup gets. Without hosted access the workspace is paused and every REST
+            // API and MCP call answers 402, which is precisely what directory reviewers
+            // would hit. Grandfather it instead of trialling so it never lapses.
+            if ($team->hosted_free_grandfathered_at === null) {
+                $team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
             }
 
             $taskIdsForTeam = Task::query()->where('team_id', $team->getKey())->pluck('id');
