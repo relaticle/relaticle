@@ -89,6 +89,10 @@ installed and configured** (`ryangjchandler/laravel-cloudflare-turnstile`,
 `spatie/laravel-honeypot`, keys in `config/services.php:60`), wired to the
 contact form only. Adding Turnstile to registration is wiring, not adoption.
 
+A fourth, found in follow-up review: **the pre-existing contact-form wiring
+carried both of the defects this work fixed for registration**, and the vendor
+siteverify client is itself unsound. See [Follow-up hardening](#follow-up-hardening).
+
 ## Decisions taken
 
 | Decision | Choice | Rationale |
@@ -182,9 +186,11 @@ requiring only the key would present a challenge that can never pass.
 - Production has both, so it is enforced
 
 Accepted risk: if production loses those env vars, bot protection disappears
-silently. The alternative — hard-requiring them as `ContactRequest.php:21` does
-— fails loudly but breaks self-hosters and forces `Turnstile::fake()` into every
-test that creates a user. Conditional was chosen deliberately.
+silently. The alternative — hard-requiring them, as the contact form originally
+did — fails loudly but breaks self-hosters and forces `Turnstile::fake()` into
+every test that creates a user. Conditional was chosen deliberately, and is now
+the single contract both public entry points share
+(`TurnstileChallenge::isConfigured()`).
 
 ### Single-use tokens
 
@@ -209,15 +215,10 @@ is retained.
 siteverify call through `Http::retry(3, 100)` with throwing left on — which makes
 its own `if (! $response->ok()) return SiteverifyResponse::success()` fail-open
 branch unreachable, and lets any Cloudflare hiccup escape as an unhandled
-exception, i.e. a 500 on a public page. The wrapper catches
+exception, i.e. a 500 on a public page. The rule catches
 `Illuminate\Http\Client\RequestException` and `ConnectionException`, logs a
 warning, and **fails closed** with `__('auth.turnstile.unavailable')`. Failing
 open was rejected: it would hand an attacker a bypass they can trigger at will.
-
-Residual: the vendor client sets no `->timeout()`, so a black-holed connection
-can still take up to three default 30s attempts before the "try again" message
-appears. Fixing that requires replacing the package's `ClientInterface` binding
-and is left as a follow-up.
 
 ## Component 3 — remove the dead Fortify route
 
@@ -239,6 +240,68 @@ returns `false` on an empty list — a failed update degrades to a stale list,
 never a signup outage. Validation is an offline array lookup; no request-path
 network calls.
 
+## Follow-up hardening
+
+Three defects the first review deferred, all fixed on this branch.
+
+### The contact form carried both registration bugs
+
+`ContactRequest` used the vendor rule unconditionally
+(`['required', new Turnstile]`), so the public contact page had exactly the two
+failure modes registration had just been fixed for. Both reproduced:
+
+- **Half-configured install** (site key set, secret missing) — the package binds
+  `new Client($config->get('services.turnstile.secret'))`, so resolving the
+  client throws `TypeError: Argument #1 ($secret) must be of type string, null
+  given`. With no token submitted it is instead a permanent
+  `The cf-turnstile-response field is required.` — an unusable contact form on
+  every self-hosted instance, verified against all three half/unconfigured
+  permutations.
+- **Siteverify unreachable** — HTTP 500, confirmed with `Http::fake()` returning
+  a 500 from `challenges.cloudflare.com`.
+
+The form now uses `App\Rules\TurnstileChallenge` through the shared
+`TurnstileChallenge::rules()` helper, which returns `[]` unless
+`isConfigured()`. `ContactController::show()` passes the same predicate to the
+view as `$turnstileEnabled`, so the widget and its script tag render exactly
+when the challenge is validated — never one without the other. Both states were
+walked in a browser.
+
+### The vendor siteverify client is unsound
+
+`Client::siteverify()` returns `SiteverifyResponse::failure($response->json('error-codes'))`
+on **every** HTTP 200 — it never constructs a success. Because `Rules\Turnstile`
+reports a failure only while looping those codes, a response of
+`{"success": false, "error-codes": []}` **passes validation**. Reproduced: a
+registration completed with a token Cloudflare had explicitly refused. And since
+`json('error-codes')` is null when the key is absent while
+`failure(array $errorCodes = [])` is not nullable, a 200 without that key is a
+TypeError — which is what Cloudflare's own documented success body
+(`{"success": true}`) would produce.
+
+`App\Services\TurnstileClient` replaces it, bound over the package's own
+`ClientInterface` registration in `AppServiceProvider::register()` (app
+providers register after package providers, so the later binding wins;
+`Turnstile::fake()` still swaps it, since it goes through the facade). It reads
+Cloudflare's `success` flag, coerces `error-codes` to a `list<string>`, and
+bounds the call at a 3s connect / 5s request timeout over 2 attempts — the
+vendor client inherited Laravel's 10s/30s defaults across 3 attempts, measured,
+which is the ~90s hang a black-holed connection produced on submit.
+
+Fixing the client is necessary but **not sufficient**: the vendor rule would
+still pass a codeless `success: false`. `TurnstileChallenge` therefore makes the
+verdict itself — one siteverify call (tokens are single-use, so it cannot
+delegate and re-check), success required explicitly, the vendor's per-code
+translations kept where a code is present, and `auth.turnstile.failed` for
+anything unsuccessful without one. Exception handling is unchanged.
+
+### French fell back to English
+
+`lang/fr/` had only `filament/` and `validation.php`, so the turnstile strings
+rendered in English for French users. `lang/fr/auth.php` now mirrors
+`lang/en/auth.php` in full — `failed`, `password`, `throttle` from the canonical
+laravel-lang translations, plus the three `turnstile` keys.
+
 ## Testing
 
 All tests extend existing files. No new parallel test files, per the repo's
@@ -257,7 +320,26 @@ testing conventions.
 | Turnstile absent when key unset, or secret unset | form submits, no error — protects CI and self-host |
 | Turnstile token cleared after any validation failure | `data.cf_turnstile_response` is null, so the widget resets |
 | Siteverify 500 and connection failure | no exception escapes; `auth.turnstile.unavailable` on the field; warning logged |
+| Siteverify 200 that is not explicitly successful | four bodies (`success: false` with empty codes, with the key absent, no `success` key, non-JSON) all fail with `auth.turnstile.failed` and create no user — the silent bypass |
+| Siteverify 200 carrying an error code | the vendor's per-code translation is what the field shows |
+| Genuine success, with and without an `error-codes` key | registers — the second body is Cloudflare's documented shape and used to be a TypeError |
+| Siteverify timeouts | a global Http middleware records the Guzzle options: connect ≤ 5s, request ≤ 10s, both non-zero |
+| Turnstile prompt, failure and outage under `fr` | the French strings render, not the English fallback |
 | `GET /register` redirects to `/app/register` | route removal did not break the shim |
+
+`tests/Feature/ContactFormTest.php` (`mutates(ContactController::class,
+ContactRequest::class, TurnstileChallenge::class)`):
+
+| Test | Asserts |
+|---|---|
+| Widget rendering | neither the `cf-turnstile` div nor the Cloudflare script is emitted until both keys are filled |
+| Half-configured install, all three permutations | the form submits and mails, instead of 500ing or blocking forever |
+| Siteverify unreachable | redirect with `auth.turnstile.unavailable`, nothing mailed — was a 500 |
+| Siteverify unsuccessful without error codes | rejected with `auth.turnstile.failed` — previously mailed the submission through |
+
+The two pre-existing contact turnstile tests keep their assertions verbatim;
+they gained the `config()` arrange the registration tests already use, because
+"challenge enforced" is now a configured-install state rather than the default.
 
 `tests/Feature/Auth/SocialiteLoginTest.php` — social path: a disposable address
 throws `ValidationException` and creates no user; a normal address still creates
