@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseDeleteTool;
@@ -49,3 +50,21 @@ it('exposes the required annotation matrix', function (string $toolClass, array 
         expect($annotations[$key])->toBe($value);
     }
 })->with('annotation_matrix');
+
+// The per-category matrix above only covers the classes someone remembered to list,
+// which is how WhoAmiTool shipped without openWorldHint. Enumerate the server's own
+// registration instead so a new tool cannot opt out of the submission policy by
+// simply not being added to the dataset.
+it('declares openWorldHint on every registered tool', function (): void {
+    $tools = (new ReflectionClass(RelaticleServer::class))
+        ->getDefaultProperties()['tools'];
+
+    expect($tools)->toBeArray()->not->toBeEmpty();
+
+    foreach ($tools as $toolClass) {
+        $annotations = app($toolClass)->annotations();
+
+        expect($annotations)->toHaveKey('openWorldHint');
+        expect($annotations['openWorldHint'])->toBeFalse();
+    }
+});

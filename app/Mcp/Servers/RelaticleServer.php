@@ -52,7 +52,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('Relaticle CRM')]
 #[Version('1.0.0')]
-#[Instructions('This server provides access to Relaticle CRM data including companies, people, opportunities, tasks, and notes. All operations are scoped to the authenticated user\'s current team.')]
+#[Instructions('This server provides access to Relaticle CRM data including companies, people, opportunities, tasks, and notes. All operations are scoped to the single workspace this connection was authorized for.')]
 final class RelaticleServer extends Server
 {
     public int $defaultPaginationLength = 50;
