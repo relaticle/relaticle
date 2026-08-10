@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Livewire\App\Chat;
 
 use App\Filament\Pages\ChatConversation;
+use App\Filament\Pages\Dashboard;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -158,9 +159,10 @@ final class ChatSidePanel extends BaseLivewireComponent
         $tenant = Filament::getTenant();
 
         return view('chat::livewire.app.chat.chat-side-panel', [
+            /** Home is where a chat starts; the full-page chat only shows saved transcripts. */
             'newChatUrl' => $tenant === null
                 ? null
-                : ChatConversation::getUrl(panel: 'app', tenant: $tenant),
+                : Dashboard::getUrl(panel: 'app', tenant: $tenant),
             'conversationUrlTemplate' => $tenant === null
                 ? null
                 : ChatConversation::getUrl(['conversationId' => self::CONVERSATION_URL_PLACEHOLDER], panel: 'app', tenant: $tenant),
