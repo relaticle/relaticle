@@ -40,6 +40,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -184,6 +185,12 @@ final class EmailInboxPage extends Page
         } elseif ($this->folder === EmailFolder::Inbox) {
             $query->inbox();
         }
+
+        // `sent()`/`inbox()` already exclude drafts structurally (direction
+        // OUTBOUND+sent_at NOT NULL / direction INBOUND), but the `All` folder
+        // applies neither — without this, VisibleEmailScope's owner clause
+        // would surface the viewer's own in-progress drafts in the unified list.
+        $query->where('status', '!=', EmailStatus::DRAFT);
 
         if (filled($this->search)) {
             $query->where(function (Builder $q): void {

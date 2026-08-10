@@ -19,12 +19,17 @@ use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use LogicException;
+use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -76,10 +81,18 @@ final class EmailComposer extends Component implements HasSchemas
     public array $attachments = [];
 
     /**
-     * @param  array{mode?: string, emailId?: string, to?: list<string>, draftId?: string}  $payload
+     * `$draftId` is a dedicated parameter, not a `$payload` key: Livewire's
+     * container-based event-argument binding only matches an incoming named
+     * argument (`dispatch('composer:open', draftId: $id)`, from a PHP-side
+     * `$this->dispatch()` or the test helper) to a parameter of that exact
+     * name — a same-named `$payload['draftId']` entry would never be
+     * populated that way. A JS-side `$dispatch()` positional payload object
+     * still binds to `$payload` as before.
+     *
+     * @param  array{mode?: string, emailId?: string, to?: list<string>}  $payload
      */
     #[On('composer:open')]
-    public function open(array $payload = []): void
+    public function open(array $payload = [], ?string $draftId = null): void
     {
         // A second `composer:open` while a draft is already in progress (e.g. the `c`
         // shortcut firing after a click landed on a button, not an input) must not
@@ -107,6 +120,10 @@ final class EmailComposer extends Component implements HasSchemas
         $this->signatureId = $signature?->getKey();
         $this->setBodyHtml(resolve(EmailTemplateRenderService::class)
             ->applySignatureBlock('<p></p>', $signature));
+
+        if ($draftId !== null) {
+            $this->loadDraft($draftId);
+        }
 
         $this->isOpen = true;
         $this->isMinimized = false;
@@ -157,6 +174,10 @@ final class EmailComposer extends Component implements HasSchemas
             'attachment_file_names' => $attachmentNames,
         ]);
 
+        if ($this->draftId !== null) {
+            resolve(DeleteEmailDraftAction::class)->execute($this->authUser(), $this->draftId);
+        }
+
         Notification::make()
             ->success()
             ->title(__('filament/emails/composer.notifications.queued.title'))
@@ -168,6 +189,7 @@ final class EmailComposer extends Component implements HasSchemas
 
     public function minimize(): void
     {
+        $this->persistDraft();
         $this->isMinimized = true;
     }
 
@@ -178,6 +200,7 @@ final class EmailComposer extends Component implements HasSchemas
 
     public function close(): void
     {
+        $this->persistDraft();
         $this->closeComposer();
     }
 
@@ -342,6 +365,99 @@ final class EmailComposer extends Component implements HasSchemas
         }
 
         return [$paths, $names];
+    }
+
+    /**
+     * Persist the in-progress message as a DRAFT unless it is blank. Skipped
+     * entirely for a blank compose (nothing to save) or when the account was
+     * rejected by {@see self::ownedAccountId()} (nothing safe to save under).
+     * Reusing this on both `minimize()` and `close()` means a user who clears
+     * out an already-saved draft and closes leaves that draft row untouched
+     * rather than wiping it — {@see SaveEmailDraftAction} never runs in that
+     * case, so nothing to reconcile.
+     */
+    private function persistDraft(): void
+    {
+        if ($this->isDraftEmpty()) {
+            return;
+        }
+
+        $accountId = $this->ownedAccountId();
+
+        if ($accountId === null) {
+            return;
+        }
+
+        $draft = resolve(SaveEmailDraftAction::class)->execute(
+            user: $this->authUser(),
+            data: [
+                'connected_account_id' => $accountId,
+                'subject' => $this->subject,
+                'body_html' => $this->bodyHtmlValue(),
+                'to' => $this->to,
+                'cc' => $this->cc,
+                'bcc' => $this->bcc,
+            ],
+            draftId: $this->draftId,
+        );
+
+        $this->draftId = (string) $draft->getKey();
+    }
+
+    private function isDraftEmpty(): bool
+    {
+        return blank($this->subject)
+            && trim(strip_tags($this->bodyHtmlValue())) === ''
+            && $this->to === []
+            && $this->cc === []
+            && $this->bcc === [];
+    }
+
+    /**
+     * `$draftId` arrives from the same client-controlled `composer:open` event
+     * payload as any other `open()` argument (see {@see self::open()}), so it
+     * must be re-verified here rather than trusted — scope the lookup to this
+     * user's own DRAFT rows so a foreign id can never leak another user's
+     * draft content into the composer. A miss (foreign, deleted, or already
+     * sent) is silently ignored and the composer opens blank.
+     */
+    private function loadDraft(string $draftId): void
+    {
+        $draft = Email::query()
+            ->with(['body', 'participants'])
+            ->where('user_id', $this->authUser()->getKey())
+            ->where('status', EmailStatus::DRAFT)
+            ->whereKey($draftId)
+            ->first();
+
+        if ($draft === null) {
+            return;
+        }
+
+        $this->draftId = (string) $draft->getKey();
+        $this->accountId = (string) $draft->connected_account_id;
+        $this->subject = $draft->subject;
+        $this->setBodyHtml((string) $draft->body?->body_html);
+
+        $this->to = $this->participantAddresses($draft, EmailParticipantRole::TO);
+        $this->cc = $this->participantAddresses($draft, EmailParticipantRole::CC);
+        $this->bcc = $this->participantAddresses($draft, EmailParticipantRole::BCC);
+
+        $this->showCc = $this->cc !== [];
+        $this->showBcc = $this->bcc !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function participantAddresses(Email $draft, EmailParticipantRole $role): array
+    {
+        /** @var list<string> */
+        return $draft->participants
+            ->where('role', $role)
+            ->pluck('email_address')
+            ->values()
+            ->all();
     }
 
     private function closeComposer(): void
