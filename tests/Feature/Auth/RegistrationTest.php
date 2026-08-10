@@ -176,3 +176,18 @@ it('skips the turnstile challenge when the site key is configured but the secret
 
     expect(User::where('email', 'jane-turnstile-no-secret@gmail.com')->exists())->toBeTrue();
 });
+
+it('does not expose a fortify registration endpoint', function (): void {
+    $this->post('/register', [
+        'name' => 'Burner User',
+        'email' => 'burner-fortify@mailinator.com',
+        'password' => 'Password123!',
+        'password_confirmation' => 'Password123!',
+    ])->assertStatus(405);
+
+    expect(User::where('email', 'burner-fortify@mailinator.com')->exists())->toBeFalse();
+});
+
+it('redirects the bare register path to the panel register page', function (): void {
+    $this->get('/register')->assertRedirect(url()->getAppUrl('register'));
+});
