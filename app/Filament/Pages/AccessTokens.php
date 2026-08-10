@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Livewire\App\AccessTokens\CreateAccessToken;
 use App\Livewire\App\AccessTokens\ManageAccessTokens;
+use App\Livewire\App\AccessTokens\ManageOAuthConnectors;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
@@ -28,6 +29,7 @@ final class AccessTokens extends Page
         return $schema->components([
             Livewire::make(CreateAccessToken::class),
             Livewire::make(ManageAccessTokens::class),
+            Livewire::make(ManageOAuthConnectors::class),
         ]);
     }
 

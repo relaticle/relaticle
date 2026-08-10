@@ -6,7 +6,9 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\SearchTool;
 use App\Models\Company;
+use App\Models\Note;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -19,18 +21,21 @@ beforeEach(function (): void {
 });
 
 it('searches across companies and people and returns canonical urls', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
     People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Contact']);
 
     $base = rtrim((string) config('app.url'), '/');
+    $slug = $this->team->slug;
 
     RelaticleServer::actingAs($this->user)
         ->tool(SearchTool::class, ['query' => 'Acme', 'limit' => 5])
         ->assertOk()
-        ->assertStructuredContent(function (AssertableJson $json) use ($base): void {
+        ->assertStructuredContent(function (AssertableJson $json) use ($base, $slug, $company): void {
             $json->has('results', 2)
                 ->has('results.0', fn (AssertableJson $row) => $row
-                    ->where('url', fn (string $url) => str_starts_with($url, $base))
+                    // The workspace slug is what makes the URL openable in a browser;
+                    // without it Filament answers 404 even for the record's owner.
+                    ->where('url', "{$base}/app/{$slug}/companies/{$company->getKey()}")
                     ->has('title')
                     ->has('snippet')
                     ->has('type')
@@ -39,6 +44,34 @@ it('searches across companies and people and returns canonical urls', function (
                 ->has('count')
                 ->etc();
         });
+});
+
+it('fetches every url the search tool publishes', function (): void {
+    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Contact']);
+    Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Acme onboarding']);
+    Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Acme call notes']);
+
+    $results = [];
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'Acme', 'limit' => 5])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) use (&$results): void {
+            $results = $json->toArray()['results'];
+            $json->etc();
+        });
+
+    expect($results)->toHaveCount(4);
+
+    foreach ($results as $result) {
+        RelaticleServer::actingAs($this->user)
+            ->tool(FetchTool::class, ['url' => $result['url']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json) => $json
+                ->where('type', $result['type'])
+                ->etc());
+    }
 });
 
 it('returns empty results for no matches', function (): void {
@@ -51,7 +84,7 @@ it('returns empty results for no matches', function (): void {
 it('fetches a company record by canonical url and returns the full payload', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
     $base = rtrim((string) config('app.url'), '/');
-    $url = "{$base}/app/companies/{$company->getKey()}";
+    $url = "{$base}/app/{$this->team->slug}/companies/{$company->getKey()}";
 
     RelaticleServer::actingAs($this->user)
         ->tool(FetchTool::class, ['url' => $url])
@@ -74,7 +107,7 @@ it('returns an error when the record does not exist', function (): void {
     $base = rtrim((string) config('app.url'), '/');
 
     RelaticleServer::actingAs($this->user)
-        ->tool(FetchTool::class, ['url' => "{$base}/app/companies/01HZZZZZZZZZZZZZZZZZZZZZZZ"])
+        ->tool(FetchTool::class, ['url' => "{$base}/app/{$this->team->slug}/companies/01HZZZZZZZZZZZZZZZZZZZZZZZ"])
         ->assertHasErrors();
 });
 
@@ -89,7 +122,7 @@ it('rejects search queries longer than 255 characters', function (): void {
 it('returns sanitized fetch payload without internal columns', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
     $base = rtrim((string) config('app.url'), '/');
-    $url = "{$base}/app/companies/{$company->getKey()}";
+    $url = "{$base}/app/{$this->team->slug}/companies/{$company->getKey()}";
 
     RelaticleServer::actingAs($this->user)
         ->tool(FetchTool::class, ['url' => $url])

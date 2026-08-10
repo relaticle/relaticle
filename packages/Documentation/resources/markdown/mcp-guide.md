@@ -46,6 +46,14 @@ The MCP endpoint advertises OAuth metadata at:
 
 Clients that support Dynamic Client Registration (RFC 7591) — including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors — register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`).
 
+At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected — subscribe first, or the connector would have no data to read.
+
+Access tokens last 30 days and refresh tokens 90 days; supported clients refresh silently in the background.
+
+### Revoking a connector
+
+**Settings → Access Tokens → AI Connectors** lists every assistant you have connected, the workspace each is bound to, and a **Revoke** button. Revoking invalidates the connector's access and refresh tokens immediately.
+
 ### Personal access tokens (recommended for developer tools)
 
 For Cursor, VS Code, MCP Inspector, or any client without OAuth support, create a personal access token from your account settings and pass it as `Authorization: Bearer YOUR_TOKEN`.
@@ -138,61 +146,61 @@ The server provides 32 tools: one account tool, two cross-entity discovery tools
 
 | Tool | Description |
 |------|-------------|
-| `whoami` | Get the authenticated user, current team, team members, and token abilities |
+| `who-ami-tool` | Get the authenticated user, current team, team members, and token abilities |
 
 ### Companies
 
 | Tool | Description |
 |------|-------------|
-| `list_companies` | List companies with optional search by name and pagination |
-| `get_company` | Get a single company by ID with full details and relationships |
-| `create_company` | Create a new company (requires `name`) |
-| `update_company` | Update a company by ID |
-| `delete_company` | Soft-delete a company by ID |
+| `list-companies-tool` | List companies with optional search by name and pagination |
+| `get-company-tool` | Get a single company by ID with full details and relationships |
+| `create-company-tool` | Create a new company (requires `name`) |
+| `update-company-tool` | Update a company by ID |
+| `delete-company-tool` | Soft-delete a company by ID |
 
 ### People
 
 | Tool | Description |
 |------|-------------|
-| `list_people` | List contacts with optional search, filter by company |
-| `get_people` | Get a single person by ID with full details and relationships |
-| `create_people` | Create a new contact (requires `name`, optional `company_id`) |
-| `update_people` | Update a contact by ID |
-| `delete_people` | Soft-delete a contact by ID |
+| `list-people-tool` | List contacts with optional search, filter by company |
+| `get-people-tool` | Get a single person by ID with full details and relationships |
+| `create-people-tool` | Create a new contact (requires `name`, optional `company_id`) |
+| `update-people-tool` | Update a contact by ID |
+| `delete-people-tool` | Soft-delete a contact by ID |
 
 ### Opportunities
 
 | Tool | Description |
 |------|-------------|
-| `list_opportunities` | List deals with optional search, filter by company |
-| `get_opportunity` | Get a single opportunity by ID with full details and relationships |
-| `create_opportunity` | Create a new deal (requires `name`, optional `company_id`, `contact_id`) |
-| `update_opportunity` | Update a deal by ID |
-| `delete_opportunity` | Soft-delete a deal by ID |
+| `list-opportunities-tool` | List deals with optional search, filter by company |
+| `get-opportunity-tool` | Get a single opportunity by ID with full details and relationships |
+| `create-opportunity-tool` | Create a new deal (requires `name`, optional `company_id`, `contact_id`) |
+| `update-opportunity-tool` | Update a deal by ID |
+| `delete-opportunity-tool` | Soft-delete a deal by ID |
 
 ### Tasks
 
 | Tool | Description |
 |------|-------------|
-| `list_tasks` | List tasks with optional search by title |
-| `get_task` | Get a single task by ID with full details and relationships |
-| `create_task` | Create a new task (requires `title`) |
-| `update_task` | Update a task by ID |
-| `delete_task` | Soft-delete a task by ID |
-| `attach_task_to_entities` | Link a task to companies, people, opportunities, or assign users. Adds without removing existing links. |
-| `detach_task_from_entities` | Unlink a task from companies, people, opportunities, or unassign users |
+| `list-tasks-tool` | List tasks with optional search by title |
+| `get-task-tool` | Get a single task by ID with full details and relationships |
+| `create-task-tool` | Create a new task (requires `title`) |
+| `update-task-tool` | Update a task by ID |
+| `delete-task-tool` | Soft-delete a task by ID |
+| `attach-task-to-entities-tool` | Link a task to companies, people, opportunities, or assign users. Adds without removing existing links. |
+| `detach-task-from-entities-tool` | Unlink a task from companies, people, opportunities, or unassign users |
 
 ### Notes
 
 | Tool | Description |
 |------|-------------|
-| `list_notes` | List notes with optional search by title |
-| `get_note` | Get a single note by ID with full details and relationships |
-| `create_note` | Create a new note (requires `title`) |
-| `update_note` | Update a note by ID |
-| `delete_note` | Soft-delete a note by ID |
-| `attach_note_to_entities` | Link a note to companies, people, or opportunities. Adds without removing existing links. |
-| `detach_note_from_entities` | Unlink a note from companies, people, or opportunities |
+| `list-notes-tool` | List notes with optional search by title |
+| `get-note-tool` | Get a single note by ID with full details and relationships |
+| `create-note-tool` | Create a new note (requires `title`) |
+| `update-note-tool` | Update a note by ID |
+| `delete-note-tool` | Soft-delete a note by ID |
+| `attach-note-to-entities-tool` | Link a note to companies, people, or opportunities. Adds without removing existing links. |
+| `detach-note-from-entities-tool` | Unlink a note from companies, people, or opportunities |
 
 All list tools support `search`, `per_page` (default 15), and `page` parameters. Create and update tools accept `custom_fields` as key-value pairs when your team has custom fields configured.
 
