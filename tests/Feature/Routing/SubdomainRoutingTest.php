@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Mcp\Servers\RelaticleServer;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Facades\Mcp;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
@@ -81,22 +83,43 @@ describe('MCP routing - default path mode', function () {
 });
 
 describe('MCP routing - subdomain mode', function () {
-    it('returns JSON info on MCP subdomain root', function (): void {
+    /**
+     * Mount the real MCP server at the subdomain root exactly as routes/ai.php
+     * does when MCP_DOMAIN is set, so the globally prepended
+     * SubdomainRootResponse middleware is exercised against the real endpoint.
+     */
+    beforeEach(function (): void {
         config(['app.mcp_domain' => 'mcp.example.com']);
 
         Route::domain('mcp.example.com')->group(function (): void {
-            Route::get('/', fn () => response()->json([
-                'name' => 'Relaticle MCP Server',
-                'version' => '1.0.0',
-                'docs' => url('/docs/mcp'),
-            ]));
+            Mcp::web('/', RelaticleServer::class);
         });
+    });
 
-        $response = $this->get('http://mcp.example.com/');
+    it('returns JSON info when a browser visits the MCP subdomain root', function (): void {
+        $response = $this->get('http://mcp.example.com/', ['Accept' => 'text/html,application/xhtml+xml']);
+
         $response->assertOk();
 
         $json = $response->json();
         expect($json)->toHaveKeys(['name', 'version', 'docs']);
         expect($json['name'])->toBe('Relaticle MCP Server');
+    });
+
+    it('routes JSON-RPC POST to the MCP server instead of the info payload', function (): void {
+        $response = $this->postJson('http://mcp.example.com/', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ], ['Accept' => 'application/json, text/event-stream']);
+
+        expect($response->json('name'))->not->toBe('Relaticle MCP Server');
+        expect((string) $response->getContent())->toContain('jsonrpc');
+    });
+
+    it('routes an SSE stream GET to the MCP server instead of the info payload', function (): void {
+        $response = $this->get('http://mcp.example.com/', ['Accept' => 'text/event-stream']);
+
+        expect((string) $response->getContent())->not->toContain('Relaticle MCP Server');
     });
 });

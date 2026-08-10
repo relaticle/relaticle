@@ -13,7 +13,7 @@ final readonly class SubdomainRootResponse
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->path() !== '/') {
+        if ($request->path() !== '/' || ! $this->isRootVisit($request)) {
             return $next($request);
         }
 
@@ -36,5 +36,23 @@ final readonly class SubdomainRootResponse
         }
 
         return $next($request);
+    }
+
+    /**
+     * Whether this is someone landing on the subdomain root rather than a
+     * protocol client talking to a server mounted there.
+     *
+     * When MCP_DOMAIN is set the MCP server is mounted at the subdomain root
+     * and speaks over POST (JSON-RPC), GET (SSE stream), and DELETE (session
+     * teardown). Answering any of those with the static info payload would
+     * make the endpoint unreachable, so only a plain GET gets the banner.
+     */
+    private function isRootVisit(Request $request): bool
+    {
+        if (! $request->isMethod('GET')) {
+            return false;
+        }
+
+        return ! str_contains((string) $request->header('Accept'), 'text/event-stream');
     }
 }
