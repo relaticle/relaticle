@@ -38,18 +38,30 @@ beforeEach(function (): void {
     ]);
 });
 
-it('renders the consent view with the user\'s teams', function (): void {
-    $this->actingAs($this->user);
-
-    $response = $this->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $this->client->getKey(),
+/**
+ * The authorize endpoint with a valid PKCE challenge, so each test only has to
+ * name the parameters it actually cares about.
+ *
+ * @param  array<string, string>  $overrides
+ */
+function authorizeUrl(Client $client, array $overrides = []): string
+{
+    return '/oauth/authorize?'.http_build_query([
+        'client_id' => $client->getKey(),
         'redirect_uri' => 'https://example.com/callback',
         'response_type' => 'code',
         'scope' => '',
         'state' => 'test-state',
         'code_challenge' => str_repeat('a', 43),
         'code_challenge_method' => 'S256',
-    ]));
+        ...$overrides,
+    ]);
+}
+
+it('renders the consent view with the user\'s teams', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client));
 
     $response->assertOk();
     $response->assertSee($this->personalTeam->name);
@@ -60,15 +72,7 @@ it('renders the consent view with the user\'s teams', function (): void {
 it('rejects the approve POST without a team_id', function (): void {
     $this->actingAs($this->user);
 
-    $this->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'response_type' => 'code',
-        'scope' => '',
-        'state' => 'test-state',
-        'code_challenge' => str_repeat('a', 43),
-        'code_challenge_method' => 'S256',
-    ]));
+    $this->get(authorizeUrl($this->client));
 
     $response = $this->from('/oauth/authorize')->post('/oauth/authorize', [
         'state' => 'test-state',
@@ -84,15 +88,7 @@ it('rejects the approve POST when the user does not belong to the team', functio
 
     $this->actingAs($this->user);
 
-    $this->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'response_type' => 'code',
-        'scope' => '',
-        'state' => 'test-state',
-        'code_challenge' => str_repeat('a', 43),
-        'code_challenge_method' => 'S256',
-    ]));
+    $this->get(authorizeUrl($this->client));
 
     $response = $this->post('/oauth/authorize', [
         'state' => 'test-state',
@@ -107,15 +103,7 @@ it('rejects the approve POST when the user does not belong to the team', functio
 it('persists the chosen team_id onto the auth code', function (): void {
     $this->actingAs($this->user);
 
-    $this->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'response_type' => 'code',
-        'scope' => '',
-        'state' => 'test-state',
-        'code_challenge' => str_repeat('a', 43),
-        'code_challenge_method' => 'S256',
-    ]));
+    $this->get(authorizeUrl($this->client));
 
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
@@ -229,14 +217,10 @@ function completeOauthFlow(User $user, Client $client, Team $team): array
 
     test()->actingAs($user);
 
-    test()->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'response_type' => 'code',
+    test()->get(authorizeUrl($client, [
         'scope' => 'mcp:use',
         'state' => 'st',
         'code_challenge' => $challenge,
-        'code_challenge_method' => 'S256',
     ]))->assertOk();
 
     $location = test()->post('/oauth/authorize', [
@@ -294,6 +278,28 @@ it('keeps the consented team when the client refreshes its access token', functi
     expect($refreshed->team_id)->toBe($this->otherTeam->getKey());
 });
 
+it('keeps the consented team on refresh after the consent auth code is purged', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->otherTeam);
+
+    // `passport:purge` clears revoked auth codes, taking the original consent with
+    // them; the binding then has to come from the token being replaced.
+    DB::table('oauth_auth_codes')->delete();
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+        'refresh_token' => $tokens['refresh_token'],
+        'scope' => 'mcp:use',
+    ])->assertOk();
+
+    $refreshed = DB::table('oauth_access_tokens')
+        ->where('user_id', $this->user->getKey())
+        ->where('revoked', false)
+        ->sole();
+
+    expect($refreshed->team_id)->toBe($this->otherTeam->getKey());
+});
+
 it('scopes MCP calls to the consented team rather than the user current team', function (): void {
     $tokens = completeOauthFlow($this->user, $this->client, $this->otherTeam);
 
@@ -338,14 +344,10 @@ it('keeps the consented team when the client re-authorizes and Passport skips co
 
     $this->actingAs($this->user);
 
-    $location = $this->get('/oauth/authorize?'.http_build_query([
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'response_type' => 'code',
+    $location = $this->get(authorizeUrl($this->client, [
         'scope' => 'mcp:use',
         'state' => 'again',
         'code_challenge' => $challenge,
-        'code_challenge_method' => 'S256',
     ]))->assertRedirect()->headers->get('Location');
 
     parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
