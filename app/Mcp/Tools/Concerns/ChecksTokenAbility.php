@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Models\PersonalAccessToken;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 
 trait ChecksTokenAbility
@@ -31,7 +32,11 @@ trait ChecksTokenAbility
         /** @var PersonalAccessToken|PassportAccessToken|object|null $token */
         $token = $user?->currentAccessToken();
 
-        if ($token instanceof PassportAccessToken && ! $token->can($ability)) {
+        // OAuth clients can only ever ask for `mcp:use` — it is the single entry in
+        // the authorization-server metadata laravel/mcp publishes, so per-ability
+        // grants are not expressible over OAuth. Holding it authorizes the toolset;
+        // which team's data those tools reach is bound separately on the token.
+        if ($token instanceof PassportAccessToken && ! $token->can(Registrar::OAUTH_SCOPE)) {
             return Response::error('Invalid ability provided.');
         }
 

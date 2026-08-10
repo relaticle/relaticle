@@ -9,6 +9,7 @@ use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Models\Company;
 use App\Models\User;
+use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\Passport;
 
 beforeEach(function () {
@@ -137,30 +138,33 @@ describe('no token (session auth)', function (): void {
     });
 });
 
-describe('passport read-only scope', function (): void {
-    beforeEach(function (): void {
-        Passport::actingAs($this->user, scopes: ['read']);
-    });
+/**
+ * `mcp:use` is the only scope Passport has registered and the only one the
+ * authorization-server metadata advertises, so it is the only scope an OAuth
+ * client can hold. Per-ability grants stay a personal-access-token feature.
+ */
+describe('passport oauth token', function (): void {
+    it('allows the whole toolset when the token carries mcp:use', function (): void {
+        Passport::actingAs($this->user, scopes: [Registrar::OAUTH_SCOPE]);
 
-    it('can list companies', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
             ->assertOk();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateCompanyTool::class, ['name' => 'Consented Corp'])
+            ->assertOk();
     });
 
-    it('cannot create a company', function (): void {
+    it('refuses tool calls when the token is missing mcp:use', function (): void {
+        Passport::actingAs($this->user, scopes: []);
+
         RelaticleServer::actingAs($this->user)
-            ->tool(CreateCompanyTool::class, ['name' => 'Blocked'])
+            ->tool(ListCompaniesTool::class)
             ->assertHasErrors(['Invalid ability provided.']);
-    });
-
-    it('cannot delete a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
-            ->tool(DeleteCompanyTool::class, [
-                'id' => $company->id,
-            ])
+            ->tool(DeleteCompanyTool::class, ['id' => Company::factory()->recycle([$this->user, $this->team])->create()->id])
             ->assertHasErrors(['Invalid ability provided.']);
     });
 });

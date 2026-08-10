@@ -34,7 +34,8 @@ it('accepts dynamic client registration', function (): void {
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $response->assertOk()
+    // RFC 7591 section 3.2.1: a successful registration responds 201 Created.
+    $response->assertCreated()
         ->assertJsonStructure(['client_id', 'redirect_uris', 'grant_types']);
 });
 
@@ -51,7 +52,7 @@ it('throttles dynamic client registration after the rate limit', function (): vo
 
     // 20 successful registrations per minute per IP.
     for ($i = 0; $i < 20; $i++) {
-        $this->postJson('/oauth/register', $payload)->assertStatus(200);
+        $this->postJson('/oauth/register', $payload)->assertCreated();
     }
 
     $this->postJson('/oauth/register', $payload)->assertStatus(429);
