@@ -78,27 +78,39 @@
                 @if($teams->count() > 0)
                     <div class="space-y-2">
                         <p class="text-sm font-medium">Connect to which team?</p>
-                        <p class="text-xs text-muted-foreground">This connector will only see data from the team you choose. To use a different team later, revoke and re-add the connector.</p>
+                        <p class="text-xs text-muted-foreground">This connector will only see data from the team you choose. To use a different team later, revoke the connector on your Access Tokens page and add it again.</p>
 
                         <div class="space-y-2 mt-2" role="radiogroup" aria-label="Team selection">
                             @foreach($teams as $team)
-                                <label class="flex items-center gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                                @php($isPaused = in_array($team->getKey(), $pausedTeamIds, true))
+                                <label @class([
+                                    'flex items-center gap-3 rounded-md border p-3',
+                                    'cursor-pointer hover:bg-muted/50' => ! $isPaused,
+                                    'opacity-60 cursor-not-allowed bg-muted/30' => $isPaused,
+                                ])>
                                     <input
                                         type="radio"
                                         name="team_id"
                                         value="{{ $team->getKey() }}"
                                         form="authorizeForm"
                                         required
+                                        @disabled($isPaused)
                                         @checked($team->getKey() === $selectedTeamId)
                                         class="h-4 w-4"
                                     >
                                     <span class="text-sm font-medium">{{ $team->name }}</span>
-                                    @if($team->personal_team)
+                                    @if($isPaused)
+                                        <span class="text-xs text-destructive ml-auto whitespace-nowrap">Paused — subscribe to connect</span>
+                                    @elseif($team->personal_team)
                                         <span class="text-xs text-muted-foreground ml-auto">Personal</span>
                                     @endif
                                 </label>
                             @endforeach
                         </div>
+
+                        @if($teams->count() === count($pausedTeamIds))
+                            <p class="text-xs text-destructive mt-2">Every workspace on this account is paused. Subscribe to Cloud Pro before connecting — a connector authorized against a paused workspace cannot read or write any data.</p>
+                        @endif
                     </div>
                 @else
                     <div class="rounded-lg border border-destructive/50 p-4 bg-destructive/10">
@@ -151,7 +163,7 @@
                     <input type="hidden" name="state" value="{{ $request->state }}">
                     <input type="hidden" name="client_id" value="{{ $client->id }}">
                     <input type="hidden" name="auth_token" value="{{ $authToken }}">
-                    <button type="submit" @disabled($teams->count() === 0) class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full" id="authorizeButton">
+                    <button type="submit" @disabled($teams->count() === 0 || $teams->count() === count($pausedTeamIds)) class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full" id="authorizeButton">
                         <span id="authorizeText">Authorize</span>
 
                         <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
+use Laravel\Pennant\Feature;
 
 mutates(
     ApproveAuthorizationController::class,
@@ -98,6 +100,38 @@ it('rejects the approve POST when the user does not belong to the team', functio
     ]);
 
     $response->assertForbidden();
+});
+
+it('marks a billing-paused workspace as unselectable on the consent screen', function (): void {
+    Feature::define(Billing::class, true);
+
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client));
+
+    $response->assertOk();
+    $response->assertSee('Paused — subscribe to connect', false);
+});
+
+it('refuses to approve a connector for a billing-paused workspace', function (): void {
+    Feature::define(Billing::class, true);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client));
+
+    // The picker disables this option; a tampered submit must not mint a token that
+    // would answer 402 on every subsequent MCP call.
+    $response = $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'team_id' => $this->otherTeam->getKey(),
+    ]);
+
+    $response->assertStatus(402);
+
+    expect(AuthCode::query()->where('team_id', $this->otherTeam->getKey())->exists())->toBeFalse();
 });
 
 it('persists the chosen team_id onto the auth code', function (): void {

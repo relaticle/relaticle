@@ -30,6 +30,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\GitHubService;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -126,14 +127,40 @@ final class AppServiceProvider extends ServiceProvider
         Passport::useAuthCodeModel(McpAuthCode::class);
         Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
 
+        // Connectors are long-lived but must not be immortal: a user who revokes one from
+        // the Access Tokens page should not be outlived by a year-long bearer token.
+        Passport::tokensExpireIn(now()->addDays(30));
+        Passport::refreshTokensExpireIn(now()->addDays(90));
+
         Passport::authorizationView(function (array $parameters) {
             $user = $parameters['user'] ?? null;
 
-            $parameters['teams'] = $user instanceof User
-                ? $user->allTeams()
-                : collect();
+            $teams = $user instanceof User ? $user->allTeams() : collect();
+            $access = resolve(HostedWorkspaceAccess::class);
 
-            $parameters['selectedTeamId'] = $user?->currentTeam?->getKey();
+            // Re-read the teams with their subscriptions eager-loaded: isPaused() reaches
+            // for $team->subscription(), and allTeams() hydrates more than one row, which
+            // is exactly when strict lazy loading throws.
+            /** @var list<string> $pausedTeamIds */
+            $pausedTeamIds = Team::query()
+                ->whereIn('id', $teams->pluck('id')->all())
+                ->with('subscriptions')
+                ->get()
+                ->filter(fn (Team $team): bool => $access->isPaused($team))
+                ->map(fn (Team $team): string => (string) $team->getKey())
+                ->values()
+                ->all();
+
+            $parameters['teams'] = $teams;
+            $parameters['pausedTeamIds'] = $pausedTeamIds;
+
+            // Never preselect a workspace the connector could not use — the user would
+            // approve a token that answers 402 on every call.
+            $currentTeamId = $user?->currentTeam?->getKey();
+
+            $parameters['selectedTeamId'] = is_string($currentTeamId) && ! in_array($currentTeamId, $pausedTeamIds, true)
+                ? $currentTeamId
+                : $teams->first(fn (Team $team): bool => ! in_array((string) $team->getKey(), $pausedTeamIds, true))?->getKey();
 
             return response()->view('mcp.authorize', $parameters);
         });
