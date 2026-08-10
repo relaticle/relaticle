@@ -20,6 +20,14 @@ return [
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],
+        'attachments_not_saved' => [
+            'title' => 'Attachments won\'t be saved',
+            'body' => 'Drafts don\'t keep attached files yet — closing now will discard them. Send the email to keep the attachments.',
+        ],
+        'draft_account_disconnected' => [
+            'title' => 'Original account no longer connected',
+            'body' => 'The account this draft was written from isn\'t connected anymore, so it\'s been switched to your default account. Double-check the sender before sending.',
+        ],
     ],
     'validation' => [
         'body_required' => 'Write a message before sending.',

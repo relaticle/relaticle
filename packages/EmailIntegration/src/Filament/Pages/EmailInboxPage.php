@@ -1091,7 +1091,12 @@ final class EmailInboxPage extends Page
 
         /** @var list<string> */
         return EmailParticipant::query()
-            ->whereHas('email', fn (Builder $q): Builder => $q->where('team_id', $teamId))
+            // Drafts are private (never-sent, PRIVATE tier) — without this, a
+            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
+            // everyone else's recipient autocomplete via this team-wide query.
+            ->whereHas('email', fn (Builder $q): Builder => $q
+                ->where('team_id', $teamId)
+                ->where('status', '!=', EmailStatus::DRAFT))
             ->whereNotNull('email_address')
             ->select('email_address')
             ->distinct()
