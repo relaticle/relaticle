@@ -196,6 +196,51 @@ it('registers successfully when the turnstile challenge passes', function (): vo
     expect(User::where('email', 'jane-turnstile-ok@gmail.com')->exists())->toBeTrue();
 });
 
+it('clears the spent turnstile token when another field fails validation', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Turnstile::fake();
+
+    User::factory()->create(['email' => 'jane-taken@gmail.com']);
+
+    $component = livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-taken@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => Turnstile::dummy(),
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['email' => 'unique'])
+        ->assertHasNoFormErrors(['cf_turnstile_response']);
+
+    expect($component->get('data.cf_turnstile_response'))->toBeNull();
+});
+
+it('clears the turnstile token when the challenge itself fails', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Turnstile::fake()->fail();
+
+    $component = livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-reset@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'spent-token',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response']);
+
+    expect($component->get('data.cf_turnstile_response'))->toBeNull();
+});
+
 it('skips the turnstile challenge when no site key is configured', function (): void {
     config(['services.turnstile.key' => null]);
 

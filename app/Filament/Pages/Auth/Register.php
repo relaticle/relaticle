@@ -8,6 +8,7 @@ use App\Concerns\DetectsTeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use Filament\Actions\Action;
+use Filament\Auth\Http\Responses\Contracts\RegistrationResponse;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
@@ -18,6 +19,7 @@ use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 use RyanChandler\LaravelCloudflareTurnstile\Rules\Turnstile as TurnstileRule;
 
 final class Register extends BaseRegister
@@ -68,6 +70,17 @@ final class Register extends BaseRegister
         ]);
     }
 
+    public function register(): ?RegistrationResponse
+    {
+        try {
+            return parent::register();
+        } catch (ValidationException $exception) {
+            $this->resetTurnstileChallenge();
+
+            throw $exception;
+        }
+    }
+
     public function getRegisterFormAction(): Action
     {
         return Action::make('register')
@@ -93,5 +106,27 @@ final class Register extends BaseRegister
         session()->put('fathom.track_signup', true);
 
         return $user;
+    }
+
+    /**
+     * Cloudflare turnstile tokens are single-use, and Laravel validates every
+     * field on every submit — so the token is already spent by the time any
+     * other field (duplicate email, password mismatch, disposable domain)
+     * reports its error. Blanking the state fires the widget's Livewire
+     * watcher, which resets the challenge and issues a fresh token; without it
+     * the next submit replays the spent one and fails with
+     * "timeout-or-duplicate" beside a widget showing a green tick.
+     */
+    private function resetTurnstileChallenge(): void
+    {
+        if (! is_array($this->data)) {
+            return;
+        }
+
+        if (! array_key_exists('cf_turnstile_response', $this->data)) {
+            return;
+        }
+
+        $this->data['cf_turnstile_response'] = null;
     }
 }
