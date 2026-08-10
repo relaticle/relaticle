@@ -7,12 +7,14 @@
 
     $wireModel = $attributes->wire('model')->value();
     $listId = Str::slug($wireModel ?: 'recipients').'-suggestions';
+    $removeLabel = __('filament/emails/composer.actions.remove_recipient');
 @endphp
 
 <div
     x-data="{
         values: $wire.$entangle('{{ $wireModel }}'),
         newValue: '',
+        removeLabel: @js($removeLabel),
 
         commit(raw = null) {
             const value = (raw ?? this.newValue).trim().replace(/,$/, '');
@@ -66,7 +68,7 @@
     <template x-for="value in values" :key="value">
         <span class="inline-flex max-w-full items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <span class="truncate" x-text="value"></span>
-            <button type="button" x-on:click="remove(value)" :aria-label="'Remove ' + value" class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <button type="button" x-on:click="remove(value)" :aria-label="removeLabel + ': ' + value" class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <x-heroicon-m-x-mark class="h-3 w-3" />
             </button>
         </span>

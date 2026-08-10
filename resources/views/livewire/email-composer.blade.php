@@ -45,6 +45,7 @@
                             </select>
                         </label>
                     @endif
+                    @error('accountId') <p class="pb-1 text-xs text-danger-600">{{ $message }}</p> @enderror
 
                     <div class="flex items-center gap-3 py-1.5">
                         <span class="w-12 shrink-0 text-gray-400">{{ __('filament/emails/composer.fields.to') }}</span>
@@ -57,12 +58,16 @@
                         </span>
                     </div>
                     @error('to') <p class="pb-1 text-xs text-danger-600">{{ $message }}</p> @enderror
+                    {{-- The `to.*` => email rule keys its errors per array index (to.0, to.1, ...),
+                         not the bare `to` key, so it needs its own wildcard @error block. --}}
+                    @error('to.*') <p class="pb-1 text-xs text-danger-600">{{ $message }}</p> @enderror
 
                     @if ($showCc)
                         <div class="flex items-center gap-3 py-1.5">
                             <span class="w-12 shrink-0 text-gray-400">{{ __('filament/emails/composer.fields.cc') }}</span>
                             <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" /></div>
                         </div>
+                        @error('cc.*') <p class="pb-1 text-xs text-danger-600">{{ $message }}</p> @enderror
                     @endif
 
                     @if ($showBcc)
@@ -70,6 +75,7 @@
                             <span class="w-12 shrink-0 text-gray-400">{{ __('filament/emails/composer.fields.bcc') }}</span>
                             <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" /></div>
                         </div>
+                        @error('bcc.*') <p class="pb-1 text-xs text-danger-600">{{ $message }}</p> @enderror
                     @endif
 
                     <div class="flex items-center gap-3 py-1.5">

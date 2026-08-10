@@ -16,8 +16,12 @@ return [
         'send' => 'Send email',
         'attach' => 'Attach files',
         'signature' => 'Signature',
+        'remove_recipient' => 'Remove',
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],
+    ],
+    'validation' => [
+        'body_required' => 'Write a message before sending.',
     ],
 ];

@@ -21,9 +21,11 @@ use Livewire\WithFileUploads;
 use LogicException;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
@@ -79,6 +81,15 @@ final class EmailComposer extends Component implements HasSchemas
     #[On('composer:open')]
     public function open(array $payload = []): void
     {
+        // A second `composer:open` while a draft is already in progress (e.g. the `c`
+        // shortcut firing after a click landed on a button, not an input) must not
+        // wipe what the user has typed — just bring the composer back into view.
+        if ($this->isOpen) {
+            $this->isMinimized = false;
+
+            return;
+        }
+
         $account = $this->activeAccounts()->first();
 
         if ($account === null) {
@@ -110,8 +121,19 @@ final class EmailComposer extends Component implements HasSchemas
             'cc.*' => ['email'],
             'bcc.*' => ['email'],
             'subject' => ['required', 'string', 'max:255'],
-            'bodyHtml' => ['required'],
         ]);
+
+        $bodyHtml = $this->bodyHtmlValue();
+
+        // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
+        // holds a structural `<p></p>` doc), so `required` can never catch a blank
+        // message — check the dehydrated text instead. A signature-only email (no
+        // free text, just the signature block) is legitimate and must still send.
+        if (trim(strip_tags($bodyHtml)) === '' && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')) {
+            $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
+
+            return;
+        }
 
         $renderer = resolve(EmailTemplateRenderService::class);
 
@@ -120,7 +142,7 @@ final class EmailComposer extends Component implements HasSchemas
         resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
             'subject' => $renderer->renderContent((string) $this->subject),
-            'body_html' => $renderer->renderForSending($this->bodyHtmlValue()),
+            'body_html' => $renderer->renderForSending($bodyHtml),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
@@ -128,6 +150,9 @@ final class EmailComposer extends Component implements HasSchemas
             'creation_source' => EmailCreationSource::COMPOSE,
             'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
             'batch_id' => null,
+            // Interactive sends from the composer keep the undo-send window (matches
+            // the surface being replaced — HasEmailComposeActions::buildSendData()).
+            'priority' => EmailPriority::PRIORITY,
             'attachments' => $attachmentPaths,
             'attachment_file_names' => $attachmentNames,
         ]);
@@ -219,20 +244,40 @@ final class EmailComposer extends Component implements HasSchemas
     #[Computed]
     public function signatureOptions(): array
     {
-        if ($this->accountId === null) {
+        $accountId = $this->ownedAccountId();
+
+        if ($accountId === null) {
             return [];
         }
 
         return EmailSignature::query()
-            ->where('connected_account_id', $this->accountId)
+            ->where('connected_account_id', $accountId)
             ->pluck('name', 'id')
             ->all();
     }
 
+    /**
+     * `accountId` is a plain public Livewire property, so a client can post any
+     * ULID. Reject anything that isn't one of this user's own active accounts so
+     * every downstream read (signature options, the default signature, `send()`)
+     * inherits ownership instead of re-deriving it — see {@see self::ownedAccountId()}.
+     */
+    public function updatedAccountId(?string $value): void
+    {
+        if ($value !== null && ! $this->isOwnedAccountId($value)) {
+            $this->accountId = null;
+        }
+    }
+
     public function updatedSignatureId(?string $value): void
     {
-        $signature = filled($value)
-            ? EmailSignature::query()->whereKey($value)->first()
+        $accountId = $this->ownedAccountId();
+
+        $signature = (filled($value) && $accountId !== null)
+            ? EmailSignature::query()
+                ->where('connected_account_id', $accountId)
+                ->whereKey($value)
+                ->first()
             : null;
 
         $body = $this->bodyHtmlValue();
@@ -291,7 +336,7 @@ final class EmailComposer extends Component implements HasSchemas
                 continue;
             }
 
-            $path = (string) $file->store('email-attachments', 'local');
+            $path = (string) $file->store('email-attachments', EmailAttachment::DISK);
             $paths[] = $path;
             $names[$path] = $file->getClientOriginalName();
         }
@@ -336,6 +381,28 @@ final class EmailComposer extends Component implements HasSchemas
             ->orderByDesc('is_default')
             ->oldest()
             ->get();
+    }
+
+    /**
+     * `$this->accountId` only ever reaches here as trusted after
+     * {@see self::updatedAccountId()} has rejected anything foreign — but that hook
+     * firing depends on Livewire's per-property update order, which a hand-crafted
+     * payload controls. Re-verify ownership inline so every reader is safe on its
+     * own, regardless of hook ordering.
+     */
+    private function ownedAccountId(): ?string
+    {
+        if ($this->accountId === null || ! $this->isOwnedAccountId($this->accountId)) {
+            return null;
+        }
+
+        return $this->accountId;
+    }
+
+    private function isOwnedAccountId(string $accountId): bool
+    {
+        return $this->activeAccounts()
+            ->contains(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $accountId);
     }
 
     private function authUser(): User
