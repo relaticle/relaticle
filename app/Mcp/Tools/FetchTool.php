@@ -15,6 +15,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,11 +23,13 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[Name('fetch')]
 #[Description('Fetch a single CRM record by its canonical URL. Pair with the search tool for ChatGPT Company Knowledge citations.')]
 #[IsReadOnly]
 #[IsIdempotent]
@@ -35,19 +38,21 @@ final class FetchTool extends Tool
 {
     use Concerns\ChecksTokenAbility;
 
-    /** @var array<string, array{0: string, 1: class-string<Model>, 2: class-string<JsonResource>}> */
-    private const array SEGMENT_MAP = [
-        'companies' => ['company', Company::class, CompanyResource::class],
-        'people' => ['person', People::class, PeopleResource::class],
-        'opportunities' => ['opportunity', Opportunity::class, OpportunityResource::class],
-        'tasks' => ['task', Task::class, TaskResource::class],
-        'notes' => ['note', Note::class, NoteResource::class],
+    /** @var array<string, array{0: class-string<Model>, 1: class-string<JsonResource>}> */
+    private const array TYPE_MAP = [
+        'company' => [Company::class, CompanyResource::class],
+        'person' => [People::class, PeopleResource::class],
+        'opportunity' => [Opportunity::class, OpportunityResource::class],
+        'task' => [Task::class, TaskResource::class],
+        'note' => [Note::class, NoteResource::class],
     ];
+
+    public function __construct(private readonly CanonicalRecordUrl $urls) {}
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'url' => $schema->string()->description('Canonical record URL produced by the search tool.')->required(),
+            'url' => $schema->string()->description('Canonical record URL produced by the search tool, or any Relaticle record URL copied from the browser.')->required(),
         ];
     }
 
@@ -64,15 +69,15 @@ final class FetchTool extends Tool
             'url' => ['required', 'url'],
         ]);
 
-        $path = parse_url((string) $validated['url'], PHP_URL_PATH) ?: '';
-        $segments = array_values(array_filter(explode('/', $path)));
+        $parsed = $this->urls->parse((string) $validated['url']);
 
-        if (count($segments) < 3 || $segments[0] !== 'app' || ! isset(self::SEGMENT_MAP[$segments[1]])) {
+        if ($parsed === null || ! isset(self::TYPE_MAP[$parsed['type']])) {
             return Response::error("URL [{$validated['url']}] is not a recognized record URL.");
         }
 
-        [$type, $modelClass, $resourceClass] = self::SEGMENT_MAP[$segments[1]];
-        $id = $segments[2];
+        $type = $parsed['type'];
+        $id = $parsed['id'];
+        [$modelClass, $resourceClass] = self::TYPE_MAP[$type];
 
         /** @var class-string<Model> $modelClass */
         $model = $modelClass::query()->find($id);
