@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
+use RyanChandler\LaravelCloudflareTurnstile\Facades\Turnstile;
 
 mutates(Register::class);
 
@@ -77,4 +78,101 @@ it('rejects registration from a disposable email domain', function (): void {
         ->assertHasFormErrors(['email']);
 
     expect(User::where('email', 'burner@mailinator.com')->exists())->toBeFalse();
+});
+
+it('requires a passing turnstile challenge when a site key is configured', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Turnstile::fake()->fail();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'invalid-token',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response']);
+
+    expect(User::where('email', 'jane-turnstile@gmail.com')->exists())->toBeFalse();
+});
+
+it('rejects registration when the turnstile challenge was never solved', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Turnstile::fake();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-missing@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response' => 'required']);
+
+    expect(User::where('email', 'jane-turnstile-missing@gmail.com')->exists())->toBeFalse();
+});
+
+it('registers successfully when the turnstile challenge passes', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Turnstile::fake();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-ok@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => Turnstile::dummy(),
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'jane-turnstile-ok@gmail.com')->exists())->toBeTrue();
+});
+
+it('skips the turnstile challenge when no site key is configured', function (): void {
+    config(['services.turnstile.key' => null]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-no-turnstile@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'jane-no-turnstile@gmail.com')->exists())->toBeTrue();
+});
+
+it('skips the turnstile challenge when the site key is configured but the secret is missing', function (): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => null,
+    ]);
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-no-secret@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', 'jane-turnstile-no-secret@gmail.com')->exists())->toBeTrue();
 });

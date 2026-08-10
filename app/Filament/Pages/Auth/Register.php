@@ -10,6 +10,7 @@ use App\Rules\RegistrableEmail;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
@@ -17,6 +18,7 @@ use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
+use RyanChandler\LaravelCloudflareTurnstile\Rules\Turnstile as TurnstileRule;
 
 final class Register extends BaseRegister
 {
@@ -42,6 +44,28 @@ final class Register extends BaseRegister
             ->required()
             ->maxLength(255)
             ->unique($this->getUserModel());
+    }
+
+    protected function getTurnstileFormComponent(): ViewField
+    {
+        return ViewField::make('cf_turnstile_response')
+            ->hiddenLabel()
+            ->view('filament.forms.components.turnstile')
+            ->dehydrated(false)
+            ->required()
+            ->validationMessages(['required' => __('auth.turnstile.required')])
+            ->rules([new TurnstileRule])
+            ->visible(fn (): bool => filled(config('services.turnstile.key')) && filled(config('services.turnstile.secret')));
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        $schema = parent::form($schema);
+
+        return $schema->components([
+            ...$schema->getComponents(withHidden: true),
+            $this->getTurnstileFormComponent(),
+        ]);
     }
 
     public function getRegisterFormAction(): Action
