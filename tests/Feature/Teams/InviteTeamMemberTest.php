@@ -76,7 +76,7 @@ test('team members cannot be invited with a disposable email address', function 
             'role' => 'admin',
         ])
         ->call('addTeamMember', $this->team)
-        ->assertNotified('Disposable email addresses are not allowed.');
+        ->assertNotified(__('validation.indisposable'));
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });

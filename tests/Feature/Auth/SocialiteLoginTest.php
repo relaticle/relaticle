@@ -135,7 +135,7 @@ test('callback from socialite provider rejects a disposable email address', func
     ]));
 
     $response->assertRedirect(route('login'));
-    $response->assertSessionHasErrors(['login' => 'Disposable email addresses are not allowed.']);
+    $response->assertSessionHasErrors(['login' => __('validation.indisposable')]);
 
     $this->assertDatabaseMissing('users', ['email' => 'burner@mailinator.com']);
     $this->assertGuest();

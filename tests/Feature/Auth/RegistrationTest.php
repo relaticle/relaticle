@@ -87,6 +87,20 @@ it('rejects registration from a disposable email domain', function (): void {
     expect(User::where('email', 'burner@mailinator.com')->exists())->toBeFalse();
 });
 
+it('rejects a disposable email in the active locale', function (): void {
+    app()->setLocale('fr');
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Burner User',
+            'email' => 'burner-fr@mailinator.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['email' => 'Les adresses e-mail jetables ne sont pas autorisées.']);
+});
+
 it('rejects registration from a subdomain of a disposable email domain', function (string $email): void {
     livewire(Register::class)
         ->fillForm([
