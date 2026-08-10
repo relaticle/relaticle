@@ -63,9 +63,34 @@ return [
     |
     | Insert as "mydomain.com", without the @ symbol.
     |
+    | The list below is the guardrail for the weekly "disposable:update" run,
+    | which pulls an unpinned community list from a third-party repository at
+    | branch HEAD. A single bad upstream entry would otherwise lock a mainstream
+    | provider out of registration and team invitations product-wide.
+    |
     */
 
-    'whitelist' => [],
+    'whitelist' => [
+        // Our own domains.
+        'relaticle.com',
+
+        // Mainstream consumer providers.
+        'aol.com',
+        'fastmail.com',
+        'gmail.com',
+        'gmx.com',
+        'hotmail.com',
+        'icloud.com',
+        'live.com',
+        'me.com',
+        'msn.com',
+        'outlook.com',
+        'proton.me',
+        'protonmail.com',
+        'yahoo.com',
+        'yandex.com',
+        'zoho.com',
+    ],
 
     /*
     |--------------------------------------------------------------------------

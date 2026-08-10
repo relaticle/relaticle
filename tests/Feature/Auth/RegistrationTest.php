@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 use RyanChandler\LaravelCloudflareTurnstile\Facades\Turnstile;
 
 mutates(Register::class);
@@ -95,6 +98,40 @@ it('rejects registration from a subdomain of a disposable email domain', functio
 })->with([
     'burner@anything.mailinator.com',
     'burner@sub.yopmail.com',
+]);
+
+it('never treats a whitelisted domain as disposable, even when the upstream list adds it', function (string $email): void {
+    $storagePath = storage_path('framework/testing/disposable-domains-upstream.json');
+
+    File::ensureDirectoryExists(dirname($storagePath));
+    File::put($storagePath, (string) json_encode([Str::after($email, '@')]));
+
+    config([
+        'disposable-email.storage' => $storagePath,
+        'disposable-email.cache.enabled' => false,
+    ]);
+
+    app()->forgetInstance('disposable_email.domains');
+    DisposableDomains::clearResolvedInstance('disposable_email.domains');
+
+    try {
+        livewire(Register::class)
+            ->fillForm([
+                'name' => 'Jane Doe',
+                'email' => $email,
+                'password' => 'Password123!',
+                'passwordConfirmation' => 'Password123!',
+            ])
+            ->call('register')
+            ->assertHasNoFormErrors();
+    } finally {
+        File::delete($storagePath);
+    }
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+})->with([
+    'jane-whitelisted@gmail.com',
+    'jane-whitelisted@relaticle.com',
 ]);
 
 it('requires a passing turnstile challenge when a site key is configured', function (): void {
