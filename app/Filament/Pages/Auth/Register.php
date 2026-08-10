@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Auth;
 use App\Concerns\DetectsTeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
+use App\Rules\TurnstileChallenge;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\RegistrationResponse;
 use Filament\Auth\Pages\Register as BaseRegister;
@@ -20,7 +21,6 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
-use RyanChandler\LaravelCloudflareTurnstile\Rules\Turnstile as TurnstileRule;
 
 final class Register extends BaseRegister
 {
@@ -56,7 +56,7 @@ final class Register extends BaseRegister
             ->dehydrated(false)
             ->required()
             ->validationMessages(['required' => __('auth.turnstile.required')])
-            ->rules([new TurnstileRule])
+            ->rules([new TurnstileChallenge])
             ->visible(fn (): bool => filled(config('services.turnstile.key')) && filled(config('services.turnstile.secret')));
     }
 

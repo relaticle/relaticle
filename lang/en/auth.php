@@ -8,5 +8,6 @@ return [
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
     'turnstile' => [
         'required' => 'Please complete the verification challenge.',
+        'unavailable' => 'Verification is temporarily unavailable. Please try again in a moment.',
     ],
 ];

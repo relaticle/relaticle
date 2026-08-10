@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
+use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 use RyanChandler\LaravelCloudflareTurnstile\Facades\Turnstile;
@@ -240,6 +244,33 @@ it('clears the turnstile token when the challenge itself fails', function (): vo
 
     expect($component->get('data.cf_turnstile_response'))->toBeNull();
 });
+
+it('degrades to a readable error when cloudflare siteverify is unreachable', function (callable $stub): void {
+    config([
+        'services.turnstile.key' => 'test-site-key',
+        'services.turnstile.secret' => 'test-secret-key',
+    ]);
+    Http::fake(['challenges.cloudflare.com/*' => $stub]);
+    Log::spy();
+
+    livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-turnstile-outage@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+            'cf_turnstile_response' => 'a-perfectly-good-token',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['cf_turnstile_response' => __('auth.turnstile.unavailable')]);
+
+    expect(User::where('email', 'jane-turnstile-outage@gmail.com')->exists())->toBeFalse();
+
+    Log::shouldHaveReceived('warning')->once();
+})->with([
+    'server error' => [fn (): PromiseInterface => Http::response('', 500)],
+    'connection failure' => [fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')],
+]);
 
 it('skips the turnstile challenge when no site key is configured', function (): void {
     config(['services.turnstile.key' => null]);
