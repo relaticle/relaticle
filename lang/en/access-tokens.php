@@ -76,6 +76,32 @@ return [
         'description' => 'Create a token above to get started.',
     ],
 
+    'connectors' => [
+        'title' => 'AI Connectors',
+        'description' => 'Assistants such as Claude and ChatGPT that you connected through the consent screen. Revoking one immediately invalidates its access.',
+        'columns' => [
+            'name' => 'Connector',
+            'team' => 'Workspace',
+            'active_tokens' => 'Active tokens',
+        ],
+        'actions' => [
+            'revoke' => 'Revoke',
+        ],
+        'modals' => [
+            'revoke' => [
+                'title' => 'Revoke connector',
+                'description' => 'The assistant will lose access to this workspace immediately. You can connect it again at any time.',
+            ],
+        ],
+        'notifications' => [
+            'revoked' => 'Connector revoked.',
+        ],
+        'empty_state' => [
+            'heading' => 'No AI connectors',
+            'description' => 'Connect Relaticle from Claude or ChatGPT and the connector will appear here.',
+        ],
+    ],
+
     'integrations' => [
         'heading' => 'What to do next',
         'api_link' => 'REST API',
