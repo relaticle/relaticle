@@ -1,19 +1,22 @@
 @php
     $documentTitle = '';
+    $documentDescription = '';
     if (isset($document)) {
         if (is_array($document)) {
             $documentTitle = $document['title'] ?? '';
+            $documentDescription = $document['description'] ?? '';
         } else {
             $documentTitle = $document->title ?? '';
+            $documentDescription = $document->description ?? '';
         }
     }
 @endphp
 
-<x-guest-layout 
-    :title="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : config('app.name') . ' - ' . __('Documentation')"
-    :description="!empty($documentTitle) ? $documentTitle . ' - Relaticle Documentation' : 'Documentation for Relaticle - the open-source CRM built for AI agents. Self-hosted with 30 MCP tools, REST API, and 22 custom field types.'"
-    :ogTitle="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : config('app.name') . ' - Documentation'"
-    :ogDescription="!empty($documentTitle) ? 'Learn about ' . $documentTitle . ' in the Relaticle documentation.' : 'Explore the Relaticle documentation. Installation, MCP server setup, REST API integration, custom fields, and more.'">
+<x-guest-layout
+    :title="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : __('Documentation') . ' - ' . config('app.name')"
+    :description="!empty($documentDescription) ? $documentDescription : 'Documentation for Relaticle - the open-source CRM built for AI agents. Self-hosted with 30 MCP tools, REST API, and 22 custom field types.'"
+    :ogTitle="!empty($documentTitle) ? $documentTitle . ' - ' . config('app.name') . ' ' . __('Documentation') : __('Documentation') . ' - ' . config('app.name')"
+    :ogDescription="!empty($documentDescription) ? $documentDescription : 'Explore the Relaticle documentation. Installation, MCP server setup, REST API integration, custom fields, and more.'">
     @pushonce('header')
         @vite(['packages/Documentation/resources/js/documentation.js', 'packages/Documentation/resources/css/documentation.css'])
     @endpushonce
