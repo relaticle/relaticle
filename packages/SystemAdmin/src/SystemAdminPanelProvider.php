@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\Ink\InkPlugin;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
+use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class SystemAdminPanelProvider extends PanelProvider
@@ -103,6 +104,7 @@ final class SystemAdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                DenySearchIndexing::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

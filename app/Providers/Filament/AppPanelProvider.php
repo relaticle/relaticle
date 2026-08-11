@@ -20,6 +20,7 @@ use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
+use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\AppDatabaseNotifications;
@@ -194,6 +195,7 @@ final class AppPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                DenySearchIndexing::class,
             ])
             ->authGuard('web')
             ->authPasswordBroker('users')
