@@ -142,3 +142,44 @@ it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan
         ->assertOk()
         ->assertSee('buy a prepaid credit top-up instead of waiting');
 });
+
+it('never names a model the app cannot actually serve', function (): void {
+    // Gemini 3 Flash and Gemini 3.1 Pro carry supports_tools => false in chat.php, so
+    // ModelDescriptor::isAvailable() always returns false for them and they can never
+    // be picked — the page must never claim a plan "unlocks" or is priced for them.
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertDontSee('Gemini')
+        ->assertSee(__('Which AI models does my plan unlock?'))
+        ->assertSee('Sonnet 4.6 and self-hosted models')
+        ->assertSee('Opus 4.7, GPT 5.5 and GPT 5.4');
+});
+
+it('does not claim an unconfirmed Enterprise tier is a purchasable offering', function (): void {
+    // No Enterprise plan card or checkout path exists in the codebase, so the page must
+    // not name it as a contactable/sellable tier anywhere in its visible copy.
+    foreach ([true, false] as $billingState) {
+        Feature::define(BillingFeature::class, $billingState);
+
+        $this->get('/pricing')
+            ->assertOk()
+            ->assertDontSee('Enterprise');
+    }
+});
+
+it('describes the chat rate limit as per workspace, not per person', function (): void {
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('Is there a message rate limit?'))
+        ->assertSee('shared across the whole workspace, not per person');
+});
+
+it('does not overstate the self-hoster\'s lever over the credit cap', function (): void {
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('no plan removes metering entirely')
+        ->assertSee("doesn't reset the current period's balance")
+        ->assertDontSee('raising or removing that cap is a matter of updating your own workspace\'s plan; there is no separate self-hosted billing UI for it.');
+});
