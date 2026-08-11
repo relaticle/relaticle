@@ -16,6 +16,7 @@ use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
 use App\Http\Middleware\ApplyTenantScopes;
@@ -64,7 +65,6 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
-use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
@@ -210,7 +210,8 @@ final class AppPanelProvider extends PanelProvider
             )
             ->plugins([
                 CustomFieldsPlugin::make()
-                    ->authorize(fn () => Gate::check('update', Filament::getTenant())),
+                    ->authorize(fn () => Gate::check('update', Filament::getTenant()))
+                    ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
             ])
             ->renderHook(
@@ -254,10 +255,6 @@ final class AppPanelProvider extends PanelProvider
             ->tenantRegistration(CreateTeam::class)
             ->tenantProfile(EditTeam::class)
             ->tenantMenuItems([
-                Action::make('custom_fields')
-                    ->label(__('filament/panel.tenant_menu.custom_fields'))
-                    ->icon(Heroicon::OutlinedCube)
-                    ->url(fn (): string => CustomFieldsManagementPage::getUrl()),
                 Action::make('import_history')
                     ->label(__('filament/panel.tenant_menu.import_history'))
                     ->icon(Heroicon::OutlinedClock)
