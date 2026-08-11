@@ -41,6 +41,7 @@ Defects found (all reproduced live):
 | D1 | `/documentation/quickstart` (indexed in Google) 301s to `/docs/quickstart` which **404s** | curl chain 301→404 |
 | D2 | `app.relaticle.com` login/register are **indexed** (no noindex, robots allows all) | `site:relaticle.com` shows both |
 | D3 | Sitemap contains `/login`, `/register`, `/discord` (redirects/utility URLs); no `<lastmod>` anywhere | sitemap.xml |
+| | *Scope split during implementation:* W0 fixes the utility-URL half only. `<lastmod>` is **deferred to W2** — deriving it from markdown file mtime (the original plan) publishes the *deploy* date, not the content date: every docs markdown file in a fresh checkout or Docker `COPY` shares one identical mtime, so every docs URL would advertise the same date, re-stamped on each deploy. A false freshness signal is worse than none. W2's front-matter `updated:` is the real source. | |
 | D4 | Docs article H1 renders literal markdown: `<h1># MCP Server</h1>` with mangled permalink id | /docs/mcp HTML |
 | D5 | Docs sub-page meta descriptions duplicate the title ("Getting Started - Relaticle Documentation") | /docs/* HTML |
 | D6 | Markdown-for-agents output includes nav junk and leaked Alpine attrs (`= 768) mobileMenu = false"`) | `Accept: text/markdown` on /docs/mcp |
@@ -146,10 +147,13 @@ Feed the flywheel deliberately (W4) instead of buying links.
   Marketing domain stays untouched.
 - **D3 sitemap**: `GenerateSitemapCommand` uses
   `SitemapGenerator::create(config('app.url'))` (crawl-based; scheduled daily in
-  `bootstrap/app.php:115`). Add a `shouldCrawl`/URL filter excluding
-  `/login`, `/register`, `/discord`, `/dashboard`; emit `<lastmod>` (docs pages
-  from markdown file mtime; blog handled by `BlogSitemapGenerator` when flag on).
+  `bootstrap/app.php:115`). Add a `shouldCrawl` filter excluding `/login`,
+  `/register`, `/forgot-password`, `/dashboard`, `/discord`. **No `lastmod`** —
+  see the defect table; it lands in W2 from front-matter `updated:`.
   Existing test: `tests/Feature/Commands/GenerateSitemapCommandTest.php`.
+  (That test's `Http::fake()` never intercepted `spatie/crawler`, which builds
+  its own Guzzle client — it was hitting the network locally and passing
+  vacuously in CI. Fixed during W0 with the crawler's own `FakeHandler`.)
 - **D4 docs H1 bug**: `config/markdown.php` `heading_permalink`
   (`symbol: '#'`, `insert: before`, `min_heading_level: 1`) +
   `add_anchors_to_headings` + `render_anchors_as_links: false` interact to render
