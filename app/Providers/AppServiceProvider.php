@@ -208,7 +208,13 @@ final class AppServiceProvider extends ServiceProvider
                 return null;
             }
 
-            return User::query()->where('email', $caller->getAttribute('email'))->first();
+            $email = $caller->getAttribute('email');
+
+            if (! is_string($email)) {
+                return null;
+            }
+
+            return User::query()->where('email', $email)->first();
         });
 
         // HasSEO creates a row per post but never removes it. A soft delete should
