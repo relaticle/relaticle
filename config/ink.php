@@ -40,6 +40,19 @@ return [
 
     'middleware' => ['web', ProvideMarkdownResponse::class],
 
+    /*
+     * ink's Mcp::web() route already carries ReorderJsonAccept and
+     * AddWwwAuthenticateHeader; auth:sanctum authenticates the caller and
+     * throttle:mcp (defined in AppServiceProvider::configureRateLimiting(),
+     * shared with the app's own /mcp endpoint) bounds request volume once a
+     * caller has a token.
+     */
+    'mcp' => [
+        'path' => '/mcp/blog',
+        'guard' => null,
+        'middleware' => ['auth:sanctum', 'throttle:mcp'],
+    ],
+
     'feed' => [
         'title' => 'Relaticle Engineering Blog',
         'description' => 'Deep dives into building an open-source CRM for AI agents.',
