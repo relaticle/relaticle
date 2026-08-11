@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\RegistrableEmail;
 use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -69,7 +70,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
     {
         return [
             'email' => [
-                'required', 'email',
+                'required', ...RegistrableEmail::rules(checkDns: false),
                 Rule::unique(Jetstream::teamInvitationModel())->where(function (Builder $query) use ($team): void {
                     $query->where('team_id', $team->id);
                 }),

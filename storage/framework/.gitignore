@@ -1,5 +1,6 @@
 compiled.php
 config.php
+disposable_domains.json
 down
 events.scanned.php
 maintenance.php

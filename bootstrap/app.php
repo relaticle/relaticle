@@ -121,6 +121,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+        $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:sync-recency-tags')->dailyAt('02:00')
             ->withoutOverlapping()
             ->onOneServer();

@@ -38,6 +38,7 @@
         "livewire/livewire": "^4.0",
         "manukminasyan/blade-mdi": "^1.0",
         "prism-php/prism": "^0.100.1",
+        "propaganistas/laravel-disposable-email": "^2.5",
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
