@@ -6,6 +6,9 @@ use App\Support\DetectsPublicMarkdownRequest;
 use Spatie\MarkdownResponse\Actions\GeneratesCacheKey;
 use Spatie\MarkdownResponse\Postprocessors\CollapseBlankLinesPostprocessor;
 use Spatie\MarkdownResponse\Postprocessors\RemoveHtmlTagsPostprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveFooterPreprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveHeaderPreprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveNavigationPreprocessor;
 use Spatie\MarkdownResponse\Preprocessors\RemoveScriptsAndStylesPreprocessor;
 
 return [
@@ -66,6 +69,9 @@ return [
      */
     'preprocessors' => [
         RemoveScriptsAndStylesPreprocessor::class,
+        RemoveNavigationPreprocessor::class,
+        RemoveHeaderPreprocessor::class,
+        RemoveFooterPreprocessor::class,
     ],
 
     /*

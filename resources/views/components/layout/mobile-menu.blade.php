@@ -1,5 +1,5 @@
 {{-- Full-screen mobile menu --}}
-<div x-show="mobileMenu"
+<nav x-show="mobileMenu"
      x-transition.opacity.duration.200ms
      @keydown.escape.window="mobileMenu = false"
      class="md:hidden fixed inset-0 z-[60] bg-white dark:bg-gray-950 flex flex-col"
