@@ -157,16 +157,41 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertSee('Opus 4.7, GPT 5.5 and GPT 5.4');
 });
 
-it('does not claim an unconfirmed Enterprise tier is a purchasable offering', function (): void {
+it('pins the exact membership of every model list derived from the chat catalog', function (): void {
+    // $freeCloudModels and $multiplierOneHalfModels (pricing.blade.php) are not covered by
+    // any other assertion in this file — a config edit that emptied either one (e.g. Sonnet's
+    // min_plan changing, or the GPT rows' credit_multiplier changing) would still pass every
+    // other test here, since those only assert substrings that come from the OTHER derived
+    // lists ($paidCloudModels / $multiplierOneModels). Each line below anchors one full
+    // sentence fragment, so an empty/degraded list breaks the exact assertion for that list.
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        // $freeCloudModels, via $modelsUnlockAnswer
+        ->assertSee('Every plan can use Sonnet 4.6 and any self-hosted model you connect yourself.')
+        // $paidCloudModels, via $modelsUnlockAnswer
+        ->assertSee('Cloud Pro additionally unlocks Opus 4.7, GPT 5.5 and GPT 5.4 — the models with a higher credit multiplier.')
+        // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
+        ->assertSee('1x for Sonnet 4.6 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 4.7)', false);
+});
+
+it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is on', function (): void {
     // No Enterprise plan card or checkout path exists in the codebase, so the page must
     // not name it as a contactable/sellable tier anywhere in its visible copy.
-    foreach ([true, false] as $billingState) {
-        Feature::define(BillingFeature::class, $billingState);
+    Feature::define(BillingFeature::class, true);
 
-        $this->get('/pricing')
-            ->assertOk()
-            ->assertDontSee('Enterprise');
-    }
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertDontSee('Enterprise');
+});
+
+it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertDontSee('Enterprise');
 });
 
 it('describes the chat rate limit as per workspace, not per person', function (): void {
