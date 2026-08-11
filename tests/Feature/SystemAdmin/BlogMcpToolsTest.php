@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Providers\AppServiceProvider;
 use Laravel\Sanctum\TransientToken;
 use Relaticle\Ink\Mcp\BlogServer;
 use Relaticle\Ink\Mcp\Tools\CreatePostTool;
@@ -10,6 +11,8 @@ use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+
+mutates(AppServiceProvider::class);
 
 beforeEach(function (): void {
     $this->admin = SystemAdministrator::factory()->create([
@@ -44,7 +47,7 @@ it('fails loudly when no user account matches the sysadmin email', function (): 
             'excerpt' => 'No author.',
             'category_id' => $this->category->id,
         ])
-        ->assertHasErrors();
+        ->assertHasErrors(['No author could be resolved']);
 
     expect(Post::where('title', 'Orphan Post')->exists())->toBeFalse();
 });
