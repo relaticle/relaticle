@@ -17,6 +17,7 @@ return [
             'get_started' => 'Get started',
             'copy_invite_link' => 'Copy invite link',
             'add_more' => 'Add more',
+            'cancel' => 'Cancel',
         ],
         'form' => [
             'company_name' => [

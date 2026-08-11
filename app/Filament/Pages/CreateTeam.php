@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Rules\ValidTeamSlug;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -69,6 +70,23 @@ final class CreateTeam extends RegisterTenant
     public function getSubheading(): ?string
     {
         return null;
+    }
+
+    /**
+     * Where "Cancel" returns to when the user backs out of creating another
+     * workspace. Null during first-run onboarding — a user with no workspace
+     * has nowhere to go back to, so no cancel affordance is offered.
+     */
+    public function getCancelUrl(): ?string
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        $tenant = Filament::getUserDefaultTenant($user);
+
+        return $tenant instanceof Team
+            ? Dashboard::getUrl(['tenant' => $tenant])
+            : null;
     }
 
     #[Override]
