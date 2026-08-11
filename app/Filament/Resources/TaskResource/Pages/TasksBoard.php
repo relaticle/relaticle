@@ -144,6 +144,7 @@ final class TasksBoard extends BoardResourcePage
                         return $task;
                     }),
             ])
+            ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
                     ->label(__('filament/pages/boards.tasks.actions.edit'))

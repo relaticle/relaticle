@@ -99,3 +99,18 @@ it('moves a card between columns via moveCard', function (): void {
 
     expect($updatedValue)->toBe($qualification->getKey());
 });
+
+it('opens the edit action when a card is clicked', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect($component->instance()->getBoard()->getCardAction())->toBe('edit');
+
+    $component
+        ->call('mountAction', 'edit', [], ['recordKey' => (string) $opportunity->id])
+        ->assertSet('mountedActions.0.data.name', $opportunity->name);
+});

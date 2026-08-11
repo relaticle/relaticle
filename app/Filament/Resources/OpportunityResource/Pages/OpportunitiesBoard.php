@@ -159,6 +159,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                         return $opportunity;
                     }),
             ])
+            ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
                     ->label(__('filament/pages/boards.opportunities.actions.edit'))

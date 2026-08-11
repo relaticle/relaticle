@@ -138,3 +138,18 @@ it('moves a card between columns via moveCard', function (): void {
 
     expect($updatedValue)->toBe($inProgress->getKey());
 });
+
+it('opens the edit action when a card is clicked', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+
+    $component = livewire(TasksBoard::class);
+
+    expect($component->instance()->getBoard()->getCardAction())->toBe('edit');
+
+    $component
+        ->call('mountAction', 'edit', [], ['recordKey' => (string) $task->id])
+        ->assertSet('mountedActions.0.data.title', $task->title);
+});

@@ -55,6 +55,31 @@ it('renders wizard for users who already have a team', function (): void {
         ->assertSee('Create your workspace');
 });
 
+it('offers a way back to the current workspace for users who already have one', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class);
+
+    expect($component->instance()->getCancelUrl())
+        ->toBe(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+
+    $component->assertSee(__('filament/pages/teams.create_team.actions.cancel'));
+});
+
+it('offers no way back for teamless users, who have nowhere to go', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class);
+
+    expect($component->instance()->getCancelUrl())->toBeNull();
+
+    $component->assertDontSee(__('filament/pages/teams.create_team.actions.cancel'));
+});
+
 it('creates a team with onboarding fields', function (): void {
     $user = User::factory()->create();
 
