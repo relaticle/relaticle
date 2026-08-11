@@ -41,6 +41,7 @@ use Filament\Livewire\Notifications;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -195,6 +196,20 @@ final class AppServiceProvider extends ServiceProvider
         Ink::resolvePreviewEditUrlUsing(fn (Post $post): ?string => auth('sysadmin')->check()
             ? PostResource::getUrl('edit', ['record' => $post], panel: 'sysadmin')
             : null);
+
+        // MCP callers authenticate as sysadmin accounts, but posts belong to User
+        // authors. Match by email; no match is a loud tool error, never a fallback.
+        Ink::resolveAuthorUsing(function (Authenticatable $caller): ?User {
+            if ($caller instanceof User) {
+                return $caller;
+            }
+
+            if (! $caller instanceof Model) {
+                return null;
+            }
+
+            return User::query()->where('email', $caller->getAttribute('email'))->first();
+        });
 
         // HasSEO creates a row per post but never removes it. A soft delete should
         // keep it — the post can come back — but a force delete from the panel
