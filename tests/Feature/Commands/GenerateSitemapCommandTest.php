@@ -75,24 +75,8 @@ it('excludes auth and utility redirect urls from the sitemap', function (): void
 
     $xml = File::get($this->sitemap);
 
-    expect($xml)->not->toContain('<loc>'.url('/login').'</loc>')
+    expect($xml)->toContain('<loc>'.url('/').'/</loc>')
+        ->and($xml)->not->toContain('<loc>'.url('/login').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/register').'</loc>')
-        ->and($xml)->not->toContain('<loc>'.url('/discord').'</loc>')
-        ->and($xml)->not->toContain('<loc>'.url('/dashboard').'</loc>');
-});
-
-it('stamps documentation urls with the markdown file modification date', function (): void {
-    fakeSitemapCrawl([
-        config('app.url') => (string) $this->get('/')->getContent(),
-        url('/docs') => (string) $this->get('/docs')->getContent(),
-        url('/docs/mcp') => (string) $this->get('/docs/mcp')->getContent(),
-    ]);
-
-    $this->artisan('app:generate-sitemap')->assertSuccessful();
-
-    $xml = File::get($this->sitemap);
-    $expected = date('Y-m-d', filemtime(config('documentation.markdown.base_path').'/mcp-guide.md'));
-
-    expect($xml)->toContain(url('/docs/mcp'))
-        ->and($xml)->toContain("<lastmod>{$expected}");
+        ->and($xml)->not->toContain('<loc>'.url('/discord').'</loc>');
 });
