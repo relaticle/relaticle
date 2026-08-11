@@ -13,21 +13,52 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\Ink\InkPlugin;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Relaticle\SystemAdmin\Policies\CategoryPolicy;
+use Relaticle\SystemAdmin\Policies\PostPolicy;
 
 final class SystemAdminPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        // Blog MCP requests are not Filament panel requests, so the panel-scoped
+        // policy discovery in AppServiceProvider never sees them.
+        Gate::policy(Post::class, PostPolicy::class);
+        Gate::policy(Category::class, CategoryPolicy::class);
+
+        // PostPolicy/CategoryPolicy type-hint SystemAdministrator, and Gate never
+        // checks a policy method's parameter type before calling it — a caller of
+        // any other type (e.g. a customer's User model, or an MCP token minted for
+        // one) would hit an uncaught TypeError instead of a clean denial now that
+        // the policies above resolve globally. Intercept before Gate reaches them.
+        Gate::before(function (Authenticatable $user, string $ability, array $arguments = []): ?bool {
+            $target = $arguments[0] ?? null;
+            $modelClass = is_string($target) ? $target : ($target instanceof Model ? $target::class : null);
+
+            if (in_array($modelClass, [Post::class, Category::class], true) && ! $user instanceof SystemAdministrator) {
+                return false;
+            }
+
+            return null;
+        });
+    }
+
     /**
      * @throws Exception
      */
