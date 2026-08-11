@@ -11,6 +11,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
@@ -71,8 +72,17 @@ Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,
             ->name('teams.join.confirm');
     });
 
-// Legacy documentation redirects
-Route::get('/documentation/{slug?}', fn (string $slug = '') => redirect("/docs/{$slug}", 301))
+// Legacy documentation redirects — old slugs that differ from current /docs types
+// are mapped explicitly; anything unknown lands on the docs index instead of a 404.
+Route::get('/documentation/{slug?}', function (string $slug = ''): RedirectResponse {
+    $map = ['quickstart' => 'getting-started'];
+
+    $target = $map[$slug] ?? $slug;
+
+    return array_key_exists($target, config('documentation.documents', []))
+        ? redirect("/docs/{$target}", 301)
+        : redirect('/docs', 301);
+})
     ->where('slug', '.*');
 
 // Community redirects
