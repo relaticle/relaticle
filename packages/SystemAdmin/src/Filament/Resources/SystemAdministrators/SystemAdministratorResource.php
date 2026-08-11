@@ -14,6 +14,7 @@ use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Pages\CreateSy
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Pages\EditSystemAdministrator;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Pages\ListSystemAdministrators;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Pages\ViewSystemAdministrator;
+use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\RelationManagers\ApiTokensRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Schemas\SystemAdministratorForm;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Schemas\SystemAdministratorInfolist;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\Tables\SystemAdministratorsTable;
@@ -48,7 +49,7 @@ final class SystemAdministratorResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ApiTokensRelationManager::class,
         ];
     }
 
