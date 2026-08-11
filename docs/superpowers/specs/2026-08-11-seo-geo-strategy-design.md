@@ -44,8 +44,9 @@ Defects found (all reproduced live):
 | D4 | Docs article H1 renders literal markdown: `<h1># MCP Server</h1>` with mangled permalink id | /docs/mcp HTML |
 | D5 | Docs sub-page meta descriptions duplicate the title ("Getting Started - Relaticle Documentation") | /docs/* HTML |
 | D6 | Markdown-for-agents output includes nav junk and leaked Alpine attrs (`= 768) mobileMenu = false"`) | `Accept: text/markdown` on /docs/mcp |
+| | *Origin of the leaked fragment, established during implementation:* the mobile-menu carries `@resize.window="if (window.innerWidth >= 768) mobileMenu = false"` — a raw `>` inside a quoted attribute value. Valid HTML, but naive tag-stripping splits the attribute and emits its tail as text. Not reproducible against the local DOM-based converter; stripping the header removes it either way. | |
 | D7 | Pricing page ~280 words, no schema; docs index ~200 words | word counts |
-| D8 | Homepage images 0/3 have alt text | HTML audit |
+| ~~D8~~ | ~~Homepage images 0/3 have alt text~~ — **RETRACTED 2026-08-11 during implementation.** The audit's `grep -o '<img [^>]*>'` was line-bounded and those `<img>` tags span several lines; re-checked with a multiline parse, production has alt on all 3 ("Relaticle CRM — Pipeline", …). W0 still improves them (localized via `__()`, more descriptive), but this was never a defect. | audit error |
 | D9 | Marketing pages sent with `cache-control: no-cache, private` — no edge/page caching | response headers |
 | D10 | Clone deployments serve our marketing site verbatim (e.g. glazoncrm.space, no canonical) — AGPL self-hosts create duplicate-content noise | live clone |
 | D11 | FAQPage schema targets a rich result Google removed (May 2026) — **no action**: zero cost, no penalty, some AI engines still parse it; the visible FAQ content is what matters | schema-types guidance |
@@ -175,7 +176,8 @@ Feed the flywheel deliberately (W4) instead of buying links.
   (same inline `Spatie\SchemaOrg\Graph` pattern as
   `resources/views/home/index.blade.php`). Existing test:
   `tests/Feature/PricingPageTest.php`.
-- **D8 alt text**: `resources/views/home/partials/hero.blade.php:136,150,164`.
+- **D8 alt text**: retracted — see the defect table. The hero alt strings are still
+  localized and made more descriptive in W0, but no defect existed.
 - **D9 caching**: an ops/deploy-layer task, not code — every marketing response
   sets session/XSRF cookies, so an app-layer `Cache-Control: public` would risk
   caches storing cookied responses. Configure edge caching for the marketing
