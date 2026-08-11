@@ -157,10 +157,14 @@ Feed the flywheel deliberately (W4) instead of buying links.
   pipeline config. Constraint: `DocumentData::extractTableOfContents()` regexes
   `<h2.*><a.*id="..."` — the TOC must keep working (its test must cover this).
   This renderer is shared with blog posts, so the fix benefits W1 too.
-- **D5 docs meta descriptions**: per-type `description` already exists in
-  `config/documentation.php` but the docs views emit the title as description.
-  Pass `DocumentData->description` through (`packages/Documentation`
-  views/controller).
+- **D5 docs meta descriptions + title convention**: per-type `description`
+  already exists in `config/documentation.php` but the docs views emit the title
+  as description — pass `DocumentData->description` through
+  (`packages/Documentation` views/controller). Same change standardizes titles to
+  the program-wide `<Base Title> - Relaticle` convention (current titles are
+  inconsistent: "Contact Us - Relaticle" vs "Relaticle - Documentation" vs
+  "Getting Started - Relaticle Documentation"; `x-guest-layout` takes the full
+  title string, no automatic suffix).
 - **D6 markdown-for-agents pollution**: `config/markdown-response.php`
   `preprocessors` only runs `RemoveScriptsAndStylesPreprocessor`. The package
   ships (unused) `RemoveNavigationPreprocessor`, `RemoveHeaderPreprocessor`,
@@ -309,6 +313,35 @@ pricing) with dates. No thin programmatic mass-generation — quality gates appl
 - Brand-query volume and GitHub stars as leading indicators.
 - Freshness discipline: decaying posts get updated, not duplicated; content
   review on each minor release; no unreviewed AI-generated publishing.
+
+## Metadata & editorial standards (program-wide)
+
+Adapted from the proven Payments Max content playbook where it generalizes;
+verified against 2026 SERP guidance (titles truncate ~600px ≈ 50-60 chars;
+hyphen separator preferred; Google rewrites ~60-70% of description snippets, so
+accuracy beats exact counts).
+
+- **Titles**: `<Base Title> - Relaticle` everywhere except the homepage
+  (`Relaticle - <tagline>`). Base ≤60 chars, keyword first, no clickbait, no
+  all-caps, no vague titles; **unique across the site**.
+- **Descriptions**: 140-160 chars, one natural sentence, front-loaded, specific
+  to the page, **unique across the site**; never invented claims (pricing,
+  certifications, integrations, capabilities must be verifiable in the product).
+- **Headings**: exactly one H1 per page; H2/H3 in natural order, descriptive,
+  never numbered prefixes.
+- **Enforcement is code where possible**: the help/docs manifest gets Pest tests
+  asserting title/description presence + length bounds + uniqueness and
+  one-H1-per-article; blog metadata is checked at review (ink's `SEOData` handles
+  emission).
+- **Publish verification loop**: after any MCP/panel publish, re-fetch the
+  record (`GetPostTool`) and the live page and verify stored + rendered values —
+  never trust the write. Live-page checks at desktop and mobile breakpoints via
+  agent-browser before a content PR closes.
+- **Credentials**: MCP tokens live in the MCP client config / process memory
+  only — never in repo files, reports, or docs.
+- **Consciously NOT adopted** from the playbook: 280-350-word posts (lead-gen
+  thin-content pattern; our posts are E-E-A-T depth pieces) and FAQPage
+  microdata (rich result removed May 2026 — see anti-goals).
 
 ## What we deliberately do NOT do
 
