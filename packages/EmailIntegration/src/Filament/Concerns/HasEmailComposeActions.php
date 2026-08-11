@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\HtmlString;
+use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -591,13 +593,17 @@ trait HasEmailComposeActions
         return $this->defaultPrivacyTier();
     }
 
-    private function hasActiveConnectedAccount(): bool
+    /**
+     * Drives both the compose actions and the "connect a mailbox" empty states,
+     * so it is read from blades as a computed property.
+     */
+    #[Computed]
+    public function hasActiveConnectedAccount(): bool
     {
-        return ConnectedAccount::query()
-            ->where('user_id', $this->getAuthenticatedUser()->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->exists();
+        /** @var Team|null $team */
+        $team = filament()->getTenant();
+
+        return ConnectedAccount::hasActiveFor($this->getAuthenticatedUser(), $team);
     }
 
     /**

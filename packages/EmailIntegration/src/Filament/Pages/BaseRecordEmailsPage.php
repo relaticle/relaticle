@@ -132,6 +132,27 @@ abstract class BaseRecordEmailsPage extends Page
         return $query->latest('sent_at')->paginate(20);
     }
 
+    /**
+     * Take the whole page over with the connect prompt only when the user has nothing
+     * to read here: teammates without a mailbox of their own still get the thread list
+     * for emails shared with them.
+     */
+    #[Computed]
+    public function showConnectPrompt(): bool
+    {
+        if ($this->hasActiveConnectedAccount()) {
+            return false;
+        }
+
+        /** @var Company|Opportunity|People $record */
+        $record = $this->getRecord();
+
+        return $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
+            ->doesntExist();
+    }
+
     #[Computed]
     public function selectedEmail(): ?Email
     {

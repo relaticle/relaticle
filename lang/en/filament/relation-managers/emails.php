@@ -80,4 +80,8 @@ return [
             'title' => 'Access request sent.',
         ],
     ],
+    'empty_state' => [
+        'heading' => 'No emails yet',
+        'description' => 'Emails exchanged with this record appear here.',
+    ],
 ];

@@ -195,6 +195,20 @@ final class ConnectedAccount extends Model
 
     // Helpers
 
+    /**
+     * Whether the user has at least one connected, authorised account in the given team.
+     * Single source of truth for the "is email set up?" gate that drives compose actions
+     * and the not-connected empty states.
+     */
+    public static function hasActiveFor(User $user, ?Team $team): bool
+    {
+        if (! $team instanceof Team) {
+            return false;
+        }
+
+        return self::query()->ownedBy($user, $team)->active()->exists();
+    }
+
     public function isTokenExpired(): bool
     {
         return $this->token_expires_at !== null && $this->token_expires_at->isPast();

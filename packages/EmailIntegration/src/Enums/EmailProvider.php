@@ -32,7 +32,8 @@ enum EmailProvider: string implements HasColor, HasIcon, HasLabel
     public function getIcon(): string
     {
         return match ($this) {
-            self::GMAIL, self::AZURE => 'heroicon-o-envelope',
+            self::GMAIL => 'icon-google',
+            self::AZURE => 'heroicon-o-envelope',
         };
     }
 }

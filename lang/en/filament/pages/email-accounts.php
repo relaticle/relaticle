@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 return [
-    'title' => 'Accounts',
+    'title' => 'Email and calendar accounts',
+    'navigation_label' => 'Accounts',
+    'subheading' => 'Manage and sync your email and calendar accounts to stay organized.',
     'actions' => [
-        'connect_gmail' => 'Connect Gmail',
-        'connect_azure' => 'Connect Outlook',
+        'connect_gmail' => 'Connect Google Account',
+        'connect_azure' => 'Connect Microsoft Account',
         'manage' => 'Manage',
         're_auth' => 'Re-authenticate',
         'edit_settings' => 'Settings',
@@ -68,4 +70,31 @@ return [
         ],
     ],
     'default_badge' => 'Default',
+    'sections' => [
+        'connected' => [
+            'heading' => 'Connected accounts',
+            'description' => 'We take your privacy very seriously. Read our <a href=":url" target="_blank" class="underline">Privacy Policy</a>.',
+        ],
+    ],
+    'synced_at' => 'Synced :time',
+    'in_sync' => 'In Sync',
+    'capabilities' => [
+        'email' => 'Email',
+        'calendar' => 'Calendar',
+    ],
+    'not_connected' => [
+        'action' => 'Configure mailbox',
+        'inbox' => [
+            'heading' => 'Send emails in Relaticle',
+            'description' => 'Connect your mailbox to read and reply without leaving Relaticle. Mass sending, templates, attachments, and more.',
+        ],
+        'record' => [
+            'heading' => 'Keep emails on the record',
+            'description' => 'Connect your mailbox to see every conversation with this record and reply in one click.',
+        ],
+        'meetings' => [
+            'heading' => 'See your meetings in Relaticle',
+            'description' => 'Connect your mailbox and enable calendar sync to track meetings alongside your CRM records.',
+        ],
+    ],
 ];

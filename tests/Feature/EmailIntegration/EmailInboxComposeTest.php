@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -81,4 +82,20 @@ it('removes the signature block when "no signature" is selected', function (): v
         // ...selecting the empty option strips it.
         ->set('mountedActions.0.data.signature_id', null)
         ->assertSet('mountedActions.0.data.body_html', fn (mixed $body): bool => ! str_contains((string) json_encode($body), 'customBlock'));
+});
+
+it('prompts to configure a mailbox when no account is connected', function (): void {
+    $this->account->forceDelete();
+
+    livewire(EmailInboxPage::class)
+        ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
+        ->assertSee(__('filament/pages/email-accounts.not_connected.action'))
+        ->assertSeeHtml(EmailAccountsPage::getUrl())
+        ->assertActionHidden('composeEmail');
+});
+
+it('shows the inbox instead of the prompt once an account is connected', function (): void {
+    livewire(EmailInboxPage::class)
+        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
+        ->assertActionVisible('composeEmail');
 });

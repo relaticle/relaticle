@@ -40,11 +40,24 @@ final class EmailAccountsPage extends Page
 
     protected static ?string $slug = 'accounts';
 
-    protected static ?string $title = 'Accounts';
-
     protected static ?int $navigationSort = 1;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-at-symbol';
+
+    public function getTitle(): string
+    {
+        return __('filament/pages/email-accounts.title');
+    }
+
+    public function getSubheading(): string
+    {
+        return __('filament/pages/email-accounts.subheading');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/email-accounts.navigation_label');
+    }
 
     /**
      * @var Collection<int, ConnectedAccount>
@@ -70,8 +83,9 @@ final class EmailAccountsPage extends Page
     {
         return Action::make('connectGmail')
             ->label(__('filament/pages/email-accounts.actions.connect_gmail'))
-            ->icon('heroicon-o-plus')
-            ->size(Size::Small)
+            ->icon('icon-google')
+            ->color('gray')
+            ->outlined()
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'gmail']), true);
     }
 
@@ -79,9 +93,9 @@ final class EmailAccountsPage extends Page
     {
         return Action::make('connectAzure')
             ->label(__('filament/pages/email-accounts.actions.connect_azure'))
-            ->icon('heroicon-o-plus')
-            ->color('info')
-            ->size(Size::Small)
+            ->icon('heroicon-o-envelope')
+            ->color('gray')
+            ->outlined()
             // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
             ->hidden()
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
@@ -319,8 +333,9 @@ final class EmailAccountsPage extends Page
         ])
             ->label(__('filament/pages/email-accounts.actions.manage'))
             ->icon(Heroicon::EllipsisVertical)
+            ->color('gray')
             ->size(Size::Small)
-            ->button();
+            ->iconButton();
     }
 
     public function sendSuccessNotification(): void

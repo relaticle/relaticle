@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -314,6 +315,16 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 ->send();
                         }),
                 ]),
+            ])
+            ->emptyStateIcon('heroicon-o-envelope')
+            ->emptyStateHeading(fn (): string => $this->hasActiveConnectedAccount()
+                ? __('filament/relation-managers/emails.empty_state.heading')
+                : __('filament/pages/email-accounts.not_connected.record.heading'))
+            ->emptyStateDescription(fn (): string => $this->hasActiveConnectedAccount()
+                ? __('filament/relation-managers/emails.empty_state.description')
+                : __('filament/pages/email-accounts.not_connected.record.description'))
+            ->emptyStateActions([
+                ConfigureMailboxAction::make(),
             ]);
     }
 

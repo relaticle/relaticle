@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Resources;
 
+use App\Models\Team;
+use App\Models\User;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -19,8 +21,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
+use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 
@@ -131,7 +135,27 @@ final class MeetingResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+            ])
+            ->emptyStateIcon('heroicon-o-calendar-days')
+            ->emptyStateHeading(fn (): string => self::hasMailbox()
+                ? __('filament/resources/meeting.empty_state.heading')
+                : __('filament/pages/email-accounts.not_connected.meetings.heading'))
+            ->emptyStateDescription(fn (): string => self::hasMailbox()
+                ? __('filament/resources/meeting.empty_state.description')
+                : __('filament/pages/email-accounts.not_connected.meetings.description'))
+            ->emptyStateActions([
+                ConfigureMailboxAction::make(),
             ]);
+    }
+
+    private static function hasMailbox(): bool
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+        /** @var Team|null $team */
+        $team = filament()->getTenant();
+
+        return $user instanceof User && ConnectedAccount::hasActiveFor($user, $team);
     }
 
     #[Override]

@@ -1,4 +1,12 @@
 <x-filament-panels::page class="!pb-0">
+    @if ($this->showConnectPrompt)
+        <div class="flex items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
+            <x-emails.not-connected
+                :heading="__('filament/pages/email-accounts.not_connected.record.heading')"
+                :description="__('filament/pages/email-accounts.not_connected.record.description')"
+            />
+        </div>
+    @else
     <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
 
         {{-- ── Left panel: folder tabs + search + email list ─────────── --}}
@@ -149,6 +157,7 @@
         </div>
 
     </div>
+    @endif
 
     <x-filament-actions::modals />
 </x-filament-panels::page>
