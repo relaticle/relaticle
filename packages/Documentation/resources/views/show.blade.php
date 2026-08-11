@@ -1,7 +1,7 @@
 <x-documentation::layout :document="$document ?? null">
     <div class="grid grid-cols-12 gap-6 lg:gap-8 min-h-screen">
         <!-- Left Sidebar: Documentation Types -->
-        <div class="hidden sm:block col-span-12 sm:col-span-3 lg:col-span-2 relative">
+        <nav class="hidden sm:block col-span-12 sm:col-span-3 lg:col-span-2 relative" aria-label="{{ __('Documentation sections') }}">
             <div class="sticky top-24 pt-0.5 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4 pb-16">
                 <h2 class="text-sm font-semibold text-black dark:text-white mb-4 flex items-center space-x-2">
                     <x-heroicon-o-book-open class="h-4 w-4 text-primary dark:text-primary-400" />
@@ -19,7 +19,7 @@
                     @endforeach
                 </div>
             </div>
-        </div>
+        </nav>
 
         <!-- Main Content Column -->
         <div class="col-span-12 sm:col-span-9 md:col-span-6 lg:col-span-7 px-4">
@@ -49,11 +49,11 @@
         <aside class="hidden lg:block pb-16 col-span-3 print-hidden ">
             <div class="sticky top-[5rem] pt-0.5 overflow-y-auto pb-16">
                 @if(count($tableOfContents))
-                    <h3 class="text-sm font-semibold text-black dark:text-white mb-4 flex items-center space-x-2">
-                        <x-heroicon-o-list-bullet class="h-4 w-4 text-primary dark:text-primary-400" />
-                        <span>On this page</span>
-                    </h3>
                     <nav>
+                        <h3 class="text-sm font-semibold text-black dark:text-white mb-4 flex items-center space-x-2">
+                            <x-heroicon-o-list-bullet class="h-4 w-4 text-primary dark:text-primary-400" />
+                            <span>On this page</span>
+                        </h3>
                         <ul class="space-y-2.5">
                             @foreach($tableOfContents as $fragment => $title)
                                 <li class="text-sm">

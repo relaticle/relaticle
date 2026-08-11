@@ -8,7 +8,10 @@ it('serves docs pages as clean article markdown without site chrome', function (
         ->getContent();
 
     expect($markdown)->toContain('Getting Started')
-        ->and($markdown)->not->toContain('mobileMenu')
+        ->and($markdown)->not->toContain('Sign In')
         ->and($markdown)->not->toContain('[ Start for free ]')
-        ->and($markdown)->not->toContain('Skip to main content');
+        ->and($markdown)->not->toContain('Skip to main content')
+        ->and($markdown)->not->toContain('All rights reserved')
+        ->and($markdown)->not->toContain('Developer Guide')
+        ->and($markdown)->not->toContain('On this page');
 });

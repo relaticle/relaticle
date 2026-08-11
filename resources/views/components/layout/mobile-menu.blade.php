@@ -3,7 +3,8 @@
      x-transition.opacity.duration.200ms
      @keydown.escape.window="mobileMenu = false"
      class="md:hidden fixed inset-0 z-[60] bg-white dark:bg-gray-950 flex flex-col"
-     x-cloak>
+     x-cloak
+     aria-label="{{ __('Mobile menu') }}">
 
     {{-- Header --}}
     <div class="flex items-center justify-between h-16 px-4 shrink-0">
@@ -56,4 +57,4 @@
             </x-marketing.button>
         </div>
     </div>
-</div>
+</nav>
