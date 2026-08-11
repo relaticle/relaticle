@@ -21,7 +21,7 @@ return [
         'sitemap' => false,
         'tags' => true,
         'media_library' => false,
-        'mcp' => false,
+        'mcp' => true,
     ],
 
     /*
