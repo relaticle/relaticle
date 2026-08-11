@@ -25,7 +25,7 @@ return [
     /*
      * When enabled, anchor links will be added to all titles
      */
-    'add_anchors_to_headings' => true,
+    'add_anchors_to_headings' => false,
 
     /**
      * When enabled, anchors will be rendered as links.
@@ -52,11 +52,11 @@ return [
             'id_prefix' => '',
             'fragment_prefix' => '',
             'insert' => 'before',
-            'min_heading_level' => 1,
+            'min_heading_level' => 2,
             'max_heading_level' => 6,
             'title' => 'Permalink',
-            'symbol' => '#',
-            'aria_hidden' => false,
+            'symbol' => '',
+            'aria_hidden' => true,
         ],
     ],
 
