@@ -28,29 +28,67 @@
 
             @php
                 $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
+                $freeCredits = number_format(\App\Enums\Plan::Free->credits());
                 $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+                $enterpriseCredits = number_format(\App\Enums\Plan::Enterprise->credits());
+                $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
+                $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
+                $enterpriseRateLimit = \App\Enums\Plan::Enterprise->rateLimit();
                 $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
+
+                // Sourced from packages/Chat/config/chat.php's model catalog ('credit_multiplier'
+                // per model) and 'tool_call_credit_bonus'. Settlement formula verified in
+                // packages/Chat/src/Services/CreditService.php::calculateCredits():
+                // max(1, ceil(multiplier + toolCalls * toolBonus)).
+                $opusReplies = intdiv((int) \App\Enums\Plan::Pro->credits(), 3);
+
+                $creditFaqAnswer = __('Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (1x for Sonnet 4.6, Gemini 3 Flash, and self-hosted models; 1.5x for GPT 5.5, GPT 5.4, and Gemini 3.1 Pro; 3x for Opus 4.7), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple Sonnet 4.6 reply with no tool calls costs 1 credit; an Opus 4.7 reply that touches two records costs 4. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.');
+
+                // "Cloud Pro" is the billing-on marketing name only — under billing-off there is
+                // no self-service path onto a paid plan at all (CreateTeam only auto-starts a
+                // trial when Feature::active(Billing), and the billing page 403s otherwise), so
+                // these two facts use the generic "a paid plan" label when billing is off.
+                $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
+
+                $modelsUnlockAnswer = __(
+                    'Every plan can use Sonnet 4.6, Gemini 3 Flash, and any self-hosted model you connect yourself. :paidPlan (and an Enterprise plan) additionally unlock Opus 4.7, GPT 5.5, GPT 5.4, and Gemini 3.1 Pro — the four models with a higher credit multiplier.',
+                    ['paidPlan' => $paidPlanLabel]
+                );
+
+                $rateLimitAnswer = __(
+                    'Yes — a per-minute cap that scales with plan: :free messages/minute on Free, :pro/minute on :paidPlan, and :enterprise/minute on an Enterprise plan (:enterpriseCredits credits/month, available via a custom contract — see "Get in touch" below). It exists to stop runaway usage, not to constrain normal work.',
+                    ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'enterprise' => $enterpriseRateLimit, 'enterpriseCredits' => $enterpriseCredits, 'paidPlan' => $paidPlanLabel]
+                );
+
+                $selfHostedCreditAnswer = __(
+                    'No. Self-hosting does not disable credit metering: every workspace, self-hosted or hosted, defaults to the Free plan\'s :credits-credit monthly allowance — the same one a brand-new Cloud signup gets. Self-hosters do have direct database access, though, so raising or removing that cap is a matter of updating your own workspace\'s plan; there is no separate self-hosted billing UI for it.',
+                    ['credits' => $freeCredits]
+                );
 
                 if ($billingActive) {
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle — no self-hosted maintenance required');
                     $hostedPlanAnswer = __(
-                        'Cloud Pro is :price and includes unlimited users and records, a :credits-credit monthly AI allowance across every supported model including premium ones, the REST API, the 30-tool MCP server, and email support. New workspaces start on a :days-day trial automatically, with no card required.',
+                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 4.6 up to Opus 4.7, the REST API, the 30-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below) — as a reference point, :credits credits covers roughly :credits simple Sonnet 4.6 replies, or around :opusReplies Opus 4.7 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
                             'price' => '$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)',
                             'credits' => $proCredits,
+                            'opusReplies' => number_format($opusReplies),
                             'days' => $trialDays,
                         ]
                     );
                     $planLimitAnswer = __(
-                        "CRM data itself is never capped — every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is the AI assistant: Cloud Pro includes a :credits-credit monthly allowance that resets each billing (or trial) period. Once it's used up, the assistant stops answering new chat requests until the next reset; nothing else in the CRM is affected.",
+                        'CRM data itself is never capped — every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is the AI assistant: Cloud Pro\'s :credits credits a month reset each billing (or trial) period. Once they are used up, the assistant declines new chat requests until the next reset — Pro and Enterprise workspaces can also buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
                         ['credits' => $proCredits]
                     );
                 } else {
                     $hostedPriceCell = __('$0/mo per workspace');
                     $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
                     $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 30-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support — no credit card required.');
-                    $planLimitAnswer = __("CRM data is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you're self-hosting or on the hosted Cloud plan.");
+                    $planLimitAnswer = __(
+                        'CRM data itself is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. The AI assistant is metered, though: every workspace defaults to the Free plan\'s :credits credits a month (self-hosted included — see "Are self-hosted installs exempt from AI credit limits?" below), resetting every calendar month. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
+                        ['credits' => $freeCredits]
+                    );
                 }
             @endphp
 
@@ -71,41 +109,36 @@
                     </p>
                 </div>
 
-                <div class="overflow-x-auto rounded-2xl border border-gray-200/80 dark:border-white/[0.06]">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 dark:bg-white/[0.02]">
-                            <tr>
-                                <th scope="col" class="px-4 py-3 sm:px-6 sm:py-4 font-medium text-gray-500 dark:text-gray-400">
-                                    <span class="sr-only">{{ __('Category') }}</span>
-                                </th>
-                                <th scope="col" class="px-4 py-3 sm:px-6 sm:py-4 font-semibold text-gray-900 dark:text-white">{{ __('Self-Hosted') }}</th>
-                                <th scope="col" class="px-4 py-3 sm:px-6 sm:py-4 font-semibold text-gray-900 dark:text-white">{{ __('Hosted') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/[0.04]">
-                            <tr>
-                                <th scope="row" class="px-4 py-3 sm:px-6 sm:py-4 font-medium text-gray-500 dark:text-gray-400">{{ __('Price') }}</th>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('Free forever') }}</td>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ $hostedPriceCell }}</td>
-                            </tr>
-                            <tr>
-                                <th scope="row" class="px-4 py-3 sm:px-6 sm:py-4 font-medium text-gray-500 dark:text-gray-400">{{ __('Data ownership') }}</th>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('Stays on your own infrastructure') }}</td>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('Stored on Relaticle-managed infrastructure') }}</td>
-                            </tr>
-                            <tr>
-                                <th scope="row" class="px-4 py-3 sm:px-6 sm:py-4 font-medium text-gray-500 dark:text-gray-400">{{ __('Updates') }}</th>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('You pull and deploy new Docker images yourself') }}</td>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ $hostedUpdatesCell }}</td>
-                            </tr>
-                            <tr>
-                                <th scope="row" class="px-4 py-3 sm:px-6 sm:py-4 font-medium text-gray-500 dark:text-gray-400">{{ __('Getting help') }}</th>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('Community support on Discord') }}</td>
-                                <td class="px-4 py-3 sm:px-6 sm:py-4 text-gray-700 dark:text-gray-300">{{ __('Email support') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                {{--
+                    A <table> here would collapse to a run-on line for the markdown-response
+                    channel (GPTBot/ClaudeBot/PerplexityBot): the app's configured league/
+                    html-to-markdown driver runs with `strip_tags: true` and does not register
+                    TableConverter, so table cells lose their separators. <ul>/<li>/<p>/<strong>
+                    all have registered converters and were verified to survive conversion —
+                    each row below reads as "Category: Self-Hosted X / Hosted Y" in markdown.
+                --}}
+                <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
+                    <li class="px-4 py-3 sm:px-6 sm:py-4">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Price') }}</p>
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Self-Hosted') }}:</span> {{ __('Free forever') }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Hosted') }}:</span> {{ $hostedPriceCell }}</p>
+                    </li>
+                    <li class="px-4 py-3 sm:px-6 sm:py-4">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Data ownership') }}</p>
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Self-Hosted') }}:</span> {{ __('Stays on your own infrastructure') }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Hosted') }}:</span> {{ __('Stored on Relaticle-managed infrastructure') }}</p>
+                    </li>
+                    <li class="px-4 py-3 sm:px-6 sm:py-4">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Updates') }}</p>
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Self-Hosted') }}:</span> {{ __('You pull and deploy new Docker images yourself') }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Hosted') }}:</span> {{ $hostedUpdatesCell }}</p>
+                    </li>
+                    <li class="px-4 py-3 sm:px-6 sm:py-4">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Getting help') }}</p>
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Self-Hosted') }}:</span> {{ __('Community support on Discord') }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-500">{{ __('Hosted') }}:</span> {{ __('Email support') }}</p>
+                    </li>
+                </ul>
             </div>
 
             {{-- FAQ --}}
@@ -148,7 +181,28 @@
                     <div>
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('What counts as an AI credit?') }}</h3>
                         <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ __('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary. Using the REST API, the MCP server, or the CRM directly never touches your credit balance.') }}
+                            {{ $creditFaqAnswer }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Which AI models does my plan unlock?') }}</h3>
+                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                            {{ $modelsUnlockAnswer }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Is there a message rate limit?') }}</h3>
+                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                            {{ $rateLimitAnswer }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Are self-hosted installs exempt from AI credit limits?') }}</h3>
+                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                            {{ $selfHostedCreditAnswer }}
                         </p>
                     </div>
 

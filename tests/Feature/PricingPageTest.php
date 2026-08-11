@@ -66,3 +66,79 @@ it('scopes the hosted-plan faq to the free tier when billing is off', function (
         ->assertDontSee(__('What happens after my trial ends?'))
         ->assertDontSee('2,000-credit');
 });
+
+it('shows the comparison list with the pro-tier hosted price and updates when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('Self-hosted or hosted: how to choose'))
+        ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
+        ->assertSee(__('Managed by Relaticle — no self-hosted maintenance required'))
+        ->assertDontSee(__('$0/mo per workspace'))
+        ->assertDontSee(__('Zero-downtime updates and automatic daily backups, handled for you'));
+});
+
+it('shows the comparison list with the free-tier hosted price and updates when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('Self-hosted or hosted: how to choose'))
+        ->assertSee(__('$0/mo per workspace'))
+        ->assertSee(__('Zero-downtime updates and automatic daily backups, handled for you'))
+        ->assertDontSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
+});
+
+it('emits accurate product json-ld offers when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('"name":"Self-hosted","price":"0"', false)
+        ->assertSee('"name":"Cloud Pro","price":"19"', false)
+        ->assertDontSee('"name":"Cloud","price":"0"', false);
+});
+
+it('emits accurate product json-ld offers when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('"name":"Self-hosted","price":"0"', false)
+        ->assertSee('"name":"Cloud","price":"0"', false)
+        ->assertDontSee('"name":"Cloud Pro"', false);
+});
+
+it('discloses the real per-model credit multiplier instead of a flat allowance claim', function (): void {
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('What counts as an AI credit?'))
+        ->assertSee('3x for Opus 4.7', false)
+        ->assertSee('0.5 credits for every tool call')
+        ->assertDontSee('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary.');
+});
+
+it('discloses that self-hosted installs are not exempt from the free-tier credit cap', function (): void {
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('Are self-hosted installs exempt from AI credit limits?'))
+        ->assertSee('300-credit');
+});
+
+it('discloses the free-tier credit cap in the billing-off plan-limit answer', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee("Free plan's 300 credits a month")
+        ->assertDontSee('CRM data is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan.');
+});
+
+it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan-limit answer', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('buy a prepaid credit top-up instead of waiting');
+});
