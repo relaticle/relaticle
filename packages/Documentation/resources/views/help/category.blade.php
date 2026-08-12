@@ -70,4 +70,13 @@
             </div>
         </div>
     </div>
+
+    @php
+        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
+            ['name' => __('Help Centre'), 'url' => route('help.index')],
+            ['name' => $category->title, 'url' => route('help.category', ['category' => \Illuminate\Support\Str::after($category->path, '/')])],
+        ]);
+    @endphp
+
+    {!! $jsonLd->toScript() !!}
 </x-guest-layout>

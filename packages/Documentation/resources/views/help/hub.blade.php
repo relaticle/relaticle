@@ -41,4 +41,12 @@
             </div>
         </div>
     </div>
+
+    @php
+        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
+            ['name' => $baseTitle, 'url' => route('help.index')],
+        ]);
+    @endphp
+
+    {!! $jsonLd->toScript() !!}
 </x-guest-layout>

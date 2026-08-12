@@ -13,8 +13,11 @@ Route::middleware([ProvideMarkdownResponse::class])->prefix('docs')->name('docum
     Route::get('/{type}', [DocumentationController::class, 'show'])->name('show');
 });
 
+Route::get('/llms.txt', [HelpController::class, 'llmsTxt'])->name('llms-txt');
+
 Route::middleware([ProvideMarkdownResponse::class])->prefix('help')->name('help.')->group(function (): void {
     Route::get('/', [HelpController::class, 'index'])->name('index');
+    Route::get('/search-index.json', [HelpController::class, 'searchIndex'])->name('search-index');
     Route::get('/{category}', [HelpController::class, 'category'])->name('category')->where('category', '[a-z0-9-]+');
     Route::get('/{category}/{slug}', [HelpController::class, 'show'])->name('show')->where(['category' => '[a-z0-9-]+', 'slug' => '[a-z0-9-]+']);
 });

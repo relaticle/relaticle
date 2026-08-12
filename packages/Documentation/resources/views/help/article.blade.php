@@ -114,4 +114,24 @@
             </div>
         </div>
     </div>
+
+    @php
+        $breadcrumbTrail = [
+            ['name' => __('Help Centre'), 'url' => route('help.index')],
+        ];
+
+        if ($category) {
+            $breadcrumbTrail[] = ['name' => $category->title, 'url' => route('help.category', ['category' => $page->category])];
+        }
+
+        $breadcrumbTrail[] = ['name' => $page->title, 'url' => route('help.show', ['category' => $page->category, 'slug' => $page->slug])];
+
+        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->article(
+            $page,
+            route('help.show', ['category' => $page->category, 'slug' => $page->slug]),
+            $breadcrumbTrail,
+        );
+    @endphp
+
+    {!! $jsonLd->toScript() !!}
 </x-guest-layout>

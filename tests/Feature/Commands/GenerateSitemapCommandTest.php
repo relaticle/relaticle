@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Console\Commands\GenerateSitemapCommand;
 use App\Features\Blog;
 use GuzzleHttp\HandlerStack;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Ink\Models\Post;
 use Spatie\Crawler\Faking\FakeHandler;
@@ -59,6 +61,42 @@ it('leaves the blog out of the sitemap when the feature is off', function (): vo
     $this->artisan('app:generate-sitemap')->assertSuccessful();
 
     expect(File::get($this->sitemap))->not->toContain(route('blog.show', $post->slug));
+});
+
+it('adds help urls to the sitemap with lastmod from front matter', function (): void {
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = File::get($this->sitemap);
+
+    expect($xml)->toContain('<loc>'.route('help.index').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('help.category', ['category' => 'getting-started']).'</loc>')
+        ->and($xml)->toContain('<loc>'.route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']).'</loc>')
+        ->and($xml)->toMatch('#getting-started/create-your-first-company</loc>\s*<lastmod>2026-08-12#');
+});
+
+it('omits lastmod for a help page with no updated front matter', function (): void {
+    $fixturePath = storage_path('framework/testing/sitemap-help-'.Str::random(8));
+
+    File::ensureDirectoryExists("{$fixturePath}/help/no-date");
+    File::put(
+        "{$fixturePath}/help/no-date/_index.md",
+        "---\ntitle: No date\ndescription: A category with an undated page.\norder: 1\n---\n\nBody.\n",
+    );
+    File::put(
+        "{$fixturePath}/help/no-date/undated-page.md",
+        "---\ntitle: Undated page\ndescription: A page without an updated date.\norder: 1\n---\n\nBody.\n",
+    );
+
+    Config::set('documentation.content_path', $fixturePath);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    File::deleteDirectory($fixturePath);
+
+    $xml = File::get($this->sitemap);
+
+    expect($xml)->toContain('<loc>'.route('help.show', ['category' => 'no-date', 'slug' => 'undated-page']).'</loc>')
+        ->and($xml)->not->toMatch('#no-date/undated-page</loc>\s*<lastmod>#');
 });
 
 it('excludes auth and utility redirect urls from the sitemap', function (): void {

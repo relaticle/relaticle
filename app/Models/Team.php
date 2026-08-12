@@ -102,7 +102,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
-        'discord',
+        'discord', 'llms.txt',
 
         // API & developer
         'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',

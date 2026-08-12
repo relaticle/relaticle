@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Documentation\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
@@ -18,6 +21,7 @@ final readonly class HelpController
     public function __construct(
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
+        private BuildSearchIndex $buildSearchIndex,
     ) {}
 
     public function index(): View
@@ -68,6 +72,23 @@ final readonly class HelpController
         ]);
     }
 
+    public function searchIndex(): JsonResponse
+    {
+        return response()->json(($this->buildSearchIndex)());
+    }
+
+    /**
+     * A plain, accurate index for agent discovery -- generated from the same
+     * manifests the pages themselves render from, so it can't drift out of
+     * date. Never a ranking mechanism: Google doesn't read llms.txt.
+     */
+    public function llmsTxt(): Response
+    {
+        return response($this->llmsTxtBody(), 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+        ]);
+    }
+
     /** @return Collection<string, DocCategory> */
     private function helpCategories(): Collection
     {
@@ -82,5 +103,64 @@ final readonly class HelpController
             ->map(fn (string $relatedPath): ?DocPage => $this->repository->find($relatedPath))
             ->filter(fn (?DocPage $related): bool => $related instanceof DocPage)
             ->values();
+    }
+
+    private function llmsTxtBody(): string
+    {
+        $lines = [
+            '# '.config('app.name'),
+            '',
+            '> '.__('Open-source, self-hosted CRM with a built-in AI chat and an MCP server for external AI agents.'),
+        ];
+
+        $help = $this->llmsTxtHelpEntries();
+
+        if ($help !== []) {
+            array_push($lines, '', '## '.__('Help Centre'), '', ...$help);
+        }
+
+        $docs = $this->llmsTxtDocsEntries();
+
+        if ($docs !== []) {
+            array_push($lines, '', '## '.__('Documentation'), '', ...$docs);
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /** @return list<string> */
+    private function llmsTxtHelpEntries(): array
+    {
+        $entries = [];
+
+        foreach ($this->helpCategories() as $category) {
+            foreach ($this->repository->pagesIn($category->path) as $page) {
+                $entries[] = sprintf(
+                    '- [%s](%s): %s',
+                    $page->title,
+                    route('help.show', ['category' => $page->category, 'slug' => $page->slug]),
+                    $page->description,
+                );
+            }
+        }
+
+        return $entries;
+    }
+
+    /** @return list<string> */
+    private function llmsTxtDocsEntries(): array
+    {
+        /** @var array<string, array<string, string>> $documents */
+        $documents = config('documentation.documents', []);
+
+        $entries = [];
+
+        foreach ($documents as $type => $document) {
+            $url = isset($document['url']) ? url($document['url']) : route('documentation.show', ['type' => $type]);
+
+            $entries[] = sprintf('- [%s](%s): %s', $document['title'], $url, $document['description'] ?? '');
+        }
+
+        return $entries;
     }
 }
