@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use App\Providers\AppServiceProvider;
 use Laravel\Sanctum\TransientToken;
 use Relaticle\Ink\Mcp\BlogServer;
 use Relaticle\Ink\Mcp\Tools\CreatePostTool;
@@ -12,7 +11,10 @@ use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(AppServiceProvider::class);
+// No mutates() here: the author-resolution closure under test lives in
+// AppServiceProvider::configureBlog(), and app/Providers/AppServiceProvider.php is
+// excluded from phpunit.xml's <source>, so `--mutate --class=AppServiceProvider`
+// would never generate a mutant for it.
 
 beforeEach(function (): void {
     $this->admin = SystemAdministrator::factory()->create([

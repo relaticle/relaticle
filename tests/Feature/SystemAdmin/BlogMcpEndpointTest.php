@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Routing\Route;
-use Relaticle\Ink\Mcp\BlogTool;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(BlogTool::class);
+// No mutates() here: this file's production code is either vendor (Relaticle\Ink\Mcp\BlogTool,
+// installed from Packagist, outside app/ and packages/) or route/config wiring with no owning
+// class -- neither is a valid --mutate --class target under phpunit.xml's <source> config.
 
 it('registers the blog mcp endpoint', function (): void {
     expect(collect(app('router')->getRoutes())->contains(
@@ -37,7 +38,8 @@ it('serves tools/list to a bearer token issued to a super administrator', functi
             'method' => 'tools/list',
         ])
         ->assertOk()
-        ->assertJsonPath('jsonrpc', '2.0');
+        ->assertJsonPath('jsonrpc', '2.0')
+        ->assertJsonPath('result.tools', fn (array $tools): bool => count($tools) > 0);
 });
 
 it('denies a tool call outside the token abilities', function (): void {
