@@ -42,15 +42,18 @@ return [
 
     /*
      * ink's Mcp::web() route already carries ReorderJsonAccept and
-     * AddWwwAuthenticateHeader; auth:sanctum authenticates the caller and
-     * throttle:mcp (defined in AppServiceProvider::configureRateLimiting(),
-     * shared with the app's own /mcp endpoint) bounds request volume once a
-     * caller has a token.
+     * AddWwwAuthenticateHeader. auth:sanctum-sysadmin authenticates the caller
+     * against the dedicated guard scoped to system_administrators
+     * (config/auth.php) -- the app's own /mcp and /api/v1/* routes use the
+     * default 'sanctum' guard, scoped to users only, so a blog token and an
+     * app token are never accepted on each other's endpoints. throttle:mcp
+     * (defined in AppServiceProvider::configureRateLimiting(), shared with the
+     * app's own /mcp endpoint) bounds request volume once a caller has a token.
      */
     'mcp' => [
         'path' => '/mcp/blog',
-        'guard' => null,
-        'middleware' => ['auth:sanctum', 'throttle:mcp'],
+        'guard' => 'sanctum-sysadmin',
+        'middleware' => ['auth:sanctum-sysadmin', 'throttle:mcp'],
     ],
 
     'feed' => [

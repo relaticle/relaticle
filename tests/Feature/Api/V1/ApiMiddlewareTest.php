@@ -9,6 +9,8 @@ use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(
     ForceJsonResponse::class,
@@ -109,6 +111,15 @@ describe('real-token middleware chain', function (): void {
 
     it('rejects request with invalid bearer token', function (): void {
         $this->withToken('invalid-token')
+            ->getJson('/api/v1/companies')
+            ->assertUnauthorized();
+    });
+
+    it('rejects a personal access token minted for a tokenable outside the users provider', function (): void {
+        $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
+        $token = $admin->createToken('blog-token', ['posts:read'])->plainTextToken;
+
+        $this->withToken($token)
             ->getJson('/api/v1/companies')
             ->assertUnauthorized();
     });
