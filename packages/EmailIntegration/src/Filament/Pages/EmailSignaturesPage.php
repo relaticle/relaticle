@@ -23,6 +23,9 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
+/**
+ * @property-read Action $createSignatureAction
+ */
 final class EmailSignaturesPage extends Page
 {
     use HasClusterBreadcrumbs;
@@ -38,6 +41,12 @@ final class EmailSignaturesPage extends Page
 
     protected static ?int $navigationSort = 2;
 
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-pencil-square';
 
     /**
@@ -48,13 +57,6 @@ final class EmailSignaturesPage extends Page
     public function mount(): void
     {
         $this->signatures = $this->loadSignatures();
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            $this->createSignatureAction(),
-        ];
     }
 
     /**
@@ -100,6 +102,14 @@ final class EmailSignaturesPage extends Page
             ->where('user_id', auth()->id())
             ->where('team_id', filament()->getTenant()?->getKey())
             ->firstOrFail();
+    }
+
+    /**
+     * @return array<int, Action>
+     */
+    public function clusterHeaderActions(): array
+    {
+        return [$this->createSignatureAction];
     }
 
     public function createSignatureAction(): Action

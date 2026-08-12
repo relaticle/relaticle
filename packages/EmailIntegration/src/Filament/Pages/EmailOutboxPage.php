@@ -48,6 +48,12 @@ final class EmailOutboxPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 5;
 
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
+
     public function table(Table $table): Table
     {
         return $table

@@ -24,6 +24,12 @@ final class UserEmailPrivacyPage extends Page
 
     protected static ?int $navigationSort = 5;
 
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user';
 
     public function getTitle(): string

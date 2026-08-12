@@ -42,6 +42,12 @@ final class EmailAccessRequestsPage extends Page
 
     protected static ?int $navigationSort = 6;
 
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
+
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/email-access-requests.navigation_label');

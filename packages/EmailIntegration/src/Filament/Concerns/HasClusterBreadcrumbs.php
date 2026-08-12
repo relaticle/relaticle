@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
-use Illuminate\Contracts\View\View;
+use Filament\Actions\Action;
 
 /**
  * Email settings cluster pages render their own header (breadcrumbs, heading, actions)
- * from `<x-email-integration::cluster-header />` at the top of the page view, so it starts at the
- * content column like the accounts page rather than spanning the cluster navigation.
- * The stock full-width header is suppressed here, and it would drop the breadcrumbs
- * anyway — the app panel disables them globally (AppPanelProvider::breadcrumbs(false)).
+ * from `<x-email-integration::cluster-header />` at the top of the page view, so it
+ * starts at the content column like the accounts page rather than spanning the cluster
+ * navigation. Each page blanks `$heading` so the stock full-width header is not
+ * rendered at all — it would drop the breadcrumbs anyway, since the app panel disables
+ * them globally (AppPanelProvider::breadcrumbs(false)).
  */
 trait HasClusterBreadcrumbs
 {
-    public function getHeader(): ?View
+    /**
+     * Actions for the cluster header. They cannot be registered as page header actions:
+     * that alone makes Filament render the stock full-width header.
+     *
+     * @return array<int, Action>
+     */
+    public function clusterHeaderActions(): array
     {
-        return view('email-integration::filament.pages.partials.no-header');
+        return [];
     }
 
     /**

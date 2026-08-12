@@ -4,8 +4,6 @@
 
 <x-filament-panels::header
     class="-mt-2"
-    :actions="$this->getCachedHeaderActions()"
-    :actions-alignment="$this->getHeaderActionsAlignment()"
-    :heading="$this->getHeading()"
-    :subheading="$this->getSubheading()"
+    :actions="$this->clusterHeaderActions()"
+    :heading="$this->getTitle()"
 />

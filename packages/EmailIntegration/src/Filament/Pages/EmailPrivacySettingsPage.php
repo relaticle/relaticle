@@ -66,6 +66,12 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     protected static ?int $navigationSort = 4;
 
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
 
     public function getTitle(): string
