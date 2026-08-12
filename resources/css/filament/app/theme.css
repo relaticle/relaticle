@@ -294,6 +294,16 @@
     @apply rounded-xl;
 }
 
+/* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
+   z-index 21 so its own dropdowns clear the sticky table head at 19. That also
+   puts it above a page-header action dropdown, whose panel is Filament's
+   default z-index 20 — the panel then renders *behind* the search field and
+   filter/column triggers. Lift those panels over the toolbar; 22 keeps them
+   under Filament chrome (topbar/sidebar, z-index 30). */
+.fi-header-actions-ctn .fi-dropdown-panel {
+    @apply z-[22];
+}
+
 .fi-dropdown-list-item {
     @apply rounded-lg;
 }
