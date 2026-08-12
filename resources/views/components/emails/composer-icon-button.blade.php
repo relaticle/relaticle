@@ -5,7 +5,7 @@
 
 <button
     type="button"
-    {{ $attributes->merge(['class' => 'rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800']) }}
+    {{ $attributes->merge(['class' => 'rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200']) }}
     aria-label="{{ $label }}"
     x-tooltip="{ content: @js($label), theme: $store.theme }"
 >

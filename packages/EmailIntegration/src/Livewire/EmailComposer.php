@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Livewire;
 
 use App\Models\User;
+use App\Services\AvatarService;
 use Filament\Forms\Components\RichEditor;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
@@ -12,6 +13,7 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -33,6 +35,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
@@ -44,6 +47,8 @@ final class EmailComposer extends Component implements HasSchemas
     public bool $isOpen = false;
 
     public bool $isMinimized = false;
+
+    public bool $isExpanded = false;
 
     public ?string $draftId = null;
 
@@ -207,6 +212,12 @@ final class EmailComposer extends Component implements HasSchemas
         $this->isMinimized = false;
     }
 
+    public function toggleExpand(): void
+    {
+        $this->isExpanded = ! $this->isExpanded;
+        $this->isMinimized = false;
+    }
+
     public function close(): void
     {
         $this->persistDraft();
@@ -224,6 +235,13 @@ final class EmailComposer extends Component implements HasSchemas
         $this->showBcc = ! $this->showBcc;
     }
 
+    public function removeAttachment(int $index): void
+    {
+        unset($this->attachments[$index]);
+
+        $this->attachments = array_values($this->attachments);
+    }
+
     public function bodySchema(Schema $schema): Schema
     {
         return $schema->components([
@@ -232,6 +250,7 @@ final class EmailComposer extends Component implements HasSchemas
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
+                ->placeholder(__('filament/emails/composer.fields.body_placeholder'))
                 ->toolbarButtons([])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],
@@ -274,6 +293,82 @@ final class EmailComposer extends Component implements HasSchemas
         return $this->activeAccounts()
             ->mapWithKeys(fn (ConnectedAccount $account): array => [(string) $account->getKey() => $account->label])
             ->all();
+    }
+
+    /**
+     * The account the email will actually be sent from, for the "From" row.
+     */
+    #[Computed]
+    public function fromAccount(): ?ConnectedAccount
+    {
+        $accountId = $this->ownedAccountId();
+
+        return $accountId === null
+            ? null
+            : $this->activeAccounts()->firstWhere(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $accountId);
+    }
+
+    /**
+     * Avatar for the "From" row, generated from the sending account's own name —
+     * not the signed-in user's profile photo, which would be misleading on a
+     * shared or delegated mailbox.
+     */
+    #[Computed]
+    public function fromAvatarUrl(): ?string
+    {
+        $account = $this->fromAccount();
+
+        return $account === null
+            ? null
+            : resolve(AvatarService::class)->generate($account->display_name ?? $account->email_address);
+    }
+
+    /**
+     * Team templates the user may apply: shared ones plus their own.
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function templateOptions(): array
+    {
+        return $this->ownedTemplates()->pluck('name', 'id')->all();
+    }
+
+    /**
+     * Fill subject and body from a template, keeping the current signature below
+     * the template body so applying one never discards it.
+     */
+    public function applyTemplate(string $templateId): void
+    {
+        $template = $this->ownedTemplates()->whereKey($templateId)->first();
+
+        if (! $template instanceof EmailTemplate) {
+            return;
+        }
+
+        $signature = filled($this->signatureId)
+            ? EmailSignature::query()
+                ->where('connected_account_id', $this->ownedAccountId())
+                ->whereKey($this->signatureId)
+                ->first()
+            : null;
+
+        $rendered = resolve(EmailTemplateRenderService::class)->renderWithSignature($template, null, $signature);
+
+        $this->subject = $rendered['subject'];
+        $this->setBodyHtml($rendered['body_html']);
+    }
+
+    /**
+     * @return EloquentBuilder<EmailTemplate>
+     */
+    private function ownedTemplates(): EloquentBuilder
+    {
+        return EmailTemplate::query()
+            ->where('team_id', $this->authUser()->current_team_id)
+            ->where(fn (Builder $query): Builder => $query
+                ->where('is_shared', true)
+                ->orWhere('created_by', $this->authUser()->getKey()));
     }
 
     /**

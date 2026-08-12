@@ -18,7 +18,9 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 use function Pest\Laravel\actingAs;
 
@@ -409,4 +411,70 @@ it('falls back to the default account and warns when a draft\'s connected accoun
 
     expect(Email::query()->where('status', EmailStatus::DRAFT)->whereKey($draft->id)->value('connected_account_id'))
         ->toBe($this->account->id);
+});
+
+it('fills subject and body from a template and keeps the signature below it', function (): void {
+    $signature = EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>— Ada</p>',
+    ]);
+
+    $template = EmailTemplate::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'created_by' => $this->user->id,
+        'is_shared' => true,
+        'subject' => 'Renewal options',
+        'body_html' => '<p>Here are your options.</p>',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('signatureId', $signature->id)
+        ->call('applyTemplate', $template->id)
+        ->assertSet('subject', 'Renewal options')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Renewal options')->sole();
+    expect($email->body->body_html)->toContain('Here are your options.')
+        ->and($email->body->body_html)->toContain('Ada');
+});
+
+it('ignores a template belonging to another team', function (): void {
+    $foreign = EmailTemplate::factory()->create([
+        'team_id' => Team::factory()->create()->id,
+        'is_shared' => true,
+        'subject' => 'Not yours',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('applyTemplate', $foreign->id)
+        ->assertSet('subject', null);
+});
+
+it('drops a pending attachment when it is removed before sending', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'No attachment after all')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [
+            UploadedFile::fake()->create('keep.pdf', 12),
+            UploadedFile::fake()->create('drop.pdf', 12),
+        ])
+        // Each pending attachment is listed with its name and human-readable size.
+        ->assertSee('keep.pdf')
+        ->assertSee('drop.pdf')
+        ->assertSee('12.0 KB')
+        ->call('removeAttachment', 1)
+        ->assertSee('keep.pdf')
+        ->assertDontSee('drop.pdf')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'No attachment after all')->sole();
+    expect($email->attachments()->pluck('filename')->all())->toBe(['keep.pdf']);
 });
