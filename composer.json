@@ -42,7 +42,7 @@
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
-        "relaticle/custom-fields": "dev-feat/configurable-management-page as 3.7.0",
+        "relaticle/custom-fields": "^3.6.2",
         "relaticle/flowforge": "^4.0",
         "relaticle/ink": "^2.3",
         "ryangjchandler/laravel-cloudflare-turnstile": "^3.0",
@@ -183,11 +183,5 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/Relaticle/custom-fields"
-        }
-    ]
+    "prefer-stable": true
 }
