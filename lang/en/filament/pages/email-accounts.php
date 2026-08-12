@@ -36,11 +36,11 @@ return [
         ],
         'contact_creation_mode' => [
             'label' => 'Auto-create contacts',
-            'helper_text' => 'Controls when new Person records are created from email participants.',
+            'helper_text' => 'When to create Person records from participants.',
         ],
         'auto_create_companies' => [
             'label' => 'Auto-create companies',
-            'helper_text' => 'Create Company records for unrecognised business domains (public domains like gmail.com are always excluded).',
+            'helper_text' => 'Creates companies from business domains only.',
         ],
         'hourly_send_limit' => [
             'label' => 'Hourly send limit',

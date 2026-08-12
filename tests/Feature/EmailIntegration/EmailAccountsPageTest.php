@@ -6,7 +6,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -25,40 +25,12 @@ beforeEach(function (): void {
     ]));
 });
 
-it('saves all four settings fields on editSettings', function (): void {
+it('links editSettings to the per-account settings page', function (): void {
     livewire(EmailAccountsPage::class)
-        ->callAction('editSettings', data: [
-            'sync_inbox' => false,
-            'sync_sent' => true,
-            'contact_creation_mode' => ContactCreationMode::All->value,
-            'auto_create_companies' => true,
-        ], arguments: ['account_id' => $this->account->id]);
-
-    expect($this->account->fresh())
-        ->sync_inbox->toBeFalse()
-        ->sync_sent->toBeTrue()
-        ->contact_creation_mode->toBe(ContactCreationMode::All)
-        ->auto_create_companies->toBeTrue();
-});
-
-it('does not update another user\'s account via editSettings', function (): void {
-    $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
-    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'team_id' => $this->team->id,
-        'user_id' => $otherUser->id,
-        'sync_inbox' => true,
-    ]));
-
-    expect(fn () => livewire(EmailAccountsPage::class)
-        ->callAction('editSettings', data: [
-            'sync_inbox' => false,
-            'sync_sent' => false,
-            'contact_creation_mode' => ContactCreationMode::None->value,
-            'auto_create_companies' => false,
-        ], arguments: ['account_id' => $otherAccount->id]))
-        ->toThrow(ModelNotFoundException::class);
-
-    expect($otherAccount->fresh()->sync_inbox)->toBeTrue();
+        ->assertActionHasUrl(
+            TestAction::make('editSettings')->arguments(['account_id' => $this->account->id]),
+            EmailAccountSettingsPage::getUrl(['account' => $this->account->id]),
+        );
 });
 
 it('deletes the authenticated user\'s account on disconnect', function (): void {
