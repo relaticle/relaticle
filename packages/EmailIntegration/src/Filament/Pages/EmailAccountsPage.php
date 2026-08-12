@@ -71,7 +71,7 @@ final class EmailAccountsPage extends Page
      *
      * @return array<int, string>
      */
-    public static function getNavigationItemActiveRoutePattern(): string|array
+    public static function getNavigationItemActiveRoutePattern(): array
     {
         return [
             self::getRouteName(),
