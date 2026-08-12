@@ -14,10 +14,10 @@ it('closes the model picker when the user presses Escape', function (): void {
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
-        ->click('[data-chat-context="conversation"] [aria-label="Select AI model"]')
-        ->assertVisible('[data-chat-context="conversation"] [role="listbox"][aria-label="AI model options"]')
-        ->keys('[data-chat-context="conversation"] [aria-label="Select AI model"]', 'Escape')
-        ->assertMissing('[data-chat-context="conversation"] [role="listbox"][aria-label="AI model options"]');
+        ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
+        ->assertVisible('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]')
+        ->keys('[data-chat-context="dashboard"] [aria-label="Select AI model"]', 'Escape')
+        ->assertMissing('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]');
 });
 
 it('reopens the model picker after Escape closes it', function (): void {
@@ -30,8 +30,8 @@ it('reopens the model picker after Escape closes it', function (): void {
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
-        ->click('[data-chat-context="conversation"] [aria-label="Select AI model"]')
-        ->keys('[data-chat-context="conversation"] [aria-label="Select AI model"]', 'Escape')
-        ->click('[data-chat-context="conversation"] [aria-label="Select AI model"]')
-        ->assertVisible('[data-chat-context="conversation"] [role="listbox"][aria-label="AI model options"]');
+        ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
+        ->keys('[data-chat-context="dashboard"] [aria-label="Select AI model"]', 'Escape')
+        ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
+        ->assertVisible('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]');
 });
