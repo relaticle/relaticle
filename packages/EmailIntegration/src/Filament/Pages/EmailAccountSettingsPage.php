@@ -55,6 +55,8 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  * Sharing tier and blocklist are stored per user + team (not per account), so the
  * General and Blocklist tabs edit settings that apply to every mailbox this user
  * has connected — the info tooltips say so. Signatures are per account.
+ *
+ * @property-read Schema $form
  */
 final class EmailAccountSettingsPage extends Page implements HasSchemas
 {
@@ -67,6 +69,10 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     protected static ?string $slug = 'accounts/{account}';
 
     protected static bool $shouldRegisterNavigation = false;
+
+    protected ?string $heading = '';
+
+    protected ?string $subheading = null;
 
     public string $accountId;
 
@@ -92,7 +98,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             'auto_create_companies' => $this->account()->auto_create_companies,
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
-            'default_email_sharing_tier' => $user->default_email_sharing_tier?->value ?? '',
+            'default_email_sharing_tier' => $user->default_email_sharing_tier->value ?? '',
             'blocklist_emails' => $this->blocklistValues(EmailBlocklistType::EMAIL),
             'blocklist_domains' => $this->blocklistValues(EmailBlocklistType::DOMAIN),
         ]);
@@ -106,28 +112,13 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     }
 
     /**
-     * The account identity (logo, address, default badge, action menu) is rendered
-     * at the top of the settings panel itself — see the page view — so the page
-     * header stays empty; the cluster navigation carries the way back.
-     */
-    public function getHeading(): string
-    {
-        return '';
-    }
-
-    public function getSubheading(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * @return array<string, string>
+     * @return array<int|string, string>
      */
     public function getBreadcrumbs(): array
     {
         return [
-            EmailSettings::getUrl() => __('filament/clusters/email-settings.breadcrumb'),
-            EmailAccountsPage::getUrl() => __('filament/pages/email-accounts.navigation_label'),
+            EmailSettings::getUrl() => (string) __('filament/clusters/email-settings.breadcrumb'),
+            EmailAccountsPage::getUrl() => (string) __('filament/pages/email-accounts.navigation_label'),
             $this->account()->email_address,
         ];
     }
@@ -465,7 +456,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
      */
     private function blocklistRows(array $data): array
     {
-        return collect([
+        return array_values(collect([
             EmailBlocklistType::EMAIL->value => $data['blocklist_emails'] ?? [],
             EmailBlocklistType::DOMAIN->value => $data['blocklist_domains'] ?? [],
         ])
@@ -473,10 +464,12 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 fn (string $value): array => ['type' => $type, 'value' => $value],
                 $values,
             ))
-            ->values()
-            ->all();
+            ->all());
     }
 
+    /**
+     * @return Builder<EmailSignature>
+     */
     private function signaturesQuery(): Builder
     {
         return EmailSignature::query()

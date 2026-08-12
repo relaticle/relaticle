@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration;
 use App\Features\EmailIntegration;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,7 @@ use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -34,6 +36,12 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         // Parse the Public Suffix List once per process.
         $this->app->singleton(PublicSuffixList::class);
+
+        // Not gated by the feature flag: these are inert while the feature is off, and
+        // static analysis (which runs with it off) can only resolve
+        // `email-integration::` view strings when they are always registered.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
+        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'email-integration');
     }
 
     public function boot(): void
@@ -41,8 +49,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         if (! Feature::active(EmailIntegration::class)) {
             return;
         }
-
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
 
         // Dedicated Google OAuth driver for email/calendar connect, backed by the
         // `services.gmail` client + redirect (separate from social login's `services.google`).
@@ -55,6 +61,14 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         //
         // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
         // scheduled work lives there); do not re-register them here.
+
+        // The templates resource has no page view of its own, so its cluster header
+        // (see HasClusterBreadcrumbs) is rendered into the content column from here.
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
+            fn (): View => view('email-integration::components.cluster-header'),
+            scopes: ManageEmailTemplates::class,
+        );
 
         Route::middleware('web')
             ->group(function (): void {

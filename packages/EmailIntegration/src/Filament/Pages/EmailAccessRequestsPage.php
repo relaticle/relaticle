@@ -20,11 +20,13 @@ use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 final class EmailAccessRequestsPage extends Page
 {
+    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
     use WithPagination;
 
@@ -39,6 +41,12 @@ final class EmailAccessRequestsPage extends Page
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 
     protected static ?int $navigationSort = 6;
+
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
 
     public static function getNavigationLabel(): string
     {

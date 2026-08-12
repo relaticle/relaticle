@@ -16,13 +16,16 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
  */
 final class ConfigureMailboxAction extends Action
 {
-    public static function make(?string $name = null): static
+    public static function getDefaultName(): string
     {
-        /** @var static $action */
-        $action = parent::make($name ?? 'configureMailbox');
+        return 'configureMailbox';
+    }
 
-        return $action
-            ->label(__('filament/pages/email-accounts.not_connected.action'))
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->label(__('filament/pages/email-accounts.not_connected.action'))
             ->icon('heroicon-o-cog-6-tooth')
             ->url(fn (): string => EmailAccountsPage::getUrl())
             ->visible(function (): bool {

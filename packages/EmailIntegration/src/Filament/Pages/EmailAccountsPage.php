@@ -50,13 +50,13 @@ final class EmailAccountsPage extends Page
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int|string, string>
      */
     public function getBreadcrumbs(): array
     {
         return [
-            EmailSettings::getUrl() => __('filament/clusters/email-settings.breadcrumb'),
-            __('filament/pages/email-accounts.navigation_label'),
+            EmailSettings::getUrl() => (string) __('filament/clusters/email-settings.breadcrumb'),
+            (string) __('filament/pages/email-accounts.navigation_label'),
         ];
     }
 
@@ -71,7 +71,7 @@ final class EmailAccountsPage extends Page
      *
      * @return array<int, string>
      */
-    public static function getNavigationItemActiveRoutePattern(): string|array
+    public static function getNavigationItemActiveRoutePattern(): array
     {
         return [
             self::getRouteName(),

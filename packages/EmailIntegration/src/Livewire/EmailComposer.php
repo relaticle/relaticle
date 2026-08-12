@@ -318,9 +318,9 @@ final class EmailComposer extends Component implements HasSchemas
     {
         $account = $this->fromAccount();
 
-        return $account === null
-            ? null
-            : resolve(AvatarService::class)->generate($account->display_name ?? $account->email_address);
+        return $account instanceof ConnectedAccount
+            ? resolve(AvatarService::class)->generate($account->display_name ?? $account->email_address)
+            : null;
     }
 
     /**
