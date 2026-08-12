@@ -105,6 +105,13 @@ return [
 
     'edit_team' => 'Workspace Settings',
 
+    'tabs' => [
+        'general' => 'General',
+        'members' => 'Members',
+        'custom_fields' => 'Custom Fields',
+        'billing' => 'Billing',
+    ],
+
     'roles' => [
         'admin' => [
             'description' => 'Administrator users can perform any action.',

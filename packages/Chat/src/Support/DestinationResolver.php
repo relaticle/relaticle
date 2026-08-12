@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
-use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\CustomFields;
+use App\Filament\Pages\Team\Members;
 use App\Models\Team;
-use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
@@ -38,13 +38,13 @@ final readonly class DestinationResolver
     {
         try {
             return match ($destination) {
-                'custom_fields' => CustomFieldsManagementPage::getUrl(panel: 'app', tenant: $team),
+                'custom_fields' => CustomFields::getUrl(panel: 'app', tenant: $team),
                 'import_companies' => ImportCompanies::getUrl(panel: 'app', tenant: $team),
                 'import_people' => ImportPeople::getUrl(panel: 'app', tenant: $team),
                 'import_opportunities' => ImportOpportunities::getUrl(panel: 'app', tenant: $team),
                 'import_tasks' => ImportTasks::getUrl(panel: 'app', tenant: $team),
                 'import_notes' => ImportNotes::getUrl(panel: 'app', tenant: $team),
-                'team_members' => EditTeam::getUrl(panel: 'app', tenant: $team),
+                'team_members' => Members::getUrl(panel: 'app', tenant: $team),
                 default => null,
             };
         } catch (Throwable) {

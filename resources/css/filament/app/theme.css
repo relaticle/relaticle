@@ -289,6 +289,13 @@
     @apply rounded-xl;
 }
 
+/* Page sub-navigation tabs (workspace settings). Filament centres the strip;
+   every heading and section on these pages is left-aligned, so a centred strip
+   reads as a stray floating element. */
+.fi-page-sub-navigation-tabs {
+    @apply mx-0;
+}
+
 /* Dropdowns */
 .fi-dropdown-panel {
     @apply rounded-xl;

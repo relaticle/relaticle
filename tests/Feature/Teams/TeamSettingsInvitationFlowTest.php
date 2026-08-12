@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\Members;
 use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
@@ -24,19 +25,30 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
-test('team settings page does not render ManageInviteLink', function () {
+test('the general tab owns workspace name and deletion', function () {
     $page = app(EditTeam::class);
     $page->tenant = $this->team;
 
-    $schema = $page->form(Schema::make($page));
-
-    $components = collect($schema->getComponents())
-        ->filter(fn ($c) => $c instanceof LivewireComponent)
-        ->map(fn (LivewireComponent $c) => $c->getComponent())
+    $components = collect($page->form(Schema::make($page))->getComponents())
+        ->filter(fn ($c): bool => $c instanceof LivewireComponent)
+        ->map(fn (LivewireComponent $c): string => $c->getComponent())
         ->all();
 
     expect($components)->toContain(UpdateTeamName::class)
-        ->and($components)->toContain(AddTeamMember::class)
+        ->and($components)->not->toContain(AddTeamMember::class)
+        ->and($components)->not->toContain(PendingTeamInvitations::class)
+        ->and($components)->not->toContain(TeamMembers::class);
+});
+
+test('the members tab owns invitations and membership, and does not render ManageInviteLink', function () {
+    $page = app(Members::class);
+
+    $components = collect($page->form(Schema::make($page))->getComponents())
+        ->filter(fn ($c): bool => $c instanceof LivewireComponent)
+        ->map(fn (LivewireComponent $c): string => $c->getComponent())
+        ->all();
+
+    expect($components)->toContain(AddTeamMember::class)
         ->and($components)->toContain(PendingTeamInvitations::class)
         ->and($components)->toContain(TeamMembers::class)
         ->and($components)->not->toContain('App\\Livewire\\App\\Teams\\ManageInviteLink');

@@ -9,6 +9,7 @@ use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
@@ -17,7 +18,6 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\RedirectResponse;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
@@ -26,6 +26,8 @@ use Throwable;
 
 final class Billing extends Page
 {
+    use HasWorkspaceSettingsNavigation;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
     protected static ?string $slug = 'billing';
@@ -86,57 +88,51 @@ final class Billing extends Page
         Notification::make()->title(__('billing.trial.started'))->success()->send();
     }
 
-    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): ?RedirectResponse
+    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team) || $team->subscribed()) {
-            return null;
+            return;
         }
 
         try {
-            return redirect()->away($createCheckout->execute($team, $interval));
+            $this->redirect($createCheckout->execute($team, $interval));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 
-    public function managePortal(): ?RedirectResponse
+    public function managePortal(): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team)) {
-            return null;
+            return;
         }
 
         try {
-            return $team->redirectToBillingPortal(self::getUrl(panel: 'app', tenant: $team));
+            $this->redirect($team->billingPortalUrl(self::getUrl(panel: 'app', tenant: $team)));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 
-    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): ?RedirectResponse
+    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team) || ! resolve(HostedWorkspaceAccess::class)->allows($team)) {
-            return null;
+            return;
         }
 
         try {
-            return redirect()->away($createCheckout->execute($team, $pack));
+            $this->redirect($createCheckout->execute($team, $pack));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 

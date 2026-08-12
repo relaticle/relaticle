@@ -17,7 +17,6 @@ return [
     ],
 
     'tenant_menu' => [
-        'custom_fields' => 'Custom Fields',
         'import_history' => 'Import History',
     ],
 ];
