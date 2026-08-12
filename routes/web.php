@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
+use Relaticle\Documentation\Support\DocsRepository;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
@@ -74,12 +75,15 @@ Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,
 
 // Legacy documentation redirects — old slugs that differ from current /docs types
 // are mapped explicitly; anything unknown lands on the docs index instead of a 404.
-Route::get('/documentation/{slug?}', function (string $slug = ''): RedirectResponse {
+Route::get('/documentation/{slug?}', function (DocsRepository $repository, string $slug = ''): RedirectResponse {
     $map = ['quickstart' => 'getting-started'];
 
     $target = $map[$slug] ?? $slug;
 
-    return array_key_exists($target, config('documentation.documents', []))
+    $isKnownTarget = $repository->find("docs/guides/{$target}") !== null
+        || "/docs/{$target}" === config('documentation.api_reference.url');
+
+    return $isKnownTarget
         ? redirect("/docs/{$target}", 301)
         : redirect('/docs', 301);
 })

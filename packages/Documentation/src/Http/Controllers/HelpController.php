@@ -18,6 +18,8 @@ final readonly class HelpController
 {
     private const string AREA = 'help';
 
+    private const string DOCS_CATEGORY = 'docs/guides';
+
     public function __construct(
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
@@ -150,16 +152,21 @@ final readonly class HelpController
     /** @return list<string> */
     private function llmsTxtDocsEntries(): array
     {
-        /** @var array<string, array<string, string>> $documents */
-        $documents = config('documentation.documents', []);
-
         $entries = [];
 
-        foreach ($documents as $type => $document) {
-            $url = isset($document['url']) ? url($document['url']) : route('documentation.show', ['type' => $type]);
-
-            $entries[] = sprintf('- [%s](%s): %s', $document['title'], $url, $document['description'] ?? '');
+        foreach ($this->repository->pagesIn(self::DOCS_CATEGORY) as $page) {
+            $entries[] = sprintf(
+                '- [%s](%s): %s',
+                $page->title,
+                route('documentation.show', ['type' => $page->slug]),
+                $page->description,
+            );
         }
+
+        /** @var array{title: string, url: string, description: string} $apiReference */
+        $apiReference = config('documentation.api_reference');
+
+        $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], url($apiReference['url']), $apiReference['description']);
 
         return $entries;
     }

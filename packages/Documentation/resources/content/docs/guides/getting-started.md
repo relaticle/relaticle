@@ -1,4 +1,8 @@
-# Getting Started
+---
+title: Getting Started
+description: Set up your account and learn the basics.
+order: 1
+---
 
 Welcome to Relaticle. This guide gets you up and running in 5 minutes.
 

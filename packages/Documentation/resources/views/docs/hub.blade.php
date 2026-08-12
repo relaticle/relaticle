@@ -1,6 +1,26 @@
 @php
-    $baseTitle = __('Help Centre');
-    $pageDescription = __('Guides for setting up your workspace, importing records, and using Relaticle day to day.');
+    $baseTitle = __('Documentation');
+    $pageDescription = __('Guides and resources to help you get the most out of Relaticle CRM.');
+
+    $documentIcons = [
+        'getting-started' => 'ri-rocket-2-line',
+        'import' => 'ri-upload-2-line',
+        'developer' => 'ri-code-s-slash-line',
+        'self-hosting' => 'ri-server-line',
+        'mcp' => 'ri-cpu-line',
+    ];
+
+    $cards = $pages->map(fn ($page): array => [
+        'title' => $page->title,
+        'description' => $page->description,
+        'link' => route('documentation.show', ['type' => $page->slug]),
+        'icon' => $documentIcons[$page->slug] ?? null,
+    ])->push([
+        'title' => $apiReference['title'],
+        'description' => $apiReference['description'],
+        'link' => $apiReference['url'],
+        'icon' => 'ri-terminal-box-line',
+    ]);
 @endphp
 
 <x-documentation::shell
@@ -18,14 +38,19 @@
             </p>
         </div>
 
-        <h2 class="sr-only">{{ __('Help categories') }}</h2>
+        <h2 class="sr-only">{{ __('Available Guides') }}</h2>
         <div class="border-t border-gray-200/60 dark:border-white/[0.04] divide-y divide-gray-200/60 dark:divide-white/[0.04]">
             <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200/60 dark:divide-white/[0.04]">
-                @foreach($categories as $category)
+                @foreach($cards as $card)
+                    @if($loop->index % 2 === 0 && ! $loop->first)
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200/60 dark:divide-white/[0.04]">
+                    @endif
                     <x-documentation::card
-                        :title="$category->title"
-                        :description="$category->description"
-                        :link="route('help.category', ['category' => \Illuminate\Support\Str::after($category->path, '/')])"
+                        :title="$card['title']"
+                        :description="$card['description']"
+                        :link="$card['link']"
+                        :icon="$card['icon']"
                     />
                 @endforeach
             </div>
@@ -34,7 +59,7 @@
 
     @php
         $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
-            ['name' => $baseTitle, 'url' => route('help.index')],
+            ['name' => $baseTitle, 'url' => route('documentation.index')],
         ]);
     @endphp
 

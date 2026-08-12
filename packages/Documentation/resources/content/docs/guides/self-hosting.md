@@ -1,4 +1,8 @@
-# Self-Hosting Guide
+---
+title: Self-Hosting Guide
+description: Deploy Relaticle with Docker or manually.
+order: 4
+---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
 

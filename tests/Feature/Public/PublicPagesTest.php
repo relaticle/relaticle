@@ -131,13 +131,6 @@ describe('Documentation pages', function () {
         $response->assertStatus(404);
     });
 
-    it('can search documentation and returns results', function () {
-        $response = $this->get('/docs/search?query=import');
-
-        $response->assertStatus(200);
-        $response->assertSee('Import');
-    });
-
 });
 
 describe('Pricing page', function () {

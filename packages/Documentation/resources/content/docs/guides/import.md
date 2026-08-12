@@ -1,4 +1,8 @@
-# Import Guide
+---
+title: Import Guide
+description: Import data from CSV files.
+order: 2
+---
 
 Relaticle's import wizard lets you bulk import data from CSV files into your CRM.
 

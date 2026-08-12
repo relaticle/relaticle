@@ -1,4 +1,8 @@
-# Developer Guide
+---
+title: Developer Guide
+description: Installation, architecture, and contributing.
+order: 3
+---
 
 Technical documentation for developers and contributors.
 
