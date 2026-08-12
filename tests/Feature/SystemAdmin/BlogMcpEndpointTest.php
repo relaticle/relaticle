@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Routing\Route;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
@@ -24,6 +25,28 @@ it('rejects unauthenticated blog mcp requests', function (): void {
         'id' => 1,
         'method' => 'tools/list',
     ])->assertUnauthorized();
+});
+
+/**
+ * The mirror of the app MCP guard test (rejects a personal access token minted
+ * for a tokenable outside the users provider): 'sanctum-sysadmin' is scoped to
+ * the system_administrators provider (config/auth.php), so a token minted for
+ * an App\Models\User must never authenticate here. Before the guard split this
+ * endpoint used the default 'sanctum' guard with `provider: null`, which
+ * accepted any CRM user's PAT.
+ */
+it('rejects a personal access token minted for a tokenable outside the system_administrators provider', function (): void {
+    $user = User::factory()->create();
+    $token = $user->createToken('crm-pat', ['*'])->plainTextToken;
+
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->withHeader('Accept', 'application/json')
+        ->postJson('/mcp/blog', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ])
+        ->assertUnauthorized();
 });
 
 it('serves tools/list to a bearer token issued to a super administrator', function (): void {

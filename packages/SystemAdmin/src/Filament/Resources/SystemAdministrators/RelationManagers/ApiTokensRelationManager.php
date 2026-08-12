@@ -60,11 +60,13 @@ final class ApiTokensRelationManager extends RelationManager
                             ->required(),
                     ])
                     ->action(function (array $data): void {
-                        // Filament generates no option-membership rule for CheckboxList, so a
-                        // crafted request could submit abilities outside the eight above (e.g.
-                        // `*`, which Sanctum treats as "every ability"). Intersecting against
-                        // the enum is the actual security boundary — the checkbox list is UI
-                        // only.
+                        // Filament's CheckboxList dehydrates an `abilities.*` => in(...) rule
+                        // from the same options() the enum populates, so a crafted request
+                        // carrying an ability outside the eight above (e.g. `*`, which Sanctum
+                        // treats as "every ability") is already rejected before this closure
+                        // runs. The intersect below is a second, independent layer of
+                        // defence-in-depth that enforces the same allowlist regardless of
+                        // whether that Filament behaviour ever changes.
                         $abilities = array_values(array_intersect($data['abilities'], BlogTokenAbility::values()));
 
                         // A token minted here authenticates as this record from then on, so
