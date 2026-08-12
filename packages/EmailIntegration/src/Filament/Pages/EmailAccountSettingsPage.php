@@ -70,6 +70,10 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
 
     protected static bool $shouldRegisterNavigation = false;
 
+    protected ?string $heading = '';
+
+    protected ?string $subheading = null;
+
     public string $accountId;
 
     private ?ConnectedAccount $account = null;
@@ -106,22 +110,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return $this->account()->email_address;
     }
-
-    /**
-     * The account identity (logo, address, default badge, action menu) is rendered
-     * at the top of the settings panel itself — see the page view — so the page
-     * header stays empty; the cluster navigation carries the way back.
-     */
-    public function getHeading(): string
-    {
-        return '';
-    }
-
-    public function getSubheading(): ?string
-    {
-        return null;
-    }
-
     /**
      * @return array<int|string, string>
      */

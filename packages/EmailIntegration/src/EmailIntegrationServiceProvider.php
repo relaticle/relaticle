@@ -36,14 +36,10 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Registered unconditionally (like the other packages): the namespace is inert
-        // while the feature is off, and static analysis can only resolve
-        // `email-integration::` view strings when it is always registered.
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
-
         if (! Feature::active(EmailIntegration::class)) {
             return;
         }
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
 
         // Dedicated Google OAuth driver for email/calendar connect, backed by the
         // `services.gmail` client + redirect (separate from social login's `services.google`).
