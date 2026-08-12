@@ -45,4 +45,9 @@ return [
             'label' => 'My RSVP',
         ],
     ],
+
+    'empty_state' => [
+        'heading' => 'No meetings yet',
+        'description' => 'Meetings from your synced calendar appear here.',
+    ],
 ];

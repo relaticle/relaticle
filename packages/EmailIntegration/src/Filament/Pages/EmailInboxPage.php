@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
@@ -1065,14 +1066,37 @@ final class EmailInboxPage extends Page
         return $this->defaultPrivacyTier();
     }
 
+    /**
+     * Drives both the compose action and the "connect a mailbox" empty state,
+     * so it is read from the blade as a computed property.
+     */
     #[Computed]
     public function hasActiveConnectedAccount(): bool
     {
-        return ConnectedAccount::query()
-            ->where('user_id', $this->authUser()->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->exists();
+        /** @var Team|null $team */
+        $team = filament()->getTenant();
+
+        return ConnectedAccount::hasActiveFor($this->authUser(), $team);
+    }
+
+    /**
+     * Take the whole page over with the connect prompt only when the user has nothing
+     * to read here: teammates without a mailbox of their own still get the inbox for
+     * emails shared with them.
+     */
+    #[Computed]
+    public function showConnectPrompt(): bool
+    {
+        if ($this->hasActiveConnectedAccount()) {
+            return false;
+        }
+
+        $user = $this->authUser();
+
+        return Email::query()
+            ->forTeam($user->current_team_id)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->doesntExist();
     }
 
     /**

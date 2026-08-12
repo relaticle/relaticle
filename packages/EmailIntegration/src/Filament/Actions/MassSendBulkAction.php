@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Filament\Actions;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\RichEditor;
@@ -33,12 +34,14 @@ final class MassSendBulkAction extends BulkAction
             ->label(__('filament/actions/mass-send.label'))
             ->icon('heroicon-o-paper-airplane')
             ->modalWidth(Width::ThreeExtraLarge)
-            ->visible(fn (): bool => ConnectedAccount::query()
-                ->where('user_id', auth()->id())
-                ->where('team_id', filament()->getTenant()?->getKey())
-                ->where('status', 'active')
-                ->exists()
-            )
+            ->visible(function (): bool {
+                /** @var User|null $user */
+                $user = auth()->user();
+                /** @var Team|null $team */
+                $team = filament()->getTenant();
+
+                return $user instanceof User && ConnectedAccount::hasActiveFor($user, $team);
+            })
             ->schema([
                 Select::make('connected_account_id')
                     ->label(__('filament/actions/mass-send.fields.from.label'))
