@@ -119,9 +119,23 @@ final class ApiTokensRelationManager extends RelationManager
                     ),
             ])
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Done')
-            ->after(function (): void {
-                $this->plainTextToken = '';
-            });
+            ->modalCancelActionLabel('Done');
+    }
+
+    /**
+     * `showCreatedTokenAction()` has no submit action (`modalSubmitAction(false)`),
+     * so closing it — via "Done", Escape, or the modal backdrop — always goes
+     * through `unmountAction()`, never `callAfter()`. An `->after()` hook on that
+     * action is therefore dead code that never runs, leaving the plaintext token
+     * sitting in this component's public property (and re-serialized into the
+     * page's Livewire snapshot on every later request) until the browser tab is
+     * closed. Clearing it here, on the one path that's actually taken, is what
+     * makes "shown once" true.
+     */
+    public function unmountAction(bool|string|null $cancelParentActions = null): void
+    {
+        $this->plainTextToken = '';
+
+        parent::unmountAction($cancelParentActions);
     }
 }

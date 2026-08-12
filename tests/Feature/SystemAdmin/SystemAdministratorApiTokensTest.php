@@ -41,6 +41,26 @@ it('creates a token and persists only its sha256 hash', function (): void {
         ->and($persisted->token)->not->toBe($plainTextToken);
 });
 
+it('clears the plaintext token from component state once the "shown once" modal is closed', function (): void {
+    $component = livewire(ApiTokensRelationManager::class, [
+        'ownerRecord' => $this->admin,
+        'pageClass' => EditSystemAdministrator::class,
+    ])
+        ->callAction(TestAction::make('create-token')->table(), [
+            'name' => 'Claude Code',
+            'abilities' => ['posts:read'],
+        ])
+        ->assertHasNoActionErrors();
+
+    expect((string) $component->get('plainTextToken'))->not->toBeEmpty();
+
+    // The "showCreatedToken" modal has no submit action (modalSubmitAction(false)),
+    // so "Done"/Escape/backdrop all resolve to unmountAction() — never the ->after()
+    // hook that used to live on the action, which never actually ran.
+    $component->call('unmountAction')
+        ->assertSet('plainTextToken', '');
+});
+
 it('revokes a token', function (): void {
     $this->admin->createToken('Old client', ['posts:read']);
     $token = $this->admin->tokens()->first();
