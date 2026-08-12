@@ -195,9 +195,6 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',
         'Relaticle\Documentation\Services\DocumentationService',
-        // Memoizes the parsed content manifest per request; readonly would
-        // block the lazy-load cache this class exists to provide.
-        'Relaticle\Documentation\Support\DocsRepository',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
         'Relaticle\ImportWizard\Support\EntityLinkResolver',
         'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',

@@ -17,80 +17,101 @@ use Symfony\Component\Yaml\Yaml;
  * value objects, keyed by their path. Nav, search, sitemap entries, and the
  * `.md` variant of a page all derive from this manifest — the content files
  * are the single source of truth, never front matter.
+ *
+ * Resolved as a container singleton, so the manifest is parsed once, eagerly,
+ * here in the constructor — a caller resolving this class already intends to
+ * use it, and there is no cheaper "maybe I won't need it" case to defer for.
  */
-final class DocsRepository
+final readonly class DocsRepository
 {
-    /** @var Collection<string, DocPage>|null */
-    private ?Collection $pages = null;
+    private const string CACHE_KEY = 'documentation.manifest';
 
-    /** @var Collection<string, DocCategory>|null */
-    private ?Collection $categories = null;
+    /** @var Collection<string, DocPage> */
+    private Collection $pages;
+
+    /** @var Collection<string, DocCategory> */
+    private Collection $categories;
+
+    public function __construct()
+    {
+        [$this->pages, $this->categories] = $this->resolve();
+    }
 
     /** @return Collection<string, DocPage> */
     public function pages(): Collection
     {
-        $this->load();
-
-        return $this->pages instanceof Collection ? $this->pages : collect();
+        return $this->pages;
     }
 
     /** @return Collection<string, DocCategory> */
     public function categories(): Collection
     {
-        $this->load();
-
-        return $this->categories instanceof Collection ? $this->categories : collect();
+        return $this->categories;
     }
 
     public function find(string $path): ?DocPage
     {
-        return $this->pages()->get($path);
+        return $this->pages->get($path);
     }
 
     public function findCategory(string $path): ?DocCategory
     {
-        return $this->categories()->get($path);
+        return $this->categories->get($path);
     }
 
     /** @return Collection<string, DocPage> */
     public function pagesIn(string $categoryPath): Collection
     {
-        return $this->pages()
+        return $this->pages
             ->filter(fn (DocPage $page): bool => "{$page->area}/{$page->category}" === $categoryPath)
             ->sortBy(fn (DocPage $page): int => $page->order);
     }
 
-    public function clearCache(): void
+    /** @return array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>} */
+    private function resolve(): array
     {
-        $this->pages = null;
-        $this->categories = null;
-
         $root = (string) config('documentation.content_path');
 
-        Cache::forget($this->manifestCacheKey($root));
+        if (! $this->cachingEnabled()) {
+            return $this->build($root);
+        }
+
+        $signature = $this->signature($root);
+
+        /** @var array{signature: string, pages: Collection<string, DocPage>, categories: Collection<string, DocCategory>}|null $cached */
+        $cached = Cache::get(self::CACHE_KEY);
+
+        if (is_array($cached) && $cached['signature'] === $signature) {
+            return [$cached['pages'], $cached['categories']];
+        }
+
+        [$pages, $categories] = $this->build($root);
+
+        // One stable key holding the current manifest, not one key per content
+        // state — otherwise every edit abandons the previous key forever with
+        // no TTL to reclaim it.
+        Cache::forever(self::CACHE_KEY, [
+            'signature' => $signature,
+            'pages' => $pages,
+            'categories' => $categories,
+        ]);
+
+        return [$pages, $categories];
     }
 
-    private function load(): void
+    /**
+     * Local dev edits content constantly, so `app.debug` always bypasses the
+     * cache. `documentation.cache.enabled` (env DOCUMENTATION_CACHE_ENABLED)
+     * is the operator-facing override for forcing a rebuild in any
+     * environment without waiting for a file to change.
+     */
+    private function cachingEnabled(): bool
     {
-        if ($this->pages instanceof Collection) {
-            return;
-        }
-
-        $root = (string) config('documentation.content_path');
-
         if ((bool) config('app.debug')) {
-            [$this->pages, $this->categories] = $this->build($root);
-
-            return;
+            return false;
         }
 
-        /** @var array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>} $manifest */
-        $manifest = Cache::rememberForever(
-            $this->manifestCacheKey($root),
-            fn (): array => $this->build($root),
-        );
-
-        [$this->pages, $this->categories] = $manifest;
+        return (bool) config('documentation.cache.enabled', true);
     }
 
     /** @return array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>} */
@@ -153,10 +174,13 @@ final class DocsRepository
             fn (DocCategory $category): array => [$category->path => $category->order],
         )->all();
 
+        // Grouped by category, alphabetical within — a sane default listing.
+        // This is deliberately NOT sorted by $page->order: pagesIn() is the
+        // one place that contract lives, so a regression there can't hide
+        // behind an accidentally-already-sorted pages() collection.
         return [
             $pages->sortBy(fn (DocPage $page): array => [
                 $categoryOrder["{$page->area}/{$page->category}"] ?? PHP_INT_MAX,
-                $page->order,
                 $page->title,
             ]),
             $categories->sortBy(fn (DocCategory $category): int => $category->order),
@@ -165,21 +189,20 @@ final class DocsRepository
 
     /**
      * A hash of every content file's name and modification time. An edit,
-     * addition, or removal changes the hash, which changes the cache key,
-     * which busts the cached manifest — no separate invalidation signal
-     * needed.
+     * addition, or removal changes the hash, so a stale cached manifest is
+     * detected by comparing signatures rather than by a separate bust signal.
      */
-    private function manifestCacheKey(string $root): string
+    private function signature(string $root): string
     {
         if (! File::isDirectory($root)) {
-            return 'documentation.manifest.'.hash('sha256', $root);
+            return hash('sha256', $root);
         }
 
-        $signature = collect(File::allFiles($root))
+        $fileList = collect(File::allFiles($root))
             ->map(fn (SplFileInfo $file): string => $file->getRelativePathname().':'.$file->getMTime())
             ->implode('|');
 
-        return 'documentation.manifest.'.hash('sha256', $root.'|'.$signature);
+        return hash('sha256', $root.'|'.$fileList);
     }
 
     /**

@@ -23,6 +23,13 @@ return [
     |
     | These options control the caching behavior of the documentation package.
     |
+    | `enabled` also gates DocsRepository's content manifest (alongside
+    | app.debug, which always bypasses it) — flip DOCUMENTATION_CACHE_ENABLED
+    | off to force a rebuild without touching a file. `ttl` does not apply to
+    | DocsRepository: its manifest cache is invalidated by comparing a
+    | content-hash signature on every read, not by expiry, so a stale entry
+    | can't outlive the content it was built from.
+    |
     */
     'cache' => [
         'enabled' => env('DOCUMENTATION_CACHE_ENABLED', true),
