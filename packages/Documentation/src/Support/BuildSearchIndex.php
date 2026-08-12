@@ -6,7 +6,6 @@ namespace Relaticle\Documentation\Support;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 /**
  * One record per `##` heading, plus a lead record for the text above the
@@ -69,16 +68,18 @@ final readonly class BuildSearchIndex
     }
 
     /**
-     * A hash of every help page's path and body -- cheap to compute from the
-     * already-parsed collection, no extra filesystem walk needed. Any content
-     * edit changes the hash, so a stale cached index is never served.
+     * A hash of every field a cached record actually embeds -- path, title,
+     * and body -- cheap to compute from the already-parsed collection, no
+     * extra filesystem walk needed. Any edit to any of those three changes
+     * the hash, so a stale cached index (including a front-matter-only title
+     * edit) is never served.
      *
      * @param  Collection<string, DocPage>  $pages
      */
     private function signature(Collection $pages): string
     {
         return hash('sha256', $pages
-            ->map(fn (DocPage $page): string => "{$page->path}:{$page->body}")
+            ->map(fn (DocPage $page): string => "{$page->path}:{$page->title}:{$page->body}")
             ->implode('|'));
     }
 
@@ -93,16 +94,25 @@ final readonly class BuildSearchIndex
             ->all());
     }
 
-    /** @return list<array{path: string, title: string, section: string, anchor: string, content: string}> */
+    /**
+     * The heading text is captured twice with the identical regex -- once
+     * here to slice the body into per-section content, once inside
+     * HeadingAnchors to derive real anchor ids -- so the two stay aligned in
+     * document order without this class reimplementing the renderer's
+     * slugging (and its duplicate-heading suffixing) itself.
+     *
+     * @return list<array{path: string, title: string, section: string, anchor: string, content: string}>
+     */
     private function sections(DocPage $page): array
     {
         $chunks = preg_split('/^##[ \t]+(.+)$/m', $page->body, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$page->body];
+        $anchors = (new HeadingAnchors)($page->body);
 
         $records = [$this->record($page, $page->title, '', $chunks[0])];
         $counter = count($chunks);
 
-        for ($i = 1; $i < $counter; $i += 2) {
-            $records[] = $this->record($page, $chunks[$i], Str::slug($chunks[$i]), $chunks[$i + 1] ?? '');
+        for ($i = 1, $heading = 0; $i < $counter; $i += 2, $heading++) {
+            $records[] = $this->record($page, $chunks[$i], $anchors[$heading] ?? '', $chunks[$i + 1] ?? '');
         }
 
         return array_values(array_filter(

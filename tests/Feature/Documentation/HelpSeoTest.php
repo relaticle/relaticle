@@ -2,11 +2,35 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Relaticle\Documentation\Http\Controllers\HelpController;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocsJsonLd;
+use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\HeadingAnchors;
+use Relaticle\Documentation\Support\RenderDocMarkdown;
 
-mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class);
+mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class);
+
+/** @return list<string> Real heading-permalink ids, in document order, extracted from rendered HTML. */
+function renderedHeadingIds(string $html): array
+{
+    $dom = new DOMDocument;
+    libxml_use_internal_errors(true);
+    $dom->loadHTML('<?xml encoding="utf-8"?><body>'.$html.'</body>');
+    libxml_clear_errors();
+
+    $ids = [];
+
+    foreach ((new DOMXPath($dom))->query('//a[contains(concat(" ", normalize-space(@class), " "), " heading-permalink ")]') as $node) {
+        /** @var DOMElement $node */
+        $ids[] = $node->getAttribute('id');
+    }
+
+    return $ids;
+}
 
 it('emits article and breadcrumb json-ld on a help article', function (): void {
     $html = $this->get('/help/getting-started/create-your-first-company')->assertOk()->getContent();
@@ -64,4 +88,90 @@ it('serves an llms.txt indexing help and docs', function (): void {
         ->and($body)->toContain('/docs/getting-started')
         ->and($body)->toContain('Help Centre')
         ->and($body)->toContain('Documentation');
+});
+
+it('gives the search index anchors that equal the real heading ids the renderer emits', function (): void {
+    $fixturePath = storage_path('framework/testing/search-index-anchors-'.Str::random(8));
+
+    File::ensureDirectoryExists("{$fixturePath}/help/anchors");
+    File::put(
+        "{$fixturePath}/help/anchors/duplicate-and-unicode-headings.md",
+        <<<'MARKDOWN'
+        ---
+        title: Duplicate and unicode headings
+        description: Exercises duplicate and non-ASCII heading anchors.
+        order: 1
+        ---
+
+        Intro text above the first heading.
+
+        ## Settings
+
+        First settings section.
+
+        ## Café Settings
+
+        A non-ASCII heading -- must keep its Unicode letters, not transliterate them.
+
+        ## Settings
+
+        A second heading with the same text as the first, forcing the
+        renderer to append a disambiguating suffix.
+        MARKDOWN,
+    );
+
+    Config::set('documentation.content_path', $fixturePath);
+
+    $repository = new DocsRepository;
+    $page = $repository->find('help/anchors/duplicate-and-unicode-headings');
+
+    expect($page)->not->toBeNull();
+
+    $renderedIds = renderedHeadingIds(app(RenderDocMarkdown::class)($page->body));
+
+    $indexAnchors = collect((new BuildSearchIndex($repository))()['records'])
+        ->where('path', $page->path)
+        ->pluck('anchor')
+        ->reject(fn (string $anchor): bool => $anchor === '')
+        ->values()
+        ->all();
+
+    File::deleteDirectory($fixturePath);
+
+    expect($renderedIds)->toBe(['settings', 'café-settings', 'settings-1'])
+        ->and($indexAnchors)->toBe($renderedIds);
+});
+
+it('busts the cached search index on a front-matter-only title edit', function (): void {
+    $bodyTemplate = <<<'MARKDOWN'
+        ---
+        title: %s
+        description: Exercises the search-index cache signature.
+        order: 1
+        ---
+
+        Same body both times, only the title changes.
+        MARKDOWN;
+
+    $original = storage_path('framework/testing/search-index-cache-original-'.Str::random(8));
+    File::ensureDirectoryExists("{$original}/help/cache-guard");
+    File::put("{$original}/help/cache-guard/page.md", sprintf($bodyTemplate, 'Original title'));
+
+    $updated = storage_path('framework/testing/search-index-cache-updated-'.Str::random(8));
+    File::ensureDirectoryExists("{$updated}/help/cache-guard");
+    File::put("{$updated}/help/cache-guard/page.md", sprintf($bodyTemplate, 'Updated title'));
+
+    Config::set('documentation.content_path', $original);
+    $firstRecord = collect((new BuildSearchIndex(new DocsRepository))()['records'])
+        ->firstWhere('path', 'help/cache-guard/page');
+
+    Config::set('documentation.content_path', $updated);
+    $secondRecord = collect((new BuildSearchIndex(new DocsRepository))()['records'])
+        ->firstWhere('path', 'help/cache-guard/page');
+
+    File::deleteDirectory($original);
+    File::deleteDirectory($updated);
+
+    expect($firstRecord['title'])->toBe('Original title')
+        ->and($secondRecord['title'])->toBe('Updated title');
 });
