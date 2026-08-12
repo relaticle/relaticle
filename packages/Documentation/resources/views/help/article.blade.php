@@ -44,7 +44,6 @@
                     </div>
                 </nav>
 
-                <!-- Main Content Column -->
                 <div class="col-span-12 sm:col-span-9 lg:col-span-10 px-4 max-w-3xl">
                     <h1 class="font-display text-3xl sm:text-4xl font-bold text-gray-950 dark:text-white leading-[1.1] tracking-[-0.02em] mb-2">
                         {{ $page->title }}

@@ -32,3 +32,12 @@ it('serves an article as markdown to an agent', function (): void {
     expect($markdown)->toContain('Create your first company')
         ->and($markdown)->not->toContain('Start for free');
 });
+
+it('strips the related-articles nav from the markdown response but keeps the body', function (): void {
+    $markdown = $this->get('/help/getting-started/create-your-first-company', ['Accept' => 'text/markdown'])
+        ->assertOk()
+        ->getContent();
+
+    expect($markdown)->toContain('A company record tracks an account')
+        ->and($markdown)->not->toContain('Add your first person');
+});
