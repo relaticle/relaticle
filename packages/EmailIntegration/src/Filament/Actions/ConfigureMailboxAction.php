@@ -16,7 +16,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
  */
 final class ConfigureMailboxAction extends Action
 {
-    public static function getDefaultName(): ?string
+    public static function getDefaultName(): string
     {
         return 'configureMailbox';
     }
