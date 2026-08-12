@@ -24,10 +24,18 @@ php artisan tinker --execute 'echo json_encode([
 
 - app panel = `https://{app_domain}` if set, else `{base}/{app_path}`
 - sysadmin  = `https://{sysadmin_domain}` if set, else `{base}/{sysadmin_path}`
-- Current local env (verified: 2026-06-12): domain-routed —
-  `https://app.relaticle.test`, `https://sysadmin.relaticle.test`, base
-  `https://relaticle.test`. **Older docs said `/app` paths — that is the path-routed
-  fallback, only valid when the `*_DOMAIN` envs are unset.**
+- **Routing mode is per-checkout — derive it, never carry it over from another
+  workspace.** Both modes are live in the wild:
+  - Conductor workspace `bamako`, `APP_PANEL_DOMAIN`/`SYSADMIN_DOMAIN` empty →
+    path-routed: `https://bamako.test/app`, `https://bamako.test/sysadmin`
+    (verified: 2026-08-12).
+  - A checkout with the `*_DOMAIN` envs set → domain-routed, e.g.
+    `https://app.relaticle.test`, `https://sysadmin.relaticle.test`
+    (verified: 2026-06-12).
+
+  Each Conductor workspace is served by Herd under its own `https://<workspace>.test`,
+  so the host changes too. Run the `tinker` block above every run and use what it
+  returns.
 - Login entry points are Filament-registered routes; ground truth:
   `php artisan route:list --json` filtered for `login` (names like
   `filament.app.auth.login`). If a URL 404s, check the route table before anything else.
