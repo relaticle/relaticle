@@ -35,12 +35,25 @@ use Relaticle\SystemAdmin\Policies\PostPolicy;
 
 final class SystemAdminPanelProvider extends PanelProvider
 {
+    /**
+     * Single source of truth for which ink models the blog policies below cover
+     * — both Gate::policy() registration and the Gate::before() guard read from
+     * this array, so the two can never drift apart.
+     *
+     * @var array<class-string, class-string>
+     */
+    private const array BLOG_MODEL_POLICIES = [
+        Post::class => PostPolicy::class,
+        Category::class => CategoryPolicy::class,
+    ];
+
     public function boot(): void
     {
         // Blog MCP requests are not Filament panel requests, so the panel-scoped
         // policy discovery in AppServiceProvider never sees them.
-        Gate::policy(Post::class, PostPolicy::class);
-        Gate::policy(Category::class, CategoryPolicy::class);
+        foreach (self::BLOG_MODEL_POLICIES as $model => $policy) {
+            Gate::policy($model, $policy);
+        }
 
         // PostPolicy/CategoryPolicy type-hint SystemAdministrator, and Gate never
         // checks a policy method's parameter type before calling it — a caller of
@@ -51,7 +64,7 @@ final class SystemAdminPanelProvider extends PanelProvider
             $target = $arguments[0] ?? null;
             $modelClass = is_string($target) ? $target : ($target instanceof Model ? $target::class : null);
 
-            if (in_array($modelClass, [Post::class, Category::class], true) && ! $user instanceof SystemAdministrator) {
+            if ($modelClass !== null && array_key_exists($modelClass, self::BLOG_MODEL_POLICIES) && ! $user instanceof SystemAdministrator) {
                 return false;
             }
 
