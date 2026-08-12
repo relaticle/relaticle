@@ -21,9 +21,13 @@
                         Pricing
                     </a>
                     @feature(App\Features\Documentation::class)
+                    <a href="{{ route('help.index') }}"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
+                        {{ __('Help') }}
+                    </a>
                     <a href="{{ route('documentation.index') }}"
                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        Documentation
+                        {{ __('Developers') }}
                     </a>
                     @endfeature
                     @feature(App\Features\Blog::class)

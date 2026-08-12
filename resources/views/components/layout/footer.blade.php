@@ -52,7 +52,7 @@
                     <li>
                         <a href="{{ route('documentation.index') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
-                            Documentation
+                            {{ __('Developers') }}
                         </a>
                     </li>
                     @endfeature
@@ -79,6 +79,14 @@
                     Support & Legal
                 </h3>
                 <ul class="space-y-3">
+                    @feature(App\Features\Documentation::class)
+                    <li>
+                        <a href="{{ route('help.index') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('Help') }}
+                        </a>
+                    </li>
+                    @endfeature
                     <li>
                         <a href="{{ url('privacy-policy') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">

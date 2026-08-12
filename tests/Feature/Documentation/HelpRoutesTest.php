@@ -41,3 +41,12 @@ it('strips the related-articles nav from the markdown response but keeps the bod
     expect($markdown)->toContain('A company record tracks an account')
         ->and($markdown)->not->toContain('Add your first person');
 });
+
+it('links to help and developers from the marketing header, mobile nav, and footer', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    // A future nav refactor that silently drops one of these anchors still
+    // passes an "assertSee" style check -- count the occurrences instead.
+    expect(substr_count($html, route('help.index')))->toBeGreaterThanOrEqual(3)
+        ->and(substr_count($html, route('documentation.index')))->toBeGreaterThanOrEqual(3);
+});

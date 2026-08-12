@@ -41,7 +41,7 @@ Defects found (all reproduced live):
 | D1 | `/documentation/quickstart` (indexed in Google) 301s to `/docs/quickstart` which **404s** | curl chain 301→404 |
 | D2 | `app.relaticle.com` login/register are **indexed** (no noindex, robots allows all) | `site:relaticle.com` shows both |
 | D3 | Sitemap contains `/login`, `/register`, `/discord` (redirects/utility URLs); no `<lastmod>` anywhere | sitemap.xml |
-| | *Scope split during implementation:* W0 fixes the utility-URL half only. `<lastmod>` is **deferred to W2** — deriving it from markdown file mtime (the original plan) publishes the *deploy* date, not the content date: every docs markdown file in a fresh checkout or Docker `COPY` shares one identical mtime, so every docs URL would advertise the same date, re-stamped on each deploy. A false freshness signal is worse than none. W2's front-matter `updated:` is the real source. | |
+| | *Scope split during implementation, both halves now shipped:* W0 fixed the utility-URL half. `<lastmod>` was **deferred to W2, and has landed** — deriving it from markdown file mtime (the original W0 attempt, `f7c409fa5`) published the *deploy* date, not the content date, and was reverted before merge (`a7f131c6d`): every docs markdown file in a fresh checkout or Docker `COPY` shares one identical mtime, so every docs URL would advertise the same date, re-stamped on each deploy. A false freshness signal is worse than none. W2's front-matter `updated:` is the real source, wired into `GenerateSitemapCommand` via `DocPage->updated`. | |
 | D4 | Docs article H1 renders literal markdown: `<h1># MCP Server</h1>` with mangled permalink id | /docs/mcp HTML |
 | D5 | Docs sub-page meta descriptions duplicate the title ("Getting Started - Relaticle Documentation") | /docs/* HTML |
 | D6 | Markdown-for-agents output includes nav junk and leaked Alpine attrs (`= 768) mobileMenu = false"`) | `Accept: text/markdown` on /docs/mcp |
@@ -247,47 +247,97 @@ Wave-1 posts (agent-native cluster anchors + flywheel bait):
 
 Engineering posts (5, 8) double as HN/dev.to/Reddit distribution assets.
 
-### W2 — /help customer help centre (Phase 3 PR) — technical design
+### W2 — /help customer help centre (Phase 3 PR) — shipped 2026-08-12
 
-Port the maxforms docs-engine pattern (max-forms PRs #476/#481: in-repo markdown,
-front-matter, cached manifest, hub/category/article, section-level search index,
-Article + BreadcrumbList JSON-LD, link-integrity tests, content-conventions
-README) to **relaticle.com/help** — served directly by this app, no edge worker.
+Ported the maxforms docs-engine pattern (max-forms PRs #476/#481: in-repo
+markdown, front-matter, cached manifest, hub/category/article, section-level
+search index, Article + BreadcrumbList JSON-LD, link-integrity tests) to
+**relaticle.com/help** — served directly by this app, no edge worker.
 
 - **Surfaces**: two, per the landscape research — end-user `/help` (new) and
-  developer `/docs` (stays; its URLs are indexed and the Scribe-generated API
-  reference lives there — API/MCP is a product pillar, so the developer surface
-  keeps its own home; maxforms' single-prefix choice was driven by a
-  Cloudflare-zone constraint Relaticle doesn't have).
-- **Engine placement**: evolve `packages/Documentation` (`Relaticle\Documentation`)
-  into the shared engine rather than adding a second parallel markdown engine:
-  front-matter articles under `resources/content/help/{category}/{slug}.md`,
-  `HelpRepository`-style cached manifest (content-hash busted), readonly page/
-  category value objects, category `_index.md` metadata. Existing `/docs` types
-  keep their URLs and migrate onto the same rendering path (structurally fixing
-  D4/D5's class of bug). Current `DocumentationService` (config-listed files,
-  regex TOC) is absorbed/retired in the same change — no dual old/new paths.
+  developer `/docs` (kept its own home; its URLs are indexed and the
+  Scribe-generated API reference lives there — API/MCP is a product pillar).
+  Both are linked from the marketing header, mobile nav, and footer, gated
+  behind the same `App\Features\Documentation` flag as the routes themselves.
+- **Nav naming decision (2026-08-12)**: the two links read **"Help"** and
+  **"Developers"**, not "Help Center"/"Documentation". Once `/docs` and
+  `/help` are both front-matter documentation on the same engine, labelling
+  either one plain "Documentation" is ambiguous. "Developers" names `/docs`
+  by audience instead — it holds the developer guide, self-hosting, the MCP
+  server guide, and the API reference, so it is deliberately not shortened to
+  "API" (self-hosting and MCP aren't API docs, and MCP is this program's
+  strategic priority — see "Own the agent-native CRM query space" in Goals).
+  Order is Help, then Developers, in the header, mobile nav, and footer: end
+  users outnumber developers, and Help is the broader entry point.
+- **Engine placement, as planned**: `packages/Documentation`
+  (`Relaticle\Documentation`) became the shared engine instead of a second
+  parallel markdown pipeline. Content lives at
+  `packages/Documentation/resources/content/{help,docs/guides}/{category}/{slug}.md`,
+  each category carrying its own `_index.md` metadata; a `DocsRepository`
+  singleton parses the manifest once per request into readonly `DocPage`/
+  `DocCategory` value objects, cached under a single key with a content-hash
+  signature (not a TTL, so a front-matter-only edit still busts it).
+- **Scope change vs. plan — `/docs` migrated in the same effort, not deferred**:
+  the plan allowed `/docs` to "migrate onto the same rendering path" as a
+  follow-on; it shipped as part of W2 itself. The old `DocumentationService`
+  (config-listed files, regex-based TOC extraction), its `DocumentData`/
+  `DocumentSearchRequest`/`DocumentSearchResultData` DTOs, and the standalone
+  docs search view were deleted outright — no dual old/new rendering path ever
+  existed in the merged code. This structurally closed D4 (literal `# ` in
+  the H1) and D5 (title-as-description) for `/docs`, rather than patching the
+  old renderer in W0 and re-fixing it in W2.
 - **Views**: hub (category cards), category (article list + body), article
-  (breadcrumbs, TOC, related-articles footer, prev/next) — `docs::`-style
-  namespaced views following the existing marketing layout (`x-guest-layout`).
-- **SEO/GEO plumbing**: `Article` + `BreadcrumbList` JSON-LD via the installed
-  `spatie/schema-org`; front-matter `title`/`description`/`updated` drive metas
-  and sitemap `lastmod`; `.md` variants come free from the existing
-  `ProvideMarkdownResponse` middleware (post-D6 fix); a small `/llms.txt` route
-  generated from the manifest indexes `/help` + `/docs` (agent-discovery only —
-  see anti-goals); `search-index.json` + client-side palette (section-level
-  records, maxforms v2 contract).
-- **Tests**: link-integrity Pest test (every `related:` entry, internal link, and
-  image asset resolves against the manifest); route/meta/JSON-LD feature tests in
-  `tests/Feature/`; arch coverage for the package namespace
-  (`tests/Arch/ConventionsTest.php` requires conscious coverage for package
-  namespaces; service layer readonly per ArchTest conventions).
-- **Content wave 1 (~30 articles, 7 lifecycle categories)**: Getting started ·
-  Records (companies/people/opportunities) · Custom fields & views ·
-  Tasks/notes/pipeline · AI chat · Import, API & MCP · Workspace, team & billing.
-  Titles in the user's vocabulary (what they'd type into a search box),
-  answer-first bodies, real screenshots via agent-browser, never documenting
-  flag-gated/unreleased behavior (maxforms content conventions adopted verbatim).
+  (breadcrumbs, TOC via heading permalinks, related-articles footer wrapped in
+  a `<nav>` landmark, prev/next) — `documentation::help.*` and
+  `documentation::docs.*` namespaced views sharing one `shell` component,
+  following the existing marketing layout.
+- **SEO/GEO plumbing**: `Article` + `BreadcrumbList` JSON-LD via
+  `spatie/schema-org`; `.md` variants come from the existing
+  `ProvideMarkdownResponse` middleware; `/llms.txt` generated from the same
+  manifest indexes both `/help` and `/docs` (agent-discovery only — see
+  anti-goals); `/help/search-index.json` serves a section-level record set
+  (v2 contract: `path`/`title`/`section`/`anchor`/`content`) with anchors
+  guaranteed to equal the heading-permalink ids the renderer actually emits.
+- **`<lastmod>` scope change vs. plan — now shipped, sourced from front-matter**:
+  W0 (`f7c409fa5`) initially stamped `/docs/*` `<lastmod>` from markdown file
+  `mtime`; that was reverted before merge (`a7f131c6d`) because every docs file
+  in a fresh checkout or Docker `COPY` shares one deploy-time mtime, so it
+  would have advertised a false, identical freshness date on every URL,
+  re-stamped daily by the scheduled regeneration. `GenerateSitemapCommand` now
+  reads `DocPage->updated` (front-matter `updated:`, parsed by
+  `DocsRepository`) and only calls `setLastModificationDate()` when a page
+  actually declares one — closing D3's `<lastmod>` half without reintroducing
+  the false-freshness defect W0 avoided.
+- **Content-integrity guards (shipped, 5)**: every `related:` entry resolves to
+  a real page; every internal `/help` link — including anchored and
+  query-qualified ones — resolves to a real page and a real heading anchor;
+  every referenced image exists on disk; every page has a unique,
+  length-bounded title and description; every page has exactly one
+  H1-equivalent, driven by its front-matter title (no stray `# ` in the body).
+  A dedicated regression test also pins the related-articles footer inside its
+  `<nav>` wrapper, so it can't silently reappear in `Accept: text/markdown`
+  output the way D6 did for the header/footer/nav landmarks.
+- **Tests**: `tests/Feature/Documentation/{HelpRoutesTest,HelpSeoTest,
+  HelpContentIntegrityTest,DocumentationMetaTest,DocsRepositoryTest,
+  DocsUrlIntegrityTest,DocumentationHeadingsTest}.php`; arch coverage for the
+  package namespace per `tests/Arch/ConventionsTest.php`'s conscious-coverage
+  and service-layer-readonly rules.
+- **Content wave 1 — scope change vs. plan, partial not full**: the plan called
+  for ~30 articles across 7 lifecycle categories (Getting started · Records ·
+  Custom fields & views · Tasks/notes/pipeline · AI chat · Import/API/MCP ·
+  Workspace/team/billing). What shipped is the first category only — 7
+  getting-started articles (create your first company, add your first person,
+  track a deal through the pipeline, use custom fields, import your existing
+  data, invite your team, find anything with search and filters) — with real
+  screenshots via agent-browser. The remaining 6 categories are unscheduled
+  follow-on content work, not a defect in this PR.
+- **Open item — `/docs` vs `/help` content overlap**: `/docs/getting-started`
+  and `/docs/import` now cover ground the new `/help/getting-started` articles
+  also cover, from the developer-audience and end-user-audience angles
+  respectively. Both stay live and indexable as shipped — no `/docs` URL was
+  retired or redirected. Whether to consolidate, cross-link, or leave the two
+  audiences deliberately separate is a content-strategy call for the owner,
+  not decided here.
 
 ### W3 — Comparison & programmatic surfaces (after W1/W2)
 
@@ -381,7 +431,8 @@ accuracy beats exact counts).
 1. **PR-1: W0 hygiene** — immediate, unblocks everything, measurable in GSC in weeks.
 2. **PR-2: W1 blog + MCP tokens** — the authoring pipeline is the prerequisite
    for every content workstream.
-3. **PR-3: W2 /help engine** — largest build; starts once W1 ships.
+3. **PR-3: W2 /help engine** — largest build; shipped 2026-08-12 (content wave 1
+   partial — see W2).
 4. **W3/W4** — continuous after W1; W4 outreach can start the day W0 lands.
 
 ## Alternatives considered
