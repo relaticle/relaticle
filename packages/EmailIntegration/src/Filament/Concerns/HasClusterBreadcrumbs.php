@@ -8,7 +8,7 @@ use Illuminate\Contracts\View\View;
 
 /**
  * Email settings cluster pages render their own header (breadcrumbs, heading, actions)
- * from the `cluster-header` partial at the top of the page view, so it starts at the
+ * from `<x-email-integration::cluster-header />` at the top of the page view, so it starts at the
  * content column like the accounts page rather than spanning the cluster navigation.
  * The stock full-width header is suppressed here, and it would drop the breadcrumbs
  * anyway — the app panel disables them globally (AppPanelProvider::breadcrumbs(false)).

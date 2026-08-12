@@ -8,6 +8,7 @@ use App\Features\EmailIntegration;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
@@ -33,10 +34,11 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // Parse the Public Suffix List once per process.
         $this->app->singleton(PublicSuffixList::class);
 
-        // Not gated by the feature flag: the namespace is inert while the feature is
-        // off, and static analysis (which runs with it off) can only resolve
-        // `email-integration::` view strings when it is always registered.
+        // Not gated by the feature flag: these are inert while the feature is off, and
+        // static analysis (which runs with it off) can only resolve
+        // `email-integration::` view strings when they are always registered.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
+        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'email-integration');
     }
 
     public function boot(): void
@@ -61,7 +63,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // (see HasClusterBreadcrumbs) is rendered into the content column from here.
         FilamentView::registerRenderHook(
             PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
-            fn (): View => view('email-integration::filament.pages.partials.cluster-header'),
+            fn (): View => view('email-integration::components.cluster-header'),
             scopes: ManageEmailTemplates::class,
         );
 
