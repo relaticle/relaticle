@@ -159,6 +159,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Browser Tests
 
+    # A browser test that waits on an element which never appears hangs rather
+    # than fails, and without a ceiling the job runs until GitHub cancels it at
+    # six hours. The suite finishes in about two minutes.
+    timeout-minutes: 20
+
     services:
       postgres:
         image: postgres:alpine

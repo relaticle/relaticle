@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Tests\Helpers\ChatBrowser;
 
 /**
  * The agent outcome summary (`proposalOutcome`) is pure Alpine view logic on the
@@ -23,11 +24,11 @@ it('summarizes a finalized proposal for each operation and branch', function ():
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
-    $outcomes = json_decode((string) $page->script(<<<'JS'
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $outcomes = json_decode((string) $page->script(<<<JS
         (() => {
-            const host = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'))
-                .find((el) => el.offsetParent !== null);
-            const data = Alpine.$data(host);
+            {$resolveInterface}
 
             const singleCreate = {
                 operation: 'create', status: 'approved',
