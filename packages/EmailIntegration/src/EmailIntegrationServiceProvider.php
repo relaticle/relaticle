@@ -32,6 +32,11 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         // Parse the Public Suffix List once per process.
         $this->app->singleton(PublicSuffixList::class);
+
+        // Not gated by the feature flag: the namespace is inert while the feature is
+        // off, and static analysis (which runs with it off) can only resolve
+        // `email-integration::` view strings when it is always registered.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
     }
 
     public function boot(): void
@@ -39,7 +44,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         if (! Feature::active(EmailIntegration::class)) {
             return;
         }
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'email-integration');
 
         // Dedicated Google OAuth driver for email/calendar connect, backed by the
         // `services.gmail` client + redirect (separate from social login's `services.google`).

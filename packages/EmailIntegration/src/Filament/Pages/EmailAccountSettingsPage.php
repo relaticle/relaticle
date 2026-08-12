@@ -110,6 +110,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return $this->account()->email_address;
     }
+
     /**
      * @return array<int|string, string>
      */
