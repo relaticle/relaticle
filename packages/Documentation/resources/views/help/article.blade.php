@@ -24,7 +24,6 @@
             </nav>
 
             <div class="grid grid-cols-12 gap-6 lg:gap-8 min-h-screen">
-                <!-- Left Sidebar: Articles in this category -->
                 <nav class="hidden sm:block col-span-12 sm:col-span-3 lg:col-span-2 relative" aria-label="{{ __('Articles in this category') }}">
                     <div class="sticky top-24 pt-0.5 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4 pb-16">
                         <h2 class="text-sm font-semibold text-black dark:text-white mb-4 flex items-center space-x-2">
@@ -63,7 +62,7 @@
                     </div>
 
                     @if($related->isNotEmpty())
-                        <div class="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
+                        <nav class="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800" aria-label="{{ __('Related articles') }}">
                             <h2 class="text-sm font-semibold text-black dark:text-white mb-4">{{ __('Related articles') }}</h2>
                             <ul class="space-y-2">
                                 @foreach($related as $relatedPage)
@@ -76,7 +75,7 @@
                                     </li>
                                 @endforeach
                             </ul>
-                        </div>
+                        </nav>
                     @endif
 
                     @if($previous || $next)

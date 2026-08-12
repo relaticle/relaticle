@@ -7,7 +7,10 @@ it('renders the help hub with category cards', function (): void {
 });
 
 it('renders a category page', function (): void {
-    $this->get('/help/getting-started')->assertOk();
+    $this->get('/help/getting-started')
+        ->assertOk()
+        ->assertSee('Getting started', false)
+        ->assertSee('Create your first company', false);
 });
 
 it('renders an article with its rendered body', function (): void {

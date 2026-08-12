@@ -10,7 +10,6 @@ use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
-use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 final readonly class HelpController
 {
@@ -19,7 +18,6 @@ final readonly class HelpController
     public function __construct(
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
-        private MarkdownRenderer $renderer,
     ) {}
 
     public function index(): View
@@ -38,7 +36,7 @@ final readonly class HelpController
 
         return view('documentation::help.category', [
             'category' => $docCategory,
-            'categoryBody' => trim($docCategory->body) !== '' ? $this->renderer->toHtml($docCategory->body) : null,
+            'categoryBody' => trim($docCategory->body) !== '' ? ($this->renderMarkdown)($docCategory->body) : null,
             'pages' => $this->repository->pagesIn($categoryPath)->values(),
             'categories' => $this->helpCategories(),
         ]);
@@ -61,7 +59,7 @@ final readonly class HelpController
         return view('documentation::help.article', [
             'page' => $page,
             'category' => $docCategory,
-            'body' => ($this->renderMarkdown)($page),
+            'body' => ($this->renderMarkdown)($page->body),
             'pagesInCategory' => $pagesInCategory,
             'previous' => $currentIndex !== false && $currentIndex > 0 ? $pagesInCategory->get($currentIndex - 1) : null,
             'next' => $currentIndex !== false && $currentIndex < $pagesInCategory->count() - 1 ? $pagesInCategory->get($currentIndex + 1) : null,

@@ -10,8 +10,8 @@ final readonly class RenderDocMarkdown
 {
     public function __construct(private MarkdownRenderer $renderer) {}
 
-    public function __invoke(DocPage $page): string
+    public function __invoke(string $body): string
     {
-        return $this->renderer->toHtml($page->body);
+        return $this->renderer->toHtml($body);
     }
 }
