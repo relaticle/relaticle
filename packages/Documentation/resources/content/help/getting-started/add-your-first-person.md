@@ -3,7 +3,7 @@ title: Add your first person
 description: Add a person record and link them to a company.
 order: 2
 updated: "2026-08-12"
-related: [help/getting-started/create-your-first-company]
+related: [help/getting-started/create-your-first-company, help/getting-started/track-a-deal-through-the-pipeline]
 ---
 
 A person record is someone you're in touch with — a contact at a company you

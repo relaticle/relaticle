@@ -3,7 +3,7 @@ title: Create your first company
 description: Add a company record and fill in the fields your team actually uses.
 order: 1
 updated: "2026-08-12"
-related: [help/getting-started/add-your-first-person]
+related: [help/getting-started/add-your-first-person, help/getting-started/import-your-existing-data]
 ---
 
 A company record tracks an account you sell to or work with — its name, who
