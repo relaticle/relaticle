@@ -1,4 +1,6 @@
 <x-filament-panels::page>
+    <x-email-integration::cluster-header />
+
 
     {{-- ── Tab switcher ─────────────────────────────────────────────── --}}
     <x-filament::tabs :label="__('filament/pages/email-access-requests.tabs.aria')" class="ei-tabs-segmented">

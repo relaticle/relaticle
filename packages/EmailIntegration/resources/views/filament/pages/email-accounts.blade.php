@@ -1,4 +1,15 @@
 <x-filament-panels::page>
+    <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" />
+
+    <div class="-mt-2">
+        <h2 class="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
+            {{ __('filament/pages/email-accounts.title') }}
+        </h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {{ __('filament/pages/email-accounts.subheading') }}
+        </p>
+    </div>
+
     <x-filament::section
         :heading="__('filament/pages/email-accounts.sections.connected.heading')"
         :description="new \Illuminate\Support\HtmlString(__('filament/pages/email-accounts.sections.connected.description', ['url' => route('policy.show')]))"
@@ -40,7 +51,7 @@
                             {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
                         </x-filament::badge>
 
-                        {{ $this->accountActions($account) }}
+                        {{ $this->accountActions($account, [$this->editSettingsAction()]) }}
                     </div>
                 </div>
             @endforeach

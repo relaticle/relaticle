@@ -25,12 +25,14 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\Email;
 use RuntimeException;
 
 final class EmailOutboxPage extends Page implements HasTable
 {
+    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
     use InteractsWithTable;
 
@@ -45,6 +47,12 @@ final class EmailOutboxPage extends Page implements HasTable
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
     protected static ?int $navigationSort = 5;
+
+    /**
+     * Blank so the stock full-width header is not rendered: the page view carries its
+     * own `<x-email-integration::cluster-header />` inside the content column.
+     */
+    protected ?string $heading = '';
 
     public function table(Table $table): Table
     {
