@@ -5,6 +5,19 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
+    | Content Path
+    |--------------------------------------------------------------------------
+    |
+    | Root directory for the markdown-driven content engine (DocsRepository).
+    | Every file lives at {content_path}/{area}/{category}/{slug}.md, e.g.
+    | help/getting-started/create-your-first-company.md. A category's own
+    | metadata lives in that directory's _index.md.
+    |
+    */
+    'content_path' => base_path('packages/Documentation/resources/content'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Settings
     |--------------------------------------------------------------------------
     |

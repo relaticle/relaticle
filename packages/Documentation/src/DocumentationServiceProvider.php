@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 use Relaticle\Documentation\Services\DocumentationService;
+use Relaticle\Documentation\Support\DocsRepository;
 
 final class DocumentationServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,7 @@ final class DocumentationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/documentation.php', 'documentation');
 
         $this->app->singleton(DocumentationService::class);
+        $this->app->singleton(DocsRepository::class);
     }
 
     /**
