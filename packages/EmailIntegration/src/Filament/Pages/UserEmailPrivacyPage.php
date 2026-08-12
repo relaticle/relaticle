@@ -6,10 +6,12 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use Filament\Pages\Page;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 
 final class UserEmailPrivacyPage extends Page
 {
+    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
 
     protected string $view = 'email-integration::filament.pages.user-email-privacy';

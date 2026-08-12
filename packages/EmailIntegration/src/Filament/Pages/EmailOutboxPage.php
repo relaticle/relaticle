@@ -25,12 +25,14 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\Email;
 use RuntimeException;
 
 final class EmailOutboxPage extends Page implements HasTable
 {
+    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
     use InteractsWithTable;
 

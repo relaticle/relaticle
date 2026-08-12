@@ -18,12 +18,14 @@ use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
 final class EmailSignaturesPage extends Page
 {
+    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
 
     protected string $view = 'email-integration::filament.pages.email-signatures';

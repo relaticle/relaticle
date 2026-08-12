@@ -22,10 +22,12 @@ use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
+use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
+    use HasClusterBreadcrumbs;
     use InteractsWithSchemas;
 
     /**

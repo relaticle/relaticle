@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Features\EmailIntegration;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
@@ -13,6 +16,7 @@ use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
@@ -49,6 +53,14 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         //
         // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
         // scheduled work lives there); do not re-register them here.
+
+        // The templates resource has no page view of its own, so its cluster header
+        // (see HasClusterBreadcrumbs) is rendered into the content column from here.
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
+            fn (): View => view('email-integration::filament.pages.partials.cluster-header'),
+            scopes: ManageEmailTemplates::class,
+        );
 
         Route::middleware('web')
             ->group(function (): void {
