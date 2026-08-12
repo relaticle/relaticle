@@ -49,6 +49,12 @@ return [
      * app token are never accepted on each other's endpoints. throttle:mcp
      * (defined in AppServiceProvider::configureRateLimiting(), shared with the
      * app's own /mcp endpoint) bounds request volume once a caller has a token.
+     *
+     * WARNING: never add 'web' to this route's middleware. Sanctum's
+     * Guard::__invoke() checks the 'web' session guard before it ever consults
+     * the bearer token / configured provider, so a caller with an unrelated
+     * logged-in web session would silently authenticate as that session user
+     * instead of the sanctum-sysadmin token holder.
      */
     'mcp' => [
         'path' => '/mcp/blog',
