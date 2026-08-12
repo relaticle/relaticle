@@ -119,6 +119,16 @@ it('discloses the real per-model credit multiplier instead of a flat allowance c
         ->assertDontSee('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary.');
 });
 
+it('does not contradict the credit-multiplier faq with a flat-allowance claim on the billing-on plan card', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('What counts as an AI credit?'))
+        ->assertDontSee('1 credit ≈ one AI chat message or record summary')
+        ->assertDontSee('All AI models, including premium');
+});
+
 it('discloses that self-hosted installs are not exempt from the free-tier credit cap', function (): void {
     $this->get('/pricing')
         ->assertOk()
