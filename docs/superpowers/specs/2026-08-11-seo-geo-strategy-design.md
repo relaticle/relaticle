@@ -349,6 +349,23 @@ accuracy beats exact counts).
   thin-content pattern; our posts are E-E-A-T depth pieces) and FAQPage
   microdata (rich result removed May 2026 — see anti-goals).
 
+## Owner decisions (2026-08-12, settled — do not re-open without new evidence)
+
+- **The Enterprise tier stays off the pricing page.** `Plan::Enterprise` exists
+  (10,000 credits, 60/min) but nothing in the codebase can assign it: it is only
+  ever *read*, at `HostedWorkspaceAccess.php:28` and `billing.blade.php:26`. No
+  plan card, no checkout, no Stripe price mapping. It is a manually-assigned
+  internal tier, and advertising it would be an unverifiable commercial claim.
+- **Chat rate limiting stays per-workspace.** `RateLimiter::for('chat-send')` keys
+  by `$team->getKey()`, so Free's 10/min is shared across the whole workspace
+  (Pro 30, Enterprise 60). On an unlimited-seat plan that is deliberate cost
+  control, not an oversight; the pricing copy discloses it explicitly. Re-keying
+  by user would multiply inference cost by team size on a flat price.
+- **The blog launches on content, not on code.** `RELATICLE_FEATURE_BLOG` stays
+  `false` until several wave-one posts are drafted and reviewed. The authoring
+  endpoint is live and verified end-to-end; launching an empty blog wastes the
+  crawl and the freshness signal.
+
 ## What we deliberately do NOT do
 
 - No llms.txt as an SEO play (Google: explicitly unnecessary; zero correlation at
