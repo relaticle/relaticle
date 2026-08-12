@@ -16,8 +16,15 @@ use App\Models\User;
  * internals, because the suggestion only fires from genuine ProseMirror input.
  */
 
-/** Selector for the visible conversation composer's contenteditable surface. */
-const EDITOR = '[data-chat-context="conversation"] [contenteditable="true"]';
+/**
+ * Selector for the visible composer's contenteditable surface.
+ *
+ * The chat drawer rework made the dashboard composer the one that is on screen
+ * when you land on a workspace; the side-panel interfaces are mounted collapsed.
+ * Targeting a context that is not rendered makes Playwright wait for an element
+ * that never becomes actionable, which hangs the run rather than failing it.
+ */
+const EDITOR = '[data-chat-context="dashboard"] [contenteditable="true"]';
 
 /** Poll until the mention popup renders at least one option, returning its labels. */
 const WAIT_FOR_OPTIONS = <<<'JS'
@@ -71,7 +78,7 @@ it('opens a picker when @ is typed and inserts a chip on selection', function ()
 
     $chip = $page->script(<<<'JS'
         (() => {
-            const node = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"] span[data-mention-id]');
+            const node = document.querySelector('[data-chat-context="dashboard"] [contenteditable="true"] span[data-mention-id]');
             return node ? node.textContent.trim() : null;
         })();
     JS);
@@ -216,7 +223,7 @@ it('removes a selected mention chip with backspace', function (): void {
             if (! option) return -1;
             option.click();
             await new Promise((r) => setTimeout(r, 100));
-            return document.querySelectorAll('[data-chat-context="conversation"] [contenteditable="true"] span[data-mention-id]').length;
+            return document.querySelectorAll('[data-chat-context="dashboard"] [contenteditable="true"] span[data-mention-id]').length;
         })();
     JS);
 
@@ -228,7 +235,7 @@ it('removes a selected mention chip with backspace', function (): void {
 
     $after = $page->script(<<<'JS'
         (() => {
-            const editor = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]');
+            const editor = document.querySelector('[data-chat-context="dashboard"] [contenteditable="true"]');
             return {
                 chips: editor.querySelectorAll('span[data-mention-id]').length,
                 text: editor.textContent,
