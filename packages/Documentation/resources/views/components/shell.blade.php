@@ -140,8 +140,6 @@
                     <x-ri-search-line class="h-5 w-5" />
                 </button>
 
-                <x-theme-switcher />
-
                 <span aria-hidden="true" class="mx-1 hidden h-5 w-px bg-gray-200 sm:block dark:bg-white/10"></span>
 
                 <a href="{{ route('login') }}"
@@ -212,6 +210,7 @@
                             <x-ri-github-fill class="h-4 w-4" />
                             {{ __('GitHub') }}
                         </a>
+                        <x-theme-switcher />
                     </div>
                 </div>
             </footer>
