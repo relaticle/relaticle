@@ -27,7 +27,7 @@
             $page,
             route('documentation.show', ['type' => $page->slug]),
             [
-                ['name' => __('Documentation'), 'url' => route('documentation.index')],
+                ['name' => __('Developer Documentation'), 'url' => route('documentation.index')],
                 ['name' => $page->title, 'url' => route('documentation.show', ['type' => $page->slug])],
             ],
         );

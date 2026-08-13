@@ -19,7 +19,7 @@
                 ];
 
                 if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
-                    $cards[] = ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Documentation', 'desc' => 'Learn how to use Relaticle. Comprehensive guides for users and developers alike.', 'cta' => 'Read the Docs', 'external' => false];
+                    $cards[] = ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Developer Docs', 'desc' => 'Self-host with Docker, build on the REST API, and connect AI agents over MCP.', 'cta' => 'Read the Docs', 'external' => false];
                 }
             @endphp
             @foreach($cards as $card)

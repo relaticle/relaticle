@@ -1,6 +1,6 @@
 @php
-    $baseTitle = __('Documentation');
-    $pageDescription = __('Guides and resources to help you get the most out of Relaticle CRM.');
+    $baseTitle = __('Developer Documentation');
+    $pageDescription = __('Self-host Relaticle with Docker, build integrations on the REST API, and connect AI agents over MCP. Guides for developers building on Relaticle CRM.');
 
     $sections = collect($nav)->where('area', \Relaticle\Documentation\Support\DocUrl::DOCS);
 @endphp
@@ -11,7 +11,7 @@
     :nav="$nav">
     <div class="mx-auto max-w-3xl">
         <p class="text-pico font-semibold tracking-[0.08em] text-primary-600 uppercase dark:text-primary-400">
-            {{ __('Developers') }}
+            {{ __('Build on Relaticle') }}
         </p>
         <h1 class="font-display mt-3 text-4xl font-bold tracking-[-0.02em] text-gray-950 sm:text-[2.75rem] dark:text-white">
             {{ $baseTitle }}
