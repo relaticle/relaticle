@@ -39,16 +39,18 @@ it('lets a teammate clear their own unread count on a shared email', function ()
     $this->actingAs($this->viewer);
     Filament::setTenant($this->team);
 
-    // Mounting auto-selects + reads the newest email for the viewer, leaving one unread.
+    // Loading the list opens nothing, so neither email is read yet.
     $page = livewire(EmailInboxPage::class);
-    expect($page->instance()->inboxUnreadCount())->toBe(1);
-    // The unread row renders the per-viewer unread indicator dot.
-    $page->assertSeeHtml('h-1.5 w-1.5 rounded-full bg-primary-500');
+    expect($page->instance()->inboxUnreadCount())->toBe(2);
+    // The unread rows render the per-viewer unread indicator.
+    $page->assertSeeHtml('data-unread-indicator');
 
     $page->call('selectEmail', $this->older->getKey());
+    expect($page->instance()->inboxUnreadCount())->toBe(1);
 
+    $page->call('selectEmail', $this->newer->getKey());
     expect($page->instance()->inboxUnreadCount())->toBe(0);
-    $page->assertDontSeeHtml('h-1.5 w-1.5 rounded-full bg-primary-500');
+    $page->assertDontSeeHtml('data-unread-indicator');
 });
 
 it('keeps each viewer unread state independent of the owner', function (): void {
@@ -58,15 +60,16 @@ it('keeps each viewer unread state independent of the owner', function (): void 
 
     $viewerPage = livewire(EmailInboxPage::class);
     $viewerPage->call('selectEmail', $this->older->getKey());
+    $viewerPage->call('selectEmail', $this->newer->getKey());
     expect($viewerPage->instance()->inboxUnreadCount())->toBe(0);
 
-    // Owner has not touched the older email — mounting only auto-reads the newest,
-    // so one stays unread for the owner regardless of what the viewer did.
+    // The owner has opened neither, so both stay unread for them regardless of what
+    // the viewer did.
     $this->actingAs($this->owner);
     Filament::setTenant($this->team);
 
     $ownerPage = livewire(EmailInboxPage::class);
-    expect($ownerPage->instance()->inboxUnreadCount())->toBe(1);
+    expect($ownerPage->instance()->inboxUnreadCount())->toBe(2);
 });
 
 it('marks every visible unread inbox email as read for the viewer', function (): void {
@@ -74,8 +77,8 @@ it('marks every visible unread inbox email as read for the viewer', function ():
     Filament::setTenant($this->team);
 
     $page = livewire(EmailInboxPage::class);
-    // Mounting auto-reads only the newest, leaving the older one unread.
-    expect($page->instance()->inboxUnreadCount())->toBe(1);
+    // Loading the list reads nothing.
+    expect($page->instance()->inboxUnreadCount())->toBe(2);
 
     $page->call('markAllAsRead');
 
@@ -104,8 +107,8 @@ it('leaves an already-read row untouched when marking all as read', function ():
     $this->actingAs($this->viewer);
     Filament::setTenant($this->team);
 
-    $page = livewire(EmailInboxPage::class);
-    // Mount already read the newest email for the viewer.
+    // Opening the newest email records the read for this viewer.
+    $page = livewire(EmailInboxPage::class)->call('selectEmail', $this->newer->getKey());
     $existing = EmailRead::query()->where('user_id', $this->viewer->id)->where('email_id', $this->newer->id)->sole();
 
     $page->call('markAllAsRead');

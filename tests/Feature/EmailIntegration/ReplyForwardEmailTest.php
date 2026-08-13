@@ -132,22 +132,25 @@ it('forward persists a queued Email with FORWARD creation_source', function (): 
         ->and($forward->in_reply_to)->toBeNull();
 });
 
-it('renders the quoted original message in a sandboxed iframe with sanitized content', function (): void {
+it('renders an email body in a sandboxed iframe with sanitized content', function (): void {
     $this->inboundEmail->body->update([
-        'body_html' => '<style>body{background:#fff}</style><p>Quoted body</p><script>alert(1)</script>',
+        'body_html' => '<style>body{background:#fff}</style><p>Body</p><script>alert(1)</script>',
     ]);
 
-    livewire(EmailInboxPage::class)
-        ->mountAction(
-            'replyForwardEmail',
-            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply'],
-        )
-        ->assertActionMounted('replyForwardEmail')
-        // Quoted body is isolated in a sandboxed iframe, mirroring the email body view,
-        // instead of being dumped inline where the email's own styles leak into the panel.
-        ->assertSee('sandbox="allow-popups allow-popups-to-escape-sandbox"', escape: false)
-        // The untrusted script tag is stripped by the sanitizer before display.
+    $page = livewire(EmailInboxPage::class)
+        ->call('selectEmail', $this->inboundEmail->id)
+        // The script tag is stripped by the sanitizer before it ever reaches the frame.
         ->assertDontSee('alert(1)', escape: false);
+
+    // `allow-same-origin` is present so the page can measure the frame and size it to
+    // its content. `allow-scripts` must NOT be — together they let a script inside the
+    // frame strip its own sandbox, which is the whole reason the frame exists.
+    $html = $page->html();
+    $sandbox = str($html)->after('<iframe')->after('sandbox="')->before('"')->toString();
+
+    expect($sandbox)
+        ->toContain('allow-same-origin')
+        ->not->toContain('allow-scripts');
 });
 
 it('reply_all recipients keep the original sender and drop the user\'s own address', function (): void {

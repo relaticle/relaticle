@@ -1,9 +1,8 @@
 <div
     @class([
-        // Inline: this root is a flex child of the reading pane, so it is the only
-        // element whose percentage cap resolves against a definite height. It stays
-        // content-sized (the draft grows with the message) until the cap bites.
-        'flex min-h-0 max-h-[60%] shrink-0 flex-col overflow-hidden' => $dock === 'inline',
+        // Inline: the draft is appended to the reading pane's scroll region, so it is
+        // simply as tall as its message — the region does the scrolling.
+        'shrink-0' => $dock === 'inline',
     ])
     x-data="{
         insertVariable(id) {
@@ -24,24 +23,40 @@
         })()"
     @endif
 >
+    @php
+        // Composing and editing a saved draft both open fitted to the screen, so a
+        // draft looks the same wherever it came from — and the same as the reader it
+        // sits alongside. Shrinking drops back to the corner window.
+        $isModal = $dock === 'floating' && $isExpanded && ! $isMinimized;
+    @endphp
+
     @if ($isOpen)
+        @if ($isModal)
+            {{-- Backdrop click minimises rather than closes: the corner window keeps the
+                 draft in progress and in sight, where closing would file it away. --}}
+            <div
+                wire:click="minimize"
+                class="fi-email-reader-backdrop fixed inset-0 z-40 bg-gray-950/50"
+            ></div>
+        @endif
+
         <div
             x-data
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="translate-y-4 opacity-0"
             x-transition:enter-end="translate-y-0 opacity-100"
             @class([
-                'flex flex-col overflow-hidden bg-white dark:bg-gray-900',
-                // Docked under the message being answered, split off by a dashed rule.
-                // Height follows the draft: it grows as the message does, pushing up
-                // into the pane until the root's cap bites, after which the message
-                // scrolls under the pinned address rows.
-                'min-h-0 flex-1 border-t-2 border-dashed border-gray-200 dark:border-gray-700' => $dock === 'inline',
+                'flex flex-col bg-white dark:bg-gray-900',
+                'overflow-hidden' => $dock === 'floating',
+                // Docked under the message being answered. No height of its own and no
+                // internal scroll: it grows with the message, and the region scrolls.
+                '' => $dock === 'inline',
                 'fixed z-40 rounded-xl shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 transition-all duration-200 dark:shadow-black/50 dark:ring-white/10' => $dock === 'floating',
                 'bottom-4 right-4' => $dock === 'floating' && ($isMinimized || ! $isExpanded),
                 'w-[38rem] h-[36rem]' => $dock === 'floating' && ! $isMinimized && ! $isExpanded,
                 'w-80' => $dock === 'floating' && $isMinimized,
-                'inset-4 md:inset-8' => $dock === 'floating' && ! $isMinimized && $isExpanded,
+                // Matches the reader's panel: centred, same width and height.
+                'fi-email-reader-panel left-1/2 top-1/2 z-50 h-[85vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2' => $isModal,
             ])
         >
             {{-- Title bar. The inline dock sits inside the message it answers, so it
@@ -49,7 +64,7 @@
             <div
                 @class([
                     'flex shrink-0 items-center justify-between gap-2',
-                    'h-10 px-4 sm:px-6' => $dock === 'inline',
+                    'sticky top-0 z-10 h-10 border-t-2 border-dashed border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6' => $dock === 'inline',
                     'h-12 bg-gray-50 pl-4 pr-2 dark:bg-white/5' => $dock === 'floating',
                     'border-b border-gray-200 dark:border-white/10' => $dock === 'floating' && ! $isMinimized,
                 ])
@@ -177,10 +192,10 @@
                     {{ __('filament/emails/composer.fields.message') }}
                 </p>
                 <div @class([
-                    'email-composer-body-ctn flex-1 overflow-y-auto pb-3 pt-1',
-                    'min-h-0 px-4' => $dock === 'floating',
-                    'min-h-[6rem] px-4 sm:px-6' => $dock === 'inline',
-                ]) wire:ignore>
+                    'email-composer-body-ctn pt-1',
+                    'min-h-0 flex-1 overflow-y-auto px-4 pb-3' => $dock === 'floating',
+                    'shrink-0 px-4 pb-2 sm:px-6' => $dock === 'inline',
+                ]) @if ($dock === 'inline') data-composer-dock="inline" @endif wire:ignore>
                     {{ $this->getSchema('bodySchema') }}
                 </div>
                 @error('bodyHtml') <p class="px-4 pb-1 text-xs text-danger-600 dark:text-danger-400">{{ $message }}</p> @enderror
@@ -223,7 +238,11 @@
                 @endif
 
                 {{-- Bottom bar --}}
-                <div @class(['flex h-14 shrink-0 items-center justify-between border-t border-gray-200 dark:border-white/10', 'px-3' => $dock === 'floating', 'px-3 sm:px-5' => $dock === 'inline'])>
+                <div @class([
+                    'flex h-14 shrink-0 items-center justify-between border-t border-gray-200 dark:border-white/10',
+                    'px-3' => $dock === 'floating',
+                    'sticky bottom-0 z-10 bg-white px-3 dark:bg-gray-900 sm:px-5' => $dock === 'inline',
+                ])>
                     <div class="flex items-center gap-1">
                         <x-emails.composer-icon-button icon="heroicon-o-paper-clip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
                         <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />

@@ -211,6 +211,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->isOpen = true;
         $this->isMinimized = false;
+        // Composing and opening a saved draft are the same task and now present the
+        // same way — fit to the screen, like the reader. A forwarded message that was
+        // parked as a draft used to come back in the small corner window while the
+        // message it answers opened full size, which read as two different features.
+        $this->isExpanded = true;
     }
 
     /**

@@ -108,12 +108,6 @@ final class EmailInboxPage extends Page
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
 
-        // Only the mail reader auto-selects: ensureEmailSelected() marks the opened
-        // email as read, which must not happen just because the page was loaded on
-        // the drafts, outbox or templates tab.
-        if ($this->tab === EmailPageTab::EMAILS) {
-            $this->ensureEmailSelected();
-        }
     }
 
     /**
@@ -146,7 +140,6 @@ final class EmailInboxPage extends Page
         $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails, $this->inboxUnreadCount);
-        $this->ensureEmailSelected();
         $this->dispatch('composer:dismiss-inline');
     }
 
@@ -321,10 +314,6 @@ final class EmailInboxPage extends Page
     public function setTab(string $tab): void
     {
         $this->tab = EmailPageTab::from($tab);
-
-        if ($this->tab === EmailPageTab::EMAILS) {
-            $this->ensureEmailSelected();
-        }
     }
 
     /**
@@ -367,29 +356,17 @@ final class EmailInboxPage extends Page
         $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails);
-        $this->ensureEmailSelected();
         $this->dispatch('composer:dismiss-inline');
-    }
-
-    private function ensureEmailSelected(): void
-    {
-        if ($this->selectedEmailId !== null) {
-            return;
-        }
-
-        $first = $this->emails()->first();
-
-        if ($first === null) {
-            return;
-        }
-
-        $this->selectEmail((string) $first->getKey());
     }
 
     public function deselectEmail(): void
     {
         $this->selectedEmailId = null;
         unset($this->selectedEmail);
+
+        // Dismissing the dock persists whatever was typed as a draft, so closing the
+        // reader can never silently drop a half-written reply.
+        $this->dispatch('composer:dismiss-inline');
     }
 
     public function updatedSearch(): void
@@ -569,10 +546,11 @@ final class EmailInboxPage extends Page
     {
         return Action::make('manageSharing')
             ->label(__('filament/pages/email-inbox.sharing.label'))
-            ->icon('heroicon-o-lock-open')
+            ->icon('ri-share-line')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.sharing.label'))
             ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
             ->modalSubmitActionLabel('Save')
             ->schema([
@@ -689,8 +667,9 @@ final class EmailInboxPage extends Page
             ->label(__('filament/pages/email-inbox.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.summarize_thread.label'))
             ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
@@ -712,8 +691,9 @@ final class EmailInboxPage extends Page
             ->label(__('filament/pages/email-inbox.request_access.label'))
             ->icon('heroicon-o-key')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.request_access.label'))
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))

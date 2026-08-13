@@ -73,6 +73,18 @@ return [
             ],
         ],
     ],
+    'reader' => [
+        'heading' => 'View email',
+    ],
+    'back_to_list' => 'Back to list',
+    'recipients' => [
+        'to' => 'to',
+        'cc' => 'cc',
+        'more' => '{1}and 1 more|[2,*]and :count more',
+    ],
+    'row_actions' => [
+        'label' => 'Email actions',
+    ],
     'mark_all_read' => [
         'label' => 'Mark all read',
         'notification' => '{0}No unread emails to mark|{1}1 email marked as read|[2,*]:count emails marked as read',

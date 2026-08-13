@@ -1,11 +1,15 @@
-@props(['folder', 'active', 'icon', 'label', 'badge' => null])
+{{-- `grow` splits the tabs evenly across a narrow column (the record pages); without
+     it they size to their labels, which is what the full-width inbox toolbar wants. --}}
+@props(['folder', 'active', 'icon', 'label', 'badge' => null, 'grow' => true])
 
 <button
     wire:click="setFolder('{{ $folder }}')"
     wire:loading.attr="disabled"
     wire:loading.class="opacity-60 cursor-not-allowed"
     @class([
-        'flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors focus:outline-none',
+        'flex items-center justify-center gap-1.5 text-sm font-medium transition-colors focus:outline-none',
+        'flex-1 py-3' => $grow,
+        'shrink-0 px-3 py-2' => ! $grow,
         'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400' => $active,
         'border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' => ! $active,
     ])
