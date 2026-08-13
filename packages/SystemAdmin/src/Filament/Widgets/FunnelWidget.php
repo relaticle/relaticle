@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Enums\CreationSource;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget;
@@ -83,27 +82,14 @@ final class FunnelWidget extends StatsOverviewWidget
     }
 
     /**
-     * Mirrors HasPeriodComparison::getActiveCreatorIds() at team grain: same
-     * non-system, non-deleted, period-scoped filter across the entity tables,
-     * counted by distinct team_id instead of creator_id.
+     * Reuses HasPeriodComparison::getDistinctActiveColumnValues() — the same
+     * helper ActivationRateWidget's getActiveCreatorIds() calls — at team
+     * grain instead of creator grain, so the source filter only lives in one
+     * place.
      */
     private function countActivatedTeams(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        $unionParts = [];
-        $bindings = [];
-
-        foreach (self::ENTITY_TABLES as $table) {
-            $unionParts[] = "SELECT DISTINCT \"team_id\" FROM \"{$table}\" WHERE \"creator_id\" IS NOT NULL AND \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
-            $bindings[] = CreationSource::SYSTEM->value;
-            $bindings[] = $start->toDateTimeString();
-            $bindings[] = $end->toDateTimeString();
-        }
-
-        $sql = 'SELECT COUNT(DISTINCT team_id) AS cnt FROM ('.implode(' UNION ', $unionParts).') AS activated_teams';
-
-        $row = DB::selectOne($sql, $bindings);
-
-        return (int) ($row->cnt ?? 0);
+        return $this->getDistinctActiveColumnValues('team_id', $start, $end)->count();
     }
 
     /**
