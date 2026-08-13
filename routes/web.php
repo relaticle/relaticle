@@ -6,8 +6,10 @@ use App\Features\Documentation;
 use App\Features\Marketing;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
+use App\Http\Controllers\AlternativesController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
@@ -55,6 +57,9 @@ if (Feature::active(Marketing::class)) {
         Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
         Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
         Route::get('/pricing', fn () => view('pricing'))->name('pricing');
+        Route::get('/press', fn () => view('press'))->name('press');
+        Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
+        Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
         Route::get('/contact', [ContactController::class, 'show'])->name('contact');
         Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
     });
@@ -69,6 +74,9 @@ if (Feature::active(Marketing::class)) {
     Route::get('/terms-of-service', $redirectToLogin)->name('terms.show');
     Route::get('/privacy-policy', $redirectToLogin)->name('policy.show');
     Route::get('/pricing', $redirectToLogin)->name('pricing');
+    Route::get('/press', $redirectToLogin)->name('press');
+    Route::get('/compare/relaticle-vs-{competitor}', $redirectToLogin)->name('compare.show');
+    Route::get('/alternatives/{competitor}', $redirectToLogin)->name('alternatives.show');
     Route::get('/contact', $redirectToLogin)->name('contact');
     Route::post('/contact', $redirectToLogin);
 }

@@ -46,7 +46,7 @@
                         'Unlimited users and records',
                         '2,000 AI credits / month',
                         'Premium AI models included',
-                        'REST API and 30-tool MCP server',
+                        'REST API and 32-tool MCP server',
                         'Email support',
                     ] as $feature)
                         <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">

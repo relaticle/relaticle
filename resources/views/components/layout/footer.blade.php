@@ -75,6 +75,36 @@
                             Features
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('press') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('Press kit') }}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('compare.show', 'twenty') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('Relaticle vs Twenty') }}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('compare.show', 'espocrm') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('Relaticle vs EspoCRM') }}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('alternatives.show', 'attio') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('Attio alternative') }}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('alternatives.show', 'hubspot') }}"
+                           class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
+                            {{ __('HubSpot alternative') }}
+                        </a>
+                    </li>
                 </ul>
             </div>
 
