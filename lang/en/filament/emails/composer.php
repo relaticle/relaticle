@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'title' => 'New email',
     'draft' => 'Draft',
+    'quoted' => [
+        'hidden' => 'The original message is not shared with you.',
+    ],
     'fields' => [
         'from' => 'From',
         'to' => 'To',
@@ -38,6 +41,7 @@ return [
         'minimize' => 'Minimize',
         'restore' => 'Restore',
         'close' => 'Close',
+        'discard' => 'Discard draft',
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],

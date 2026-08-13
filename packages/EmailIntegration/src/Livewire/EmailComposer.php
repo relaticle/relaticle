@@ -93,8 +93,15 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public bool $isExpanded = false;
 
     /**
-     * Set when the open draft answers an existing message, so the outgoing email
-     * threads against it and is attributed to the right creation source.
+     * The message this draft was made from — replied to OR forwarded. Drives what is
+     * shown above the draft and survives a save, so reopening resumes the same task.
+     */
+    public ?string $sourceEmailId = null;
+
+    /**
+     * Set only when the draft answers a message, so the outgoing email threads against
+     * it. A forward has a source but must not thread, which is why this is separate
+     * from {@see $sourceEmailId}.
      */
     public ?string $inReplyToEmailId = null;
 
@@ -268,7 +275,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         // Only quote the original body when the viewer is entitled to read it.
         $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
-        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : (string) $email->getKey();
+        $this->sourceEmailId = (string) $email->getKey();
+        // A forward carries its source for display, but must not thread against it.
+        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
 
         $signature = $this->defaultSignatureFor($this->accountId);
         $this->signatureId = $signature?->getKey();
@@ -292,6 +301,69 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->close();
+    }
+
+    /**
+     * Reopen an unfinished reply or forward when the message it belongs to is opened.
+     * A draft written here and left behind should be waiting under that message, not
+     * only findable by hunting through the Drafts tab.
+     */
+    #[On('composer:resume-draft')]
+    public function resumeDraftFor(string $emailId): void
+    {
+        if ($this->dock !== 'inline' || $this->isOpen) {
+            return;
+        }
+
+        $original = $this->replyableEmail($emailId);
+
+        if (! $original instanceof Email || blank($original->rfc_message_id)) {
+            return;
+        }
+
+        $user = $this->authUser();
+
+        $draft = Email::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->where('status', EmailStatus::DRAFT)
+            ->where('in_reply_to', $original->rfc_message_id)
+            ->latest('updated_at')
+            ->first();
+
+        $account = $this->activeAccounts()->first();
+
+        if (! $draft instanceof Email || $account === null) {
+            return;
+        }
+
+        $this->resetComposerState();
+
+        $this->accountId = (string) $account->getKey();
+        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+
+        $this->loadDraft((string) $draft->getKey());
+
+        $this->isOpen = true;
+        $this->isMinimized = false;
+
+        // Nothing was clicked here — the draft came back on its own — so the reader
+        // has to be told to scroll down to it, the way the reply buttons do.
+        $this->dispatch('composer:opened-inline');
+    }
+
+    /**
+     * The message this draft answers or forwards, for display above it. Only the
+     * fitted window shows it — the inline dock already sits under the real thing.
+     */
+    #[Computed]
+    public function sourceEmail(): ?Email
+    {
+        if ($this->sourceEmailId === null || $this->dock !== 'floating') {
+            return null;
+        }
+
+        return $this->replyableEmail($this->sourceEmailId);
     }
 
     /**
@@ -424,9 +496,30 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->isMinimized = false;
     }
 
+    /**
+     * Put the draft away and keep it. Used when the composer is dismissed by
+     * something other than the user rejecting it — minimizing, or the reader moving
+     * to another message — where losing what was typed would be a surprise.
+     */
     public function close(): void
     {
         $this->persistDraft();
+        $this->closeComposer();
+    }
+
+    /**
+     * Throw the draft away, including any row a previous save already wrote. This is
+     * what the × means: dismissing a draft should not quietly leave it behind in
+     * Drafts. {@see close()} is the keep-it path.
+     */
+    public function discard(): void
+    {
+        if ($this->draftId !== null) {
+            resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
+
+            $this->dispatch('drafts:changed');
+        }
+
         $this->closeComposer();
     }
 
@@ -922,6 +1015,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'to' => $this->to,
                 'cc' => $this->cc,
                 'bcc' => $this->bcc,
+                // Without these a reply parked as a draft comes back as a plain new
+                // message: no original to show, and no threading when it is sent.
+                'source_email_id' => $this->sourceEmailId,
+                'creation_source' => $this->creationSource(),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
             ],
@@ -1019,7 +1116,43 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->showCc = $this->cc !== [];
         $this->showBcc = $this->bcc !== [];
 
+        $this->restoreReplyContext($draft);
+
         $this->loadSavedAttachments($draft);
+    }
+
+    /**
+     * Put a reply draft back into reply mode. The link survives as the original's RFC
+     * message id on the draft row, so it is resolved back to the email here — which is
+     * what lets the composer show what is being answered and thread the sent message.
+     */
+    private function restoreReplyContext(Email $draft): void
+    {
+        if (blank($draft->in_reply_to)) {
+            return;
+        }
+
+        $user = $this->authUser();
+
+        $original = Email::query()
+            ->with(['body', 'participants', 'from', 'shares'])
+            ->where('team_id', $user->current_team_id)
+            ->where('rfc_message_id', $draft->in_reply_to)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->first();
+
+        if (! $original instanceof Email || $user->cannot('view', $original)) {
+            return;
+        }
+
+        $this->sourceEmailId = (string) $original->getKey();
+        $this->replyMode = match ($draft->creation_source) {
+            EmailCreationSource::REPLY_ALL => 'reply_all',
+            EmailCreationSource::FORWARD => 'forward',
+            default => 'reply',
+        };
+        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
+        $this->quotedBodyHtml = $user->can('viewBody', $original) ? $original->body?->body_html : null;
     }
 
     /**
@@ -1044,7 +1177,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'inReplyToEmailId', 'quotedBodyHtml']);
+        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'sourceEmailId', 'inReplyToEmailId', 'quotedBodyHtml']);
         $this->resetErrorBag();
     }
 

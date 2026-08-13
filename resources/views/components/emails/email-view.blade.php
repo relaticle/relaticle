@@ -138,6 +138,9 @@
                 }, 1200)
             },
         }"
+        {{-- A draft that comes back with its email was not opened by a click here, so
+             the composer says when it has docked and the reader scrolls to it. --}}
+        x-on:composer:opened-inline.window="scrollToDraft()"
         class="shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-3 sm:px-6"
     >
         <div class="flex items-start gap-3">

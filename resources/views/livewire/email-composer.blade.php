@@ -1,4 +1,10 @@
 <div
+    @if ($dock === 'inline')
+        {{-- The reader closes by removing this component along with itself, which is
+             too late for an event-based "save your draft first". The reader finds the
+             dock by this hook and awaits its save before unmounting. --}}
+        data-inline-composer
+    @endif
     @class([
         // Inline: the draft is appended to the reading pane's scroll region, so it is
         // simply as tall as its message — the region does the scrolling.
@@ -108,11 +114,22 @@
                             </button>
                         @endunless
                     @endif
+                    {{-- Every × that sits on a Draft bar throws the draft away, including
+                         a row a previous save already wrote — on the dock this bar IS
+                         that Draft bar. Closing the floating window's chrome instead
+                         puts the draft away and keeps it; so does closing the reader. --}}
                     <button
                         type="button"
-                        wire:click="close"
-                        aria-label="{{ __('filament/emails/composer.actions.close') }}"
-                        class="rounded-lg p-1.5 text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-400/10 dark:hover:text-danger-400"
+                        wire:click="{{ $dock === 'inline' ? 'discard' : 'close' }}"
+                        aria-label="{{ $dock === 'inline' ? __('filament/emails/composer.actions.discard') : __('filament/emails/composer.actions.close') }}"
+                        @if ($dock === 'inline')
+                            x-tooltip="{ content: @js(__('filament/emails/composer.actions.discard')), theme: $store.theme }"
+                        @endif
+                        @class([
+                            'rounded-lg p-1.5 text-gray-400 transition',
+                            'hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-400/10 dark:hover:text-danger-400' => $dock === 'inline',
+                            'hover:bg-gray-200/70 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200' => $dock === 'floating',
+                        ])
                     >
                         <x-heroicon-m-x-mark class="h-4 w-4" />
                     </button>
@@ -120,6 +137,35 @@
             </div>
 
             @unless ($isMinimized)
+                {{-- The message being answered or forwarded, above the draft and split
+                     off by the same dashed rule the inline dock uses — so a reply looks
+                     the same whether it is being written under the original or reopened
+                     later from Drafts. The dock never shows this: there, the real
+                     message is already on screen right above it. --}}
+                @if ($isModal && $this->sourceEmail !== null)
+                    <div class="min-h-0 flex-1 overflow-y-auto border-b-2 border-dashed border-gray-200 dark:border-gray-700">
+                        <x-emails.quoted-message :record="$this->sourceEmail" />
+                    </div>
+
+                    {{-- Same Draft bar the inline dock carries. Its × throws the draft
+                         away — including the row a previous save already wrote — which
+                         is the one place that deletes. The window × above keeps it. --}}
+                    <div class="flex h-10 shrink-0 items-center justify-between gap-2 px-4">
+                        <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
+                            {{ __('filament/emails/composer.draft') }}
+                        </span>
+                        <button
+                            type="button"
+                            wire:click="discard"
+                            aria-label="{{ __('filament/emails/composer.actions.discard') }}"
+                            x-tooltip="{ content: @js(__('filament/emails/composer.actions.discard')), theme: $store.theme }"
+                            class="rounded-lg p-1.5 text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-400/10 dark:hover:text-danger-400"
+                        >
+                            <x-heroicon-m-x-mark class="h-4 w-4" />
+                        </button>
+                    </div>
+                @endif
+
                 {{-- Field rows --}}
                 <div @class(['shrink-0 divide-y divide-gray-100 text-sm dark:divide-white/5', 'px-4' => $dock === 'floating', 'px-4 sm:px-6' => $dock === 'inline'])>
                     <label class="flex items-center gap-3 py-2">

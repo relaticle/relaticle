@@ -213,6 +213,49 @@ it('inline composer prefills reply-all and forward from their modes', function (
         ->assertSet('inReplyToEmailId', null);
 });
 
+it('a reply saved as a draft still threads when it is sent later', function (): void {
+    // The draft used to be stored with no link to the message it answered, so
+    // reopening it resumed a plain new email and sending it threaded nowhere.
+    $composer = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->set('bodyHtml', '<p>Started, not finished</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    livewire(EmailComposer::class)
+        ->call('open', [], $draftId)
+        ->assertSet('replyMode', 'reply')
+        ->assertSet('inReplyToEmailId', $this->inboundEmail->id)
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->sole();
+
+    expect($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id)
+        ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id);
+});
+
+it('a forward saved as a draft keeps its source without threading against it', function (): void {
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    livewire(EmailComposer::class)
+        ->call('open', [], $draftId)
+        ->assertSet('replyMode', 'forward')
+        // The source is kept so the composer can show what is being forwarded...
+        ->assertSet('sourceEmailId', $this->inboundEmail->id)
+        // ...but a forward is a new message, so it must not thread against it.
+        ->assertSet('inReplyToEmailId', null);
+});
+
 it('the docked composer closes when the reader moves to another email', function (): void {
     $other = Email::create([
         'team_id' => $this->team->id,

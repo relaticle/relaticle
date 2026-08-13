@@ -21,9 +21,17 @@ use RuntimeException;
 final readonly class SaveEmailDraftAction
 {
     /**
-     * Create or update a DRAFT email row. Drafts are never queued, never
-     * team-visible (privacy_tier PRIVATE), and never carry reply threading
-     * (spec §4 — a minimized reply saves as a plain draft in v1).
+     * Create or update a DRAFT email row. Drafts are never queued and never
+     * team-visible (privacy_tier PRIVATE).
+     *
+     * A draft made from another message keeps the link to it. Dropping it — as this
+     * did originally — meant a reply saved as a draft came back as a plain new
+     * message: reopening it could not show what was being answered, and sending it
+     * threaded nowhere in the recipient's client. `source_email_id` carries that
+     * link for replies AND forwards, resolved here to the original's RFC message id
+     * and thread, so no extra column is needed. On a draft those columns mean "what
+     * this was made from"; whether the sent message actually threads is decided at
+     * send time, which is why a forward can be restored without threading.
      *
      * `attachments` holds storage paths already written to {@see EmailAttachment::DISK}
      * by the caller; each becomes an EmailAttachment row on the draft. Rows already
@@ -36,6 +44,8 @@ final readonly class SaveEmailDraftAction
      *     to: list<string>,
      *     cc: list<string>,
      *     bcc: list<string>,
+     *     source_email_id?: ?string,
+     *     creation_source?: ?EmailCreationSource,
      *     attachments?: list<string>,
      *     attachment_file_names?: array<string, string>,
      * }  $data
@@ -66,6 +76,8 @@ final readonly class SaveEmailDraftAction
                 return $existing;
             }
 
+            $source = $this->sourceEmail($user, $data['source_email_id'] ?? null);
+
             $attributes = [
                 'team_id' => $account->team_id,
                 'user_id' => $user->getKey(),
@@ -81,7 +93,11 @@ final readonly class SaveEmailDraftAction
                 // clear the flag for files a previous save already attached.
                 'has_attachments' => $existing instanceof Email && $existing->has_attachments,
                 'is_internal' => false,
-                'creation_source' => EmailCreationSource::COMPOSE,
+                'creation_source' => $data['creation_source'] ?? EmailCreationSource::COMPOSE,
+                // Keeps the draft attached to the message it came from, so reopening
+                // it resumes the reply or forward it was.
+                'in_reply_to' => $source?->rfc_message_id,
+                'thread_id' => $source?->thread_id,
             ];
 
             if ($existing !== null) {
@@ -113,6 +129,24 @@ final readonly class SaveEmailDraftAction
 
             return $draft;
         });
+    }
+
+    /**
+     * The message this draft was made from, if the caller named one this user may
+     * read. Anything else is ignored rather than trusted: the id comes from the client.
+     */
+    private function sourceEmail(User $user, ?string $emailId): ?Email
+    {
+        if ($emailId === null) {
+            return null;
+        }
+
+        $email = Email::query()
+            ->where('team_id', $user->current_team_id)
+            ->whereKey($emailId)
+            ->first();
+
+        return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 
     /**

@@ -123,13 +123,29 @@
              stale inline `display: none` stays behind, leaving an invisible overlay.
              A mount animation has no state to fall out of sync. --}}
         <div
-            x-data
+            x-data="{
+                /**
+                 * Save any reply in progress before the reader goes away. Closing
+                 * removes the docked composer along with the reader, so an event asking
+                 * it to save its draft would arrive after it no longer exists — the
+                 * draft has to be persisted first, and awaited.
+                 */
+                async closeReader() {
+                    const dock = document.querySelector('[data-inline-composer][wire\\:id]')
+
+                    if (dock) {
+                        await window.Livewire.find(dock.getAttribute('wire:id')).call('close')
+                    }
+
+                    $wire.deselectEmail()
+                },
+            }"
             wire:key="email-reader"
-            x-on:keydown.escape.window="$wire.deselectEmail()"
+            x-on:keydown.escape.window="closeReader()"
             class="fixed inset-0 z-30 flex items-center justify-center p-4 sm:p-6"
         >
             <div
-                wire:click="deselectEmail"
+                x-on:click="closeReader()"
                 class="fi-email-reader-backdrop absolute inset-0 bg-gray-950/50"
             ></div>
 
@@ -141,7 +157,7 @@
                         {{ __('filament/pages/email-inbox.reader.heading') }}
                     </span>
                     <button
-                        wire:click="deselectEmail"
+                        x-on:click="closeReader()"
                         type="button"
                         aria-label="{{ __('filament/emails/composer.actions.close') }}"
                         class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"

@@ -294,6 +294,9 @@ final class EmailInboxPage extends Page
         // different one. The composer saves whatever was typed as a draft.
         $this->dispatch('composer:dismiss-inline');
 
+        // ...and if this message already has an unfinished reply, bring it back up.
+        $this->dispatch('composer:resume-draft', emailId: $id);
+
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
         unset($this->inboxUnreadCount);
