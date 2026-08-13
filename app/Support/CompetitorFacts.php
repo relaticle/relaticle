@@ -19,11 +19,14 @@ final readonly class CompetitorFacts
      *     license: string,
      *     stars: int,
      *     stars_verified: string,
+     *     contributors: int|string,
+     *     contributors_verified: string,
      *     pricing: string,
      *     pricing_verified: string,
      *     stack: string,
      *     self_host: string,
      *     ai: string,
+     *     extensibility: string,
      *     verified: string,
      * }>
      */
@@ -35,11 +38,14 @@ final readonly class CompetitorFacts
          *     license: string,
          *     stars: int,
          *     stars_verified: string,
+         *     contributors: int|string,
+         *     contributors_verified: string,
          *     pricing: string,
          *     pricing_verified: string,
          *     stack: string,
          *     self_host: string,
          *     ai: string,
+         *     extensibility: string,
          *     verified: string,
          * }> $facts
          */
