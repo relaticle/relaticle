@@ -7,10 +7,19 @@
             />
         </div>
     @else
-    <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
+    {{-- Sized in CSS, not JS: an inline height set by Alpine is wiped by every
+         Livewire re-render (x-init does not re-run after a morph), which drops the
+         pane back to its min-height mid-interaction. --}}
+    <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[calc(100dvh-15rem)] min-h-[30rem]">
 
         {{-- ── Left panel: folder tabs + search + email list ─────────── --}}
-        <div class="flex w-80 shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+        {{-- Below `lg` the two panes alternate: the list until an email is picked,
+             then the reader (which carries its own back button). --}}
+        <div @class([
+            'w-full shrink-0 flex-col border-r border-gray-200 dark:border-gray-700 lg:flex lg:w-80',
+            'hidden' => $selectedEmailId !== null,
+            'flex' => $selectedEmailId === null,
+        ])>
 
             <div class="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
                 <x-emails.folder-tab folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   label="All" />
@@ -73,7 +82,11 @@
         </div>
 
         {{-- ── Right panel: email detail ───────────────────────────────── --}}
-        <div class="relative flex flex-1 flex-col min-h-0">
+        <div @class([
+            'relative flex-1 flex-col min-h-0 lg:flex',
+            'hidden' => $selectedEmailId === null,
+            'flex' => $selectedEmailId !== null,
+        ])>
 
             {{-- Loading overlay while switching emails --}}
             <div wire:loading wire:target="selectEmail,setFolder" class="absolute inset-0 z-10 bg-white/70 dark:bg-gray-900/70">
@@ -83,10 +96,8 @@
                 </svg>
             </div>
 
-            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-y-auto min-h-0">
+            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-hidden min-h-0">
                 @if ($this->selectedEmail !== null)
-                    <x-emails.detail-action-bar :email="$this->selectedEmail" />
-
                     @php
                         $authUser = auth()->user();
                         $isEmailOwner = $this->selectedEmail->user_id === $authUser->getKey();

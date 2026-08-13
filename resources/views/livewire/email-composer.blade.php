@@ -1,4 +1,10 @@
 <div
+    @class([
+        // Inline: this root is a flex child of the reading pane, so it is the only
+        // element whose percentage cap resolves against a definite height. It stays
+        // content-sized (the draft grows with the message) until the cap bites.
+        'flex min-h-0 max-h-[60%] shrink-0 flex-col overflow-hidden' => $dock === 'inline',
+    ])
     x-data="{
         insertVariable(id) {
             const editor = document.querySelector('.email-composer-body [x-data^=\'richEditorFormComponent\']')
@@ -8,13 +14,15 @@
             }
         },
     }"
-    x-on:keydown.window="(() => {
-        if ($event.key === 'c'
-            && ! $event.metaKey && ! $event.ctrlKey && ! $event.altKey
-            && ! ['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)
-            && ! $event.target.isContentEditable
-        ) { $event.preventDefault(); $wire.dispatch('composer:open') }
-    })()"
+    @if ($dock === 'floating')
+        x-on:keydown.window="(() => {
+            if ($event.key === 'c'
+                && ! $event.metaKey && ! $event.ctrlKey && ! $event.altKey
+                && ! ['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)
+                && ! $event.target.isContentEditable
+            ) { $event.preventDefault(); $wire.dispatch('composer:open') }
+        })()"
+    @endif
 >
     @if ($isOpen)
         <div
@@ -23,51 +31,68 @@
             x-transition:enter-start="translate-y-4 opacity-0"
             x-transition:enter-end="translate-y-0 opacity-100"
             @class([
-                'fixed z-40 flex flex-col overflow-hidden rounded-xl bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 transition-all duration-200 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10',
-                'bottom-4 right-4' => $isMinimized || ! $isExpanded,
-                'w-[38rem] h-[36rem]' => ! $isMinimized && ! $isExpanded,
-                'w-80' => $isMinimized,
-                'inset-4 md:inset-8' => ! $isMinimized && $isExpanded,
+                'flex flex-col overflow-hidden bg-white dark:bg-gray-900',
+                // Docked under the message being answered, split off by a dashed rule.
+                // Height follows the draft: it grows as the message does, pushing up
+                // into the pane until the root's cap bites, after which the message
+                // scrolls under the pinned address rows.
+                'min-h-0 flex-1 border-t-2 border-dashed border-gray-200 dark:border-gray-700' => $dock === 'inline',
+                'fixed z-40 rounded-xl shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 transition-all duration-200 dark:shadow-black/50 dark:ring-white/10' => $dock === 'floating',
+                'bottom-4 right-4' => $dock === 'floating' && ($isMinimized || ! $isExpanded),
+                'w-[38rem] h-[36rem]' => $dock === 'floating' && ! $isMinimized && ! $isExpanded,
+                'w-80' => $dock === 'floating' && $isMinimized,
+                'inset-4 md:inset-8' => $dock === 'floating' && ! $isMinimized && $isExpanded,
             ])
         >
-            {{-- Title bar --}}
+            {{-- Title bar. The inline dock sits inside the message it answers, so it
+                 needs no window chrome — just a Draft marker and a way out. --}}
             <div
                 @class([
-                    'flex h-12 shrink-0 items-center justify-between gap-2 bg-gray-50 pl-4 pr-2 dark:bg-white/5',
-                    'border-b border-gray-200 dark:border-white/10' => ! $isMinimized,
+                    'flex shrink-0 items-center justify-between gap-2',
+                    'h-10 px-4 sm:px-6' => $dock === 'inline',
+                    'h-12 bg-gray-50 pl-4 pr-2 dark:bg-white/5' => $dock === 'floating',
+                    'border-b border-gray-200 dark:border-white/10' => $dock === 'floating' && ! $isMinimized,
                 ])
             >
-                <button
-                    type="button"
-                    wire:click="{{ $isMinimized ? 'restore' : 'minimize' }}"
-                    class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-gray-900 dark:text-gray-100"
-                >
-                    <x-heroicon-m-envelope class="h-4 w-4 shrink-0 text-primary-500" />
-                    <span class="truncate">{{ filled($subject) ? $subject : __('filament/emails/composer.title') }}</span>
-                </button>
-
-                <div class="flex shrink-0 items-center gap-0.5">
+                @if ($dock === 'inline')
+                    <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
+                        {{ __('filament/emails/composer.draft') }}
+                    </span>
+                @else
                     <button
                         type="button"
                         wire:click="{{ $isMinimized ? 'restore' : 'minimize' }}"
-                        aria-label="{{ $isMinimized ? __('filament/emails/composer.actions.restore') : __('filament/emails/composer.actions.minimize') }}"
-                        class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-200/70 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                        class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-gray-900 dark:text-gray-100"
                     >
-                        <x-dynamic-component :component="$isMinimized ? 'heroicon-m-chevron-up' : 'heroicon-m-minus'" class="h-4 w-4" />
+                        <x-heroicon-m-envelope class="h-4 w-4 shrink-0 text-primary-500" />
+                        <span class="truncate">{{ filled($subject) ? $subject : __('filament/emails/composer.title') }}</span>
                     </button>
-                    @unless ($isMinimized)
+                @endif
+
+                <div class="flex shrink-0 items-center gap-0.5">
+                    @if ($dock === 'floating')
                         <button
                             type="button"
-                            wire:click="toggleExpand"
-                            aria-label="{{ $isExpanded ? __('filament/emails/composer.actions.shrink') : __('filament/emails/composer.actions.expand') }}"
+                            wire:click="{{ $isMinimized ? 'restore' : 'minimize' }}"
+                            aria-label="{{ $isMinimized ? __('filament/emails/composer.actions.restore') : __('filament/emails/composer.actions.minimize') }}"
                             class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-200/70 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
                         >
-                            <x-dynamic-component
-                                :component="$isExpanded ? 'heroicon-m-arrows-pointing-in' : 'heroicon-m-arrows-pointing-out'"
-                                class="h-4 w-4"
-                            />
+                            <x-dynamic-component :component="$isMinimized ? 'heroicon-m-chevron-up' : 'heroicon-m-minus'" class="h-4 w-4" />
                         </button>
-                    @endunless
+                        @unless ($isMinimized)
+                            <button
+                                type="button"
+                                wire:click="toggleExpand"
+                                aria-label="{{ $isExpanded ? __('filament/emails/composer.actions.shrink') : __('filament/emails/composer.actions.expand') }}"
+                                class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-200/70 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                            >
+                                <x-dynamic-component
+                                    :component="$isExpanded ? 'heroicon-m-arrows-pointing-in' : 'heroicon-m-arrows-pointing-out'"
+                                    class="h-4 w-4"
+                                />
+                            </button>
+                        @endunless
+                    @endif
                     <button
                         type="button"
                         wire:click="close"
@@ -81,7 +106,7 @@
 
             @unless ($isMinimized)
                 {{-- Field rows --}}
-                <div class="shrink-0 divide-y divide-gray-100 px-4 text-sm dark:divide-white/5">
+                <div @class(['shrink-0 divide-y divide-gray-100 text-sm dark:divide-white/5', 'px-4' => $dock === 'floating', 'px-4 sm:px-6' => $dock === 'inline'])>
                     <label class="flex items-center gap-3 py-2">
                         <span class="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-gray-400">{{ __('filament/emails/composer.fields.from') }}</span>
                         <span class="flex min-w-0 flex-1 items-center gap-2">
@@ -148,10 +173,14 @@
                 </div>
 
                 {{-- Body: Filament RichEditor with floating toolbar only --}}
-                <p class="shrink-0 px-4 pt-3 text-xs font-medium uppercase tracking-wide text-gray-400">
+                <p @class(['shrink-0 pt-3 text-xs font-medium uppercase tracking-wide text-gray-400', 'px-4' => $dock === 'floating', 'px-4 sm:px-6' => $dock === 'inline'])>
                     {{ __('filament/emails/composer.fields.message') }}
                 </p>
-                <div class="email-composer-body-ctn min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-1" wire:ignore>
+                <div @class([
+                    'email-composer-body-ctn flex-1 overflow-y-auto pb-3 pt-1',
+                    'min-h-0 px-4' => $dock === 'floating',
+                    'min-h-[6rem] px-4 sm:px-6' => $dock === 'inline',
+                ]) wire:ignore>
                     {{ $this->getSchema('bodySchema') }}
                 </div>
                 @error('bodyHtml') <p class="px-4 pb-1 text-xs text-danger-600 dark:text-danger-400">{{ $message }}</p> @enderror
@@ -194,7 +223,7 @@
                 @endif
 
                 {{-- Bottom bar --}}
-                <div class="flex h-14 shrink-0 items-center justify-between border-t border-gray-200 px-3 dark:border-white/10">
+                <div @class(['flex h-14 shrink-0 items-center justify-between border-t border-gray-200 dark:border-white/10', 'px-3' => $dock === 'floating', 'px-3 sm:px-5' => $dock === 'inline'])>
                     <div class="flex items-center gap-1">
                         <x-emails.composer-icon-button icon="heroicon-o-paper-clip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
                         <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />

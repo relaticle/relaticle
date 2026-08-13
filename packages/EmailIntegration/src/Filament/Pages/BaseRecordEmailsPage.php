@@ -83,21 +83,6 @@ abstract class BaseRecordEmailsPage extends Page
         ];
     }
 
-    public function replyAction(): Action
-    {
-        return $this->replyForwardModeAction('reply', 'reply', $this->selectedEmailId);
-    }
-
-    public function replyAllAction(): Action
-    {
-        return $this->replyForwardModeAction('replyAll', 'reply_all', $this->selectedEmailId);
-    }
-
-    public function forwardAction(): Action
-    {
-        return $this->replyForwardModeAction('forward', 'forward', $this->selectedEmailId);
-    }
-
     /**
      * @return LengthAwarePaginator<int, Email&object{pivot: MorphPivot}>
      */
@@ -189,6 +174,10 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->selectedEmailId = $id;
 
+        // A reply answers the message that was open; it cannot stay docked under a
+        // different one. The composer saves whatever was typed as a draft.
+        $this->dispatch('composer:dismiss-inline');
+
         // Optimistically mark the email as read so the unread count updates immediately
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
@@ -203,6 +192,7 @@ abstract class BaseRecordEmailsPage extends Page
         unset($this->emails);
         $firstItem = $this->emails()->items()[0] ?? null;
         $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
+        $this->dispatch('composer:dismiss-inline');
     }
 
     public function markAllAsRead(): void

@@ -22,10 +22,19 @@
         {{-- No wrapper: the Filament table renders its own card. --}}
         @livewire($tab->livewireComponent(), key($tab->value.'-table'))
     @else
-    <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
+    {{-- Sized in CSS, not JS: an inline height set by Alpine is wiped by every
+         Livewire re-render (x-init does not re-run after a morph), which drops the
+         pane back to its min-height mid-interaction. --}}
+    <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[calc(100dvh-17rem)] min-h-[30rem]">
 
         {{-- ── Left panel: folder tabs + search + email list ─────────── --}}
-        <div class="flex w-80 shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+        {{-- Below `lg` the two panes alternate: the list until an email is picked,
+             then the reader (which carries its own back button). --}}
+        <div @class([
+            'w-full shrink-0 flex-col border-r border-gray-200 dark:border-gray-700 lg:flex lg:w-80',
+            'hidden' => $selectedEmailId !== null,
+            'flex' => $selectedEmailId === null,
+        ])>
 
             @if ($this->showAccountSwitcher)
                 <div class="flex h-8 shrink-0 items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-3">
@@ -107,17 +116,19 @@
         </div>
 
         {{-- ── Right panel: email detail ───────────────────────────────── --}}
-        <div class="relative flex flex-1 flex-col min-h-0">
+        <div @class([
+            'relative flex-1 flex-col min-h-0 lg:flex',
+            'hidden' => $selectedEmailId === null,
+            'flex' => $selectedEmailId !== null,
+        ])>
 
             {{-- Loading overlay while switching emails --}}
             <div wire:loading wire:target="selectEmail,setFolder" class="absolute inset-0 z-10 bg-white/70 dark:bg-gray-900/70">
                 <x-filament::loading-indicator class="absolute top-1/2 left-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-primary-500" />
             </div>
 
-            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-y-auto min-h-0">
+            <div wire:loading.class="opacity-0" wire:target="selectEmail,setFolder" class="flex flex-1 flex-col overflow-hidden min-h-0">
                 @if ($this->selectedEmail !== null)
-                    <x-emails.detail-action-bar :email="$this->selectedEmail" />
-
                     @if ($this->pendingAccessRequests->isNotEmpty())
                         <div class="shrink-0 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
                             <div class="flex items-center gap-2 mb-2">

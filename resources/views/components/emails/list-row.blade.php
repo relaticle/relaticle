@@ -15,6 +15,17 @@
     $canSummarize     = $isOwner || $authUser->can('viewBody', $email);
     $canRequestAccess = $authUser->cannot('viewBody', $email) && $authUser->can('requestAccess', $email);
     $hasActions       = $isOwner || $canSummarize || $canRequestAccess;
+
+    // A column of "1 day ago" is unscannable; mail lists read by clock, weekday, date.
+    $sentAt = $email->sent_at;
+    $timestamp = match (true) {
+        $sentAt === null            => null,
+        $sentAt->isToday()          => $sentAt->format('g:i A'),
+        $sentAt->isYesterday()      => 'Yesterday',
+        $sentAt->diffInDays() < 7   => $sentAt->format('D'),
+        $sentAt->isCurrentYear()    => $sentAt->format('M j'),
+        default                     => $sentAt->format('M j, Y'),
+    };
 @endphp
 
 <div x-data="{ actionsOpen: false }" class="relative group">
@@ -51,9 +62,12 @@
                         </span>
                     @endif
                 @endif
-                <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ $email->sent_at?->diffForHumans() }}
-                </span>
+                <time
+                    class="text-xs text-gray-400 dark:text-gray-500"
+                    title="{{ $sentAt?->format('M j, Y · g:i A') }}"
+                >
+                    {{ $timestamp }}
+                </time>
             </div>
         </div>
 

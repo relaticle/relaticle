@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -47,6 +48,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
@@ -73,11 +75,37 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private const int MAX_ATTACHMENTS_TOTAL_BYTES = 15 * 1024 * 1024;
 
+    /**
+     * Where this instance renders. `floating` is the bottom-right window that
+     * handles Compose; `inline` is the copy docked under a message being read,
+     * which handles replies and forwards only. Both are the same component, so
+     * the toolbar, attachments, drafts, templates and signatures behave
+     * identically on either surface — the dock only decides chrome and which
+     * open event the instance answers.
+     */
+    #[Locked]
+    public string $dock = 'floating';
+
     public bool $isOpen = false;
 
     public bool $isMinimized = false;
 
     public bool $isExpanded = false;
+
+    /**
+     * Set when the open draft answers an existing message, so the outgoing email
+     * threads against it and is attributed to the right creation source.
+     */
+    public ?string $inReplyToEmailId = null;
+
+    public ?string $replyMode = null;
+
+    /**
+     * The message being replied to, quoted into the body at send time. It is
+     * never rendered in the composer — on the inline dock the original is on
+     * screen directly above it.
+     */
+    public ?string $quotedBodyHtml = null;
 
     public ?string $draftId = null;
 
@@ -140,11 +168,16 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * A same-named `$payload['draftId']` entry is never populated by either
      * caller; only a literal `draftId` parameter is.
      *
-     * @param  array{mode?: string, emailId?: string, to?: list<string>}  $payload
+     * @param  array{to?: list<string>}  $payload
      */
     #[On('composer:open')]
     public function open(array $payload = [], ?string $draftId = null): void
     {
+        // Compose belongs to the floating window. Both instances hear the event.
+        if ($this->dock !== 'floating') {
+            return;
+        }
+
         // A second `composer:open` while a draft is already in progress (e.g. the `c`
         // shortcut firing after a click landed on a button, not an input) must not
         // wipe what the user has typed — just bring the composer back into view.
@@ -178,6 +211,99 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->isOpen = true;
         $this->isMinimized = false;
+    }
+
+    /**
+     * Open the docked composer as a reply, reply-all or forward of `$emailId`.
+     * Only the inline instance answers — the floating window stays free for a
+     * separate compose draft.
+     */
+    #[On('composer:reply')]
+    public function openReply(string $emailId, string $mode = 'reply'): void
+    {
+        if ($this->dock !== 'inline') {
+            return;
+        }
+
+        $email = $this->replyableEmail($emailId);
+
+        if (! $email instanceof Email) {
+            return;
+        }
+
+        $account = $this->activeAccounts()->first();
+
+        if ($account === null) {
+            return;
+        }
+
+        $this->resetComposerState();
+
+        $user = $this->authUser();
+        $this->accountId = (string) $account->getKey();
+        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+
+        $this->replyMode = in_array($mode, ['reply', 'reply_all', 'forward'], true) ? $mode : 'reply';
+
+        $this->to = match ($this->replyMode) {
+            'forward' => [],
+            // Reply-all addresses the original sender PLUS the to/cc recipients
+            // (never bcc), minus the user's own account address.
+            'reply_all' => $email->replyAllRecipients($account->email_address),
+            // `where()` on the loaded collection keeps the original keys, so the
+            // result has to be re-indexed to satisfy the list-typed property.
+            default => array_values($email->participants
+                ->where('role', EmailParticipantRole::FROM)
+                ->map(fn (EmailParticipant $participant): string => (string) $participant->email_address)
+                ->filter(fn (string $address): bool => $address !== '')
+                ->all()),
+        };
+
+        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').($email->subject ?? '');
+
+        // Only quote the original body when the viewer is entitled to read it.
+        $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
+        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : (string) $email->getKey();
+
+        $signature = $this->defaultSignatureFor($this->accountId);
+        $this->signatureId = $signature?->getKey();
+        $this->setBodyHtml(resolve(EmailTemplateRenderService::class)
+            ->applySignatureBlock('<p></p>', $signature));
+
+        $this->isOpen = true;
+        $this->isMinimized = false;
+    }
+
+    /**
+     * Close the docked composer because the reader moved to a different message —
+     * the draft answers the email that was on screen, so it must not stay attached
+     * under a different one. Anything typed is saved as a draft on the way out.
+     */
+    #[On('composer:dismiss-inline')]
+    public function dismissInline(): void
+    {
+        if ($this->dock !== 'inline' || ! $this->isOpen) {
+            return;
+        }
+
+        $this->close();
+    }
+
+    /**
+     * The email a reply may target: visible to this user, in the current tenant.
+     */
+    private function replyableEmail(string $emailId): ?Email
+    {
+        $user = $this->authUser();
+
+        $email = Email::query()
+            ->with(['participants', 'body', 'shares'])
+            ->forTeam($user->current_team_id)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->whereKey($emailId)
+            ->first();
+
+        return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 
     public function send(): void
@@ -214,12 +340,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
             'subject' => $renderer->renderContent((string) $this->subject),
-            'body_html' => $renderer->renderForSending($bodyHtml),
+            'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
-            'in_reply_to_email_id' => null,
-            'creation_source' => EmailCreationSource::COMPOSE,
+            'in_reply_to_email_id' => $this->inReplyToEmailId,
+            'creation_source' => $this->creationSource(),
             'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
             'batch_id' => null,
             // Interactive sends from the composer keep the undo-send window (matches
@@ -248,6 +374,32 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->dispatch('composer:sent');
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
+    }
+
+    private function creationSource(): EmailCreationSource
+    {
+        return match ($this->replyMode) {
+            'reply' => EmailCreationSource::REPLY,
+            'reply_all' => EmailCreationSource::REPLY_ALL,
+            'forward' => EmailCreationSource::FORWARD,
+            default => EmailCreationSource::COMPOSE,
+        };
+    }
+
+    /**
+     * Append the original message to a reply or forward. The composer never shows
+     * this — the message is on screen above the dock — but the recipient's client
+     * needs it for the conversation to read as a thread.
+     */
+    private function withQuotedBody(string $bodyHtml): string
+    {
+        if (blank($this->quotedBodyHtml)) {
+            return $bodyHtml;
+        }
+
+        return $bodyHtml.($this->replyMode === 'forward'
+            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$this->quotedBodyHtml
+            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$this->quotedBodyHtml.'</blockquote>');
     }
 
     public function minimize(): void
@@ -887,7 +1039,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments']);
+        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'inReplyToEmailId', 'quotedBodyHtml']);
         $this->resetErrorBag();
     }
 

@@ -147,6 +147,7 @@ final class EmailInboxPage extends Page
         $this->resetPage();
         unset($this->emails, $this->inboxUnreadCount);
         $this->ensureEmailSelected();
+        $this->dispatch('composer:dismiss-inline');
     }
 
     /**
@@ -283,9 +284,22 @@ final class EmailInboxPage extends Page
         return $query->count();
     }
 
+    /**
+     * Covers selection changes that come from the client (the mobile back button
+     * clears it) rather than from {@see selectEmail()}.
+     */
+    public function updatedSelectedEmailId(): void
+    {
+        $this->dispatch('composer:dismiss-inline');
+    }
+
     public function selectEmail(string $id): void
     {
         $this->selectedEmailId = $id;
+
+        // A reply answers the message that was open; it cannot stay docked under a
+        // different one. The composer saves whatever was typed as a draft.
+        $this->dispatch('composer:dismiss-inline');
 
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
@@ -354,6 +368,7 @@ final class EmailInboxPage extends Page
         $this->resetPage();
         unset($this->emails);
         $this->ensureEmailSelected();
+        $this->dispatch('composer:dismiss-inline');
     }
 
     private function ensureEmailSelected(): void
@@ -456,48 +471,12 @@ final class EmailInboxPage extends Page
             });
     }
 
-    public function replyAction(): Action
-    {
-        return $this->replyForwardModeAction('reply', 'reply');
-    }
-
-    public function replyAllAction(): Action
-    {
-        return $this->replyForwardModeAction('replyAll', 'reply_all');
-    }
-
-    public function forwardAction(): Action
-    {
-        return $this->replyForwardModeAction('forward', 'forward');
-    }
-
-    /**
-     * A single reply/reply-all/forward action with its mode baked in, for use as
-     * a child of the native `<x-filament-actions::group>` dropdown. Grouped-action
-     * triggers cannot carry per-action arguments, so the target email is the one
-     * currently open in the detail pane ({@see $selectedEmailId}).
-     */
-    private function replyForwardModeAction(string $name, string $mode): Action
-    {
-        return Action::make($name)
-            ->label($this->replyForwardLabel($mode))
-            ->icon($this->replyForwardIcon($mode))
-            ->modalHeading($this->replyForwardLabel($mode))
-            ->slideOver()
-            ->modalWidth(Width::SevenExtraLarge)
-            ->fillForm(fn (): array => $this->replyForwardFormData($this->selectedEmailId, $mode))
-            ->schema($this->replyFormSchema())
-            ->action(function (array $data) use ($mode): void {
-                $this->submitReplyForward($data, $mode);
-            });
-    }
-
     private function replyForwardIcon(string $mode): string
     {
         return match ($mode) {
-            'reply_all' => 'heroicon-o-arrow-uturn-right',
-            'forward' => 'heroicon-o-arrow-right',
-            default => 'heroicon-o-arrow-uturn-left',
+            'reply_all' => 'ri-reply-all-line',
+            'forward' => 'ri-share-forward-line',
+            default => 'ri-reply-line',
         };
     }
 

@@ -13,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
@@ -167,25 +168,20 @@ it('reply_all recipients keep the original sender and drop the user\'s own addre
         ->not->toContain('me@example.com');    // self excluded
 });
 
-it('header reply action group targets the selected email without trigger arguments', function (): void {
-    // The native <x-filament-actions::group> dropdown renders its child triggers
-    // without per-action arguments, so the `reply` action must resolve its target
-    // from the currently selected email rather than from mounted arguments.
-    livewire(EmailInboxPage::class)
-        ->set('selectedEmailId', $this->inboundEmail->id)
-        ->callAction(
-            'reply',
-            data: [
-                'connected_account_id' => $this->account->id,
-                'to' => ['sender@contact.com'],
-                'cc' => [],
-                'bcc' => [],
-                'subject' => 'Re: Original Subject',
-                'body_html' => '<p>Reply via group</p>',
-                'in_reply_to_email_id' => $this->inboundEmail->id,
-            ],
-        )
-        ->assertHasNoActionErrors();
+it('inline composer prefills a reply from the selected email and queues it', function (): void {
+    // The reply icons carry the target email, and the docked composer answers
+    // `composer:reply` only — the floating window keeps Compose to itself.
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('isOpen', true)
+        ->assertSet('replyMode', 'reply')
+        ->assertSet('to', ['sender@contact.com'])
+        ->assertSet('subject', 'Re: Original Subject')
+        ->assertSet('inReplyToEmailId', $this->inboundEmail->id)
+        ->set('bodyHtml', '<p>Reply via composer</p>')
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
 
     $reply = Email::query()
         ->where('direction', EmailDirection::OUTBOUND)
@@ -194,6 +190,70 @@ it('header reply action group targets the selected email without trigger argumen
 
     expect($reply->status)->toBe(EmailStatus::QUEUED)
         ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
+});
+
+it('inline composer prefills reply-all and forward from their modes', function (): void {
+    $replyAll = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply_all')
+        ->assertSet('subject', 'Re: Original Subject');
+
+    // Reply-all keeps the sender and the CC recipient, in whichever order.
+    expect($replyAll->get('to'))
+        ->toContain('sender@contact.com')
+        ->toContain('cc-person@contact.com');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertSet('subject', 'Fwd: Original Subject')
+        // A forward has no recipient yet, and does not thread against the original.
+        ->assertSet('to', [])
+        ->assertSet('inReplyToEmailId', null);
+});
+
+it('the docked composer closes when the reader moves to another email', function (): void {
+    $other = Email::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Another Subject',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'creation_source' => EmailCreationSource::SYNC,
+        'rfc_message_id' => '<other@example.com>',
+        'thread_id' => 'thread-def',
+    ]);
+
+    // Selecting a different email must tell the dock to stand down — a draft that
+    // answers one message cannot stay docked under another.
+    livewire(EmailInboxPage::class)
+        ->set('selectedEmailId', $this->inboundEmail->id)
+        ->call('selectEmail', $other->id)
+        ->assertDispatched('composer:dismiss-inline');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('isOpen', true)
+        ->call('dismissInline')
+        ->assertSet('isOpen', false);
+
+    // The floating window is not dismissed by the reader moving on.
+    livewire(EmailComposer::class)
+        ->call('open')
+        ->assertSet('isOpen', true)
+        ->call('dismissInline')
+        ->assertSet('isOpen', true);
+});
+
+it('the floating composer ignores reply events, and the docked one ignores compose', function (): void {
+    livewire(EmailComposer::class)
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('isOpen', false);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('open')
+        ->assertSet('isOpen', false);
 });
 
 it('reply_all persists a queued Email with REPLY_ALL creation_source', function (): void {

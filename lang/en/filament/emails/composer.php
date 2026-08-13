@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'New email',
+    'draft' => 'Draft',
     'fields' => [
         'from' => 'From',
         'to' => 'To',
