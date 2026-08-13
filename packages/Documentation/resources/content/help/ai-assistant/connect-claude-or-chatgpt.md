@@ -54,8 +54,12 @@ connect it again later.
 
 - Works with an active Relaticle Cloud workspace — a paused workspace can't
   be selected on the consent screen until it's subscribed again.
+- Claude and ChatGPT are the assistants with a built-in connector flow
+  today, but the server speaks the open MCP standard — any other
+  MCP-capable tool can use the same URL with a personal access token, the
+  way developers connect Cursor (see the
+  [MCP Server guide](/developers/mcp)).
 - Self-hosted installs include the same connector server on your own domain
-  — the [MCP Server guide](/developers/mcp) covers the setup, and also how
-  developers connect tools like Cursor with a personal access token.
+  — the [MCP Server guide](/developers/mcp) covers the setup.
 - Access renews itself in the background; you only see the consent screen
   again if you revoke and reconnect.
