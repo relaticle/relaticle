@@ -108,7 +108,12 @@ final class EmailTemplateResource extends Resource
                     ->sortable(),
             ])
             ->recordActions([
+                // The edit schema is set explicitly rather than inferred from the
+                // resource: this table is also rendered outside a resource page
+                // (the Templates tab hosted by TemplatesTable), where there is no
+                // resource context to infer it from.
                 EditAction::make()
+                    ->schema(fn (Schema $schema): Schema => self::form($schema))
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
 
                 DeleteAction::make()

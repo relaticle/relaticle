@@ -1,5 +1,5 @@
 <x-filament-panels::page>
     <x-email-integration::cluster-header />
 
-    {{ $this->table }}
+    @livewire('email-integration.outbox-table')
 </x-filament-panels::page>

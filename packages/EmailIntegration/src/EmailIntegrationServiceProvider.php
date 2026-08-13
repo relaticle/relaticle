@@ -20,7 +20,10 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
+use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
+use Relaticle\EmailIntegration\Livewire\OutboxTable;
+use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
@@ -76,6 +79,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             });
 
         Livewire::component('email-integration.composer', EmailComposer::class);
+        Livewire::component('email-integration.drafts-table', DraftsTable::class);
+        Livewire::component('email-integration.outbox-table', OutboxTable::class);
+        Livewire::component('email-integration.templates-table', TemplatesTable::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the

@@ -8,6 +8,32 @@ return [
         'label' => 'Account',
         'all' => 'All accounts',
     ],
+    'tabs' => [
+        'emails' => 'Emails',
+        'drafts' => 'Drafts',
+        'outbox' => 'Outbox',
+        'templates' => 'Templates',
+    ],
+    'drafts' => [
+        'columns' => [
+            'subject' => 'Draft',
+            'no_subject' => 'No subject',
+            'recipients' => 'To',
+            'no_recipients' => 'No recipients',
+            'last_edited' => 'Last edited',
+        ],
+        'actions' => [
+            'open' => 'Continue writing',
+            'delete' => 'Delete draft',
+        ],
+        'empty' => [
+            'heading' => 'No drafts',
+            'description' => 'Messages you close before sending are saved here.',
+        ],
+        'notifications' => [
+            'deleted' => 'Draft deleted',
+        ],
+    ],
     'folders' => [
         'all' => 'All',
         'inbox' => 'Inbox',

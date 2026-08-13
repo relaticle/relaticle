@@ -40,6 +40,7 @@ use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -82,6 +83,14 @@ final class EmailInboxPage extends Page
 
     public EmailFolder $folder = EmailFolder::Inbox;
 
+    /**
+     * Which top-level surface the page is showing: the mail reader itself, or one
+     * of the sibling lists (drafts, outbox, templates) hosted as tabs. The tab
+     * bodies are nested Livewire components shared with their standalone pages.
+     */
+    #[Url(as: 'tab')]
+    public EmailPageTab $tab = EmailPageTab::EMAILS;
+
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
@@ -98,7 +107,13 @@ final class EmailInboxPage extends Page
     {
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
-        $this->ensureEmailSelected();
+
+        // Only the mail reader auto-selects: ensureEmailSelected() marks the opened
+        // email as read, which must not happen just because the page was loaded on
+        // the drafts, outbox or templates tab.
+        if ($this->tab === EmailPageTab::EMAILS) {
+            $this->ensureEmailSelected();
+        }
     }
 
     /**
@@ -139,7 +154,17 @@ final class EmailInboxPage extends Page
      */
     protected function getListeners(): array
     {
-        return ['reply-email' => 'openReplyModal'];
+        return [
+            'reply-email' => 'openReplyModal',
+            // The composer saves/discards drafts and queues mail from outside this
+            // component, so the tab badges have to be told when those counts move.
+            'drafts:changed' => 'refreshTabCounts',
+        ];
+    }
+
+    public function refreshTabCounts(): void
+    {
+        unset($this->tabCounts);
     }
 
     public function openReplyModal(string $emailId, string $mode): void
@@ -277,6 +302,48 @@ final class EmailInboxPage extends Page
             ->success()
             ->title(trans_choice('filament/pages/email-inbox.mark_all_read.notification', $count, ['count' => $count]))
             ->send();
+    }
+
+    public function setTab(string $tab): void
+    {
+        $this->tab = EmailPageTab::from($tab);
+
+        if ($this->tab === EmailPageTab::EMAILS) {
+            $this->ensureEmailSelected();
+        }
+    }
+
+    /**
+     * Badge counts for the tab bar. Drafts are the user's own unsent messages and
+     * the outbox counts what is still waiting to go out; templates count what the
+     * user may actually apply (shared, or their own).
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function tabCounts(): array
+    {
+        $user = $this->authUser();
+        $teamId = $user->current_team_id;
+
+        return [
+            EmailPageTab::DRAFTS->value => Email::query()
+                ->forTeam($teamId)
+                ->where('user_id', $user->getKey())
+                ->where('status', EmailStatus::DRAFT)
+                ->count(),
+            EmailPageTab::OUTBOX->value => Email::query()
+                ->forTeam($teamId)
+                ->where('user_id', $user->getKey())
+                ->whereIn('status', [EmailStatus::QUEUED, EmailStatus::FAILED])
+                ->count(),
+            EmailPageTab::TEMPLATES->value => EmailTemplate::query()
+                ->where('team_id', $teamId)
+                ->where(fn (Builder $q): Builder => $q
+                    ->where('is_shared', true)
+                    ->orWhere('created_by', $user->getKey()))
+                ->count(),
+        ];
     }
 
     public function setFolder(string $folder): void

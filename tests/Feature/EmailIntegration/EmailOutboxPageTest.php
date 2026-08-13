@@ -10,10 +10,11 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailOutboxPage;
+use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
-mutates(EmailOutboxPage::class);
+mutates(EmailOutboxPage::class, OutboxTable::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -56,7 +57,7 @@ it('queued tab shows only this user\'s queued OUTBOUND emails', function (): voi
     ]));
     $theirs = makeOutboxEmail($otherUser, $otherAccount, EmailStatus::QUEUED);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$failed, $theirs]);
 });
@@ -67,7 +68,7 @@ it('failed tab filters to failed emails', function (): void {
         'last_error' => 'SMTP bounce',
     ]);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->filterTable('status_tab', 'failed')
         ->assertCanSeeTableRecords([$failed])
         ->assertCanNotSeeTableRecords([$queued]);
@@ -76,7 +77,7 @@ it('failed tab filters to failed emails', function (): void {
 it('cancel row action moves a queued email to CANCELLED', function (): void {
     $email = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->callAction(TestAction::make('cancel')->table($email))
         ->assertNotified();
 
@@ -86,7 +87,7 @@ it('cancel row action moves a queued email to CANCELLED', function (): void {
 it('cancel row action is hidden for non-queued emails', function (): void {
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->filterTable('status_tab', 'failed')
         ->assertActionHidden(TestAction::make('cancel')->table($failed));
 });
@@ -96,7 +97,7 @@ it('reschedule row action updates scheduled_for', function (): void {
 
     $target = now()->addDay()->startOfMinute();
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->callAction(
             TestAction::make('reschedule')->table($email),
             data: ['scheduled_for' => $target->toDateTimeString()],
@@ -112,7 +113,7 @@ it('retry row action re-queues a failed email', function (): void {
         'attempts' => 3,
     ]);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->filterTable('status_tab', 'failed')
         ->assertCanSeeTableRecords([$email])
         ->callAction([['name' => 'retry', 'context' => ['table' => true, 'recordKey' => $email->getKey()]]])
@@ -130,7 +131,7 @@ it('retry row action re-queues a failed email', function (): void {
 it('retry row action is hidden for queued emails', function (): void {
     $email = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->assertActionHidden(TestAction::make('retry')->table($email));
 });
 
@@ -138,7 +139,7 @@ it('bulkCancel cancels selected queued rows', function (): void {
     $queuedA = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
     $queuedB = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
-    livewire(EmailOutboxPage::class)
+    livewire(OutboxTable::class)
         ->selectTableRecords([$queuedA, $queuedB])
         ->callAction([['name' => 'bulkCancel', 'context' => ['table' => true, 'bulk' => true]]])
         ->assertNotified();
@@ -152,7 +153,7 @@ it('bulkCancel skips a row that raced to SENDING and still cancels the rest', fu
     $racing = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
     $queuedB = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
-    $component = livewire(EmailOutboxPage::class)
+    $component = livewire(OutboxTable::class)
         ->selectTableRecords([$queuedA, $racing, $queuedB]);
 
     // Simulate the row transitioning QUEUED -> SENDING between render and the

@@ -7,6 +7,21 @@
             />
         </div>
     @else
+    {{-- ── Page tabs: the mail reader plus its sibling lists ────────── --}}
+    <div class="flex items-center gap-1 border-b border-gray-200 pb-2 dark:border-gray-700">
+        @foreach (\Relaticle\EmailIntegration\Enums\EmailPageTab::cases() as $pageTab)
+            <x-emails.page-tab
+                :tab="$pageTab"
+                :active="$tab === $pageTab"
+                :badge="$this->tabCounts[$pageTab->value] ?? null"
+            />
+        @endforeach
+    </div>
+
+    @if ($tab !== \Relaticle\EmailIntegration\Enums\EmailPageTab::EMAILS)
+        {{-- No wrapper: the Filament table renders its own card. --}}
+        @livewire($tab->livewireComponent(), key($tab->value.'-table'))
+    @else
     <div class="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
 
         {{-- ── Left panel: folder tabs + search + email list ─────────── --}}
@@ -161,6 +176,7 @@
         </div>
 
     </div>
+    @endif
     @endif
 
     <x-filament-actions::modals />

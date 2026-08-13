@@ -225,6 +225,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->closeComposer();
         $this->dispatch('composer:sent');
+        // A send both removes the draft (if any) and adds an outbox row.
+        $this->dispatch('drafts:changed');
     }
 
     public function minimize(): void
@@ -681,6 +683,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         );
 
         $this->draftId = (string) $draft->getKey();
+
+        // The drafts tab and its badge are rendered by other components; without
+        // this they only pick the new draft up on a full page load.
+        $this->dispatch('drafts:changed');
     }
 
     private function isDraftEmpty(): bool
