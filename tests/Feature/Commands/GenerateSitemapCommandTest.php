@@ -99,7 +99,7 @@ it('adds developer guide urls with lastmod from front matter', function (): void
     $xml = File::get($this->sitemap);
 
     expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
-        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-08-13#')
+        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-08-14#')
         ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-08-12#');
 });
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\Billing;
 use App\Features\Blog;
 use App\Features\Documentation;
+use App\Features\Marketing;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
 use App\Filament\Pages\CreateTeam;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class);
+mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, Marketing::class);
 
 describe('Billing', function (): void {
     it('is off by default', function (): void {
@@ -163,5 +164,61 @@ describe('Blog', function (): void {
             ->and(Route::has('filament.app.resources.posts.index'))->toBeFalse()
             ->and(Route::has('filament.app.resources.categories.index'))->toBeFalse()
             ->and(Route::has('filament.app.resources.tags.index'))->toBeFalse();
+    });
+});
+
+describe('Marketing', function (): void {
+    beforeEach(function () {
+        Http::fake([
+            'api.github.com/*' => Http::response(['stargazers_count' => 0], 200),
+        ]);
+    });
+
+    it('is on by default', function (): void {
+        expect(Feature::active(Marketing::class))->toBeTrue();
+    });
+
+    it('serves marketing routes when the feature is active', function (): void {
+        $this->get('/')->assertOk();
+        $this->get('/pricing')->assertOk();
+    });
+
+    it('redirects marketing routes to the app login when the feature is inactive', function (): void {
+        putenv('RELATICLE_FEATURE_MARKETING=false');
+        $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+
+        $this->get('/')->assertRedirect(url()->getAppUrl('login'));
+        $this->get('/pricing')->assertRedirect(url()->getAppUrl('login'));
+        $this->get('/contact')->assertRedirect(url()->getAppUrl('login'));
+        $this->get('/terms-of-service')->assertRedirect(url()->getAppUrl('login'));
+        $this->get('/privacy-policy')->assertRedirect(url()->getAppUrl('login'));
+
+        putenv('RELATICLE_FEATURE_MARKETING');
+        unset($_ENV['RELATICLE_FEATURE_MARKETING'], $_SERVER['RELATICLE_FEATURE_MARKETING']);
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('keeps /developers and /help reachable when the feature is inactive', function (): void {
+        putenv('RELATICLE_FEATURE_MARKETING=false');
+        $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+
+        $this->get('/developers')->assertOk();
+        $this->get('/help')->assertOk();
+
+        putenv('RELATICLE_FEATURE_MARKETING');
+        unset($_ENV['RELATICLE_FEATURE_MARKETING'], $_SERVER['RELATICLE_FEATURE_MARKETING']);
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
     });
 });
