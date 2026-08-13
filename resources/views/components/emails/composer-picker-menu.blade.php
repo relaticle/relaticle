@@ -9,6 +9,9 @@
     'handler' => 'wire',
     /** Builds the click expression for an option id (null = the "none" row). */
     'click',
+    /** Optional trailing row that creates a new option; bound to wire:click. */
+    'createLabel' => null,
+    'createClick' => null,
 ])
 
 @php
@@ -52,4 +55,12 @@
             </x-filament::dropdown.list.item>
         @endif
     </x-filament::dropdown.list>
+
+    @if (filled($createLabel))
+        <x-filament::dropdown.list>
+            <x-filament::dropdown.list.item wire:click="{{ $createClick }}" icon="heroicon-m-plus" color="gray">
+                {{ $createLabel }}
+            </x-filament::dropdown.list.item>
+        </x-filament::dropdown.list>
+    @endif
 </x-filament::dropdown>

@@ -189,6 +189,8 @@
                             :selected="$signatureId"
                             :none-label="__('filament/emails/composer.fields.signature_none')"
                             :click="fn (?string $id): string => $id === null ? '$set(\'signatureId\', null)' : '$set(\'signatureId\', \''.$id.'\')'"
+                            :create-label="__('filament/emails/composer.actions.create_signature')"
+                            create-click="mountAction('createSignature')"
                         />
                         <x-emails.composer-picker-menu
                             icon="heroicon-o-document-text"
@@ -196,6 +198,8 @@
                             :options="$this->templateOptions"
                             :empty-label="__('filament/emails/composer.fields.template_none')"
                             :click="fn (?string $id): string => 'applyTemplate(\''.$id.'\')'"
+                            :create-label="__('filament/emails/composer.actions.create_template')"
+                            create-click="mountAction('createTemplate')"
                         />
                         {{-- Inserts a merge tag into the RichEditor via its own Alpine
                              component (`insertMergeTag`), which is what the editor's
@@ -222,4 +226,6 @@
             @endunless
         </div>
     @endif
+
+    <x-filament-actions::modals />
 </div>

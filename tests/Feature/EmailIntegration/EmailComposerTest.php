@@ -441,6 +441,49 @@ it('fills subject and body from a template and keeps the signature below it', fu
         ->and($email->body->body_html)->toContain('Ada');
 });
 
+it('saves the current message as a template from the composer', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Renewal outreach')
+        ->set('bodyHtml', '<p>Here are your options.</p>')
+        ->callAction('createTemplate', [
+            'name' => 'Renewal outreach',
+            'subject' => 'Renewal outreach',
+            'body_html' => '<p>Here are your options.</p>',
+            'is_shared' => true,
+        ])
+        ->assertHasNoActionErrors();
+
+    $template = EmailTemplate::query()->where('name', 'Renewal outreach')->sole();
+    expect($template->team_id)->toBe($this->user->current_team_id)
+        ->and($template->created_by)->toBe($this->user->id)
+        ->and($template->is_shared)->toBeTrue()
+        ->and($template->body_html)->toContain('Here are your options.');
+});
+
+it('creates a signature from the composer and applies it to the message', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Signature on the fly')
+        ->set('bodyHtml', '<p>Hello there</p>')
+        ->callAction('createSignature', [
+            'name' => 'Work',
+            'content_html' => '<p>— Ada, CEO</p>',
+            'is_default' => true,
+        ])
+        ->assertHasNoActionErrors()
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $signature = EmailSignature::query()->where('name', 'Work')->sole();
+    expect($signature->connected_account_id)->toBe($this->account->id)
+        ->and($signature->is_default)->toBeTrue();
+
+    $email = Email::query()->where('subject', 'Signature on the fly')->sole();
+    expect($email->body->body_html)->toContain('Ada, CEO');
+});
+
 it('ignores a template belonging to another team', function (): void {
     $foreign = EmailTemplate::factory()->create([
         'team_id' => Team::factory()->create()->id,
@@ -452,6 +495,33 @@ it('ignores a template belonging to another team', function (): void {
         ->dispatch('composer:open')
         ->call('applyTemplate', $foreign->id)
         ->assertSet('subject', null);
+});
+
+it('rejects attachments over the per-file and total size caps', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Too heavy')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [
+            UploadedFile::fake()->create('small.pdf', 100),
+            // Over the 10 MB per-file cap.
+            UploadedFile::fake()->create('huge.pdf', 11 * 1024),
+            // Fits on its own, but pushes the message past the 15 MB total.
+            UploadedFile::fake()->create('big-a.pdf', 9 * 1024),
+            UploadedFile::fake()->create('big-b.pdf', 9 * 1024),
+        ])
+        ->assertSee('small.pdf')
+        ->assertSee('big-a.pdf')
+        ->assertDontSee('huge.pdf')
+        ->assertDontSee('big-b.pdf')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Too heavy')->sole();
+    expect($email->attachments->pluck('filename')->all())->toEqualCanonicalizing(['small.pdf', 'big-a.pdf']);
 });
 
 it('drops a pending attachment when it is removed before sending', function (): void {

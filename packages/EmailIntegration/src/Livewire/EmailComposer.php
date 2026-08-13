@@ -6,7 +6,12 @@ namespace Relaticle\EmailIntegration\Livewire;
 
 use App\Models\User;
 use App\Services\AvatarService;
+use Filament\Actions\Action;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -15,12 +20,15 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use LogicException;
+use Relaticle\EmailIntegration\Actions\CreateEmailTemplateAction;
+use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
@@ -39,10 +47,28 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
-final class EmailComposer extends Component implements HasSchemas
+/**
+ * @property-read Action $createSignatureAction
+ * @property-read Action $createTemplateAction
+ */
+final class EmailComposer extends Component implements HasActions, HasSchemas
 {
+    use InteractsWithActions;
     use InteractsWithSchemas;
     use WithFileUploads;
+
+    /**
+     * Per-file cap, matching the Filament compose modal this composer replaced
+     * (`FileUpload::maxSize(10240)`).
+     */
+    private const int MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+    /**
+     * Whole-message cap. Attachment bytes are base64-encoded into the outbound
+     * message (~33% overhead), and Gmail rejects the message past ~25 MB encoded
+     * — by which point the email is already queued and only fails at send time.
+     */
+    private const int MAX_ATTACHMENTS_TOTAL_BYTES = 15 * 1024 * 1024;
 
     public bool $isOpen = false;
 
@@ -235,6 +261,53 @@ final class EmailComposer extends Component implements HasSchemas
         $this->showBcc = ! $this->showBcc;
     }
 
+    /**
+     * Enforce the size caps as files arrive, dropping (and deleting) anything
+     * over them rather than reporting an error and leaving the file in state —
+     * an invalid attachment left in `$attachments` would still be stored and
+     * sent by {@see self::send()}, which does not re-check.
+     */
+    public function updatedAttachments(): void
+    {
+        $kept = [];
+        $rejected = [];
+        $total = 0;
+
+        foreach ($this->attachments as $file) {
+            if (! $file instanceof TemporaryUploadedFile) {
+                continue;
+            }
+
+            $size = $file->getSize();
+
+            if ($size > self::MAX_ATTACHMENT_BYTES || $total + $size > self::MAX_ATTACHMENTS_TOTAL_BYTES) {
+                $rejected[] = $file->getClientOriginalName();
+                $file->delete();
+
+                continue;
+            }
+
+            $total += $size;
+            $kept[] = $file;
+        }
+
+        $this->attachments = $kept;
+
+        if ($rejected === []) {
+            return;
+        }
+
+        Notification::make()
+            ->warning()
+            ->title(__('filament/emails/composer.notifications.attachment_too_large.title'))
+            ->body(__('filament/emails/composer.notifications.attachment_too_large.body', [
+                'files' => implode(', ', $rejected),
+                'max' => Number::fileSize(self::MAX_ATTACHMENT_BYTES),
+                'total' => Number::fileSize(self::MAX_ATTACHMENTS_TOTAL_BYTES),
+            ]))
+            ->send();
+    }
+
     public function removeAttachment(int $index): void
     {
         unset($this->attachments[$index]);
@@ -357,6 +430,102 @@ final class EmailComposer extends Component implements HasSchemas
 
         $this->subject = $rendered['subject'];
         $this->setBodyHtml($rendered['body_html']);
+    }
+
+    /**
+     * Save what is currently in the composer as a reusable template, without
+     * leaving the composer. The signature block is stripped from the prefilled
+     * body: {@see self::applyTemplate()} re-applies the current signature below
+     * the template body, so keeping it here would duplicate it.
+     */
+    public function createTemplateAction(): Action
+    {
+        return Action::make('createTemplate')
+            ->label(__('filament/emails/composer.actions.create_template'))
+            ->modalWidth('2xl')
+            ->fillForm(fn (): array => [
+                'name' => $this->subject,
+                'subject' => $this->subject,
+                'body_html' => resolve(EmailTemplateRenderService::class)->stripSignatureBlock($this->bodyHtmlValue()),
+            ])
+            ->schema([
+                TextInput::make('name')
+                    ->label(__('filament/emails/composer.fields.template_name'))
+                    ->required()
+                    ->maxLength(100),
+                TextInput::make('subject')
+                    ->label(__('filament/emails/composer.fields.subject'))
+                    ->required()
+                    ->maxLength(255),
+                RichEditor::make('body_html')
+                    ->label(__('filament/emails/composer.fields.message'))
+                    ->required()
+                    ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                    ->toolbarButtons(['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList']),
+                Toggle::make('is_shared')
+                    ->label(__('filament/emails/composer.fields.template_shared')),
+            ])
+            ->action(function (array $data, CreateEmailTemplateAction $createEmailTemplate): void {
+                $createEmailTemplate->execute($this->authUser(), [
+                    'name' => $data['name'],
+                    'subject' => $data['subject'],
+                    'body_html' => $data['body_html'],
+                    'is_shared' => (bool) ($data['is_shared'] ?? false),
+                ]);
+
+                unset($this->templateOptions);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/emails/composer.notifications.template_created.title'))
+                    ->send();
+            });
+    }
+
+    /**
+     * Create a signature for the account currently selected in the "From" row and
+     * apply it to the message immediately.
+     */
+    public function createSignatureAction(): Action
+    {
+        return Action::make('createSignature')
+            ->label(__('filament/emails/composer.actions.create_signature'))
+            ->modalWidth('2xl')
+            ->schema([
+                TextInput::make('name')
+                    ->label(__('filament/emails/composer.fields.signature_name'))
+                    ->required()
+                    ->maxLength(100),
+                RichEditor::make('content_html')
+                    ->label(__('filament/emails/composer.fields.signature_content'))
+                    ->required()
+                    ->toolbarButtons(['bold', 'italic', 'underline', 'link']),
+                Toggle::make('is_default')
+                    ->label(__('filament/emails/composer.fields.signature_default')),
+            ])
+            ->action(function (array $data, CreateSignatureAction $createSignature): void {
+                $account = $this->fromAccount();
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                $signature = $createSignature->execute($account, [
+                    'name' => $data['name'],
+                    'content_html' => $data['content_html'],
+                    'is_default' => (bool) ($data['is_default'] ?? false),
+                ]);
+
+                unset($this->signatureOptions);
+
+                $this->signatureId = (string) $signature->getKey();
+                $this->updatedSignatureId($this->signatureId);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/emails/composer.notifications.signature_created.title'))
+                    ->send();
+            });
     }
 
     /**
