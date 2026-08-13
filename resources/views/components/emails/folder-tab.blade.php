@@ -9,7 +9,7 @@
     @class([
         'flex items-center justify-center gap-1.5 text-sm font-medium transition-colors focus:outline-none',
         'flex-1 py-3' => $grow,
-        'shrink-0 px-3 py-2' => ! $grow,
+        'h-9 shrink-0 px-3' => ! $grow,
         'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400' => $active,
         'border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' => ! $active,
     ])

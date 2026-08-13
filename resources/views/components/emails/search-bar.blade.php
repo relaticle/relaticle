@@ -1,6 +1,9 @@
-@props(['search'])
+{{-- `framed` is the sidebar dressing: a full-width rule and padding that make sense
+     when the search sits alone above a column, and read as a stray divider when it is
+     one control inside a toolbar. --}}
+@props(['search', 'framed' => true])
 
-<div class="shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
+<div @class(['shrink-0', 'border-b border-gray-200 dark:border-gray-700 p-3' => $framed])>
     <div class="relative">
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <x-heroicon-o-magnifying-glass class="h-4 w-4 text-gray-400 dark:text-gray-500" wire:loading.remove wire:target="search" />
@@ -10,7 +13,7 @@
             wire:model.live.debounce.300ms="search"
             type="text"
             placeholder="{{ __('filament/pages/email-inbox.search.placeholder') }}"
-            class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-500 dark:focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            class="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-0 pl-9 pr-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-500 dark:focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         />
         @if (filled($search))
             <button

@@ -636,3 +636,12 @@
     background-color: theme('colors.gray.800');
     color: theme('colors.gray.300');
 }
+
+/* ── Email list: direction badge ───────────────────────────────────────────
+   Filament's xs badge ships 2px of horizontal padding, which leaves the label
+   touching the pill edge at this size. A little room either side makes it read
+   as a tag rather than tinted text. */
+.fi-email-direction-badge.fi-badge {
+    padding-block: 1px;
+    padding-inline: calc(var(--spacing) * 1.5);
+}

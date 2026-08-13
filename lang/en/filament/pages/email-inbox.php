@@ -112,10 +112,13 @@ return [
             ],
             'shares' => [
                 'label' => 'Share with specific teammates',
+                'description' => 'Give named people more access than the setting above allows.',
                 'add_action_label' => 'Add teammate',
+                'new_item' => 'New teammate',
             ],
             'shared_with' => [
                 'label' => 'Teammate',
+                'placeholder' => 'Choose a teammate…',
             ],
             'tier' => [
                 'label' => 'Access level',

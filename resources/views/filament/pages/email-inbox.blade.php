@@ -24,61 +24,65 @@
     @else
     {{-- ── Email list: full width, one line per email ────────────────────
          The card owns the rest of the viewport so the rows scroll inside it and the
-         pagination bar stays pinned to the bottom of the screen. --}}
-    <div class="flex h-[calc(100dvh-17rem)] min-h-[24rem] flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+         pagination bar stays pinned to the bottom of the screen. The subtraction is
+         the chrome above it — topbar, page padding and the tab row — measured, not
+         guessed; it was still sized for the page heading that used to sit there and
+         so came up short, leaving dead space below the card. --}}
+    <div class="flex h-[calc(100dvh-12.25rem)] min-h-[24rem] flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
 
-        <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:px-6">
-            <div class="flex shrink-0 items-center">
-                <x-emails.folder-tab :grow="false" folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   :label="__('filament/pages/email-inbox.folders.all')" />
-                <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" :badge="$this->inboxUnreadCount" />
-                <x-emails.folder-tab :grow="false" folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" :label="__('filament/pages/email-inbox.folders.sent')" />
+        {{-- Toolbar: what you are looking at on the left, what you can do with it on
+             the right, one control height throughout. Everything used to sit in a
+             single undifferentiated run of items at mixed sizes. --}}
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 dark:border-gray-700 px-4 py-2.5 sm:px-6">
+
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+                <div class="flex shrink-0 items-center">
+                    <x-emails.folder-tab :grow="false" folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   :label="__('filament/pages/email-inbox.folders.all')" />
+                    <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" :badge="$this->inboxUnreadCount" />
+                    <x-emails.folder-tab :grow="false" folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" :label="__('filament/pages/email-inbox.folders.sent')" />
+                </div>
+
+                <div class="min-w-[10rem] max-w-sm flex-1">
+                    <x-emails.search-bar :search="$search" :framed="false" />
+                </div>
             </div>
 
-            <div class="min-w-[12rem] flex-1">
-                <x-emails.search-bar :search="$search" />
-            </div>
+            <div class="flex shrink-0 items-center gap-2">
+                @if ($this->showAccountSwitcher)
+                    <select
+                        wire:model.live="accountId"
+                        aria-label="{{ __('filament/pages/email-inbox.account_filter.label') }}"
+                        class="h-9 w-40 shrink-0 cursor-pointer truncate rounded-lg border-gray-200 bg-transparent py-0 text-sm text-gray-700 focus:border-primary-500 focus:ring-0 dark:border-gray-700 dark:text-gray-200"
+                    >
+                        @foreach ($this->accountFilterOptions as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                @endif
 
-            @if ($this->showAccountSwitcher)
-                <select
-                    wire:model.live="accountId"
-                    aria-label="{{ __('filament/pages/email-inbox.account_filter.label') }}"
-                    class="w-44 shrink-0 truncate cursor-pointer rounded-lg border-gray-200 dark:border-gray-700 bg-transparent py-1.5 text-sm text-gray-700 dark:text-gray-200 focus:border-primary-500 focus:ring-0"
-                >
-                    @foreach ($this->accountFilterOptions as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            @endif
-
-            @if ($this->inboxUnreadCount > 0)
-                <div class="flex shrink-0 items-center gap-3">
-                    <span class="text-xs text-gray-400 dark:text-gray-500">
-                        {{ __('filament/pages/email-inbox.unread_label', ['count' => $this->inboxUnreadCount]) }}
-                    </span>
+                @if ($this->inboxUnreadCount > 0)
                     <button
                         wire:click="markAllAsRead"
                         wire:loading.attr="disabled"
                         wire:target="markAllAsRead"
                         type="button"
-                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-50"
+                        class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                     >
-                        <x-ri-check-double-line class="h-3.5 w-3.5" />
-                        {{ __('filament/pages/email-inbox.mark_all_read.label') }}
+                        <x-ri-check-double-line class="h-4 w-4" />
+                        <span class="hidden lg:inline">{{ __('filament/pages/email-inbox.mark_all_read.label') }}</span>
                     </button>
-                </div>
-            @endif
+                @endif
 
-            {{-- Compose belongs to the board, not the page: it acts on mail, so it
-                 lives with the folders and search and appears only here — the Drafts,
-                 Outbox and Templates tabs render their own tables instead of this. --}}
-            <div class="shrink-0">
+                {{-- Compose belongs to the board, not the page: it acts on mail, so it
+                     lives with the folders and search and appears only here — the
+                     Drafts, Outbox and Templates tabs render their own tables. --}}
                 {{ ($this->composeEmailAction)([]) }}
             </div>
         </div>
 
         <div class="flex-1 divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto">
             @forelse ($this->emails as $email)
-                <x-emails.list-row-wide :email="$email" :folder="$folder" />
+                <x-emails.list-row-wide :email="$email" :folder="$folder" :own-addresses="$this->ownEmailAddresses" />
             @empty
                 <x-emails.list-empty :search="$search" :folder="$folder" />
             @endforelse

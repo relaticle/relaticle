@@ -9,11 +9,16 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
@@ -229,38 +234,68 @@ abstract class BaseRecordEmailsPage extends Page
             ->extraAttributes(['class' => 'fi-email-reader-action'])
             ->tooltip(__('filament/pages/record-emails.actions.manage_sharing.label'))
             ->modalHeading(__('filament/pages/record-emails.actions.manage_sharing.modal_heading'))
+            ->modalWidth(Width::FiveExtraLarge)
             ->modalSubmitActionLabel(__('filament/pages/record-emails.actions.manage_sharing.submit'))
             ->schema([
-                Select::make('privacy_tier')
-                    ->label(__('filament/pages/record-emails.fields.privacy_tier.label'))
-                    ->options(EmailPrivacyTier::class)
-                    ->required(),
-
-                Repeater::make('shares')
-                    ->label(__('filament/pages/record-emails.fields.shares.label'))
-                    ->defaultItems(0)
-                    ->addActionLabel('Add teammate')
-                    ->columns(2)
+                // Two halves of one decision, side by side: what the workspace at large
+                // gets, and who is named individually. Stacked, the second half reads as
+                // an afterthought below the fold.
+                Grid::make(['default' => 1, 'md' => 12])
                     ->schema([
-                        Select::make('shared_with')
-                            ->label(__('filament/pages/record-emails.fields.shared_with.label'))
-                            ->options(function (): array {
-                                $user = $this->authUser();
+                        // Cards rather than a select: each tier is a decision about who
+                        // sees what, which a dropdown of four nouns hides. Same cards as
+                        // the account settings page.
+                        Section::make(__('filament/pages/record-emails.fields.privacy_tier.label'))
+                            ->icon('heroicon-o-globe-alt')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 5])
+                            ->schema([
+                                Radio::make('privacy_tier')
+                                    ->hiddenLabel()
+                                    ->view('email-integration::forms.sharing-tier-cards')
+                                    ->viewData(['ariaLabel' => __('filament/pages/record-emails.fields.privacy_tier.label')])
+                                    ->required(),
+                            ]),
 
-                                return User::query()
-                                    ->where('current_team_id', $user->current_team_id)
-                                    ->where('id', '!=', $user->getKey())
-                                    ->pluck('name', 'id')
-                                    ->all();
-                            })
-                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                            ->required()
-                            ->distinct(),
+                        Section::make(__('filament/pages/record-emails.fields.shares.label'))
+                            ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
+                            ->icon('heroicon-o-user-group')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 7])
+                            ->schema([
+                                Repeater::make('shares')
+                                    ->hiddenLabel()
+                                    ->defaultItems(0)
+                                    // Who was added first says nothing about access, so
+                                    // the drag handle is just noise in the row header.
+                                    ->reorderable(false)
+                                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
+                                    // Not ->table(): that layout quietly stacks once its
+                                    // container is this narrow, which is what put the
+                                    // delete button on a line of its own. Naming the row
+                                    // instead gives each entry a header that carries the
+                                    // delete inline, and the two fields sit side by side.
+                                    ->itemLabel(fn (array $state): string => $this->teammateOptions()[$state['shared_with'] ?? null]
+                                        ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item'))
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('shared_with')
+                                            ->label(__('filament/pages/record-emails.fields.shared_with.label'))
+                                            ->hiddenLabel()
+                                            ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
+                                            ->options(fn (): array => $this->teammateOptions())
+                                            ->searchable()
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                            ->required()
+                                            ->distinct(),
 
-                        Select::make('tier')
-                            ->label(__('filament/pages/record-emails.fields.tier.label'))
-                            ->options(EmailPrivacyTier::class)
-                            ->required(),
+                                        Select::make('tier')
+                                            ->label(__('filament/pages/record-emails.fields.tier.label'))
+                                            ->hiddenLabel()
+                                            ->options(EmailPrivacyTier::class)
+                                            ->required(),
+                                    ]),
+                            ]),
                     ]),
             ])
             ->fillForm(function (array $arguments): array {
@@ -300,6 +335,23 @@ abstract class BaseRecordEmailsPage extends Page
                     ->title(__('filament/pages/record-emails.notifications.sharing_saved.title'))
                     ->send();
             });
+    }
+
+    /**
+     * Teammates who can be given access to an email: everyone else on the team.
+     *
+     * @return array<string, string>
+     */
+    private function teammateOptions(): array
+    {
+        $user = $this->authUser();
+
+        return User::query()
+            ->where('current_team_id', $user->current_team_id)
+            ->where('id', '!=', $user->getKey())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
     }
 
     protected function summarizeThreadAction(): Action

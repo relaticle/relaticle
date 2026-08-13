@@ -1,10 +1,9 @@
-@props(['email', 'folder'])
+@props(['email', 'folder', 'ownAddresses' => []])
 
 {{-- The full-width inbox row: one line per email, the way a mail list is meant to
      scan. The narrow variant ({@see list-row}) still serves the record pages, whose
      list lives in a 320px column and has to stack. --}}
 @php
-    use Relaticle\EmailIntegration\Enums\EmailCategory;
     use Relaticle\EmailIntegration\Enums\EmailDirection;
 
     // `is_read` is a per-viewer flag set by the withReadStateFor() query scope.
@@ -30,7 +29,9 @@
         default                   => $sentAt->format('M j, Y'),
     };
 
-    $category = EmailCategory::tryFrom($email->labels->first()?->label ?? '');
+    // Filament's palette, picked by a stable hash of the sender so the same
+    // correspondent keeps the same colour between renders and pages.
+    $avatarColor = ['primary', 'success', 'warning', 'danger', 'info'][crc32(mb_strtolower($senderName)) % 5];
 
     $initials = collect(explode(' ', trim($senderName)))
         ->filter()
@@ -38,34 +39,53 @@
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('');
 
-    // "Google, someone@example.com" — who the message is between, in one line.
-    $participantLine = $email->participants
+    // Who the message is between — the reader excluded. Their own address appears on
+    // every row and tells them nothing; what matters is the other party. A message to
+    // yourself has no one else, so it falls back to the sender rather than going blank.
+    $counterparties = $email->participants
+        ->reject(fn ($participant): bool => in_array(mb_strtolower((string) $participant->email_address), $ownAddresses, true))
         ->map(fn ($participant): string => (string) ($participant->name ?: $participant->email_address))
         ->filter()
         ->unique()
-        ->take(4)
-        ->implode(', ');
+        ->values();
+
+    $participantLine = $counterparties->isNotEmpty()
+        ? $counterparties->take(4)->implode(', ')
+        : $senderName;
+
+    // Snippets and subjects arrive holding HTML entities from the source message.
+    // Blade escapes on output, so without decoding first the row literally reads
+    // "You&#39;ve found" instead of "You've found".
+    $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    $subject = $decode($email->subject);
+
+    // Provider snippets open with preheader text, most often the recipient's own
+    // address — so the preview began by telling the reader their own email instead
+    // of the first words of the message.
+    $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($email->snippet)) ?? '');
+
 @endphp
 
-<div x-data="{ actionsOpen: false }" class="group relative">
+<div class="group relative">
 
     <button
         wire:click="selectEmail('{{ $email->id }}')"
         type="button"
+        @if ($isUnread) data-unread-indicator @endif
         @class([
-            'flex w-full items-start gap-3 px-4 py-3 pr-24 text-left transition-colors focus:outline-none sm:px-6',
+            'flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors sm:px-6',
+            // Keyboard users need to see where they are; the row is the primary control.
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
             'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-            'bg-primary-50/40 dark:bg-primary-900/10' => $isUnread,
         ])
     >
-        {{-- Sender avatar, doubling as the unread marker --}}
-        <span class="relative shrink-0">
-            <span class="flex h-7 w-7 select-none items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                {{ $initials ?: '?' }}
-            </span>
-            @if ($isUnread)
-                <span data-unread-indicator class="absolute -left-1 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary-500"></span>
-            @endif
+        {{-- Sender avatar --}}
+        <span
+            @class(['flex h-7 w-7 shrink-0 select-none items-center justify-center rounded-full text-[11px] font-semibold', 'fi-color-'.$avatarColor])
+            style="background-color: color-mix(in oklab, var(--color-500) 14%, transparent); color: var(--color-600)"
+        >
+            {{ $initials ?: '?' }}
         </span>
 
         <span class="min-w-0 flex-1">
@@ -76,95 +96,47 @@
                     'font-semibold text-gray-900 dark:text-white' => $isUnread,
                     'font-medium text-gray-800 dark:text-gray-200' => ! $isUnread,
                 ])>
-                    {{ $canViewSubject ? ($email->subject ?: '(no subject)') : '(subject hidden)' }}
+                    {{ $canViewSubject ? ($subject ?: '(no subject)') : '(subject hidden)' }}
                 </span>
+
+                {{-- Only the All folder mixes directions. The badge sits with the
+                     subject it describes; in the timestamp cluster it read as another
+                     date-ish token. --}}
+                @if ($folder->value === 'all')
+                    @php $isOutbound = $email->direction === EmailDirection::OUTBOUND; @endphp
+
+                    <x-filament::badge
+                        :color="$isOutbound ? 'info' : 'success'"
+                        size="xs"
+                        class="fi-email-direction-badge hidden shrink-0 sm:inline-flex"
+                    >
+                        {{ $isOutbound
+                            ? __('filament/pages/email-inbox.folders.sent')
+                            : __('filament/pages/email-inbox.folders.inbox') }}
+                    </x-filament::badge>
+                @endif
 
                 <span class="flex shrink-0 items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                     @if ($email->has_attachments)
                         <x-heroicon-m-paper-clip class="h-3.5 w-3.5" />
                     @endif
-                    @if ($category)
-                        <span
-                            @class(['hidden h-1.5 w-1.5 rounded-full lg:block', 'fi-color-'.$category->getColor()])
-                            style="background-color: var(--color-400)"
-                            title="{{ $category->getLabel() }}"
-                        ></span>
-                    @endif
-                    @if ($folder->value === 'all')
-                        <span class="hidden sm:inline">
-                            {{ $email->direction === EmailDirection::OUTBOUND ? 'Sent' : 'Inbox' }}
-                        </span>
-                    @endif
-                    <time class="tabular-nums" title="{{ $sentAt?->format('M j, Y · g:i A') }}">{{ $timestamp }}</time>
+                    <time class="w-[4.5rem] shrink-0 text-right tabular-nums" title="{{ $sentAt?->format('M j, Y · g:i A') }}">{{ $timestamp }}</time>
                 </span>
             </span>
 
-            {{-- Who it is between --}}
-            <span class="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+            {{-- Who it is between: second in the row's hierarchy, so it carries more
+                 weight than the preview below it. --}}
+            <span class="mt-0.5 block truncate text-xs font-medium text-gray-600 dark:text-gray-300">
                 {{ $participantLine }}
             </span>
 
             {{-- Preview --}}
-            @if ($email->snippet)
-                <span class="mt-1 block truncate text-sm text-gray-400 dark:text-gray-500">
-                    {{ $email->snippet }}
+            @if (filled($snippet))
+                <span class="mt-0.5 block truncate text-xs text-gray-400 dark:text-gray-500">
+                    {{ $snippet }}
                 </span>
             @endif
         </span>
     </button>
 
-    {{-- Per-email actions, revealed on hover over the row --}}
-    @if ($hasActions)
-        <div class="absolute right-4 top-1/2 -translate-y-1/2 sm:right-6">
-            <button
-                @click.stop="actionsOpen = !actionsOpen"
-                type="button"
-                aria-label="{{ __('filament/pages/email-inbox.row_actions.label') }}"
-                class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                :class="{ 'opacity-100 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300': actionsOpen }"
-            >
-                <x-heroicon-o-ellipsis-horizontal class="h-4 w-4" />
-            </button>
-
-            <div
-                x-show="actionsOpen"
-                @click.outside="actionsOpen = false"
-                x-cloak
-                class="absolute right-0 top-8 z-20 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-            >
-                @if ($isOwner)
-                    <button
-                        @click.stop="actionsOpen = false; $wire.mountAction('manageSharing', { emailId: '{{ $email->id }}' })"
-                        type="button"
-                        class="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50"
-                    >
-                        <x-ri-share-line class="h-4 w-4 shrink-0 text-gray-400" />
-                        {{ __('filament/pages/email-inbox.sharing.label') }}
-                    </button>
-                @endif
-
-                @if ($canSummarize)
-                    <button
-                        @click.stop="actionsOpen = false; $wire.mountAction('summarizeThread', { emailId: '{{ $email->id }}' })"
-                        type="button"
-                        class="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50"
-                    >
-                        <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-gray-400" />
-                        {{ __('filament/pages/email-inbox.summarize_thread.label') }}
-                    </button>
-                @endif
-
-                @if ($canRequestAccess)
-                    <button
-                        @click.stop="actionsOpen = false; $wire.mountAction('requestAccess', { emailId: '{{ $email->id }}' })"
-                        type="button"
-                        class="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50"
-                    >
-                        <x-heroicon-o-key class="h-4 w-4 shrink-0 text-gray-400" />
-                        {{ __('filament/pages/email-inbox.request_access.label') }}
-                    </button>
-                @endif
-            </div>
-        </div>
-    @endif
 </div>
