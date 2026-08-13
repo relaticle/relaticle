@@ -331,13 +331,68 @@ search index, Article + BreadcrumbList JSON-LD, link-integrity tests) to
   data, invite your team, find anything with search and filters) — with real
   screenshots via agent-browser. The remaining 6 categories are unscheduled
   follow-on content work, not a defect in this PR.
-- **Open item — `/docs` vs `/help` content overlap**: `/docs/getting-started`
-  and `/docs/import` now cover ground the new `/help/getting-started` articles
-  also cover, from the developer-audience and end-user-audience angles
-  respectively. Both stay live and indexable as shipped — no `/docs` URL was
-  retired or redirected. Whether to consolidate, cross-link, or leave the two
-  audiences deliberately separate is a content-strategy call for the owner,
-  not decided here.
+- **~~Open item~~ — `/docs` vs `/help` content overlap: RESOLVED 2026-08-13
+  (owner decision), implemented as W2.5 below.** The developer area keeps only
+  genuinely-technical content; the two end-user guides that predated the help
+  centre are retired into it with 301s. Rationale: "API-reference only" was
+  rejected because Self-Hosting and MCP back the homepage's core claims and
+  serve pre-signup personas that don't fit a help centre, and the Developer
+  Guide is the contributor funnel; "status quo" was rejected because two
+  Getting Starteds in one unified sidebar split SEO and confuse readers.
+
+### W2.5 — Docs consolidation + `/developers` rename (decided 2026-08-13)
+
+- **Retire the two end-user guides from the developer area** (owner decision
+  "B"): `/docs/getting-started` 301s to `/help/getting-started` (content
+  redundant with the shipped category; its one unique asset, the core-concepts
+  entity table, folds into the help getting-started `_index.md` body).
+  `/docs/import` 301s to a new **"Importing data" help category**
+  (`/help/import`, decision "b2" — a small category, not one long article,
+  because import is the highest-stakes task a new team performs): prepare your
+  CSV · what each record type needs · update existing records ·
+  fix import errors. The shallow getting-started walkthrough article stays and
+  cross-links the deep category.
+- **Rename `/docs` → `/developers`** (owner decision "v"). The 2026-08-12 nav
+  naming decision already chose the *label* "Developers" because "docs" is
+  ambiguous next to a help centre; the same argument applies to the URL, and
+  the landscape evidence agrees: paired-surface products name the developer
+  sibling of `/help` "developers" (Typeform, WPForms, Twenty), while "docs"
+  is the convention for a *sole* surface (Stripe, GitHub) — or, at Linear,
+  the *user* docs. Timing is the decider: only 7 `/docs` URLs exist, two are
+  being retired anyway, and W1 blog/W4 outreach haven't started accumulating
+  external links — the rename is at its cheapest ever. Mechanics: route
+  prefix + `scribe.docs_url`/`documentation.api_reference` move to
+  `/developers`; `/docs/*` → `/developers/*` 301s are kept forever (type-in
+  muscle memory); the legacy `/documentation/*` map points **directly** at
+  final URLs so no chain ever exceeds one hop. The "Developer Guide" slug
+  `developer` (which would read `/developers/developer`) becomes
+  `contributing`.
+- **End-state developer area**: hub · Self-Hosting · MCP · Contributing ·
+  API reference (`/developers/api`). Pure technical audience; label, URL,
+  breadcrumb, and llms.txt section all say "Developers".
+
+### W2 content completion — help-centre roadmap (agreed 2026-08-13)
+
+Wave order is by wedge value, not the original spec order; scope "n": W2.5
+ships alone, waves 2-6 are separate follow-up content PRs.
+
+| Wave | Category | Why this order |
+|---|---|---|
+| ✅ | Getting started (7 articles) | shipped 2026-08-12 |
+| 1 (=W2.5) | Importing data | deep content already written — cheapest wave |
+| 2 | AI chat (Ask Relaticle) | backs the agent-native wedge — the program's #1 query space |
+| 3 | Custom fields & views | 22 field types = table-first content AI engines lift |
+| 4 | Records (companies, people, opportunities) | core JTBD long tail |
+| 5 | Tasks, notes & pipeline | |
+| 6 | Workspace, team & billing | |
+
+Per-article completion bar (in addition to the program-wide metadata
+standards): answer in the first paragraph; user-vocabulary titles; real
+screenshots with localized alt text; `updated:` front matter on every article
+(feeds sitemap `<lastmod>`); `related:` links. Backlog, not scheduled:
+"Was this helpful?" escalation row on articles; in-app contextual help links
+from the Filament panel; the chat assistant's `GuideToPageTool` escorting
+users to `/help` articles.
 
 ### W3 — Comparison & programmatic surfaces (after W1/W2)
 
