@@ -25,6 +25,7 @@ return [
         'actions' => [
             'open' => 'Continue writing',
             'delete' => 'Delete draft',
+            'delete_selected' => 'Delete drafts',
         ],
         'empty' => [
             'heading' => 'No drafts',
@@ -32,6 +33,7 @@ return [
         ],
         'notifications' => [
             'deleted' => 'Draft deleted',
+            'bulk_deleted' => '{1}1 draft deleted|[2,*]:count drafts deleted',
         ],
     ],
     'folders' => [

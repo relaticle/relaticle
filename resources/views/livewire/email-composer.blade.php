@@ -100,7 +100,11 @@
                         >
                             <x-dynamic-component :component="$isMinimized ? 'heroicon-m-chevron-up' : 'heroicon-m-minus'" class="h-4 w-4" />
                         </button>
-                        @unless ($isMinimized)
+                        {{-- No fit-to-screen toggle while the message being answered is
+                             previewed above the draft: shrinking to the corner window
+                             drops the preview, so the control would only ever throw away
+                             what this view exists to show. --}}
+                        @unless ($isMinimized || $this->sourceEmail !== null)
                             <button
                                 type="button"
                                 wire:click="toggleExpand"

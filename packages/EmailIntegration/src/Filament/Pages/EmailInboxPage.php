@@ -174,9 +174,18 @@ final class EmailInboxPage extends Page
      */
     protected function getHeaderActions(): array
     {
-        return [
-            $this->composeEmailAction(),
-        ];
+        return [];
+    }
+
+    /**
+     * No page heading. The board is the page — a title bar above it repeating the word
+     * already highlighted in the sidebar only pushes the list down. Filament drops the
+     * whole header block when the heading and header actions are both empty, which is
+     * why Compose moved onto the board's own toolbar.
+     */
+    public function getHeading(): string
+    {
+        return '';
     }
 
     /**

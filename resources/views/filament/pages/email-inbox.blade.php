@@ -67,6 +67,13 @@
                     </button>
                 </div>
             @endif
+
+            {{-- Compose belongs to the board, not the page: it acts on mail, so it
+                 lives with the folders and search and appears only here — the Drafts,
+                 Outbox and Templates tabs render their own tables instead of this. --}}
+            <div class="shrink-0">
+                {{ ($this->composeEmailAction)([]) }}
+            </div>
         </div>
 
         <div class="flex-1 divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto">
