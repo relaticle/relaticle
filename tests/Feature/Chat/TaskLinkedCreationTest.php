@@ -104,3 +104,43 @@ it('renders linked names in the proposal display data', function (): void {
     expect($fields->pluck('label')->all())->toContain('Linked people');
     expect($fields->firstWhere('label', 'Linked people')['value'] ?? '')->toContain('Angel');
 });
+
+it('coerces a scalar assignee_ids into a list instead of dropping it', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    $tool = resolve(CreateTaskTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000001');
+
+    // LLMs sometimes emit a scalar where an array is declared.
+    $tool->handle(new Request([
+        'records' => [['title' => 'Scalar assignee', 'assignee_ids' => (string) $member->getKey()]],
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('team_id', $this->team->getKey())
+        ->latest()
+        ->firstOrFail();
+
+    expect($pending->action_data)->toHaveKey('assignee_ids', [(string) $member->getKey()]);
+});
+
+it('shows the assignee row on the card when assignee_ids arrives as a scalar', function (): void {
+    $member = User::factory()->create(['name' => 'Dana Scully']);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    $tool = resolve(CreateTaskTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000001');
+
+    $tool->handle(new Request([
+        'records' => [['title' => 'Scalar assignee display', 'assignee_ids' => (string) $member->getKey()]],
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('team_id', $this->team->getKey())
+        ->latest()
+        ->firstOrFail();
+
+    $fields = collect($pending->display_data['fields'] ?? []);
+    expect($fields->firstWhere('label', 'Assignees')['value'] ?? '')->toContain('Dana Scully');
+});

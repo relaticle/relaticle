@@ -143,3 +143,21 @@ it('renders linked names in the proposal display data', function (): void {
     expect($fields->firstWhere('label', 'Linked people')['value'] ?? '')->toContain('Angel');
     expect($fields->firstWhere('label', 'Linked companies')['value'] ?? '')->toContain('Acme');
 });
+
+it('coerces a scalar people_ids into a list instead of dropping it', function (): void {
+    $angel = People::factory()->for($this->team)->create(['name' => 'Angel']);
+
+    $tool = resolve(CreateNoteTool::class);
+    $tool->setConversationId('019df800-4444-7000-8000-000000000001');
+
+    $tool->handle(new Request([
+        'records' => [['title' => 'Scalar people', 'people_ids' => (string) $angel->id]],
+    ]));
+
+    $pending = PendingAction::query()
+        ->where('team_id', $this->team->getKey())
+        ->latest()
+        ->firstOrFail();
+
+    expect($pending->action_data)->toHaveKey('people_ids', [(string) $angel->id]);
+});

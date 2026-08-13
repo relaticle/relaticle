@@ -843,3 +843,52 @@ it('offers no inline-edit codes for a delete proposal', function (): void {
 
     expect($codes)->toBe([]);
 });
+
+it('surfaces a failure when the assignee left the workspace between proposal and approval', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Follow up call', 'assignee_ids' => [(string) $member->getKey()]],
+        'display_data' => ['title' => 'Create Task', 'summary' => 'Create task "Follow up call"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $this->team->users()->detach($member);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertHasErrors('resolve');
+
+    expect(Task::query()->where('title', 'Follow up call')->exists())->toBeFalse()
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('renders the resolve failure in the dock so the approval is never a silent no-op', function (): void {
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'Ghost assignee', 'assignee_ids' => [(string) User::factory()->create()->getKey()]],
+        'display_data' => ['title' => 'Create Task', 'summary' => 'Create task "Ghost assignee"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertSee('not in your workspace');
+});
