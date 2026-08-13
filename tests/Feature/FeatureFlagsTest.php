@@ -105,7 +105,7 @@ describe('Documentation', function (): void {
     });
 
     it('serves documentation pages when feature is active', function (): void {
-        $this->get('/docs')
+        $this->get('/developers')
             ->assertOk();
     });
 
@@ -116,6 +116,9 @@ describe('Documentation', function (): void {
         RouteServiceProvider::loadCachedRoutesUsing(null);
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
+
+        $this->get('/developers')
+            ->assertNotFound();
 
         $this->get('/docs')
             ->assertNotFound();

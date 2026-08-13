@@ -92,8 +92,8 @@
         <span class="relaticle-nav-title">API Reference</span>
     </div>
     <div class="relaticle-nav-links">
-        <a href="/docs">Docs</a>
-        <a href="/docs/mcp">MCP</a>
+        <a href="/developers">Docs</a>
+        <a href="/developers/mcp">MCP</a>
         <a href="/pricing">Pricing</a>
         <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener">GitHub</a>
     </div>

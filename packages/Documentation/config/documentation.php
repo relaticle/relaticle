@@ -46,7 +46,7 @@ return [
     */
     'api_reference' => [
         'title' => 'API Reference',
-        'url' => '/docs/api',
+        'url' => '/developers/api',
         'description' => 'REST API documentation for managing CRM entities.',
     ],
 ];

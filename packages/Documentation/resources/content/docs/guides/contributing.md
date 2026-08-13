@@ -1,5 +1,5 @@
 ---
-title: Developer Guide
+title: Contributing Guide
 description: Installation, architecture, and contributing.
 order: 3
 ---

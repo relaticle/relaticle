@@ -8,9 +8,8 @@
     $icon = match ((string) $topic) {
         'help/getting-started' => 'ri-rocket-line',
         'docs/guides' => 'ri-code-s-slash-line',
-        'docs/guides/getting-started' => 'ri-rocket-line',
-        'docs/guides/import' => 'ri-upload-2-line',
-        'docs/guides/developer' => 'ri-code-s-slash-line',
+        'help/import' => 'ri-upload-2-line',
+        'docs/guides/contributing' => 'ri-git-pull-request-line',
         'docs/guides/self-hosting' => 'ri-server-line',
         'docs/guides/mcp' => 'ri-cpu-line',
         'api-reference' => 'ri-terminal-box-line',

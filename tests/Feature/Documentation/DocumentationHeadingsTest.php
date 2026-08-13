@@ -7,7 +7,7 @@ use Relaticle\Documentation\Support\HeadingAnchors;
 mutates(HeadingAnchors::class);
 
 it('renders documentation headings without a literal permalink symbol or mangled id', function (): void {
-    $html = $this->get('/docs/mcp')->assertOk()->getContent();
+    $html = $this->get('/developers/mcp')->assertOk()->getContent();
 
     preg_match('/<h1[^>]*>(.*?)<\/h1>/s', $html, $h1);
 
@@ -17,7 +17,7 @@ it('renders documentation headings without a literal permalink symbol or mangled
 });
 
 it('points every on-this-page link at a heading id that exists in the rendered article', function (): void {
-    $html = $this->get('/docs/mcp')->assertOk()->getContent();
+    $html = $this->get('/developers/mcp')->assertOk()->getContent();
 
     preg_match('/<ul id="docs-toc".*?<\/ul>/s', $html, $toc);
     preg_match_all('/href="#([^"]+)"/', $toc[0] ?? '', $tocAnchors);

@@ -3,7 +3,7 @@ title: Import your existing data
 description: Bring companies, people, or opportunities in from a CSV file.
 order: 4
 updated: "2026-08-12"
-related: [help/getting-started/create-your-first-company, help/getting-started/use-custom-fields]
+related: [help/import/prepare-your-csv, help/import/update-existing-records, help/getting-started/use-custom-fields]
 ---
 
 Import brings in existing companies, people, or opportunities from a
@@ -50,3 +50,7 @@ failed.
 Open the dropdown under **Map To** for that column and choose the right field
 yourself, or click **Clear mapping** to leave that column out of the import
 entirely.
+
+For file formatting rules, matching and updating existing records, and fixes
+for values the wizard flags, see the
+[Importing data](/help/import) articles.

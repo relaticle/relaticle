@@ -76,57 +76,43 @@ describe('Documentation pages', function () {
         config()->set('markdown.code_highlighting.enabled', false);
     });
 
-    it('displays the documentation index', function () {
-        $response = $this->get('/docs');
+    it('displays the developers index', function () {
+        $response = $this->get('/developers');
 
         $response->assertStatus(200);
         $response->assertSee('Documentation');
     });
 
-    it('displays the getting started guide', function () {
-        $response = $this->get('/docs/getting-started');
+    it('displays the contributing guide', function () {
+        $response = $this->get('/developers/contributing');
 
         $response->assertStatus(200);
-        $response->assertSee('Getting Started');
-    });
-
-    it('displays the import guide', function () {
-        $response = $this->get('/docs/import');
-
-        $response->assertStatus(200);
-        $response->assertSee('Import Guide');
-    });
-
-    it('displays the developer guide', function () {
-        $response = $this->get('/docs/developer');
-
-        $response->assertStatus(200);
-        $response->assertSee('Developer Guide');
+        $response->assertSee('Contributing Guide');
     });
 
     it('displays the self-hosting guide', function () {
-        $response = $this->get('/docs/self-hosting');
+        $response = $this->get('/developers/self-hosting');
 
         $response->assertStatus(200);
         $response->assertSee('Self-Hosting Guide');
     });
 
     it('displays the MCP guide', function () {
-        $response = $this->get('/docs/mcp');
+        $response = $this->get('/developers/mcp');
 
         $response->assertStatus(200);
         $response->assertSee('MCP Server');
     });
 
     it('shows edit on GitHub link on documentation pages', function () {
-        $response = $this->get('/docs/getting-started');
+        $response = $this->get('/developers/self-hosting');
 
         $response->assertStatus(200);
         $response->assertSee('Edit this page on GitHub');
     });
 
     it('returns 404 for non-existent documentation page', function () {
-        $response = $this->get('/docs/non-existent-page');
+        $response = $this->get('/developers/non-existent-page');
 
         $response->assertStatus(404);
     });

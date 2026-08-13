@@ -103,7 +103,7 @@ it('serves an llms.txt indexing help and docs', function (): void {
     $body = $response->getContent();
 
     expect($body)->toContain('/help/getting-started/create-your-first-company')
-        ->and($body)->toContain('/docs/getting-started')
+        ->and($body)->toContain('/developers/self-hosting')
         ->and($body)->toContain('Help Centre')
         ->and($body)->toContain('Documentation');
 });

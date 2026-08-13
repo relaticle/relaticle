@@ -52,7 +52,14 @@ it('resolves every internal link -- including anchored and query-qualified ones 
         return collect($matches)->flatMap(function (array $match) use ($page, $repo, $headingAnchors): array {
             $url = $match[1];
             $fragment = $match[2] ?? '';
-            $target = $repo->find(ltrim($url, '/'));
+            $path = ltrim($url, '/');
+            $target = $repo->find($path);
+
+            // A one-segment-deep /help link is a category page — valid as
+            // long as the category exists and no fragment points into it.
+            if (! $target instanceof DocPage && $fragment === '' && $repo->findCategory($path) !== null) {
+                return [];
+            }
 
             if (! $target instanceof DocPage) {
                 return ["{$page->path} -> {$url}"];

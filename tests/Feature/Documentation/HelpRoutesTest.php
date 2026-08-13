@@ -53,14 +53,14 @@ it('renders documentation pages in their own shell, not the marketing chrome', f
     // mount -- its id is the only stable marker of that specific chrome.
     expect($html)->not->toContain('id="main-header"')
         ->and($html)->toContain('Search the docs');
-})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/docs', '/docs/mcp']);
+})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp']);
 
 it('offers both areas in the sidebar of every documentation page', function (string $path): void {
     $html = $this->get($path)->assertOk()->getContent();
 
     expect($html)->toContain(route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']))
         ->and($html)->toContain(route('documentation.show', ['type' => 'mcp']));
-})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/docs', '/docs/mcp']);
+})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp']);
 
 it('serves the .md variant the article copy-page action fetches', function (): void {
     $this->get('/help/getting-started/create-your-first-company.md')

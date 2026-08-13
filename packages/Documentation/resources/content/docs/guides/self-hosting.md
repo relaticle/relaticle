@@ -1,7 +1,7 @@
 ---
 title: Self-Hosting Guide
 description: Deploy Relaticle with Docker or manually.
-order: 4
+order: 1
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -154,7 +154,7 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/docs` documentation module. Set to `false` to remove documentation routes and navigation links. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
 
 ---
 
