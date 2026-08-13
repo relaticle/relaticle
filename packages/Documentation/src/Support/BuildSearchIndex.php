@@ -12,27 +12,29 @@ use Illuminate\Support\Facades\Cache;
  * first one, so client-side search can jump straight to a section instead of
  * just the page. `v` lets a client refuse a payload shape it doesn't
  * understand instead of guessing at it.
+ *
+ * Every area is indexed, not just help: the search dialog is reachable from
+ * both surfaces, and a reader looking for "MCP" from a help article should
+ * find the guide rather than nothing.
  */
 final readonly class BuildSearchIndex
 {
     private const int VERSION = 2;
 
-    private const string AREA = 'help';
-
-    private const string CACHE_KEY = 'documentation.help.search-index';
+    private const string CACHE_KEY = 'documentation.search-index';
 
     public function __construct(private DocsRepository $repository) {}
 
-    /** @return array{v: int, records: list<array{path: string, title: string, section: string, anchor: string, content: string}>} */
+    /** @return array{v: int, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>} */
     public function __invoke(): array
     {
         return ['v' => self::VERSION, 'records' => $this->records()];
     }
 
-    /** @return list<array{path: string, title: string, section: string, anchor: string, content: string}> */
+    /** @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}> */
     private function records(): array
     {
-        $pages = $this->repository->pages()->filter(fn (DocPage $page): bool => $page->area === self::AREA);
+        $pages = $this->repository->pages();
 
         if (! $this->cachingEnabled()) {
             return $this->build($pages);
@@ -40,7 +42,7 @@ final readonly class BuildSearchIndex
 
         $signature = $this->signature($pages);
 
-        /** @var array{signature: string, records: list<array{path: string, title: string, section: string, anchor: string, content: string}>}|null $cached */
+        /** @var array{signature: string, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>}|null $cached */
         $cached = Cache::get(self::CACHE_KEY);
 
         if (is_array($cached) && $cached['signature'] === $signature) {
@@ -68,24 +70,29 @@ final readonly class BuildSearchIndex
     }
 
     /**
-     * A hash of every field a cached record actually embeds -- path, title,
-     * and body -- cheap to compute from the already-parsed collection, no
-     * extra filesystem walk needed. Any edit to any of those three changes
-     * the hash, so a stale cached index (including a front-matter-only title
-     * edit) is never served.
+     * A hash of every field a cached record actually embeds -- the page's
+     * path, title, and body, plus the category titles the crumb is read from
+     * -- cheap to compute from the already-parsed collections, no extra
+     * filesystem walk needed. Any edit to any of them changes the hash, so a
+     * stale cached index (including a front-matter-only title edit) is never
+     * served.
      *
      * @param  Collection<string, DocPage>  $pages
      */
     private function signature(Collection $pages): string
     {
+        $categories = $this->repository->categories()
+            ->map(fn (DocCategory $category): string => "{$category->path}:{$category->title}")
+            ->implode('|');
+
         return hash('sha256', $pages
             ->map(fn (DocPage $page): string => "{$page->path}:{$page->title}:{$page->body}")
-            ->implode('|'));
+            ->implode('|').'||'.$categories);
     }
 
     /**
      * @param  Collection<string, DocPage>  $pages
-     * @return list<array{path: string, title: string, section: string, anchor: string, content: string}>
+     * @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>
      */
     private function build(Collection $pages): array
     {
@@ -101,7 +108,7 @@ final readonly class BuildSearchIndex
      * document order without this class reimplementing the renderer's
      * slugging (and its duplicate-heading suffixing) itself.
      *
-     * @return list<array{path: string, title: string, section: string, anchor: string, content: string}>
+     * @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>
      */
     private function sections(DocPage $page): array
     {
@@ -121,16 +128,36 @@ final readonly class BuildSearchIndex
         ));
     }
 
-    /** @return array{path: string, title: string, section: string, anchor: string, content: string} */
+    /** @return array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string} */
     private function record(DocPage $page, string $section, string $anchor, string $raw): array
     {
+        $url = DocUrl::page($page);
+
         return [
             'path' => $page->path,
             'title' => $page->title,
             'section' => trim($section),
             'anchor' => $anchor,
             'content' => $this->plainText($raw),
+            'url' => $anchor === '' ? $url : "{$url}#{$anchor}",
+            'crumb' => $this->crumb($page),
         ];
+    }
+
+    /**
+     * Where the result sits, said the way the sidebar says it -- the category
+     * title for help, the area name for the developer guides, whose single
+     * "Guides" category is collapsed out of the URL anyway.
+     */
+    private function crumb(DocPage $page): string
+    {
+        if ($page->area !== DocUrl::HELP) {
+            return DocUrl::areaTitle($page->area);
+        }
+
+        $category = $this->repository->findCategory("{$page->area}/{$page->category}");
+
+        return $category instanceof DocCategory ? $category->title : DocUrl::areaTitle($page->area);
     }
 
     private function plainText(string $markdown): string

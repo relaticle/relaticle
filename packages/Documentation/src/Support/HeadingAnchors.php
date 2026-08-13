@@ -26,12 +26,28 @@ final readonly class HeadingAnchors
     /** @return list<string> One entry per `##` heading, in document order. */
     public function __invoke(string $body): array
     {
+        return array_column($this->headings($body), 'anchor');
+    }
+
+    /**
+     * The same headings with their text kept alongside the anchor, which is
+     * what an on-this-page table of contents needs. Derived here rather than
+     * from the rendered HTML so a page's table of contents can't disagree with
+     * the anchors the search index already points at.
+     *
+     * @return list<array{text: string, anchor: string}>
+     */
+    public function headings(string $body): array
+    {
         preg_match_all('/^##[ \t]+(.+)$/m', $body, $matches);
 
         $normalizer = new UniqueSlugNormalizer(new SlugNormalizer);
 
         return array_map(
-            fn (string $heading): string => $normalizer->normalize(trim($heading)),
+            fn (string $heading): array => [
+                'text' => trim($heading),
+                'anchor' => $normalizer->normalize(trim($heading)),
+            ],
             $matches[1],
         );
     }

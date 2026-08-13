@@ -1,166 +1,260 @@
-// Copy button functionality for code blocks
-function addCopyButtons() {
-    const codeBlocks = document.querySelectorAll('pre code');
+/**
+ * Behaviour for the documentation shell: client-side search over the
+ * pre-built index, copy buttons on code blocks, and the on-this-page rail.
+ *
+ * Search is exposed on `window` because the shell drives it from Alpine —
+ * the ranking stays here so the Blade template holds markup, not algorithms.
+ */
 
-    codeBlocks.forEach((codeBlock) => {
-        const pre = codeBlock.parentElement;
+const SNIPPET_RADIUS = 70;
+const RESULT_LIMIT = 12;
+const INDEX_VERSION = 2;
 
-        // Skip if already wrapped
-        if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
+function terms(query) {
+    return (query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((term) => term.length > 1);
+}
 
-        // Create wrapper div to hold pre and copy button
+function fieldScore(haystack, term, wordWeight, partWeight) {
+    const at = haystack.indexOf(term);
+
+    if (at === -1) {
+        return 0;
+    }
+
+    const startsWord = at === 0 || !/[\p{L}\p{N}]/u.test(haystack[at - 1]);
+
+    return startsWord ? wordWeight : partWeight;
+}
+
+function scoreRecord(record, queryTerms, phrase) {
+    let score = 0;
+
+    for (const term of queryTerms) {
+        const hit =
+            fieldScore(record.lowerTitle, term, 12, 6) +
+            fieldScore(record.lowerSection, term, 8, 4) +
+            fieldScore(record.lowerContent, term, 2, 1);
+
+        // Every term has to land somewhere, or "invite stripe" would match a
+        // page about invites that never mentions Stripe.
+        if (hit === 0) {
+            return 0;
+        }
+
+        score += hit;
+    }
+
+    if (phrase.length > 2) {
+        if (record.lowerTitle.includes(phrase)) score += 30;
+        if (record.lowerSection.includes(phrase)) score += 20;
+        if (record.lowerContent.includes(phrase)) score += 8;
+    }
+
+    // A tie between a page's opening and one of its sections goes to the page.
+    if (record.anchor === '') {
+        score += 2;
+    }
+
+    return score;
+}
+
+function buildSnippet(content, queryTerms) {
+    if (content === '') {
+        return [{ text: '', mark: false }];
+    }
+
+    const pattern = queryTerms
+        .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
+
+    if (pattern === '') {
+        return [{ text: content.slice(0, SNIPPET_RADIUS * 2), mark: false }];
+    }
+
+    const first = new RegExp(pattern, 'iu').exec(content);
+
+    if (first === null) {
+        return [{ text: content.slice(0, SNIPPET_RADIUS * 2), mark: false }];
+    }
+
+    const start = Math.max(0, first.index - SNIPPET_RADIUS);
+    const end = Math.min(content.length, first.index + first[0].length + SNIPPET_RADIUS);
+    const window = (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
+
+    const segments = [];
+    let cursor = 0;
+
+    for (const match of window.matchAll(new RegExp(pattern, 'giu'))) {
+        if (match.index > cursor) {
+            segments.push({ text: window.slice(cursor, match.index), mark: false });
+        }
+
+        segments.push({ text: match[0], mark: true });
+        cursor = match.index + match[0].length;
+    }
+
+    if (cursor < window.length) {
+        segments.push({ text: window.slice(cursor), mark: false });
+    }
+
+    return segments;
+}
+
+window.RelaticleDocs = {
+    async loadIndex(url) {
+        const payload = await fetch(url).then((response) => response.json());
+
+        if (payload?.v !== INDEX_VERSION || !Array.isArray(payload.records)) {
+            throw new Error('Unsupported documentation search index payload');
+        }
+
+        return payload.records.map((record, index) => ({
+            ...record,
+            id: `${index}:${record.path}#${record.anchor}`,
+            lowerTitle: record.title.toLowerCase(),
+            lowerSection: record.section.toLowerCase(),
+            lowerContent: record.content.toLowerCase(),
+        }));
+    },
+
+    search(records, query) {
+        if (!Array.isArray(records)) {
+            return [];
+        }
+
+        const phrase = query.trim().toLowerCase();
+
+        // An empty box lists the pages themselves — somewhere to start rather
+        // than an empty panel.
+        if (phrase === '') {
+            return records
+                .filter((record) => record.anchor === '')
+                .slice(0, RESULT_LIMIT)
+                .map((record) => ({ ...record, snippet: [{ text: record.content.slice(0, 120), mark: false }] }));
+        }
+
+        const queryTerms = terms(phrase);
+
+        if (queryTerms.length === 0) {
+            return [];
+        }
+
+        return records
+            .map((record) => ({ record, score: scoreRecord(record, queryTerms, phrase) }))
+            .filter((scored) => scored.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, RESULT_LIMIT)
+            .map(({ record }) => ({ ...record, snippet: buildSnippet(record.content, queryTerms) }));
+    },
+};
+
+const COPY_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const CHECK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+function addCopyButtons(root) {
+    root.querySelectorAll('pre').forEach((pre) => {
+        if (pre.parentElement?.classList.contains('code-block-wrapper')) {
+            return;
+        }
+
         const wrapper = document.createElement('div');
         wrapper.className = 'code-block-wrapper';
-
-        // Insert wrapper before pre and move pre inside
         pre.parentNode.insertBefore(wrapper, pre);
         wrapper.appendChild(pre);
 
-        // Create copy button
-        const copyButton = document.createElement('button');
-        copyButton.className = 'copy-button';
-        copyButton.setAttribute('aria-label', 'Copy code to clipboard');
-        copyButton.innerHTML = `
-            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-        `;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'code-copy';
+        button.setAttribute('aria-label', 'Copy code to clipboard');
+        button.innerHTML = COPY_ICON;
 
-        // Add click handler
-        copyButton.addEventListener('click', async () => {
-            const text = codeBlock.textContent;
-
+        button.addEventListener('click', async () => {
             try {
-                await navigator.clipboard.writeText(text);
-
-                // Show success state with subtle feedback
-                copyButton.classList.add('copied');
-                copyButton.querySelector('.copy-icon').style.display = 'none';
-                copyButton.querySelector('.check-icon').style.display = 'block';
-
-                // Reset after 1.5 seconds
+                await navigator.clipboard.writeText(pre.querySelector('code')?.innerText ?? pre.innerText);
+                button.classList.add('copied');
+                button.innerHTML = CHECK_ICON;
                 setTimeout(() => {
-                    copyButton.classList.remove('copied');
-                    copyButton.querySelector('.copy-icon').style.display = 'block';
-                    copyButton.querySelector('.check-icon').style.display = 'none';
+                    button.classList.remove('copied');
+                    button.innerHTML = COPY_ICON;
                 }, 1500);
-            } catch (err) {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-
-                try {
-                    document.execCommand('copy');
-                    copyButton.classList.add('copied');
-                    copyButton.querySelector('.copy-icon').style.display = 'none';
-                    copyButton.querySelector('.check-icon').style.display = 'block';
-
-                    setTimeout(() => {
-                        copyButton.classList.remove('copied');
-                        copyButton.querySelector('.copy-icon').style.display = 'block';
-                        copyButton.querySelector('.check-icon').style.display = 'none';
-                    }, 1500);
-                } catch (err) {
-                    console.error('Failed to copy code:', err);
-                }
-
-                document.body.removeChild(textArea);
+            } catch {
+                // Clipboard denied (insecure context or blocked permission) —
+                // the code is still selectable, so there is nothing to recover.
             }
         });
 
-        // Append button to wrapper (not pre), so it stays fixed during horizontal scroll
-        wrapper.appendChild(copyButton);
+        wrapper.appendChild(button);
     });
 }
 
-// Simple smooth scrolling for anchor links
-document.addEventListener('DOMContentLoaded', function() {
-    // Add copy buttons to code blocks
-    addCopyButtons();
+function trackTableOfContents() {
+    const toc = document.getElementById('docs-toc');
 
-    // Watch for dynamic content changes
-    const observer = new MutationObserver(() => {
-        addCopyButtons();
-    });
-
-    const contentElement = document.getElementById('documentation-content');
-    if (contentElement) {
-        observer.observe(contentElement, {
-            childList: true,
-            subtree: true
-        });
+    if (!toc) {
+        return;
     }
 
-    // Make h2/h3 heading text clickable -- navigate to their anchor
-    document.querySelectorAll('#documentation-content h2, #documentation-content h3').forEach(function(heading) {
-        heading.addEventListener('click', function(e) {
-            if (e.target.closest('a')) return;
-            if (e.target !== heading && !heading.contains(e.target)) return;
-            var permalink = heading.querySelector('.heading-permalink');
-            if (permalink) {
-                var href = permalink.getAttribute('href');
-                if (href) {
-                    var targetId = href.substring(1);
-                    var targetEl = document.getElementById(targetId);
-                    if (targetEl) {
-                        var pos = targetEl.getBoundingClientRect().top + window.scrollY - 80;
-                        window.scrollTo({ top: pos, behavior: 'smooth' });
-                        history.pushState(null, null, href);
-                    }
-                }
+    const targets = [...toc.querySelectorAll('a[href^="#"]')]
+        .map((link) => {
+            const anchor = document.getElementById(decodeURIComponent(link.getAttribute('href').slice(1)));
+
+            // The renderer puts the id on a permalink anchor inside the
+            // heading, and that anchor is absolutely positioned — measure the
+            // heading instead.
+            return anchor ? { link, element: anchor.closest('h2, h3, h4') ?? anchor } : null;
+        })
+        .filter(Boolean);
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    let active = null;
+
+    const sync = () => {
+        const threshold = 120;
+        let current = targets[0];
+
+        for (const target of targets) {
+            if (target.element.getBoundingClientRect().top <= threshold) {
+                current = target;
             }
+        }
+
+        if (current === active) {
+            return;
+        }
+
+        active?.link.removeAttribute('data-active');
+        current.link.setAttribute('data-active', '');
+        active = current;
+    };
+
+    let queued = false;
+
+    const onScroll = () => {
+        if (queued) {
+            return;
+        }
+
+        queued = true;
+        requestAnimationFrame(() => {
+            queued = false;
+            sync();
         });
-    });
+    };
 
-    // Add smooth scrolling
-    document.addEventListener('click', function(e) {
-        const link = e.target.closest('a[href^="#"]');
-        if (link) {
-            e.preventDefault();
-            const targetId = link.getAttribute('href').substring(1);
-            const targetElement = document.getElementById(targetId);
-
-            if (targetElement) {
-                // Calculate the element's position relative to the document
-                const elementPosition = targetElement.getBoundingClientRect().top + window.scrollY;
-                const offsetPosition = elementPosition - 80;
-
-                // Scroll with offset for fixed header
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-
-                // Update the URL hash without scrolling
-                history.pushState(null, null, `#${targetId}`);
-            }
-        }
-    });
-});
-
-// Ensure sidebars can properly scroll
-function adjustSidebarHeights() {
-    // Calculate available height for sidebars
-    const viewportHeight = window.innerHeight;
-    const topOffset = 96; // 24 (top-24 in TailwindCSS) = 6rem
-    const sidebarMaxHeight = viewportHeight - topOffset;
-
-    // Apply height to sidebar containers if needed
-    document.querySelectorAll('.docs-sidebar > div, .toc').forEach(sidebar => {
-        if (sidebar) {
-            sidebar.style.maxHeight = `${sidebarMaxHeight}px`;
-        }
-    });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    sync();
 }
 
-// Run on load and resize
-window.addEventListener('load', adjustSidebarHeights);
-window.addEventListener('resize', adjustSidebarHeights);
+document.addEventListener('DOMContentLoaded', () => {
+    const content = document.getElementById('documentation-content');
+
+    if (content) {
+        addCopyButtons(content);
+    }
+
+    trackTableOfContents();
+});

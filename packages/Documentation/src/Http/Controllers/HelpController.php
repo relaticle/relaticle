@@ -11,12 +11,15 @@ use Illuminate\View\View;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
+use Relaticle\Documentation\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
+use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
 
 final readonly class HelpController
 {
-    private const string AREA = 'help';
+    private const string AREA = DocUrl::HELP;
 
     private const string DOCS_CATEGORY = 'docs/guides';
 
@@ -24,12 +27,14 @@ final readonly class HelpController
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
         private BuildSearchIndex $buildSearchIndex,
+        private DocsNavigation $navigation,
+        private HeadingAnchors $headingAnchors,
     ) {}
 
     public function index(): View
     {
         return view('documentation::help.hub', [
-            'categories' => $this->helpCategories(),
+            'nav' => ($this->navigation)(),
         ]);
     }
 
@@ -44,7 +49,8 @@ final readonly class HelpController
             'category' => $docCategory,
             'categoryBody' => trim($docCategory->body) !== '' ? ($this->renderMarkdown)($docCategory->body) : null,
             'pages' => $this->repository->pagesIn($categoryPath)->values(),
-            'categories' => $this->helpCategories(),
+            'nav' => ($this->navigation)(),
+            'currentPath' => $docCategory->path,
         ]);
     }
 
@@ -55,7 +61,6 @@ final readonly class HelpController
 
         abort_unless($page instanceof DocPage, 404);
 
-        $docCategory = $this->repository->findCategory(self::AREA."/{$category}");
         $pagesInCategory = $this->repository->pagesIn(self::AREA."/{$category}")->values();
 
         $currentIndex = $pagesInCategory->search(
@@ -64,13 +69,14 @@ final readonly class HelpController
 
         return view('documentation::help.article', [
             'page' => $page,
-            'category' => $docCategory,
+            'category' => $this->repository->findCategory(self::AREA."/{$category}"),
             'body' => ($this->renderMarkdown)($page->body),
-            'pagesInCategory' => $pagesInCategory,
+            'headings' => $this->headingAnchors->headings($page->body),
             'previous' => $currentIndex !== false && $currentIndex > 0 ? $pagesInCategory->get($currentIndex - 1) : null,
             'next' => $currentIndex !== false && $currentIndex < $pagesInCategory->count() - 1 ? $pagesInCategory->get($currentIndex + 1) : null,
             'related' => $this->resolveRelated($page),
-            'categories' => $this->helpCategories(),
+            'nav' => ($this->navigation)(),
+            'currentPath' => $page->path,
         ]);
     }
 

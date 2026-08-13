@@ -2,88 +2,249 @@
 
 @import "~/css/theme.css";
 
-mark {
-    background: oklch(0.42 0.24 287.23 / 0.1);
+/*
+ * The documentation surface is its own shell — it does not render the
+ * marketing header or footer — so its reading styles live here rather than
+ * leaning on the typography plugin. Sizes are deliberately tighter than the
+ * marketing pages: this is a manual, not a landing page.
+ */
+
+::selection {
+    background: var(--color-primary-200);
+}
+
+:is(.dark) ::selection {
+    background: color-mix(in oklab, var(--color-primary) 45%, transparent);
+}
+
+.docs-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-300) transparent;
+}
+
+:is(.dark) .docs-scroll {
+    scrollbar-color: var(--color-gray-700) transparent;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ─── Search dialog ─── */
+
+.docs-search-mark {
+    background: color-mix(in oklab, var(--color-primary) 18%, transparent);
     color: inherit;
-    padding: 1px 3px;
-    border-radius: 3px;
+    border-radius: 0.2rem;
+    padding: 0 0.1rem;
+    font-weight: 500;
 }
 
-:is(.dark) mark {
-    background: oklch(0.42 0.24 287.23 / 0.2);
+:is(.dark) .docs-search-mark {
+    background: color-mix(in oklab, var(--color-primary) 35%, transparent);
 }
 
-#documentation-content {
-    h1,
-    h2,
-    h3 {
-        @apply font-display relative;
-    }
+/* ─── On this page ─── */
 
-    h2,
-    h3 {
-        @apply cursor-pointer w-fit;
-    }
+.docs-toc-link {
+    @apply text-gray-500 dark:text-gray-400;
+}
 
-    .heading-permalink {
-        @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
-    }
+.docs-toc-link:hover {
+    @apply text-gray-900 dark:text-white;
+}
 
-    h2:hover .heading-permalink,
-    h3:hover .heading-permalink {
-        @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
-    }
+.docs-toc-link[data-active] {
+    @apply border-primary-500 font-medium text-primary-600 dark:border-primary-400 dark:text-primary-400;
+}
 
-    h1 .heading-permalink {
-        @apply hidden;
-    }
+/* ─── Article prose ─── */
 
-    /* Code block wrapper for sticky copy button */
-    .code-block-wrapper {
-        @apply relative rounded-lg bg-gray-900 dark:bg-gray-950;
-        margin: 1rem 0;
-    }
+.prose-docs {
+    @apply text-[15px]/[1.75] text-gray-600 dark:text-gray-300;
+}
 
-    .code-block-wrapper pre {
-        @apply rounded-lg bg-transparent text-gray-100 text-sm leading-relaxed overflow-x-auto m-0;
-        padding: 1rem 1.25rem;
-    }
+.prose-docs > :first-child {
+    margin-top: 0;
+}
 
-    /* Standalone pre without wrapper */
-    pre:not(.code-block-wrapper pre) {
-        @apply rounded-lg bg-gray-900 dark:bg-gray-950 text-gray-100 text-sm leading-relaxed overflow-x-auto;
-        padding: 1rem 1.25rem;
-        margin: 1rem 0;
-    }
+.prose-docs > :last-child {
+    margin-bottom: 0;
+}
 
-    pre code {
-        @apply bg-transparent p-0 text-sm font-mono;
-        white-space: pre;
-        word-spacing: normal;
-        word-break: normal;
-        tab-size: 4;
-    }
+.prose-docs p {
+    margin: 1rem 0;
+}
 
-    /* Inline code */
-    :not(pre) > code {
-        @apply bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-1.5 py-0.5 rounded text-sm font-mono;
-    }
+.prose-docs :is(h2, h3, h4) {
+    @apply font-display relative w-fit scroll-mt-24 font-bold tracking-[-0.015em] text-balance text-gray-950 dark:text-white;
+}
 
-    /* Copy button - positioned on wrapper, stays fixed during scroll */
-    .copy-button {
-        @apply absolute top-2 right-2 p-1.5 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-400 hover:text-gray-200 transition-all opacity-0 cursor-pointer border-0 flex items-center justify-center w-8 h-8 z-10;
-    }
+.prose-docs h2 {
+    @apply mt-11 mb-3 text-[1.375rem];
+}
 
-    .code-block-wrapper:hover .copy-button,
-    pre:hover > .copy-button {
+.prose-docs h3 {
+    @apply mt-8 mb-2.5 text-[1.0625rem];
+}
+
+.prose-docs h4 {
+    @apply mt-6 mb-2 text-[0.9375rem];
+}
+
+.prose-docs a:not(.heading-permalink) {
+    @apply text-primary-600 underline decoration-current/30 underline-offset-[3px] transition-colors dark:text-primary-400;
+}
+
+.prose-docs a:not(.heading-permalink):hover {
+    @apply decoration-current;
+}
+
+.prose-docs strong {
+    @apply font-semibold text-gray-900 dark:text-white;
+}
+
+.prose-docs :is(ul, ol) {
+    @apply my-4 space-y-1.5 pl-6;
+}
+
+.prose-docs ul {
+    list-style-type: disc;
+}
+
+.prose-docs ol {
+    list-style-type: decimal;
+}
+
+.prose-docs li::marker {
+    @apply text-gray-400 dark:text-gray-600;
+}
+
+.prose-docs :is(ul, ol) :is(ul, ol) {
+    @apply my-1.5;
+}
+
+.prose-docs blockquote {
+    @apply my-5 rounded-r-lg border-l-2 border-primary-300 bg-primary-50/50 px-4 py-3 text-gray-600 dark:border-primary-500/50 dark:bg-primary-500/[0.07] dark:text-gray-300;
+}
+
+.prose-docs blockquote p {
+    @apply my-1;
+}
+
+.prose-docs hr {
+    @apply my-10 border-gray-200 dark:border-white/10;
+}
+
+.prose-docs img {
+    @apply my-5 rounded-lg border border-gray-200 dark:border-white/10;
+}
+
+.prose-docs table {
+    @apply my-5 w-full border-collapse text-[13px];
+}
+
+.prose-docs th {
+    @apply border-b border-gray-200 py-2 pr-3 text-left font-semibold text-gray-900 dark:border-white/15 dark:text-white;
+}
+
+.prose-docs td {
+    @apply border-b border-gray-100 py-2 pr-3 align-top dark:border-white/[0.07];
+}
+
+/* Heading permalinks: the renderer injects an empty anchor before each heading. */
+.prose-docs .heading-permalink {
+    @apply absolute top-1/2 -left-6 -translate-y-1/2 text-gray-300 no-underline opacity-0 transition-opacity dark:text-gray-600;
+}
+
+.prose-docs .heading-permalink::before {
+    content: "#";
+}
+
+.prose-docs :is(h2, h3, h4):hover .heading-permalink,
+.prose-docs .heading-permalink:focus-visible {
+    @apply text-primary-600 opacity-100 dark:text-primary-400;
+}
+
+/* ─── Code ─── */
+
+.prose-docs :not(pre) > code {
+    @apply rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[0.85em] text-gray-800 dark:bg-white/10 dark:text-gray-200;
+}
+
+/*
+ * Shiki writes its own (github-dark) background inline on `pre.shiki`, so the
+ * surface stays dark in both themes and only the chrome around it is themed.
+ */
+.prose-docs .code-block-wrapper {
+    @apply relative my-5 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10;
+}
+
+.prose-docs pre {
+    @apply overflow-x-auto bg-gray-950 px-5 py-4 font-mono text-[13px]/[1.7] text-gray-100;
+    scrollbar-width: thin;
+}
+
+.prose-docs .code-block-wrapper pre {
+    @apply my-0 rounded-none border-0;
+}
+
+.prose-docs pre:not(.code-block-wrapper pre) {
+    @apply my-5 rounded-xl border border-gray-200 dark:border-white/10;
+}
+
+.prose-docs pre code {
+    @apply bg-transparent p-0 font-mono text-[13px];
+    white-space: pre;
+    word-break: normal;
+    tab-size: 4;
+}
+
+.prose-docs .code-copy {
+    @apply absolute top-2.5 right-2.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-white/10 bg-white/10 text-gray-300 opacity-0 transition-all hover:bg-white/20 hover:text-white;
+}
+
+.prose-docs .code-block-wrapper:hover .code-copy,
+.prose-docs .code-copy:focus-visible {
+    @apply opacity-100;
+}
+
+@media (hover: none) {
+    .prose-docs .code-copy {
         @apply opacity-100;
     }
+}
 
-    .copy-button.copied {
-        @apply text-green-400;
-    }
+.prose-docs .code-copy.copied {
+    @apply text-emerald-400;
+}
 
-    .copy-button svg {
-        @apply w-4 h-4 shrink-0;
-    }
+/*
+ * The permalink is the element that actually carries the heading id, and it is
+ * absolutely positioned, so it needs its own scroll margin — otherwise a
+ * deep-linked heading lands underneath the sticky header.
+ */
+.prose-docs .heading-permalink {
+    scroll-margin-top: 7rem;
+}
+
+/*
+ * Shiki writes github-dark's own background inline; overriding it keeps
+ * highlighted and unhighlighted blocks on one surface.
+ */
+.prose-docs pre.shiki {
+    background-color: var(--color-gray-950) !important;
 }

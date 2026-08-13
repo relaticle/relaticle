@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Documentation;
 
 use App\Features\Documentation;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
@@ -34,7 +33,6 @@ final class DocumentationServiceProvider extends ServiceProvider
 
         $this->registerRoutes();
         $this->registerViews();
-        $this->registerComponents();
         $this->registerPublishing();
     }
 
@@ -55,18 +53,6 @@ final class DocumentationServiceProvider extends ServiceProvider
     private function registerViews(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'documentation');
-    }
-
-    /**
-     * Register Blade components.
-     */
-    private function registerComponents(): void
-    {
-        // Register components with the 'documentation::' namespace
-        Blade::componentNamespace('Relaticle\\Documentation\\Components', 'documentation');
-
-        // Register anonymous components
-        $this->loadViewComponentsAs('documentation', []);
     }
 
     /**

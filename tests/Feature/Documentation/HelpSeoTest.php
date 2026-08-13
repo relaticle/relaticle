@@ -77,6 +77,24 @@ it('serves a section-level search index', function (): void {
         ->and($headingRecord['content'])->toContain('Custom Fields');
 });
 
+it('indexes the developer guides alongside help, with a link and a crumb per record', function (): void {
+    $records = collect($this->get('/help/search-index.json')->assertOk()->json('records'));
+
+    $guide = $records->first(fn (array $record): bool => $record['path'] === 'docs/guides/mcp' && $record['anchor'] === '');
+    $article = $records->first(fn (array $record): bool => $record['path'] === 'help/getting-started/create-your-first-company' && $record['anchor'] === '');
+
+    expect($guide)->not->toBeNull()
+        ->and($guide['url'])->toBe(route('documentation.show', ['type' => 'mcp']))
+        ->and($guide['crumb'])->toBe('Developers')
+        ->and($article['url'])->toBe(route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']))
+        ->and($article['crumb'])->toBe('Getting started');
+
+    $section = $records->first(fn (array $record): bool => $record['path'] === 'help/getting-started/create-your-first-company'
+        && $record['section'] === "If you don't see the fields you expect");
+
+    expect($section['url'])->toEndWith('#if-you-dont-see-the-fields-you-expect');
+});
+
 it('serves an llms.txt indexing help and docs', function (): void {
     $response = $this->get('/llms.txt')
         ->assertOk()

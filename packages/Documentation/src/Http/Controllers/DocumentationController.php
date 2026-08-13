@@ -6,7 +6,9 @@ namespace Relaticle\Documentation\Http\Controllers;
 
 use Illuminate\View\View;
 use Relaticle\Documentation\Support\DocPage;
+use Relaticle\Documentation\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
 
 final readonly class DocumentationController
@@ -24,13 +26,14 @@ final readonly class DocumentationController
     public function __construct(
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
+        private DocsNavigation $navigation,
+        private HeadingAnchors $headingAnchors,
     ) {}
 
     public function index(): View
     {
         return view('documentation::docs.hub', [
-            'pages' => $this->repository->pagesIn(self::CATEGORY)->values(),
-            'apiReference' => config('documentation.api_reference'),
+            'nav' => ($this->navigation)(),
         ]);
     }
 
@@ -40,11 +43,20 @@ final readonly class DocumentationController
 
         abort_unless($page instanceof DocPage, 404);
 
+        $pages = $this->repository->pagesIn(self::CATEGORY)->values();
+
+        $currentIndex = $pages->search(
+            fn (DocPage $candidate): bool => $candidate->path === $page->path,
+        );
+
         return view('documentation::docs.article', [
             'page' => $page,
             'body' => ($this->renderMarkdown)($page->body),
-            'pages' => $this->repository->pagesIn(self::CATEGORY)->values(),
-            'apiReference' => config('documentation.api_reference'),
+            'headings' => $this->headingAnchors->headings($page->body),
+            'previous' => $currentIndex !== false && $currentIndex > 0 ? $pages->get($currentIndex - 1) : null,
+            'next' => $currentIndex !== false && $currentIndex < $pages->count() - 1 ? $pages->get($currentIndex + 1) : null,
+            'nav' => ($this->navigation)(),
+            'currentPath' => $page->path,
         ]);
     }
 }

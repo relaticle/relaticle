@@ -1,0 +1,79 @@
+@props([
+    'title' => null,
+    'description' => null,
+    'ogTitle' => null,
+    'ogDescription' => null,
+    'ogImage' => null,
+    'ogType' => 'website',
+    'canonical' => null,
+    'robots' => null,
+])
+
+@php
+    // Coalesced rather than defaulted through @props: callers pass the prop
+    // through explicitly, so a null from an inner layout must still fall back
+    // here instead of emitting an empty description.
+    $description ??= 'Relaticle - The open-source CRM built for people and AI-powered work. Self-hosted with MCP server, REST API, and 22 custom field types.';
+    $ogType ??= 'website';
+@endphp
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<meta name="description" content="{{ $description }}">
+{{-- Defaults to the query-stripped URL, which is what consolidates the marketing
+     pages. Pages that genuinely paginate pass their own page-aware canonical. --}}
+<link rel="canonical" href="{{ $canonical ?? url()->current() }}" />
+@if($robots)
+    <meta name="robots" content="{{ $robots }}">
+@endif
+
+@php
+    // Bump the version whenever public/images/open-graph.jpg is regenerated
+    // so social caches re-scrape it.
+    $defaultOgImage = url('/images/open-graph.jpg').'?v=2';
+@endphp
+
+<!-- Open Graph Meta Tags -->
+<meta property="og:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
+<meta property="og:description" content="{{ $ogDescription ?? $description }}"/>
+<meta property="og:image" content="{{ $ogImage ?? $defaultOgImage }}"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
+<meta property="og:url" content="{{ request()->getUri() }}"/>
+<meta property="og:type" content="{{ $ogType }}" />
+<meta property="og:site_name" content="{{ config('app.name', 'Relaticle') }}" />
+<meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}" />
+
+<!-- Twitter Card Meta Tags -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}" />
+<meta name="twitter:description" content="{{ $ogDescription ?? $description }}" />
+<meta name="twitter:image" content="{{ $ogImage ?? $defaultOgImage }}" />
+<meta name="twitter:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}" />
+
+<title>{{ $title ?? config('app.name', 'Relaticle - CRM Built for People and AI-Powered Work') }}</title>
+<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="shortcut icon" href="/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-title" content="Relaticle" />
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+<link rel="manifest" href="/site.webmanifest" />
+
+{{-- Preload critical fonts (discovered late if left to CSS) --}}
+<link rel="preload" as="font" href="/fonts/inter/InterVariable.woff2" type="font/woff2" crossorigin />
+<link rel="preload" as="font" href="/fonts/satoshi/Satoshi-Variable.woff2" type="font/woff2" crossorigin />
+
+@stack('preload')
+
+<!-- Dark mode FOUC prevention (must run synchronously before paint) -->
+<script>
+    document.documentElement.classList.toggle(
+        'dark',
+        localStorage.getItem('theme') === 'dark' || ((!localStorage.getItem('theme') || localStorage.getItem('theme') === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    );
+</script>
