@@ -11,6 +11,7 @@ use Filament\Pages\Dashboard\Concerns\HasFiltersAction;
 use Filament\Widgets\WidgetConfiguration;
 use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\FunnelWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 
 final class EngagementDashboard extends BaseDashboard
@@ -37,6 +38,7 @@ final class EngagementDashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            FunnelWidget::class,
             ActivationRateWidget::class,
             UserRetentionChartWidget::class,
             AiSpendStatsWidget::class,
