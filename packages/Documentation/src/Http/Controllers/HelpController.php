@@ -61,19 +61,11 @@ final readonly class HelpController
 
         abort_unless($page instanceof DocPage, 404);
 
-        $pagesInCategory = $this->repository->pagesIn(self::AREA."/{$category}")->values();
-
-        $currentIndex = $pagesInCategory->search(
-            fn (DocPage $candidate): bool => $candidate->path === $page->path,
-        );
-
         return view('documentation::help.article', [
             'page' => $page,
             'category' => $this->repository->findCategory(self::AREA."/{$category}"),
             'body' => ($this->renderMarkdown)($page->body),
             'headings' => $this->headingAnchors->headings($page->body),
-            'previous' => $currentIndex !== false && $currentIndex > 0 ? $pagesInCategory->get($currentIndex - 1) : null,
-            'next' => $currentIndex !== false && $currentIndex < $pagesInCategory->count() - 1 ? $pagesInCategory->get($currentIndex + 1) : null,
             'related' => $this->resolveRelated($page),
             'nav' => ($this->navigation)(),
             'currentPath' => $page->path,

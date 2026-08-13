@@ -19,8 +19,6 @@
         :page="$page"
         :body="$body"
         :headings="$headings"
-        :previous="$previous"
-        :next="$next"
         :related="$related"
         :eyebrow="$category?->title"
         :eyebrow-url="$category ? route('help.category', ['category' => $page->category]) : null" />

@@ -379,12 +379,20 @@ ships alone, waves 2-6 are separate follow-up content PRs.
 | Wave | Category | Why this order |
 |---|---|---|
 | ✅ | Getting started (7 articles) | shipped 2026-08-12 |
-| 1 (=W2.5) | Importing data | deep content already written — cheapest wave |
-| 2 | AI chat (Ask Relaticle) | backs the agent-native wedge — the program's #1 query space |
-| 3 | Custom fields & views | 22 field types = table-first content AI engines lift |
-| 4 | Records (companies, people, opportunities) | core JTBD long tail |
-| 5 | Tasks, notes & pipeline | |
-| 6 | Workspace, team & billing | |
+| ✅ 1 (=W2.5) | Importing data (4 articles) | shipped 2026-08-13 |
+| ✅ 2 | AI assistant (4 articles) | shipped 2026-08-13 — backs the agent-native wedge |
+| ✅ 3 | Custom fields (4 articles) | shipped 2026-08-13 — note: 21 selectable field types in-app (File Upload disabled), so articles avoid the "22" claim |
+| ✅ 4 | Records (6 articles) | shipped 2026-08-13 |
+| ✅ 5 | Tasks & notes (3 articles) | shipped 2026-08-13 — pipeline customisation lives in the custom-fields category |
+| ✅ 6 | Workspace & billing (4 articles) | shipped 2026-08-13 — Enterprise tier and 2FA deliberately undocumented (owner rule / unused UI) |
+
+All content was fact-checked against the codebase before writing (five
+research passes over packages/Chat, custom-fields, resources, boards, and
+billing), with screenshots captured from the live seeded app. Article-footer
+decision (2026-08-13): help articles show curated related links only
+("Keep reading"); prev/next pagination is developer-guides-only — the
+landscape's converged help anatomy has no sequential nav, and Maxforms
+shipped the same split.
 
 Per-article completion bar (in addition to the program-wide metadata
 standards): answer in the first paragraph; user-vocabulary titles; real
