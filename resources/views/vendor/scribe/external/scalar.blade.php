@@ -100,12 +100,12 @@
 
 <nav class="relaticle-nav">
     <div class="relaticle-nav-left">
-        <a href="/" aria-label="Relaticle Home">
-            <img src="/brand/logomark.svg" alt="Relaticle" style="height:1.5rem;width:1.5rem;"/>
+        <a href="/" aria-label="Relaticle Home" style="gap:0.625rem;">
+            <img src="/brand/logomark.svg" alt="" style="height:1.5rem;width:1.5rem;"/>
+            <span class="relaticle-nav-brand">Relaticle</span>
         </a>
-        <span class="relaticle-nav-brand">Relaticle</span>
         <div class="relaticle-nav-sep"></div>
-        <span class="relaticle-nav-title">API Reference</span>
+        <a href="/developers" class="relaticle-nav-title" style="text-decoration:none;">API Reference</a>
     </div>
     <div class="relaticle-nav-links">
         <a href="/help">Help</a>

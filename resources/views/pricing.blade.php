@@ -163,88 +163,46 @@
 
             {{-- FAQ --}}
             <div class="mt-16 max-w-3xl mx-auto">
-                <div class="mx-auto mb-10 max-w-2xl text-center">
+                <div class="mx-auto mb-6 max-w-2xl text-center">
                     <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
                         {{ __('Pricing questions, answered') }}
                     </h2>
                 </div>
 
-                <div class="space-y-8">
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Is Relaticle really free to self-host?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file — your data stays on your own server the entire time.') }}
-                        </p>
-                    </div>
+                @php
+                    $pricingFaqs = [
+                        [
+                            __('Is Relaticle really free to self-host?'),
+                            __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file — your data stays on your own server the entire time.'),
+                        ],
+                        [
+                            __('Do you charge per seat?'),
+                            __('No — Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
+                        ],
+                        [__("What's included in the hosted plan?"), $hostedPlanAnswer],
+                        [__('What happens when I hit a plan limit?'), $planLimitAnswer],
+                        [__('What counts as an AI credit?'), $creditFaqAnswer],
+                        [__('Which AI models does my plan unlock?'), $modelsUnlockAnswer],
+                        [__('Is there a message rate limit?'), $rateLimitAnswer],
+                        [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
+                        [
+                            __('Can I switch between self-hosted and cloud?'),
+                            __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV — moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
+                        ],
+                    ];
 
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Do you charge per seat?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ __('No — Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.') }}
-                        </p>
-                    </div>
+                    if ($billingActive) {
+                        $pricingFaqs[] = [
+                            __('What happens after my trial ends?'),
+                            __(
+                                'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the exact same open-source codebase is always available as a fallback.',
+                                ['days' => $trialDays]
+                            ),
+                        ];
+                    }
+                @endphp
 
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __("What's included in the hosted plan?") }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $hostedPlanAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('What happens when I hit a plan limit?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $planLimitAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('What counts as an AI credit?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $creditFaqAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Which AI models does my plan unlock?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $modelsUnlockAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Is there a message rate limit?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $rateLimitAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Are self-hosted installs exempt from AI credit limits?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ $selfHostedCreditAnswer }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('Can I switch between self-hosted and cloud?') }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                            {{ __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV — moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.') }}
-                        </p>
-                    </div>
-
-                    @if($billingActive)
-                        <div>
-                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('What happens after my trial ends?') }}</h3>
-                            <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                                {{ __(
-                                    'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the exact same open-source codebase is always available as a fallback.',
-                                    ['days' => $trialDays]
-                                ) }}
-                            </p>
-                        </div>
-                    @endif
-                </div>
+                <x-marketing.faq-accordion :faqs="$pricingFaqs" id-prefix="pricing-faq" />
             </div>
 
             {{-- Trust signals --}}
