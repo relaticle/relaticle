@@ -1055,15 +1055,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         // Bridge the docked livewire proposal-card's resolution lifecycle back
         // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
         // named-arg dispatches arrive as a single params object (e.detail).
+        // A FAILED resolve needs no bridge: the proposal stays pending, so the dock
+        // keeps rendering it and owns the error message (`resolve` error bag).
         this._proposalListeners = [
             window.Livewire.on('proposal:resolved', (payload) => {
                 if ((payload?.context ?? 'conversation') !== this.context) return;
                 this.applyProposalResolution(payload);
-            }),
-            window.Livewire.on('proposal:resolve-failed', (payload) => {
-                if ((payload?.context ?? 'conversation') !== this.context) return;
-                const action = this.findPendingAction(payload?.pendingActionId);
-                if (action) action.error = 'Could not complete the action. Please try again.';
             }),
         ];
 
@@ -1110,7 +1107,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     applyProposalResolution(payload) {
         const action = this.findPendingAction(payload.pendingActionId);
         if (!action) return;
-        action.error = null;
 
         if (payload.index === null || payload.index === undefined) {
             // Single proposal.
@@ -1454,7 +1450,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 if (action.status !== 'pending') continue;
                 if (idFilter && !idFilter.has(action.pending_action_id)) continue;
                 action.status = 'superseded';
-                action.error = null;
             }
         }
     },

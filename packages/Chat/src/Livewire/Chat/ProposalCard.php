@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -467,13 +468,12 @@ final class ProposalCard extends BaseLivewireComponent
                 $finalized = true;
                 $record = $this->recordReferenceFor($resolved);
             }
-        } catch (RuntimeException $exception) {
-            $this->dispatch(
-                'proposal:resolve-failed',
-                pendingActionId: $pendingAction->getKey(),
-                message: $exception->getMessage(),
-                context: $this->context,
-            );
+        } catch (RuntimeException|ValidationException $exception) {
+            // ValidationException is thrown by the action's tenant guards when a
+            // referenced record or assignee stopped being reachable between the
+            // proposal and the approval. Livewire would otherwise absorb it into an
+            // error bag nothing renders, leaving the button a permanent no-op.
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
             return;
         }
@@ -528,12 +528,7 @@ final class ProposalCard extends BaseLivewireComponent
                 $finalized = true;
             }
         } catch (RuntimeException $exception) {
-            $this->dispatch(
-                'proposal:resolve-failed',
-                pendingActionId: $pendingAction->getKey(),
-                message: $exception->getMessage(),
-                context: $this->context,
-            );
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
             return;
         }
@@ -555,6 +550,24 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+    }
+
+    /**
+     * Report a failed resolve on the card itself AND to the transcript. The
+     * dispatched event alone is not user-visible, so the message is also bound to
+     * the `resolve` error bag which the dock renders — a proposal that cannot be
+     * resolved must say so rather than leave the button dead.
+     */
+    private function reportResolveFailure(PendingAction $pendingAction, string $message): void
+    {
+        $this->addError('resolve', $message);
+
+        $this->dispatch(
+            'proposal:resolve-failed',
+            pendingActionId: $pendingAction->getKey(),
+            message: $message,
+            context: $this->context,
+        );
     }
 
     private function ensureTenantContext(): void
