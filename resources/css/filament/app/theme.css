@@ -598,6 +598,23 @@
     }
 }
 
+/* ── Action modals sit above the mail surfaces ─────────────────────────────
+   Filament paints a modal at z-40 (z-50 for one stacked on another). The reader
+   overlay and the composer window are z-40, and z-50 once the composer is
+   expanded — so an action opened from either (sharing, signatures, templates)
+   renders *underneath* an opaque panel: no error, no visible modal, and the
+   click reads as dead. A modal is always the topmost surface, so it is lifted
+   past both here, keeping Filament's own base/stacked ordering intact. */
+.fi-modal > .fi-modal-close-overlay,
+.fi-modal > .fi-modal-window-ctn {
+    z-index: 60;
+}
+
+.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-close-overlay,
+.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-window-ctn {
+    z-index: 70;
+}
+
 /* ── Docked draft: the writing area runs to the footer ─────────────────────
    The dock has no height of its own (it grows with the draft), so the editor
    cannot flex into it — giving the container a min-height would just open a gap
