@@ -26,3 +26,10 @@ it('serves comparison pages as clean markdown with the table intact', function (
     expect($markdown)->toContain('Twenty')
         ->and($markdown)->not->toContain('Skip to');
 });
+
+it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {
+    $html = $this->get('/alternatives/attio')->assertOk()->getContent();
+
+    expect($html)->not->toContain('rEST')
+        ->and($html)->toContain('Relaticle&#039;s extensibility: REST API plus a 32-tool MCP server');
+});

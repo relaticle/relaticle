@@ -44,7 +44,7 @@
                 ],
                 [
                     'heading' => __('AI and MCP tooling'),
-                    'body' => __('Relaticle ships :relaticleAi. EspoCRM currently has :espocrmAi.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => lcfirst($competitor['ai'])]),
+                    'body' => __('Relaticle ships :relaticleAi. EspoCRM\'s AI: :espocrmAi.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => $competitor['ai']]),
                 ],
                 [
                     'heading' => __('Tech stack & deployment'),

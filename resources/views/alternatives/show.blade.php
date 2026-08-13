@@ -15,15 +15,15 @@
                 ],
                 [
                     'heading' => __('AI capabilities'),
-                    'body' => __('Attio\'s AI is :attioAi, available only on their SaaS. Relaticle ships :relaticleAi.', ['attioAi' => lcfirst($competitor['ai']), 'relaticleAi' => $relaticle['ai']]),
+                    'body' => __('Attio\'s AI: :attioAi — available only on their SaaS. Relaticle\'s AI: :relaticleAi.', ['attioAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
                 ],
                 [
                     'heading' => __('Data ownership & deployment'),
-                    'body' => __('Attio has :attioSelfHost — your data lives on their infrastructure. Relaticle\'s deployment is :relaticleStack, and :relaticleSelfHost.', ['attioSelfHost' => lcfirst($competitor['self_host']), 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => lcfirst($relaticle['self_host'])]),
+                    'body' => __('Attio: :attioSelfHost — your data lives on their infrastructure. Relaticle: :relaticleStack. :relaticleSelfHost.', ['attioSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
                 ],
                 [
                     'heading' => __('Extensibility'),
-                    'body' => __('Attio offers :attioExtensibility. Relaticle offers :relaticleExtensibility.', ['attioExtensibility' => lcfirst($competitor['extensibility']), 'relaticleExtensibility' => lcfirst($relaticle['extensibility'])]),
+                    'body' => __('Attio\'s extensibility: :attioExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['attioExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
                 ],
             ],
         ],
@@ -37,15 +37,15 @@
                 ],
                 [
                     'heading' => __('AI capabilities'),
-                    'body' => __('HubSpot\'s AI is :hubspotAi. Relaticle ships :relaticleAi.', ['hubspotAi' => lcfirst($competitor['ai']), 'relaticleAi' => $relaticle['ai']]),
+                    'body' => __('HubSpot\'s AI: :hubspotAi. Relaticle\'s AI: :relaticleAi.', ['hubspotAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
                 ],
                 [
                     'heading' => __('Data ownership & deployment'),
-                    'body' => __('HubSpot has :hubspotSelfHost. Relaticle\'s deployment is :relaticleStack, and :relaticleSelfHost.', ['hubspotSelfHost' => lcfirst($competitor['self_host']), 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => lcfirst($relaticle['self_host'])]),
+                    'body' => __('HubSpot: :hubspotSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['hubspotSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
                 ],
                 [
                     'heading' => __('Extensibility'),
-                    'body' => __('HubSpot offers a :hubspotExtensibility. Relaticle offers :relaticleExtensibility.', ['hubspotExtensibility' => lcfirst($competitor['extensibility']), 'relaticleExtensibility' => lcfirst($relaticle['extensibility'])]),
+                    'body' => __('HubSpot\'s extensibility: :hubspotExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['hubspotExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
                 ],
             ],
         ],
