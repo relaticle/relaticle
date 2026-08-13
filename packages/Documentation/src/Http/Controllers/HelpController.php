@@ -122,7 +122,7 @@ final readonly class HelpController
         $docs = $this->llmsTxtDocsEntries();
 
         if ($docs !== []) {
-            array_push($lines, '', '## '.__('Documentation'), '', ...$docs);
+            array_push($lines, '', '## '.__('Developer Documentation'), '', ...$docs);
         }
 
         return implode("\n", $lines)."\n";

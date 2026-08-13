@@ -13,5 +13,5 @@ it('uses the configured per-document description as the meta description', funct
 it('titles the documentation index with the brand-suffix convention', function (): void {
     $this->get('/developers')
         ->assertOk()
-        ->assertSee('<title>Documentation - Relaticle</title>', false);
+        ->assertSee('<title>Developer Documentation - Relaticle</title>', false);
 });
