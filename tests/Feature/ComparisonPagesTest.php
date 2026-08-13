@@ -18,7 +18,7 @@ it('404s for undeclared competitors', function (): void {
     $this->get('/compare/relaticle-vs-salesforce')->assertNotFound();
 });
 
-it('serves comparison pages as clean markdown with the table intact', function (): void {
+it('serves comparison pages as clean markdown without nav chrome', function (): void {
     $markdown = $this->get('/compare/relaticle-vs-twenty', ['Accept' => 'text/markdown'])
         ->assertOk()
         ->getContent();

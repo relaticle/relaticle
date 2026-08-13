@@ -47,9 +47,9 @@
                 </h2>
 
                 {{--
-                    A <table> here would collapse to a run-on line for the markdown-response
-                    channel (GPTBot/ClaudeBot/PerplexityBot) — see the same note in
-                    pricing.blade.php. <ul>/<li>/<p> survive conversion cleanly instead.
+                    List layout kept for responsive styling; tables DO convert to
+                    markdown since the TableAwareLeagueDriver landed — see the same
+                    note in pricing.blade.php.
                 --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
                     <li class="px-4 py-3 sm:px-6 sm:py-4">

@@ -88,7 +88,7 @@
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle — no self-hosted maintenance required');
                     $hostedPlanAnswer = __(
-                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 4.6 up to Opus 4.7, the REST API, the 30-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below) — as a reference point, :credits credits covers roughly :credits simple Sonnet 4.6 replies, or around :opusReplies Opus 4.7 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
+                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 4.6 up to Opus 4.7, the REST API, the 32-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below) — as a reference point, :credits credits covers roughly :credits simple Sonnet 4.6 replies, or around :opusReplies Opus 4.7 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
                             'price' => '$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)',
                             'credits' => $proCredits,
@@ -103,7 +103,7 @@
                 } else {
                     $hostedPriceCell = __('$0/mo per workspace');
                     $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
-                    $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 30-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support — no credit card required.');
+                    $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 32-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support — no credit card required.');
                     $planLimitAnswer = __(
                         'CRM data itself is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. The AI assistant is metered, though: every workspace defaults to the Free plan\'s :credits credits a month (self-hosted included — see "Are self-hosted installs exempt from AI credit limits?" below), resetting every calendar month. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
                         ['credits' => $freeCredits]
@@ -129,12 +129,10 @@
                 </div>
 
                 {{--
-                    A <table> here would collapse to a run-on line for the markdown-response
-                    channel (GPTBot/ClaudeBot/PerplexityBot): the app's configured league/
-                    html-to-markdown driver runs with `strip_tags: true` and does not register
-                    TableConverter, so table cells lose their separators. <ul>/<li>/<p> (category
-                    names are CSS-bold, not <strong> — no semantic-bold tag is used) all have
-                    registered converters and were verified to survive conversion — each row
+                    List layout kept for responsive styling; tables DO convert to
+                    markdown since the TableAwareLeagueDriver landed. <ul>/<li>/<p>
+                    (category names are CSS-bold, not <strong> — no semantic-bold
+                    tag is used) were verified to survive conversion — each row
                     below reads as "Category" / "Self-Hosted: X" / "Hosted: Y" in markdown.
                 --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -210,7 +208,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach([
                         ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', '30', 'MCP Tools'],
+                        ['ri-robot-2-line', '32', 'MCP Tools'],
                         ['ri-stack-line', '22', 'Field Types'],
                         ['ri-lock-line', '5-Layer', 'Authorization'],
                     ] as [$icon, $value, $label])

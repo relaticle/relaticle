@@ -1,13 +1,10 @@
 @php
     /**
-     * A literal <table> here would collapse into a single run-on line for the
-     * markdown-response channel (GPTBot/ClaudeBot/PerplexityBot, see
-     * config/markdown-response.php): the "league" driver's default HtmlConverter
-     * never registers league/html-to-markdown's TableConverter, so every <table>
-     * falls through to its generic DefaultConverter instead — this isn't limited
-     * to "complex" layouts, it's every table, confirmed by inspecting
-     * vendor/league/html-to-markdown/src/Environment.php. <ul>/<li>/<p> survive
-     * conversion cleanly instead — see the same pattern in press.blade.php.
+     * List layout kept for responsive styling (a real <table> doesn't stack
+     * cleanly on narrow viewports); tables DO convert to markdown since the
+     * TableAwareLeagueDriver landed (see app/Support/Markdown) — this is a
+     * presentation choice, not a markdown-conversion workaround. See the
+     * same pattern in press.blade.php.
      */
     $formatStars = function (array $facts): string {
         if ($facts['stars'] === 0) {
