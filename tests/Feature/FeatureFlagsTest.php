@@ -10,12 +10,15 @@ use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
 use App\Filament\Pages\CreateTeam;
 use App\Models\Company;
+use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Laravel\Pennant\Feature;
 
 mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, Marketing::class);
@@ -215,6 +218,34 @@ describe('Marketing', function (): void {
 
         $this->get('/developers')->assertOk();
         $this->get('/help')->assertOk();
+
+        putenv('RELATICLE_FEATURE_MARKETING');
+        unset($_ENV['RELATICLE_FEATURE_MARKETING'], $_SERVER['RELATICLE_FEATURE_MARKETING']);
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('renders a guest-layout page outside the marketing group when the feature is inactive', function (): void {
+        putenv('RELATICLE_FEATURE_MARKETING=false');
+        $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = Team::factory()->create();
+        $invitation = TeamInvitation::factory()->expired()->create([
+            'team_id' => $team->id,
+            'email' => $user->email,
+        ]);
+        $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+        $this->actingAs($user)
+            ->get($acceptUrl)
+            ->assertOk()
+            ->assertViewIs('teams.invitation-expired');
 
         putenv('RELATICLE_FEATURE_MARKETING');
         unset($_ENV['RELATICLE_FEATURE_MARKETING'], $_SERVER['RELATICLE_FEATURE_MARKETING']);
