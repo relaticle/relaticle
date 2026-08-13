@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
+use Laravel\Sanctum\Sanctum;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(
     ApproveAuthorizationController::class,
@@ -248,6 +251,47 @@ it('still honors a Sanctum personal access token with its own team_id', function
 
     $response->assertOk();
     expect((string) $response->getContent())->toContain($this->otherTeam->getKey());
+});
+
+/**
+ * The 'sanctum' guard used here is scoped to the users provider (config/auth.php),
+ * so a token minted for any other tokenable (e.g. a blog token issued to a
+ * Relaticle\SystemAdmin\Models\SystemAdministrator) must never authenticate on the
+ * app's own MCP endpoint -- it is a live credential impersonating a caller type
+ * SetApiTeamContext (and every policy/observer downstream) does not expect.
+ */
+it('rejects a personal access token minted for a tokenable outside the users provider', function (): void {
+    $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
+    $token = $admin->createToken('blog-token', ['posts:read'])->plainTextToken;
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson('/mcp', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => 'who-ami-tool', 'arguments' => (object) []],
+        ])
+        ->assertUnauthorized();
+});
+
+/**
+ * The 'sanctum' guard rejecting a non-User tokenable (above) should make this
+ * unreachable in production, but SetApiTeamContext must not depend on that being
+ * true -- Sanctum::actingAs() bypasses the guard's own provider check the same way
+ * a future guard misconfiguration could, proving the middleware's own defensive
+ * check is what stands between a caller type mismatch and an uncaught TypeError.
+ */
+it('fails closed with 403 instead of a type error when the resolved caller is not a User', function (): void {
+    $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
+
+    Sanctum::actingAs($admin, ['posts:read']);
+
+    $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => 'who-ami-tool', 'arguments' => (object) []],
+    ])->assertForbidden();
 });
 
 /**

@@ -47,8 +47,15 @@ final readonly class SetApiTeamContext
 
     public function handle(Request $request, Closure $next): Response
     {
-        /** @var User $user */
         $user = $request->user();
+
+        // The 'sanctum' guard is scoped to the users provider (config/auth.php), so
+        // this should be unreachable in practice -- but a caller type mismatch here
+        // must fail closed with a clean denial, not the uncaught TypeError a plain
+        // `User $user` parameter on resolveTeam() below would throw for anything else.
+        if (! $user instanceof User) {
+            return response()->json(['message' => 'This credential cannot access team-scoped resources.'], 403);
+        }
 
         $team = $this->resolveTeam($request, $user);
 

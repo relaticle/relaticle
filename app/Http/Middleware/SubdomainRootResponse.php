@@ -23,7 +23,7 @@ final readonly class SubdomainRootResponse
             return new JsonResponse([
                 'name' => 'Relaticle API',
                 'version' => 'v1',
-                'docs' => url('/docs/api'),
+                'docs' => url('/developers/api'),
             ]);
         }
 
@@ -31,7 +31,7 @@ final readonly class SubdomainRootResponse
             return new JsonResponse([
                 'name' => 'Relaticle MCP Server',
                 'version' => '1.0.0',
-                'docs' => url('/docs/mcp'),
+                'docs' => url('/developers/mcp'),
             ]);
         }
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\Auth\CallbackController;
@@ -11,9 +12,11 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
+use Relaticle\Documentation\Support\DocsRepository;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
@@ -71,9 +74,34 @@ Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,
             ->name('teams.join.confirm');
     });
 
-// Legacy documentation redirects
-Route::get('/documentation/{slug?}', fn (string $slug = '') => redirect("/docs/{$slug}", 301))
-    ->where('slug', '.*');
+// Legacy documentation redirects. Two indexed generations point here: the
+// original /documentation/* URLs and the /docs/* generation retired 2026-08-13
+// (renamed to /developers; its two end-user guides moved into /help). Every
+// entry maps straight to the final URL so no chain ever exceeds one hop.
+$legacyDocsRedirect = function (DocsRepository $repository, string $slug = ''): RedirectResponse {
+    $map = [
+        'quickstart' => '/help/getting-started',
+        'getting-started' => '/help/getting-started',
+        'import' => '/help/import',
+        'developer' => '/developers/contributing',
+    ];
+
+    if (isset($map[$slug])) {
+        return redirect($map[$slug], 301);
+    }
+
+    $isKnownTarget = $repository->find("docs/guides/{$slug}") !== null
+        || "/developers/{$slug}" === config('documentation.api_reference.url');
+
+    return $isKnownTarget
+        ? redirect("/developers/{$slug}", 301)
+        : redirect('/developers', 301);
+};
+
+if (Feature::active(Documentation::class)) {
+    Route::get('/documentation/{slug?}', $legacyDocsRedirect)->where('slug', '.*');
+    Route::get('/docs/{slug?}', $legacyDocsRedirect)->where('slug', '.*');
+}
 
 // Community redirects
 Route::get('/discord', function () {

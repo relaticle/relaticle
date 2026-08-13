@@ -1,5 +1,5 @@
-<div x-data="{ mobileMenu: false }" @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
-    <header
+<header x-data="{ mobileMenu: false }" @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
+    <div
         id="main-header"
         class="fixed w-full top-0 z-50 bg-white/80 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200/60 dark:border-white/[0.06]">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,9 +21,13 @@
                         Pricing
                     </a>
                     @feature(App\Features\Documentation::class)
+                    <a href="{{ route('help.index') }}"
+                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
+                        {{ __('Help') }}
+                    </a>
                     <a href="{{ route('documentation.index') }}"
                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        Documentation
+                        {{ __('Developers') }}
                     </a>
                     @endfeature
                     @feature(App\Features\Blog::class)
@@ -63,7 +67,7 @@
                 </div>
             </div>
         </div>
-    </header>
+    </div>
 
     <x-layout.mobile-menu/>
-</div>
+</header>

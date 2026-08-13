@@ -39,7 +39,7 @@ const SMOKE_EXCLUDED_ROUTES = [
     'user/confirm-password',
     'up',
     'scheduled-deletion',
-    'docs/api*',
+    'developers/api*',
     'api/*',
     'oauth/*',
     '.well-known/*',

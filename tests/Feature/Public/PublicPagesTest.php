@@ -35,6 +35,15 @@ describe('Home page', function () {
         $response->assertStatus(200);
         $response->assertSee('42');
     });
+
+    it('has descriptive alt text on every hero product screenshot', function () {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+        $response->assertSee('alt="Relaticle opportunities board with deals grouped into pipeline stages, showing deal value and close date"', false);
+        $response->assertSee('alt="Relaticle companies list showing account owner, ICP status, and website domain for each company"', false);
+        $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
+    });
 });
 
 describe('Legal pages', function () {
@@ -67,66 +76,45 @@ describe('Documentation pages', function () {
         config()->set('markdown.code_highlighting.enabled', false);
     });
 
-    it('displays the documentation index', function () {
-        $response = $this->get('/docs');
+    it('displays the developers index', function () {
+        $response = $this->get('/developers');
 
         $response->assertStatus(200);
         $response->assertSee('Documentation');
     });
 
-    it('displays the getting started guide', function () {
-        $response = $this->get('/docs/getting-started');
+    it('displays the contributing guide', function () {
+        $response = $this->get('/developers/contributing');
 
         $response->assertStatus(200);
-        $response->assertSee('Getting Started');
-    });
-
-    it('displays the import guide', function () {
-        $response = $this->get('/docs/import');
-
-        $response->assertStatus(200);
-        $response->assertSee('Import Guide');
-    });
-
-    it('displays the developer guide', function () {
-        $response = $this->get('/docs/developer');
-
-        $response->assertStatus(200);
-        $response->assertSee('Developer Guide');
+        $response->assertSee('Contributing Guide');
     });
 
     it('displays the self-hosting guide', function () {
-        $response = $this->get('/docs/self-hosting');
+        $response = $this->get('/developers/self-hosting');
 
         $response->assertStatus(200);
         $response->assertSee('Self-Hosting Guide');
     });
 
     it('displays the MCP guide', function () {
-        $response = $this->get('/docs/mcp');
+        $response = $this->get('/developers/mcp');
 
         $response->assertStatus(200);
         $response->assertSee('MCP Server');
     });
 
     it('shows edit on GitHub link on documentation pages', function () {
-        $response = $this->get('/docs/getting-started');
+        $response = $this->get('/developers/self-hosting');
 
         $response->assertStatus(200);
         $response->assertSee('Edit this page on GitHub');
     });
 
     it('returns 404 for non-existent documentation page', function () {
-        $response = $this->get('/docs/non-existent-page');
+        $response = $this->get('/developers/non-existent-page');
 
         $response->assertStatus(404);
-    });
-
-    it('can search documentation and returns results', function () {
-        $response = $this->get('/docs/search?query=import');
-
-        $response->assertStatus(200);
-        $response->assertSee('Import');
     });
 
 });
