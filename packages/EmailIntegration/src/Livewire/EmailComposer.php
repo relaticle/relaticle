@@ -10,6 +10,7 @@ use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -614,11 +615,21 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return $schema->components([
             RichEditor::make('bodyHtml')
                 ->hiddenLabel()
+                ->resizableImages()
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
                 ->placeholder(__('filament/emails/composer.fields.body_placeholder'))
-                ->toolbarButtons([])
+                // `attachFiles` is not optional here: file attachments are gated on that
+                // button being present (RichEditor::hasFileAttachmentsByDefault), and
+                // they are what let an image be dropped, pasted or picked into the body.
+                ->toolbarButtons([
+                    ['bold', 'italic', 'underline', 'strike', 'attachFiles'],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.paragraph'), ['paragraph', 'h1', 'h2', 'h3'])],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
+                    ['blockquote', 'codeBlock', 'bulletList', 'orderedList'],
+                    ['undo', 'redo'],
+                ])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],
                 ])

@@ -25,6 +25,11 @@ return [
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
     ],
+    'toolbar' => [
+        'paragraph' => 'Paragraph',
+        'alignment' => 'Alignment',
+    ],
+
     'actions' => [
         'send' => 'Send email',
         'attach' => 'Attach files',
