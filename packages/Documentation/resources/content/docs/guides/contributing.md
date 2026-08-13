@@ -2,6 +2,7 @@
 title: Contributing Guide
 description: Installation, architecture, and contributing.
 order: 3
+updated: "2026-08-13"
 ---
 
 Technical documentation for developers and contributors.

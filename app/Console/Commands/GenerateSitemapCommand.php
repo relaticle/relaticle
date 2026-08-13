@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Features\Blog;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Ink\BlogSitemapGenerator;
 use Spatie\Sitemap\Sitemap;
 use Spatie\Sitemap\SitemapGenerator;
@@ -37,7 +38,7 @@ final class GenerateSitemapCommand extends Command
             ->shouldCrawl(fn (string $url): bool => ! in_array(parse_url($url, PHP_URL_PATH), $excluded, true))
             ->getSitemap();
 
-        $this->addHelpUrls($sitemap, $docsRepository);
+        $this->addDocumentationUrls($sitemap, $docsRepository);
 
         if (Feature::active(Blog::class)) {
             BlogSitemapGenerator::addToSitemap($sitemap);
@@ -47,35 +48,39 @@ final class GenerateSitemapCommand extends Command
     }
 
     /**
-     * The crawler only follows links reachable from the homepage, and /help
-     * isn't linked from anywhere yet, so it needs adding explicitly -- the
-     * same way BlogSitemapGenerator does. Only a page's own front-matter
-     * `updated:` date produces a <lastmod>; a missing one is left out
-     * entirely rather than falling back to a file timestamp.
+     * The crawler usually discovers the documentation pages itself (they're
+     * linked from the marketing nav), but a crawl-found entry carries no
+     * <lastmod> -- and Sitemap::add() keeps the first tag per URL, so adding
+     * again would be silently ignored. Merge instead: stamp lastmod onto the
+     * existing tag, or add the URL when the crawl missed it. Only a page's
+     * own front-matter `updated:` produces a <lastmod>; a missing one is
+     * left out entirely rather than falling back to a file timestamp.
      */
-    private function addHelpUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
+    private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
     {
-        $sitemap->add(Url::create(route('help.index')));
+        $this->ensureUrl($sitemap, route('help.index'));
+        $this->ensureUrl($sitemap, route('documentation.index'));
 
         $docsRepository->categories()
-            ->filter(fn (DocCategory $category): bool => $category->area === 'help')
-            ->each(function (DocCategory $category) use ($sitemap, $docsRepository): void {
-                $sitemap->add(Url::create(route('help.category', [
-                    'category' => Str::after($category->path, '/'),
-                ])));
+            ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
+            ->each(fn (DocCategory $category) => $this->ensureUrl($sitemap, DocUrl::category($category)));
 
-                $docsRepository->pagesIn($category->path)->each(function (DocPage $page) use ($sitemap): void {
-                    $url = Url::create(route('help.show', [
-                        'category' => $page->category,
-                        'slug' => $page->slug,
-                    ]));
+        $docsRepository->pages()->each(function (DocPage $page) use ($sitemap): void {
+            $this->ensureUrl($sitemap, DocUrl::page($page), $page->updated);
+        });
+    }
 
-                    if ($page->updated) {
-                        $url->setLastModificationDate($page->updated);
-                    }
+    private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): void
+    {
+        $url = $sitemap->getUrl($location);
 
-                    $sitemap->add($url);
-                });
-            });
+        if (! $url instanceof Url) {
+            $url = Url::create($location);
+            $sitemap->add($url);
+        }
+
+        if ($lastModified instanceof CarbonImmutable) {
+            $url->setLastModificationDate($lastModified);
+        }
     }
 }

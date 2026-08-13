@@ -9,6 +9,7 @@ use Relaticle\Documentation\Http\Controllers\HelpController;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocsJsonLd;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
 
@@ -93,6 +94,35 @@ it('indexes the developer guides alongside help, with a link and a crumb per rec
         && $record['section'] === "If you don't see the fields you expect");
 
     expect($section['url'])->toEndWith('#if-you-dont-see-the-fields-you-expect');
+});
+
+it('titles every content page base-title-dash-brand, exactly once', function (): void {
+    // Shiki would spawn a node process per fenced block across all 36 pages;
+    // nothing here reads highlighted output.
+    config()->set('markdown.code_highlighting.enabled', false);
+
+    $brand = config('app.name');
+    $offenders = [];
+
+    foreach (app(DocsRepository::class)->pages() as $page) {
+        $html = $this->get(DocUrl::page($page))->assertOk()->getContent();
+
+        preg_match('/<title>(.*?)<\/title>/', $html, $match);
+
+        $expected = "{$page->title} - {$brand}";
+
+        if (($match[1] ?? null) !== $expected || substr_count($match[1] ?? '', " - {$brand}") !== 1) {
+            $offenders[] = "{$page->path} -> ".($match[1] ?? '(no title)');
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});
+
+it('lazy-loads article images', function (): void {
+    $html = $this->get('/help/records/company-records')->assertOk()->getContent();
+
+    expect($html)->toContain('<img loading="lazy" decoding="async" src="/help-assets/records/company-records-1.png"');
 });
 
 it('serves an llms.txt indexing help and docs', function (): void {

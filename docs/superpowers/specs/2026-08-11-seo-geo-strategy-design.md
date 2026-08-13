@@ -394,6 +394,41 @@ decision (2026-08-13): help articles show curated related links only
 landscape's converged help anatomy has no sequential nav, and Maxforms
 shipped the same split.
 
+### W2.6 — Docs SEO hardening (measured audit + fixes, 2026-08-13)
+
+A remeasure after the content waves (36 pages, 51 sitemap URLs vs 15 at the
+2026-08-11 audit) found one live regression and three hardening gaps, all
+fixed in the same PR:
+
+- **Sitemap `<lastmod>` regression (fixed)**: linking /help from the
+  marketing nav (this branch) meant the crawler discovered help URLs before
+  `addHelpUrls()` ran — and `Sitemap::add()` keeps the first tag per URL, so
+  every lastmod-carrying add was silently dropped. Production sitemap had
+  **zero** `<lastmod>` entries while the test passed vacuously (its faked
+  crawl finds nothing, so the explicit adds always won).
+  `GenerateSitemapCommand` now merges: it stamps lastmod onto the
+  crawl-found tag via `Sitemap::getUrl()` and only adds when the crawl
+  missed the URL. The regression test reproduces crawl-found-first ordering
+  and was verified to fail against the old command.
+- **Developer guides carry `updated:`** and the sitemap pass now covers all
+  areas (`DocsRepository::pages()` + `DocUrl`), not just help.
+- **Category metadata is now guarded**: unique, length-bounded (≤60/≤160)
+  titles and descriptions, unique across pages *and* categories combined —
+  plus an every-page HTTP sweep asserting `<base title> - Relaticle`
+  exactly once per `<title>`.
+- **Article images render `loading="lazy" decoding="async"`** via
+  `RenderDocMarkdown` (test-pinned).
+
+**Payments Max playbook delta (attachment reviewed 2026-08-13 — settled, do
+not re-litigate):** adopted category-level metadata guards and the
+suffix-exactly-once check (both now code-enforced, stronger than the
+playbook's checklist form). Already practiced here: unsupported claims kept
+out of the index, re-fetch-after-publish verification (the integrity suite +
+browser pass). Rejected, unchanged from the earlier decision: 280-350-word
+posts, FAQPage microdata (rich result removed May 2026), and the "no
+standalone word 'in'" title rule (a Payments Max client quirk with no
+equivalent here).
+
 Per-article completion bar (in addition to the program-wide metadata
 standards): answer in the first paragraph; user-vocabulary titles; real
 screenshots with localized alt text; `updated:` front matter on every article

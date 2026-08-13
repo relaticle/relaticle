@@ -19,6 +19,11 @@
                        aria-label="GitHub">
                         <x-ri-github-fill class="h-5 w-5" />
                     </a>
+                    <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer"
+                       class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
+                       aria-label="Discord">
+                        <x-ri-discord-fill class="h-5 w-5" />
+                    </a>
                     <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="X">
                         <x-ri-twitter-x-fill class="h-5 w-5" />

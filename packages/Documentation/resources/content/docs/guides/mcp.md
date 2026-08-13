@@ -2,6 +2,7 @@
 title: MCP Server
 description: Connect AI assistants like Claude to your CRM.
 order: 2
+updated: "2026-08-12"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update contacts, and more -- all from a natural conversation.

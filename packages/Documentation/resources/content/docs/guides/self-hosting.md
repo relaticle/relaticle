@@ -2,6 +2,7 @@
 title: Self-Hosting Guide
 description: Deploy Relaticle with Docker or manually.
 order: 1
+updated: "2026-08-13"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.

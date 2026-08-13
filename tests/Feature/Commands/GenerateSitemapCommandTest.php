@@ -74,6 +74,35 @@ it('adds help urls to the sitemap with lastmod from front matter', function (): 
         ->and($xml)->toMatch('#getting-started/create-your-first-company</loc>\s*<lastmod>2026-08-12#');
 });
 
+it('stamps lastmod onto urls the crawler already found', function (): void {
+    // The marketing nav links /help, so in production the crawler discovers
+    // help URLs first -- and Sitemap::add() keeps the first tag per URL. A
+    // naive re-add of the lastmod-carrying version is silently dropped,
+    // which shipped a sitemap with zero <lastmod> entries. Reproduce the
+    // crawl-found-first ordering and require the merge.
+    $article = route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']);
+
+    fakeSitemapCrawl([
+        config('app.url') => '<html><body><a href="'.$article.'">Help</a></body></html>',
+        $article => '<html><body>article</body></html>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    expect(File::get($this->sitemap))
+        ->toMatch('#getting-started/create-your-first-company</loc>\s*<lastmod>2026-08-12#');
+});
+
+it('adds developer guide urls with lastmod from front matter', function (): void {
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = File::get($this->sitemap);
+
+    expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
+        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-08-13#')
+        ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-08-12#');
+});
+
 it('omits lastmod for a help page with no updated front matter', function (): void {
     $fixturePath = storage_path('framework/testing/sitemap-help-'.Str::random(8));
 

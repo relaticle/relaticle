@@ -122,6 +122,26 @@ it('gives every page a unique, length-bounded title and description', function (
         ->and($overLongDescriptions)->toBeEmpty(offendersMessage('Descriptions over 160 chars', $overLongDescriptions));
 });
 
+it('gives every category a unique, length-bounded title and description, distinct from every page', function (): void {
+    $repo = app(DocsRepository::class);
+    $categories = $repo->categories();
+
+    $overLong = $categories
+        ->filter(fn ($category): bool => mb_strlen($category->title) > 60 || mb_strlen($category->description) > 160)
+        ->map(fn ($category): string => "{$category->path} (title ".mb_strlen($category->title).', desc '.mb_strlen($category->description).')')
+        ->values();
+
+    // Categories render as pages (hub sections, <title> tags, sitemap URLs),
+    // so their metadata competes in the same SERPs as articles -- uniqueness
+    // has to hold across both sets, not within each.
+    $titles = $repo->pages()->pluck('title')->merge($categories->pluck('title'));
+    $descriptions = $repo->pages()->pluck('description')->merge($categories->pluck('description'));
+
+    expect($overLong)->toBeEmpty(offendersMessage('Category metadata over bounds', $overLong))
+        ->and($titles->duplicates()->values()->all())->toBe([])
+        ->and($descriptions->duplicates()->values()->all())->toBe([]);
+});
+
 it('gives every page exactly one h1-equivalent, which is its front-matter title', function (): void {
     $offenders = app(DocsRepository::class)->pages()
         ->filter(fn (DocPage $page): bool => (bool) preg_match('/^# /m', withoutFencedCodeBlocks($page->body)))
