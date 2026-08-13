@@ -1,8 +1,7 @@
 @props(['email', 'folder', 'ownAddresses' => []])
 
-{{-- The full-width inbox row: one line per email, the way a mail list is meant to
-     scan. The narrow variant ({@see list-row}) still serves the record pages, whose
-     list lives in a 320px column and has to stack. --}}
+{{-- The full-width row: one line per email, the way a mail list is meant to scan.
+     Used by every mail list — the inbox board and the record pages. --}}
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
 

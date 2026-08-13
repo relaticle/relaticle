@@ -76,6 +76,10 @@ return [
     ],
     'reader' => [
         'heading' => 'View email',
+        'attachments' => [
+            'unnamed' => 'Unnamed file',
+            'processing' => 'processing…',
+        ],
     ],
     'back_to_list' => 'Back to list',
     'recipients' => [

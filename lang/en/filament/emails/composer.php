@@ -34,6 +34,7 @@ return [
         'create_template' => 'Save as template',
         'variable' => 'Insert variable',
         'remove_recipient' => 'Remove',
+        'download_attachment' => 'Download attachment',
         'remove_attachment' => 'Remove attachment',
         'uploading' => 'Uploading…',
         'expand' => 'Fit to screen',

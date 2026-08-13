@@ -24,6 +24,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
@@ -32,10 +33,12 @@ use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -61,13 +64,20 @@ abstract class BaseRecordEmailsPage extends Page
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
-        $firstItem = $this->emails()->items()[0] ?? null;
-        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
     }
 
     protected function getCrmRecord(): Model
     {
         return $this->getRecord();
+    }
+
+    /**
+     * The last crumb. Without this it is the headlined class name — "Company Emails
+     * Page" — which reads as a class, not a place.
+     */
+    public function getBreadcrumb(): string
+    {
+        return __('filament/pages/record-emails.breadcrumb');
     }
 
     /**
@@ -196,11 +206,65 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->folder = EmailFolder::from($folder);
         $this->search = '';
+        $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails);
-        $firstItem = $this->emails()->items()[0] ?? null;
-        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
         $this->dispatch('composer:dismiss-inline');
+    }
+
+    public function deselectEmail(): void
+    {
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
+
+        // Dismissing the dock persists whatever was typed as a draft, so closing the
+        // reader can never silently drop a half-written reply.
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    /**
+     * Access requests waiting on the reader — only ever their own mail, since only
+     * the owner may grant access to it.
+     *
+     * @return Collection<int, EmailAccessRequest>
+     */
+    #[Computed]
+    public function pendingAccessRequests(): Collection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
+            return collect();
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->where('email_id', $email->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->get();
+    }
+
+    /**
+     * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
+     * reader out of their participant line: repeating your own address on every row
+     * says nothing, and it is the widest thing on the row.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function ownEmailAddresses(): array
+    {
+        $user = $this->authUser();
+
+        /** @var list<string> */
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->pluck('email_address')
+            ->map(fn (mixed $address): string => mb_strtolower((string) $address))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function markAllAsRead(): void

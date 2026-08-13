@@ -252,37 +252,49 @@
 
                 {{-- Attachments: files already saved on the draft, then pending uploads --}}
                 @if ($attachments !== [] || $savedAttachments !== [])
-                    <div class="flex shrink-0 flex-wrap gap-1.5 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+                    <div class="flex shrink-0 flex-wrap gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
                         @foreach ($savedAttachments as $saved)
-                            <span wire:key="saved-attachment-{{ $saved['id'] }}" class="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-gray-100 py-1 pl-2 pr-1 text-xs text-gray-700 dark:bg-white/10 dark:text-gray-200">
-                                <x-heroicon-m-paper-clip class="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                                <span class="truncate">{{ $saved['filename'] }}</span>
-                                <span class="shrink-0 tabular-nums text-gray-400">{{ \Illuminate\Support\Number::fileSize($saved['size'], precision: 1) }}</span>
+                            <x-emails.attachment-card
+                                wire:key="saved-attachment-{{ $saved['id'] }}"
+                                :filename="$saved['filename']"
+                                :size="$saved['size']"
+                            >
+                                {{-- Saved on the draft, so it has a row to stream back.
+                                     Pending uploads have no id yet and no download. --}}
+                                <a
+                                    href="{{ route('email-attachments.download', $saved['id']) }}"
+                                    download
+                                    aria-label="{{ __('filament/emails/composer.actions.download_attachment') }}"
+                                    class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                                >
+                                    <x-heroicon-m-arrow-down-tray class="h-4 w-4" />
+                                </a>
                                 <button
                                     type="button"
                                     wire:click="removeSavedAttachment('{{ $saved['id'] }}')"
                                     aria-label="{{ __('filament/emails/composer.actions.remove_attachment') }}"
-                                    class="shrink-0 rounded p-0.5 text-gray-400 transition hover:text-danger-600 dark:hover:text-danger-400"
+                                    class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-danger-600 dark:hover:bg-white/10 dark:hover:text-danger-400"
                                 >
-                                    <x-heroicon-m-x-mark class="h-3 w-3" />
+                                    <x-heroicon-m-x-mark class="h-4 w-4" />
                                 </button>
-                            </span>
+                            </x-emails.attachment-card>
                         @endforeach
 
                         @foreach ($attachments as $index => $attachment)
-                            <span wire:key="attachment-{{ $index }}" class="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-gray-100 py-1 pl-2 pr-1 text-xs text-gray-700 dark:bg-white/10 dark:text-gray-200">
-                                <x-heroicon-m-paper-clip class="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                                <span class="truncate">{{ $attachment->getClientOriginalName() }}</span>
-                                <span class="shrink-0 tabular-nums text-gray-400">{{ \Illuminate\Support\Number::fileSize($attachment->getSize(), precision: 1) }}</span>
+                            <x-emails.attachment-card
+                                wire:key="attachment-{{ $index }}"
+                                :filename="$attachment->getClientOriginalName()"
+                                :size="$attachment->getSize()"
+                            >
                                 <button
                                     type="button"
                                     wire:click="removeAttachment({{ $index }})"
                                     aria-label="{{ __('filament/emails/composer.actions.remove_attachment') }}"
-                                    class="shrink-0 rounded p-0.5 text-gray-400 transition hover:text-danger-600 dark:hover:text-danger-400"
+                                    class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-danger-600 dark:hover:bg-white/10 dark:hover:text-danger-400"
                                 >
-                                    <x-heroicon-m-x-mark class="h-3 w-3" />
+                                    <x-heroicon-m-x-mark class="h-4 w-4" />
                                 </button>
-                            </span>
+                            </x-emails.attachment-card>
                         @endforeach
                     </div>
                 @endif

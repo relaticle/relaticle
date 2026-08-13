@@ -33,12 +33,6 @@
         default      => 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
     };
 
-    $formatBytes = fn (int $bytes): string => match (true) {
-        $bytes < 1_024         => $bytes . ' B',
-        $bytes < 1_048_576     => round($bytes / 1_024, 1) . ' KB',
-        default                => round($bytes / 1_048_576, 1) . ' MB',
-    };
-
     $recipientChipClass = 'inline-flex cursor-pointer items-center rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 ring-1 ring-inset ring-gray-200 dark:ring-gray-700 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700';
 
     // Hoisted so the reader knows up front whether there is a frame to wait for: a
@@ -248,21 +242,23 @@
                         : null;
                 @endphp
 
-                <a
-                    @if ($downloadUrl) href="{{ $downloadUrl }}" download @endif
-                    @class([
-                        'flex max-w-56 items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-2.5 py-1 transition-colors',
-                        'hover:bg-gray-100 dark:hover:bg-gray-800' => $downloadUrl,
-                        'pointer-events-none opacity-60' => ! $downloadUrl,
-                    ])
+                <x-emails.attachment-card
+                    :filename="$attachment->filename ?? __('filament/pages/email-inbox.reader.attachments.unnamed')"
+                    :size="$downloadUrl ? ($attachment->size ?? 0) : null"
+                    :placeholder="__('filament/pages/email-inbox.reader.attachments.processing')"
+                    :class="$downloadUrl ? '' : 'opacity-60'"
                 >
-                    <span class="truncate text-xs font-medium {{ $downloadUrl ? 'text-primary-700 dark:text-primary-300' : 'text-gray-800 dark:text-gray-200' }}">
-                        {{ $attachment->filename ?? 'Unnamed file' }}
-                    </span>
-                    <span class="shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
-                        {{ $downloadUrl ? $formatBytes($attachment->size ?? 0) : 'processing…' }}
-                    </span>
-                </a>
+                    @if ($downloadUrl)
+                        <a
+                            href="{{ $downloadUrl }}"
+                            download
+                            aria-label="{{ __('filament/emails/composer.actions.download_attachment') }}"
+                            class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                        >
+                            <x-heroicon-m-arrow-down-tray class="h-4 w-4" />
+                        </a>
+                    @endif
+                </x-emails.attachment-card>
             @endforeach
         </div>
     @endif

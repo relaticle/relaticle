@@ -652,7 +652,7 @@ it('drops a pending attachment when it is removed before sending', function (): 
         // Each pending attachment is listed with its name and human-readable size.
         ->assertSee('keep.pdf')
         ->assertSee('drop.pdf')
-        ->assertSee('12.0 KB')
+        ->assertSee('12 KB')
         ->call('removeAttachment', 1)
         ->assertSee('keep.pdf')
         ->assertDontSee('drop.pdf')

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -34,7 +35,20 @@ final readonly class EmailAttachmentController
         // Respect privacy — body access is required to download attachments
         abort_unless($user->can('viewBody', $email), 403);
 
-        abort_if(blank($attachment->provider_attachment_id), 404, 'Attachment is not available for download.');
+        // Files the user attached here (a draft's own uploads) never went through a
+        // provider, so there is no provider id to fetch them by — they are already on
+        // our disk and stream straight back.
+        if (blank($attachment->provider_attachment_id)) {
+            $storagePath = $attachment->storage_path;
+
+            abort_if(blank($storagePath), 404, 'Attachment is not available for download.');
+
+            $disk = Storage::disk(EmailAttachment::DISK);
+
+            abort_unless($disk->exists($storagePath), 404, 'Attachment is not available for download.');
+
+            return $this->stream($disk->get($storagePath) ?? '', $attachment->filename ?? 'attachment');
+        }
 
         // The provider download needs the parent message id; outbound/partially-synced
         // rows can have a null provider_message_id, so guard for a clean 404 rather than
@@ -56,12 +70,17 @@ final readonly class EmailAttachmentController
 
         $binary = $mailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
 
-        $filename = $attachment->filename ?? 'attachment';
+        return $this->stream($binary, $attachment->filename ?? 'attachment');
+    }
 
-        // Force a generic binary content-type and tell browsers not to MIME-sniff.
-        // Sender-controlled mime types (image/svg+xml, text/html) combined with
-        // browser sniffing could otherwise lead to scripts executing in the app
-        // origin if the disposition header were ever weakened.
+    /**
+     * Force a generic binary content-type and tell browsers not to MIME-sniff.
+     * Sender-controlled mime types (image/svg+xml, text/html) combined with browser
+     * sniffing could otherwise lead to scripts executing in the app origin if the
+     * disposition header were ever weakened.
+     */
+    private function stream(string $binary, string $filename): StreamedResponse
+    {
         return response()->streamDownload(
             function () use ($binary): void {
                 echo $binary;

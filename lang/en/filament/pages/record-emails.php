@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'breadcrumb' => 'Emails',
+
     'actions' => [
         'manage_sharing' => [
             'label' => 'Sharing',
