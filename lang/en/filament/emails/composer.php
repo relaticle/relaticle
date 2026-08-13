@@ -46,10 +46,6 @@ return [
             'title' => 'Some files were too large',
             'body' => 'Not attached: :files. Each file must be under :max, and all attachments together under :total.',
         ],
-        'attachments_not_saved' => [
-            'title' => 'Attachments won\'t be saved',
-            'body' => 'Drafts don\'t keep attached files yet — closing now will discard them. Send the email to keep the attachments.',
-        ],
         'draft_account_disconnected' => [
             'title' => 'Original account no longer connected',
             'body' => 'The account this draft was written from isn\'t connected anymore, so it\'s been switched to your default account. Double-check the sender before sending.',

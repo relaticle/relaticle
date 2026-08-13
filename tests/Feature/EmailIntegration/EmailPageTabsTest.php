@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -17,6 +19,7 @@ use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 use function Pest\Laravel\actingAs;
@@ -147,14 +150,27 @@ it('opens a draft in the composer', function (): void {
         ->assertDispatched('composer:open', draftId: (string) $draft->getKey());
 });
 
-it('deletes a draft from the drafts table', function (): void {
-    $draft = makeDraft($this->user, $this->account);
+it('deletes a draft from the drafts table, attachment rows and files included', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    // Save through the composer so the draft carries a real stored attachment.
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Delete from the list')
+        ->set('attachments', [UploadedFile::fake()->create('attached.pdf', 15)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Delete from the list')->sole();
+    $path = (string) $draft->attachments->first()->storage_path;
 
     Livewire::test(DraftsTable::class)
         ->callAction(TestAction::make('deleteDraft')->table($draft))
         ->assertNotified();
 
-    expect(Email::withTrashed()->whereKey($draft->getKey())->exists())->toBeFalse();
+    expect(Email::withTrashed()->whereKey($draft->getKey())->exists())->toBeFalse()
+        ->and(EmailAttachment::query()->where('email_id', $draft->getKey())->exists())->toBeFalse();
+
+    Storage::disk(EmailAttachment::DISK)->assertMissing($path);
 });
 
 it('lists shared and own templates in the templates tab', function (): void {

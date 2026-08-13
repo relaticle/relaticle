@@ -20,7 +20,9 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -29,6 +31,7 @@ use Livewire\WithFileUploads;
 use LogicException;
 use Relaticle\EmailIntegration\Actions\CreateEmailTemplateAction;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
+use Relaticle\EmailIntegration\Actions\DeleteDraftAttachmentAction;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
@@ -108,8 +111,22 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public ?string $privacyTier = null;
 
-    /** @var array<int, mixed> */
+    /**
+     * Pending uploads: `TemporaryUploadedFile`s not yet written to the attachment
+     * disk. They become {@see $savedAttachments} the moment the draft is saved.
+     *
+     * @var array<int, mixed>
+     */
     public array $attachments = [];
+
+    /**
+     * Attachments already persisted against the open draft, as
+     * `{id, filename, size}` — the chip row renders these alongside the pending
+     * uploads, which expose the same three facts through a different API.
+     *
+     * @var list<array{id: string, filename: string, size: int}>
+     */
+    public array $savedAttachments = [];
 
     /**
      * `$draftId` is its own parameter, not a `$payload` key. Livewire resolves
@@ -188,7 +205,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $renderer = resolve(EmailTemplateRenderService::class);
 
-        [$attachmentPaths, $attachmentNames] = $this->storeAttachments();
+        [$pendingPaths, $pendingNames] = $this->storeAttachments();
+        [$copiedPaths, $copiedNames] = $this->copySavedAttachments();
+
+        $attachmentPaths = [...$pendingPaths, ...$copiedPaths];
+        $attachmentNames = [...$pendingNames, ...$copiedNames];
 
         resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
@@ -249,7 +270,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public function close(): void
     {
         $this->persistDraft();
-        $this->warnIfAttachmentsWillBeDiscarded();
         $this->closeComposer();
     }
 
@@ -315,6 +335,28 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         unset($this->attachments[$index]);
 
         $this->attachments = array_values($this->attachments);
+    }
+
+    /**
+     * Detach a file the open draft has already stored. Unlike a pending upload
+     * this has to reach the database and the disk, so it goes through an action
+     * that re-verifies ownership.
+     */
+    public function removeSavedAttachment(string $attachmentId): void
+    {
+        if ($this->draftId === null) {
+            return;
+        }
+
+        resolve(DeleteDraftAttachmentAction::class)
+            ->execute($this->authUser(), $this->draftId, $attachmentId);
+
+        $this->savedAttachments = array_values(array_filter(
+            $this->savedAttachments,
+            fn (array $attachment): bool => $attachment['id'] !== $attachmentId,
+        ));
+
+        $this->dispatch('drafts:changed');
     }
 
     public function bodySchema(Schema $schema): Schema
@@ -649,6 +691,49 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
+     * Duplicate the open draft's stored attachments for the outgoing email. The
+     * copy is deliberate: the queued email and the draft must not share bytes,
+     * or deleting the draft right after send (see {@see self::send()}) would pull
+     * the files out from under a message that has not gone out yet.
+     *
+     * @return array{0: list<string>, 1: array<string, string>}
+     */
+    private function copySavedAttachments(): array
+    {
+        if ($this->draftId === null || $this->savedAttachments === []) {
+            return [[], []];
+        }
+
+        $disk = Storage::disk(EmailAttachment::DISK);
+        $paths = [];
+        $names = [];
+
+        $attachments = EmailAttachment::query()
+            ->where('email_id', $this->draftId)
+            ->whereIn('id', array_column($this->savedAttachments, 'id'))
+            ->get();
+
+        foreach ($attachments as $attachment) {
+            $source = $attachment->storage_path;
+            if ($source === null) {
+                continue;
+            }
+            if (! $disk->exists($source)) {
+                continue;
+            }
+
+            $copy = 'email-attachments/'.Str::ulid().'.'.pathinfo($source, PATHINFO_EXTENSION);
+
+            $disk->copy($source, $copy);
+
+            $paths[] = $copy;
+            $names[$copy] = (string) $attachment->filename;
+        }
+
+        return [$paths, $names];
+    }
+
+    /**
      * Persist the in-progress message as a DRAFT unless it is blank. Skipped
      * entirely for a blank compose (nothing to save) or when the account was
      * rejected by {@see self::ownedAccountId()} (nothing safe to save under).
@@ -669,6 +754,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
+        [$attachmentPaths, $attachmentNames] = $this->storeAttachments();
+
         $draft = resolve(SaveEmailDraftAction::class)->execute(
             user: $this->authUser(),
             data: [
@@ -678,11 +765,19 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'to' => $this->to,
                 'cc' => $this->cc,
                 'bcc' => $this->bcc,
+                'attachments' => $attachmentPaths,
+                'attachment_file_names' => $attachmentNames,
             ],
             draftId: $this->draftId,
         );
 
         $this->draftId = (string) $draft->getKey();
+
+        // The pending uploads are rows on the draft now; keeping them in
+        // `$attachments` too would store and attach them a second time on the
+        // next save, and send them twice.
+        $this->attachments = [];
+        $this->loadSavedAttachments($draft);
 
         // The drafts tab and its badge are rendered by other components; without
         // this they only pick the new draft up on a full page load.
@@ -695,7 +790,25 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             && trim(strip_tags($this->bodyHtmlValue())) === ''
             && $this->to === []
             && $this->cc === []
-            && $this->bcc === [];
+            && $this->bcc === []
+            && $this->attachments === []
+            && $this->savedAttachments === [];
+    }
+
+    private function loadSavedAttachments(Email $draft): void
+    {
+        /** @var list<array{id: string, filename: string, size: int}> $rows */
+        $rows = $draft->attachments()
+            ->get()
+            ->map(fn (EmailAttachment $attachment): array => [
+                'id' => (string) $attachment->getKey(),
+                'filename' => (string) $attachment->filename,
+                'size' => (int) $attachment->size,
+            ])
+            ->values()
+            ->all();
+
+        $this->savedAttachments = $rows;
     }
 
     /**
@@ -711,7 +824,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     private function loadDraft(string $draftId): void
     {
         $draft = Email::query()
-            ->with(['body', 'participants'])
+            ->with(['body', 'participants', 'attachments'])
             ->where('user_id', $this->authUser()->getKey())
             ->where('team_id', $this->authUser()->current_team_id)
             ->where('status', EmailStatus::DRAFT)
@@ -748,21 +861,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->showCc = $this->cc !== [];
         $this->showBcc = $this->bcc !== [];
-    }
 
-    private function warnIfAttachmentsWillBeDiscarded(): void
-    {
-        if ($this->attachments === []) {
-            return;
-        }
-
-        // Attachment persistence for drafts is explicitly out of v1 scope — the
-        // fix here is only to stop discarding pending uploads silently.
-        Notification::make()
-            ->warning()
-            ->title(__('filament/emails/composer.notifications.attachments_not_saved.title'))
-            ->body(__('filament/emails/composer.notifications.attachments_not_saved.body'))
-            ->send();
+        $this->loadSavedAttachments($draft);
     }
 
     /**
@@ -787,7 +887,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments']);
+        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments']);
         $this->resetErrorBag();
     }
 

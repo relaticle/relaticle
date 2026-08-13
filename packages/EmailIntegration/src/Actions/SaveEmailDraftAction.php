@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -13,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use RuntimeException;
 
@@ -23,6 +25,10 @@ final readonly class SaveEmailDraftAction
      * team-visible (privacy_tier PRIVATE), and never carry reply threading
      * (spec §4 — a minimized reply saves as a plain draft in v1).
      *
+     * `attachments` holds storage paths already written to {@see EmailAttachment::DISK}
+     * by the caller; each becomes an EmailAttachment row on the draft. Rows already
+     * attached to the draft are left alone, so re-saving never duplicates them.
+     *
      * @param  array{
      *     connected_account_id: string,
      *     subject: ?string,
@@ -30,6 +36,8 @@ final readonly class SaveEmailDraftAction
      *     to: list<string>,
      *     cc: list<string>,
      *     bcc: list<string>,
+     *     attachments?: list<string>,
+     *     attachment_file_names?: array<string, string>,
      * }  $data
      */
     public function execute(User $user, array $data, ?string $draftId = null): Email
@@ -69,7 +77,9 @@ final readonly class SaveEmailDraftAction
                 'folder' => EmailFolder::Drafts,
                 'status' => EmailStatus::DRAFT,
                 'privacy_tier' => EmailPrivacyTier::PRIVATE,
-                'has_attachments' => false,
+                // Set below, once the new attachment rows exist — an update must not
+                // clear the flag for files a previous save already attached.
+                'has_attachments' => $existing instanceof Email && $existing->has_attachments,
                 'is_internal' => false,
                 'creation_source' => EmailCreationSource::COMPOSE,
             ];
@@ -85,6 +95,8 @@ final readonly class SaveEmailDraftAction
                 'body_html' => $data['body_html'],
                 'body_text' => strip_tags((string) $data['body_html']),
             ]);
+
+            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? []);
 
             $draft->participants()->delete();
 
@@ -104,7 +116,7 @@ final readonly class SaveEmailDraftAction
     }
 
     /**
-     * @param  array{subject: ?string, body_html: ?string, to: list<string>, cc: list<string>, bcc: list<string>}  $data
+     * @param  array{subject: ?string, body_html: ?string, to: list<string>, cc: list<string>, bcc: list<string>, attachments?: list<string>}  $data
      */
     private function isEmpty(array $data): bool
     {
@@ -112,6 +124,41 @@ final readonly class SaveEmailDraftAction
             && trim(strip_tags((string) $data['body_html'])) === ''
             && $data['to'] === []
             && $data['cc'] === []
-            && $data['bcc'] === [];
+            && $data['bcc'] === []
+            // A message that is nothing but an attached file is still worth keeping.
+            && ($data['attachments'] ?? []) === [];
+    }
+
+    /**
+     * Attach freshly stored files to the draft. Paths the draft already holds are
+     * skipped so re-saving (every minimize/close) cannot duplicate rows.
+     *
+     * @param  list<string>  $paths
+     * @param  array<string, string>  $originalNames  storage path => original client filename
+     */
+    private function attachFiles(Email $draft, array $paths, array $originalNames): void
+    {
+        $disk = Storage::disk(EmailAttachment::DISK);
+
+        /** @var list<string> $existingPaths */
+        $existingPaths = $draft->attachments()->pluck('storage_path')->all();
+
+        foreach ($paths as $path) {
+            if (in_array($path, $existingPaths, true)) {
+                continue;
+            }
+            if (! $disk->exists($path)) {
+                continue;
+            }
+            EmailAttachment::query()->create([
+                'email_id' => $draft->getKey(),
+                'filename' => $originalNames[$path] ?? basename($path),
+                'mime_type' => $disk->mimeType($path) ?: 'application/octet-stream',
+                'size' => $disk->size($path),
+                'storage_path' => $path,
+            ]);
+        }
+
+        $draft->update(['has_attachments' => $draft->attachments()->exists()]);
     }
 }

@@ -156,9 +156,25 @@
                 </div>
                 @error('bodyHtml') <p class="px-4 pb-1 text-xs text-danger-600 dark:text-danger-400">{{ $message }}</p> @enderror
 
-                {{-- Attachments --}}
-                @if ($attachments !== [])
+                {{-- Attachments: files already saved on the draft, then pending uploads --}}
+                @if ($attachments !== [] || $savedAttachments !== [])
                     <div class="flex shrink-0 flex-wrap gap-1.5 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+                        @foreach ($savedAttachments as $saved)
+                            <span wire:key="saved-attachment-{{ $saved['id'] }}" class="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-gray-100 py-1 pl-2 pr-1 text-xs text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                                <x-heroicon-m-paper-clip class="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                                <span class="truncate">{{ $saved['filename'] }}</span>
+                                <span class="shrink-0 tabular-nums text-gray-400">{{ \Illuminate\Support\Number::fileSize($saved['size'], precision: 1) }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="removeSavedAttachment('{{ $saved['id'] }}')"
+                                    aria-label="{{ __('filament/emails/composer.actions.remove_attachment') }}"
+                                    class="shrink-0 rounded p-0.5 text-gray-400 transition hover:text-danger-600 dark:hover:text-danger-400"
+                                >
+                                    <x-heroicon-m-x-mark class="h-3 w-3" />
+                                </button>
+                            </span>
+                        @endforeach
+
                         @foreach ($attachments as $index => $attachment)
                             <span wire:key="attachment-{{ $index }}" class="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-gray-100 py-1 pl-2 pr-1 text-xs text-gray-700 dark:bg-white/10 dark:text-gray-200">
                                 <x-heroicon-m-paper-clip class="h-3.5 w-3.5 shrink-0 text-gray-400" />

@@ -65,10 +65,14 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
             ->recordActions([
                 Action::make('openDraft')
                     ->label(__('filament/pages/email-inbox.drafts.actions.open'))
+                    ->hiddenLabel()
+                    ->tooltip(__('filament/pages/email-inbox.drafts.actions.open'))
                     ->icon(Heroicon::OutlinedPencilSquare)
                     ->action(fn (Email $record) => $this->dispatch('composer:open', draftId: (string) $record->getKey())),
                 Action::make('deleteDraft')
                     ->label(__('filament/pages/email-inbox.drafts.actions.delete'))
+                    ->hiddenLabel()
+                    ->tooltip(__('filament/pages/email-inbox.drafts.actions.delete'))
                     ->icon(Heroicon::OutlinedTrash)
                     ->color('danger')
                     ->requiresConfirmation()

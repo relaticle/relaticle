@@ -6,8 +6,10 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 
 final readonly class DeleteEmailDraftAction
 {
@@ -55,6 +57,18 @@ final readonly class DeleteEmailDraftAction
     private function delete(Email $draft): void
     {
         DB::transaction(function () use ($draft): void {
+            // Attachment bytes are the draft's own copies (send() duplicates them
+            // onto the queued email), so deleting them here cannot strand a sent
+            // message — but skipping it would leak files on disk forever.
+            $disk = Storage::disk(EmailAttachment::DISK);
+
+            foreach ($draft->attachments as $attachment) {
+                if ($attachment->storage_path !== null) {
+                    $disk->delete($attachment->storage_path);
+                }
+            }
+
+            $draft->attachments()->delete();
             $draft->body()->delete();
             $draft->participants()->delete();
             // Email uses SoftDeletes — a plain delete() would leave a husk row

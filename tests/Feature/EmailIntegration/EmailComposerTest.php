@@ -368,8 +368,8 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
     expect($suggestions)->not->toContain('hidden-recipient@example.com');
 });
 
-it('warns instead of silently discarding pending attachments when the composer is closed', function (): void {
-    Storage::fake('local');
+it('saves pending attachments onto the draft when the composer is closed', function (): void {
+    Storage::fake(EmailAttachment::DISK);
 
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
@@ -377,11 +377,124 @@ it('warns instead of silently discarding pending attachments when the composer i
         ->set('subject', 'Has an attachment')
         ->set('bodyHtml', '<p>b</p>')
         ->set('attachments', [UploadedFile::fake()->create('quote.pdf', 12)])
-        ->call('close')
-        ->assertNotified('Attachments won\'t be saved');
+        ->call('close');
 
     $draft = Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Has an attachment')->sole();
-    expect($draft->has_attachments)->toBeFalse();
+
+    expect($draft->has_attachments)->toBeTrue()
+        ->and($draft->attachments)->toHaveCount(1)
+        ->and($draft->attachments->first()->filename)->toBe('quote.pdf');
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $draft->attachments->first()->storage_path);
+});
+
+it('reopens a draft with its saved attachments listed', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Reopen me')
+        ->set('attachments', [UploadedFile::fake()->create('brief.pdf', 20)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Reopen me')->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $draft->attachments->first()->getKey(),
+            'filename' => 'brief.pdf',
+            'size' => (int) $draft->attachments->first()->size,
+        ]])
+        ->assertSee('brief.pdf');
+});
+
+it('does not attach a saved draft file twice when the draft is saved again', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Saved twice')
+        ->set('attachments', [UploadedFile::fake()->create('once.pdf', 10)])
+        ->call('minimize')
+        ->call('minimize')
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Saved twice')->sole();
+
+    expect($draft->attachments)->toHaveCount(1);
+});
+
+it('removes a saved attachment from the draft and from disk', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Drop the file')
+        ->set('attachments', [UploadedFile::fake()->create('oops.pdf', 10)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Drop the file')->sole();
+    $attachment = $draft->attachments->first();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->call('removeSavedAttachment', (string) $attachment->getKey())
+        ->assertSet('savedAttachments', []);
+
+    Storage::disk(EmailAttachment::DISK)->assertMissing((string) $attachment->storage_path);
+    expect($draft->refresh()->attachments)->toHaveCount(0)
+        ->and($draft->has_attachments)->toBeFalse();
+});
+
+it('sends a reopened draft with its saved attachments and leaves no orphaned files', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Send with attachment')
+        ->set('attachments', [UploadedFile::fake()->create('contract.pdf', 30)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Send with attachment')->sole();
+    $draftPath = (string) $draft->attachments->first()->storage_path;
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->set('to', ['lead@example.com'])
+        ->set('bodyHtml', '<p>Signed copy attached</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $sent = Email::query()->where('subject', 'Send with attachment')->where('status', EmailStatus::QUEUED)->sole();
+    $sentAttachment = $sent->attachments->sole();
+
+    expect($sentAttachment->filename)->toBe('contract.pdf')
+        // The queued email holds its own copy: deleting the draft (which send()
+        // does straight after) must not strip the bytes out from under it.
+        ->and($sentAttachment->storage_path)->not->toBe($draftPath);
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $sentAttachment->storage_path);
+    Storage::disk(EmailAttachment::DISK)->assertMissing($draftPath);
+    expect(Email::query()->whereKey($draft->getKey())->exists())->toBeFalse();
+});
+
+it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Delete me')
+        ->set('attachments', [UploadedFile::fake()->create('gone.pdf', 10)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Delete me')->sole();
+    $path = (string) $draft->attachments->first()->storage_path;
+
+    resolve(DeleteEmailDraftAction::class)->execute($this->user, (string) $draft->getKey());
+
+    Storage::disk(EmailAttachment::DISK)->assertMissing($path);
+    expect(EmailAttachment::query()->where('email_id', $draft->getKey())->exists())->toBeFalse();
 });
 
 it('falls back to the default account and warns when a draft\'s connected account is no longer active', function (): void {
