@@ -9,6 +9,7 @@ return [
         'all' => 'All accounts',
     ],
     'tabs' => [
+        'emails' => 'Emails',
         'drafts' => 'Drafts',
         'outbox' => 'Outbox',
         'templates' => 'Templates',
