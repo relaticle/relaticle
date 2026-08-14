@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
@@ -33,24 +35,34 @@ beforeEach(function (): void {
         'connected_account_id' => $this->account->getKey(),
         'sent_at' => now()->subHour(),
     ]);
+
+    $this->person = People::factory()->create([
+        'team_id' => $this->team->id,
+        'creator_id' => $this->owner->id,
+    ]);
+
+    $this->person->emails()->attach([$this->newer->getKey(), $this->older->getKey()]);
 });
 
 it('lets a teammate clear their own unread count on a shared email', function (): void {
     $this->actingAs($this->viewer);
     Filament::setTenant($this->team);
 
-    // Loading the list opens nothing, so neither email is read yet.
+    // Loading the page opens nothing, so neither email is read yet.
     $page = livewire(EmailInboxPage::class);
     expect($page->instance()->inboxUnreadCount())->toBe(2);
-    // The unread rows render the per-viewer unread indicator.
-    $page->assertSeeHtml('data-unread-indicator');
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSeeHtml('data-unread-indicator');
 
     $page->call('selectEmail', $this->older->getKey());
     expect($page->instance()->inboxUnreadCount())->toBe(1);
 
     $page->call('selectEmail', $this->newer->getKey());
     expect($page->instance()->inboxUnreadCount())->toBe(0);
-    $page->assertDontSeeHtml('data-unread-indicator');
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertDontSeeHtml('data-unread-indicator');
 });
 
 it('keeps each viewer unread state independent of the owner', function (): void {
@@ -77,7 +89,7 @@ it('marks every visible unread inbox email as read for the viewer', function ():
     Filament::setTenant($this->team);
 
     $page = livewire(EmailInboxPage::class);
-    // Loading the list reads nothing.
+    // Loading the page reads nothing.
     expect($page->instance()->inboxUnreadCount())->toBe(2);
 
     $page->call('markAllAsRead');

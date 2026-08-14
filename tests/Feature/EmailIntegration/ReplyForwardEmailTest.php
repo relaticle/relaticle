@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
@@ -137,7 +138,9 @@ it('renders an email body in a sandboxed iframe with sanitized content', functio
         'body_html' => '<style>body{background:#fff}</style><p>Body</p><script>alert(1)</script>',
     ]);
 
-    $page = livewire(EmailInboxPage::class)
+    $this->person->emails()->attach($this->inboundEmail->getKey());
+
+    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
         ->call('selectEmail', $this->inboundEmail->id)
         // The script tag is stripped by the sanitizer before it ever reaches the frame.
         ->assertDontSee('alert(1)', escape: false);
