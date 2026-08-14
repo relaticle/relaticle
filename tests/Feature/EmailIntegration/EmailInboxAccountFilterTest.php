@@ -74,12 +74,16 @@ it('falls back to "all" when given an account the user does not own', function (
     expect($page->instance()->accountId)->toBe('all');
 });
 
-it('only renders the account switcher with more than one account', function (): void {
-    livewire(EmailInboxPage::class)
-        ->assertSeeHtml('wire:model.live="accountId"');
+it('only exposes the account switcher when more than one account exists', function (): void {
+    $page = livewire(EmailInboxPage::class);
+
+    expect($page->instance()->showAccountSwitcher())->toBeTrue()
+        ->and($page->instance()->accountFilterOptions())->toHaveCount(3);
 
     $this->secondaryAccount->delete();
 
-    livewire(EmailInboxPage::class)
-        ->assertDontSeeHtml('wire:model.live="accountId"');
+    $page = livewire(EmailInboxPage::class);
+
+    expect($page->instance()->showAccountSwitcher())->toBeFalse()
+        ->and($page->instance()->accountFilterOptions())->toHaveCount(2);
 });

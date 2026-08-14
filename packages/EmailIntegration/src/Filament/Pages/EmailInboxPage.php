@@ -10,6 +10,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -21,6 +22,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
@@ -84,12 +86,11 @@ final class EmailInboxPage extends Page
     public EmailFolder $folder = EmailFolder::Inbox;
 
     /**
-     * Which top-level surface the page is showing: the mail reader itself, or one
-     * of the sibling lists (drafts, outbox, templates) hosted as tabs. The tab
+     * Which of the lists (drafts, outbox, templates) the page is showing. The tab
      * bodies are nested Livewire components shared with their standalone pages.
      */
     #[Url(as: 'tab')]
-    public EmailPageTab $tab = EmailPageTab::EMAILS;
+    public EmailPageTab $tab = EmailPageTab::DRAFTS;
 
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
@@ -108,12 +109,6 @@ final class EmailInboxPage extends Page
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
 
-        // Only the mail reader auto-selects: ensureEmailSelected() marks the opened
-        // email as read, which must not happen just because the page was loaded on
-        // the drafts, outbox or templates tab.
-        if ($this->tab === EmailPageTab::EMAILS) {
-            $this->ensureEmailSelected();
-        }
     }
 
     /**
@@ -146,7 +141,7 @@ final class EmailInboxPage extends Page
         $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails, $this->inboxUnreadCount);
-        $this->ensureEmailSelected();
+        $this->dispatch('composer:dismiss-inline');
     }
 
     /**
@@ -180,9 +175,18 @@ final class EmailInboxPage extends Page
      */
     protected function getHeaderActions(): array
     {
-        return [
-            $this->composeEmailAction(),
-        ];
+        return [];
+    }
+
+    /**
+     * No page heading. The board is the page — a title bar above it repeating the word
+     * already highlighted in the sidebar only pushes the list down. Filament drops the
+     * whole header block when the heading and header actions are both empty, which is
+     * why Compose moved onto the board's own toolbar.
+     */
+    public function getHeading(): string
+    {
+        return '';
     }
 
     /**
@@ -283,9 +287,25 @@ final class EmailInboxPage extends Page
         return $query->count();
     }
 
+    /**
+     * Covers selection changes that come from the client (the mobile back button
+     * clears it) rather than from {@see selectEmail()}.
+     */
+    public function updatedSelectedEmailId(): void
+    {
+        $this->dispatch('composer:dismiss-inline');
+    }
+
     public function selectEmail(string $id): void
     {
         $this->selectedEmailId = $id;
+
+        // A reply answers the message that was open; it cannot stay docked under a
+        // different one. The composer saves whatever was typed as a draft.
+        $this->dispatch('composer:dismiss-inline');
+
+        // ...and if this message already has an unfinished reply, bring it back up.
+        $this->dispatch('composer:resume-draft', emailId: $id);
 
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
@@ -307,10 +327,6 @@ final class EmailInboxPage extends Page
     public function setTab(string $tab): void
     {
         $this->tab = EmailPageTab::from($tab);
-
-        if ($this->tab === EmailPageTab::EMAILS) {
-            $this->ensureEmailSelected();
-        }
     }
 
     /**
@@ -353,28 +369,17 @@ final class EmailInboxPage extends Page
         $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails);
-        $this->ensureEmailSelected();
-    }
-
-    private function ensureEmailSelected(): void
-    {
-        if ($this->selectedEmailId !== null) {
-            return;
-        }
-
-        $first = $this->emails()->first();
-
-        if ($first === null) {
-            return;
-        }
-
-        $this->selectEmail((string) $first->getKey());
+        $this->dispatch('composer:dismiss-inline');
     }
 
     public function deselectEmail(): void
     {
         $this->selectedEmailId = null;
         unset($this->selectedEmail);
+
+        // Dismissing the dock persists whatever was typed as a draft, so closing the
+        // reader can never silently drop a half-written reply.
+        $this->dispatch('composer:dismiss-inline');
     }
 
     public function updatedSearch(): void
@@ -387,6 +392,9 @@ final class EmailInboxPage extends Page
     {
         return Action::make('composeEmail')
             ->label(__('filament/pages/email-inbox.compose.label'))
+            // Sits in the board toolbar, so it matches the height of the controls
+            // beside it rather than the smaller page-header default.
+            ->size(Size::Medium)
             ->slideOver()
             ->icon('heroicon-o-pencil-square')
             ->modalWidth(Width::SevenExtraLarge)
@@ -456,48 +464,12 @@ final class EmailInboxPage extends Page
             });
     }
 
-    public function replyAction(): Action
-    {
-        return $this->replyForwardModeAction('reply', 'reply');
-    }
-
-    public function replyAllAction(): Action
-    {
-        return $this->replyForwardModeAction('replyAll', 'reply_all');
-    }
-
-    public function forwardAction(): Action
-    {
-        return $this->replyForwardModeAction('forward', 'forward');
-    }
-
-    /**
-     * A single reply/reply-all/forward action with its mode baked in, for use as
-     * a child of the native `<x-filament-actions::group>` dropdown. Grouped-action
-     * triggers cannot carry per-action arguments, so the target email is the one
-     * currently open in the detail pane ({@see $selectedEmailId}).
-     */
-    private function replyForwardModeAction(string $name, string $mode): Action
-    {
-        return Action::make($name)
-            ->label($this->replyForwardLabel($mode))
-            ->icon($this->replyForwardIcon($mode))
-            ->modalHeading($this->replyForwardLabel($mode))
-            ->slideOver()
-            ->modalWidth(Width::SevenExtraLarge)
-            ->fillForm(fn (): array => $this->replyForwardFormData($this->selectedEmailId, $mode))
-            ->schema($this->replyFormSchema())
-            ->action(function (array $data) use ($mode): void {
-                $this->submitReplyForward($data, $mode);
-            });
-    }
-
     private function replyForwardIcon(string $mode): string
     {
         return match ($mode) {
-            'reply_all' => 'heroicon-o-arrow-uturn-right',
-            'forward' => 'heroicon-o-arrow-right',
-            default => 'heroicon-o-arrow-uturn-left',
+            'reply_all' => 'ri-reply-all-line',
+            'forward' => 'ri-share-forward-line',
+            default => 'ri-reply-line',
         };
     }
 
@@ -590,43 +562,74 @@ final class EmailInboxPage extends Page
     {
         return Action::make('manageSharing')
             ->label(__('filament/pages/email-inbox.sharing.label'))
-            ->icon('heroicon-o-lock-open')
+            ->icon('ri-share-line')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.sharing.label'))
             ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
+            ->modalWidth(Width::FiveExtraLarge)
             ->modalSubmitActionLabel('Save')
             ->schema([
-                Select::make('privacy_tier')
-                    ->label(__('filament/pages/email-inbox.sharing.fields.privacy_tier.label'))
-                    ->options(EmailPrivacyTier::class)
-                    ->required(),
-
-                Repeater::make('shares')
-                    ->label(__('filament/pages/email-inbox.sharing.fields.shares.label'))
-                    ->defaultItems(0)
-                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
-                    ->columns(2)
+                // Two halves of one decision, side by side: what the workspace at large
+                // gets, and who is named individually. Stacked, the second half reads as
+                // an afterthought below the fold.
+                Grid::make(['default' => 1, 'md' => 12])
                     ->schema([
-                        Select::make('shared_with')
-                            ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
-                            ->options(function (): array {
-                                $user = $this->authUser();
+                        // Cards rather than a select: each tier is a decision about who
+                        // sees what, which a dropdown of four nouns hides. Same cards as
+                        // the account settings page.
+                        Section::make(__('filament/pages/email-inbox.sharing.fields.privacy_tier.label'))
+                            ->icon('heroicon-o-globe-alt')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 5])
+                            ->schema([
+                                Radio::make('privacy_tier')
+                                    ->hiddenLabel()
+                                    ->view('email-integration::forms.sharing-tier-cards')
+                                    ->viewData(['ariaLabel' => __('filament/pages/email-inbox.sharing.fields.privacy_tier.label')])
+                                    ->required(),
+                            ]),
 
-                                return User::query()
-                                    ->where('current_team_id', $user->current_team_id)
-                                    ->where('id', '!=', $user->getKey())
-                                    ->pluck('name', 'id')
-                                    ->all();
-                            })
-                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                            ->required()
-                            ->distinct(),
+                        Section::make(__('filament/pages/email-inbox.sharing.fields.shares.label'))
+                            ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
+                            ->icon('heroicon-o-user-group')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 7])
+                            ->schema([
+                                Repeater::make('shares')
+                                    ->hiddenLabel()
+                                    ->defaultItems(0)
+                                    // Who was added first says nothing about access, so
+                                    // the drag handle is just noise in the row header.
+                                    ->reorderable(false)
+                                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
+                                    // Not ->table(): that layout quietly stacks once its
+                                    // container is this narrow, which is what put the
+                                    // delete button on a line of its own. Naming the row
+                                    // instead gives each entry a header that carries the
+                                    // delete inline, and the two fields sit side by side.
+                                    ->itemLabel(fn (array $state): string => $this->teammateOptions()[$state['shared_with'] ?? null]
+                                        ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item'))
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('shared_with')
+                                            ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
+                                            ->hiddenLabel()
+                                            ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
+                                            ->options(fn (): array => $this->teammateOptions())
+                                            ->searchable()
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                            ->required()
+                                            ->distinct(),
 
-                        Select::make('tier')
-                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
-                            ->options(EmailPrivacyTier::class)
-                            ->required(),
+                                        Select::make('tier')
+                                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
+                                            ->hiddenLabel()
+                                            ->options(EmailPrivacyTier::class)
+                                            ->required(),
+                                    ]),
+                            ]),
                     ]),
             ])
             ->fillForm(function (array $arguments): array {
@@ -704,14 +707,55 @@ final class EmailInboxPage extends Page
             ->first()?->requester->name ?? 'this user';
     }
 
+    /**
+     * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
+     * reader out of their participant line: repeating your own address on every row
+     * says nothing, and it is the widest thing on the row.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function ownEmailAddresses(): array
+    {
+        $user = $this->authUser();
+
+        /** @var list<string> */
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->pluck('email_address')
+            ->map(fn (mixed $address): string => mb_strtolower((string) $address))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Teammates who can be given access to an email: everyone else on the team.
+     *
+     * @return array<string, string>
+     */
+    private function teammateOptions(): array
+    {
+        $user = $this->authUser();
+
+        return User::query()
+            ->where('current_team_id', $user->current_team_id)
+            ->where('id', '!=', $user->getKey())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
             ->label(__('filament/pages/email-inbox.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.summarize_thread.label'))
             ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
@@ -733,8 +777,9 @@ final class EmailInboxPage extends Page
             ->label(__('filament/pages/email-inbox.request_access.label'))
             ->icon('heroicon-o-key')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/email-inbox.request_access.label'))
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))

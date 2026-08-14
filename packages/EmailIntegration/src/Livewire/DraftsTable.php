@@ -6,6 +6,8 @@ namespace Relaticle\EmailIntegration\Livewire;
 
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Notifications\Notification;
@@ -18,6 +20,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
@@ -86,6 +89,36 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                             ->title(__('filament/pages/email-inbox.drafts.notifications.deleted'))
                             ->send();
                     }),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('deleteDrafts')
+                        ->label(__('filament/pages/email-inbox.drafts.actions.delete_selected'))
+                        ->icon(Heroicon::OutlinedTrash)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $user = $this->authUser();
+
+                            // Per record through the action, which re-checks ownership
+                            // and clears each draft's stored attachments — a bulk delete
+                            // must not become a shortcut around either.
+                            $records->each(fn (Email $draft) => resolve(DeleteEmailDraftAction::class)
+                                ->executeIfExists($user, (string) $draft->getKey()));
+
+                            $this->dispatch('drafts:changed');
+
+                            Notification::make()
+                                ->success()
+                                ->title(trans_choice(
+                                    'filament/pages/email-inbox.drafts.notifications.bulk_deleted',
+                                    $records->count(),
+                                    ['count' => $records->count()],
+                                ))
+                                ->send();
+                        }),
+                ]),
             ]);
     }
 

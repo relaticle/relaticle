@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
+use App\Models\People;
 use App\Models\User;
 use App\Services\AvatarService;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -24,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -47,6 +53,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
@@ -73,11 +80,44 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private const int MAX_ATTACHMENTS_TOTAL_BYTES = 15 * 1024 * 1024;
 
+    /**
+     * Where this instance renders. `floating` is the bottom-right window that
+     * handles Compose; `inline` is the copy docked under a message being read,
+     * which handles replies and forwards only. Both are the same component, so
+     * the toolbar, attachments, drafts, templates and signatures behave
+     * identically on either surface — the dock only decides chrome and which
+     * open event the instance answers.
+     */
+    #[Locked]
+    public string $dock = 'floating';
+
     public bool $isOpen = false;
 
     public bool $isMinimized = false;
 
     public bool $isExpanded = false;
+
+    /**
+     * The message this draft was made from — replied to OR forwarded. Drives what is
+     * shown above the draft and survives a save, so reopening resumes the same task.
+     */
+    public ?string $sourceEmailId = null;
+
+    /**
+     * Set only when the draft answers a message, so the outgoing email threads against
+     * it. A forward has a source but must not thread, which is why this is separate
+     * from {@see $sourceEmailId}.
+     */
+    public ?string $inReplyToEmailId = null;
+
+    public ?string $replyMode = null;
+
+    /**
+     * The message being replied to, quoted into the body at send time. It is
+     * never rendered in the composer — on the inline dock the original is on
+     * screen directly above it.
+     */
+    public ?string $quotedBodyHtml = null;
 
     public ?string $draftId = null;
 
@@ -140,11 +180,16 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * A same-named `$payload['draftId']` entry is never populated by either
      * caller; only a literal `draftId` parameter is.
      *
-     * @param  array{mode?: string, emailId?: string, to?: list<string>}  $payload
+     * @param  array{to?: list<string>}  $payload
      */
     #[On('composer:open')]
     public function open(array $payload = [], ?string $draftId = null): void
     {
+        // Compose belongs to the floating window. Both instances hear the event.
+        if ($this->dock !== 'floating') {
+            return;
+        }
+
         // A second `composer:open` while a draft is already in progress (e.g. the `c`
         // shortcut firing after a click landed on a button, not an input) must not
         // wipe what the user has typed — just bring the composer back into view.
@@ -178,6 +223,169 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->isOpen = true;
         $this->isMinimized = false;
+        // Composing and opening a saved draft are the same task and now present the
+        // same way — fit to the screen, like the reader. A forwarded message that was
+        // parked as a draft used to come back in the small corner window while the
+        // message it answers opened full size, which read as two different features.
+        $this->isExpanded = true;
+    }
+
+    /**
+     * Open the docked composer as a reply, reply-all or forward of `$emailId`.
+     * Only the inline instance answers — the floating window stays free for a
+     * separate compose draft.
+     */
+    #[On('composer:reply')]
+    public function openReply(string $emailId, string $mode = 'reply'): void
+    {
+        if ($this->dock !== 'inline') {
+            return;
+        }
+
+        $email = $this->replyableEmail($emailId);
+
+        if (! $email instanceof Email) {
+            return;
+        }
+
+        $account = $this->activeAccounts()->first();
+
+        if ($account === null) {
+            return;
+        }
+
+        $this->resetComposerState();
+
+        $user = $this->authUser();
+        $this->accountId = (string) $account->getKey();
+        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+
+        $this->replyMode = in_array($mode, ['reply', 'reply_all', 'forward'], true) ? $mode : 'reply';
+
+        $this->to = match ($this->replyMode) {
+            'forward' => [],
+            // Reply-all addresses the original sender PLUS the to/cc recipients
+            // (never bcc), minus the user's own account address.
+            'reply_all' => $email->replyAllRecipients($account->email_address),
+            // `where()` on the loaded collection keeps the original keys, so the
+            // result has to be re-indexed to satisfy the list-typed property.
+            default => array_values($email->participants
+                ->where('role', EmailParticipantRole::FROM)
+                ->map(fn (EmailParticipant $participant): string => (string) $participant->email_address)
+                ->filter(fn (string $address): bool => $address !== '')
+                ->all()),
+        };
+
+        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').($email->subject ?? '');
+
+        // Only quote the original body when the viewer is entitled to read it.
+        $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
+        $this->sourceEmailId = (string) $email->getKey();
+        // A forward carries its source for display, but must not thread against it.
+        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
+
+        $signature = $this->defaultSignatureFor($this->accountId);
+        $this->signatureId = $signature?->getKey();
+        $this->setBodyHtml(resolve(EmailTemplateRenderService::class)
+            ->applySignatureBlock('<p></p>', $signature));
+
+        $this->isOpen = true;
+        $this->isMinimized = false;
+    }
+
+    /**
+     * Close the docked composer because the reader moved to a different message —
+     * the draft answers the email that was on screen, so it must not stay attached
+     * under a different one. Anything typed is saved as a draft on the way out.
+     */
+    #[On('composer:dismiss-inline')]
+    public function dismissInline(): void
+    {
+        if ($this->dock !== 'inline' || ! $this->isOpen) {
+            return;
+        }
+
+        $this->close();
+    }
+
+    /**
+     * Reopen an unfinished reply or forward when the message it belongs to is opened.
+     * A draft written here and left behind should be waiting under that message, not
+     * only findable by hunting through the Drafts tab.
+     */
+    #[On('composer:resume-draft')]
+    public function resumeDraftFor(string $emailId): void
+    {
+        if ($this->dock !== 'inline' || $this->isOpen) {
+            return;
+        }
+
+        $original = $this->replyableEmail($emailId);
+
+        if (! $original instanceof Email || blank($original->rfc_message_id)) {
+            return;
+        }
+
+        $user = $this->authUser();
+
+        $draft = Email::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->where('status', EmailStatus::DRAFT)
+            ->where('in_reply_to', $original->rfc_message_id)
+            ->latest('updated_at')
+            ->first();
+
+        $account = $this->activeAccounts()->first();
+
+        if (! $draft instanceof Email || $account === null) {
+            return;
+        }
+
+        $this->resetComposerState();
+
+        $this->accountId = (string) $account->getKey();
+        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+
+        $this->loadDraft((string) $draft->getKey());
+
+        $this->isOpen = true;
+        $this->isMinimized = false;
+
+        // Nothing was clicked here — the draft came back on its own — so the reader
+        // has to be told to scroll down to it, the way the reply buttons do.
+        $this->dispatch('composer:opened-inline');
+    }
+
+    /**
+     * The message this draft answers or forwards, for display above it. Only the
+     * fitted window shows it — the inline dock already sits under the real thing.
+     */
+    #[Computed]
+    public function sourceEmail(): ?Email
+    {
+        if ($this->sourceEmailId === null || $this->dock !== 'floating') {
+            return null;
+        }
+
+        return $this->replyableEmail($this->sourceEmailId);
+    }
+
+    /**
+     * The email a reply may target: visible to this user, in the current tenant.
+     */
+    private function replyableEmail(string $emailId): ?Email
+    {
+        $user = $this->authUser();
+
+        $email = Email::query()
+            ->with(['participants', 'body', 'shares'])
+            ->forTeam($user->current_team_id)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->whereKey($emailId)
+            ->first();
+
+        return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 
     public function send(): void
@@ -214,12 +422,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
             'subject' => $renderer->renderContent((string) $this->subject),
-            'body_html' => $renderer->renderForSending($bodyHtml),
+            'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
-            'in_reply_to_email_id' => null,
-            'creation_source' => EmailCreationSource::COMPOSE,
+            'in_reply_to_email_id' => $this->inReplyToEmailId,
+            'creation_source' => $this->creationSource(),
             'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
             'batch_id' => null,
             // Interactive sends from the composer keep the undo-send window (matches
@@ -250,6 +458,32 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->dispatch('drafts:changed');
     }
 
+    private function creationSource(): EmailCreationSource
+    {
+        return match ($this->replyMode) {
+            'reply' => EmailCreationSource::REPLY,
+            'reply_all' => EmailCreationSource::REPLY_ALL,
+            'forward' => EmailCreationSource::FORWARD,
+            default => EmailCreationSource::COMPOSE,
+        };
+    }
+
+    /**
+     * Append the original message to a reply or forward. The composer never shows
+     * this — the message is on screen above the dock — but the recipient's client
+     * needs it for the conversation to read as a thread.
+     */
+    private function withQuotedBody(string $bodyHtml): string
+    {
+        if (blank($this->quotedBodyHtml)) {
+            return $bodyHtml;
+        }
+
+        return $bodyHtml.($this->replyMode === 'forward'
+            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$this->quotedBodyHtml
+            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$this->quotedBodyHtml.'</blockquote>');
+    }
+
     public function minimize(): void
     {
         $this->persistDraft();
@@ -267,9 +501,30 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->isMinimized = false;
     }
 
+    /**
+     * Put the draft away and keep it. Used when the composer is dismissed by
+     * something other than the user rejecting it — minimizing, or the reader moving
+     * to another message — where losing what was typed would be a surprise.
+     */
     public function close(): void
     {
         $this->persistDraft();
+        $this->closeComposer();
+    }
+
+    /**
+     * Throw the draft away, including any row a previous save already wrote. This is
+     * what the × means: dismissing a draft should not quietly leave it behind in
+     * Drafts. {@see close()} is the keep-it path.
+     */
+    public function discard(): void
+    {
+        if ($this->draftId !== null) {
+            resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
+
+            $this->dispatch('drafts:changed');
+        }
+
         $this->closeComposer();
     }
 
@@ -364,11 +619,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return $schema->components([
             RichEditor::make('bodyHtml')
                 ->hiddenLabel()
+                ->resizableImages()
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
                 ->placeholder(__('filament/emails/composer.fields.body_placeholder'))
-                ->toolbarButtons([])
+                ->toolbarButtons([
+                    ['bold', 'italic', 'underline', 'strike', 'attachFiles'],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.paragraph'), ['paragraph', 'h1', 'h2', 'h3'])],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
+                    ['blockquote', 'codeBlock', 'bulletList', 'orderedList'],
+                    ['undo', 'redo'],
+                ])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],
                 ])
@@ -399,6 +661,139 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->limit(300)
             ->pluck('email_address')
             ->all();
+    }
+
+    /**
+     * @return list<array{
+     *     type: 'person'|'company_team',
+     *     id: string,
+     *     label: string,
+     *     description: string|null,
+     *     email?: string,
+     *     count?: int,
+     *     emails?: list<string>,
+     * }>
+     */
+    #[Computed]
+    public function recipientOptions(): array
+    {
+        $teamId = (string) $this->authUser()->current_team_id;
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->orderBy('name')
+            ->limit(300)
+            ->get(['id', 'name', 'company_id']);
+
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $primaryEmailEntries = $this->primaryEmailEntriesForPeople($peopleIds, $teamId);
+        $options = [];
+        $companyCounts = [];
+        $companyEmails = [];
+
+        foreach ($people as $person) {
+            $personId = (string) $person->getKey();
+            $email = $this->primaryEmailForPersonId($primaryEmailEntries, $personId);
+
+            if ($email === null) {
+                continue;
+            }
+
+            $options[] = [
+                'type' => 'person',
+                'id' => $personId,
+                'label' => $person->name,
+                'description' => $email,
+                'email' => $email,
+            ];
+
+            if ($person->company_id === null) {
+                continue;
+            }
+
+            $companyId = (string) $person->company_id;
+            $companyCounts[$companyId] = ($companyCounts[$companyId] ?? 0) + 1;
+            $companyEmails[$companyId][] = $email;
+        }
+
+        $companyOptions = Company::query()
+            ->where('team_id', $teamId)
+            ->whereKey(array_keys($companyCounts))
+            ->orderBy('name')
+            ->limit(100)
+            ->get(['id', 'name'])
+            ->map(function (Company $company) use ($companyCounts, $companyEmails): array {
+                $companyId = (string) $company->getKey();
+
+                return [
+                    'type' => 'company_team',
+                    'id' => $companyId,
+                    'label' => $company->name,
+                    'description' => __('filament/emails/composer.fields.company_team'),
+                    'count' => $companyCounts[$companyId],
+                    'emails' => $companyEmails[$companyId],
+                ];
+            });
+
+        foreach ($companyOptions as $companyOption) {
+            $options[] = $companyOption;
+        }
+
+        return $options;
+    }
+
+    public function addCompanyTeamRecipients(string $companyId, string $field = 'to'): void
+    {
+        if (! in_array($field, ['to', 'cc', 'bcc'], true)) {
+            return;
+        }
+
+        $teamId = (string) $this->authUser()->current_team_id;
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->get(['id']);
+
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $emails = [];
+
+        foreach ($this->primaryEmailEntriesForPeople($peopleIds, $teamId) as $entry) {
+            $emails[] = $entry['email'];
+        }
+        $nextRecipients = match ($field) {
+            'cc' => $this->cc,
+            'bcc' => $this->bcc,
+            default => $this->to,
+        };
+
+        foreach ($emails as $email) {
+            if (! in_array($email, $nextRecipients, true)) {
+                $nextRecipients[] = $email;
+            }
+        }
+
+        if ($field === 'cc') {
+            $this->cc = $nextRecipients;
+
+            return;
+        }
+
+        if ($field === 'bcc') {
+            $this->bcc = $nextRecipients;
+
+            return;
+        }
+
+        $this->to = $nextRecipients;
     }
 
     /**
@@ -438,6 +833,76 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return $account instanceof ConnectedAccount
             ? resolve(AvatarService::class)->generate($account->display_name ?? $account->email_address)
             : null;
+    }
+
+    /**
+     * @param  list<string>  $peopleIds
+     * @return list<array{person_id: string, email: string}>
+     */
+    private function primaryEmailEntriesForPeople(array $peopleIds, string $teamId): array
+    {
+        if ($peopleIds === []) {
+            return [];
+        }
+
+        $emailField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', 'people')
+            ->where('code', 'emails')
+            ->first();
+
+        if (! $emailField instanceof CustomField) {
+            return [];
+        }
+
+        $entries = [];
+
+        foreach (CustomFieldValue::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', 'people')
+            ->where('custom_field_id', $emailField->getKey())
+            ->whereIn('entity_id', $peopleIds)
+            ->get(['entity_id', 'json_value']) as $value) {
+            $email = $this->primaryEmailFromValue($value->json_value);
+
+            if ($email !== null) {
+                $entries[] = [
+                    'person_id' => (string) $value->entity_id,
+                    'email' => $email,
+                ];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param  list<array{person_id: string, email: string}>  $entries
+     */
+    private function primaryEmailForPersonId(array $entries, string $personId): ?string
+    {
+        foreach ($entries as $entry) {
+            if ($entry['person_id'] === $personId) {
+                return $entry['email'];
+            }
+        }
+
+        return null;
+    }
+
+    private function primaryEmailFromValue(mixed $value): ?string
+    {
+        $emails = $value instanceof Collection
+            ? $value
+            : collect(is_array($value) ? $value : []);
+
+        $email = $emails
+            ->filter(fn (mixed $item): bool => is_string($item) && trim($item) !== '')
+            ->first();
+
+        return is_string($email) ? $email : null;
     }
 
     /**
@@ -612,7 +1077,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         if ($value !== null && ! $this->isOwnedAccountId($value)) {
             $this->accountId = null;
+
+            return;
         }
+
+        $signature = $this->defaultSignatureFor($value);
+        $this->signatureId = $signature?->getKey();
+        $this->updatedSignatureId($this->signatureId);
     }
 
     public function updatedSignatureId(?string $value): void
@@ -711,6 +1182,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachments = EmailAttachment::query()
             ->where('email_id', $this->draftId)
             ->whereIn('id', array_column($this->savedAttachments, 'id'))
+            ->whereHas('email', fn (Builder $query): Builder => $query
+                ->where('user_id', $this->authUser()->getKey())
+                ->where('team_id', $this->authUser()->current_team_id)
+                ->where('status', EmailStatus::DRAFT))
             ->get();
 
         foreach ($attachments as $attachment) {
@@ -765,6 +1240,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'to' => $this->to,
                 'cc' => $this->cc,
                 'bcc' => $this->bcc,
+                // Without these a reply parked as a draft comes back as a plain new
+                // message: no original to show, and no threading when it is sent.
+                'source_email_id' => $this->sourceEmailId,
+                'creation_source' => $this->creationSource(),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
             ],
@@ -862,7 +1341,43 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->showCc = $this->cc !== [];
         $this->showBcc = $this->bcc !== [];
 
+        $this->restoreReplyContext($draft);
+
         $this->loadSavedAttachments($draft);
+    }
+
+    /**
+     * Put a reply draft back into reply mode. The link survives as the original's RFC
+     * message id on the draft row, so it is resolved back to the email here — which is
+     * what lets the composer show what is being answered and thread the sent message.
+     */
+    private function restoreReplyContext(Email $draft): void
+    {
+        if (blank($draft->in_reply_to)) {
+            return;
+        }
+
+        $user = $this->authUser();
+
+        $original = Email::query()
+            ->with(['body', 'participants', 'from', 'shares'])
+            ->where('team_id', $user->current_team_id)
+            ->where('rfc_message_id', $draft->in_reply_to)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->first();
+
+        if (! $original instanceof Email || $user->cannot('view', $original)) {
+            return;
+        }
+
+        $this->sourceEmailId = (string) $original->getKey();
+        $this->replyMode = match ($draft->creation_source) {
+            EmailCreationSource::REPLY_ALL => 'reply_all',
+            EmailCreationSource::FORWARD => 'forward',
+            default => 'reply',
+        };
+        $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
+        $this->quotedBodyHtml = $user->can('viewBody', $original) ? $original->body?->body_html : null;
     }
 
     /**
@@ -887,7 +1402,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments']);
+        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'sourceEmailId', 'inReplyToEmailId', 'quotedBodyHtml']);
         $this->resetErrorBag();
     }
 
@@ -908,13 +1423,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function activeAccounts(): Collection
     {
-        return ConnectedAccount::query()
+        return once(fn (): Collection => ConnectedAccount::query()
             ->where('user_id', $this->authUser()->getKey())
             ->where('team_id', $this->authUser()->current_team_id)
             ->where('status', 'active')
             ->orderByDesc('is_default')
             ->oldest()
-            ->get();
+            ->get());
     }
 
     /**

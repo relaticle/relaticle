@@ -9,7 +9,6 @@ return [
         'all' => 'All accounts',
     ],
     'tabs' => [
-        'emails' => 'Emails',
         'drafts' => 'Drafts',
         'outbox' => 'Outbox',
         'templates' => 'Templates',
@@ -25,6 +24,7 @@ return [
         'actions' => [
             'open' => 'Continue writing',
             'delete' => 'Delete draft',
+            'delete_selected' => 'Delete drafts',
         ],
         'empty' => [
             'heading' => 'No drafts',
@@ -32,6 +32,7 @@ return [
         ],
         'notifications' => [
             'deleted' => 'Draft deleted',
+            'bulk_deleted' => '{1}1 draft deleted|[2,*]:count drafts deleted',
         ],
     ],
     'folders' => [
@@ -73,6 +74,22 @@ return [
             ],
         ],
     ],
+    'reader' => [
+        'heading' => 'View email',
+        'attachments' => [
+            'unnamed' => 'Unnamed file',
+            'processing' => 'processing…',
+        ],
+    ],
+    'back_to_list' => 'Back to list',
+    'recipients' => [
+        'to' => 'to',
+        'cc' => 'cc',
+        'more' => '{1}and 1 more|[2,*]and :count more',
+    ],
+    'row_actions' => [
+        'label' => 'Email actions',
+    ],
     'mark_all_read' => [
         'label' => 'Mark all read',
         'notification' => '{0}No unread emails to mark|{1}1 email marked as read|[2,*]:count emails marked as read',
@@ -98,10 +115,13 @@ return [
             ],
             'shares' => [
                 'label' => 'Share with specific teammates',
+                'description' => 'Give named people more access than the setting above allows.',
                 'add_action_label' => 'Add teammate',
+                'new_item' => 'New teammate',
             ],
             'shared_with' => [
                 'label' => 'Teammate',
+                'placeholder' => 'Choose a teammate…',
             ],
             'tier' => [
                 'label' => 'Access level',

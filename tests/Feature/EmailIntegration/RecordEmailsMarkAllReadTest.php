@@ -6,8 +6,10 @@ use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 
 beforeEach(function (): void {
@@ -38,6 +40,18 @@ beforeEach(function (): void {
         'sent_at' => now()->subHour(),
     ]);
 
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Alex Sender',
+        'email_address' => 'alex@example.test',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Taylor Recipient',
+        'email_address' => 'taylor@example.test',
+    ]);
+
     $this->person->emails()->attach([$this->newer->getKey(), $this->older->getKey()]);
 
     $this->actingAs($this->owner);
@@ -46,8 +60,7 @@ beforeEach(function (): void {
 
 it('marks all of the record\'s unread emails as read', function (): void {
     $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()]);
-    // The record page selects the newest on mount but does not auto-read it,
-    // so both attached emails start unread.
+    // Nothing is open on mount, so both attached emails start unread.
     expect($page->instance()->inboxUnreadCount())->toBe(2);
 
     $page->call('markAllAsRead');
@@ -55,6 +68,30 @@ it('marks all of the record\'s unread emails as read', function (): void {
     expect($page->instance()->inboxUnreadCount())->toBe(0);
     expect(EmailRead::query()->where('user_id', $this->owner->id)
         ->whereIn('email_id', [$this->newer->id, $this->older->id])->count())->toBe(2);
+});
+
+it('opens with the list only, and reads an email into the overlay until it is closed', function (): void {
+    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSet('folder', EmailFolder::All)
+        ->assertSet('selectedEmailId', null);
+
+    expect($page->instance()->selectedEmail())->toBeNull();
+
+    $page->call('selectEmail', $this->newer->getKey())
+        ->assertSet('selectedEmailId', $this->newer->getKey());
+
+    expect($page->instance()->selectedEmail()?->getKey())->toBe($this->newer->getKey());
+
+    $page->call('deselectEmail')
+        ->assertSet('selectedEmailId', null);
+
+    expect($page->instance()->selectedEmail())->toBeNull();
+});
+
+it('shows sender and recipient metadata in the email list', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSee('Alex Sender')
+        ->assertSee('Taylor Recipient');
 });
 
 it('does not mark emails belonging to other records', function (): void {

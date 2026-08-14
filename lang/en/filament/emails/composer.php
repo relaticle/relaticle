@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 return [
     'title' => 'New email',
+    'draft' => 'Draft',
+    'quoted' => [
+        'hidden' => 'The original message is not shared with you.',
+    ],
     'fields' => [
         'from' => 'From',
         'to' => 'To',
@@ -20,7 +24,14 @@ return [
         'template_shared' => 'Share with my team',
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
+        'company_team' => 'Company team',
+        'company_team_count' => 'Team',
     ],
+    'toolbar' => [
+        'paragraph' => 'Paragraph',
+        'alignment' => 'Alignment',
+    ],
+
     'actions' => [
         'send' => 'Send email',
         'attach' => 'Attach files',
@@ -30,6 +41,7 @@ return [
         'create_template' => 'Save as template',
         'variable' => 'Insert variable',
         'remove_recipient' => 'Remove',
+        'download_attachment' => 'Download attachment',
         'remove_attachment' => 'Remove attachment',
         'uploading' => 'Uploading…',
         'expand' => 'Fit to screen',
@@ -37,6 +49,7 @@ return [
         'minimize' => 'Minimize',
         'restore' => 'Restore',
         'close' => 'Close',
+        'discard' => 'Discard draft',
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],

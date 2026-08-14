@@ -9,16 +9,22 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
@@ -27,10 +33,12 @@ use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -47,7 +55,7 @@ abstract class BaseRecordEmailsPage extends Page
 
     protected string $view = 'filament.pages.record-emails';
 
-    public EmailFolder $folder = EmailFolder::Inbox;
+    public EmailFolder $folder = EmailFolder::All;
 
     public ?string $selectedEmailId = null;
 
@@ -56,13 +64,25 @@ abstract class BaseRecordEmailsPage extends Page
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
-        $firstItem = $this->emails()->items()[0] ?? null;
-        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
     }
 
     protected function getCrmRecord(): Model
     {
         return $this->getRecord();
+    }
+
+    /**
+     * The last crumb. Without this it is the headlined class name — "Company Emails
+     * Page" — which reads as a class, not a place.
+     */
+    public function getBreadcrumb(): string
+    {
+        return __('filament/pages/record-emails.breadcrumb');
+    }
+
+    public function getTitle(): string
+    {
+        return __('filament/pages/record-emails.title');
     }
 
     /**
@@ -81,21 +101,6 @@ abstract class BaseRecordEmailsPage extends Page
         return [
             $this->composeEmailAction(),
         ];
-    }
-
-    public function replyAction(): Action
-    {
-        return $this->replyForwardModeAction('reply', 'reply', $this->selectedEmailId);
-    }
-
-    public function replyAllAction(): Action
-    {
-        return $this->replyForwardModeAction('replyAll', 'reply_all', $this->selectedEmailId);
-    }
-
-    public function forwardAction(): Action
-    {
-        return $this->replyForwardModeAction('forward', 'forward', $this->selectedEmailId);
     }
 
     /**
@@ -189,6 +194,13 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->selectedEmailId = $id;
 
+        // A reply answers the message that was open; it cannot stay docked under a
+        // different one. The composer saves whatever was typed as a draft.
+        $this->dispatch('composer:dismiss-inline');
+
+        // ...and if this message already has an unfinished reply, bring it back up.
+        $this->dispatch('composer:resume-draft', emailId: $id);
+
         // Optimistically mark the email as read so the unread count updates immediately
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
 
@@ -199,10 +211,65 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->folder = EmailFolder::from($folder);
         $this->search = '';
+        $this->selectedEmailId = null;
         $this->resetPage();
         unset($this->emails);
-        $firstItem = $this->emails()->items()[0] ?? null;
-        $this->selectedEmailId = $firstItem instanceof Email ? $firstItem->id : null;
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    public function deselectEmail(): void
+    {
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
+
+        // Dismissing the dock persists whatever was typed as a draft, so closing the
+        // reader can never silently drop a half-written reply.
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    /**
+     * Access requests waiting on the reader — only ever their own mail, since only
+     * the owner may grant access to it.
+     *
+     * @return Collection<int, EmailAccessRequest>
+     */
+    #[Computed]
+    public function pendingAccessRequests(): Collection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
+            return collect();
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->where('email_id', $email->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->get();
+    }
+
+    /**
+     * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
+     * reader out of their participant line: repeating your own address on every row
+     * says nothing, and it is the widest thing on the row.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function ownEmailAddresses(): array
+    {
+        $user = $this->authUser();
+
+        /** @var list<string> */
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->pluck('email_address')
+            ->map(fn (mixed $address): string => mb_strtolower((string) $address))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function markAllAsRead(): void
@@ -230,43 +297,74 @@ abstract class BaseRecordEmailsPage extends Page
     {
         return Action::make('manageSharing')
             ->label(__('filament/pages/record-emails.actions.manage_sharing.label'))
-            ->icon('heroicon-o-lock-open')
+            ->icon('ri-share-line')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/record-emails.actions.manage_sharing.label'))
             ->modalHeading(__('filament/pages/record-emails.actions.manage_sharing.modal_heading'))
+            ->modalWidth(Width::FiveExtraLarge)
             ->modalSubmitActionLabel(__('filament/pages/record-emails.actions.manage_sharing.submit'))
             ->schema([
-                Select::make('privacy_tier')
-                    ->label(__('filament/pages/record-emails.fields.privacy_tier.label'))
-                    ->options(EmailPrivacyTier::class)
-                    ->required(),
-
-                Repeater::make('shares')
-                    ->label(__('filament/pages/record-emails.fields.shares.label'))
-                    ->defaultItems(0)
-                    ->addActionLabel('Add teammate')
-                    ->columns(2)
+                // Two halves of one decision, side by side: what the workspace at large
+                // gets, and who is named individually. Stacked, the second half reads as
+                // an afterthought below the fold.
+                Grid::make(['default' => 1, 'md' => 12])
                     ->schema([
-                        Select::make('shared_with')
-                            ->label(__('filament/pages/record-emails.fields.shared_with.label'))
-                            ->options(function (): array {
-                                $user = $this->authUser();
+                        // Cards rather than a select: each tier is a decision about who
+                        // sees what, which a dropdown of four nouns hides. Same cards as
+                        // the account settings page.
+                        Section::make(__('filament/pages/record-emails.fields.privacy_tier.label'))
+                            ->icon('heroicon-o-globe-alt')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 5])
+                            ->schema([
+                                Radio::make('privacy_tier')
+                                    ->hiddenLabel()
+                                    ->view('email-integration::forms.sharing-tier-cards')
+                                    ->viewData(['ariaLabel' => __('filament/pages/record-emails.fields.privacy_tier.label')])
+                                    ->required(),
+                            ]),
 
-                                return User::query()
-                                    ->where('current_team_id', $user->current_team_id)
-                                    ->where('id', '!=', $user->getKey())
-                                    ->pluck('name', 'id')
-                                    ->all();
-                            })
-                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                            ->required()
-                            ->distinct(),
+                        Section::make(__('filament/pages/record-emails.fields.shares.label'))
+                            ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
+                            ->icon('heroicon-o-user-group')
+                            ->compact()
+                            ->columnSpan(['default' => 1, 'md' => 7])
+                            ->schema([
+                                Repeater::make('shares')
+                                    ->hiddenLabel()
+                                    ->defaultItems(0)
+                                    // Who was added first says nothing about access, so
+                                    // the drag handle is just noise in the row header.
+                                    ->reorderable(false)
+                                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
+                                    // Not ->table(): that layout quietly stacks once its
+                                    // container is this narrow, which is what put the
+                                    // delete button on a line of its own. Naming the row
+                                    // instead gives each entry a header that carries the
+                                    // delete inline, and the two fields sit side by side.
+                                    ->itemLabel(fn (array $state): string => $this->teammateOptions()[$state['shared_with'] ?? null]
+                                        ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item'))
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('shared_with')
+                                            ->label(__('filament/pages/record-emails.fields.shared_with.label'))
+                                            ->hiddenLabel()
+                                            ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
+                                            ->options(fn (): array => $this->teammateOptions())
+                                            ->searchable()
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                            ->required()
+                                            ->distinct(),
 
-                        Select::make('tier')
-                            ->label(__('filament/pages/record-emails.fields.tier.label'))
-                            ->options(EmailPrivacyTier::class)
-                            ->required(),
+                                        Select::make('tier')
+                                            ->label(__('filament/pages/record-emails.fields.tier.label'))
+                                            ->hiddenLabel()
+                                            ->options(EmailPrivacyTier::class)
+                                            ->required(),
+                                    ]),
+                            ]),
                     ]),
             ])
             ->fillForm(function (array $arguments): array {
@@ -308,14 +406,32 @@ abstract class BaseRecordEmailsPage extends Page
             });
     }
 
+    /**
+     * Teammates who can be given access to an email: everyone else on the team.
+     *
+     * @return array<string, string>
+     */
+    private function teammateOptions(): array
+    {
+        $user = $this->authUser();
+
+        return User::query()
+            ->where('current_team_id', $user->current_team_id)
+            ->where('id', '!=', $user->getKey())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     protected function summarizeThreadAction(): Action
     {
         return Action::make('summarizeThread')
             ->label(__('filament/pages/record-emails.actions.summarize_thread.label'))
             ->icon('heroicon-o-sparkles')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/record-emails.actions.summarize_thread.label'))
             ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
             ->modalIcon('heroicon-o-sparkles')
             ->modalSubmitAction(false)
@@ -337,8 +453,9 @@ abstract class BaseRecordEmailsPage extends Page
             ->label(__('filament/pages/record-emails.actions.request_access.label'))
             ->icon('heroicon-o-key')
             ->color('gray')
-            ->link()
-            ->extraAttributes(['class' => 'text-xs'])
+            ->iconButton()
+            ->extraAttributes(['class' => 'fi-email-reader-action'])
+            ->tooltip(__('filament/pages/record-emails.actions.request_access.label'))
             ->schema([
                 Select::make('tier_requested')
                     ->label(__('filament/pages/record-emails.fields.tier_requested.label'))
