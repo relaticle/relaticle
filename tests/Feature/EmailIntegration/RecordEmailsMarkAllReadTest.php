@@ -6,8 +6,10 @@ use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 
 beforeEach(function (): void {
@@ -38,6 +40,18 @@ beforeEach(function (): void {
         'sent_at' => now()->subHour(),
     ]);
 
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Alex Sender',
+        'email_address' => 'alex@example.test',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Taylor Recipient',
+        'email_address' => 'taylor@example.test',
+    ]);
+
     $this->person->emails()->attach([$this->newer->getKey(), $this->older->getKey()]);
 
     $this->actingAs($this->owner);
@@ -58,6 +72,7 @@ it('marks all of the record\'s unread emails as read', function (): void {
 
 it('opens with the list only, and reads an email into the overlay until it is closed', function (): void {
     $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSet('folder', EmailFolder::All)
         ->assertSet('selectedEmailId', null);
 
     expect($page->instance()->selectedEmail())->toBeNull();
@@ -71,6 +86,12 @@ it('opens with the list only, and reads an email into the overlay until it is cl
         ->assertSet('selectedEmailId', null);
 
     expect($page->instance()->selectedEmail())->toBeNull();
+});
+
+it('shows sender and recipient metadata in the email list', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSee('Alex Sender')
+        ->assertSee('Taylor Recipient');
 });
 
 it('does not mark emails belonging to other records', function (): void {

@@ -24,6 +24,8 @@ return [
         'template_shared' => 'Share with my team',
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
+        'company_team' => 'Company team',
+        'company_team_count' => 'Team',
     ],
     'toolbar' => [
         'paragraph' => 'Paragraph',

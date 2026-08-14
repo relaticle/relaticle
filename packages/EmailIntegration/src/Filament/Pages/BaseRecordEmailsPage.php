@@ -55,7 +55,7 @@ abstract class BaseRecordEmailsPage extends Page
 
     protected string $view = 'filament.pages.record-emails';
 
-    public EmailFolder $folder = EmailFolder::Inbox;
+    public EmailFolder $folder = EmailFolder::All;
 
     public ?string $selectedEmailId = null;
 
@@ -78,6 +78,11 @@ abstract class BaseRecordEmailsPage extends Page
     public function getBreadcrumb(): string
     {
         return __('filament/pages/record-emails.breadcrumb');
+    }
+
+    public function getTitle(): string
+    {
+        return __('filament/pages/record-emails.title');
     }
 
     /**

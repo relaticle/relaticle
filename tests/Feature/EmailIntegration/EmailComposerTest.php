@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
+use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -80,6 +84,38 @@ it('includes the default signature content in the sent body_html', function (): 
     $email = Email::query()->where('subject', 'Signature roundtrip')->sole();
 
     expect($email->body->body_html)->toContain('Best, Test Sender');
+});
+
+it('swaps the visible signature when the sending account changes', function (): void {
+    EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>Best, Account A</p>',
+        'is_default' => true,
+    ]));
+    $secondAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+    EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $secondAccount->id,
+        'content_html' => '<p>Best, Account B</p>',
+        'is_default' => true,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', $secondAccount->id)
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Signature after account switch')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Signature after account switch')->sole();
+
+    expect($email->connected_account_id)->toBe($secondAccount->id)
+        ->and($email->body->body_html)->toContain('Best, Account B')
+        ->and($email->body->body_html)->not->toContain('Best, Account A');
 });
 
 it('shows validation errors instead of sending when recipients are missing', function (): void {
@@ -368,6 +404,53 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
     expect($suggestions)->not->toContain('hidden-recipient@example.com');
 });
 
+it('adds every company team member primary email to recipients', function (): void {
+    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Basepoint']);
+
+    $people = People::factory()
+        ->count(2)
+        ->for($this->user->currentTeam)
+        ->for($company)
+        ->sequence(
+            ['name' => 'Natalie Hughes'],
+            ['name' => 'Asha Gupta'],
+        )
+        ->create();
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->user->current_team_id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->sole();
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $people[0]->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['natalie@example.com', 'natalie.personal@example.com'],
+    ]);
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $people[1]->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['asha@example.com'],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['existing@example.com'])
+        ->call('addCompanyTeamRecipients', $company->id)
+        ->assertSet('to', [
+            'existing@example.com',
+            'natalie@example.com',
+            'asha@example.com',
+        ]);
+});
+
 it('saves pending attachments onto the draft when the composer is closed', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
@@ -477,6 +560,56 @@ it('sends a reopened draft with its saved attachments and leaves no orphaned fil
     Storage::disk(EmailAttachment::DISK)->assertExists((string) $sentAttachment->storage_path);
     Storage::disk(EmailAttachment::DISK)->assertMissing($draftPath);
     expect(Email::query()->whereKey($draft->getKey())->exists())->toBeFalse();
+});
+
+it('does not copy another user\'s saved draft attachment from client-controlled state', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+    $foreignDraft = Email::factory()->create([
+        'team_id' => $otherUser->current_team_id,
+        'user_id' => $otherUser->id,
+        'connected_account_id' => $otherAccount->id,
+        'status' => EmailStatus::DRAFT,
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Drafts,
+        'subject' => 'Foreign draft',
+    ]);
+
+    Storage::disk(EmailAttachment::DISK)->put('email-attachments/secret.pdf', 'secret');
+
+    $foreignAttachment = EmailAttachment::factory()->create([
+        'email_id' => $foreignDraft->getKey(),
+        'filename' => 'secret.pdf',
+        'storage_path' => 'email-attachments/secret.pdf',
+        'size' => 6,
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Forged saved attachment')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('draftId', (string) $foreignDraft->getKey())
+        ->set('savedAttachments', [[
+            'id' => (string) $foreignAttachment->getKey(),
+            'filename' => 'secret.pdf',
+            'size' => 6,
+        ]])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Forged saved attachment')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments)->toHaveCount(0);
 });
 
 it('deletes a draft\'s attachment files when the draft is deleted', function (): void {

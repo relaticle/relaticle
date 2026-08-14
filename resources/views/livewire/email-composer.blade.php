@@ -158,7 +158,7 @@
 
                     <x-emails.composer-field :label="__('filament/emails/composer.fields.to')">
                         <div class="min-w-0 flex-1">
-                            <x-emails.recipient-chips wire:model="to" :suggestions="$this->recipientSuggestions" />
+                            <x-emails.recipient-chips wire:model="to" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" />
                         </div>
                         <span class="shrink-0 space-x-2 text-xs font-medium text-gray-400">
                             <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
@@ -172,14 +172,14 @@
 
                     @if ($showCc)
                         <x-emails.composer-field :label="__('filament/emails/composer.fields.cc')">
-                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" /></div>
+                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" /></div>
                         </x-emails.composer-field>
                         <x-emails.composer-error field="cc.*" />
                     @endif
 
                     @if ($showBcc)
                         <x-emails.composer-field :label="__('filament/emails/composer.fields.bcc')">
-                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" /></div>
+                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" /></div>
                         </x-emails.composer-field>
                         <x-emails.composer-error field="bcc.*" />
                     @endif

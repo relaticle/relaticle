@@ -6,7 +6,7 @@
     <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" class="-mb-2" />
 
     @if ($this->showConnectPrompt)
-        <div class="flex items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm h-[80vh]">
+        <div class="flex h-[80vh] items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <x-emails.not-connected
                 :heading="__('filament/pages/email-accounts.not_connected.record.heading')"
                 :description="__('filament/pages/email-accounts.not_connected.record.description')"
@@ -18,15 +18,15 @@
          Livewire re-render (x-init does not re-run after a morph), which drops the
          pane back to its min-height mid-interaction. The subtraction is the chrome
          above it — topbar, record header and the resource tabs. --}}
-    <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+    <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
 
         {{-- Toolbar: what you are looking at on the left, what you can do with it on
              the right, one control height throughout. Compose is not here — on a
              record page it is a header action, alongside the record's own actions. --}}
-        <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 dark:border-gray-700 px-4 py-2.5 sm:px-6">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
 
             <div class="flex min-w-0 flex-1 items-center gap-3">
-                <div class="flex shrink-0 items-center">
+                <div class="flex shrink-0 items-center gap-1 rounded-lg bg-gray-100 p-1 ring-1 ring-gray-950/5 dark:bg-gray-950 dark:ring-white/10">
                     <x-emails.folder-tab :grow="false" folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   :label="__('filament/pages/email-inbox.folders.all')" />
                     <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" :badge="$this->inboxUnreadCount" />
                     <x-emails.folder-tab :grow="false" folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" :label="__('filament/pages/email-inbox.folders.sent')" />
@@ -51,7 +51,7 @@
             @endif
         </div>
 
-        <div class="flex-1 divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto">
+        <div class="flex-1 divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
             @forelse ($this->emails as $email)
                 <x-emails.list-row-wide :email="$email" :folder="$folder" :own-addresses="$this->ownEmailAddresses" />
             @empty
@@ -59,7 +59,7 @@
             @endforelse
         </div>
 
-        <div class="flex shrink-0 items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 py-2 sm:px-6">
+        <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-gray-50/80 px-4 py-2 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
             <button
                 wire:click="previousPage"
                 wire:loading.attr="disabled"

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
+use App\Models\People;
 use App\Models\User;
 use App\Services\AvatarService;
 use Filament\Actions\Action;
@@ -620,9 +624,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
                 ->placeholder(__('filament/emails/composer.fields.body_placeholder'))
-                // `attachFiles` is not optional here: file attachments are gated on that
-                // button being present (RichEditor::hasFileAttachmentsByDefault), and
-                // they are what let an image be dropped, pasted or picked into the body.
                 ->toolbarButtons([
                     ['bold', 'italic', 'underline', 'strike', 'attachFiles'],
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.paragraph'), ['paragraph', 'h1', 'h2', 'h3'])],
@@ -663,6 +664,139 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
+     * @return list<array{
+     *     type: 'person'|'company_team',
+     *     id: string,
+     *     label: string,
+     *     description: string|null,
+     *     email?: string,
+     *     count?: int,
+     *     emails?: list<string>,
+     * }>
+     */
+    #[Computed]
+    public function recipientOptions(): array
+    {
+        $teamId = (string) $this->authUser()->current_team_id;
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->orderBy('name')
+            ->limit(300)
+            ->get(['id', 'name', 'company_id']);
+
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $primaryEmailEntries = $this->primaryEmailEntriesForPeople($peopleIds, $teamId);
+        $options = [];
+        $companyCounts = [];
+        $companyEmails = [];
+
+        foreach ($people as $person) {
+            $personId = (string) $person->getKey();
+            $email = $this->primaryEmailForPersonId($primaryEmailEntries, $personId);
+
+            if ($email === null) {
+                continue;
+            }
+
+            $options[] = [
+                'type' => 'person',
+                'id' => $personId,
+                'label' => $person->name,
+                'description' => $email,
+                'email' => $email,
+            ];
+
+            if ($person->company_id === null) {
+                continue;
+            }
+
+            $companyId = (string) $person->company_id;
+            $companyCounts[$companyId] = ($companyCounts[$companyId] ?? 0) + 1;
+            $companyEmails[$companyId][] = $email;
+        }
+
+        $companyOptions = Company::query()
+            ->where('team_id', $teamId)
+            ->whereKey(array_keys($companyCounts))
+            ->orderBy('name')
+            ->limit(100)
+            ->get(['id', 'name'])
+            ->map(function (Company $company) use ($companyCounts, $companyEmails): array {
+                $companyId = (string) $company->getKey();
+
+                return [
+                    'type' => 'company_team',
+                    'id' => $companyId,
+                    'label' => $company->name,
+                    'description' => __('filament/emails/composer.fields.company_team'),
+                    'count' => $companyCounts[$companyId],
+                    'emails' => $companyEmails[$companyId],
+                ];
+            });
+
+        foreach ($companyOptions as $companyOption) {
+            $options[] = $companyOption;
+        }
+
+        return $options;
+    }
+
+    public function addCompanyTeamRecipients(string $companyId, string $field = 'to'): void
+    {
+        if (! in_array($field, ['to', 'cc', 'bcc'], true)) {
+            return;
+        }
+
+        $teamId = (string) $this->authUser()->current_team_id;
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->get(['id']);
+
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $emails = [];
+
+        foreach ($this->primaryEmailEntriesForPeople($peopleIds, $teamId) as $entry) {
+            $emails[] = $entry['email'];
+        }
+        $nextRecipients = match ($field) {
+            'cc' => $this->cc,
+            'bcc' => $this->bcc,
+            default => $this->to,
+        };
+
+        foreach ($emails as $email) {
+            if (! in_array($email, $nextRecipients, true)) {
+                $nextRecipients[] = $email;
+            }
+        }
+
+        if ($field === 'cc') {
+            $this->cc = $nextRecipients;
+
+            return;
+        }
+
+        if ($field === 'bcc') {
+            $this->bcc = $nextRecipients;
+
+            return;
+        }
+
+        $this->to = $nextRecipients;
+    }
+
+    /**
      * @return array<string, string>
      */
     #[Computed]
@@ -699,6 +833,76 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return $account instanceof ConnectedAccount
             ? resolve(AvatarService::class)->generate($account->display_name ?? $account->email_address)
             : null;
+    }
+
+    /**
+     * @param  list<string>  $peopleIds
+     * @return list<array{person_id: string, email: string}>
+     */
+    private function primaryEmailEntriesForPeople(array $peopleIds, string $teamId): array
+    {
+        if ($peopleIds === []) {
+            return [];
+        }
+
+        $emailField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', 'people')
+            ->where('code', 'emails')
+            ->first();
+
+        if (! $emailField instanceof CustomField) {
+            return [];
+        }
+
+        $entries = [];
+
+        foreach (CustomFieldValue::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', 'people')
+            ->where('custom_field_id', $emailField->getKey())
+            ->whereIn('entity_id', $peopleIds)
+            ->get(['entity_id', 'json_value']) as $value) {
+            $email = $this->primaryEmailFromValue($value->json_value);
+
+            if ($email !== null) {
+                $entries[] = [
+                    'person_id' => (string) $value->entity_id,
+                    'email' => $email,
+                ];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param  list<array{person_id: string, email: string}>  $entries
+     */
+    private function primaryEmailForPersonId(array $entries, string $personId): ?string
+    {
+        foreach ($entries as $entry) {
+            if ($entry['person_id'] === $personId) {
+                return $entry['email'];
+            }
+        }
+
+        return null;
+    }
+
+    private function primaryEmailFromValue(mixed $value): ?string
+    {
+        $emails = $value instanceof Collection
+            ? $value
+            : collect(is_array($value) ? $value : []);
+
+        $email = $emails
+            ->filter(fn (mixed $item): bool => is_string($item) && trim($item) !== '')
+            ->first();
+
+        return is_string($email) ? $email : null;
     }
 
     /**
@@ -873,7 +1077,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         if ($value !== null && ! $this->isOwnedAccountId($value)) {
             $this->accountId = null;
+
+            return;
         }
+
+        $signature = $this->defaultSignatureFor($value);
+        $this->signatureId = $signature?->getKey();
+        $this->updatedSignatureId($this->signatureId);
     }
 
     public function updatedSignatureId(?string $value): void
@@ -972,6 +1182,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachments = EmailAttachment::query()
             ->where('email_id', $this->draftId)
             ->whereIn('id', array_column($this->savedAttachments, 'id'))
+            ->whereHas('email', fn (Builder $query): Builder => $query
+                ->where('user_id', $this->authUser()->getKey())
+                ->where('team_id', $this->authUser()->current_team_id)
+                ->where('status', EmailStatus::DRAFT))
             ->get();
 
         foreach ($attachments as $attachment) {
@@ -1209,13 +1423,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function activeAccounts(): Collection
     {
-        return ConnectedAccount::query()
+        return once(fn (): Collection => ConnectedAccount::query()
             ->where('user_id', $this->authUser()->getKey())
             ->where('team_id', $this->authUser()->current_team_id)
             ->where('status', 'active')
             ->orderByDesc('is_default')
             ->oldest()
-            ->get();
+            ->get());
     }
 
     /**

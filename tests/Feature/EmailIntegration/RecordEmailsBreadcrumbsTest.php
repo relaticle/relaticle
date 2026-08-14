@@ -35,6 +35,12 @@ it('walks from the resource index to the record to this page', function (): void
         ->toContain('Emails');
 });
 
+it('uses a human page title', function (): void {
+    $page = livewire(CompanyEmailsPage::class, ['record' => $this->company->getKey()]);
+
+    expect($page->instance()->getTitle())->toBe('Emails');
+});
+
 it('renders the crumbs, which the panel would otherwise drop', function (): void {
     // The app panel disables breadcrumbs globally, so the page view renders its own —
     // asserting the method alone would pass with nothing on screen.
