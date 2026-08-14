@@ -9,6 +9,7 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -448,6 +449,52 @@ it('adds every company team member primary email to recipients', function (): vo
             'existing@example.com',
             'natalie@example.com',
             'asha@example.com',
+        ]);
+});
+
+it('includes company team recipient options outside the first person option page', function (): void {
+    $earlyCompany = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Alpha']);
+    $targetCompany = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Zephyr']);
+
+    People::factory()
+        ->count(300)
+        ->for($this->user->currentTeam)
+        ->for($earlyCompany)
+        ->sequence(fn (Sequence $sequence): array => [
+            'name' => sprintf('A Contact %03d', $sequence->index),
+        ])
+        ->create();
+
+    $person = People::factory()
+        ->for($this->user->currentTeam)
+        ->for($targetCompany)
+        ->create(['name' => 'Zoe Late']);
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->user->current_team_id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->sole();
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['zoe@example.com'],
+    ]);
+
+    $options = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientOptions();
+
+    expect(collect($options)
+        ->first(fn (array $option): bool => $option['type'] === 'company_team' && $option['label'] === 'Zephyr'))
+        ->toMatchArray([
+            'count' => 1,
+            'emails' => ['zoe@example.com'],
         ]);
 });
 
