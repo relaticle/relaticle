@@ -86,12 +86,11 @@ final class EmailInboxPage extends Page
     public EmailFolder $folder = EmailFolder::Inbox;
 
     /**
-     * Which top-level surface the page is showing: the mail reader itself, or one
-     * of the sibling lists (drafts, outbox, templates) hosted as tabs. The tab
+     * Which of the lists (drafts, outbox, templates) the page is showing. The tab
      * bodies are nested Livewire components shared with their standalone pages.
      */
     #[Url(as: 'tab')]
-    public EmailPageTab $tab = EmailPageTab::EMAILS;
+    public EmailPageTab $tab = EmailPageTab::DRAFTS;
 
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;

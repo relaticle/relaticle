@@ -56,8 +56,6 @@ function makeDraft(User $user, ConnectedAccount $account, array $overrides = [])
 
 it('defaults to the first tab and switches between tabs', function (): void {
     Livewire::test(EmailInboxPage::class)
-        ->assertSet('tab', EmailPageTab::EMAILS)
-        ->call('setTab', 'drafts')
         ->assertSet('tab', EmailPageTab::DRAFTS)
         ->call('setTab', 'outbox')
         ->assertSet('tab', EmailPageTab::OUTBOX)
