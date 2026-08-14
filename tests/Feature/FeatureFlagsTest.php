@@ -195,6 +195,12 @@ describe('Marketing', function (): void {
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
+        // refreshApplication() discards TestCase::setUp state; the fresh app needs
+        // the Vite stub, the lazy database hook, and the OnboardSeed kill-switch back.
+        $this->withoutVite();
+        $this->refreshDatabase();
+        Feature::define(OnboardSeed::class, false);
+
         $this->get('/')->assertRedirect(url()->getAppUrl('login'));
         $this->get('/pricing')->assertRedirect(url()->getAppUrl('login'));
         $this->get('/contact')->assertRedirect(url()->getAppUrl('login'));
@@ -216,6 +222,10 @@ describe('Marketing', function (): void {
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
+        $this->withoutVite();
+        $this->refreshDatabase();
+        Feature::define(OnboardSeed::class, false);
+
         $this->get('/developers')->assertOk();
         $this->get('/help')->assertOk();
 
@@ -233,6 +243,10 @@ describe('Marketing', function (): void {
         RouteServiceProvider::loadCachedRoutesUsing(null);
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
+
+        $this->withoutVite();
+        $this->refreshDatabase();
+        Feature::define(OnboardSeed::class, false);
 
         $user = User::factory()->withPersonalTeam()->create();
         $team = Team::factory()->create();
