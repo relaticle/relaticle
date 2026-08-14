@@ -187,6 +187,9 @@ describe('Marketing', function (): void {
     });
 
     it('redirects marketing routes to the app login when the feature is inactive', function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
         putenv('RELATICLE_FEATURE_MARKETING=false');
         $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
         CachedState::$cachedRoutes = null;
@@ -196,8 +199,12 @@ describe('Marketing', function (): void {
         $this->refreshApplication();
 
         // refreshApplication() discards TestCase::setUp state; the fresh app needs
-        // the Vite stub, the lazy database hook, and the OnboardSeed kill-switch back.
+        // the Vite stub, the parallel-testing database (the fresh app re-reads the
+        // un-suffixed phpunit env default), the lazy database hook, and the
+        // OnboardSeed kill-switch back.
         $this->withoutVite();
+        config()->set("database.connections.{$connection}.database", $database);
+        $this->app['db']->purge();
         $this->refreshDatabase();
         Feature::define(OnboardSeed::class, false);
 
@@ -214,6 +221,9 @@ describe('Marketing', function (): void {
     });
 
     it('keeps /developers and /help reachable when the feature is inactive', function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
         putenv('RELATICLE_FEATURE_MARKETING=false');
         $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
         CachedState::$cachedRoutes = null;
@@ -223,6 +233,8 @@ describe('Marketing', function (): void {
         $this->refreshApplication();
 
         $this->withoutVite();
+        config()->set("database.connections.{$connection}.database", $database);
+        $this->app['db']->purge();
         $this->refreshDatabase();
         Feature::define(OnboardSeed::class, false);
 
@@ -236,6 +248,9 @@ describe('Marketing', function (): void {
     });
 
     it('renders a guest-layout page outside the marketing group when the feature is inactive', function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
         putenv('RELATICLE_FEATURE_MARKETING=false');
         $_ENV['RELATICLE_FEATURE_MARKETING'] = $_SERVER['RELATICLE_FEATURE_MARKETING'] = 'false';
         CachedState::$cachedRoutes = null;
@@ -245,6 +260,8 @@ describe('Marketing', function (): void {
         $this->refreshApplication();
 
         $this->withoutVite();
+        config()->set("database.connections.{$connection}.database", $database);
+        $this->app['db']->purge();
         $this->refreshDatabase();
         Feature::define(OnboardSeed::class, false);
 
