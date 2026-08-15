@@ -692,8 +692,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $primaryEmailEntries = $this->primaryEmailEntriesForPeople($peopleIds, $teamId);
         $options = [];
-        $companyCounts = [];
-        $companyEmails = [];
 
         foreach ($people as $person) {
             $personId = (string) $person->getKey();
@@ -710,36 +708,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'description' => $email,
                 'email' => $email,
             ];
-
-            if ($person->company_id === null) {
-                continue;
-            }
-
-            $companyId = (string) $person->company_id;
-            $companyCounts[$companyId] = ($companyCounts[$companyId] ?? 0) + 1;
-            $companyEmails[$companyId][] = $email;
         }
 
-        $companyOptions = Company::query()
-            ->where('team_id', $teamId)
-            ->whereKey(array_keys($companyCounts))
-            ->orderBy('name')
-            ->limit(100)
-            ->get(['id', 'name'])
-            ->map(function (Company $company) use ($companyCounts, $companyEmails): array {
-                $companyId = (string) $company->getKey();
-
-                return [
-                    'type' => 'company_team',
-                    'id' => $companyId,
-                    'label' => $company->name,
-                    'description' => __('filament/emails/composer.fields.company_team'),
-                    'count' => $companyCounts[$companyId],
-                    'emails' => $companyEmails[$companyId],
-                ];
-            });
-
-        foreach ($companyOptions as $companyOption) {
+        foreach ($this->companyTeamRecipientOptions($teamId) as $companyOption) {
             $options[] = $companyOption;
         }
 
@@ -794,6 +765,76 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->to = $nextRecipients;
+    }
+
+    /**
+     * @return list<array{
+     *     type: 'company_team',
+     *     id: string,
+     *     label: string,
+     *     description: string,
+     *     count: int,
+     *     emails: list<string>,
+     * }>
+     */
+    private function companyTeamRecipientOptions(string $teamId): array
+    {
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->whereNotNull('company_id')
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_id']);
+
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $primaryEmailEntries = $this->primaryEmailEntriesForPeople($peopleIds, $teamId);
+        $companyCounts = [];
+        $companyEmails = [];
+
+        foreach ($people as $person) {
+            $email = $this->primaryEmailForPersonId($primaryEmailEntries, (string) $person->getKey());
+
+            if ($email === null) {
+                continue;
+            }
+
+            if ($person->company_id === null) {
+                continue;
+            }
+
+            $companyId = (string) $person->company_id;
+            $companyCounts[$companyId] = ($companyCounts[$companyId] ?? 0) + 1;
+            $companyEmails[$companyId][] = $email;
+        }
+
+        if ($companyCounts === []) {
+            return [];
+        }
+
+        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, emails: list<string>}> */
+        return Company::query()
+            ->where('team_id', $teamId)
+            ->whereKey(array_keys($companyCounts))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(function (Company $company) use ($companyCounts, $companyEmails): array {
+                $companyId = (string) $company->getKey();
+
+                return [
+                    'type' => 'company_team',
+                    'id' => $companyId,
+                    'label' => $company->name,
+                    'description' => __('filament/emails/composer.fields.company_team'),
+                    'count' => $companyCounts[$companyId],
+                    'emails' => $companyEmails[$companyId],
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
