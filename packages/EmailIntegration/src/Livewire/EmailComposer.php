@@ -798,7 +798,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         foreach ($people as $person) {
             $email = $this->primaryEmailForPersonId($primaryEmailEntries, (string) $person->getKey());
 
-            if ($email === null || $person->company_id === null) {
+            if ($email === null) {
+                continue;
+            }
+
+            if ($person->company_id === null) {
                 continue;
             }
 
