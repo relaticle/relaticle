@@ -65,6 +65,7 @@ use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Comments\CommentsConfig;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
@@ -135,6 +136,12 @@ final class AppServiceProvider extends ServiceProvider
 
         Passport::useAuthCodeModel(McpAuthCode::class);
         Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
+
+        CommentsConfig::resolveTenantUsing(function (): ?string {
+            $tenant = Filament::getTenant();
+
+            return $tenant instanceof Team ? (string) $tenant->getKey() : null;
+        });
 
         // Connectors are long-lived but must not be immortal: a user who revokes one from
         // the Access Tokens page should not be outlived by a year-long bearer token.

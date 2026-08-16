@@ -65,6 +65,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
+use Relaticle\Comments\CommentsPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
@@ -215,6 +216,7 @@ final class AppPanelProvider extends PanelProvider
                     ->authorize(fn () => Gate::check('update', Filament::getTenant()))
                     ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
+                CommentsPlugin::make(),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,

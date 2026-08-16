@@ -22,6 +22,9 @@
 /* Activity Log */
 @source '../../../../vendor/relaticle/activity-log/resources/views/**/*';
 
+/* Comments */
+@source '../../../../vendor/relaticle/comments/resources/views/**/*.blade.php';
+
 /* ===================================
    Relaticle Brand Theme Customization
    Pure Tailwind CSS Classes Only

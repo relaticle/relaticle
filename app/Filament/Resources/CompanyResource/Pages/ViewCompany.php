@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
+use Relaticle\Comments\Filament\Actions\CommentsAction;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewCompany extends ViewRecord
@@ -30,6 +31,7 @@ final class ViewCompany extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            CommentsAction::make(),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
