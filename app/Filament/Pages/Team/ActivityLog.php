@@ -25,7 +25,10 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
@@ -85,6 +88,9 @@ final class ActivityLog extends Page implements HasTable
     #[Url(as: 'sort')]
     public ?string $tableSort = null;
 
+    /** @var array<string, Model>|null */
+    private ?array $liveSubjects = null;
+
     #[Override]
     public static function shouldRegisterNavigation(): bool
     {
@@ -125,10 +131,11 @@ final class ActivityLog extends Page implements HasTable
     }
 
     /**
-     * One save writes two rows — the trait's own event and, when custom fields
-     * moved, a sibling under `custom_field_changes` sharing a `batch_uuid`.
-     * Reporting both would show a phantom update alongside every create, so the
-     * sibling is dropped and its payload carried onto the surviving row.
+     * One save writes the trait's own event plus one `custom_field_changes` row
+     * per custom field that moved, all sharing a `batch_uuid`. Reporting them
+     * all put a phantom update next to every create, so they collapse onto a
+     * single surviving row — the native event when there is one, otherwise the
+     * first custom-field row — which carries every sibling payload with it.
      */
     public function table(Table $table): Table
     {
@@ -137,16 +144,18 @@ final class ActivityLog extends Page implements HasTable
                 Activity::query()
                     ->select('activity_log.*')
                     ->addSelect(['batch_custom_field_properties' => $this->sameSave(DB::table('activity_log', 'sibling'))
-                        ->select('sibling.properties')
-                        ->where('sibling.event', self::CUSTOM_FIELD_EVENT)
-                        ->limit(1),
+                        ->selectRaw('json_agg(sibling.properties order by sibling.id)')
+                        ->where('sibling.event', self::CUSTOM_FIELD_EVENT),
                     ])
                     ->whereNot(fn (Builder $query): Builder => $query
                         ->where('event', self::CUSTOM_FIELD_EVENT)
                         ->whereNotNull('batch_uuid')
                         ->whereExists(fn (QueryBuilder $sibling): QueryBuilder => $this->sameSave($sibling)
-                            ->whereNot('sibling.event', self::CUSTOM_FIELD_EVENT)))
-                    ->with(['causer', 'subject'])
+                            ->whereRaw(
+                                '(case when sibling.event = ? then 1 else 0 end, sibling.id) < (1, activity_log.id)',
+                                [self::CUSTOM_FIELD_EVENT],
+                            )))
+                    ->with('causer')
             )
             ->defaultSort('created_at', 'desc')
             ->recordUrl($this->subjectUrl(...))
@@ -259,7 +268,7 @@ final class ActivityLog extends Page implements HasTable
             }
         }
 
-        $subject = $record->subject;
+        $subject = $this->liveSubject($record);
 
         if ($subject instanceof Model) {
             $name = $subject->getAttribute('name') ?? $subject->getAttribute('title');
@@ -276,11 +285,64 @@ final class ActivityLog extends Page implements HasTable
     {
         $resource = self::SUBJECT_RESOURCES[$record->subject_type] ?? null;
 
-        if ($resource === null || ! $record->subject instanceof Model) {
+        if ($resource === null || ! $this->liveSubject($record) instanceof Model) {
             return null;
         }
 
         return $resource::getUrl('view', ['record' => $record->subject_id]);
+    }
+
+    /**
+     * Resolved for the whole page at once rather than through `subject`, because
+     * a morph alias whose model has since been removed from the codebase — a
+     * stale row from a retired feature — makes eager loading the relation throw
+     * and takes the entire audit log down with it. Unknown aliases simply have
+     * no live record; the row still renders from its own payload.
+     */
+    private function liveSubject(Activity $record): ?Model
+    {
+        $this->liveSubjects ??= $this->resolveLiveSubjects();
+
+        return $this->liveSubjects[$record->subject_type.':'.$record->subject_id] ?? null;
+    }
+
+    /**
+     * @return array<string, Model>
+     */
+    private function resolveLiveSubjects(): array
+    {
+        $this->liveSubjects = [];
+
+        $morphMap = Relation::morphMap();
+        $idsByType = [];
+
+        $records = $this->getTableRecords();
+
+        foreach ($records instanceof Collection ? $records->all() : $records->items() as $row) {
+            $type = (string) $row->getAttribute('subject_type');
+
+            if (isset($morphMap[$type])) {
+                $idsByType[$type][] = $row->getAttribute('subject_id');
+            }
+        }
+
+        $resolved = [];
+
+        foreach ($idsByType as $type => $ids) {
+            /** @var class-string<Model> $model */
+            $model = $morphMap[$type];
+
+            $subjects = $model::query()
+                ->withoutGlobalScopes([SoftDeletingScope::class])
+                ->whereKey(array_values(array_unique($ids)))
+                ->get();
+
+            foreach ($subjects as $subject) {
+                $resolved[$type.':'.$subject->getKey()] = $subject;
+            }
+        }
+
+        return $resolved;
     }
 
     private function eventLabel(?string $state): string

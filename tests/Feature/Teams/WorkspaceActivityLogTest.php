@@ -210,6 +210,94 @@ test('a create and a delete in one request both stay on the record', function ()
         ->assertSee(__('teams.activity.events.deleted'));
 });
 
+/**
+ * Each custom field that moves is logged as its own row, so a save touching
+ * three fields writes three siblings — not one.
+ */
+function seedCustomFieldRow(object $test, Company $company, string $batch, string $label, string $old, string $new): Activity
+{
+    return Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $test->owner->getKey(),
+        'team_id' => $test->team->getKey(),
+        'batch_uuid' => $batch,
+        'properties' => ['custom_field_changes' => [['label' => $label, 'old' => $old, 'new' => $new]]],
+    ]);
+}
+
+test('a save touching several custom fields shows every one of them', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Many Fields Co']);
+    $batch = (string) Str::uuid();
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'created',
+        'event' => 'created',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'attribute_changes' => ['attributes' => ['name' => 'Many Fields Co']],
+    ]);
+
+    seedCustomFieldRow($this, $company, $batch, 'Status', 'None', 'To do');
+    seedCustomFieldRow($this, $company, $batch, 'Priority', 'None', 'High');
+    seedCustomFieldRow($this, $company, $batch, 'Due Date', 'None', '2026-08-08');
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Status: None → To do', escape: false)
+        ->assertSee('Priority: None → High', escape: false)
+        ->assertSee('Due Date: None → 2026-08-08', escape: false);
+});
+
+test('custom field rows with no native sibling collapse without borrowing each others diffs', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Field Only Co']);
+    $batch = (string) Str::uuid();
+
+    $first = seedCustomFieldRow($this, $company, $batch, 'Priority', 'Medium', 'High');
+    $second = seedCustomFieldRow($this, $company, $batch, 'Description', 'Old copy', 'New copy');
+    $third = seedCustomFieldRow($this, $company, $batch, 'Due Date', '2026-07-20', '2026-08-20');
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords([$first])
+        ->assertCanNotSeeTableRecords([$second, $third])
+        ->assertSee('Priority: Medium → High', escape: false)
+        ->assertSee('Description: Old copy → New copy', escape: false)
+        ->assertSee('Due Date: 2026-07-20 → 2026-08-20', escape: false);
+});
+
+test('a stale morph alias whose model is gone does not take the page down', function (): void {
+    $orphan = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'meeting.created',
+        'event' => 'meeting.created',
+        'subject_type' => 'meeting',
+        'subject_id' => '01kxn0qpzsz9hb0tseg3xy01mm',
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'properties' => ['title' => 'Quarterly review call'],
+    ]);
+
+    Company::factory()->for($this->team)->create(['name' => 'Neighbour Co'])->delete();
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords([$orphan])
+        ->assertSee('Neighbour Co')
+        ->sortTable('created_at')
+        ->assertOk();
+});
+
 test('renaming a record does not rewrite its history', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Original Name Ltd']);
     $company->update(['name' => 'Renamed Name Ltd']);

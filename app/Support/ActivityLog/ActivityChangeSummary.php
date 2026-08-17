@@ -63,52 +63,70 @@ final readonly class ActivityChangeSummary
     }
 
     /**
-     * The custom-field half of a save is logged as its own row. The audit table
-     * collapses a save to a single row, so the surviving row carries its
-     * sibling's payload in `batch_custom_field_properties`.
+     * Each custom field that moved is logged as its own row. The audit table
+     * collapses a save to a single row, so the survivor carries every sibling
+     * payload — including its own — aggregated into
+     * `batch_custom_field_properties`. Rows written outside a batch have no
+     * aggregate and speak for themselves.
      *
      * @return list<string>
      */
     private static function customFieldLines(Activity $activity): array
     {
-        $properties = $activity->properties?->toArray() ?? [];
-
-        $sibling = $activity->getAttribute('batch_custom_field_properties');
-
-        if (is_string($sibling)) {
-            /** @var array<string, mixed>|null $decoded */
-            $decoded = json_decode($sibling, true);
-
-            if (is_array($decoded)) {
-                $properties = [...$properties, ...$decoded];
-            }
-        }
-
-        $changes = $properties['custom_field_changes'] ?? null;
-
-        if (! is_array($changes)) {
-            return [];
-        }
+        $payloads = self::aggregatedPayloads($activity)
+            ?? [$activity->properties?->toArray() ?? []];
 
         $lines = [];
 
-        foreach ($changes as $change) {
-            if (! is_array($change)) {
+        foreach ($payloads as $payload) {
+            $changes = $payload['custom_field_changes'] ?? null;
+
+            if (! is_array($changes)) {
                 continue;
             }
 
-            $label = $change['label'] ?? $change['code'] ?? null;
-            $before = self::stringify($change['old'] ?? null);
-            $after = self::stringify($change['new'] ?? null);
+            foreach ($changes as $change) {
+                if (! is_array($change)) {
+                    continue;
+                }
 
-            if (! is_string($label) || $before === $after) {
-                continue;
+                $label = $change['label'] ?? $change['code'] ?? null;
+                $before = self::stringify($change['old'] ?? null);
+                $after = self::stringify($change['new'] ?? null);
+
+                if (! is_string($label) || $before === $after) {
+                    continue;
+                }
+
+                $line = $label.': '.$before.self::ARROW.$after;
+
+                if (! in_array($line, $lines, true)) {
+                    $lines[] = $line;
+                }
             }
-
-            $lines[] = $label.': '.$before.self::ARROW.$after;
         }
 
         return $lines;
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private static function aggregatedPayloads(Activity $activity): ?array
+    {
+        $aggregate = $activity->getAttribute('batch_custom_field_properties');
+
+        if (! is_string($aggregate)) {
+            return null;
+        }
+
+        $decoded = json_decode($aggregate, true);
+
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        return array_values(array_filter($decoded, is_array(...)));
     }
 
     private static function stringify(mixed $value): string
