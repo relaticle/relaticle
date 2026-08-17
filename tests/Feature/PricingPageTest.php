@@ -37,7 +37,26 @@ it('emits product json-ld on the pricing page', function (): void {
     $this->get('/pricing')
         ->assertOk()
         ->assertSee('application/ld+json', false)
-        ->assertSee('"@type":"Product"', false);
+        ->assertSee('"@type":"Product"', false)
+        ->assertSee('"brand":{"@type":"Brand","name":"Relaticle"}', false)
+        ->assertSee('"availability":"https://schema.org/InStock"', false);
+});
+
+it('lists three existing aspect-ratio images in the product json-ld', function (): void {
+    $html = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $html, $matches);
+
+    $graph = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+    $product = collect($graph['@graph'])->firstWhere('@type', 'Product');
+
+    expect($product['image'])->toHaveCount(3);
+
+    foreach ($product['image'] as $url) {
+        $path = public_path((string) parse_url((string) $url, PHP_URL_PATH));
+
+        expect(file_exists($path))->toBeTrue("Missing product image on disk: {$url}");
+    }
 });
 
 it('answers common pricing questions on the page', function (): void {
