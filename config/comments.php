@@ -52,12 +52,10 @@ return [
 
     'mentions' => [
         /*
-         | Disabled until relaticle/comments ships the fix routing the editor's
-         | @mention autocomplete through the resolver below (relaticle/comments#30).
-         | The current release's autocomplete queries every user in the database,
-         | which would leak user names across workspaces.
+         | Enable @mention autocomplete in the comment editor and mention
+         | notifications. Set to false to turn the feature off entirely.
          */
-        'enabled' => false,
+        'enabled' => true,
 
         'resolver' => TeamMentionResolver::class,
         'max_results' => 5,

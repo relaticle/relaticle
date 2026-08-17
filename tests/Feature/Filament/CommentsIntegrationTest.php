@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Services\TeamMentionResolver;
 use Filament\Facades\Filament;
+use Relaticle\Comments\CommentsConfig;
 use Relaticle\Comments\Livewire\Comments;
 use Relaticle\Comments\Models\Comment;
 
@@ -80,4 +81,14 @@ it('includes the workspace owner in mention lookups', function (): void {
     $resolver = resolve(TeamMentionResolver::class);
 
     expect($resolver->search($this->user->name)->sole()->getKey())->toBe($this->user->getKey());
+});
+
+it('scopes editor mention autocomplete to workspace members', function (): void {
+    $teammate = User::factory()->create(['name' => 'Teammate Tessa']);
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+    User::factory()->withTeam()->create(['name' => 'Teammate Rival']);
+
+    $results = CommentsConfig::makeMentionProvider()->getSearchResults('Teammate');
+
+    expect($results)->toBe([$teammate->getKey() => 'Teammate Tessa']);
 });

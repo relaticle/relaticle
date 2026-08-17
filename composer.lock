@@ -10129,16 +10129,16 @@
         },
         {
             "name": "relaticle/comments",
-            "version": "v1.0.4",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/comments.git",
-                "reference": "4680d37e8ae8617efc321a8ac51819082c3493df"
+                "reference": "45059e7ca523c995d36fafaba85f0c858c7b44fa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/comments/zipball/4680d37e8ae8617efc321a8ac51819082c3493df",
-                "reference": "4680d37e8ae8617efc321a8ac51819082c3493df",
+                "url": "https://api.github.com/repos/relaticle/comments/zipball/45059e7ca523c995d36fafaba85f0c858c7b44fa",
+                "reference": "45059e7ca523c995d36fafaba85f0c858c7b44fa",
                 "shasum": ""
             },
             "require": {
@@ -10155,9 +10155,9 @@
                 "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.0",
                 "orchestra/testbench": "^10.0|^11.0",
-                "pestphp/pest": "^3.0|^4.0",
-                "pestphp/pest-plugin-laravel": "^3.0|^4.0",
-                "pestphp/pest-plugin-livewire": "^3.0|^4.0"
+                "pestphp/pest": "^3.0|^4.0|^5.0",
+                "pestphp/pest-plugin-laravel": "^3.0|^4.0|^5.0",
+                "pestphp/pest-plugin-livewire": "^3.0|^4.0|^5.0"
             },
             "type": "library",
             "extra": {
@@ -10180,7 +10180,7 @@
             "description": "A full-featured commenting system for Filament panels",
             "support": {
                 "issues": "https://github.com/relaticle/comments/issues",
-                "source": "https://github.com/relaticle/comments/tree/v1.0.4"
+                "source": "https://github.com/relaticle/comments/tree/v1.1.1"
             },
             "funding": [
                 {
@@ -10188,7 +10188,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-15T22:50:55+00:00"
+            "time": "2026-08-17T12:03:48+00:00"
         },
         {
             "name": "relaticle/custom-fields",
