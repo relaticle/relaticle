@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Support\DetectsPublicMarkdownRequest;
+use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use Spatie\MarkdownResponse\Actions\GeneratesCacheKey;
 use Spatie\MarkdownResponse\Postprocessors\CollapseBlankLinesPostprocessor;
 use Spatie\MarkdownResponse\Postprocessors\RemoveHtmlTagsPostprocessor;
@@ -80,6 +81,7 @@ return [
      */
     'postprocessors' => [
         RemoveHtmlTagsPostprocessor::class,
+        DecodeHtmlEntitiesPostprocessor::class,
         CollapseBlankLinesPostprocessor::class,
     ],
 
