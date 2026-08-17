@@ -67,6 +67,12 @@ never edit past rows.
 | 2026-08-13 | Twenty alternatives | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
 | 2026-08-13 | Twenty alternatives | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
 
+## Infrastructure log
+
+| date | item | status |
+|---|---|---|
+| 2026-08-17 | awesome-selfhosted submission — PR [#2918](https://github.com/awesome-selfhosted/awesome-selfhosted-data/pull/2918) (`software/relaticle.yml`) | **Closed without comment** by maintainer `Rabenherz112` at 17:21Z, 5h36m after opening. No review body, no canned reply, no CI (the repo runs no checks on PRs). Every published criterion is met: first release v1.0.0 2025-04-26 (>4 months), 78 tags, repo pushed same day, AGPL-3.0 in `licenses.yml`, tag name matches `tags/customer-relationship-management-crm.yml`, platforms `PHP`/`Docker` both exist, description 128 chars (<250), `relaticle.com/developers/self-hosting` serves working Docker Compose instructions. Not an additions freeze — external `Add X` PRs merged on 2026-08-16/17. Reason unknown; see reply draft in `.context/awesome-selfhosted-2918-reply-draft.md`. |
+
 ## Reachability notes for next run
 
 - ChatGPT and Claude require a founder-logged-in `agent-browser` session
