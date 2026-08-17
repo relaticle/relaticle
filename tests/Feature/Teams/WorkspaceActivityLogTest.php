@@ -9,6 +9,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 
 mutates(ActivityLog::class);
 
@@ -104,6 +106,153 @@ test('a member without the admin role cannot open the audit log', function (): v
 
 test('an admin can open the audit log over http', function (): void {
     $this->get(ActivityLog::getUrl(tenant: $this->team))->assertSuccessful();
+});
+
+test('one save is one row, even when custom fields log their own event', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Batched Co']);
+
+    $batch = (string) Str::uuid();
+
+    $native = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'created',
+        'event' => 'created',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'attribute_changes' => ['attributes' => ['name' => 'Batched Co']],
+    ]);
+
+    $sibling = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'properties' => ['custom_field_changes' => [['label' => 'ICP', 'old' => null, 'new' => 'Yes']]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords([$native])
+        ->assertCanNotSeeTableRecords([$sibling])
+        ->assertSee('ICP: — → Yes', escape: false);
+});
+
+test('one batch spanning two records keeps each record its own row and payload', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Batch Company']);
+    $person = People::factory()->for($this->team)->create(['name' => 'Batch Person']);
+
+    $batch = (string) Str::uuid();
+
+    $rows = collect([$company, $person])->map(fn ($record, $index) => Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'updated',
+        'event' => 'updated',
+        'subject_type' => $record->getMorphClass(),
+        'subject_id' => $record->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'attribute_changes' => ['attributes' => ['name' => $record->name], 'old' => ['name' => 'Was '.$index]],
+    ]));
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'properties' => ['custom_field_changes' => [['label' => 'Company Only Field', 'old' => null, 'new' => 'Set']]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords($rows->all())
+        ->assertSee('Batch Company')
+        ->assertSee('Batch Person')
+        ->assertSee('Company Only Field: — → Set', escape: false);
+});
+
+test('a create and a delete in one request both stay on the record', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Short Lived Co']);
+    $batch = (string) Str::uuid();
+
+    $rows = collect(['created', 'deleted'])->map(fn (string $event) => Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => $event,
+        'event' => $event,
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+        'attribute_changes' => ['attributes' => ['name' => 'Short Lived Co']],
+    ]));
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords($rows->all())
+        ->assertSee(__('teams.activity.events.created'))
+        ->assertSee(__('teams.activity.events.deleted'));
+});
+
+test('renaming a record does not rewrite its history', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Original Name Ltd']);
+    $company->update(['name' => 'Renamed Name Ltd']);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Original Name Ltd')
+        ->assertSee('Renamed Name Ltd');
+});
+
+test('it spells out what actually changed on a row', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Diff Co']);
+    $company->update(['name' => 'Diff Co Renamed']);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Diff Co → Diff Co Renamed', escape: false);
+});
+
+test('filter and sort state is bound to the url so a view can be shared', function (): void {
+    $page = new ReflectionClass(ActivityLog::class);
+
+    $bound = [];
+
+    foreach (['tableFilters', 'tableSort'] as $property) {
+        $attributes = $page->getProperty($property)->getAttributes(Url::class);
+        $bound[$property] = $attributes !== [];
+    }
+
+    expect($bound)->toBe([
+        'tableFilters' => true,
+        'tableSort' => true,
+    ]);
+});
+
+test('a shared filtered url renders already filtered', function (): void {
+    Company::factory()->for($this->team)->create(['name' => 'Still Here']);
+    Company::factory()->for($this->team)->create(['name' => 'Gone Already'])->delete();
+
+    livewire(ActivityLog::class, ['tableFilters' => ['event' => ['value' => 'deleted']]])
+        ->assertOk()
+        ->assertSee('Gone Already')
+        ->assertDontSee('Still Here');
 });
 
 test('a custom field edit reads as an update, not its raw event name', function (): void {

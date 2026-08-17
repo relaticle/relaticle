@@ -11,6 +11,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Models\ActivityLog\Activity;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\ActivityLog\ActivityChangeSummary;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -24,7 +25,10 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use Override;
 
 /**
@@ -58,11 +62,28 @@ final class ActivityLog extends Page implements HasTable
         'updated' => ['updated', 'custom_field_changes'],
     ];
 
+    private const string CUSTOM_FIELD_EVENT = 'custom_field_changes';
+
+    private const string NOTHING = '—';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
     protected static ?string $slug = 'team/activity';
 
     protected string $view = 'filament.pages.team.activity-log';
+
+    /**
+     * Filament binds these on resource list pages but not on a plain page, so a
+     * filtered audit view could not be reloaded, bookmarked, or handed to a
+     * colleague. Declared here to match every other table in the app.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[Url(as: 'filters')]
+    public ?array $tableFilters = null;
+
+    #[Url(as: 'sort')]
+    public ?string $tableSort = null;
 
     #[Override]
     public static function shouldRegisterNavigation(): bool
@@ -103,10 +124,30 @@ final class ActivityLog extends Page implements HasTable
         return __('teams.activity.description');
     }
 
+    /**
+     * One save writes two rows — the trait's own event and, when custom fields
+     * moved, a sibling under `custom_field_changes` sharing a `batch_uuid`.
+     * Reporting both would show a phantom update alongside every create, so the
+     * sibling is dropped and its payload carried onto the surviving row.
+     */
     public function table(Table $table): Table
     {
         return $table
-            ->query(Activity::query()->with(['causer', 'subject']))
+            ->query(
+                Activity::query()
+                    ->select('activity_log.*')
+                    ->addSelect(['batch_custom_field_properties' => $this->sameSave(DB::table('activity_log', 'sibling'))
+                        ->select('sibling.properties')
+                        ->where('sibling.event', self::CUSTOM_FIELD_EVENT)
+                        ->limit(1),
+                    ])
+                    ->whereNot(fn (Builder $query): Builder => $query
+                        ->where('event', self::CUSTOM_FIELD_EVENT)
+                        ->whereNotNull('batch_uuid')
+                        ->whereExists(fn (QueryBuilder $sibling): QueryBuilder => $this->sameSave($sibling)
+                            ->whereNot('sibling.event', self::CUSTOM_FIELD_EVENT)))
+                    ->with(['causer', 'subject'])
+            )
             ->defaultSort('created_at', 'desc')
             ->recordUrl($this->subjectUrl(...))
             ->emptyStateHeading(__('teams.activity.empty.heading'))
@@ -139,6 +180,14 @@ final class ActivityLog extends Page implements HasTable
                     ->label(__('teams.activity.columns.record'))
                     ->state($this->recordName(...))
                     ->wrap(),
+                TextColumn::make('batch_uuid')
+                    ->label(__('teams.activity.columns.changes'))
+                    ->state(ActivityChangeSummary::for(...))
+                    ->listWithLineBreaks()
+                    ->limitList(2)
+                    ->expandableLimitedList()
+                    ->placeholder(self::NOTHING)
+                    ->wrap(),
             ])
             ->filters([
                 SelectFilter::make('event')
@@ -169,35 +218,51 @@ final class ActivityLog extends Page implements HasTable
     }
 
     /**
-     * The record still on screen wins; otherwise fall back to the name captured
-     * in the activity payload, which is all that is left after a force delete.
+     * Rows written for one record inside one request. The batch is stamped per
+     * request, not per save, so a request touching several records shares it —
+     * the subject columns are what keep one record's payload off another's row.
+     *
+     * Only ever used to fold a `custom_field_changes` row into its native
+     * sibling. Collapsing the batch itself would swallow a genuine event, since
+     * a single request can legitimately create and then delete a record.
+     */
+    private function sameSave(QueryBuilder $sibling): QueryBuilder
+    {
+        return $sibling
+            ->from('activity_log', 'sibling')
+            ->whereColumn('sibling.batch_uuid', 'activity_log.batch_uuid')
+            ->whereColumn('sibling.team_id', 'activity_log.team_id')
+            ->whereColumn('sibling.subject_type', 'activity_log.subject_type')
+            ->whereColumn('sibling.subject_id', 'activity_log.subject_id');
+    }
+
+    /**
+     * The name the record carried at the time of the event wins. Reading the
+     * live record instead would rewrite history on every rename — and there is
+     * no live record left to read once it has been destroyed.
      */
     private function recordName(Activity $record): string
     {
-        $subject = $record->subject;
+        $changes = $record->attribute_changes?->toArray() ?? [];
 
-        if ($subject instanceof Model) {
-            $name = $subject->getAttribute('name') ?? $subject->getAttribute('title');
-
-            if (is_string($name) && $name !== '') {
-                return $name;
-            }
-        }
-
-        /** @var array<string, mixed> $properties */
-        $properties = [
-            ...($record->properties?->toArray() ?? []),
-            ...($record->attribute_changes?->toArray() ?? []),
-        ];
-
-        foreach (['old', 'attributes'] as $side) {
-            $values = $properties[$side] ?? null;
+        foreach (['attributes', 'old'] as $side) {
+            $values = $changes[$side] ?? null;
 
             if (! is_array($values)) {
                 continue;
             }
 
             $name = $values['name'] ?? $values['title'] ?? null;
+
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+        }
+
+        $subject = $record->subject;
+
+        if ($subject instanceof Model) {
+            $name = $subject->getAttribute('name') ?? $subject->getAttribute('title');
 
             if (is_string($name) && $name !== '') {
                 return $name;
