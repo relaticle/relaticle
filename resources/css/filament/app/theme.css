@@ -182,6 +182,12 @@
     @apply relative overflow-hidden transition-shadow duration-200 rounded-xl;
 }
 
+/* Filament hangs action badges outside the button box (top-right corner);
+   the overflow clip above would swallow the count on badged buttons. */
+.fi-btn:has(> .fi-btn-badge-ctn) {
+    @apply overflow-visible;
+}
+
 /* Icon Buttons */
 .fi-icon-btn {
     @apply rounded-xl;
