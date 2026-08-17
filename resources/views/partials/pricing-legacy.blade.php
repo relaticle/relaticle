@@ -39,7 +39,7 @@
             <ul class="space-y-3">
                 @foreach([
                     'Unlimited users and data',
-                    'MCP server with 30 tools',
+                    'MCP server with 32 tools',
                     'REST API with full CRUD',
                     '22 custom field types',
                     'Multi-team workspaces',
@@ -104,7 +104,7 @@
             <ul class="space-y-3">
                 @foreach([
                     'Unlimited users and data',
-                    'MCP server with 30 tools',
+                    'MCP server with 32 tools',
                     'REST API with full CRUD',
                     '22 custom field types',
                     'Multi-team workspaces',

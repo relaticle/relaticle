@@ -27,7 +27,7 @@
 
                 <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
                     Open-source, self-hosted, and human-first.<br class="hidden sm:block"/>
-                    Built-in AI chat plus 30 MCP tools for external agents.
+                    Built-in AI chat plus 32 MCP tools for external agents.
                 </p>
             </div>
 
