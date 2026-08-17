@@ -35,6 +35,7 @@ use App\Services\GitHubService;
 use App\Services\TurnstileClient;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -110,6 +111,16 @@ final class AppServiceProvider extends ServiceProvider
         // provider registers after the package's, so this binding wins;
         // Turnstile::fake() still swaps it, as it goes through the facade.
         $this->app->scoped(ClientInterface::class, fn (): TurnstileClient => new TurnstileClient);
+
+        // Spatie's LeagueDriver never registers TableConverter, so <table>
+        // markup collapses to a run-on line in the markdown-response channel.
+        // Our provider registers after the package's, so this binding wins.
+        $this->app->singleton(
+            'markdown-response.driver.league',
+            fn (): TableAwareLeagueDriver => new TableAwareLeagueDriver(
+                config('markdown-response.driver_options.league.options', []),
+            ),
+        );
     }
 
     /**
