@@ -60,6 +60,7 @@ use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
+use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
@@ -146,6 +147,17 @@ final class AppServiceProvider extends ServiceProvider
 
         Passport::useAuthCodeModel(McpAuthCode::class);
         Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
+
+        // The grantable scopes for the v1 REST API -- EnsureTokenHasAbility maps
+        // each HTTP method onto one of them. laravel/mcp appends its own
+        // `mcp:use` from an app-booted callback, which runs after this, so
+        // registering the catalog here does not drop it.
+        Passport::tokensCan([
+            'read' => 'Read your CRM records',
+            'create' => 'Create new CRM records',
+            'update' => 'Update existing CRM records',
+            'delete' => 'Delete CRM records',
+        ]);
 
         // Connectors are long-lived but must not be immortal: a user who revokes one from
         // the Access Tokens page should not be outlived by a year-long bearer token.
@@ -317,12 +329,30 @@ final class AppServiceProvider extends ServiceProvider
         Livewire::component(Notifications::class, FilamentNotifications::class);
     }
 
+    /**
+     * The per-token rate-limit key, or null when the credential has no token id.
+     *
+     * Neither guard's TransientToken implements getKey(), so session credentials
+     * must fall back to per-IP keying rather than fatal here.
+     */
+    private function rateLimitTokenId(?object $token): ?string
+    {
+        return match (true) {
+            $token instanceof PersonalAccessToken => (string) $token->getKey(),
+            // Read the id straight off the token's attributes: getKey() would
+            // forward to the oauth_access_tokens row and hydrate it on every
+            // rate-limited request, and fatals once that row is purged.
+            $token instanceof PassportAccessToken => (string) $token->oauth_access_token_id,
+            default => null,
+        };
+    }
+
     private function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request): array {
             /** @var User|null $user */
             $user = $request->user();
-            $tokenId = $user?->currentAccessToken()?->getKey();
+            $tokenId = $this->rateLimitTokenId($user?->currentAccessToken());
             $teamId = $user?->currentTeam?->getKey();
             $key = $tokenId ?: $request->ip();
 

@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use League\OAuth2\Server\Exception\OAuthServerException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
@@ -110,6 +111,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // They are user-state noise, not actionable errors — keep them out of
         // Sentry (issue #125406836).
         $exceptions->dontReport(CorruptComponentPayloadException::class);
+
+        // Passport's TokenGuard report()s every bearer token league rejects
+        // (TokenGuard::getPsrRequestViaBearerToken). Since the v1 API accepts the
+        // `api` guard, each expired token or scanner probe would otherwise burn
+        // Sentry budget on a routine 401. Only the client-error side is muted:
+        // league wraps unexpected failures during token issuance in this same
+        // class as a 500 (OAuthServerException::serverError), and losing those
+        // would blind the /oauth/token path MCP connectors depend on.
+        $exceptions->dontReportWhen(
+            fn (Throwable $e): bool => $e instanceof OAuthServerException && $e->getHttpStatusCode() < 500,
+        );
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('app:generate-sitemap')->daily();

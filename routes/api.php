@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
-    ->middleware([ForceJsonResponse::class, 'auth:sanctum', 'throttle:api', EnsureTokenHasAbility::class, SetApiTeamContext::class, EnsureHostedWorkspaceAccess::class])
+    ->middleware([ForceJsonResponse::class, 'auth:sanctum,api', 'throttle:api', EnsureTokenHasAbility::class, SetApiTeamContext::class, EnsureHostedWorkspaceAccess::class])
     ->group(function (): void {
         Route::get('user', function (Request $request) {
             return new UserResource($request->user());
