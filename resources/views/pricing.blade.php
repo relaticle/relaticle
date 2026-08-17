@@ -246,18 +246,26 @@
                 ->name('Relaticle')
                 ->description('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.')
                 ->url(route('pricing'))
+                ->image([
+                    asset('images/product-preview-16x9.jpg'),
+                    asset('images/product-preview-4x3.jpg'),
+                    asset('images/product-preview-1x1.jpg'),
+                ])
+                ->brand(\Spatie\SchemaOrg\Schema::brand()->name('Relaticle'))
                 ->offers($billingActive
                     ? [
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Self-hosted')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Cloud Pro')
                             ->price('19')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Per workspace, billed yearly at $228/year ($19/mo); $24/mo billed monthly.'),
                     ]
@@ -266,12 +274,14 @@
                             ->name('Self-hosted')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Cloud')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free hosted plan, managed by Relaticle.'),
                     ]

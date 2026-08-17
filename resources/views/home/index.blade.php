@@ -54,7 +54,7 @@
             ->organization(fn ($org) => $org
                 ->name('Relaticle')
                 ->url(url('/'))
-                ->logo(asset('favicon.svg'))
+                ->logo(asset('web-app-manifest-512x512.png'))
                 ->sameAs(array_filter([
                     'https://github.com/relaticle/relaticle',
                     config('services.discord.invite_url'),

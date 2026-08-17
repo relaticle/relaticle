@@ -44,6 +44,18 @@ describe('Home page', function () {
         $response->assertSee('alt="Relaticle companies list showing account owner, ICP status, and website domain for each company"', false);
         $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
     });
+
+    it('uses an existing raster logo in the organization json-ld', function () {
+        $html = (string) $this->get('/')->assertStatus(200)->getContent();
+
+        preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $html, $matches);
+
+        $graph = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        $organization = collect($graph['@graph'])->firstWhere('@type', 'Organization');
+
+        expect($organization['logo'])->toEndWith('/web-app-manifest-512x512.png')
+            ->and(file_exists(public_path('web-app-manifest-512x512.png')))->toBeTrue();
+    });
 });
 
 describe('Legal pages', function () {
