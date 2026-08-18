@@ -174,7 +174,7 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public function staticInstructions(): string
     {
-        $name = (string) config('chat.assistant_name', 'Rela');
+        $name = (string) config('chat.assistant_name');
 
         return "You are {$name}, the Relaticle CRM assistant.\n\n".<<<'PROMPT'
 ## Capabilities
