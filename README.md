@@ -43,6 +43,7 @@ Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any A
 - **Multi-Team Isolation** - 5-layer authorization with team-scoped data and workspaces
 - **Modern Tech Stack** - Laravel 13, Filament 5, PHP 8.4, 2,000+ automated tests
 - **Privacy-First** - Self-hosted, AGPL-3.0, your data stays on your server
+- **Agent Plugin Ready** - [`plugins/relaticle-crm-operator`](plugins/relaticle-crm-operator) packages Relaticle's MCP workflow guidance as an installable plugin with a focused CRM Skill and eval cases.
 
 # Requirements
 
