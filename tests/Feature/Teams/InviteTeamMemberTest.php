@@ -82,6 +82,23 @@ test('team members cannot be invited with a disposable email address', function 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
 
+test('admin cannot invite a new member as admin', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($admin);
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'newadmin@example.com',
+            'role' => 'admin',
+        ])
+        ->call('addTeamMember', $this->team)
+        ->assertForbidden();
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
+
 test('owner can manage members and promote to admin', function (): void {
     $owner = User::factory()->withTeam()->create();
     $team = $owner->currentTeam;

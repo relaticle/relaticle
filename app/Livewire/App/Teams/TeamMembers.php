@@ -124,7 +124,10 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             return;
         }
 
-        if ($data['role'] === TeamRole::Admin->value && ! Gate::check('promoteToAdmin', $team)) {
+        $touchesAdminStatus = $data['role'] === TeamRole::Admin->value
+            || $teamMember->role === TeamRole::Admin->value;
+
+        if ($touchesAdminStatus && ! Gate::check('promoteToAdmin', $team)) {
             $this->sendNotification(
                 __('teams.notifications.permission_denied.cannot_promote_to_admin'),
                 type: 'danger'

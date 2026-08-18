@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
@@ -29,6 +30,10 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
     public function invite(User $user, Team $team, string $email, ?string $role = null): void
     {
         Gate::forUser($user)->authorize('addTeamMember', $team);
+
+        if ($role === TeamRole::Admin->value) {
+            Gate::forUser($user)->authorize('promoteToAdmin', $team);
+        }
 
         $this->validate($team, $email, $role);
 
