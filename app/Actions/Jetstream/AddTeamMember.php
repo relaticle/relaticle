@@ -8,6 +8,8 @@ use App\Models\Team;
 use App\Models\User;
 use Closure;
 use Illuminate\Contracts\Validation\Rule;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Jetstream\Contracts\AddsTeamMembers;
@@ -31,9 +33,14 @@ final readonly class AddTeamMember implements AddsTeamMembers
 
         event(new AddingTeamMember($team, $newTeamMember));
 
-        $team->users()->attach(
-            $newTeamMember, ['role' => $role]
-        );
+        try {
+            DB::transaction(fn () => $team->users()->attach(
+                $newTeamMember, ['role' => $role]
+            ));
+        } catch (UniqueConstraintViolationException) {
+            // A concurrent request already attached this member and fired the event.
+            return;
+        }
 
         event(new TeamMemberAdded($team, $newTeamMember));
     }
