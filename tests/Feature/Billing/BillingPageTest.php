@@ -48,24 +48,24 @@ it('shows trial CTA to an owner who never trialed', function (): void {
         ->assertSee(__('billing.trial.start_button'));
 });
 
-it('hides the trial CTA once the user used a trial', function (): void {
-    [$user] = billingPageOwner();
-    $user->forceFill(['pro_trial_used_at' => now()])->save();
+it('hides the trial CTA once the workspace used its trial', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['pro_trial_used_at' => now()])->save();
 
     livewire(Billing::class)
         ->assertDontSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.upgrade.button'));
 });
 
-it('does not offer a manual trial to a new hosted workspace', function (): void {
+it('offers the trial to a hosted workspace that never received one', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $team] = billingPageOwner();
     $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
     livewire(Billing::class)
-        ->assertDontSee(__('billing.trial.start_button'))
+        ->assertSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.paused.title'))
-        ->assertSee(__('billing.upgrade.unlock'))
+        ->assertSee(__('billing.upgrade.now'))
         ->assertSee('$19')
         ->assertSee(__('billing.pro_plan.billed_yearly'))
         ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
@@ -80,9 +80,9 @@ it('starts a trial via the page action', function (): void {
         ->and($team->onGenericTrial())->toBeTrue();
 });
 
-it('refuses a manual trial to a new hosted workspace even when called directly', function (): void {
+it('refuses a second trial on a workspace even when called directly', function (): void {
     [, $team] = billingPageOwner();
-    $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
+    $team->forceFill(['pro_trial_used_at' => now()])->save();
 
     livewire(Billing::class)->call('startTrial');
 
