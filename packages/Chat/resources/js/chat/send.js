@@ -1,0 +1,506 @@
+// sendMessage, retry/resume, rate-limit handling, and the optimistic user
+// bubble. Spread into the `chatInterface` Alpine component alongside
+// transcriptModule() and streamModule(): see chat-interface.blade.php for
+// the composition. `sendUrl`, `createConversationUrl`, and `conversationsUrl`
+// replace what were `@js(...)` Blade calls inline in these method bodies
+// before the move; they carry the exact same route values.
+export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl }) => ({
+    input: '',
+    streamAbortController: null,
+
+    // When the user types + sends during an active stream, we stash the
+    // message here, clear the editor (so they see their intent was accepted),
+    // and auto-flush this on handleStreamEnd / cancel / failure.
+    queuedSend: null,
+
+    // Active send-throttle window: {secondsLeft, timerId, document}. While set,
+    // the composer is soft-disabled with a countdown and the stashed message
+    // auto-sends the moment the window opens. Cancel keeps the text, drops the
+    // auto-send.
+    rateLimit: null,
+
+    // Scoped lookup of THIS chat-interface's TipTap editor. Avoids the
+    // window.__chatEditor global that breaks when multiple chat-interface
+    // instances render simultaneously (e.g. side panel + main page).
+    //
+    // We deliberately use `document.querySelector` scoped by data-chat-context
+    // rather than `this.$root.querySelector` because Livewire's morphdom can
+    // briefly detach children from the chat-interface root during a re-render,
+    // and `this.$root.querySelector` returns null for the editor wrapper in
+    // that window — which is exactly when sendMessage() needs it most to
+    // call clear() after a send. Both this.$root and the chatEditor wrapper
+    // expose data-chat-context, so the selector is unambiguous.
+    // Documents stashed in Alpine state come back as reactive Proxies, and
+    // TipTap's setDocument structuredClones its input — Proxies cannot be
+    // structuredCloned, so the call throws and silently kills whatever line
+    // was next (this lost queued messages AND broke rate-limit auto-send
+    // before it was found). Always unwrap to plain JSON first.
+    plainDocument(doc) {
+        if (!doc) return null;
+        try {
+            return JSON.parse(JSON.stringify(doc));
+        } catch (_) {
+            return null;
+        }
+    },
+
+    async regenerateMessage(index) {
+        if (this.isStreaming) return;
+
+        let userIndex = -1;
+        for (let i = index - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'user') {
+                userIndex = i;
+                break;
+            }
+        }
+        if (userIndex === -1) return;
+
+        const userMsg = this.messages[userIndex];
+        if (!(await this.supersedeServerTurns(userMsg))) return;
+
+        const userText = userMsg.content;
+        this.messages.splice(userIndex);
+
+        this.input = userText;
+        this.localEditor()?.setText(userText);
+        this.$nextTick(() => this.sendMessage());
+    },
+
+    // Tell the server the turns from this user message onward are replaced.
+    // Without this, the local splice is cosmetic: reload resurrects the old
+    // turns (with the user row duplicated) and the model keeps them in its
+    // history. Persisted messages anchor by id; optimistic ones (no id yet)
+    // anchor by content against the latest user row server-side.
+    async supersedeServerTurns(userMsg) {
+        if (!this.conversationId) return true;
+        try {
+            const res = await fetch(conversationsUrl + '/' + this.conversationId + '/messages/supersede', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    anchor_id: userMsg.id ?? null,
+                    anchor_content: userMsg.id ? null : (userMsg.content || null),
+                }),
+            });
+            return res.ok;
+        } catch {
+            return false;
+        }
+    },
+
+    documentFromInput(text) {
+        const trimmed = text.trim();
+        if (trimmed === '') {
+            return { type: 'doc', content: [] };
+        }
+        return {
+            type: 'doc',
+            content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: trimmed }],
+            }],
+        };
+    },
+
+    async sendMessage() {
+        if (this.hasPendingProposal) return;
+        if (this.rateLimit) return;
+
+        const editor = this.localEditor();
+        const text = (editor?.getText() ?? this.input).trim();
+        if (!text) return;
+        if (text.length > 5000) return;
+
+        // If a previous turn is still streaming, queue this message and clear
+        // the editor so the user sees their intent was accepted. handleStreamEnd
+        // (or cancel / failure) will flush this queue.
+        if (this.isStreaming) {
+            this.queuedSend = {
+                document: this.localEditor()?.getDocument() ?? this.documentFromInput(text),
+                model: this.selectedModel,
+            };
+            this.localEditor()?.clear();
+            this.input = '';
+            return;
+        }
+
+        // Claim the lock SYNCHRONOUSLY so a second tick of sendMessage() bails at the
+        // guard above. Any failure path between here and the existing isStreaming=false
+        // resets must keep that invariant.
+        this.isStreaming = true;
+
+        // The user moved on without acting on any prior proposals. Server will
+        // confirm via .pending_actions_superseded; we update locally so the
+        // approve/reject buttons disappear immediately.
+        this.markPendingActionsSuperseded();
+
+        const isFirstMessage = !this.conversationId;
+        const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
+        // Captured once per send: the pill attaches to THIS message only. Both the
+        // optimistic bubble below and the request payload further down must read
+        // the SAME snapshot — re-reading activePageContext() after the consumed
+        // flag flips would silently drop it from the outgoing request.
+        const contextForSend = this.activePageContext();
+
+        if (isFirstMessage) {
+            const nowIso = new Date().toISOString();
+            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+            this.pageContextConsumed = true;
+            this.mintAssistantStub();
+            this.localEditor()?.clear();
+            this.input = '';
+            this.currentToolStatus = null;
+
+            let newId = null;
+            try {
+                // Step 1: create the conversation row. Server returns the id
+                // immediately without dispatching the AI job. Channel auth
+                // requires this row to exist, so we must complete this before
+                // attempting to subscribe.
+                const createRes = await fetch(createConversationUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                    body: JSON.stringify({
+                        document: payload,
+                        model: this.selectedModel !== 'auto' ? this.selectedModel : undefined,
+                    }),
+                });
+
+                if (!createRes.ok) {
+                    const body = await createRes.json().catch(() => ({}));
+
+                    if (createRes.status === 429 && body?.error === 'rate_limited') {
+                        this.handleSendRateLimit(body, payload);
+                        return;
+                    }
+
+                    const assistantMsg = this.messages[this.messages.length - 1];
+
+                    if (createRes.status === 401 || createRes.status === 419) {
+                        try { localStorage.setItem('chat:draft', text); } catch (_) { /* ignore */ }
+                        assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
+                        assistantMsg.sessionExpired = true;
+                    } else {
+                        assistantMsg.content = body?.errors?.document?.[0] ?? body?.message ?? `Error ${createRes.status}: ${createRes.statusText}`;
+                    }
+                    assistantMsg.rendered = true;
+                    this.isStreaming = false;
+                    this.restoreInputFocus();
+                    return;
+                }
+
+                newId = (await createRes.json()).conversation_id;
+                this.conversationId = newId;
+
+                // Step 2: subscribe BEFORE dispatching the job so the broadcasts
+                // emitted during the streaming job land on a live channel. The
+                // row exists at this point so channel auth will succeed.
+                await this.subscribeToConversation(newId);
+
+                // Step 3: update the URL so a reload keeps the conversation.
+                const url = new URL(window.location.href);
+                url.pathname = url.pathname.replace(/\/chats\/?$/, `/chats/${newId}`);
+                url.search = '';
+                url.hash = '';
+                history.replaceState(null, '', url.toString());
+
+                window.dispatchEvent(new CustomEvent('chat:conversation-created', {
+                    detail: { id: newId },
+                }));
+
+                // Step 4: trigger the AI by hitting the existing send endpoint.
+                // It reserves a credit, dispatches ProcessChatMessage, and the
+                // job's broadcasts arrive on our already-subscribed channel.
+                this.startStreamTimeout();
+                this.scrollToBottom(true);
+
+                this.streamAbortController = new AbortController();
+
+                const sendRes = await fetch(sendUrl.replace(/\/$/, '') + '/' + newId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                    body: JSON.stringify({
+                        document: payload,
+                        conversation_id: newId,
+                        model: this.selectedModel,
+                        page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
+                    }),
+                    signal: this.streamAbortController.signal,
+                });
+
+                if (!sendRes.ok) {
+                    const body = await sendRes.json().catch(() => ({}));
+
+                    if (sendRes.status === 429 && body?.error === 'rate_limited') {
+                        this.handleSendRateLimit(body, payload);
+                        return;
+                    }
+
+                    const assistantMsg = this.messages[this.messages.length - 1];
+
+                    if (sendRes.status === 402 && body?.error === 'credits_exhausted') {
+                        const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
+                        assistantMsg.paywall = {
+                            heading: "You've used all your AI credits",
+                            body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
+                            upgrade_url: body.top_up_url || body.upgrade_url || '/app',
+                        };
+                        assistantMsg.content = '';
+                    } else {
+                        assistantMsg.content = body?.message || `Error ${sendRes.status}: ${sendRes.statusText}`;
+                    }
+                    assistantMsg.rendered = true;
+                    this.isStreaming = false;
+                    this.clearStreamTimeout();
+                    this.restoreInputFocus();
+                    return;
+                }
+            } catch (error) {
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+                const assistantMsg = this.messages[this.messages.length - 1];
+                assistantMsg.content = 'Network error. Please try again.';
+                assistantMsg.rendered = true;
+                this.isStreaming = false;
+                this.clearStreamTimeout();
+                this.restoreInputFocus();
+            }
+
+            return;
+        }
+
+        if (!this.channel) {
+            await this.subscribeToConversation(this.conversationId);
+        } else if (this.channel.readyPromise) {
+            await this.channel.readyPromise;
+        }
+
+        const nowIso = new Date().toISOString();
+        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
+        this.pageContextConsumed = true;
+        this.localEditor()?.clear();
+        this.input = '';
+        this.currentToolStatus = null;
+
+        this.mintAssistantStub();
+
+        const url = this.conversationId
+            ? sendUrl.replace(/\/$/, '') + '/' + this.conversationId
+            : sendUrl;
+
+        this.startStreamTimeout();
+
+        this.streamAbortController = new AbortController();
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    document: payload,
+                    conversation_id: this.conversationId,
+                    model: this.selectedModel,
+                    page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
+                }),
+                signal: this.streamAbortController.signal,
+            });
+
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+
+                if (response.status === 429 && body?.error === 'rate_limited') {
+                    this.handleSendRateLimit(body, payload);
+                    return;
+                }
+
+                const assistantMsg = this.messages[this.messages.length - 1];
+
+                if (response.status === 401 || response.status === 419) {
+                    try { localStorage.setItem('chat:draft', text); } catch (_) { /* ignore */ }
+                    assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
+                    assistantMsg.sessionExpired = true;
+                    assistantMsg.rendered = true;
+                    this.isStreaming = false;
+                    this.clearStreamTimeout();
+                    this.restoreInputFocus();
+                    return;
+                }
+
+                if (response.status === 402 && body?.error === 'credits_exhausted') {
+                    const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
+                    assistantMsg.paywall = {
+                        heading: "You've used all your AI credits",
+                        body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
+                        upgrade_url: body.top_up_url || body.upgrade_url || '/app',
+                    };
+                    assistantMsg.content = '';
+                } else {
+                    assistantMsg.content = body.message || `Error ${response.status}: ${response.statusText}`;
+                }
+
+                assistantMsg.rendered = true;
+                this.isStreaming = false;
+                this.clearStreamTimeout();
+                this.restoreInputFocus();
+                return;
+            }
+
+            const body = await response.json();
+            if (body.conversation_id && body.conversation_id !== this.conversationId) {
+                this.conversationId = body.conversation_id;
+                this.subscribeToConversation(body.conversation_id);
+            }
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
+
+            const assistantMsg = this.messages[this.messages.length - 1];
+            assistantMsg.content = 'Network error. Please try again.';
+            assistantMsg.rendered = true;
+            this.isStreaming = false;
+            this.clearStreamTimeout();
+            this.restoreInputFocus();
+        }
+
+        this.scrollToBottom(true);
+    },
+
+    async cancelStream() {
+        if (this.conversationId) {
+            try {
+                await fetch(conversationsUrl + '/' + this.conversationId + '/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                });
+            } catch (_) { /* best-effort */ }
+        }
+
+        try { this.streamAbortController?.abort(); } catch (_) { /* ignore */ }
+        this.streamAbortController = null;
+
+        this.unsubscribe();
+        this.clearStreamTimeout();
+
+        const assistantMsg = this.messages[this.messages.length - 1];
+        if (assistantMsg?.role === 'assistant') {
+            if (!assistantMsg.content) {
+                assistantMsg.content = 'Cancelled.';
+            }
+            assistantMsg.rendered = true;
+            assistantMsg.prerendered = false;
+        }
+
+        this.currentToolStatus = null;
+        this.isStreaming = false;
+        this.queuedSend = null;
+        this.restoreInputFocus();
+    },
+
+    async retryTurn(msg) {
+        if (this.isStreaming) return;
+        if (msg._retrying) return;
+
+        // Failed user turn: the server never stored the message — re-send the
+        // preceding user message from local state (same flow as edit-resend).
+        // Compute userIndex BEFORE committing to any state change so the no-op
+        // path never sets _retrying.
+        const idx = this.messages.indexOf(msg);
+        let userIndex = -1;
+        for (let i = idx - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'user') { userIndex = i; break; }
+        }
+        if (userIndex === -1) return;
+
+        const userText = this.messages[userIndex].content;
+        // Splice exactly the user message at userIndex plus the failed assistant
+        // bubble (msg) when it sits directly after — no further messages removed.
+        const removeCount = (this.messages[userIndex + 1] === msg) ? 2 : 1;
+        this.messages.splice(userIndex, removeCount);
+        this.input = userText;
+        this.localEditor()?.setText(userText);
+        this.$nextTick(() => this.sendMessage());
+    },
+
+    // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
+    // text back in the composer, and count down to an automatic re-send. The
+    // user keeps everything they typed; nothing fake lands in the transcript.
+    handleSendRateLimit(body, payload) {
+        const stub = this.messages[this.messages.length - 1];
+        if (stub?.role === 'assistant' && !stub.content && !stub.rendered && !(stub.pending_actions || []).length) {
+            this.messages.pop();
+        }
+        const userMsg = this.messages[this.messages.length - 1];
+        if (userMsg?.role === 'user' && !userMsg.editing) {
+            this.messages.pop();
+        }
+
+        this.localEditor()?.setDocument?.(payload);
+
+        this.isStreaming = false;
+        this.clearStreamTimeout();
+        // +1s margin: re-sending at the exact Retry-After boundary lands back
+        // in the closing window and 429s again (observed live).
+        this.startRateLimitCountdown(Math.max(2, (Number(body?.retry_after_seconds) || 30) + 1), payload);
+        this.restoreInputFocus();
+    },
+
+    startRateLimitCountdown(seconds, document = null) {
+        this.clearRateLimit();
+        this.rateLimit = { secondsLeft: seconds, timerId: null, document };
+        this.rateLimit.timerId = setInterval(() => {
+            if (!this.rateLimit) return;
+            this.rateLimit.secondsLeft -= 1;
+            if (this.rateLimit.secondsLeft > 0) return;
+            const doc = this.plainDocument(this.rateLimit.document);
+            this.clearRateLimit();
+            if (doc) {
+                this.localEditor()?.setDocument?.(doc);
+            }
+            // setTimeout, NOT $nextTick: an exception in any effect sharing
+            // Alpine's flush queue (e.g. the banner tearing down) would drop a
+            // queued nextTick callback — observed live. A macrotask is isolated.
+            setTimeout(() => this.sendMessage(), 50);
+        }, 1000);
+    },
+
+    clearRateLimit() {
+        if (this.rateLimit?.timerId) {
+            clearInterval(this.rateLimit.timerId);
+        }
+        this.rateLimit = null;
+    },
+
+    flushQueuedSend() {
+        if (!this.queuedSend) return;
+        const queued = this.queuedSend;
+        this.queuedSend = null;
+        if (queued.model && this.modelOptions.some((o) => o.value === queued.model)) {
+            this.selectedModel = queued.model;
+        }
+        this.$nextTick(() => {
+            this.localEditor()?.setDocument?.(this.plainDocument(queued.document));
+            this.sendMessage();
+        });
+    },
+});
