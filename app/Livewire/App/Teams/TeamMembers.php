@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\Teams;
 
 use App\Actions\Jetstream\RemoveTeamMember as RemoveTeamMemberAction;
+use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Membership;
 use App\Models\Team;
@@ -117,6 +118,15 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
         if (! Gate::check('updateTeamMember', $team)) {
             $this->sendNotification(
                 __('teams.notifications.permission_denied.cannot_update_team_member'),
+                type: 'danger'
+            );
+
+            return;
+        }
+
+        if ($data['role'] === TeamRole::Admin->value && ! Gate::check('promoteToAdmin', $team)) {
+            $this->sendNotification(
+                __('teams.notifications.permission_denied.cannot_promote_to_admin'),
                 type: 'danger'
             );
 
