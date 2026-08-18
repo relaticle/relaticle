@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Models\CustomField;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -23,6 +23,7 @@ final readonly class CustomFieldsFilterTranslator
 {
     public function __construct(
         private CustomFieldFilterSchema $filterSchema,
+        private CustomFieldOptionMap $optionMap,
     ) {}
 
     /**
@@ -70,7 +71,7 @@ final readonly class CustomFieldsFilterTranslator
                     ]);
                 }
 
-                $translated[$code][$operator] = $this->translateOperand($code, $options[$code] ?? [], $operand);
+                $translated[$code][$operator] = $this->translateOperand($code, $options[$code] ?? ['ids' => [], 'labels' => []], $operand);
             }
         }
 
@@ -80,31 +81,34 @@ final readonly class CustomFieldsFilterTranslator
     /**
      * Choice fields match on option IDs; a field with no options passes through as sent.
      *
-     * @param  array<string, string>  $options  lowercased label => option id
+     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
      */
-    private function translateOperand(string $code, array $options, mixed $operand): mixed
+    private function translateOperand(string $code, array $entry, mixed $operand): mixed
     {
-        if ($options === []) {
+        if ($entry['ids'] === []) {
             return $operand;
         }
 
         if (is_array($operand)) {
-            return array_map(fn (mixed $label): string => $this->optionId($code, $options, $label), $operand);
+            return array_map(fn (mixed $label): string => $this->optionId($code, $entry, $label), $operand);
         }
 
-        return $this->optionId($code, $options, $operand);
+        return $this->optionId($code, $entry, $operand);
     }
 
     /**
-     * @param  array<string, string>  $options  lowercased label => option id
+     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
      */
-    private function optionId(string $code, array $options, mixed $label): string
+    private function optionId(string $code, array $entry, mixed $label): string
     {
-        $id = $options[mb_strtolower((string) $label)] ?? null;
+        $id = $this->optionMap->idFor($entry, (string) $label);
 
         if ($id === null) {
+            // The stored casing, not the lowercased match keys — this string is read
+            // by the assistant and echoed to the user.
             throw ValidationException::withMessages([
-                'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".implode(', ', $options === [] ? ['none'] : array_keys($options)).'.',
+                'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
+                    implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
             ]);
         }
 
@@ -112,30 +116,19 @@ final readonly class CustomFieldsFilterTranslator
     }
 
     /**
-     * Lowercased option label => option id, per field code.
-     *
      * @param  list<string>  $codes
-     * @return array<string, array<string, string>>
+     * @return array<string, array{ids: array<string, string>, labels: list<string>}>
      */
     private function optionsByCode(User $user, string $entityType, array $codes): array
     {
-        $fieldsTable = (string) config('custom-fields.database.table_names.custom_fields');
-        $optionsTable = (string) config('custom-fields.database.table_names.custom_field_options');
-        $tenantKey = (string) config('custom-fields.database.column_names.tenant_foreign_key');
-
-        $rows = DB::table("{$fieldsTable} as f")
-            ->join("{$optionsTable} as o", 'o.custom_field_id', '=', 'f.id')
-            ->where("f.{$tenantKey}", $user->currentTeam->getKey())
-            ->where('f.entity_type', $entityType)
-            ->whereIn('f.code', $codes)
-            ->get(['f.code as field_code', 'o.id as option_id', 'o.name as option_name']);
-
-        $options = [];
-
-        foreach ($rows as $row) {
-            $options[(string) $row->field_code][mb_strtolower((string) $row->option_name)] = (string) $row->option_id;
-        }
-
-        return $options;
+        return $this->optionMap->fromFields(
+            CustomField::query()
+                ->where('tenant_id', $user->currentTeam->getKey())
+                ->where('entity_type', $entityType)
+                ->whereIn('code', $codes)
+                ->active()
+                ->with('options')
+                ->get(),
+        );
     }
 }

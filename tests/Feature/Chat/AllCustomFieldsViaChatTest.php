@@ -18,9 +18,12 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
+use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
@@ -250,3 +253,35 @@ function morphAliasForCustomFieldsTest(Model $model): string
         default => throw new RuntimeException('unsupported model'),
     };
 }
+
+it('accepts an option label in any casing when writing a choice field', function (string $label): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => $label]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(optionLabelForCustomFieldsTest($task, 'status'))->toBe('In progress');
+})->with(['In progress', 'in progress', 'IN PROGRESS', 'In Progress']);
+
+it('resolves an option label identically whether filtering or writing', function (string $label, bool $valid): void {
+    Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    $readAccepted = true;
+    try {
+        resolve(CustomFieldsFilterTranslator::class)
+            ->translate($this->user, 'task', ['status' => ['eq' => $label]]);
+    } catch (ValidationException) {
+        $readAccepted = false;
+    }
+
+    $writeAccepted = resolve(CustomFieldsRequestValidator::class)
+        ->validate($this->user, 'task', ['status' => $label])->error === null;
+
+    expect($readAccepted)->toBe($valid)
+        ->and($writeAccepted)->toBe($valid);
+})->with([
+    'exact casing' => ['In progress', true],
+    'lowercased' => ['in progress', true],
+    'uppercased' => ['IN PROGRESS', true],
+    'not an option' => ['Bananas', false],
+]);
