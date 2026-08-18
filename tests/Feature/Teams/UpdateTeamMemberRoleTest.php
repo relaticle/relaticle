@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
+use App\Livewire\App\Teams\TeamMembers;
+use App\Models\Membership;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Livewire;
 
-mutates(User::class);
+mutates(User::class, TeamMembers::class);
 
 test('team member roles can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
@@ -45,6 +49,33 @@ test('editor cannot update team member roles', function () {
     expect($otherUser->fresh()->hasTeamRole(
         $user->currentTeam->fresh(), 'editor'
     ))->toBeTrue();
+});
+
+test('admin cannot promote another member to admin', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $admin = User::factory()->create();
+    $team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $editor = User::factory()->create();
+    $team->users()->attach($editor, ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($admin);
+    Filament::setTenant($team);
+
+    $editorMembership = Membership::query()
+        ->where('team_id', $team->id)
+        ->where('user_id', $editor->id)
+        ->firstOrFail();
+
+    livewire(TeamMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table($editorMembership), data: [
+            'role' => TeamRole::Admin->value,
+        ])
+        ->assertNotified(__('teams.notifications.permission_denied.cannot_promote_to_admin'));
+
+    expect($editor->fresh()->hasTeamRole($team->fresh(), TeamRole::Editor->value))->toBeTrue();
 });
 
 test('viewer is a registered team role with only read ability', function (): void {
