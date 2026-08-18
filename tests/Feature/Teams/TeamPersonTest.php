@@ -7,6 +7,7 @@ use App\Models\Membership;
 use App\Models\TeamInvitation;
 use App\Models\TeamPerson;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 mutates(TeamPerson::class);
 
@@ -38,8 +39,23 @@ test('the unified query returns members and invitations with distinct keys', fun
 });
 
 test('the unified query is scoped to one team', function (): void {
-    $team = User::factory()->withTeam()->create()->currentTeam;
-    $otherTeam = User::factory()->withTeam()->create()->currentTeam;
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $attachedMember = User::factory()->create();
+    $team->users()->attach($attachedMember, ['role' => TeamRole::Editor->value]);
+
+    $team->teamInvitations()->create([
+        'email' => 'pending@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $otherOwner = User::factory()->withTeam()->create();
+    $otherTeam = $otherOwner->currentTeam;
+
+    $otherMember = User::factory()->create();
+    $otherTeam->users()->attach($otherMember, ['role' => TeamRole::Editor->value]);
 
     $otherTeam->teamInvitations()->create([
         'email' => 'elsewhere@example.test',
@@ -47,8 +63,16 @@ test('the unified query is scoped to one team', function (): void {
         'expires_at' => now()->addDays(5),
     ]);
 
-    expect(TeamPerson::forTeam($team)->pluck('email'))
-        ->not->toContain('elsewhere@example.test');
+    // Pins all three union legs (owner, attached member, invitation) to this
+    // team and none of the other team's — deleting either team-scoping WHERE
+    // clause would still pass a looser assertion that only checks one email's
+    // absence, since both teams would otherwise be owner-only.
+    expect(TeamPerson::forTeam($team)->pluck('email')->all())
+        ->toEqualCanonicalizing([
+            $owner->email,
+            $attachedMember->email,
+            'pending@example.test',
+        ]);
 });
 
 test('an invitation row surfaces expires_at while a member row leaves it null', function (): void {
@@ -123,4 +147,24 @@ test('ordering by happened_at sorts member and invitation rows together', functi
         $attachedMember->email,
         'later@example.test',
     ]);
+});
+
+test('a stray team_user row for the owner does not produce a duplicate member row', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    DB::table('team_user')->insert([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'role' => TeamRole::Editor->value,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $rows = TeamPerson::forTeam($team)->get();
+
+    $ownerRows = $rows->where('user_id', $owner->id);
+
+    expect($ownerRows)->toHaveCount(1)
+        ->and($ownerRows->first()->id)->toBe('member:owner');
 });
