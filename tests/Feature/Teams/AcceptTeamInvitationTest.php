@@ -149,6 +149,19 @@ test('a GET on the accept link never joins the team', function (): void {
     expect($invitee->fresh()->belongsToTeam($this->team))->toBeFalse();
 });
 
+test('the token accept route never leaks the token via the Referer header', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)
+        ->get(route('team-invitations.token.accept', ['token' => $raw]))
+        ->assertOk()
+        ->assertHeader('Referrer-Policy', 'no-referrer');
+});
+
 test('a POST joins the team', function (): void {
     $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
     $raw = $invitation->issueToken();
