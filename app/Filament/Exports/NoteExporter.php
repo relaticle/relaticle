@@ -28,7 +28,7 @@ final class NoteExporter extends BaseExporter
             self::dateTimeColumn('updated_at', __('filament/exports.columns.updated_at')),
             self::dateTimeColumn('deleted_at', __('filament/exports.columns.deleted_at')),
 
-            ...CustomFields::exporter()->forModel(self::getModel())->columns(),
+            ...self::customFieldColumns(CustomFields::exporter()->forModel(self::getModel())->columns()),
         ];
     }
 

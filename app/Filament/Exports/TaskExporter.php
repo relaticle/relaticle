@@ -27,7 +27,7 @@ final class TaskExporter extends BaseExporter
             self::dateTimeColumn('created_at', __('filament/exports.columns.created_at')),
             self::dateTimeColumn('updated_at', __('filament/exports.columns.updated_at')),
 
-            ...CustomFields::exporter()->forModel(self::getModel())->columns(),
+            ...self::customFieldColumns(CustomFields::exporter()->forModel(self::getModel())->columns()),
         ];
     }
 

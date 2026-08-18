@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
+use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
@@ -442,10 +443,18 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
 
-        // Replaces the package's `date-time` definition to fix its table column, which
-        // renders stored UTC to every viewer — see App\Filament\CustomFields\DateTimeColumn.
-        // Deliberately not registered for `date`: a date has no time of day to convert.
-        CustomFieldsType::register(['date-time' => DateTimeFieldType::class]);
+        // Replaces the package's definitions so custom-field dates read the same as the
+        // native columns beside them: `date-time` swaps the table column, which otherwise
+        // renders stored UTC to every viewer (App\Filament\CustomFields\DateTimeColumn),
+        // and both swap the infolist entry, which otherwise hardcodes `Y-m-d H:i:s` on
+        // record pages (App\Filament\CustomFields\DateTimeEntry).
+        //
+        // `date` gets the entry only. A bare date has no time of day, so converting one
+        // would move it a day for every viewer west of UTC.
+        CustomFieldsType::register([
+            'date-time' => DateTimeFieldType::class,
+            'date' => DateFieldType::class,
+        ]);
 
         $this->configureCustomFieldSchemaInvalidation();
     }

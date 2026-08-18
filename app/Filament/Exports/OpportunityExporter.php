@@ -41,7 +41,7 @@ final class OpportunityExporter extends BaseExporter
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
 
             // Add all custom fields automatically
-            ...CustomFields::exporter()->forModel(self::getModel())->columns(),
+            ...self::customFieldColumns(CustomFields::exporter()->forModel(self::getModel())->columns()),
         ];
     }
 

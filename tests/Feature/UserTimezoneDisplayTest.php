@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Models\CustomField;
 use App\Models\Note;
+use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -12,6 +15,8 @@ use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -151,4 +156,50 @@ it('stops shipping the detection script once the user has a timezone', function 
     $this->get(Dashboard::getUrl(tenant: $user->personalTeam()))
         ->assertOk()
         ->assertDontSee('resolvedOptions().timeZone', escape: false);
+});
+
+/**
+ * A record's view page renders custom fields through the package's infolist entry, which
+ * hardcoded `Y-m-d H:i:s` when the package had no format configured — which it never does
+ * here. So the page printed `2026-08-19 08:30:00` for the same field the table beside it
+ * rendered as `Aug 19, 2026 08:30`. Same value, same row, two formats.
+ */
+it('renders a custom-field datetime on a record page in the panel format, not a raw literal', function (): void {
+    $user = actAsTokyoUser();
+
+    /** @var Team $team */
+    $team = $user->currentTeam;
+
+    TenantContextService::setTenantId($team->getKey());
+
+    $field = CustomField::query()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'people')
+        ->where('type', 'date-time')
+        ->first();
+
+    if (! $field instanceof CustomField) {
+        $field = CustomField::forceCreate([
+            'name' => 'Tz Meeting At',
+            'code' => 'tz_meeting_at',
+            'type' => 'date-time',
+            'entity_type' => 'people',
+            'tenant_id' => $team->getKey(),
+            'sort_order' => 97,
+            'active' => true,
+            'system_defined' => false,
+            'settings' => new CustomFieldSettingsData,
+        ]);
+    }
+
+    $person = People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creator_id' => $user->getKey(),
+    ]);
+    $person->saveCustomFieldValue($field, knownInstant()->toDateTimeString());
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertSuccessful()
+        ->assertSee('Aug 19, 2026 08:30')
+        ->assertDontSee('2026-08-19 08:30:00');
 });
