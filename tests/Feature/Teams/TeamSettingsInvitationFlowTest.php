@@ -9,6 +9,7 @@ use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Livewire\App\Teams\UpdateTeamName;
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -17,7 +18,6 @@ use Filament\Facades\Filament;
 use Filament\Schemas\Components\Livewire as LivewireComponent;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();

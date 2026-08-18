@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Enums\TeamRole;
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
@@ -21,7 +22,6 @@ use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
 
 final readonly class InviteTeamMember implements InvitesTeamMembers
@@ -54,7 +54,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
         ]);
 
         /** @var TeamInvitationModel $invitation */
-        $invitation->issueToken();
+        $rawToken = $invitation->issueToken();
         $invitation->save();
 
         // Queued, and deferred to after the transaction commits. The chat
@@ -64,7 +64,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
         // that row stayed locked. afterCommit() is what keeps the queue push
         // itself out of the transaction too: a rolled back approval must not
         // leave a real invitation email on its way.
-        Mail::to($invitation->email)->queue(new TeamInvitation($invitation)->afterCommit());
+        Mail::to($invitation->email)->queue(new TeamInvitationMail($invitation, $rawToken)->afterCommit());
 
         return $invitation;
     }
