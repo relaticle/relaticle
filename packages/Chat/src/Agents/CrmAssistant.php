@@ -109,9 +109,9 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
     public array $supersededProposals = [];
 
     /**
-     * Actions already resolved (approved/rejected/expired/superseded) since the
-     * last assistant turn, injected so the model knows their outcome even if the
-     * approval continuation never journaled them into the transcript.
+     * Every terminal action (approved/rejected/expired/superseded) on this
+     * conversation, re-injected each turn: resolutions never reach the replayed
+     * transcript, whose tool results keep claiming the proposal is pending.
      *
      * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>}>
      */
@@ -389,7 +389,9 @@ PROMPT;
         $lines = [
             '',
             '<resolved_actions>',
-            'These proposals were already decided by the user. Do not re-propose them.',
+            'These proposals were already decided by the user and their approval cards are gone.',
+            'NEVER describe a decided proposal as pending, awaiting approval, or "shown above".',
+            'Do not re-propose them on your own initiative. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal.',
             'Use an approved record id to continue any multi-step request still in progress.',
         ];
 

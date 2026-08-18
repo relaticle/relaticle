@@ -48,7 +48,11 @@ function seedResolvedAssistantMsg(string $conversationId, User $user, DateTimeIn
     ]);
 }
 
-it('surfaces only actions resolved after the last assistant message', function (): void {
+it('keeps actions resolved before the last assistant message in context', function (): void {
+    // Regression: a rejection followed by any later assistant turn used to fall
+    // out of the resolved window, leaving only the stale "pending approval"
+    // tool result in the replayed transcript — the model then told the user the
+    // proposal was still awaiting approval instead of proposing again.
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-1', $user);
@@ -58,10 +62,10 @@ it('surfaces only actions resolved after the last assistant message', function (
     PendingAction::query()->create([
         'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
-        'action_data' => ['title' => 'Stale'], 'display_data' => [],
-        'status' => PendingActionStatus::Approved, 'expires_at' => now(),
-        'resolved_at' => now()->subMinutes(10), 'result_data' => ['id' => 'old-id'],
+        'operation' => PendingActionOperation::Delete, 'entity_type' => 'task',
+        'action_data' => ['title' => 'Rejected before last turn'], 'display_data' => [],
+        'status' => PendingActionStatus::Rejected, 'expires_at' => now(),
+        'resolved_at' => now()->subMinutes(10),
     ]);
 
     PendingAction::query()->create([
@@ -73,14 +77,37 @@ it('surfaces only actions resolved after the last assistant message', function (
         'resolved_at' => now()->subMinute(), 'result_data' => ['id' => 'new-id'],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage('conv-1');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1');
 
-    expect($resolved)->toHaveCount(1)
-        ->and($resolved[0]['label'])->toBe('Fresh Task')
-        ->and($resolved[0]['status'])->toBe('approved')
-        ->and($resolved[0]['record_id'])->toBe('new-id')
-        ->and($resolved[0]['operation'])->toBe('create')
-        ->and($resolved[0]['entity_type'])->toBe('task');
+    expect($resolved)->toHaveCount(2)
+        ->and($resolved[0]['label'])->toBe('Rejected before last turn')
+        ->and($resolved[0]['status'])->toBe('rejected')
+        ->and($resolved[1]['label'])->toBe('Fresh Task')
+        ->and($resolved[1]['status'])->toBe('approved')
+        ->and($resolved[1]['record_id'])->toBe('new-id');
+});
+
+it('caps the context at the 20 newest resolutions, oldest first', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-1', $user);
+
+    foreach (range(1, 21) as $i) {
+        PendingAction::query()->create([
+            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
+            'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
+            'action_data' => ['title' => "Task {$i}"], 'display_data' => [],
+            'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+            'resolved_at' => now()->subMinutes(30 - $i), 'result_data' => ['id' => "id-{$i}"],
+        ]);
+    }
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1');
+
+    expect($resolved)->toHaveCount(20)
+        ->and($resolved[0]['label'])->toBe('Task 2')
+        ->and($resolved[19]['label'])->toBe('Task 21');
 });
 
 it('returns an empty list for another conversation', function (): void {
@@ -97,7 +124,7 @@ it('returns an empty list for another conversation', function (): void {
         'resolved_at' => now(), 'result_data' => ['id' => 'x'],
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage('other-conv'))->toBe([]);
+    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv'))->toBe([]);
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
@@ -118,7 +145,7 @@ it('surfaces an approval even when the continuation never journals it (Bug A)', 
 
     resolve(PendingActionService::class)->approve($pending, $user);
 
-    $resolved = resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage('conv-A');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-A');
 
     expect($resolved)->toHaveCount(1)
         ->and($resolved[0]['status'])->toBe('approved')

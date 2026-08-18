@@ -15,14 +15,16 @@ it('renders a resolved_actions block when set', function (): void {
     expect($instructions)->toContain('<resolved_actions>')
         ->and($instructions)->toContain('approved: create task "Review Q3" (id: 01ABC)')
         ->and($instructions)->toContain('rejected: create person "Sarah"')
-        ->and($instructions)->not->toContain('rejected: create person "Sarah" (id:');
+        ->and($instructions)->not->toContain('rejected: create person "Sarah" (id:')
+        ->and($instructions)->toContain('NEVER describe a decided proposal as pending')
+        ->and($instructions)->toContain('when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal');
 });
 
 it('omits the resolved_actions block when empty', function (): void {
     // The prose mentions the <resolved_actions> tag; the rendered block has a
     // unique content marker that must be absent when there are no resolved actions.
     expect((new CrmAssistant)->instructions())
-        ->not->toContain('These proposals were already decided by the user.');
+        ->not->toContain('These proposals were already decided by the user');
 });
 
 it('static instructions forbid enumerating proposal data in prose', function (): void {

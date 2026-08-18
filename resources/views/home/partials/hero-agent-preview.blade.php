@@ -27,7 +27,7 @@
 <div x-data="heroChat()"
      @hero-chat-reset.window="cancelInflight(); resetChat()"
      @hero-chat-animate.window="animateChat()"
-     class="hero-agent-preview relative bg-gray-50 dark:bg-gray-950 flex h-[520px] sm:h-[580px] md:h-[640px]">
+     class="hero-agent-preview relative bg-gray-50 dark:bg-zinc-950 flex h-[520px] sm:h-[580px] md:h-[640px]">
 
     {{-- Non-interactive overlay: blocks clicks, right-click, and drag.
          z-30 puts it above all panel content. --}}
@@ -41,6 +41,24 @@
          position itself within this column instead of the whole panel — that
          keeps the sidebar visible during the entry phase too. --}}
     <div class="relative flex-1 flex flex-col min-w-0">
+
+        {{-- Topbar — mirrors the real fi-topbar: sidebar toggle on the left,
+             "Ask Relaticle" outlined trigger + user avatar on the right. The Ask
+             pill only exists on the dashboard in the real app, so the script
+             fades it out during the entry → conversation transition. Sits above
+             the entry overlay (which starts at top-10) so it stays visible in
+             both phases, exactly like the real shell. --}}
+        <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white px-3 dark:border-white/[0.06] dark:bg-zinc-900">
+            <x-heroicon-o-bars-3 class="w-4 h-4 text-gray-400 md:hidden dark:text-zinc-500"/>
+            <x-heroicon-o-chevron-left class="hidden w-4 h-4 text-gray-400 md:block dark:text-zinc-500"/>
+            <div class="flex items-center gap-2">
+                <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-zinc-200 dark:ring-white/10">
+                    <x-heroicon-o-chat-bubble-left-ellipsis class="w-3.5 h-3.5" aria-hidden="true"/>
+                    <span>Ask Relaticle</span>
+                </span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
+            </div>
+        </div>
 
         {{-- Conversation title — mirrors app chat-page H1: large, bold, left-aligned, no chrome --}}
         <div class="hero-agent-title px-4 sm:px-6 md:px-8 pt-5 pb-3">
@@ -74,7 +92,7 @@
             // before the loop restarts.
             prompts: [
                 { text: "What's overdue this week?", charMs: 55 },
-                { text: 'Mark them all as done.', charMs: 38 },
+                { text: 'Mark the Kovra demo as done.', charMs: 38 },
                 { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 28 }
             ],
             // Entry phase budget — first prompt is typed into the centered
@@ -100,10 +118,10 @@
                     el.style.opacity = '';
                     el.style.transform = '';
                 });
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '';
-                    el.style.transform = '';
-                });
+                this.resetDock();
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask) ask.style.opacity = '';
+                this.setShellActive('home');
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
@@ -121,6 +139,45 @@
                 this.clearEntryComposer();
             },
 
+            // Restore the shell chrome to its dashboard state (Home active,
+            // Ask pill back). Runs once the entry curtain is opaque over the
+            // chat column, so the sidebar/topbar change lands at the same
+            // moment the "page" changes — like a real navigation.
+            restoreShellToDashboard() {
+                this.setShellActive('home');
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (!ask) return;
+                if (getComputedStyle(ask).opacity !== '1' && typeof animate === 'function') {
+                    animate(ask, { opacity: [0, 1] }, { duration: 0.3, ease: this.ease });
+                } else {
+                    ask.style.opacity = '';
+                }
+            },
+
+            // Swap the sidebar's active item between Home (dashboard phase) and
+            // the demo conversation, mirroring how the real shell highlights the
+            // current page. Labels and icons both carry the active primary tone.
+            setShellActive(which) {
+                var home = this.$root.querySelector('#hero-shell-nav-home');
+                var chat = this.$root.querySelector('#hero-shell-nav-chat');
+                if (!home || !chat) return;
+                var itemOn = ['bg-gray-100', 'dark:bg-zinc-800', 'font-medium', 'text-primary-700', 'dark:text-primary-400'];
+                var itemOff = ['text-gray-700', 'dark:text-zinc-200'];
+                var iconOn = ['text-primary-700', 'dark:text-primary-400'];
+                var iconOff = ['text-gray-400', 'dark:text-zinc-500'];
+                var apply = function(el, active) {
+                    el.classList.remove.apply(el.classList, active ? itemOff : itemOn);
+                    el.classList.add.apply(el.classList, active ? itemOn : itemOff);
+                    var icon = el.querySelector('svg');
+                    if (icon) {
+                        icon.classList.remove.apply(icon.classList, active ? iconOff : iconOn);
+                        icon.classList.add.apply(icon.classList, active ? iconOn : iconOff);
+                    }
+                };
+                apply(home, which === 'home');
+                apply(chat, which === 'chat');
+            },
+
             // Reset only the conversation layer (messages, cards, title, scroll,
             // composer). Run while the entry curtain covers the column so the
             // clear is invisible. Leaves the entry layer untouched.
@@ -135,14 +192,69 @@
                     el.style.opacity = '';
                     el.style.transform = '';
                 });
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '';
-                    el.style.transform = '';
-                });
+                this.resetDock();
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
                 this.clearComposer();
+            },
+
+            // Restore the composer/dock swap to its rest state: dock hidden,
+            // composer input back in the flow (its opacity is owned by the
+            // .mcp-el reset/animation cycle).
+            resetDock() {
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (dock) {
+                    dock.style.display = 'none';
+                    dock.style.opacity = '0';
+                    dock.style.transform = '';
+                }
+                var input = this.$root.querySelector('.mcp-input');
+                if (input) {
+                    input.style.display = '';
+                }
+            },
+
+            // Swap the composer input for the docked proposal, like the real
+            // chat does while a write awaits review.
+            showDock() {
+                var input = this.$root.querySelector('.mcp-input');
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (!input || !dock) return;
+                var self = this;
+                if (typeof animate === 'function') {
+                    animate(input, { opacity: [1, 0] }, { duration: 0.18, ease: this.ease });
+                }
+                this.pendingTimers.push(setTimeout(function() {
+                    input.style.display = 'none';
+                    dock.style.display = '';
+                    if (typeof animate === 'function') {
+                        animate(dock, { opacity: [0, 1], transform: ['translateY(10px)', 'translateY(0px)'] }, { duration: 0.35, ease: self.ease });
+                    } else {
+                        dock.style.opacity = '1';
+                    }
+                }, 190));
+            },
+
+            // Resolve the review: dock slides away, composer returns.
+            hideDock() {
+                var input = this.$root.querySelector('.mcp-input');
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (!input || !dock) return;
+                var self = this;
+                if (typeof animate === 'function') {
+                    animate(dock, { opacity: [1, 0], transform: ['translateY(0px)', 'translateY(4px)'] }, { duration: 0.22, ease: self.ease });
+                }
+                this.pendingTimers.push(setTimeout(function() {
+                    dock.style.display = 'none';
+                    dock.style.opacity = '0';
+                    input.style.display = '';
+                    if (typeof animate === 'function') {
+                        animate(input, { opacity: [0, 1] }, { duration: 0.25, ease: self.ease });
+                    } else {
+                        input.style.opacity = '1';
+                    }
+                }, 230));
             },
 
             clearComposer() {
@@ -233,11 +345,12 @@
             },
 
             cancelInflight() {
-                // .mcp-approve-actions isn't an .mcp-el but is animated (the
-                // approve cross-fade), so include it — otherwise its in-flight /
-                // delayed animation keeps holding opacity and overrides a static
-                // reset (e.g. the reduced-motion view after a tab switch).
-                this.$root.querySelectorAll('.mcp-el, .mcp-approve-actions').forEach(function(el) {
+                // .mcp-dock and .mcp-topbar-ask aren't .mcp-el but are animated
+                // (the composer/dock swap and the Ask-pill fade), so include
+                // them — otherwise an in-flight / delayed animation keeps
+                // holding opacity and overrides a static reset (e.g. the
+                // reduced-motion view after a tab switch).
+                this.$root.querySelectorAll('.mcp-el, .mcp-dock, .mcp-topbar-ask').forEach(function(el) {
                     if (el.getAnimations) {
                         el.getAnimations().forEach(function(a) { a.cancel(); });
                     }
@@ -261,12 +374,14 @@
                 this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
                     el.style.opacity = '1';
                 });
-                // Static view shows the resolved approval (the confirmed overlay
-                // is an .mcp-el shown above); hide the pending buttons so they
-                // don't stack underneath it.
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '0';
-                });
+                // Static view shows the resolved review (audit card + outcome
+                // are .mcp-el, shown above); the dock stays hidden and the
+                // composer stays in the flow. The shell reflects the final
+                // conversation state: Ask pill hidden, chat item highlighted.
+                this.resetDock();
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask) ask.style.opacity = '0';
+                this.setShellActive('chat');
                 var entry = this.$root.querySelector('.hero-agent-entry');
                 if (entry) entry.style.opacity = '0';
                 this.clearComposer();
@@ -292,6 +407,16 @@
                         transform: ['translateY(-4px)', 'translateY(0px)']
                     }, { duration: d * 0.85, delay: d * 0.15, ease: ease });
                 }
+
+                // The real app only shows the "Ask Relaticle" trigger on the
+                // dashboard; the sidebar highlight moves to the conversation.
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask && typeof animate === 'function') {
+                    animate(ask, { opacity: [1, 0] }, { duration: d * 0.6, ease: ease });
+                } else if (ask) {
+                    ask.style.opacity = '0';
+                }
+                this.setShellActive('chat');
             },
 
             // Keep the conversation anchored to the bottom like a real chat:
@@ -356,8 +481,10 @@
                 // Loop restart: the entry curtain (above) has now faded in over
                 // the previous conversation. Clear that conversation underneath
                 // once the curtain is opaque so the next cycle starts clean — no
-                // blank-panel flash. No-op on first load.
-                this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); }, 420));
+                // blank-panel flash — and flip the shell chrome back to its
+                // dashboard state at the same "navigation" moment. No-op on
+                // first load.
+                this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); self.restoreShellToDashboard(); }, 420));
 
                 // Type prompt 1 into the entry composer, then send.
                 var p1 = this.prompts[0];
@@ -393,10 +520,12 @@
                 // (e.g. the shorter mobile panel); a no-op when it already fits.
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-tasks-table'); }, conversationStart + 1300));
 
-                // ── Exchange 2: bulk approval ──
-                // The composer types while the view stays on exchange 1; the new
-                // message and its response then reveal at the bottom and the view
-                // follows each one down, leaving exchange 1 visible above.
+                // ── Exchange 2: a write gated by review ──
+                // The composer types while the view stays on exchange 1. The
+                // response then docks a proposal where the composer was — the
+                // same swap the real chat performs — and after a beat the "Save
+                // changes" press resolves it into the transcript audit card and
+                // the agent outcome bubble.
                 var p2 = this.prompts[1];
                 var typeStart2 = conversationStart + 2700;
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
@@ -408,20 +537,27 @@
                 animate(root.querySelector('.mcp-label-2'),  { opacity: [0, 1] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, send2At + 320));
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 90); }, send2At + 300));
-                animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (send2At + 750) / 1000, duration: 0.4, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-action-card'); }, send2At + 780));
 
-                // Resolve the approval: press Approve, then cross-fade the
-                // buttons to a confirmed state. Completes the safe-approval
-                // story before the next prompt rather than leaving it pending.
-                var approveAt = send2At + 1300;
+                // The proposal docks at the composer. The dock is taller than
+                // the composer it replaces, so re-anchor the scroll once the
+                // swap lands — otherwise the assistant bubble gets clipped.
+                var dockAt = send2At + 850;
+                this.pendingTimers.push(setTimeout(function() { self.showDock(); }, dockAt));
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, dockAt + 580));
+
+                // Resolve the review: press "Save changes", the dock hands back
+                // to the composer, and the audit card + outcome land inline.
+                var approveAt = dockAt + 1900;
                 this.pendingTimers.push(setTimeout(function() { self.flashButton('#hero-approve-btn'); }, approveAt));
-                animate(root.querySelector('.mcp-approve-actions'), { opacity: [1, 0] }, { delay: (approveAt + 200) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-approve-done'),    { opacity: [0, 1], transform: ['translateY(3px)', 'translateY(0px)'] }, { delay: (approveAt + 340) / 1000, duration: 0.3, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.hideDock(); }, approveAt + 220));
+                animate(root.querySelector('.mcp-audit-card'),   { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (approveAt + 500) / 1000, duration: 0.4, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-audit-card'); }, approveAt + 530));
+                animate(root.querySelector('.mcp-approve-done'), { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (approveAt + 750) / 1000, duration: 0.3, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-approve-done'); }, approveAt + 780));
 
                 // ── Exchange 3: create contact (longest prompt) ──
                 var p3 = this.prompts[2];
-                var typeStart3 = send2At + 2500;
+                var typeStart3 = approveAt + 2100;
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p3.text, p3.charMs); }, typeStart3));
                 var send3At = typeStart3 + p3.charMs * p3.text.length + 50;
                 this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send3At));
