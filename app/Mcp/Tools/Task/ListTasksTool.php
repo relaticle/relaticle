@@ -39,6 +39,7 @@ final class ListTasksTool extends BaseListTool
     {
         return [
             'assigned_to_me' => $schema->boolean()->description('Filter tasks assigned to the current user.'),
+            'assignee_ids' => $schema->array()->description('Filter tasks assigned to any of these user IDs. Use the whoami tool to discover valid user IDs.'),
             'company_id' => $schema->string()->description('Filter tasks linked to a specific company.'),
             'people_id' => $schema->string()->description('Filter tasks linked to a specific person.'),
             'opportunity_id' => $schema->string()->description('Filter tasks linked to a specific opportunity.'),
@@ -49,6 +50,7 @@ final class ListTasksTool extends BaseListTool
     {
         return [
             'assigned_to_me' => $request->get('assigned_to_me') ? '1' : null,
+            'assignee_ids' => $request->get('assignee_ids'),
             'company_id' => $request->get('company_id'),
             'people_id' => $request->get('people_id'),
             'opportunity_id' => $request->get('opportunity_id'),

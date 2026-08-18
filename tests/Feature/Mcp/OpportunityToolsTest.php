@@ -146,3 +146,19 @@ describe('team scoping', function () {
             ->assertHasErrors();
     });
 });
+
+describe('stale filtering', function () {
+    it('filters opportunities by stale_days', function (): void {
+        $this->travelTo(now()->subDays(40));
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Stale Deal']);
+
+        $this->travelBack();
+        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Active Deal']);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListOpportunitiesTool::class, ['stale_days' => 30])
+            ->assertOk()
+            ->assertSee('Stale Deal')
+            ->assertDontSee('Active Deal');
+    });
+});
