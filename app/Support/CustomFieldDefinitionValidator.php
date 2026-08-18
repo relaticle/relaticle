@@ -81,11 +81,11 @@ final readonly class CustomFieldDefinitionValidator
                 'required_without:active', 'string', 'max:50',
                 self::uniqueDefinition('name', $user->currentTeam->getKey(), $entityType)->ignore($field->getKey()),
             ],
-            'active' => ['required_without:name', 'boolean'],
+            // Only `name` carries required_without: with the rule on both, an empty
+            // payload failed twice and the assistant was handed the same sentence twice.
+            'active' => ['nullable', 'boolean'],
         ], [
             'name.required_without' => 'Provide at least one of: name, active.',
-            'active.required_without' => 'Provide at least one of: name, active.',
-            'name.required' => 'A field name is required.',
             'name.max' => 'Field names must be 50 characters or fewer.',
             'name.unique' => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name.",
         ])->validate();

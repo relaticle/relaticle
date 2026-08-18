@@ -89,7 +89,7 @@ final class CreateCustomFieldTool implements Tool
             'name' => $name,
             'type' => $type,
             'code' => $code !== '' ? $code : null,
-            'options' => $optionNames !== [] ? array_map(static fn (string $option): array => ['name' => $option], $optionNames) : null,
+            'options' => $optionNames !== [] ? $validated['options'] : null,
         ], fn (mixed $value): bool => $value !== null);
 
         $displayFields = [

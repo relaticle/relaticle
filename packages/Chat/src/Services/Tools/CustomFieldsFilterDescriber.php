@@ -35,7 +35,7 @@ final readonly class CustomFieldsFilterDescriber
             return 'No filterable custom fields are defined for this entity type.';
         }
 
-        $optionLabels = $this->optionLabels($user->currentTeam, $entityType);
+        $optionLabels = $this->optionLabels($user->currentTeam, $entityType, array_keys($schema));
 
         $lines = [
             'Filter by custom field values. Keys MUST be one of the codes below; each value is an object of operator => operand.',
@@ -71,30 +71,26 @@ final readonly class CustomFieldsFilterDescriber
     }
 
     /**
+     * Narrowed to the codes actually being described, so tenants whose filterable
+     * fields are all non-choice skip the options join entirely.
+     *
+     * @param  list<string>  $codes
      * @return array<string, list<string>>
      */
-    private function optionLabels(Team $team, string $entityType): array
+    private function optionLabels(Team $team, string $entityType, array $codes): array
     {
-        $fields = CustomField::query()
+        return CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $team->getKey())
             ->where('entity_type', $entityType)
+            ->whereIn('code', $codes)
             ->active()
             ->with(['options:id,custom_field_id,name'])
-            ->get();
-
-        $labels = [];
-
-        foreach ($fields as $field) {
-            $codeLabels = [];
-
-            foreach ($field->options as $option) {
-                $codeLabels[] = (string) $option->name;
-            }
-
-            $labels[(string) $field->code] = $codeLabels;
-        }
-
-        return $labels;
+            ->select('id', 'code')
+            ->get()
+            ->mapWithKeys(fn (CustomField $field): array => [
+                (string) $field->code => array_values(array_map(strval(...), $field->options->pluck('name')->all())),
+            ])
+            ->all();
     }
 }

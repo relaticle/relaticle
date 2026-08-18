@@ -96,7 +96,7 @@ final class AddCustomFieldOptionsTool implements Tool
 
         $actionData = [
             '_record_id' => $field->getKey(),
-            'options' => array_map(static fn (string $option): array => ['name' => $option], $optionNames),
+            'options' => $validated['options'],
         ];
 
         $displayData = [
