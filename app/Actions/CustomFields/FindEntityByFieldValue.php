@@ -75,7 +75,7 @@ final readonly class FindEntityByFieldValue
 
         // Several records can legitimately carry the same value; the caller cannot
         // disambiguate either, so the oldest one always wins.
-        return $query->orderBy('created_at')->orderBy($model->getKeyName())->first();
+        return $query->oldest()->orderBy($model->getKeyName())->first();
     }
 
     /**
