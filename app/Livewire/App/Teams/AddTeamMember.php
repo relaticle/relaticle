@@ -9,7 +9,6 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -109,7 +108,9 @@ final class AddTeamMember extends BaseLivewireComponent
 
         $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
 
-        $this->redirect(Filament::getTenantProfileUrl());
+        $this->form->fill($this->team->only(['name']));
+
+        $this->dispatch('teamInvitationSent');
     }
 
     public function render(): View

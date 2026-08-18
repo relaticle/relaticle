@@ -94,13 +94,11 @@ final class UpdateTeamName extends BaseLivewireComponent
 
         resolve(UpdateTeamNameAction::class)->update($this->authUser(), $team, $data);
 
+        $this->sendNotification();
+
         if ($team->slug !== $oldSlug) {
             $this->redirect(EditTeam::getUrl(tenant: $team));
-
-            return;
         }
-
-        $this->sendNotification();
     }
 
     public function render(): View
