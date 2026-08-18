@@ -72,10 +72,19 @@ final class GenerateConversationTitle implements ShouldQueue
             return;
         }
 
-        broadcast(new ConversationTitleGenerated(
-            conversationId: $this->conversationId,
-            title: $title,
-        ));
+        // The title is already applied; a Reverb hiccup must not fail the job
+        // over it. The client's turn-end pull picks up a dropped broadcast.
+        try {
+            broadcast(new ConversationTitleGenerated(
+                conversationId: $this->conversationId,
+                title: $title,
+            ));
+        } catch (Throwable $e) {
+            ChatTelemetry::breadcrumb('broadcast.dropped', [
+                'event' => ConversationTitleGenerated::class,
+                'reason' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function generate(): ?string
