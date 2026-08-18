@@ -199,6 +199,13 @@ await comp2.call("callMountedAction");
 - **Stale session after branch switches** → first action of a batch is a fresh login.
 - **AI credits drain during chat testing** → re-seed `LocalSeeder` to top up before
   chat-heavy flows.
+- **Screenshot pipeline can serve STALE FRAMES from a dead target** (verified:
+  2026-08-18): after long sessions / viewport changes, `screenshot` kept returning a
+  frame that no longer matched the DOM (evals said dark theme + correct state; PNG
+  showed an old light half-render). Detection: `eval 'document.body.style.outline="40px
+  solid red"'` → screenshot → if no red border, the pipeline is stale. Fix:
+  `pkill -9 -f agent-browser; sleep 3`, new session, re-login. Don't debug the "bug"
+  in the PNG before running the red-outline probe.
 
 ## 7. DB-assert (corroboration only — the UI is the proof)
 
