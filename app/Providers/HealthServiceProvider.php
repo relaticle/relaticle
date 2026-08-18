@@ -35,8 +35,8 @@ final class HealthServiceProvider extends ServiceProvider
             DatabaseCheck::new(),
 
             DatabaseConnectionCountCheck::new()
-                ->warnWhenMoreConnectionsThan(50)
-                ->failWhenMoreConnectionsThan(100),
+                ->warnWhenMoreConnectionsThan(60)
+                ->failWhenMoreConnectionsThan(80),
 
             DatabaseSizeCheck::new()
                 ->failWhenSizeAboveGb(errorThresholdGb: 10.0),
@@ -71,8 +71,8 @@ final class HealthServiceProvider extends ServiceProvider
                 ->failWhenUsedSpaceIsAbovePercentage(90),
 
             CpuLoadCheck::new()
-                ->failWhenLoadIsHigherInTheLast5Minutes(4.0)
-                ->failWhenLoadIsHigherInTheLast15Minutes(2.0),
+                ->failWhenLoadIsHigherInTheLast5Minutes(8.0)
+                ->failWhenLoadIsHigherInTheLast15Minutes(4.0),
 
             DebugModeCheck::new(),
 

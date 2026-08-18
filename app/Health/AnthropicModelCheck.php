@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Health;
 
+use Illuminate\Http\Client\ConnectionException;
 use Prism\Prism\Enums\Provider;
+use Prism\Prism\Exceptions\PrismProviderOverloadedException;
+use Prism\Prism\Exceptions\PrismRateLimitedException;
 use Prism\Prism\Facades\Prism;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
@@ -12,6 +15,11 @@ use Throwable;
 
 final class AnthropicModelCheck extends Check
 {
+    /**
+     * Provider overload and rate limiting are transient and nothing we can act
+     * on, so they only warn. Persistent faults — a revoked key, a retired
+     * model — are the ones worth failing the health report over.
+     */
     public function run(): Result
     {
         $model = $this->defaultAnthropicModel();
@@ -28,6 +36,8 @@ final class AnthropicModelCheck extends Check
                 ->generate();
 
             return $result->ok();
+        } catch (PrismRateLimitedException|PrismProviderOverloadedException|ConnectionException $e) {
+            return $result->warning("Anthropic is temporarily unavailable: {$e->getMessage()}");
         } catch (Throwable $e) {
             return $result->failed("Anthropic model '{$model}' is unavailable: {$e->getMessage()}");
         }
