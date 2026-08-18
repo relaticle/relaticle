@@ -65,7 +65,7 @@
             <div class="group/message">
                 {{-- User message --}}
                 <template x-if="msg.role === 'user'">
-                    <div class="flex justify-end">
+                    <div class="flex justify-end" data-user-bubble :data-send-state="msg.sendState ?? 'sent'">
                         <div class="flex max-w-[80%] flex-col items-end gap-1">
                             <template x-if="!msg.editing">
                                 <div
@@ -86,6 +86,37 @@
                                     <x-heroicon-m-at-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     <span class="truncate" x-text="msg.page_context.label"></span>
                                 </a>
+                            </template>
+
+                            {{-- Telegram-style send-state glyph: only rendered for a bubble sent THIS
+                                 session. Reloaded (persisted) messages carry no sendState and stay
+                                 silent rather than showing a permanent checkmark on every past message. --}}
+                            <template x-if="msg.sendState && !msg.editing">
+                                <div
+                                    class="flex items-center gap-1 px-1 text-[11px]"
+                                    :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-primary-100/70 dark:text-gray-500'"
+                                >
+                                    <template x-if="msg.sendState === 'sending'">
+                                        <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" role="status" aria-label="{{ __('Sending') }}" />
+                                    </template>
+                                    <template x-if="msg.sendState === 'sent'">
+                                        <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" role="status" aria-label="{{ __('Sent') }}" />
+                                    </template>
+                                    <template x-if="msg.sendState === 'failed'">
+                                        <span class="inline-flex items-center gap-1" role="alert">
+                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            <span>{{ __('Not sent') }}</span>
+                                            <button
+                                                type="button"
+                                                x-on:click="resendMessage(msg)"
+                                                :disabled="isStreaming"
+                                                class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
+                                            >
+                                                {{ __('Resend') }}
+                                            </button>
+                                        </span>
+                                    </template>
+                                </div>
                             </template>
 
                             <template x-if="msg.editing">
