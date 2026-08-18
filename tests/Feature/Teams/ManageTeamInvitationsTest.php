@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Actions\Jetstream\ResendTeamInvitation;
 use App\Console\Commands\CleanupExpiredInvitationsCommand;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Support\Facades\Mail;
 
 mutates(TeamInvitation::class);
 
@@ -143,7 +143,9 @@ test('old cancel action name is gone', function () {
 // --- Resend invitation ---
 
 test('resending re-issues the token and extends expiry', function (): void {
-    $user = User::factory()->withTeam()->create();
+    Mail::fake();
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
     $team = $user->currentTeam;
 
     $invitation = $team->teamInvitations()->create([
@@ -154,7 +156,8 @@ test('resending re-issues the token and extends expiry', function (): void {
 
     expect($invitation->token)->toBeNull();
 
-    resolve(ResendTeamInvitation::class)->resend($invitation->fresh());
+    livewire(PendingTeamInvitations::class, ['team' => $team])
+        ->callAction(TestAction::make('resendTeamInvitation')->table($invitation));
 
     $invitation->refresh();
 
