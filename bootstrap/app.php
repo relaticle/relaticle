@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
+use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ValidateSignature;
@@ -71,6 +73,42 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->prepend(SubdomainRootResponse::class);
+
+        $middleware->append(DenyIndexingOnSecondaryHosts::class);
+
+        $middleware->web(append: RedirectToPrimaryHost::class);
+
+        // Only enforced on multi-host deployments (any *_DOMAIN configured);
+        // the framework already skips TrustHosts in local and test runs.
+        // Anchored patterns, because Symfony matches them as unanchored regex.
+        $middleware->trustHosts(at: function (): array {
+            $dedicatedDomains = array_filter(
+                [
+                    config('app.api_domain'),
+                    config('app.mcp_domain'),
+                    config('app.sysadmin_domain'),
+                    config('app.app_panel_domain'),
+                ],
+                fn (mixed $domain): bool => is_string($domain) && $domain !== '',
+            );
+
+            if ($dedicatedDomains === []) {
+                return [];
+            }
+
+            $primaryHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+            $hosts = array_filter([
+                $primaryHost,
+                is_string($primaryHost) ? "www.{$primaryHost}" : null,
+                ...array_values($dedicatedDomains),
+            ], is_string(...));
+
+            return array_map(
+                fn (string $host): string => '^'.preg_quote($host).'$',
+                array_values($hosts),
+            );
+        }, subdomains: false);
 
         $middleware->prependToPriorityList(
             before: SubstituteBindings::class,

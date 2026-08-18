@@ -361,7 +361,7 @@ describe('photo url generation', function () {
 
         Route::get('/_test/avatar-url', function () {
             return auth()->user()->getFilamentAvatarUrl();
-        })->middleware('web');
+        })->middleware(['web', 'auth']);
     });
 
     test('avatar url uses current request host instead of APP_URL', function () {
@@ -398,9 +398,10 @@ describe('photo url generation', function () {
         config(['app.url' => 'https://relaticle.test']);
 
         Route::get('/_test/rewrite-url', fn () => SameOriginUrl::rewrite('https://relaticle.test/storage/profile-photos/x.png'))
-            ->middleware('web');
+            ->middleware(['web', 'auth']);
 
-        $response = $this->get('https://app.relaticle.test/_test/rewrite-url');
+        $response = $this->actingAs(User::factory()->create())
+            ->get('https://app.relaticle.test/_test/rewrite-url');
 
         $response->assertOk();
         expect($response->getContent())->toBe('https://app.relaticle.test/storage/profile-photos/x.png');
@@ -410,9 +411,10 @@ describe('photo url generation', function () {
         config(['app.url' => 'https://relaticle.test']);
 
         Route::get('/_test/external-url', fn () => SameOriginUrl::rewrite('https://my-bucket.s3.amazonaws.com/profile-photos/x.png?X-Amz-Signature=abc'))
-            ->middleware('web');
+            ->middleware(['web', 'auth']);
 
-        $response = $this->get('https://app.relaticle.test/_test/external-url');
+        $response = $this->actingAs(User::factory()->create())
+            ->get('https://app.relaticle.test/_test/external-url');
 
         $response->assertOk();
         expect($response->getContent())->toBe('https://my-bucket.s3.amazonaws.com/profile-photos/x.png?X-Amz-Signature=abc');
@@ -435,7 +437,7 @@ describe('photo url generation', function () {
             Storage::shouldReceive('disk')->andReturn($disk);
 
             return auth()->user()->getFilamentAvatarUrl();
-        })->middleware('web');
+        })->middleware(['web', 'auth']);
 
         $response = $this->actingAs($user)
             ->get('https://app.relaticle.test/_test/avatar-url-query');
