@@ -39,6 +39,7 @@ use Filament\Enums\DatabaseNotificationsPosition;
 use Filament\Enums\GlobalSearchPosition;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -49,6 +50,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -65,6 +67,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Js;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
@@ -114,6 +117,46 @@ final class AppPanelProvider extends PanelProvider
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
             ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
             : $schema);
+
+        /**
+         * Filament's calendar decides which cell to circle as "today" with
+         * `dayjs.tz.guess()`, the device zone, and takes no server timezone. A user in
+         * Tokyo on a laptop still set elsewhere therefore saw the app say one date
+         * everywhere and the picker circle another, and clicking the circled cell books
+         * the wrong day.
+         *
+         * Only the highlight is wrong: the picker emits a naive wall-clock string that
+         * the server reads back in the panel zone, so typed values were always stored
+         * correctly. Overriding `dayIsToday` on the component's own element keeps the fix
+         * to that single comparison rather than forking the vendor component.
+         *
+         * The zone is baked in, the date is not: `Intl` recomputes it per call, so a tab
+         * left open across midnight still circles the right cell.
+         */
+        DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
+            ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
+            : $picker);
+    }
+
+    /**
+     * `en-CA` is chosen for its output shape, not its language: it is the locale whose
+     * short date is already `YYYY-MM-DD`, so the parts split cleanly without parsing a
+     * localised order.
+     */
+    private function todayInViewerZoneExpression(): string
+    {
+        $timezone = Js::from(FilamentTimezone::get());
+
+        return <<<JS
+            dayIsToday = (day) => {
+                const [year, month, date] = new Intl.DateTimeFormat('en-CA', { timeZone: {$timezone} })
+                    .format(new Date())
+                    .split('-')
+                    .map(Number);
+
+                return day === date && focusedMonth === month - 1 && focusedYear === year;
+            }
+            JS;
     }
 
     private function isCurrentPanel(): bool

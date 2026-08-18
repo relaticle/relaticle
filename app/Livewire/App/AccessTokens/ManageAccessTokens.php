@@ -59,8 +59,12 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
                 TextColumn::make('last_used_at')
                     ->label(__('access-tokens.table.columns.last_used_at'))
                     ->since()
+                    ->dateTimeTooltip()
                     ->placeholder(__('access-tokens.table.placeholders.never')),
-                TextColumn::make('created_at')->label(__('access-tokens.table.columns.created_at'))->since(),
+                TextColumn::make('created_at')
+                    ->label(__('access-tokens.table.columns.created_at'))
+                    ->since()
+                    ->dateTimeTooltip(),
             ])
             ->actions([
                 Action::make('permissions')

@@ -90,9 +90,13 @@ final class CompanyResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
+                // "2 hours ago" is the friendlier read, but it was the one datetime in the
+                // panel a user could not check: no absolute value and no tooltip. Keep the
+                // relative label and put the exact time behind a hover.
                 TextColumn::make('updated_at')
                     ->label(__('filament/resources/company.fields.updated_at.label'))
                     ->since()
+                    ->dateTimeTooltip()
                     ->searchable()
                     ->sortable()
                     ->toggleable(),

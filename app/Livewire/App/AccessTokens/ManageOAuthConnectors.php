@@ -67,7 +67,8 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
                     ->badge(),
                 TextColumn::make('created_at')
                     ->label(__('access-tokens.table.columns.created_at'))
-                    ->since(),
+                    ->since()
+                    ->dateTimeTooltip(),
             ])
             ->recordActions([
                 Action::make('revoke')
