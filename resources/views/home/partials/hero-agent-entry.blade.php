@@ -5,7 +5,7 @@
      Visibility is driven by .mcp-el rule (opacity: 0 at rest) and the
      heroChat factory; no x-show so the markup is also visible to the SEO
      crawler and to no-JS users alongside the conversation. --}}
-<div class="hero-agent-entry mcp-el absolute inset-0 z-20 flex items-start justify-center bg-gray-50 dark:bg-gray-950 px-4 sm:px-6 md:px-8 overflow-hidden">
+<div class="hero-agent-entry mcp-el absolute inset-x-0 bottom-0 top-10 z-20 flex items-start justify-center bg-gray-50 dark:bg-gray-950 px-4 sm:px-6 md:px-8 overflow-hidden">
     {{-- pt-12/pt-20 mirrors the real dashboard's `py-16` while leaving headroom
          on the shorter mobile panel (h-[520px]). max-w-2xl keeps the composer
          readable without dominating the panel. --}}
@@ -47,18 +47,14 @@
             </div>
         </div>
 
-        {{-- Example prompts — three chips spotlighting what users can ask.
-             Stack on the smallest widths so they don't crowd. --}}
+        {{-- Starter chips — the real dashboard's four starter prompts, same
+             pill recipe as chat-interface's starters. --}}
         <div class="mcp-el mcp-entry-chips mt-5 flex flex-wrap justify-center gap-2 text-xs">
-            <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                What's overdue this week?
-            </span>
-            <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                Show this week's pipeline
-            </span>
-            <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                Add a new contact
-            </span>
+            @foreach (['CRM overview', 'Overdue tasks', 'Recent companies', 'Pipeline summary'] as $heroStarterChip)
+                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    {{ $heroStarterChip }}
+                </span>
+            @endforeach
         </div>
 
         {{-- My Tasks (empty state) — mirrors chat::filament.pages.partials.my-tasks,

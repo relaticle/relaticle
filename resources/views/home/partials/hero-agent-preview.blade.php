@@ -42,6 +42,24 @@
          keeps the sidebar visible during the entry phase too. --}}
     <div class="relative flex-1 flex flex-col min-w-0">
 
+        {{-- Topbar — mirrors the real fi-topbar: sidebar toggle on the left,
+             "Ask Relaticle" outlined trigger + user avatar on the right. The Ask
+             pill only exists on the dashboard in the real app, so the script
+             fades it out during the entry → conversation transition. Sits above
+             the entry overlay (which starts at top-10) so it stays visible in
+             both phases, exactly like the real shell. --}}
+        <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white px-3 dark:border-white/[0.06] dark:bg-gray-900">
+            <x-heroicon-o-bars-3 class="w-4 h-4 text-gray-400 md:hidden dark:text-gray-500"/>
+            <x-heroicon-o-chevron-left class="hidden w-4 h-4 text-gray-400 md:block dark:text-gray-500"/>
+            <div class="flex items-center gap-2">
+                <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-gray-200 dark:ring-white/10">
+                    <x-heroicon-o-chat-bubble-left-ellipsis class="w-3.5 h-3.5" aria-hidden="true"/>
+                    <span>Ask Relaticle</span>
+                </span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
+            </div>
+        </div>
+
         {{-- Conversation title — mirrors app chat-page H1: large, bold, left-aligned, no chrome --}}
         <div class="hero-agent-title px-4 sm:px-6 md:px-8 pt-5 pb-3">
             <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white truncate">Overdue tasks this week</h2>
@@ -101,6 +119,9 @@
                     el.style.transform = '';
                 });
                 this.resetDock();
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask) ask.style.opacity = '';
+                this.setShellActive('home');
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
@@ -115,7 +136,34 @@
                     el.style.opacity = '0';
                     el.style.transform = '';
                 });
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask) ask.style.opacity = '';
+                this.setShellActive('home');
                 this.clearEntryComposer();
+            },
+
+            // Swap the sidebar's active item between Home (dashboard phase) and
+            // the demo conversation, mirroring how the real shell highlights the
+            // current page. Labels and icons both carry the active primary tone.
+            setShellActive(which) {
+                var home = this.$root.querySelector('#hero-shell-nav-home');
+                var chat = this.$root.querySelector('#hero-shell-nav-chat');
+                if (!home || !chat) return;
+                var itemOn = ['bg-gray-100', 'dark:bg-white/[0.06]', 'font-medium', 'text-primary-700', 'dark:text-primary-400'];
+                var itemOff = ['text-gray-700', 'dark:text-gray-300'];
+                var iconOn = ['text-primary-700', 'dark:text-primary-400'];
+                var iconOff = ['text-gray-400', 'dark:text-gray-500'];
+                var apply = function(el, active) {
+                    el.classList.remove.apply(el.classList, active ? itemOff : itemOn);
+                    el.classList.add.apply(el.classList, active ? itemOn : itemOff);
+                    var icon = el.querySelector('svg');
+                    if (icon) {
+                        icon.classList.remove.apply(icon.classList, active ? iconOff : iconOn);
+                        icon.classList.add.apply(icon.classList, active ? iconOn : iconOff);
+                    }
+                };
+                apply(home, which === 'home');
+                apply(chat, which === 'chat');
             },
 
             // Reset only the conversation layer (messages, cards, title, scroll,
@@ -285,11 +333,12 @@
             },
 
             cancelInflight() {
-                // .mcp-dock isn't an .mcp-el but is animated (the composer/dock
-                // swap), so include it — otherwise its in-flight / delayed
-                // animation keeps holding opacity and overrides a static reset
-                // (e.g. the reduced-motion view after a tab switch).
-                this.$root.querySelectorAll('.mcp-el, .mcp-dock').forEach(function(el) {
+                // .mcp-dock and .mcp-topbar-ask aren't .mcp-el but are animated
+                // (the composer/dock swap and the Ask-pill fade), so include
+                // them — otherwise an in-flight / delayed animation keeps
+                // holding opacity and overrides a static reset (e.g. the
+                // reduced-motion view after a tab switch).
+                this.$root.querySelectorAll('.mcp-el, .mcp-dock, .mcp-topbar-ask').forEach(function(el) {
                     if (el.getAnimations) {
                         el.getAnimations().forEach(function(a) { a.cancel(); });
                     }
@@ -315,8 +364,12 @@
                 });
                 // Static view shows the resolved review (audit card + outcome
                 // are .mcp-el, shown above); the dock stays hidden and the
-                // composer stays in the flow.
+                // composer stays in the flow. The shell reflects the final
+                // conversation state: Ask pill hidden, chat item highlighted.
                 this.resetDock();
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask) ask.style.opacity = '0';
+                this.setShellActive('chat');
                 var entry = this.$root.querySelector('.hero-agent-entry');
                 if (entry) entry.style.opacity = '0';
                 this.clearComposer();
@@ -342,6 +395,16 @@
                         transform: ['translateY(-4px)', 'translateY(0px)']
                     }, { duration: d * 0.85, delay: d * 0.15, ease: ease });
                 }
+
+                // The real app only shows the "Ask Relaticle" trigger on the
+                // dashboard; the sidebar highlight moves to the conversation.
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (ask && typeof animate === 'function') {
+                    animate(ask, { opacity: [1, 0] }, { duration: d * 0.6, ease: ease });
+                } else if (ask) {
+                    ask.style.opacity = '0';
+                }
+                this.setShellActive('chat');
             },
 
             // Keep the conversation anchored to the bottom like a real chat:

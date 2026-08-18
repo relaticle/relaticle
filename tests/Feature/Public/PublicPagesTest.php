@@ -729,13 +729,14 @@ describe('Hero AI tab — entry phase', function () {
         $response->assertSee("This week's pipeline review", false);
     });
 
-    it('shows three example prompt chips to anchor the demo', function () {
+    it('shows the four real dashboard starter chips to anchor the demo', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
 
-        $response->assertSee("What's overdue this week?", false);
-        $response->assertSee("Show this week's pipeline", false);
-        $response->assertSee('Add a new contact');
+        $response->assertSee('CRM overview');
+        $response->assertSee('Overdue tasks');
+        $response->assertSee('Recent companies');
+        $response->assertSee('Pipeline summary');
     });
 
     it('renders the empty My Tasks section mirroring the dashboard', function () {
