@@ -10,8 +10,10 @@ A panel of senior manual QAs for Relaticle. The engine is the proven v2/universa
 three organs no earlier generation had: an **environment-discovery stage** (nothing about
 URLs, credentials, or infra is assumed — it is derived from the running app each run, so
 the skill keeps working when app code, routes, or domains change), a **regression ledger**
-(`regressions.json` — past confirmed findings become standing checks the planner MUST
-schedule when the diff matches their trigger), and a **fix mode** (find → fix → cold
+(`~/.claude/business-review/relaticle/regressions.json` — machine-local, NOT in the repo:
+the repo is public and the ledger records production incident history. Past confirmed
+findings become standing checks the planner MUST schedule when the diff matches their
+trigger; `$BR_LEDGER` overrides the path), and a **fix mode** (find → fix → cold
 re-verify against the original repro → re-gate, on request).
 
 Every claim is **browser-truth**: observed through the live UI, never `tinker`/DB; an
@@ -234,5 +236,7 @@ Scripts (all pure stdlib; most support `--test`): `sanitize_pr.py` (incl. `--loc
 `check_regressions.py`, `validate_plan.py`, `aggregate_verdicts.py`, `run_evals.py`,
 `promote_to_fixture.py`, `grade_snapshot.py`, `run_drift_check.py`.
 
-Data: `relaticle-profile.json` (static facts + volatile hints), `regressions.json`
-(the ledger), `evals/fixtures/` (failure-mode regression locks).
+Data: `relaticle-profile.json` (static facts + volatile hints),
+`~/.claude/business-review/relaticle/regressions.json` (the ledger — machine-local,
+never committed; bootstrapped empty by `check_regressions.py` if missing),
+`evals/fixtures/` (failure-mode regression locks).
