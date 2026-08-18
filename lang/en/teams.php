@@ -133,5 +133,8 @@ return [
         'editor' => [
             'description' => 'Editor users have the ability to read, create, and update.',
         ],
+        'viewer' => [
+            'description' => 'Viewer users can read records but cannot create, update, or delete.',
+        ],
     ],
 ];

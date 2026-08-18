@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\TeamRole;
 use App\Models\User;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
+use Laravel\Jetstream\Jetstream;
 use Livewire\Livewire;
 
 mutates(User::class);
@@ -43,4 +45,12 @@ test('only team owner can update team member roles', function () {
     expect($otherUser->fresh()->hasTeamRole(
         $user->currentTeam->fresh(), 'admin'
     ))->toBeTrue();
+});
+
+test('viewer is a registered team role with only read ability', function (): void {
+    $role = Jetstream::findRole(TeamRole::Viewer->value);
+
+    expect($role)->not->toBeNull()
+        ->and($role->key)->toBe('viewer')
+        ->and($role->permissions)->toBe(['read']);
 });
