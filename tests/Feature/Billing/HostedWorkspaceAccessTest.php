@@ -39,7 +39,7 @@ it('keeps personal account controls available while paused', function (): void {
     $this->get(route('filament.app.settings.pages.profile', ['tenant' => $this->team->slug]))
         ->assertOk();
 
-    $this->get(route('filament.app.pages.access-tokens', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.settings.pages.access-tokens', ['tenant' => $this->team->slug]))
         ->assertOk();
 });
 

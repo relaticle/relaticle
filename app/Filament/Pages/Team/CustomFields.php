@@ -23,4 +23,9 @@ final class CustomFields extends CustomFieldsManagementPage
     {
         return 'team/custom-fields';
     }
+
+    public function getSubheading(): ?string
+    {
+        return null;
+    }
 }

@@ -67,7 +67,6 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             ->schema([
                 Section::make(__('profile.sections.update_profile_information.title'))
                     ->aside()
-                    ->description(__('profile.sections.update_profile_information.description'))
                     ->schema([
                         FileUpload::make('profile_photo_path')
                             ->label(__('profile.form.profile_photo.label'))

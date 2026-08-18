@@ -19,24 +19,19 @@ return [
     'sections' => [
         'update_team_name' => [
             'title' => 'Workspace Name',
-            'description' => 'The workspace\'s name and owner information.',
         ],
         'add_team_member' => [
             'title' => 'Add Member',
-            'description' => 'Add a new member to your workspace, allowing them to collaborate with you.',
             'notice' => 'Please provide the email address of the person you would like to add to this workspace.',
         ],
         'team_members' => [
             'title' => 'Members',
-            'description' => 'All of the people that are part of this workspace.',
         ],
         'pending_team_invitations' => [
             'title' => 'Pending Invitations',
-            'description' => 'These people have been invited to your workspace and have been sent an invitation email. They may join the workspace by accepting the email invitation.',
         ],
         'delete_team' => [
             'title' => 'Delete Workspace',
-            'description' => 'Schedule this workspace for deletion.',
             'notice' => 'Deleting this workspace will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion at any time before that. After the grace period, all resources and data will be permanently deleted.',
             'scheduled_notice' => 'This workspace is scheduled for deletion on :date.',
         ],

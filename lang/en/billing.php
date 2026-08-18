@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 return [
     'title' => 'Billing',
-    'subtitle' => 'Manage Cloud access, billing, and AI usage for this workspace.',
     'plans' => [
         'pro' => 'Pro',
         'cloud_pro' => 'Cloud Pro',

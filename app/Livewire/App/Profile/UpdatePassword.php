@@ -35,7 +35,6 @@ final class UpdatePassword extends BaseLivewireComponent
             ->schema([
                 Section::make($hasPassword ? __('profile.sections.update_password.title') : __('profile.sections.set_password.title'))
                     ->aside()
-                    ->description($hasPassword ? __('profile.sections.update_password.description') : __('profile.sections.set_password.description'))
                     ->schema([
                         TextInput::make('currentPassword')
                             ->label(__('profile.form.current_password.label'))
