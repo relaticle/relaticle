@@ -74,7 +74,7 @@
             // before the loop restarts.
             prompts: [
                 { text: "What's overdue this week?", charMs: 55 },
-                { text: 'Mark them all as done.', charMs: 38 },
+                { text: 'Mark the Kovra demo as done.', charMs: 38 },
                 { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 28 }
             ],
             // Entry phase budget — first prompt is typed into the centered
@@ -100,10 +100,7 @@
                     el.style.opacity = '';
                     el.style.transform = '';
                 });
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '';
-                    el.style.transform = '';
-                });
+                this.resetDock();
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
@@ -135,14 +132,69 @@
                     el.style.opacity = '';
                     el.style.transform = '';
                 });
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '';
-                    el.style.transform = '';
-                });
+                this.resetDock();
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
                 }
                 this.clearComposer();
+            },
+
+            // Restore the composer/dock swap to its rest state: dock hidden,
+            // composer input back in the flow (its opacity is owned by the
+            // .mcp-el reset/animation cycle).
+            resetDock() {
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (dock) {
+                    dock.style.display = 'none';
+                    dock.style.opacity = '0';
+                    dock.style.transform = '';
+                }
+                var input = this.$root.querySelector('.mcp-input');
+                if (input) {
+                    input.style.display = '';
+                }
+            },
+
+            // Swap the composer input for the docked proposal, like the real
+            // chat does while a write awaits review.
+            showDock() {
+                var input = this.$root.querySelector('.mcp-input');
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (!input || !dock) return;
+                var self = this;
+                if (typeof animate === 'function') {
+                    animate(input, { opacity: [1, 0] }, { duration: 0.18, ease: this.ease });
+                }
+                this.pendingTimers.push(setTimeout(function() {
+                    input.style.display = 'none';
+                    dock.style.display = '';
+                    if (typeof animate === 'function') {
+                        animate(dock, { opacity: [0, 1], transform: ['translateY(10px)', 'translateY(0px)'] }, { duration: 0.35, ease: self.ease });
+                    } else {
+                        dock.style.opacity = '1';
+                    }
+                }, 190));
+            },
+
+            // Resolve the review: dock slides away, composer returns.
+            hideDock() {
+                var input = this.$root.querySelector('.mcp-input');
+                var dock = this.$root.querySelector('.mcp-dock');
+                if (!input || !dock) return;
+                var self = this;
+                if (typeof animate === 'function') {
+                    animate(dock, { opacity: [1, 0], transform: ['translateY(0px)', 'translateY(4px)'] }, { duration: 0.22, ease: self.ease });
+                }
+                this.pendingTimers.push(setTimeout(function() {
+                    dock.style.display = 'none';
+                    dock.style.opacity = '0';
+                    input.style.display = '';
+                    if (typeof animate === 'function') {
+                        animate(input, { opacity: [0, 1] }, { duration: 0.25, ease: self.ease });
+                    } else {
+                        input.style.opacity = '1';
+                    }
+                }, 230));
             },
 
             clearComposer() {
@@ -233,11 +285,11 @@
             },
 
             cancelInflight() {
-                // .mcp-approve-actions isn't an .mcp-el but is animated (the
-                // approve cross-fade), so include it — otherwise its in-flight /
-                // delayed animation keeps holding opacity and overrides a static
-                // reset (e.g. the reduced-motion view after a tab switch).
-                this.$root.querySelectorAll('.mcp-el, .mcp-approve-actions').forEach(function(el) {
+                // .mcp-dock isn't an .mcp-el but is animated (the composer/dock
+                // swap), so include it — otherwise its in-flight / delayed
+                // animation keeps holding opacity and overrides a static reset
+                // (e.g. the reduced-motion view after a tab switch).
+                this.$root.querySelectorAll('.mcp-el, .mcp-dock').forEach(function(el) {
                     if (el.getAnimations) {
                         el.getAnimations().forEach(function(a) { a.cancel(); });
                     }
@@ -261,12 +313,10 @@
                 this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
                     el.style.opacity = '1';
                 });
-                // Static view shows the resolved approval (the confirmed overlay
-                // is an .mcp-el shown above); hide the pending buttons so they
-                // don't stack underneath it.
-                this.$root.querySelectorAll('.mcp-approve-actions').forEach(function(el) {
-                    el.style.opacity = '0';
-                });
+                // Static view shows the resolved review (audit card + outcome
+                // are .mcp-el, shown above); the dock stays hidden and the
+                // composer stays in the flow.
+                this.resetDock();
                 var entry = this.$root.querySelector('.hero-agent-entry');
                 if (entry) entry.style.opacity = '0';
                 this.clearComposer();
@@ -393,10 +443,12 @@
                 // (e.g. the shorter mobile panel); a no-op when it already fits.
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-tasks-table'); }, conversationStart + 1300));
 
-                // ── Exchange 2: bulk approval ──
-                // The composer types while the view stays on exchange 1; the new
-                // message and its response then reveal at the bottom and the view
-                // follows each one down, leaving exchange 1 visible above.
+                // ── Exchange 2: a write gated by review ──
+                // The composer types while the view stays on exchange 1. The
+                // response then docks a proposal where the composer was — the
+                // same swap the real chat performs — and after a beat the "Save
+                // changes" press resolves it into the transcript audit card and
+                // the agent outcome bubble.
                 var p2 = this.prompts[1];
                 var typeStart2 = conversationStart + 2700;
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
@@ -408,20 +460,27 @@
                 animate(root.querySelector('.mcp-label-2'),  { opacity: [0, 1] }, { delay: (send2At + 300) / 1000, duration: 0.25, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, send2At + 320));
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-2', 90); }, send2At + 300));
-                animate(root.querySelector('.mcp-action-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (send2At + 750) / 1000, duration: 0.4, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-action-card'); }, send2At + 780));
 
-                // Resolve the approval: press Approve, then cross-fade the
-                // buttons to a confirmed state. Completes the safe-approval
-                // story before the next prompt rather than leaving it pending.
-                var approveAt = send2At + 1300;
+                // The proposal docks at the composer. The dock is taller than
+                // the composer it replaces, so re-anchor the scroll once the
+                // swap lands — otherwise the assistant bubble gets clipped.
+                var dockAt = send2At + 850;
+                this.pendingTimers.push(setTimeout(function() { self.showDock(); }, dockAt));
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, dockAt + 580));
+
+                // Resolve the review: press "Save changes", the dock hands back
+                // to the composer, and the audit card + outcome land inline.
+                var approveAt = dockAt + 1900;
                 this.pendingTimers.push(setTimeout(function() { self.flashButton('#hero-approve-btn'); }, approveAt));
-                animate(root.querySelector('.mcp-approve-actions'), { opacity: [1, 0] }, { delay: (approveAt + 200) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-approve-done'),    { opacity: [0, 1], transform: ['translateY(3px)', 'translateY(0px)'] }, { delay: (approveAt + 340) / 1000, duration: 0.3, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.hideDock(); }, approveAt + 220));
+                animate(root.querySelector('.mcp-audit-card'),   { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (approveAt + 500) / 1000, duration: 0.4, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-audit-card'); }, approveAt + 530));
+                animate(root.querySelector('.mcp-approve-done'), { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (approveAt + 750) / 1000, duration: 0.3, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-approve-done'); }, approveAt + 780));
 
                 // ── Exchange 3: create contact (longest prompt) ──
                 var p3 = this.prompts[2];
-                var typeStart3 = send2At + 2500;
+                var typeStart3 = approveAt + 2100;
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p3.text, p3.charMs); }, typeStart3));
                 var send3At = typeStart3 + p3.charMs * p3.text.length + 50;
                 this.pendingTimers.push(setTimeout(function() { self.flashSend(); self.clearComposer(); }, send3At));

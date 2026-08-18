@@ -212,9 +212,11 @@ describe('Hero AI tab — conversation', function () {
         $response->assertSee('Call Sarah Chen');
         $response->assertSee('Send proposal to Trellis Labs');
         $response->assertSee('Schedule demo with Kovra Systems');
-        $response->assertSee('Mark them all as done');
-        // Approval action card shows the operation badge ("Update") + summary.
-        $response->assertSee('Update');
+        $response->assertSee('Mark the Kovra demo as done');
+        // The proposal docks at the composer and resolves into the audit card.
+        $response->assertSee('Review before continuing');
+        $response->assertSee('Update task');
+        $response->assertSee('Save changes');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
     });
@@ -226,8 +228,8 @@ describe('Hero AI tab — conversation', function () {
         // Exchange 1
         $response->assertSee('You have 3 overdue tasks');
         // Exchange 2 climax
-        $response->assertSee('Mark 3 tasks complete');
-        $response->assertSee('Call Sarah Chen · Send proposal · Schedule demo');
+        $response->assertSee('Review the proposal below to update the task');
+        $response->assertSee('Updated Schedule demo with Kovra Systems');
         // Exchange 3
         $response->assertSee('Added Sarah and linked her to Kovra Systems');
     });
@@ -695,7 +697,7 @@ describe('Hero AI tab — animation timeline', function () {
             ->toContain('scrollToShow')
             ->toContain("scrollToShow('.mcp-user-2')")
             ->toContain("scrollToShow('.mcp-user-3')")
-            ->toContain("scrollToShow('.mcp-action-card')")
+            ->toContain("scrollToShow('.mcp-audit-card')")
             ->not->toContain('scrollMessageIntoView')
             ->not->toContain('typeStart2 - 100')
             ->not->toContain('typeStart3 - 100');
