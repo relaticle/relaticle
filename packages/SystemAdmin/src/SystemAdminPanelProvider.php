@@ -30,6 +30,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\Ink\InkPlugin;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -51,13 +52,17 @@ final class SystemAdminPanelProvider extends PanelProvider
     ];
 
     /**
-     * Datetime format for this panel. Unlike the app panel, sysadmin deliberately
-     * does NOT convert to the viewer's timezone: it is used to correlate incidents
-     * against Horizon, Flare and server logs, which are all UTC, and two admins in
-     * different zones must describe the same event with the same numbers. The `UTC`
-     * suffix makes that explicit rather than leaving the reader to assume.
+     * Datetime format for this panel. The zone is opt-in per administrator on the
+     * profile page and defaults to UTC, because this panel is used to correlate
+     * incidents against Horizon, Flare and server logs, which are all UTC.
+     *
+     * `T` prints the zone the value is actually rendered in, so a timestamp is never
+     * ambiguous: an administrator who has opted out of UTC can still see they did,
+     * and two administrators in different zones cannot read the same row as the same
+     * numbers. This is why the suffix must stay — dropping it, not the conversion
+     * itself, is what would break incident correlation.
      */
-    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s \U\T\C';
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s T';
 
     public function boot(): void
     {
@@ -115,6 +120,7 @@ final class SystemAdminPanelProvider extends PanelProvider
 
         return $panel
             ->login()
+            ->profile(EditProfile::class)
             ->emailVerification(isRequired: config('app.require_email_verification'))
             ->authGuard('sysadmin')
             ->authPasswordBroker('system_administrators')

@@ -48,7 +48,6 @@ use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
-use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -86,19 +85,6 @@ final class AppPanelProvider extends PanelProvider
             SwitchTeam::class,
         );
 
-        /**
-         * Datetimes are stored in UTC; the app panel renders and accepts them in the
-         * signed-in user's zone. Read by both table/infolist output and DateTimePicker
-         * input, so one closure keeps display and entry symmetrical.
-         *
-         * Guarded on the panel id because TimezoneManager is a global singleton — the
-         * sysadmin panel deliberately keeps rendering UTC (see SystemAdminPanelProvider),
-         * and returning null there falls back to config('app.timezone').
-         */
-        FilamentTimezone::set(fn (): ?string => Filament::getCurrentPanel()?->getId() === 'app'
-            ? $this->signedInUser()?->timezone
-            : null);
-
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
@@ -106,8 +92,14 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
-     * The web guard is shared with the sysadmin panel's SystemAdministrator, which has
-     * no timezone of its own — narrow to the customer model rather than assuming.
+     * Gates the browser timezone detection script below, which posts to an app-panel
+     * route. Panel rendering itself no longer reads this — that resolution is global
+     * and lives in AppServiceProvider::configureFilament(), because TimezoneManager
+     * holds a single slot and a second writer here would silently win on boot order.
+     *
+     * The web guard is shared with the sysadmin panel's SystemAdministrator, whose
+     * zone is chosen on its own profile page and never detected — narrow to the
+     * customer model rather than assuming.
      */
     private function signedInUser(): ?User
     {

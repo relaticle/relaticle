@@ -49,10 +49,12 @@ it('falls back to the app timezone for a user who has not set one', function ():
         ->and(FilamentTimezone::get())->toBe('UTC');
 });
 
-it('keeps the sysadmin panel on utc even while a user timezone is set, so incidents correlate with server logs', function (): void {
+it('resolves each panel through its own guard, so a customer zone never leaks into sysadmin', function (): void {
     $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
     $this->actingAs($user);
 
+    // The administrator has chosen no zone of their own, so the panel stays on UTC
+    // and correlates with server logs — see SysadminTimezoneTest for the opt-in.
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 

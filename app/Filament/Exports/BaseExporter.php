@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -48,9 +49,7 @@ abstract class BaseExporter extends Exporter
      */
     public function timezone(): string
     {
-        $user = $this->export->user;
-
-        return ($user instanceof User ? $user->timezone : null) ?? (string) config('app.timezone');
+        return self::timezoneFor($this->export->user);
     }
 
     /**
@@ -58,9 +57,19 @@ abstract class BaseExporter extends Exporter
      */
     public static function requestTimezone(): string
     {
-        $user = Auth::guard('web')->user();
+        return self::timezoneFor(Auth::guard('web')->user());
+    }
 
-        return ($user instanceof User ? $user->timezone : null) ?? (string) config('app.timezone');
+    /**
+     * The web guard is shared with the sysadmin panel's SystemAdministrator, and an
+     * export row can outlive its author, so narrow to the customer model rather than
+     * assuming either is present.
+     */
+    private static function timezoneFor(?Authenticatable $user): string
+    {
+        return $user instanceof User
+            ? $user->effectiveTimezone()
+            : (string) config('app.timezone');
     }
 
     /**

@@ -34,7 +34,7 @@ final readonly class MyTasksService
          * is 23 or 25 hours long across a DST transition, so adding a day to the already
          * converted value would put the end of "today" an hour off twice a year.
          */
-        $timezone = $user->timezone ?? (string) config('app.timezone');
+        $timezone = $user->effectiveTimezone();
         $startOfToday = Date::now($timezone)->startOfDay()->utc();
         $startOfDayAfter = Date::now($timezone)->startOfDay()->addDay()->utc();
 

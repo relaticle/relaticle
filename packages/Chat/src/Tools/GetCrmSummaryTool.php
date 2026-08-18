@@ -37,7 +37,7 @@ final class GetCrmSummaryTool implements Tool
          * "This week" is the user's week, not the server's — bounded on UTC the counts
          * shift by a day for anyone far enough east or west.
          */
-        $startOfWeek = Date::now($user->timezone ?? (string) config('app.timezone'))
+        $startOfWeek = Date::now($user->effectiveTimezone())
             ->startOfWeek()
             ->utc();
 

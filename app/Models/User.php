@@ -120,6 +120,17 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
+     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * who never chose one and whose browser was never detected falls back to the app
+     * default, so every caller that turns a stored UTC value into a wall clock reads
+     * it from here rather than repeating the fallback.
+     */
+    public function effectiveTimezone(): string
+    {
+        return $this->timezone ?? (string) config('app.timezone');
+    }
+
+    /**
      * @return HasMany<UserSocialAccount, $this>
      */
     public function socialAccounts(): HasMany
