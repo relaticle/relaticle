@@ -218,7 +218,7 @@
                                     <template x-for="chip in msg.follow_ups" :key="chip.prompt">
                                         <button
                                             type="button"
-                                            x-on:click="input = chip.prompt; $nextTick(() => sendMessage())"
+                                            x-on:click="input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())"
                                             x-text="chip.label"
                                             class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                                         ></button>
