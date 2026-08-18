@@ -8,4 +8,5 @@ enum TeamRole: string
 {
     case Admin = 'admin';
     case Editor = 'editor';
+    case Viewer = 'viewer';
 }
