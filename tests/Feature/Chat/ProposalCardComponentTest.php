@@ -892,3 +892,68 @@ it('renders the resolve failure in the dock so the approval is never a silent no
         ->call('createCurrent')
         ->assertSee('not in your workspace');
 });
+
+/**
+ * A pending Create-custom-field proposal shaped exactly like CreateCustomFieldTool emits.
+ */
+function customFieldProposal(User $user, string $entityType, string $name, string $type): PendingAction
+{
+    return PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\CustomFields\\CreateCustomField',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'custom_field',
+        'action_data' => ['entity_type' => $entityType, 'name' => $name, 'type' => $type],
+        'display_data' => [
+            'title' => 'Create Custom Field',
+            'summary' => "Create \"{$name}\" ({$type}) on {$entityType}",
+            'fields' => [
+                ['label' => 'Entity', 'value' => $entityType],
+                ['label' => 'Name', 'value' => $name],
+                ['label' => 'Type', 'value' => $type],
+            ],
+        ],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+it('approving a custom field proposal dispatches a record link to the management page', function (): void {
+    Bus::fake();
+    $action = customFieldProposal($this->user, 'people', 'Age', 'number');
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolved', function (string $event, array $params): bool {
+            $record = $params['record'] ?? null;
+
+            return is_array($record)
+                && $record['type'] === 'custom_field'
+                && $record['label'] === 'Age'
+                && str_contains((string) $record['url'], 'currentEntityType=people');
+        });
+});
+
+it('surfaces a readable error on the card when the field name was taken after the proposal', function (): void {
+    Bus::fake();
+    $action = customFieldProposal($this->user, 'people', 'Age', 'number');
+
+    CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->team->getKey(),
+        'entity_type' => 'people',
+        'name' => 'Age',
+        'code' => 'age',
+        'type' => 'number',
+    ]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertHasErrors('resolve');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+});

@@ -6,6 +6,7 @@ namespace App\Actions\CustomFields;
 
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
@@ -60,57 +61,21 @@ final readonly class CreateCustomField
     {
         abort_unless($user->ownsTeam($user->currentTeam), 403, 'Only team owners can manage custom field definitions.');
 
-        $type = (string) ($data['type'] ?? '');
-        $entityType = (string) ($data['entity_type'] ?? '');
-        $name = (string) ($data['name'] ?? '');
-
-        abort_unless(
-            in_array($type, self::ALLOWED_TYPES, true),
-            422,
-            "Field type \"{$type}\" is not allowed via chat. Allowed types: ".implode(', ', self::ALLOWED_TYPES).'.',
-        );
-
-        abort_unless(
-            in_array($entityType, self::VALID_ENTITY_TYPES, true),
-            422,
-            "Entity type \"{$entityType}\" is not valid. Valid types: ".implode(', ', self::VALID_ENTITY_TYPES).'.',
-        );
-
-        $options = is_array($data['options'] ?? null) ? $data['options'] : [];
-        $isChoiceType = $this->isChoiceType($type);
-
-        abort_if($isChoiceType && $options === [], 422, "Field type \"{$type}\" requires at least one option.");
-
-        abort_if(! $isChoiceType && $options !== [], 422, "Field type \"{$type}\" does not support options.");
-
         $teamId = $user->currentTeam->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($teamId);
 
         try {
-            $maxFields = (int) config('chat.max_custom_fields_per_entity', 50);
-            $existingCount = CustomField::query()
-                ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
-                ->where('entity_type', $entityType)
-                ->count();
+            // Re-validated here, not just at proposal time: a proposal approved after
+            // someone else claimed the name must fail rather than write a duplicate.
+            $validated = CustomFieldDefinitionValidator::forCreate($user, $data);
 
-            abort_if(
-                $existingCount >= $maxFields,
-                422,
-                "Cannot create more than {$maxFields} custom fields per entity type.",
-            );
+            $entityType = (string) $validated['entity_type'];
+            $type = (string) $validated['type'];
+            $name = (string) $validated['name'];
+            $optionNames = array_column(is_array($validated['options'] ?? null) ? $validated['options'] : [], 'name');
 
-            if ($isChoiceType) {
-                $maxOptions = (int) config('chat.max_field_options', 50);
-                abort_if(
-                    count($options) > $maxOptions,
-                    422,
-                    "Cannot create more than {$maxOptions} options per field.",
-                );
-            }
-
-            $code = (string) ($data['code'] ?? '');
+            $code = (string) ($validated['code'] ?? '');
 
             if ($code === '') {
                 $code = CodeGenerator::generateUniqueFieldCode($name, $entityType);
@@ -122,7 +87,7 @@ final readonly class CreateCustomField
                 ->where('entity_type', $entityType)
                 ->max('sort_order') + 1;
 
-            $field = DB::transaction(function () use ($teamId, $entityType, $type, $name, $code, $nextSortOrder, $options, $isChoiceType): CustomField {
+            $field = DB::transaction(function () use ($teamId, $entityType, $type, $name, $code, $nextSortOrder, $optionNames): CustomField {
                 $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
                 /** @var CustomField $created */
@@ -139,15 +104,12 @@ final readonly class CreateCustomField
                     'settings' => new CustomFieldSettingsData,
                 ]);
 
-                if ($isChoiceType) {
-                    foreach (array_values($options) as $index => $option) {
-                        $optionName = is_array($option) ? (string) ($option['name'] ?? '') : (string) $option;
-                        $created->options()->create([
-                            $tenantKey => $teamId,
-                            'name' => $optionName,
-                            'sort_order' => $index,
-                        ]);
-                    }
+                foreach ($optionNames as $index => $optionName) {
+                    $created->options()->create([
+                        $tenantKey => $teamId,
+                        'name' => $optionName,
+                        'sort_order' => $index,
+                    ]);
                 }
 
                 return $created;
@@ -157,10 +119,5 @@ final readonly class CreateCustomField
         }
 
         return $field->load('options');
-    }
-
-    private function isChoiceType(string $type): bool
-    {
-        return in_array($type, self::CHOICE_TYPES, true);
     }
 }

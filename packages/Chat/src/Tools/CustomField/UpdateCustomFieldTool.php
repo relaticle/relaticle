@@ -7,16 +7,20 @@ namespace Relaticle\Chat\Tools\CustomField;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
 
 final class UpdateCustomFieldTool implements Tool
 {
+    use ReportsValidationFailures;
     use ResolvesOwnedCustomField;
     use WithConversationContext;
 
@@ -75,12 +79,17 @@ final class UpdateCustomFieldTool implements Tool
             return (string) json_encode(['error' => 'System-defined custom fields cannot be modified.']);
         }
 
-        $newName = ($request['name'] ?? null) !== null ? (string) $request['name'] : null;
-        $newActive = ($request['active'] ?? null) !== null ? (bool) $request['active'] : null;
-
-        if ($newName === null && $newActive === null) {
-            return (string) json_encode(['error' => 'Provide at least one of: name, active.']);
+        try {
+            $validated = CustomFieldDefinitionValidator::forRename($user, $field, array_filter([
+                'name' => $request['name'] ?? null,
+                'active' => $request['active'] ?? null,
+            ], fn (mixed $value): bool => $value !== null));
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         }
+
+        $newName = isset($validated['name']) ? (string) $validated['name'] : null;
+        $newActive = isset($validated['active']) ? (bool) $validated['active'] : null;
 
         $actionData = [
             '_record_id' => $field->getKey(),

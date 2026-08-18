@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -128,6 +129,82 @@ it('returns error when trying to update a system_defined field', function (): vo
         'entity_type' => 'company',
         'code' => $systemField->code,
         'name' => 'Hacked',
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects renaming to a name that already exists on the entity at proposal time', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Sector',
+        'code' => 'sector',
+        'type' => 'text',
+    ]);
+
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Sector',
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('already exists')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('allows renaming a field to its own current name', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Industry',
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded['type'])->toBe('pending_action');
+});
+
+it('rejects approval when the new name was taken after the proposal', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Sector',
+    ]));
+
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Sector',
+        'code' => 'sector',
+        'type' => 'text',
+    ]);
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->owner))
+        ->toThrow(ValidationException::class, 'already exists');
+
+    expect($this->field->refresh()->name)->toBe('Industry');
+});
+
+it('rejects renaming to a name longer than 50 characters', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => str_repeat('a', 51),
     ]));
 
     $decoded = json_decode($result, true);

@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\EditAction;
 use Throwable;
@@ -78,6 +81,9 @@ final readonly class RecordReferenceResolver
 
         try {
             return match ($entityType) {
+                // Custom field definitions have no per-record route — the management page
+                // is the destination, deep-linked to the tab the field lives on.
+                'custom_field' => $this->customFieldUrl($recordId, $team),
                 'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
@@ -96,10 +102,37 @@ final readonly class RecordReferenceResolver
         }
     }
 
+    /**
+     * The custom-fields management page, focused on the tab owning this field.
+     * Scoped explicitly to the team and past every global scope: this also runs on
+     * conversation reload and for deactivated fields, where neither the ambient
+     * custom-fields tenant context nor the activable scope can be relied on.
+     */
+    private function customFieldUrl(string $recordId, Team $team): ?string
+    {
+        $entityType = CustomField::query()
+            ->withoutGlobalScopes()
+            ->whereKey($recordId)
+            ->where('tenant_id', $team->getKey())
+            ->value('entity_type');
+
+        if (! is_string($entityType) || $entityType === '') {
+            return null;
+        }
+
+        return CustomFields::getUrl(panel: 'app', tenant: $team).'?'.http_build_query([
+            'currentEntityType' => $entityType,
+        ]);
+    }
+
     private function resolveLabel(string $entityType, string $recordId): ?string
     {
         try {
             $label = match ($entityType) {
+                'custom_field' => CustomField::query()
+                    ->withoutGlobalScopes()
+                    ->whereKey($recordId)
+                    ->value('name'),
                 'company' => Company::query()->whereKey($recordId)->value('name'),
                 'people' => People::query()->whereKey($recordId)->value('name'),
                 'opportunity' => Opportunity::query()->whereKey($recordId)->value('name'),

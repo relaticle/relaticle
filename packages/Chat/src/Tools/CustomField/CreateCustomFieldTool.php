@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\CreateCustomField;
-use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
-use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 
 final class CreateCustomFieldTool implements Tool
 {
+    use ReportsValidationFailures;
     use WithConversationContext;
 
     public function name(): string
@@ -26,7 +28,7 @@ final class CreateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose creating a new custom field definition on a CRM entity. Admin-only — returns an error for non-owners. Returns a proposal for user approval.';
+        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity — check ListCustomFieldsTool first. Admin-only — returns an error for non-owners. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -38,7 +40,7 @@ final class CreateCustomFieldTool implements Tool
                 ->description('The CRM entity to add the field to: company, people, opportunity, task, or note.')
                 ->required(),
             'name' => $schema->string()
-                ->description('The display name for the field (e.g. "Industry", "Priority").')
+                ->description('The display name for the field (e.g. "Industry", "Priority"). Max 50 characters, and must not match an existing field on the same entity.')
                 ->required(),
             'type' => $schema->string()
                 ->description("The field type. Allowed: {$allowedTypes}. NOT allowed: file-upload, record, rich-editor, markdown-editor, currency.")
@@ -64,75 +66,31 @@ final class CreateCustomFieldTool implements Tool
             ]);
         }
 
-        $type = (string) ($request['type'] ?? '');
-
-        if (! in_array($type, CreateCustomField::ALLOWED_TYPES, true)) {
-            return (string) json_encode([
-                'error' => "Field type \"{$type}\" is not supported via chat. Allowed types: ".implode(', ', CreateCustomField::ALLOWED_TYPES).'.',
+        try {
+            $validated = CustomFieldDefinitionValidator::forCreate($user, [
+                'entity_type' => $request['entity_type'] ?? null,
+                'name' => $request['name'] ?? null,
+                'type' => $request['type'] ?? null,
+                'code' => $request['code'] ?? null,
+                'options' => $request['options'] ?? null,
             ]);
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         }
 
-        $isChoiceType = in_array($type, CreateCustomField::CHOICE_TYPES, true);
-
-        $options = is_array($request['options'] ?? null) ? $request['options'] : [];
-
-        if ($isChoiceType && $options === []) {
-            return (string) json_encode([
-                'error' => "Field type \"{$type}\" requires at least one option. Please provide an options array with at least one {\"name\": \"...\"} entry.",
-            ]);
-        }
-
-        if (! $isChoiceType && $options !== []) {
-            return (string) json_encode([
-                'error' => "Field type \"{$type}\" does not support options.",
-            ]);
-        }
-
-        $entityType = (string) ($request['entity_type'] ?? '');
-
-        if (! in_array($entityType, CreateCustomField::VALID_ENTITY_TYPES, true)) {
-            return (string) json_encode([
-                'error' => 'Invalid entity type "'.htmlspecialchars($entityType, ENT_QUOTES, 'UTF-8').'". Must be one of: '.implode(', ', CreateCustomField::VALID_ENTITY_TYPES).'.',
-            ]);
-        }
-
-        $maxFields = (int) config('chat.max_custom_fields_per_entity', 50);
-        $teamId = $user->currentTeam->getKey();
-        $existingCount = CustomField::query()
-            ->withoutGlobalScope(CustomFieldsActivableScope::class)
-            ->where('tenant_id', $teamId)
-            ->where('entity_type', $entityType)
-            ->count();
-
-        if ($existingCount >= $maxFields) {
-            return (string) json_encode([
-                'error' => "Cannot create more than {$maxFields} custom fields for entity type \"{$entityType}\".",
-            ]);
-        }
-
-        if ($isChoiceType) {
-            $maxOptions = (int) config('chat.max_field_options', 50);
-            if (count($options) > $maxOptions) {
-                return (string) json_encode([
-                    'error' => "Too many options — at most {$maxOptions} per field.",
-                ]);
-            }
-        }
-
-        $name = (string) ($request['name'] ?? '');
-        $code = (string) ($request['code'] ?? '');
+        $entityType = (string) $validated['entity_type'];
+        $name = (string) $validated['name'];
+        $type = (string) $validated['type'];
+        $code = (string) ($validated['code'] ?? '');
+        $optionNames = array_column(is_array($validated['options'] ?? null) ? $validated['options'] : [], 'name');
 
         $actionData = array_filter([
             'entity_type' => $entityType,
             'name' => $name,
             'type' => $type,
             'code' => $code !== '' ? $code : null,
-            'options' => $options !== [] ? $options : null,
-        ], fn (mixed $v): bool => $v !== null);
-
-        $optionsSummary = $options !== []
-            ? ' with options: '.implode(', ', array_map(static fn (mixed $o): string => is_array($o) ? (string) ($o['name'] ?? '') : (string) $o, $options))
-            : '';
+            'options' => $optionNames !== [] ? array_map(static fn (string $option): array => ['name' => $option], $optionNames) : null,
+        ], fn (mixed $value): bool => $value !== null);
 
         $displayFields = [
             ['label' => 'Entity', 'value' => $entityType],
@@ -144,12 +102,11 @@ final class CreateCustomFieldTool implements Tool
             $displayFields[] = ['label' => 'Code', 'value' => $code];
         }
 
-        if ($options !== []) {
-            $displayFields[] = [
-                'label' => 'Options',
-                'value' => implode(', ', array_map(static fn (mixed $o): string => is_array($o) ? (string) ($o['name'] ?? '') : (string) $o, $options)),
-            ];
+        if ($optionNames !== []) {
+            $displayFields[] = ['label' => 'Options', 'value' => implode(', ', $optionNames)];
         }
+
+        $optionsSummary = $optionNames !== [] ? ' with options: '.implode(', ', $optionNames) : '';
 
         $displayData = [
             'title' => 'Create Custom Field',

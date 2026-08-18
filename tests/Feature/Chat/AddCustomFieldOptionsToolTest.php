@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -164,4 +165,79 @@ it('returns error when adding options would exceed the cap', function (): void {
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects adding an option that already exists on the field at proposal time', function (): void {
+    $tool = makeAddOptionsTool($this->convId);
+
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'Active']],
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('already exists')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects duplicate option names within one request', function (): void {
+    $tool = makeAddOptionsTool($this->convId);
+
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'Inactive'], ['name' => 'Inactive']],
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects empty option names', function (): void {
+    $tool = makeAddOptionsTool($this->convId);
+
+    $result = $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => '  ']],
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects approval with a friendly message when the option appeared after the proposal', function (): void {
+    $tool = makeAddOptionsTool($this->convId);
+    $tool->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'Fresh']],
+    ]));
+
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    $this->selectField->options()->create([
+        $tenantKey => $this->team->getKey(),
+        'name' => 'Fresh',
+        'sort_order' => 5,
+    ]);
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->owner))
+        ->toThrow(ValidationException::class, 'already exists');
+
+    TenantContextService::setTenantId($this->team->getKey());
+    $freshCount = CustomFieldOption::query()
+        ->where('custom_field_id', $this->selectField->getKey())
+        ->where('name', 'Fresh')
+        ->count();
+
+    expect($freshCount)->toBe(1);
 });

@@ -8,15 +8,20 @@ use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
+use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
+use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseReadListTool implements Tool
 {
     use NormalizesToolInput;
+    use ReportsValidationFailures;
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -30,6 +35,14 @@ abstract class BaseReadListTool implements Tool
 
     abstract public function description(): string;
 
+    /**
+     * The custom-fields entity alias, which is also the citation/morph alias.
+     */
+    protected function entityType(): string
+    {
+        return $this->citationType();
+    }
+
     /** @return array<string, mixed> */
     protected function additionalSchema(JsonSchema $schema): array
     {
@@ -42,12 +55,39 @@ abstract class BaseReadListTool implements Tool
         return [];
     }
 
+    /**
+     * Native columns every entity can be sorted by; custom-field codes are added
+     * per tenant.
+     *
+     * @return list<string>
+     */
+    protected function nativeSorts(): array
+    {
+        return [$this->searchFilterName(), 'created_at', 'updated_at'];
+    }
+
     public function schema(JsonSchema $schema): array
     {
+        $user = auth()->user();
+        $entityType = $this->entityType();
+
+        $customFieldsDescription = 'Filter by custom field values.';
+        $sortable = $this->nativeSorts();
+
+        if ($user instanceof User) {
+            $describer = resolve(CustomFieldsFilterDescriber::class);
+            $customFieldsDescription = $describer->describe($user, $entityType);
+            $sortable = array_merge($sortable, $describer->sortableCodes($user, $entityType));
+        }
+
         return array_merge(
             ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
             $this->additionalSchema($schema),
             [
+                'custom_fields' => $schema->object()->description($customFieldsDescription),
+                'sort' => $schema->string()->description(
+                    'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
+                ),
                 'per_page' => $schema->integer()->description('Results per page (default 15, max 50).')->default(15),
                 'page' => $schema->integer()->description('Page number.')->default(1),
             ],
@@ -59,7 +99,11 @@ abstract class BaseReadListTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $httpRequest = $this->buildHttpRequest($request);
+        try {
+            $httpRequest = $this->buildHttpRequest($user, $request);
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
+        }
 
         try {
             $action = app()->make($this->actionClass());
@@ -105,7 +149,10 @@ abstract class BaseReadListTool implements Tool
         return (string) json_encode($items, JSON_PRETTY_PRINT);
     }
 
-    private function buildHttpRequest(Request $request): HttpRequest
+    /**
+     * @throws ValidationException
+     */
+    private function buildHttpRequest(User $user, Request $request): HttpRequest
     {
         $input = [];
 
@@ -114,8 +161,21 @@ abstract class BaseReadListTool implements Tool
             $this->additionalFilters($request),
         ));
 
+        $customFields = resolve(CustomFieldsFilterTranslator::class)
+            ->translate($user, $this->entityType(), $request['custom_fields'] ?? null);
+
+        if ($customFields !== []) {
+            $nativeFilters['custom_fields'] = $customFields;
+        }
+
         if ($nativeFilters !== []) {
             $input['filter'] = $nativeFilters;
+        }
+
+        $sort = $request['sort'] ?? null;
+
+        if (is_string($sort) && $sort !== '') {
+            $input['sort'] = $sort;
         }
 
         return new HttpRequest($input);

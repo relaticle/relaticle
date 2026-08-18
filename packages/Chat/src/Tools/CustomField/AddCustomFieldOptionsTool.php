@@ -8,17 +8,20 @@ use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
-use Relaticle\CustomFields\Services\TenantContextService;
 
 final class AddCustomFieldOptionsTool implements Tool
 {
+    use ReportsValidationFailures;
     use ResolvesOwnedCustomField;
     use WithConversationContext;
 
@@ -68,12 +71,6 @@ final class AddCustomFieldOptionsTool implements Tool
             return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.']);
         }
 
-        $options = is_array($request['options'] ?? null) ? $request['options'] : [];
-
-        if ($options === []) {
-            return (string) json_encode(['error' => 'At least one option must be provided.']);
-        }
-
         $teamId = $user->currentTeam->getKey();
         $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
 
@@ -87,31 +84,19 @@ final class AddCustomFieldOptionsTool implements Tool
             ]);
         }
 
-        $maxOptions = (int) config('chat.max_field_options', 50);
-
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
-
         try {
-            $existingCount = $field->options()->withoutGlobalScopes()->count();
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
-
-        if (($existingCount + count($options)) > $maxOptions) {
-            return (string) json_encode([
-                'error' => 'Adding '.count($options)." more options would exceed the {$maxOptions} options limit for this field (currently has {$existingCount}).",
+            $validated = CustomFieldDefinitionValidator::forNewOptions($user, $field, [
+                'options' => $request['options'] ?? null,
             ]);
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         }
 
-        $optionNames = array_map(
-            static fn (mixed $o): string => is_array($o) ? (string) ($o['name'] ?? '') : (string) $o,
-            $options,
-        );
+        $optionNames = array_column($validated['options'], 'name');
 
         $actionData = [
             '_record_id' => $field->getKey(),
-            'options' => $options,
+            'options' => array_map(static fn (string $option): array => ['name' => $option], $optionNames),
         ];
 
         $displayData = [
