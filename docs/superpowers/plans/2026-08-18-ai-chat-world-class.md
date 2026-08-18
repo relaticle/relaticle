@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Assistant name: **Rela** (user-approved recommendation; a config key makes it swappable).
+- Assistant name: **Rela** (assumed from the spec recommendation, NOT yet user-confirmed; swappable via `CHAT_ASSISTANT_NAME`, so PR 1 is safe to build while the name is pending).
 - Pre-commit gates, in order: `vendor/bin/pint --dirty --format agent`, `vendor/bin/rector --dry-run` (apply if it suggests), `vendor/bin/phpstan analyse`, `composer test:type-coverage` (must stay 100%), `php artisan test --compact` (targeted filters fine).
 - Never the em-dash character (U+2014) in any file, commit, or PR text.
 - User-facing strings wrapped in `__()` (PHPStan i18n rules enforce on guarded methods/properties).
@@ -511,7 +511,7 @@ Route (inside the existing `auth:web` group in `packages/Chat/routes/chat.php`):
 ```php
 Route::get('/r/{type}/{id}', RecordRedirectController::class)->name('chat.record-redirect');
 ```
-Note: `urlFor` builds panel URLs for the CURRENT user's team and the resolver's label query already scopes by tenant for custom fields; the per-type `whereBelongsTo` team check happens on the resource route itself (Filament tenancy 404s non-members). The "outside team" test must pass via the resolver returning a URL whose panel route 404s OR the resolver returning null; assert whichever holds and document it in the test. If the resolver happily builds URLs for foreign ids, add the ownership check in the controller: look up the model class per type (same map as the resolver) and `abort_unless` it belongs to the user's current team.
+The ownership check in the controller is REQUIRED, not optional: `urlFor()` builds panel URLs blindly via `Resource::getUrl()` with no DB query for every CRM type (verified in `RecordReferenceResolver`), so it happily returns URLs for foreign and nonexistent ids. Before redirecting, map the type to its model class (same map as the resolver: company/people/opportunity/task/note), fetch the record, and `abort_unless` its `team_id` matches the user's current team (404 both for missing and foreign records so the response does not leak existence).
 
 - [ ] **Step 4: Verify + gates + commit**
 
@@ -646,6 +646,8 @@ In the list base, after assembling rows for the model payload, derive the block:
 - [ ] **Step 3: Implement derivation + reconcile**
 
 `ListConversationMessages`: a `collectDisplayBlocks(?string $toolResults): array` sibling of the pending-action extraction, attached per message. `latestAssistantMessage()` mirrors it. `StreamEventBroadcaster` is NOT modified: read results stay un-broadcast (Reverb 10 KB cap), blocks appear at stream_end reconcile and on reload.
+
+Token cost containment (required, not optional): `tool_results` are replayed to the model on every later turn, and `display_block` is presentation-only, so replaying it is pure waste (1-2 KB per list call, forever, against a prompt-cached prefix we fought to shrink). Strip the `display_block` key from tool results when building the replayed agent history: `SupersededAwareConversationStore` already filters history on replay and is the precedent hook; add the strip there with a Feature test asserting the replayed history for a turn with a block does not contain `"display_block"` while the persisted row still does.
 
 - [ ] **Step 4: Verify + commit**
 
@@ -786,7 +788,7 @@ Real browser with a real mic is manual: verify endpoint + insertion with a fixtu
 ### Task 21: Team display templates (Jav's request)
 
 **Files:**
-- Create: migration `chat_display_templates` (`team_id` FK, `entity_type` string, `field_codes` jsonb, unique(team_id, entity_type), timestamps; `up()` only)
+- Create: migration `chat_display_templates` in the root `database/migrations/` (chat tables live there, not in the package; confirm with `ls database/migrations | grep -i chat`, e.g. the `superseded_at` migration). Columns: `team_id` FK, `entity_type` string, `field_codes` jsonb, unique(team_id, entity_type), timestamps; `up()` only
 - Create: `packages/Chat/src/Models/DisplayTemplate.php`, `packages/Chat/src/Services/DisplayFieldSelector.php`, `app/Actions/Chat/SaveDisplayTemplate.php`
 - Modify: the read tool bases (Task 15's block builders consult the selector), chip hover left for later
 - Create: settings UI section on the team settings page (find the page: `grep -rn "CustomFields" app/Filament/Pages/Team` and follow that pattern)
