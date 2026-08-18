@@ -351,7 +351,10 @@
                     <div class="mt-3 space-y-3">
                         <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
                             <div class="space-y-2">
-                                <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                {{-- Block-renderer registry lookup (packages/Chat/resources/js/chat/blocks.js):
+                                     an unregistered type renders nothing, silently. Only 'pending_action' is
+                                     registered today, mapped to this proposal-card partial. --}}
+                                <template x-if="window.ChatModules.blockTemplate('pending_action') && (action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0))">
                                     @include('chat::livewire.chat.partials._proposal-card')
                                 </template>
 

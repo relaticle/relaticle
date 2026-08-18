@@ -13,6 +13,7 @@ import { chatEditor } from './chat-editor';
 import { transcriptModule } from './chat/transcript';
 import { sendModule } from './chat/send';
 import { streamModule } from './chat/stream';
+import { registerBlock, blockTemplate } from './chat/blocks';
 
 const registerChatEditor = () => {
     if (!window.Alpine) {
@@ -30,4 +31,8 @@ if (!registerChatEditor()) {
 // chat-interface.blade.php (it needs Blade's @js() to inline per-request
 // server data). These module factories are exposed here so that inline
 // script can compose them without a bundler import.
-window.ChatModules = { transcriptModule, sendModule, streamModule };
+//
+// registerBlock/blockTemplate are plain functions, not module factories:
+// exposed alongside so the transcript partial (also inline, unbundled) can
+// call window.ChatModules.blockTemplate() directly.
+window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate };
