@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Console\Commands\CleanupExpiredInvitationsCommand;
 use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -163,4 +164,33 @@ test('resending re-issues the token and extends expiry', function (): void {
 
     expect($invitation->token)->not->toBeNull()
         ->and($invitation->expires_at->isAfter(now()->addDays(6)))->toBeTrue();
+});
+
+test('resending delivers the new invitation mailable with a working raw token', function (): void {
+    Mail::fake();
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
+
+    $invitation = $team->teamInvitations()->create([
+        'email' => 'legacy@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDay(),
+    ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $team])
+        ->callAction(TestAction::make('resendTeamInvitation')->table($invitation));
+
+    $invitation->refresh();
+
+    Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail) use ($invitation): bool {
+        $resolved = TeamInvitation::findByRawToken($mail->rawToken);
+        $expectedUrl = route('team-invitations.token.accept', ['token' => $mail->rawToken]);
+
+        return $mail->hasTo('legacy@example.test')
+            && $mail->rawToken !== $invitation->token
+            && $resolved instanceof TeamInvitation
+            && $resolved->is($invitation)
+            && str_contains($mail->render(), $expectedUrl);
+    });
 });

@@ -9,6 +9,7 @@ use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Livewire\App\Teams\UpdateTeamName;
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -17,7 +18,6 @@ use Filament\Facades\Filament;
 use Filament\Schemas\Components\Livewire as LivewireComponent;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
 
 beforeEach(function () {
     $this->user = User::factory()->withTeam()->create();
@@ -73,7 +73,7 @@ test('admin invites by email and the invitation appears in the pending list', fu
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->assertCanSeeTableRecords([$invitation]);
 
-    Mail::assertSent(TeamInvitationMail::class);
+    Mail::assertQueued(TeamInvitationMail::class);
 });
 
 test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
@@ -109,7 +109,7 @@ test('admin can resend a pending invitation', function () {
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
-    Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
+    Mail::assertQueued(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
 });
 
 test('admin can revoke a pending invitation', function () {

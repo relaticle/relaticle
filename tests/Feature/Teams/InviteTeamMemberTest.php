@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\TeamRole;
 use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Mail\TeamInvitationMail;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -189,4 +191,37 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
         ->assertNotified(__('This user has already been invited to the team.'));
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
+});
+
+test('invitation email names the inviter and the role', function (): void {
+    $this->user->update(['name' => 'Ana Reyes']);
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'new@example.test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team);
+
+    Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail): bool {
+        return $mail->hasTo('new@example.test')
+            && str_contains($mail->envelope()->subject, 'Ana Reyes')
+            && str_contains($mail->envelope()->subject, $this->team->name);
+    });
+});
+
+test('invitation email accept URL resolves to the token route and carries the raw token, not the hash', function (): void {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'new@example.test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->sole();
+
+    Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail) use ($invitation): bool {
+        $resolved = TeamInvitation::findByRawToken($mail->rawToken);
+
+        $expectedUrl = route('team-invitations.token.accept', ['token' => $mail->rawToken]);
+
+        return $mail->rawToken !== $invitation->token
+            && $resolved instanceof TeamInvitation
+            && $resolved->is($invitation)
+            && str_contains($mail->render(), $expectedUrl);
+    });
 });

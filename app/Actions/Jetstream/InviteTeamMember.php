@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Enums\TeamRole;
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
@@ -20,7 +21,6 @@ use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
 
 final readonly class InviteTeamMember implements InvitesTeamMembers
@@ -49,10 +49,10 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
         ]);
 
         /** @var TeamInvitationModel $invitation */
-        $invitation->issueToken();
+        $rawToken = $invitation->issueToken();
         $invitation->save();
 
-        Mail::to($invitation->email)->send(new TeamInvitation($invitation));
+        Mail::to($invitation->email)->send(new TeamInvitationMail($invitation, $rawToken));
     }
 
     /**
