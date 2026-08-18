@@ -511,6 +511,8 @@ Route (inside the existing `auth:web` group in `packages/Chat/routes/chat.php`):
 ```php
 Route::get('/r/{type}/{id}', RecordRedirectController::class)->name('chat.record-redirect');
 ```
+Permalink contract (this route is frozen public surface once shipped): `/r/{type}/{id}` URLs persist in transcripts, copies, and external docs forever, so the path shape never changes and the route never moves hosts. The controller is the adapter that absorbs ALL future change: panel URL restructures resolve at request time, and renamed type slugs get permanent aliases in the controller's type map (e.g. a future `contacts` maps alongside `people`). New reference kinds extend the same namespace with new type segments instead of new schemes.
+
 The ownership check in the controller is REQUIRED, not optional: `urlFor()` builds panel URLs blindly via `Resource::getUrl()` with no DB query for every CRM type (verified in `RecordReferenceResolver`), so it happily returns URLs for foreign and nonexistent ids. Before redirecting, map the type to its model class (same map as the resolver: company/people/opportunity/task/note), fetch the record, and `abort_unless` its `team_id` matches the user's current team (404 both for missing and foreign records so the response does not leak existence).
 
 - [ ] **Step 4: Verify + gates + commit**
