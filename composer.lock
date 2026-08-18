@@ -10328,16 +10328,16 @@
         },
         {
             "name": "relaticle/ink",
-            "version": "v2.5.0",
+            "version": "v2.5.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/ink.git",
-                "reference": "58f0c8a2ce276e1246c9ab4ebb393568bc34b04f"
+                "reference": "e12aad057ed2b77f26241d2dee12241471edbe36"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/ink/zipball/58f0c8a2ce276e1246c9ab4ebb393568bc34b04f",
-                "reference": "58f0c8a2ce276e1246c9ab4ebb393568bc34b04f",
+                "url": "https://api.github.com/repos/relaticle/ink/zipball/e12aad057ed2b77f26241d2dee12241471edbe36",
+                "reference": "e12aad057ed2b77f26241d2dee12241471edbe36",
                 "shasum": ""
             },
             "require": {
@@ -10399,7 +10399,7 @@
                 "issues": "https://github.com/relaticle/ink/issues",
                 "source": "https://github.com/relaticle/ink"
             },
-            "time": "2026-08-18T11:43:10+00:00"
+            "time": "2026-08-18T20:46:55+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",
