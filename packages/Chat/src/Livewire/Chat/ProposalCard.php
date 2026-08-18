@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -468,11 +469,22 @@ final class ProposalCard extends BaseLivewireComponent
                 $finalized = true;
                 $record = $this->recordReferenceFor($resolved);
             }
+        } catch (QueryException $exception) {
+            // Must precede the RuntimeException arm — QueryException extends
+            // PDOException extends RuntimeException, so it would otherwise be caught
+            // there and its getMessage() put the failing SQL, the row's values and
+            // the connection host straight onto the card and into the transcript.
+            $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
         } catch (RuntimeException|ValidationException $exception) {
             // ValidationException is thrown by the action's tenant guards when a
             // referenced record or assignee stopped being reachable between the
-            // proposal and the approval. Livewire would otherwise absorb it into an
-            // error bag nothing renders, leaving the button a permanent no-op.
+            // proposal and the approval. HttpException (from abort_*() inside an
+            // action, e.g. the owner-only guard) is a RuntimeException too, and its
+            // message is written for the user, so it renders as-is. Livewire would
+            // otherwise absorb these into an error bag nothing renders, leaving the
+            // button a permanent no-op.
             $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
             return;
@@ -527,6 +539,10 @@ final class ProposalCard extends BaseLivewireComponent
                 $service->reject($pendingAction);
                 $finalized = true;
             }
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
         } catch (RuntimeException $exception) {
             $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
@@ -558,6 +574,24 @@ final class ProposalCard extends BaseLivewireComponent
      * the `resolve` error bag which the dock renders — a proposal that cannot be
      * resolved must say so rather than leave the button dead.
      */
+    /**
+     * A database error is never shown verbatim: the driver's message carries the
+     * statement, its bindings and the connection details. The operator still needs
+     * the real thing, so it goes to the log instead.
+     *
+     * A unique violation here means something got past the actions' re-validation —
+     * in practice a second approval landing in the same instant — so it is reported
+     * as a race the user can retry, not as a generic failure.
+     */
+    private function reportDatabaseFailure(PendingAction $pendingAction, QueryException $exception): void
+    {
+        report($exception);
+
+        $this->reportResolveFailure($pendingAction, $exception->getCode() === '23505'
+            ? __('Someone else just made a conflicting change. Reload the page and try again.')
+            : __('This change could not be saved. Please try again.'));
+    }
+
     private function reportResolveFailure(PendingAction $pendingAction, string $message): void
     {
         $this->addError('resolve', $message);

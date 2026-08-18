@@ -957,3 +957,32 @@ it('surfaces a readable error on the card when the field name was taken after th
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
+
+it('never puts a database error message on the card or in the transcript', function (): void {
+    Bus::fake();
+
+    // companies.name is NOT NULL and CreateCompany does not validate it, so an
+    // approval carrying a stale/emptied name reaches Postgres and raises a
+    // QueryException — whose getMessage() carries the statement, the failing row
+    // and the connection host.
+    $action = proposalCardPa($this->user, ['name' => null], ['title' => 'Create Company', 'summary' => 'Create a company']);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved');
+
+    $errors = $component->errors()->get('resolve');
+    $shown = implode(' ', $errors);
+
+    expect($errors)->not->toBeEmpty()
+        ->and($shown)->not->toContain('SQLSTATE')
+        ->and($shown)->not->toContain('insert into')
+        ->and($shown)->not->toContain('Connection: pgsql')
+        ->and($shown)->not->toContain('companies')
+        ->and($shown)->toBe('This change could not be saved. Please try again.');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
