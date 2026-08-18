@@ -424,10 +424,20 @@
             {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
                  render real Filament field editors in place (Phase C). Alpine stays the source of truth for
                  whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
-            <div x-show="hasPendingProposal" x-effect="syncActiveProposal()" class="mb-3">
-                <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    <x-heroicon-o-sparkles class="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Review before continuing</span>
+            <div
+                x-show="hasPendingProposal"
+                x-effect="syncActiveProposal()"
+                x-transition:enter="transition duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                x-transition:enter-start="translate-y-2 opacity-0"
+                x-transition:enter-end="translate-y-0 opacity-100"
+                x-transition:leave="transition duration-150 ease-in"
+                x-transition:leave-start="translate-y-0 opacity-100"
+                x-transition:leave-end="translate-y-1 opacity-0"
+                class="mb-3"
+            >
+                <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <x-heroicon-o-sparkles class="h-3.5 w-3.5 text-primary-500 dark:text-primary-400" aria-hidden="true" />
+                    <span>{{ __('Review before continuing') }}</span>
                 </div>
                 <div class="max-h-[55vh] overflow-y-auto">
                     <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />

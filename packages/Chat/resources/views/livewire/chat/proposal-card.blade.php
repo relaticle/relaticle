@@ -9,35 +9,78 @@
 
 <div>
     @if ($proposal)
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <div class="flex items-center gap-2">
-                <span
+        <div class="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-lg shadow-gray-900/[0.04] dark:border-white/10 dark:bg-gray-900 dark:shadow-black/20">
+            {{-- Header: operation icon tile + human summary + batch pager --}}
+            <div class="flex items-start gap-3">
+                <div
                     @class([
-                        'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium',
-                        'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' => $operation === 'create',
-                        'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' => $operation === 'update',
-                        'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' => $operation === 'delete',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400' => $operation === 'create',
+                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400' => $operation === 'update',
+                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $operation === 'delete',
                     ])
-                >{{ $proposal->display_data['title'] ?? ucfirst((string) $operation).' '.ucfirst($proposal->entity_type) }}</span>
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $record['summary'] ?? '' }}</span>
+                    aria-hidden="true"
+                >
+                    @if ($operation === 'update')
+                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                    @elseif ($operation === 'delete')
+                        <x-heroicon-o-trash class="h-4 w-4" />
+                    @else
+                        <x-heroicon-o-plus class="h-4 w-4" />
+                    @endif
+                </div>
+
+                <div class="min-w-0 flex-1 pt-1">
+                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $record['summary'] ?? $proposal->display_data['summary'] ?? $proposal->display_data['title'] ?? '' }}</p>
+                </div>
+
+                @if ($remainingCount > 1)
+                    <div class="flex shrink-0 items-center gap-0.5 pt-0.5">
+                        <button
+                            type="button"
+                            wire:click="stepPrev"
+                            @disabled($position <= 1)
+                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            aria-label="{{ __('Previous record') }}"
+                        >
+                            <x-heroicon-o-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+
+                        <span class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500">{{ $position }}&hairsp;/&hairsp;{{ $remainingCount }}</span>
+
+                        <button
+                            type="button"
+                            wire:click="stepNext"
+                            @disabled($position >= $remainingCount)
+                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            aria-label="{{ __('Next record') }}"
+                        >
+                            <x-heroicon-o-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                    </div>
+                @endif
             </div>
 
             @if (! empty($proposal->display_data['duplicate_warning']))
-                <div class="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">{{ $proposal->display_data['duplicate_warning'] }}</div>
+                <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>{{ $proposal->display_data['duplicate_warning'] }}</span>
+                </div>
             @endif
 
-            <div class="mt-2 space-y-1">
+            {{-- Field rows: fixed label column so values align, diffs render old → new --}}
+            <div class="mt-3 space-y-1.5 ps-11">
                 @foreach ($recordFields as $row)
                     @php
                         $code = $row['code'] ?? null;
                         $isEditable = $code !== null && in_array($code, $editableCodes, true);
                     @endphp
 
-                    <div class="group/field flex items-start gap-2 text-sm">
-                        <span class="shrink-0 font-medium text-gray-500 dark:text-gray-400">{{ ($row['label'] ?? '').':' }}</span>
+                    <div class="group/field flex items-start gap-3">
+                        <span class="w-28 shrink-0 pt-0.5 text-xs font-medium leading-5 text-gray-500 sm:w-32 dark:text-gray-400">{{ $row['label'] ?? '' }}</span>
 
                         @if ($editingFieldCode === $code && $isEditable)
-                            <div class="w-full">
+                            <div class="w-full min-w-0">
                                 {{ $this->form }}
 
                                 @error('field')
@@ -66,11 +109,11 @@
                                 </div>
                             </div>
                         @else
-                            <span class="flex flex-1 flex-wrap items-center gap-1">
+                            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm">
                                 @if (! in_array($row['value'] ?? $row['new'] ?? null, [null, ''], true) || ! empty($row['old']) || ! empty($row['values']))
                                     @if (! empty($row['old']))
-                                        <span class="text-gray-400 line-through">{{ $row['old'] }}</span>
-                                        <span class="text-gray-400" aria-hidden="true">&rarr;</span>
+                                        <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">{{ $row['old'] }}</span>
+                                        <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                                     @endif
 
                                     @if (is_array($row['values'] ?? null) && $row['values'] !== [])
@@ -85,11 +128,19 @@
                                             @endforeach
                                         @else
                                             @foreach ($row['values'] as $badge)
-                                                <span class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $badge }}</span>
+                                                <span class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">{{ $badge }}</span>
                                             @endforeach
                                         @endif
+                                    @elseif (($row['type'] ?? null) === 'boolean')
+                                        <span
+                                            @class([
+                                                'inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium',
+                                                'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400' => ($row['new'] ?? $row['value'] ?? null) === 'Yes',
+                                                'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400' => ($row['new'] ?? $row['value'] ?? null) !== 'Yes',
+                                            ])
+                                        >{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                                     @else
-                                        <span class="text-gray-900 dark:text-white">{{ $row['new'] ?? $row['value'] ?? '' }}</span>
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                                     @endif
                                 @endif
 
@@ -97,7 +148,7 @@
                                     <button
                                         type="button"
                                         wire:click="editField(@js($code))"
-                                        class="ml-auto inline-flex shrink-0 items-center justify-center rounded p-0.5 text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-gray-600 group-hover/field:opacity-100 focus-visible:opacity-100 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                                        class="ml-auto inline-flex shrink-0 items-center justify-center rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-gray-600 group-hover/field:opacity-100 focus-visible:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                                         aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
                                     >
                                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
@@ -110,72 +161,45 @@
             </div>
 
             @error('resolve')
-                <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400" role="alert">
+                <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-400/10 dark:text-red-400" role="alert">
                     {{ $message }}
                 </p>
             @enderror
 
-            <div class="mt-3 flex items-center justify-between gap-2">
-                <div class="flex items-center gap-1">
-                    @if ($remainingCount > 1)
-                        <button
-                            type="button"
-                            wire:click="stepPrev"
-                            @disabled($position <= 1)
-                            class="inline-flex items-center justify-center rounded-md p-1 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                            aria-label="{{ __('Previous record') }}"
-                        >
-                            <x-heroicon-o-chevron-left class="h-4 w-4" aria-hidden="true" />
-                        </button>
+            {{-- Footer: the decision. Separated by a hairline so it reads as one deliberate step. --}}
+            <div class="mt-4 flex items-center justify-end gap-2 border-t border-gray-100 pt-3 dark:border-white/5">
+                <button
+                    type="button"
+                    wire:click="discardCurrent"
+                    wire:loading.attr="disabled"
+                    x-on:click="$el.disabled = true"
+                    @disabled($editingFieldCode !== null)
+                    @class([
+                        'inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
+                        'opacity-50' => $editingFieldCode !== null,
+                    ])
+                >
+                    {{ __('Discard') }}
+                </button>
 
-                        <span class="select-none text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">{{ $position }} / {{ $remainingCount }}</span>
-
-                        <button
-                            type="button"
-                            wire:click="stepNext"
-                            @disabled($position >= $remainingCount)
-                            class="inline-flex items-center justify-center rounded-md p-1 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                            aria-label="{{ __('Next record') }}"
-                        >
-                            <x-heroicon-o-chevron-right class="h-4 w-4" aria-hidden="true" />
-                        </button>
-                    @endif
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        wire:click="discardCurrent"
-                        wire:loading.attr="disabled"
-                        x-on:click="$el.disabled = true"
-                        @disabled($editingFieldCode !== null)
-                        @class([
-                            'inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700',
-                            'opacity-50' => $editingFieldCode !== null,
-                        ])
-                    >
-                        {{ __('Discard') }}
-                    </button>
-
-                    <button
-                        type="button"
-                        wire:click="createCurrent"
-                        wire:loading.attr="disabled"
-                        x-on:click="$el.disabled = true"
-                        @disabled($editingFieldCode !== null)
-                        @class([
-                            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60',
-                            'bg-red-600 hover:bg-red-700' => $operation === 'delete',
-                            'bg-primary-600 hover:bg-primary-700' => $operation !== 'delete',
-                            'opacity-50' => $editingFieldCode !== null,
-                        ])
-                    >
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="createCurrent" aria-hidden="true" />
-                        <x-heroicon-o-check class="h-3.5 w-3.5" wire:loading.remove wire:target="createCurrent" aria-hidden="true" />
-                        <span>{{ $createLabel }}</span>
-                        <kbd class="hidden rounded bg-white/20 px-1 font-sans text-[10px] sm:inline">&#8984;&#9166;</kbd>
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    wire:click="createCurrent"
+                    wire:loading.attr="disabled"
+                    x-on:click="$el.disabled = true"
+                    @disabled($editingFieldCode !== null)
+                    @class([
+                        'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
+                        'bg-red-600 hover:bg-red-500' => $operation === 'delete',
+                        'bg-primary-600 hover:bg-primary-500' => $operation !== 'delete',
+                        'opacity-50' => $editingFieldCode !== null,
+                    ])
+                >
+                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="createCurrent" aria-hidden="true" />
+                    <x-heroicon-o-check class="h-3.5 w-3.5" wire:loading.remove wire:target="createCurrent" aria-hidden="true" />
+                    <span>{{ $createLabel }}</span>
+                    <kbd class="hidden rounded bg-white/20 px-1 font-sans text-[10px] sm:inline">&#8984;&#9166;</kbd>
+                </button>
             </div>
         </div>
     @endif
