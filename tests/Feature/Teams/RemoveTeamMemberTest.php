@@ -75,3 +75,60 @@ test('admin cannot remove the team owner', function () {
     Event::assertNotDispatched(TeamMemberRemoved::class);
     expect($user->currentTeam->fresh()->owner->id)->toBe($user->id);
 });
+
+test('admin cannot remove a peer admin', function () {
+    Event::fake([TeamMemberRemoved::class]);
+
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $adminA = User::factory()->create();
+    $team->users()->attach($adminA, ['role' => 'admin']);
+
+    $adminB = User::factory()->create();
+    $team->users()->attach($adminB, ['role' => 'admin']);
+
+    $this->actingAs($adminA);
+
+    Livewire::test(TeamMemberManager::class, ['team' => $team])
+        ->set('teamMemberIdBeingRemoved', $adminB->id)
+        ->call('removeTeamMember');
+
+    Event::assertNotDispatched(TeamMemberRemoved::class);
+    expect($adminB->fresh()->hasTeamRole($team->fresh(), 'admin'))->toBeTrue();
+});
+
+test('admin can still remove an editor', function () {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $admin = User::factory()->create();
+    $team->users()->attach($admin, ['role' => 'admin']);
+
+    $editor = User::factory()->create();
+    $team->users()->attach($editor, ['role' => 'editor']);
+
+    $this->actingAs($admin);
+
+    Livewire::test(TeamMemberManager::class, ['team' => $team])
+        ->set('teamMemberIdBeingRemoved', $editor->id)
+        ->call('removeTeamMember');
+
+    expect($team->fresh()->users()->where('users.id', $editor->id)->exists())->toBeFalse();
+});
+
+test('admin can still leave the team themselves', function () {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $admin = User::factory()->create();
+    $team->users()->attach($admin, ['role' => 'admin']);
+
+    $this->actingAs($admin);
+
+    Livewire::test(TeamMemberManager::class, ['team' => $team])
+        ->set('teamMemberIdBeingRemoved', $admin->id)
+        ->call('removeTeamMember');
+
+    expect($team->fresh()->users()->where('users.id', $admin->id)->exists())->toBeFalse();
+});
