@@ -36,20 +36,17 @@ jobs:
       - name: Fixture evals (failure-mode locks)
         run: python3 scripts/run_evals.py
 
-      - name: Ledger + profile sanity
+      - name: Profile sanity + ledger stays out of the repo
         run: |
           python3 - <<'EOF'
-          import json
+          import json, pathlib
           profile = json.load(open('relaticle-profile.json'))
           assert profile['sensitive_areas'], 'profile sensitive_areas empty'
           assert profile['role_credentials'], 'profile role_credentials empty'
-          ledger = json.load(open('regressions.json'))
-          entries = ledger['entries']
-          assert entries, 'regression ledger is empty'
-          ids = [e['id'] for e in entries]
-          assert len(ids) == len(set(ids)), 'duplicate REG ids'
-          for e in entries:
-              assert e.get('trigger'), f"{e['id']} has no trigger"
-              assert e.get('repro'), f"{e['id']} has no repro steps"
-          print(f"profile + ledger OK ({len(entries)} entries)")
+          # The regression ledger is machine-local (~/.claude/business-review/relaticle/)
+          # because it records production incident history and this repo is public.
+          # Committing it again is a leak — check_regressions.py --test covers its schema.
+          assert not pathlib.Path('regressions.json').exists(), \
+              'regressions.json must NOT be committed — the ledger is machine-local (see references/regression-ledger.md)'
+          print('profile OK; ledger correctly absent from the repo')
           EOF
