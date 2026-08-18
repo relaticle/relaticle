@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Health;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Collection;
-use Prism\Prism\Exceptions\PrismProviderOverloadedException;
-use Prism\Prism\Exceptions\PrismRateLimitedException;
-use Prism\Prism\Facades\Prism;
+use Illuminate\Support\Facades\Http;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
-use Throwable;
 
 final class ChatProviderCheck extends Check
 {
@@ -42,9 +41,16 @@ final class ChatProviderCheck extends Check
     }
 
     /**
+     * Retrieving the model rather than generating from it: a generative probe
+     * has to pick a token budget, and a reasoning model spends that budget on
+     * thinking before it emits anything. OpenAI rejects a budget under 16 and
+     * returns an incomplete response when the budget runs out, so no value both
+     * stays free and stays green at an every-minute cadence. A revoked key and
+     * a retired model — the two persistent faults this check exists to catch —
+     * are precisely what this endpoint reports, as 401 and 404.
+     *
      * Provider overload and rate limiting are transient and nothing we can act
-     * on, so they only warn. Persistent faults — a revoked key, a retired
-     * model — are the ones worth failing the health report over.
+     * on, so they only warn.
      */
     public function run(): Result
     {
@@ -52,19 +58,69 @@ final class ChatProviderCheck extends Check
             ->meta(['provider' => $this->provider, 'model' => $this->model])
             ->shortSummary($this->model);
 
-        try {
-            Prism::text()
-                ->using($this->provider, $this->model)
-                ->withMaxTokens(1)
-                ->withPrompt('Hi')
-                ->generate();
+        $probe = $this->probe();
 
-            return $result->ok();
-        } catch (PrismRateLimitedException|PrismProviderOverloadedException|ConnectionException $e) {
-            return $result->warning("{$this->provider} is temporarily unavailable: {$e->getMessage()}");
-        } catch (Throwable $e) {
-            return $result->failed("{$this->provider} model '{$this->model}' is unavailable: {$e->getMessage()}");
+        if (! $probe instanceof PendingRequest) {
+            return $result->failed("no health probe is defined for chat provider '{$this->provider}'");
         }
+
+        try {
+            $response = $probe->get("models/{$this->model}");
+        } catch (ConnectionException $e) {
+            return $result->warning("{$this->provider} is unreachable: {$e->getMessage()}");
+        }
+
+        if ($response->successful()) {
+            return $result->ok();
+        }
+
+        if ($response->status() === 429 || $response->serverError()) {
+            return $result->warning("{$this->provider} is temporarily unavailable: {$this->describe($response)}");
+        }
+
+        return $result->failed("{$this->provider} model '{$this->model}' is unavailable: {$this->describe($response)}");
+    }
+
+    /**
+     * Mirrors how `laravel/ai` builds its client for the same provider, so the
+     * probe fails for the same reasons a real chat turn would. A provider the
+     * catalogue can register but this method does not know is left null on
+     * purpose: `run()` then fails loudly rather than reporting a provider as
+     * healthy without ever having contacted it.
+     */
+    private function probe(): ?PendingRequest
+    {
+        $key = (string) config("ai.providers.{$this->provider}.key");
+
+        $request = match ($this->provider) {
+            'anthropic' => Http::withHeaders([
+                'x-api-key' => $key,
+                'anthropic-version' => (string) config('ai.providers.anthropic.version', '2023-06-01'),
+            ])->baseUrl($this->baseUrl('https://api.anthropic.com/v1')),
+            'openai' => Http::withToken($key)
+                ->baseUrl($this->baseUrl('https://api.openai.com/v1')),
+            default => null,
+        };
+
+        return $request?->connectTimeout(5)->timeout(10);
+    }
+
+    private function baseUrl(string $default): string
+    {
+        $url = config("ai.providers.{$this->provider}.url");
+
+        return rtrim(is_string($url) && $url !== '' ? $url : $default, '/');
+    }
+
+    private function describe(ClientResponse $response): string
+    {
+        $message = $response->json('error.message');
+
+        if (! is_string($message) || $message === '') {
+            return "HTTP {$response->status()}";
+        }
+
+        return "HTTP {$response->status()} - {$message}";
     }
 
     /**
