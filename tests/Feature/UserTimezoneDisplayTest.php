@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentTimezone;
+use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
@@ -76,8 +77,33 @@ it('renders a stored utc datetime in the user timezone in the app panel', functi
 
     livewire(ManageNotes::class)
         ->assertSuccessful()
-        ->assertSee('2026-08-19 08:30:00')
-        ->assertDontSee('2026-08-18 23:30:00');
+        ->assertSee('Aug 19, 2026 08:30:00')
+        ->assertDontSee('Aug 18, 2026 23:30:00');
+});
+
+/**
+ * The panel names its datetime format in one place, so a resource that renders a
+ * timestamp any other way is drift. Reading the format off the table rather than
+ * asserting a literal keeps this true if the panel later picks a different one.
+ */
+it('renders every app panel datetime in the format the panel declares', function (): void {
+    $user = actAsTokyoUser();
+
+    /** @var Team $team */
+    $team = $user->currentTeam;
+
+    Note::factory()->create([
+        'team_id' => $team->getKey(),
+        'creator_id' => $user->getKey(),
+        'created_at' => knownInstant(),
+        'updated_at' => knownInstant(),
+    ]);
+
+    $format = Table::make(new ManageNotes)->getDefaultDateTimeDisplayFormat();
+
+    livewire(ManageNotes::class)
+        ->assertSuccessful()
+        ->assertSee(knownInstant()->setTimezone('Asia/Tokyo')->translatedFormat($format));
 });
 
 it('labels sysadmin datetimes as utc so an admin never has to assume', function (): void {

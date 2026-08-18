@@ -46,6 +46,7 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
@@ -73,6 +74,19 @@ use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 final class AppPanelProvider extends PanelProvider
 {
     /**
+     * Datetime format for this panel, and the only place it is decided. Columns and
+     * entries call `->dateTime()` with no argument so they resolve to this; a resource
+     * that passes its own literal instead is drift, not a local preference.
+     *
+     * The value matches what Filament defaults to, so naming it here changes nothing
+     * on screen today. What it changes is that there is now one line to edit.
+     *
+     * No zone suffix, unlike sysadmin: every timestamp here is already in the reader's
+     * own zone, so there is nothing for them to correlate against.
+     */
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s';
+
+    /**
      * Perform post-registration booting of components.
      */
     public function boot(): void
@@ -88,7 +102,21 @@ final class AppPanelProvider extends PanelProvider
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
-        Table::configureUsing(fn (Table $table): Table => $table);
+
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $table);
+
+        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
+            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $schema);
+    }
+
+    private function isCurrentPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'app';
     }
 
     /**
