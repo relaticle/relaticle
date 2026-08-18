@@ -92,7 +92,8 @@ final class TeamResource extends Resource
                     TextEntry::make('name'),
                     TextEntry::make('slug'),
                     TextEntry::make('owner.name')
-                        ->label('Owner'),
+                        ->label('Owner')
+                        ->url(fn (Team $record): ?string => $record->user_id === null ? null : UserResource::getUrl('view', ['record' => $record->user_id])),
                     IconEntry::make('personal_team')
                         ->label('Personal')
                         ->boolean(),
@@ -132,7 +133,8 @@ final class TeamResource extends Resource
                 TextColumn::make('owner.name')
                     ->label('Owner')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Team $record): ?string => $record->user_id === null ? null : UserResource::getUrl('view', ['record' => $record->user_id])),
                 IconColumn::make('personal_team')
                     ->label('Personal')
                     ->boolean(),

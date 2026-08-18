@@ -8,8 +8,10 @@ use App\Models\Team;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
+use Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery;
 
 final class TeamsRelationManager extends RelationManager
 {
@@ -29,6 +31,7 @@ final class TeamsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => PivotSafeTableQuery::apply($query, $this->getRelationship()))
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')

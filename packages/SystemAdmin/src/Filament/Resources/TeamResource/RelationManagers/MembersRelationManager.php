@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
+use App\Models\User;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery;
 
 final class MembersRelationManager extends RelationManager
 {
@@ -27,11 +31,13 @@ final class MembersRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => PivotSafeTableQuery::apply($query, $this->getRelationship()))
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (User $record): string => UserResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable(),

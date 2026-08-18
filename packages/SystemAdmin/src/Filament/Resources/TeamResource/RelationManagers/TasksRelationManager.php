@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
+use App\Models\Task;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\SystemAdmin\Filament\Resources\TaskResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
 final class TasksRelationManager extends RelationManager
 {
@@ -29,10 +32,12 @@ final class TasksRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('title')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('creator.name')
                     ->label('Created by')
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Task $record): ?string => $record->creator_id === null ? null : UserResource::getUrl('view', ['record' => $record->creator_id])),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),

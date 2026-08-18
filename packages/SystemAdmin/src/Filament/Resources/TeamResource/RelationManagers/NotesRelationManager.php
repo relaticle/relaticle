@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
+use App\Models\Note;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\SystemAdmin\Filament\Resources\NoteResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
 final class NotesRelationManager extends RelationManager
 {
@@ -30,10 +33,12 @@ final class NotesRelationManager extends RelationManager
                 TextColumn::make('title')
                     ->searchable()
                     ->sortable()
-                    ->limit(50),
+                    ->limit(50)
+                    ->url(fn (Note $record): string => NoteResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('creator.name')
                     ->label('Created by')
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (Note $record): ?string => $record->creator_id === null ? null : UserResource::getUrl('view', ['record' => $record->creator_id])),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),
