@@ -269,14 +269,21 @@ final class AppPanelProvider extends PanelProvider
                 fn (): View|Factory => view('filament.app.analytics')
             )
             /**
-             * Only rendered until the user has a timezone; after that the hook returns
-             * nothing and no detection script reaches the browser at all.
+             * Only rendered for a signed-in user who has no timezone yet. The guest
+             * check matters: the panel's own login and registration pages render this
+             * hook too, and there the endpoint could only ever answer 401.
              */
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): View|Factory|string => $this->signedInUser()?->timezone === null
-                    ? view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')])
-                    : '',
+                function (): View|Factory|string {
+                    $user = $this->signedInUser();
+
+                    if (! $user instanceof User || $user->timezone !== null) {
+                        return '';
+                    }
+
+                    return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
+                },
             );
 
         if (Features::hasApiFeatures()) {

@@ -24,9 +24,9 @@ final class NoteExporter extends BaseExporter
             ExportColumn::make('creation_source')
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
             ExportColumn::make('title'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
+            self::dateTimeColumn('created_at', __('filament/exports.columns.created_at')),
+            self::dateTimeColumn('updated_at', __('filament/exports.columns.updated_at')),
+            self::dateTimeColumn('deleted_at', __('filament/exports.columns.deleted_at')),
 
             ...CustomFields::exporter()->forModel(self::getModel())->columns(),
         ];

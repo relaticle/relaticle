@@ -26,9 +26,9 @@ final class PeopleExporter extends BaseExporter
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
             ExportColumn::make('company.name'),
             ExportColumn::make('name'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
+            self::dateTimeColumn('created_at', __('filament/exports.columns.created_at')),
+            self::dateTimeColumn('updated_at', __('filament/exports.columns.updated_at')),
+            self::dateTimeColumn('deleted_at', __('filament/exports.columns.deleted_at')),
 
             ...CustomFields::exporter()->forModel(self::getModel())->columns(),
         ];

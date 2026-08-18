@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Models\Note;
 use App\Models\Team;
@@ -90,4 +91,32 @@ it('labels sysadmin datetimes as utc so an admin never has to assume', function 
     livewire(ListUsers::class)
         ->assertSuccessful()
         ->assertSee('Aug 18, 2026 23:30:00 UTC');
+});
+
+it('does not ship the timezone detection script to signed-out visitors', function (): void {
+    // The panel's own login page renders the same BODY_END hook, and the sync endpoint
+    // behind it is authenticated — a script there could only ever produce a 401.
+    $this->get(Filament::getPanel('app')->getLoginUrl())
+        ->assertSuccessful()
+        ->assertDontSee('resolvedOptions().timeZone', escape: false);
+});
+
+it('ships the timezone detection script to a signed-in user who has none yet', function (): void {
+    $user = User::factory()->withPersonalTeam()->create(['timezone' => null]);
+    $this->actingAs($user);
+    Filament::setTenant($user->personalTeam());
+
+    $this->get(Dashboard::getUrl(tenant: $user->personalTeam()))
+        ->assertOk()
+        ->assertSee('resolvedOptions().timeZone', escape: false);
+});
+
+it('stops shipping the detection script once the user has a timezone', function (): void {
+    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $this->actingAs($user);
+    Filament::setTenant($user->personalTeam());
+
+    $this->get(Dashboard::getUrl(tenant: $user->personalTeam()))
+        ->assertOk()
+        ->assertDontSee('resolvedOptions().timeZone', escape: false);
 });

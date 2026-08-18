@@ -6,6 +6,8 @@ namespace App\Filament\Exports;
 
 use App\Models\Team;
 use App\Models\User;
+use Carbon\Carbon;
+use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Database\Eloquent\Builder;
@@ -59,6 +61,18 @@ abstract class BaseExporter extends Exporter
         $user = Auth::guard('web')->user();
 
         return ($user instanceof User ? $user->timezone : null) ?? (string) config('app.timezone');
+    }
+
+    /**
+     * Every exporter builds its datetime columns through here, so a workspace never
+     * ends up with one CSV in local time and the next in UTC. The zone is named in
+     * the header because a bare timestamp gives the reader no way to tell which.
+     */
+    protected static function dateTimeColumn(string $name, string $label): ExportColumn
+    {
+        return ExportColumn::make($name)
+            ->label($label.' ('.self::requestTimezone().')')
+            ->formatStateUsing(fn (?Carbon $state, BaseExporter $exporter): ?string => $state?->setTimezone($exporter->timezone())->format('Y-m-d H:i:s'));
     }
 
     /**

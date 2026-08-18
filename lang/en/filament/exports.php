@@ -11,6 +11,7 @@ return [
         'creation_source' => 'Creation Source',
         'created_at' => 'Created At',
         'updated_at' => 'Updated At',
+        'deleted_at' => 'Deleted At',
         'company_name' => 'Company Name',
         'people_count' => 'Number of People',
         'opportunities_count' => 'Number of Opportunities',

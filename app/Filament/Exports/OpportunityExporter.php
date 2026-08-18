@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Exports;
 
 use App\Models\Opportunity;
-use Carbon\Carbon;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -35,12 +34,8 @@ final class OpportunityExporter extends BaseExporter
             ExportColumn::make('tasks_count')
                 ->label(__('filament/exports.columns.tasks_count'))
                 ->state(fn (Opportunity $opportunity): int => $opportunity->tasks()->count()),
-            ExportColumn::make('created_at')
-                ->label(__('filament/exports.columns.created_at').' ('.self::requestTimezone().')')
-                ->formatStateUsing(fn (Carbon $state, BaseExporter $exporter): string => $state->setTimezone($exporter->timezone())->format('Y-m-d H:i:s')),
-            ExportColumn::make('updated_at')
-                ->label(__('filament/exports.columns.updated_at').' ('.self::requestTimezone().')')
-                ->formatStateUsing(fn (Carbon $state, BaseExporter $exporter): string => $state->setTimezone($exporter->timezone())->format('Y-m-d H:i:s')),
+            self::dateTimeColumn('created_at', __('filament/exports.columns.created_at')),
+            self::dateTimeColumn('updated_at', __('filament/exports.columns.updated_at')),
             ExportColumn::make('creation_source')
                 ->label(__('filament/exports.columns.creation_source'))
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),
