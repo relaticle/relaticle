@@ -13,7 +13,7 @@ This release introduces a production MCP server, REST API, and aligns Relaticle 
 
 ### REST API
 - Versioned at `/api/v1/`
-- JSON:API format with Laravel 12's `JsonApiResource`
+- JSON:API format with Laravel 13's `JsonApiResource`
 - Sanctum authentication with team-scoped tokens
 - Spatie QueryBuilder integration for filtering, sorting, and pagination
 - Custom fields metadata endpoint (`GET /api/v1/custom-fields`)
@@ -38,8 +38,8 @@ This release introduces a production MCP server, REST API, and aligns Relaticle 
 - Landing page copy updated for agent-native positioning
 
 ### Technical
-- 1,100+ automated tests (58 new API + MCP tests)
-- Laravel 12, Filament 5, PHP 8.4, PostgreSQL 17
+- 3,000+ automated tests (58 new API + MCP tests)
+- Laravel 13, Filament 5, PHP 8.5, PostgreSQL 17
 - Spatie QueryBuilder v6 for declarative API filtering/sorting
 - Landing page serves markdown to AI crawlers via spatie/laravel-markdown-response
 

@@ -1,12 +1,12 @@
 # Product Hunt Listing — Relaticle
 
 ## Tagline (60 chars max)
-Open-source CRM with 20 MCP tools for AI agents
+Open-source CRM with 32 MCP tools for AI agents
 
 ## Description
 
 ### What is Relaticle?
-Relaticle is a self-hosted, open-source CRM built from the ground up for AI agent integration. It ships with a production-grade MCP server (20 tools), a REST API, and 22 custom field types.
+Relaticle is a self-hosted, open-source CRM built from the ground up for AI agent integration. It ships with a production-grade MCP server (32 tools), a REST API, and 22 custom field types.
 
 ### Who is it for?
 - Developer-led teams (2-50 people) who want AI agents to manage their CRM data
@@ -14,16 +14,16 @@ Relaticle is a self-hosted, open-source CRM built from the ground up for AI agen
 - Companies needing self-hosted CRM for data sovereignty (EU, healthcare, finance)
 
 ### What makes it different?
-- **Agent-native**: MCP server with 20 tools — more than HubSpot's 9. AI agents get full CRUD, schema discovery, and custom field support out of the box.
+- **Agent-native**: MCP server with 32 tools, working self-hosted as well as hosted. AI agents get full CRUD, schema discovery, and custom field support out of the box.
 - **Self-hosted**: Deploy on your infrastructure. Your data never leaves your servers.
 - **Open source**: AGPL-3.0. No per-seat pricing. Free forever.
-- **Modern stack**: Laravel 12, Filament 5, PHP 8.4, PostgreSQL 17.
+- **Modern stack**: Laravel 13, Filament 5, PHP 8.5, PostgreSQL 17.
 - **22 custom field types**: Entity relationships, conditional visibility, per-field encryption — no code or migrations needed.
 
 ### Key numbers
-- 20 MCP tools (vs HubSpot's 9)
+- 32 MCP tools
 - 22 custom field types
-- 1,100+ automated tests
+- 3,000+ automated tests
 - 5 entity types with full CRUD
 
 ## Maker's First Comment
@@ -34,7 +34,7 @@ I built Relaticle because I was frustrated with CRMs that couldn't talk to AI ag
 
 So I built one.
 
-Relaticle ships with a production MCP server (20 tools), a REST API, and 22 custom field types. Your AI agent can create contacts, update deals, log notes, and query CRM data — all through the standard MCP protocol.
+Relaticle ships with a production MCP server (32 tools), a REST API, and 22 custom field types. Your AI agent can create contacts, update deals, log notes, and query CRM data — all through the standard MCP protocol.
 
 The entire thing is AGPL-3.0 open source. No per-seat pricing. Deploy it on your infrastructure or use our managed hosting at [app.relaticle.com](https://app.relaticle.com?utm_source=producthunt&utm_medium=social&utm_campaign=wave1).
 

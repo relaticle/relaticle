@@ -3,7 +3,7 @@
 ## Thread (9 tweets)
 
 ### 1/9 — Hook
-I built an open-source CRM with 20 MCP tools so AI agents can manage your customer data.
+I built an open-source CRM with 32 MCP tools so AI agents can manage your customer data.
 
 HubSpot has 9. Salesforce is still figuring it out. Relaticle ships 20 today.
 
@@ -28,10 +28,10 @@ Your AI agent can:
 All through standard MCP protocol.
 
 ### 4/9 — The Numbers
-- 20 MCP tools (full CRUD for 5 entity types)
+- 32 MCP tools (full CRUD for 5 entity types)
 - 22 custom field types (no code, no migrations)
 - REST API with JSON:API format
-- 1,100+ automated tests
+- 3,000+ automated tests
 - 5-layer authorization with multi-team isolation
 
 ### 5/9 — Self-Hosted & Open Source
@@ -45,12 +45,12 @@ Your CRM. Your data. Your agents.
 
 ### 6/9 — The Stack
 Built with modern tools:
-- Laravel 12 + PHP 8.4
+- Laravel 13 + PHP 8.5
 - Filament 5 for the admin UI
 - PostgreSQL 17
 - Livewire 4 for reactivity
 
-Not a weekend project. Production-grade with 1,100+ tests.
+Not a weekend project. Production-grade with 3,000+ tests.
 
 ### 7/9 — AI-First, Down to the Homepage
 Even the landing page serves markdown to AI bots.
