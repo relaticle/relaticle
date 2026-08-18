@@ -60,3 +60,6 @@ test-results.xml
 /.gemini
 /.amp
 /.agents
+
+# business-review regression ledger is machine-local (~/.claude/business-review/) — never commit it
+.claude/skills/business-review/regressions.json
