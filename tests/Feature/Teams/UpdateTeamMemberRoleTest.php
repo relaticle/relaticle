@@ -27,23 +27,23 @@ test('team member roles can be updated', function () {
     ))->toBeTrue();
 });
 
-test('only team owner can update team member roles', function () {
+test('editor cannot update team member roles', function () {
     $user = User::factory()->withTeam()->create();
 
     $user->currentTeam->users()->attach(
-        $otherUser = User::factory()->create(), ['role' => 'admin']
+        $otherUser = User::factory()->create(), ['role' => 'editor']
     );
 
     $this->actingAs($otherUser);
 
     Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])
         ->set('managingRoleFor', $otherUser)
-        ->set('currentRole', 'editor')
+        ->set('currentRole', 'admin')
         ->call('updateRole')
         ->assertStatus(403);
 
     expect($otherUser->fresh()->hasTeamRole(
-        $user->currentTeam->fresh(), 'admin'
+        $user->currentTeam->fresh(), 'editor'
     ))->toBeTrue();
 });
 
