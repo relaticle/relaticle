@@ -78,6 +78,33 @@ test('admin cannot promote another member to admin', function (): void {
     expect($editor->fresh()->hasTeamRole($team->fresh(), TeamRole::Editor->value))->toBeTrue();
 });
 
+test('admin cannot demote another admin', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $adminA = User::factory()->create();
+    $team->users()->attach($adminA, ['role' => TeamRole::Admin->value]);
+
+    $adminB = User::factory()->create();
+    $team->users()->attach($adminB, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($adminA);
+    Filament::setTenant($team);
+
+    $adminBMembership = Membership::query()
+        ->where('team_id', $team->id)
+        ->where('user_id', $adminB->id)
+        ->firstOrFail();
+
+    livewire(TeamMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table($adminBMembership), data: [
+            'role' => TeamRole::Editor->value,
+        ])
+        ->assertNotified(__('teams.notifications.permission_denied.cannot_promote_to_admin'));
+
+    expect($adminB->fresh()->hasTeamRole($team->fresh(), TeamRole::Admin->value))->toBeTrue();
+});
+
 test('viewer is a registered team role with only read ability', function (): void {
     $role = Jetstream::findRole(TeamRole::Viewer->value);
 

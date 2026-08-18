@@ -144,6 +144,23 @@ test('the chat adapter action rejects an invitation for an existing team member'
     expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
+test('admin cannot invite a new member as admin', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($admin);
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'newadmin@example.com',
+            'role' => 'admin',
+        ])
+        ->call('addTeamMember', $this->team)
+        ->assertForbidden();
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
+
 /**
  * The chat approval path calls this inside PendingActionService::approve()'s
  * transaction, which holds lockForUpdate() on the pending action. A

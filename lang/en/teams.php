@@ -79,7 +79,7 @@ return [
         ],
         'permission_denied' => [
             'cannot_update_team_member' => 'You do not have permission to update this member.',
-            'cannot_promote_to_admin' => 'Only the workspace owner can promote a member to Administrator.',
+            'cannot_promote_to_admin' => 'Only the workspace owner can grant or revoke Administrator access.',
             'cannot_leave_team' => 'You may not leave a workspace that you created.',
             'cannot_remove_team_member' => 'You do not have permission to remove this member.',
             'cannot_delete_team' => 'You do not have permission to delete this workspace.',
