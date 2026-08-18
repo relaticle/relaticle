@@ -10,6 +10,9 @@ window.renderMarkdown = (text) => {
 
 import '../css/chat-editor.css';
 import { chatEditor } from './chat-editor';
+import { transcriptModule } from './chat/transcript';
+import { sendModule } from './chat/send';
+import { streamModule } from './chat/stream';
 
 const registerChatEditor = () => {
     if (!window.Alpine) {
@@ -22,3 +25,9 @@ const registerChatEditor = () => {
 if (!registerChatEditor()) {
     document.addEventListener('alpine:init', registerChatEditor);
 }
+
+// chatInterface's Alpine.data() factory lives inline in
+// chat-interface.blade.php (it needs Blade's @js() to inline per-request
+// server data). These module factories are exposed here so that inline
+// script can compose them without a bundler import.
+window.ChatModules = { transcriptModule, sendModule, streamModule };
