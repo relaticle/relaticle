@@ -67,6 +67,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
@@ -390,6 +391,10 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
+            )
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
             );
 
         // Hidden without a bound tenant: the old panel-root fallback sent these

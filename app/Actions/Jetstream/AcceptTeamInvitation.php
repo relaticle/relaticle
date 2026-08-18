@@ -7,6 +7,7 @@ namespace App\Actions\Jetstream;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Contracts\AddsTeamMembers;
 
@@ -37,10 +38,7 @@ final readonly class AcceptTeamInvitation
             }
 
             if (! $user->belongsToTeam($team)) {
-                /** @var User $owner */
-                $owner = $team->owner;
-
-                $this->adder->add($owner, $team, $user->email, $locked->role);
+                $this->addMember($user, $team, $locked->role);
             }
 
             $locked->delete();
@@ -50,5 +48,44 @@ final readonly class AcceptTeamInvitation
         $user->switchTeam($team);
 
         return $team;
+    }
+
+    /**
+     * Inside a Filament panel request, ApplyTenantScopes globally scopes User to
+     * members of the currently-viewed tenant. $team here is — by definition —
+     * usually a *different* team than the one the caller is currently browsing,
+     * so every User lookup AddsTeamMembers performs internally (the team owner,
+     * hasUserWithEmail(), findUserByEmailOrFail()) would silently miss under that
+     * scope. Suspend it for the duration of the add, then restore it exactly as
+     * it was — including "not registered at all", for callers outside a panel
+     * request (the accept-flow controller, queued jobs, tests).
+     */
+    private function addMember(User $invitee, Team $team, ?string $role): void
+    {
+        $scopeName = filament()->getTenancyScopeName();
+
+        if (! User::hasGlobalScope($scopeName)) {
+            $this->attachViaOwner($invitee, $team, $role);
+
+            return;
+        }
+
+        $originalScopes = User::getAllGlobalScopes();
+
+        User::addGlobalScope($scopeName, fn (Builder $query): Builder => $query);
+
+        try {
+            $this->attachViaOwner($invitee, $team, $role);
+        } finally {
+            User::setAllGlobalScopes($originalScopes);
+        }
+    }
+
+    private function attachViaOwner(User $invitee, Team $team, ?string $role): void
+    {
+        /** @var User $owner */
+        $owner = $team->owner;
+
+        $this->adder->add($owner, $team, $invitee->email, $role);
     }
 }
