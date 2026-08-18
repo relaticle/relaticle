@@ -39,6 +39,8 @@ final class ListPeopleTool extends BaseListTool
     {
         return [
             'company_id' => $schema->string()->description('Filter by company ID.'),
+            'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
+            'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
         ];
     }
 
@@ -46,6 +48,8 @@ final class ListPeopleTool extends BaseListTool
     {
         return [
             'company_id' => $request->get('company_id'),
+            'created_after' => $request->get('created_after'),
+            'created_before' => $request->get('created_before'),
         ];
     }
 }
