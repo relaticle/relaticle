@@ -2505,3 +2505,113 @@ it('creates a new company when re-importing a domain whose company was soft-dele
         ->and($import->skipped_rows)->toBe(0)
         ->and(Company::where('team_id', $this->team->id)->where('name', 'Acme Reimport 282')->exists())->toBeTrue();
 });
+
+/**
+ * A naive datetime in a CSV means "that wall clock where the importer is", exactly as
+ * it does when the same string is typed into the Filament form — which converts out of
+ * the user's zone before storing. Parsed as UTC instead, the two paths disagree by the
+ * offset, so the same value imported and hand-entered lands on different instants.
+ */
+it('parses an imported datetime in the importer timezone, matching what the form would store', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $cf = createTestCustomField($this, 'meeting_tokyo', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Meeting'], [
+        makeRow(2, ['Name' => 'John', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+
+    // 08:30 on the 19th in Tokyo is 23:30 the previous evening in UTC — the exact value
+    // TaskResourceTest asserts the form stores for this same typed string.
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->datetime_value->format('Y-m-d H:i:s'))->toBe('2026-08-18 23:30:00');
+});
+
+/**
+ * The other half of the rule: a date-only field has no time of day, so it must never be
+ * shifted. Converting it would move the calendar day for every importer west of UTC.
+ */
+it('does not shift a date-only custom field for an importer in another timezone', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    $cf = createTestCustomField($this, 'start_date_la', 'date');
+
+    createImportReadyStore($this, ['Name', 'Start'], [
+        makeRow(2, ['Name' => 'John', 'Start' => '2026-08-19'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $cfv = getTestCustomFieldValue($this, (string) $person->id, (string) $cf->id);
+
+    expect($cfv)->not->toBeNull()
+        ->and($cfv->date_value->format('Y-m-d'))->toBe('2026-08-19');
+});
+
+/**
+ * A date column holding something that is not a date used to import "successfully" with
+ * the value dropped: the wizard flagged it at review, the user clicked through, and the
+ * summary then said 0 failed. Silently discarding data is worse than refusing the row.
+ */
+it('fails a row whose datetime cannot be parsed instead of dropping the value', function (): void {
+    $cf = createTestCustomField($this, 'meeting_bad', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Meeting'], [
+        makeRow(2, ['Name' => 'Valid Row', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Bad Row', 'Meeting' => 'not-a-date'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+
+    expect($import->created_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(1)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Bad Row')->exists())->toBeFalse()
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Valid Row')->exists())->toBeTrue();
+
+    // The failed-rows table is what the user downloads, so the message has to name the
+    // column and quote the value rather than read like a stack trace.
+    expect($import->failedRows()->value('validation_error'))
+        ->toContain('Meeting bad')
+        ->toContain('not-a-date');
+});
+
+/**
+ * REG-003. A CSV row with the required name empty was imported as a record whose name is
+ * the empty string: invisible in the list, absent from search, and counted as successful.
+ */
+it('fails a row that leaves a required field empty rather than creating a nameless record', function (): void {
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'Has A Name', 'Email' => 'ok@example.test'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => '', 'Email' => 'blank@example.test'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+
+    expect($import->created_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(1)
+        ->and(People::where('team_id', $this->team->id)->where('name', '')->exists())->toBeFalse();
+
+    expect($import->failedRows()->value('validation_error'))->toContain('required');
+});

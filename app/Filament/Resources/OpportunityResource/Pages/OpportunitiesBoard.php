@@ -21,6 +21,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
@@ -255,6 +256,16 @@ final class OpportunitiesBoard extends BoardResourcePage
         )->toArray();
     }
 
+    /**
+     * "Today" and "tomorrow" are questions about the viewer's calendar, so the boundary
+     * moves into their zone — but the close date itself must not. Unlike the tasks
+     * board's due date, this is a plain calendar date the package stores at midnight
+     * UTC: converting it into a negative-offset zone walks it back past midnight and
+     * the card reads a day early. Move only the "today" it is measured against, and
+     * compare the two as dates rather than instants — midnight UTC and midnight in
+     * Los Angeles are the same calendar day but seven hours apart, so an instant
+     * comparison would call a date closing today overdue.
+     */
     private function formatCloseDateBadge(?string $state): string
     {
         if (blank($state)) {
@@ -262,11 +273,16 @@ final class OpportunitiesBoard extends BoardResourcePage
         }
 
         $date = Date::parse($state);
+        $viewerToday = Date::now(FilamentTimezone::get())->startOfDay();
+
+        $closesOn = $date->toDateString();
+        $today = $viewerToday->toDateString();
+        $tomorrow = $viewerToday->copy()->addDay()->toDateString();
 
         return match (true) {
-            $date->isPast() => $date->format('M j').' (Overdue)',
-            $date->isToday() => 'Closes Today',
-            $date->isTomorrow() => 'Closes Tomorrow',
+            $closesOn < $today => $date->format('M j').' (Overdue)',
+            $closesOn === $today => 'Closes Today',
+            $closesOn === $tomorrow => 'Closes Tomorrow',
             default => $date->format('M j'),
         };
     }

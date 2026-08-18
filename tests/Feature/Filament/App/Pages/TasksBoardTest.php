@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Board;
 
@@ -152,4 +153,34 @@ it('opens the edit action when a card is clicked', function (): void {
     $component
         ->call('mountAction', 'edit', [], ['recordKey' => (string) $task->id])
         ->assertSet('mountedActions.0.data.title', $task->title);
+});
+
+/**
+ * The badge answers "is this due today?", which is a question about the viewer's
+ * calendar. Bounded on the server clock instead, a task lands in the wrong bucket for
+ * every user far enough east or west — the board is the primary planning view, so the
+ * wrong bucket is the wrong plan for the day.
+ */
+it('buckets the due-date badge against the user calendar, not the server clock', function (): void {
+    $this->travelTo(Carbon::parse('2026-08-18 13:50:00', 'UTC'));
+
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $dueField = CustomField::query()
+        ->forEntity(Task::class)
+        ->where('code', TaskField::DUE_DATE)
+        ->first();
+
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task->saveCustomFieldValue($this->statusField, $this->statusField->options->firstWhere('name', 'To do')->getKey());
+
+    // 23:30 UTC on the 18th is 08:30 on the 19th in Tokyo. At the moment above the
+    // Tokyo calendar already reads the 18th at 22:50, so this is due *tomorrow* there
+    // while a UTC reader would still call it today.
+    $task->saveCustomFieldValue($dueField, Carbon::parse('2026-08-18 23:30:00', 'UTC'));
+
+    livewire(TasksBoard::class)
+        ->assertSee('Due Tomorrow')
+        ->assertDontSee('Due Today');
 });

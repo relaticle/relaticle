@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -230,4 +231,53 @@ it('does not leak tasks from another team where the user is also a member', func
     $items = (new MyTasksService)->forUser($user, $teamA);
 
     expect($items)->toBeEmpty();
+});
+
+it('bounds today on the user calendar, not the server clock', function (): void {
+    // At 2026-08-18 23:30 UTC the Tokyo calendar already reads the 19th, so Tokyo's
+    // "today" began at 15:00 UTC. A task due 10:00 UTC that day therefore falls before
+    // it — overdue — while for a UTC reader at the very same instant it is still today.
+    $this->travelTo(Carbon::parse('2026-08-18 23:30:00', 'UTC'));
+
+    $tokyo = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $team = $tokyo->currentTeam;
+    $dueFieldId = resolveDueDateField($team->id);
+
+    $task = Task::factory()->for($team)->create(['title' => 'crosses midnight in Tokyo']);
+    $task->assignees()->attach($tokyo);
+    attachDueDate($task, $dueFieldId, Carbon::parse('2026-08-18 10:00:00', 'UTC'));
+
+    expect((new MyTasksService)->forUser($tokyo, $team)->first()->severity)->toBe('overdue');
+});
+
+it('reads the same task as due today for a user whose calendar has not rolled over', function (): void {
+    $this->travelTo(Carbon::parse('2026-08-18 23:30:00', 'UTC'));
+
+    $london = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $team = $london->currentTeam;
+    $dueFieldId = resolveDueDateField($team->id);
+
+    $task = Task::factory()->for($team)->create(['title' => 'still today in UTC']);
+    $task->assignees()->attach($london);
+    attachDueDate($task, $dueFieldId, Carbon::parse('2026-08-18 10:00:00', 'UTC'));
+
+    expect((new MyTasksService)->forUser($london, $team)->first()->severity)->toBe('today');
+});
+
+it('ends today at local midnight across a dst transition, not 24 hours after it starts', function (): void {
+    // The UK puts its clocks back at 02:00 on 2026-10-25, so that local day runs 25
+    // hours: it starts at 23:00 UTC on the 24th and ends at 00:00 UTC on the 26th.
+    // Adding a day to the converted start would cut "today" off at 23:00 UTC and push
+    // a task due half an hour later into tomorrow.
+    $this->travelTo(Carbon::parse('2026-10-25 10:00:00', 'Europe/London'));
+
+    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Europe/London']);
+    $team = $user->currentTeam;
+    $dueFieldId = resolveDueDateField($team->id);
+
+    $task = Task::factory()->for($team)->create(['title' => 'late on the long day']);
+    $task->assignees()->attach($user);
+    attachDueDate($task, $dueFieldId, Carbon::parse('2026-10-25 23:30:00', 'Europe/London')->utc());
+
+    expect((new MyTasksService)->forUser($user, $team)->first()->severity)->toBe('today');
 });

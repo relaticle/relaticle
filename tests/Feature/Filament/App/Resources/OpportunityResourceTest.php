@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 mutates(OpportunityResource::class);
 
@@ -192,4 +193,31 @@ it('denies non-team-member from viewing another team opportunity', function (): 
     expect($this->user->can('view', $record))->toBeFalse()
         ->and($this->user->can('update', $record))->toBeFalse()
         ->and($this->user->can('delete', $record))->toBeFalse();
+});
+
+/**
+ * The date-time table column converts to the viewer's zone, but a date-only field must
+ * not: a bare close date has no time of day, so shifting it moves the day itself for
+ * anyone west of UTC. Los Angeles is UTC-7 in August — a naive conversion of
+ * 2026-08-19 00:00 renders as the 18th.
+ */
+it('does not shift a date-only custom field into the user timezone', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $closeDateField = DB::table('custom_fields')
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'close_date')
+        ->value('id');
+
+    expect($closeDateField)->not->toBeNull();
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity->saveCustomFields(['close_date' => '2026-08-19']);
+
+    livewire(ListOpportunities::class)
+        ->assertOk()
+        ->assertSee('Aug 19, 2026')
+        ->assertDontSee('Aug 18, 2026');
 });

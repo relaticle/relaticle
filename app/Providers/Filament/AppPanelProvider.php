@@ -19,6 +19,7 @@ use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
+use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
@@ -28,6 +29,7 @@ use App\Livewire\App\AppDatabaseNotifications;
 use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
+use App\Models\User;
 use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -37,6 +39,7 @@ use Filament\Enums\DatabaseNotificationsPosition;
 use Filament\Enums\GlobalSearchPosition;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -44,8 +47,10 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -62,6 +67,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Js;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
@@ -70,6 +76,21 @@ use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
 {
+    /**
+     * Datetime format for this panel, and the only place it is decided. Columns and
+     * entries call `->dateTime()` with no argument so they resolve to this; a resource
+     * that passes its own literal instead is drift, not a local preference.
+     *
+     * No seconds. Nobody reading a CRM list cares which second a note was written, and
+     * DateTimePicker offers minutes anyway, so keeping them made every value read back
+     * one field longer than it was entered. Sysadmin keeps its seconds on purpose: that
+     * panel exists to line rows up against Horizon and server logs.
+     *
+     * No zone suffix either, unlike sysadmin: every timestamp here is already in the
+     * reader's own zone, so there is nothing for them to correlate against.
+     */
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i';
+
     /**
      * Perform post-registration booting of components.
      */
@@ -86,7 +107,78 @@ final class AppPanelProvider extends PanelProvider
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
-        Table::configureUsing(fn (Table $table): Table => $table);
+
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $table);
+
+        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
+            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $schema);
+
+        /**
+         * Filament's calendar decides which cell to circle as "today" with
+         * `dayjs.tz.guess()`, the device zone, and takes no server timezone. A user in
+         * Tokyo on a laptop still set elsewhere therefore saw the app say one date
+         * everywhere and the picker circle another, and clicking the circled cell books
+         * the wrong day.
+         *
+         * Only the highlight is wrong: the picker emits a naive wall-clock string that
+         * the server reads back in the panel zone, so typed values were always stored
+         * correctly. Overriding `dayIsToday` on the component's own element keeps the fix
+         * to that single comparison rather than forking the vendor component.
+         *
+         * The zone is baked in, the date is not: `Intl` recomputes it per call, so a tab
+         * left open across midnight still circles the right cell.
+         */
+        DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
+            ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
+            : $picker);
+    }
+
+    /**
+     * `en-CA` is chosen for its output shape, not its language: it is the locale whose
+     * short date is already `YYYY-MM-DD`, so the parts split cleanly without parsing a
+     * localised order.
+     */
+    private function todayInViewerZoneExpression(): string
+    {
+        $timezone = Js::from(FilamentTimezone::get());
+
+        return <<<JS
+            dayIsToday = (day) => {
+                const [year, month, date] = new Intl.DateTimeFormat('en-CA', { timeZone: {$timezone} })
+                    .format(new Date())
+                    .split('-')
+                    .map(Number);
+
+                return day === date && focusedMonth === month - 1 && focusedYear === year;
+            }
+            JS;
+    }
+
+    private function isCurrentPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'app';
+    }
+
+    /**
+     * Gates the browser timezone detection script below, which posts to an app-panel
+     * route. Panel rendering itself no longer reads this — that resolution is global
+     * and lives in AppServiceProvider::configureFilament(), because TimezoneManager
+     * holds a single slot and a second writer here would silently win on boot order.
+     *
+     * The web guard is shared with the sysadmin panel's SystemAdministrator, whose
+     * zone is chosen on its own profile page and never detected — narrow to the
+     * customer model rather than assuming.
+     */
+    private function signedInUser(): ?User
+    {
+        $user = Auth::user();
+
+        return $user instanceof User ? $user : null;
     }
 
     /**
@@ -172,6 +264,9 @@ final class AppPanelProvider extends PanelProvider
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
+                Route::post('/timezone', SyncUserTimezoneController::class)
+                    ->middleware('auth')
+                    ->name('timezone.sync');
 
                 Route::get('/{tenant}/tasks-board', fn (string $tenant) => redirect()->to(TaskResource::getUrl('board', ['tenant' => $tenant]), status: 301))
                     ->name('tasks-board.redirect');
@@ -237,6 +332,23 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            /**
+             * Only rendered for a signed-in user who has no timezone yet. The guest
+             * check matters: the panel's own login and registration pages render this
+             * hook too, and there the endpoint could only ever answer 401.
+             */
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                function (): View|Factory|string {
+                    $user = $this->signedInUser();
+
+                    if (! $user instanceof User || $user->timezone !== null) {
+                        return '';
+                    }
+
+                    return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
+                },
             );
 
         if (Features::hasApiFeatures()) {

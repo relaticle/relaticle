@@ -93,8 +93,18 @@ enum DateFormat: string implements HasLabel
      * Parse a date string into a Carbon instance.
      *
      * Attempts multiple format variations to handle real-world CSV data.
+     *
+     * A CSV carries no offset, so a naive datetime means the wall clock where the person
+     * who exported it lives — the same thing it means when they type it into the form,
+     * which converts out of their zone before storing. `$timezone` is that zone; parsing
+     * in it keeps the two paths on the same instant. Null keeps the PHP default, for
+     * callers with no user in scope.
+     *
+     * Only pass a zone when `$withTime` is true. A date has no time of day to convert,
+     * and interpreting midnight in a negative-offset zone would move it to the previous
+     * calendar day.
      */
-    public function parse(string $value, bool $withTime = false): ?Carbon
+    public function parse(string $value, bool $withTime = false, ?string $timezone = null): ?Carbon
     {
         $value = trim($value);
 
@@ -104,10 +114,10 @@ enum DateFormat: string implements HasLabel
 
         foreach ($this->getParseFormats($withTime) as $format) {
             try {
-                $date = Date::createFromFormat($format, $value);
+                $date = Date::createFromFormat($format, $value, $withTime ? $timezone : null);
 
                 if ($date instanceof Carbon) {
-                    return $date;
+                    return $withTime && $timezone !== null ? $date->utc() : $date;
                 }
             } catch (\Exception) {
                 continue;

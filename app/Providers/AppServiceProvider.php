@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\Plan;
+use App\Filament\CustomFields\DateFieldType;
+use App\Filament\CustomFields\DateTimeFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -40,6 +42,7 @@ use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -68,6 +71,7 @@ use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
@@ -439,6 +443,19 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
 
+        // Replaces the package's definitions so custom-field dates read the same as the
+        // native columns beside them: `date-time` swaps the table column, which otherwise
+        // renders stored UTC to every viewer (App\Filament\CustomFields\DateTimeColumn),
+        // and both swap the infolist entry, which otherwise hardcodes `Y-m-d H:i:s` on
+        // record pages (App\Filament\CustomFields\DateTimeEntry).
+        //
+        // `date` gets the entry only. A bare date has no time of day, so converting one
+        // would move it a day for every viewer west of UTC.
+        CustomFieldsType::register([
+            'date-time' => DateTimeFieldType::class,
+            'date' => DateFieldType::class,
+        ]);
+
         $this->configureCustomFieldSchemaInvalidation();
     }
 
@@ -476,6 +493,38 @@ final class AppServiceProvider extends ServiceProvider
             }
 
             return $action;
+        });
+
+        /**
+         * Datetimes are stored in UTC; every panel renders and accepts them in the
+         * signed-in account's chosen zone. Read by both table/infolist output and
+         * DateTimePicker input, so one closure keeps display and entry symmetrical.
+         *
+         * TimezoneManager is a single global slot, so this must stay the only writer
+         * — a second FilamentTimezone::set() anywhere would silently replace it, and
+         * which one survived would depend on service provider boot order. It lives
+         * here rather than in a panel provider for the same reason: the resolution
+         * spans every panel.
+         *
+         * The account is read through the current panel's own guard and by attribute
+         * rather than by class, so App\Models\User and SystemAdministrator are both
+         * served without this layer naming the sysadmin package. Returning null falls
+         * back to config('app.timezone'), which covers an unset zone, a zone that is
+         * no longer a valid identifier, an account type that has no zone at all, and
+         * any request outside a panel.
+         */
+        FilamentTimezone::set(function (): ?string {
+            if (Filament::getCurrentPanel() === null) {
+                return null;
+            }
+
+            $timezone = Filament::auth()->user()?->getAttribute('timezone');
+
+            if (! is_string($timezone)) {
+                return null;
+            }
+
+            return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
     }
 

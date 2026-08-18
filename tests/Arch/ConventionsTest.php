@@ -40,6 +40,26 @@ it('keeps migrations forward-only (no down methods)', function (): void {
     );
 });
 
+it('keeps migrations off the database clock (no useCurrent, CURRENT_TIMESTAMP, or raw now())', function (): void {
+    $grandfathered = [
+        '0001_01_01_000002_create_jobs_table.php',
+    ];
+
+    $offenders = array_values(array_filter(
+        migrationFiles(),
+        fn (string $file): bool => ! in_array(basename($file), $grandfathered, true)
+            && preg_match(
+                '/->useCurrent(OnUpdate)?\s*\(|CURRENT_TIMESTAMP|DB::raw\([^)]*\bnow\s*\(\s*\)/i',
+                (string) file_get_contents($file),
+            ) === 1,
+    ));
+
+    expect($offenders)->toBe(
+        [],
+        'Migrations must not write datetimes from the database clock — it resolves against the session timezone, not UTC (.ai/guidelines/relaticle/core.md). Use a PHP-side now() in: '.implode(', ', $offenders),
+    );
+});
+
 it('keeps compiled agent guidelines in sync with their .ai sources', function (): void {
     $root = dirname(__DIR__, 2);
 

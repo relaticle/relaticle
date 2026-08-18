@@ -91,9 +91,7 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $firstName = explode(' ', $user->name)[0];
 
-        /** @var string $timezone */
-        $timezone = $user->timezone ?? config('app.timezone');
-        $hour = Date::now($timezone)->hour;
+        $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {
             $hour < 12 => "Good morning, {$firstName}.",

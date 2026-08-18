@@ -13,6 +13,7 @@ use App\Models\Note;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -116,4 +117,30 @@ test('export generates CSV with correct data', function () {
     expect($headers)->toContain('Title')
         ->and($headers)->toContain('Body')
         ->and($data)->toContain('Meeting notes Q1');
+});
+
+test('export datetimes name and use the requesting user timezone', function () {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $labels = collect(NoteExporter::getColumns())->map(fn ($column) => $column->getLabel())->all();
+
+    expect($labels)->toContain('Created At (Asia/Tokyo)')
+        ->and($labels)->toContain('Updated At (Asia/Tokyo)')
+        ->and($labels)->toContain('Deleted At (Asia/Tokyo)');
+
+    $note = Note::factory()->create([
+        'team_id' => $this->team->id,
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+    ]);
+
+    Livewire::test(ManageNotes::class)
+        ->callAction('export')
+        ->assertHasNoFormErrors();
+
+    $exporter = new NoteExporter(Export::latest()->first(), ['created_at' => 'Created At', 'deleted_at' => 'Deleted At'], []);
+    $row = $exporter($note->fresh());
+
+    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo — the date rolls over.
+    expect($row[0])->toBe('2026-08-19 08:30:00')
+        ->and($row[1])->toBeNull();
 });

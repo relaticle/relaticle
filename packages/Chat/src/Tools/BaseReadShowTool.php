@@ -14,11 +14,14 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use stdClass;
 
 abstract class BaseReadShowTool implements Tool
 {
+    use LocalisesDatetimes;
+
     /**
      * Recent related records returned per include. Mirrors the limit the
      * old record-summary context builder used, keeping prompt size bounded
@@ -149,11 +152,14 @@ abstract class BaseReadShowTool implements Tool
         $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
 
         return (string) json_encode(
-            array_merge(
-                $payload,
-                $this->extraPayload($model),
-                ['url' => $ref['url'] ?? null],
-                $this->buildIncluded($model, $requestedIncludes, $user),
+            $this->localiseDatetimes(
+                array_merge(
+                    $payload,
+                    $this->extraPayload($model),
+                    ['url' => $ref['url'] ?? null],
+                    $this->buildIncluded($model, $requestedIncludes, $user),
+                ),
+                $user,
             ),
             JSON_PRETTY_PRINT,
         );

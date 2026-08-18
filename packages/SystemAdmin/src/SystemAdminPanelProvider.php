@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin;
 
 use Exception;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
+use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -27,6 +30,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\Ink\InkPlugin;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -47,6 +51,19 @@ final class SystemAdminPanelProvider extends PanelProvider
         Category::class => CategoryPolicy::class,
     ];
 
+    /**
+     * Datetime format for this panel. The zone is opt-in per administrator on the
+     * profile page and defaults to UTC, because this panel is used to correlate
+     * incidents against Horizon, Flare and server logs, which are all UTC.
+     *
+     * `T` prints the zone the value is actually rendered in, so a timestamp is never
+     * ambiguous: an administrator who has opted out of UTC can still see they did,
+     * and two administrators in different zones cannot read the same row as the same
+     * numbers. This is why the suffix must stay — dropping it, not the conversion
+     * itself, is what would break incident correlation.
+     */
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s T';
+
     public function boot(): void
     {
         // Blog MCP requests are not Filament panel requests, so the panel-scoped
@@ -54,6 +71,16 @@ final class SystemAdminPanelProvider extends PanelProvider
         foreach (self::BLOG_MODEL_POLICIES as $model => $policy) {
             Gate::policy($model, $policy);
         }
+
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $table);
+
+        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
+            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $schema);
 
         // PostPolicy/CategoryPolicy type-hint SystemAdministrator, and Gate never
         // checks a policy method's parameter type before calling it — a caller of
@@ -72,6 +99,11 @@ final class SystemAdminPanelProvider extends PanelProvider
         });
     }
 
+    private function isCurrentPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'sysadmin';
+    }
+
     /**
      * @throws Exception
      */
@@ -88,6 +120,7 @@ final class SystemAdminPanelProvider extends PanelProvider
 
         return $panel
             ->login()
+            ->profile(EditProfile::class)
             ->emailVerification(isRequired: config('app.require_email_verification'))
             ->authGuard('sysadmin')
             ->authPasswordBroker('system_administrators')
