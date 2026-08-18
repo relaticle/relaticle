@@ -41,9 +41,6 @@ final class CreateAccessToken extends BaseLivewireComponent
             ->schema([
                 Section::make(__('access-tokens.sections.create.title'))
                     ->aside()
-                    ->description(
-                        __('access-tokens.sections.create.description'),
-                    )
                     ->schema([
                         TextInput::make('name')
                             ->label(__('access-tokens.form.name'))

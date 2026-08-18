@@ -44,7 +44,6 @@ final class AddTeamMember extends BaseLivewireComponent
                 Section::make(__('teams.sections.add_team_member.title'))
                     ->aside()
                     ->visible(fn () => Gate::check('addTeamMember', $this->team))
-                    ->description(__('teams.sections.add_team_member.description'))
                     ->schema([
                         TextEntry::make('addTeamMemberNotice')
                             ->hiddenLabel()

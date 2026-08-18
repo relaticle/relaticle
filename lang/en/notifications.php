@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 return [
     'title' => 'Notifications',
-    'subtitle' => 'Customize your notification settings to stay informed without being overwhelmed.',
 
     'digest' => [
         'heading' => 'Daily digest',

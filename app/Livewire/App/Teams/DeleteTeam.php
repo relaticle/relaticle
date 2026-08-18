@@ -32,7 +32,6 @@ final class DeleteTeam extends BaseLivewireComponent
         return $schema
             ->schema([
                 Section::make(__('teams.sections.delete_team.title'))
-                    ->description(__('teams.sections.delete_team.description'))
                     ->aside()
                     ->visible(fn () => Gate::check('delete', $this->team))
                     ->schema([
