@@ -15,4 +15,25 @@ file_include_globs = ".env"
 # (Polyscope), so that orchestrator's folder-based behavior is unchanged.
 setup = 'herd link "$CONDUCTOR_WORKSPACE_NAME" && herd secure "$CONDUCTOR_WORKSPACE_NAME" && bin/setup-workspace.sh'
 archive = 'herd unsecure "$CONDUCTOR_WORKSPACE_NAME" && herd unlink "$CONDUCTOR_WORKSPACE_NAME"'
-run = 'open "https://$CONDUCTOR_WORKSPACE_NAME.test"'
+# Workspaces are fully isolated (own Herd hostname, per-workspace Redis
+# prefixes from setup-workspace.sh, shared Postgres by design), so several can
+# run at once.
+run_mode = "concurrent"
+
+[scripts.run.preview]
+command = 'open "https://$CONDUCTOR_WORKSPACE_NAME.test"'
+default = true
+icon = "globe"
+available_in = ["local"]
+
+# Chat (and any queued work) needs a worker owned by THIS workspace — nothing
+# starts one automatically, and without it sent messages queue forever.
+[scripts.run.horizon]
+command = "php artisan horizon"
+icon = "layers"
+available_in = ["local"]
+
+[scripts.run.vite]
+command = "npm run dev"
+icon = "zap"
+available_in = ["local"]
