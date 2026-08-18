@@ -22,14 +22,11 @@ final readonly class StartProTrial
     {
         throw_unless($user->ownsTeam($team), AuthorizationException::class, 'Only the workspace owner can start a trial.');
 
-        $started = DB::transaction(function () use ($user, $team): bool {
-            /** @var User $lockedUser */
-            $lockedUser = User::query()->whereKey($user)->lockForUpdate()->firstOrFail();
-
+        $started = DB::transaction(function () use ($team): bool {
             /** @var Team $lockedTeam */
             $lockedTeam = Team::query()->whereKey($team)->lockForUpdate()->firstOrFail();
 
-            if ($lockedUser->pro_trial_used_at !== null
+            if ($lockedTeam->pro_trial_used_at !== null
                 || $lockedTeam->plan !== Plan::Free
                 || $lockedTeam->subscriptions()->exists()) {
                 return false;
@@ -38,9 +35,8 @@ final readonly class StartProTrial
             $lockedTeam->forceFill([
                 'plan' => Plan::Pro,
                 'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
+                'pro_trial_used_at' => now(),
             ])->save();
-
-            $lockedUser->forceFill(['pro_trial_used_at' => now()])->save();
 
             $this->credits->resetPeriod($lockedTeam);
 
@@ -48,7 +44,6 @@ final readonly class StartProTrial
         });
 
         if ($started) {
-            $user->refresh();
             $team->refresh();
         }
 

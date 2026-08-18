@@ -122,16 +122,15 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
     expect($team->plan)->toBe(Plan::Pro)
         ->and($team->onGenericTrial())->toBeTrue()
         ->and($team->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue()
-        ->and($user->pro_trial_used_at)->not->toBeNull()
+        ->and($team->pro_trial_used_at)->not->toBeNull()
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
 });
 
-it('creates a later hosted workspace paused when the owner already used a trial', function (): void {
+it('starts a fresh trial for each additional hosted workspace', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $user = User::factory()->withPersonalTeam()->create([
-        'pro_trial_used_at' => now(),
-    ]);
+    $user = User::factory()->withPersonalTeam()->create();
+    $user->currentTeam?->forceFill(['pro_trial_used_at' => now()])->save();
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
@@ -145,8 +144,9 @@ it('creates a later hosted workspace paused when the owner already used a trial'
     /** @var Team $team */
     $team = $user->refresh()->currentTeam;
 
-    expect($team->plan)->toBe(Plan::Free)
-        ->and($team->trial_ends_at)->toBeNull()
+    expect($team->plan)->toBe(Plan::Pro)
+        ->and($team->onGenericTrial())->toBeTrue()
+        ->and($team->pro_trial_used_at)->not->toBeNull()
         ->and($team->hosted_free_grandfathered_at)->toBeNull();
 });
 

@@ -44,6 +44,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $pm_type
  * @property ?string $pm_last_four
  * @property Carbon|null $trial_ends_at
+ * @property Carbon|null $pro_trial_used_at
  * @property Carbon|null $hosted_free_grandfathered_at
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way
@@ -162,6 +163,7 @@ final class Team extends JetstreamTeam implements HasAvatar
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'trial_ends_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
             'hosted_free_grandfathered_at' => 'datetime',
         ];
     }
