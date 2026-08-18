@@ -2559,3 +2559,59 @@ it('does not shift a date-only custom field for an importer in another timezone'
     expect($cfv)->not->toBeNull()
         ->and($cfv->date_value->format('Y-m-d'))->toBe('2026-08-19');
 });
+
+/**
+ * A date column holding something that is not a date used to import "successfully" with
+ * the value dropped: the wizard flagged it at review, the user clicked through, and the
+ * summary then said 0 failed. Silently discarding data is worse than refusing the row.
+ */
+it('fails a row whose datetime cannot be parsed instead of dropping the value', function (): void {
+    $cf = createTestCustomField($this, 'meeting_bad', 'date-time');
+
+    createImportReadyStore($this, ['Name', 'Meeting'], [
+        makeRow(2, ['Name' => 'Valid Row', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => 'Bad Row', 'Meeting' => 'not-a-date'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+
+    expect($import->created_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(1)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Bad Row')->exists())->toBeFalse()
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Valid Row')->exists())->toBeTrue();
+
+    // The failed-rows table is what the user downloads, so the message has to name the
+    // column and quote the value rather than read like a stack trace.
+    expect($import->failedRows()->value('validation_error'))
+        ->toContain('Meeting bad')
+        ->toContain('not-a-date');
+});
+
+/**
+ * REG-003. A CSV row with the required name empty was imported as a record whose name is
+ * the empty string: invisible in the list, absent from search, and counted as successful.
+ */
+it('fails a row that leaves a required field empty rather than creating a nameless record', function (): void {
+    createImportReadyStore($this, ['Name', 'Email'], [
+        makeRow(2, ['Name' => 'Has A Name', 'Email' => 'ok@example.test'], ['match_action' => RowMatchAction::Create->value]),
+        makeRow(3, ['Name' => '', 'Email' => 'blank@example.test'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'emails'),
+    ]);
+
+    runImportJob($this);
+
+    $import = $this->import->fresh();
+
+    expect($import->created_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(1)
+        ->and(People::where('team_id', $this->team->id)->where('name', '')->exists())->toBeFalse();
+
+    expect($import->failedRows()->value('validation_error'))->toContain('required');
+});
