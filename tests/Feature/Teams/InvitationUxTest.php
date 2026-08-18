@@ -11,6 +11,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 test('guest with no account clicking invitation link is redirected to register page', function () {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
@@ -40,6 +41,13 @@ test('guest with existing account clicking invitation link is redirected to logi
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getLoginUrl());
+});
+
+test('guest with a validly-signed link for a since-deleted invitation is sent to login', function (): void {
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => (string) Str::ulid()]);
+
+    $this->get($acceptUrl)
+        ->assertRedirect(route('login'));
 });
 
 test('guest clicking invitation link sees team name and sign-up link on login page', function () {

@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 mutates(TeamInvitation::class, AcceptTeamInvitation::class);
 
@@ -160,6 +161,17 @@ test('the token accept route never leaks the token via the Referer header', func
         ->get(route('team-invitations.token.accept', ['token' => $raw]))
         ->assertOk()
         ->assertHeader('Referrer-Policy', 'no-referrer');
+});
+
+test('unauthenticated attempts against the token accept route are rate limited', function (): void {
+    $token = Str::random(40);
+
+    foreach (range(1, 10) as $ignored) {
+        $this->get(route('team-invitations.token.accept', ['token' => $token]));
+    }
+
+    $this->get(route('team-invitations.token.accept', ['token' => $token]))
+        ->assertStatus(429);
 });
 
 test('a POST joins the team', function (): void {

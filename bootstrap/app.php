@@ -8,11 +8,13 @@ use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
+use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -117,6 +119,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: SubstituteBindings::class,
             prepend: SetApiTeamContext::class,
+        );
+
+        // Textual order in a route's middleware array does not decide execution
+        // order: SortedMiddleware resorts by this priority list, and — critically
+        // — an unmapped middleware sitting between two mapped ones (e.g. between
+        // the 'web' group's SubstituteBindings and 'auth') gets dragged along
+        // when the higher-priority one jumps forward. Only registering our own
+        // class here keeps ThrottleBeforeAuthentication running before auth,
+        // without moving the framework's own ThrottleRequests (used by 'throttle'
+        // elsewhere, e.g. routes/api.php, routes/ai.php) relative to auth.
+        $middleware->prependToPriorityList(
+            before: AuthenticatesRequests::class,
+            prepend: ThrottleBeforeAuthentication::class,
         );
 
         $middleware->alias([

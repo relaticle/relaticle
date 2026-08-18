@@ -148,6 +148,22 @@ test('guest hitting join link is redirected to register', function (): void {
         ->assertRedirect(Filament::getRegistrationUrl());
 });
 
+test('unauthenticated attempts against the join link route are rate limited', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-throttle',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    foreach (range(1, 10) as $ignored) {
+        $this->get(route('teams.join', ['token' => $team->invite_link_token]));
+    }
+
+    $this->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertStatus(429);
+});
+
 test('user scheduled for deletion cannot view join confirmation', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [

@@ -15,6 +15,7 @@ use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
+use App\Http\Middleware\ThrottleBeforeAuthentication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
@@ -75,7 +76,7 @@ Route::middleware(['signed', 'auth', 'verified', AuthenticateSession::class])->g
         ->name('team-invitations.join');
 });
 
-Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class, 'throttle:10,1'])->group(function (): void {
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
     Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->name('team-invitations.token.accept');
@@ -85,7 +86,7 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
         ->name('team-invitations.token.join');
 });
 
-Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', AuthenticateSession::class])
     ->group(function (): void {
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
