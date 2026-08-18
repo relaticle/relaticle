@@ -25,6 +25,19 @@ use Illuminate\Support\Facades\DB;
  * collide with `'member:' || <bigint>`) with `role` set to the literal
  * `'owner'`, matching Jetstream's `OwnerRole` key.
  *
+ * On a `member:owner` row, `source_id` is the owner's user ULID, not a
+ * `team_user.id` — there is no underlying `Membership` row for the owner.
+ * `User::find($record->source_id)` resolves it; `Membership::find($record->source_id)`
+ * throws `QueryException` (SQLSTATE[22P02], invalid bigint input), it does
+ * NOT return null. Callers that resolve `source_id` back to a model must
+ * branch on `id === 'member:owner'` (or `role === 'owner'`) first.
+ *
+ * `role` on that same row is the literal string `'owner'`, which is not a
+ * case of `App\Enums\TeamRole` — passing it to `TeamRole::from()` throws
+ * `ValueError`. Callers that change a member's role must exclude owner rows
+ * before doing so (they should already be excluded: nothing can change the
+ * owner's role through this projection).
+ *
  * @property string $id
  * @property ?string $user_id
  * @property ?string $name
