@@ -10087,16 +10087,16 @@
         },
         {
             "name": "relaticle/activity-log",
-            "version": "v1.2.1",
+            "version": "v1.2.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/activity-log.git",
-                "reference": "62aad8a05d8484f176a91497139313f14a862c30"
+                "reference": "638ee8ddddf6277df91da377cdd8d4efcb30c0e3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/62aad8a05d8484f176a91497139313f14a862c30",
-                "reference": "62aad8a05d8484f176a91497139313f14a862c30",
+                "url": "https://api.github.com/repos/relaticle/activity-log/zipball/638ee8ddddf6277df91da377cdd8d4efcb30c0e3",
+                "reference": "638ee8ddddf6277df91da377cdd8d4efcb30c0e3",
                 "shasum": ""
             },
             "require": {
@@ -10135,9 +10135,9 @@
             "description": "Reusable Filament plugin that renders a unified activity-log timeline for any Eloquent model",
             "support": {
                 "issues": "https://github.com/relaticle/activity-log/issues",
-                "source": "https://github.com/relaticle/activity-log/tree/v1.2.1"
+                "source": "https://github.com/relaticle/activity-log/tree/v1.2.2"
             },
-            "time": "2026-08-08T07:11:00+00:00"
+            "time": "2026-08-14T16:14:55+00:00"
         },
         {
             "name": "relaticle/custom-fields",
