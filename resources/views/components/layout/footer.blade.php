@@ -75,7 +75,6 @@
                             Features
                         </a>
                     </li>
-                    @feature(App\Features\Marketing::class)
                     <li>
                         <a href="{{ route('press') }}"
                            class="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 text-sm transition-colors">
@@ -106,7 +105,6 @@
                             {{ __('HubSpot alternative') }}
                         </a>
                     </li>
-                    @endfeature
                 </ul>
             </div>
 

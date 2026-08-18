@@ -156,19 +156,6 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
-| `RELATICLE_FEATURE_MARKETING` | `true` | Serve the marketing site (`/`, `/pricing`, `/press`, `/compare/*`, `/alternatives/*`, `/contact`, `/terms-of-service`, `/privacy-policy`). Set to `false` on self-hosted installs. |
-
-### Disable the marketing site
-
-The homepage, pricing, press kit, comparison/alternatives pages, contact, and
-legal pages are relaticle.com's marketing content. If you're self-hosting, you
-almost certainly don't want your instance serving that content verbatim —
-search engines end up indexing duplicate copies of relaticle.com's pages under
-your domain.
-
-Set `RELATICLE_FEATURE_MARKETING=false` to turn it off. Those routes redirect
-to your CRM's login page instead of rendering; `/developers` and `/help` stay
-available, since self-hosters still need the docs.
 
 ---
 

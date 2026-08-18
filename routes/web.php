@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Features\Documentation;
-use App\Features\Marketing;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\AlternativesController;
@@ -51,35 +50,17 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
 
-if (Feature::active(Marketing::class)) {
-    Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
-        Route::get('/', HomeController::class);
-        Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
-        Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
-        Route::get('/pricing', fn () => view('pricing'))->name('pricing');
-        Route::get('/press', fn () => view('press'))->name('press');
-        Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
-        Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
-        Route::get('/contact', [ContactController::class, 'show'])->name('contact');
-        Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
-    });
-} else {
-    // Self-hosted forks disable the marketing surface to stop duplicate-content clones
-    // serving relaticle.com's homepage/pricing/legal pages verbatim. Route names stay
-    // registered so shared layouts (e.g. the docs footer's route('pricing') link) keep
-    // resolving instead of throwing a RouteNotFoundException.
-    $redirectToLogin = fn () => redirect()->to(url()->getAppUrl('login'));
-
-    Route::get('/', $redirectToLogin);
-    Route::get('/terms-of-service', $redirectToLogin)->name('terms.show');
-    Route::get('/privacy-policy', $redirectToLogin)->name('policy.show');
-    Route::get('/pricing', $redirectToLogin)->name('pricing');
-    Route::get('/press', $redirectToLogin)->name('press');
-    Route::get('/compare/relaticle-vs-{competitor}', $redirectToLogin)->name('compare.show');
-    Route::get('/alternatives/{competitor}', $redirectToLogin)->name('alternatives.show');
-    Route::get('/contact', $redirectToLogin)->name('contact');
-    Route::post('/contact', $redirectToLogin);
-}
+Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
+    Route::get('/', HomeController::class);
+    Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
+    Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
+    Route::get('/pricing', fn () => view('pricing'))->name('pricing');
+    Route::get('/press', fn () => view('press'))->name('press');
+    Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
+    Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
+    Route::get('/contact', [ContactController::class, 'show'])->name('contact');
+    Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
+});
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
