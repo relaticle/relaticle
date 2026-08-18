@@ -41,7 +41,7 @@ RUN npm run build
 ###########################################
 # Stage 3: Production image
 ###########################################
-FROM serversideup/php:8.4-fpm-nginx AS production
+FROM serversideup/php:8.5-fpm-nginx AS production
 
 LABEL org.opencontainers.image.title="Relaticle CRM"
 LABEL org.opencontainers.image.description="Modern, open-source CRM platform"

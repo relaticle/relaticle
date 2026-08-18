@@ -428,7 +428,7 @@ If you prefer not to use Docker, you can deploy Relaticle directly on a server.
 
 ### Requirements
 
-- PHP 8.4+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
+- PHP 8.5+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
 - PostgreSQL 17+
 - Redis 7+
 - Node.js 20+
@@ -496,7 +496,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
     }

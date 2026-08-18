@@ -13,7 +13,7 @@
     ],
     "license": "AGPL-3.0",
     "require": {
-        "php": "^8.4",
+        "php": "^8.5",
         "ext-intl": "*",
         "andreiio/blade-remix-icon": "^3.9",
         "ashallendesign/favicon-fetcher": "^3.8",
