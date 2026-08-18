@@ -436,3 +436,66 @@ it('rejects empty option names', function (): void {
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
+
+it('rejects a field name that differs from an existing one only by case', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'people',
+        'name' => 'Age',
+        'code' => 'age',
+        'type' => 'number',
+    ]);
+
+    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request([
+        'entity_type' => 'people',
+        'name' => 'age',
+        'type' => 'number',
+    ])), true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('already exists')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects a recased duplicate at approval time, not just at proposal time', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+
+    expect(fn () => app(CreateCustomField::class)->execute($this->owner, [
+        'entity_type' => 'people',
+        'name' => 'Renewal Date',
+        'type' => 'date',
+    ]))->not->toThrow(ValidationException::class);
+
+    expect(fn () => app(CreateCustomField::class)->execute($this->owner, [
+        'entity_type' => 'people',
+        'name' => 'RENEWAL DATE',
+        'type' => 'date',
+    ]))->toThrow(ValidationException::class, 'already exists');
+
+    expect(CustomField::query()
+        ->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where($tenantKey, $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->whereRaw('lower(name) = ?', ['renewal date'])
+        ->count())->toBe(1);
+});
+
+it('still allows a name that merely shares a prefix with an existing field', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'people',
+        'name' => 'Age',
+        'code' => 'age',
+        'type' => 'number',
+    ]);
+
+    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request([
+        'entity_type' => 'people',
+        'name' => 'Age Bracket',
+        'type' => 'text',
+    ])), true);
+
+    expect($decoded)->not->toHaveKey('error');
+});

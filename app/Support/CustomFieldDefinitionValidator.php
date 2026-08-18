@@ -47,7 +47,11 @@ final readonly class CustomFieldDefinitionValidator
         return Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CreateCustomField::VALID_ENTITY_TYPES), self::withinFieldCap($tenantId, $entityType)],
             'type' => ['required', Rule::in(CreateCustomField::ALLOWED_TYPES)],
-            'name' => ['required', 'string', 'max:50', self::uniqueDefinition('name', $tenantId, $entityType)],
+            'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
+                $tenantId,
+                $entityType,
+                fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name, or update the existing field instead.",
+            )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
             'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
@@ -56,7 +60,6 @@ final readonly class CustomFieldDefinitionValidator
             'type.in' => 'Field type ":input" is not supported via chat. Allowed types: '.implode(', ', CreateCustomField::ALLOWED_TYPES).'.',
             'name.required' => 'A field name is required.',
             'name.max' => 'Field names must be 50 characters or fewer.',
-            'name.unique' => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name, or update the existing field instead.",
             'code.max' => 'Field codes must be 50 characters or fewer.',
             'code.alpha_dash' => 'Field codes may only contain letters, numbers, dashes, and underscores.',
             'code.unique' => "A field with code \":input\" already exists on {$entityType}. Omit the code to auto-generate a unique one, or pick a different code.",
@@ -79,7 +82,12 @@ final readonly class CustomFieldDefinitionValidator
         return Validator::make(self::normalize($data), [
             'name' => [
                 'required_without:active', 'string', 'max:50',
-                self::uniqueDefinition('name', $user->currentTeam->getKey(), $entityType)->ignore($field->getKey()),
+                self::uniqueNameIgnoringCase(
+                    $user->currentTeam->getKey(),
+                    $entityType,
+                    fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name.",
+                    $field->getKey(),
+                ),
             ],
             // Only `name` carries required_without: with the rule on both, an empty
             // payload failed twice and the assistant was handed the same sentence twice.
@@ -87,7 +95,6 @@ final readonly class CustomFieldDefinitionValidator
         ], [
             'name.required_without' => 'Provide at least one of: name, active.',
             'name.max' => 'Field names must be 50 characters or fewer.',
-            'name.unique' => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name.",
         ])->validate();
     }
 
@@ -109,11 +116,7 @@ final readonly class CustomFieldDefinitionValidator
             'options' => ['nullable', 'required', 'array', "max:{$remaining}"],
             'options.*.name' => [
                 'required', 'string', 'max:255', 'distinct:ignore_case',
-                Rule::unique(self::optionsTable(), 'name')->where(
-                    fn (Builder $query): Builder => $query
-                        ->where('custom_field_id', $field->getKey())
-                        ->where(self::tenantKey(), $user->currentTeam->getKey()),
-                ),
+                self::uniqueOptionIgnoringCase($user->currentTeam->getKey(), $field),
             ],
         ], [
             'options.required' => 'At least one option must be provided.',
@@ -129,7 +132,6 @@ final readonly class CustomFieldDefinitionValidator
         return [
             'options.*.name.required' => 'Option names cannot be empty.',
             'options.*.name.distinct' => 'Duplicate option names are not allowed.',
-            'options.*.name.unique' => 'Option ":input" already exists on this field.',
             'options.*.name.max' => 'Option names must be 255 characters or fewer.',
         ];
     }
@@ -145,6 +147,61 @@ final readonly class CustomFieldDefinitionValidator
                 ->where(self::tenantKey(), $tenantId)
                 ->where('entity_type', $entityType),
         );
+    }
+
+    /**
+     * Names compare case-insensitively, because "Age" and "age" are the same field
+     * to a human and `distinct:ignore_case` already refuses them inside one payload.
+     * Codes deliberately stay case-sensitive: they are slug-generated, and the DB's
+     * own unique index on (code, entity_type, tenant_id) is case-sensitive too, so a
+     * looser rule here would reject values the database would have accepted.
+     *
+     * @param  Closure(): string  $message  built lazily so ":input" stays out of it
+     */
+    private static function uniqueNameIgnoringCase(
+        int|string $tenantId,
+        string $entityType,
+        Closure $message,
+        int|string|null $ignoreId = null,
+    ): Closure {
+        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $entityType, $message, $ignoreId): void {
+            if (! is_string($value) || $value === '') {
+                return;
+            }
+
+            $taken = DB::table(self::definitionsTable())
+                ->where(self::tenantKey(), $tenantId)
+                ->where('entity_type', $entityType)
+                ->whereRaw('lower(name) = ?', [mb_strtolower($value)])
+                ->when($ignoreId !== null, fn (Builder $query): Builder => $query->where('id', '!=', $ignoreId))
+                ->exists();
+
+            if ($taken) {
+                $fail(str_replace(':input', $value, $message()));
+            }
+        };
+    }
+
+    /**
+     * The option-name twin of {@see uniqueNameIgnoringCase}, scoped to one field.
+     */
+    private static function uniqueOptionIgnoringCase(int|string $tenantId, CustomField $field): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $field): void {
+            if (! is_string($value) || $value === '') {
+                return;
+            }
+
+            $taken = DB::table(self::optionsTable())
+                ->where('custom_field_id', $field->getKey())
+                ->where(self::tenantKey(), $tenantId)
+                ->whereRaw('lower(name) = ?', [mb_strtolower($value)])
+                ->exists();
+
+            if ($taken) {
+                $fail("Option \"{$value}\" already exists on this field.");
+            }
+        };
     }
 
     private static function withinFieldCap(int|string $tenantId, string $entityType): Closure

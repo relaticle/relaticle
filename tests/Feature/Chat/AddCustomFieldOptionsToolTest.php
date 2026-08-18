@@ -241,3 +241,28 @@ it('rejects approval with a friendly message when the option appeared after the 
 
     expect($freshCount)->toBe(1);
 });
+
+it('rejects an option that differs from an existing one only by case', function (): void {
+    $decoded = json_decode((makeAddOptionsTool($this->convId))->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'ACTIVE']],
+    ])), true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('already exists')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('rejects a recased duplicate option at approval time, not just at proposal time', function (): void {
+    expect(fn () => app(AddCustomFieldOptions::class)->execute($this->owner, [
+        '_record_id' => $this->selectField->getKey(),
+        'options' => [['name' => 'active']],
+    ]))->toThrow(ValidationException::class, 'already exists');
+
+    expect(CustomFieldOption::query()
+        ->withoutGlobalScopes()
+        ->where('custom_field_id', $this->selectField->getKey())
+        ->whereRaw('lower(name) = ?', ['active'])
+        ->count())->toBe(1);
+});
