@@ -17,7 +17,7 @@ final readonly class EnsureTokenHasAbility
     /**
      * @throws MissingAbilityException
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string ...$abilities): Response
     {
         $user = $request->user();
         $token = $user?->currentAccessToken();
@@ -30,12 +30,18 @@ final readonly class EnsureTokenHasAbility
             return $next($request);
         }
 
-        $ability = $this->resolveAbility($request->method());
+        // A route that mutates in more than one way — the upsert endpoints create
+        // OR update — declares every ability it may exercise, and must hold all of
+        // them regardless of which branch this particular request takes. Deciding
+        // after the match would turn the 403 into an existence oracle.
+        $required = $abilities === [] ? [$this->resolveAbility($request->method())] : $abilities;
 
         // Sanctum abilities and Passport scopes share the four names, and both
         // failures raise MissingAbilityException so the 403 body is identical
         // whichever credential the caller presented.
-        throw_unless($token->can($ability), MissingAbilityException::class, [$ability]);
+        foreach ($required as $ability) {
+            throw_unless($token->can($ability), MissingAbilityException::class, [$ability]);
+        }
 
         return $next($request);
     }

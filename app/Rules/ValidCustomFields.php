@@ -17,10 +17,15 @@ use Relaticle\CustomFields\Services\ValidationService;
 
 final readonly class ValidCustomFields implements ValidationRule
 {
+    /**
+     * @param  string|int|null  $ignoreEntityId  Record exempted from uniqueness checks, so an
+     *                                           upsert may resubmit the value it matched on.
+     */
     public function __construct(
         private string $tenantId,
         private string $entityType,
         private bool $isUpdate = false,
+        private string|int|null $ignoreEntityId = null,
     ) {}
 
     /**
@@ -41,7 +46,7 @@ final readonly class ValidCustomFields implements ValidationRule
 
             /** @var BaseCustomField $customField */
             foreach ($customFields as $customField) {
-                $fieldRules = $validationService->getValidationRules($customField);
+                $fieldRules = $validationService->getValidationRules($customField, $this->ignoreEntityId);
 
                 if ($fieldRules !== []) {
                     $rules["custom_fields.{$customField->code}"] = $fieldRules;

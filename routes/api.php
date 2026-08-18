@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\CompaniesController;
+use App\Http\Controllers\Api\V1\CompaniesUpsertController;
 use App\Http\Controllers\Api\V1\CustomFieldsController;
 use App\Http\Controllers\Api\V1\NotesController;
 use App\Http\Controllers\Api\V1\OpportunitiesController;
 use App\Http\Controllers\Api\V1\PeopleController;
+use App\Http\Controllers\Api\V1\PeopleUpsertController;
 use App\Http\Controllers\Api\V1\TasksController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\EnsureTokenHasAbility;
@@ -22,6 +24,17 @@ Route::prefix('v1')
         Route::get('user', function (Request $request) {
             return new UserResource($request->user());
         });
+
+        // Declared ahead of the resource routes so the literal segment is never
+        // read as a record key, and gated on both abilities because the endpoint
+        // may create or update.
+        Route::post('companies/upsert', CompaniesUpsertController::class)
+            ->middleware(EnsureTokenHasAbility::class.':create,update')
+            ->name('companies.upsert');
+
+        Route::post('people/upsert', PeopleUpsertController::class)
+            ->middleware(EnsureTokenHasAbility::class.':create,update')
+            ->name('people.upsert');
 
         Route::apiResource('companies', CompaniesController::class);
         Route::apiResource('people', PeopleController::class);
