@@ -37,10 +37,10 @@ return [
     'relaticle' => [
         'name' => 'Relaticle',
         'license' => 'AGPL-3.0',
-        'stars' => 1_506,
-        'stars_verified' => '2026-08-13',
+        'stars' => 1_518,
+        'stars_verified' => '2026-08-18',
         'contributors' => 7,
-        'contributors_verified' => '2026-08-13',
+        'contributors_verified' => '2026-08-18',
         'pricing' => '$24/mo flat (or $19/mo billed annually), unlimited users, AI credit packs on top',
         'pricing_verified' => '2026-08-13',
         'stack' => 'Laravel 13 + Filament 5, single-server deploy',
