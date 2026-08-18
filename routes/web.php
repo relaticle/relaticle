@@ -75,7 +75,7 @@ Route::middleware(['signed', 'auth', 'verified', AuthenticateSession::class])->g
         ->name('team-invitations.join');
 });
 
-Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class, 'throttle:10,1'])->group(function (): void {
     Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->name('team-invitations.token.accept');

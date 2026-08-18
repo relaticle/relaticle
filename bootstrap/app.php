@@ -129,18 +129,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request): string {
-            if ($request->routeIs('team-invitations.accept')) {
-                $invitation = TeamInvitation::query()
-                    ->whereKey($request->route('invitation'))
-                    ->first();
-
-                if ($invitation && User::query()->where('email', $invitation->email)->exists()) {
-                    return Filament::getLoginUrl();
-                }
-
-                return Filament::getRegistrationUrl();
-            }
-
             // A shared join link carries no email, so we cannot tell whether the
             // visitor has an account. Most people opening one do not, and the
             // register page links back to sign-in for the rest.
@@ -148,7 +136,23 @@ return Application::configure(basePath: dirname(__DIR__))
                 return Filament::getRegistrationUrl();
             }
 
-            return route('login');
+            $invitation = match (true) {
+                $request->routeIs('team-invitations.accept') => TeamInvitation::query()
+                    ->whereKey($request->route('invitation'))
+                    ->first(),
+                $request->routeIs('team-invitations.token.accept') => TeamInvitation::findByRawToken(
+                    (string) $request->route('token')
+                ),
+                default => null,
+            };
+
+            if ($invitation === null) {
+                return route('login');
+            }
+
+            return User::query()->where('email', $invitation->email)->exists()
+                ? Filament::getLoginUrl()
+                : Filament::getRegistrationUrl();
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {

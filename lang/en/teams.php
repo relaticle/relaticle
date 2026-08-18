@@ -157,8 +157,8 @@ return [
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
         'ready' => [
             'heading' => 'Join :team',
-            'body_with_inviter' => ':inviter invited you to join :team as a :role.',
-            'body' => 'You have been invited to join :team as a :role.',
+            'body_with_inviter' => ':inviter invited you to join :team with :role access.',
+            'body' => 'You have been invited to join :team with :role access.',
             'action' => 'Join :team',
             'decline' => 'Not now',
         ],
