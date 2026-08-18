@@ -8,6 +8,7 @@ use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Enums\TeamRole;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
@@ -54,6 +55,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property Carbon|null $trial_ends_at
  * @property Carbon|null $pro_trial_used_at
  * @property Carbon|null $hosted_free_grandfathered_at
+ * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way
  */
@@ -64,6 +66,7 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_use_case',
     'onboarding_context',
     'onboarding_referral_source',
+    'invite_link_default_role',
 ])]
 #[Hidden([
     'invite_link_token',
@@ -154,6 +157,15 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         'created' => TeamCreated::class,
         'updated' => TeamUpdated::class,
         'deleted' => TeamDeleted::class,
+    ];
+
+    /**
+     * The model's default attribute values.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'invite_link_default_role' => TeamRole::Editor->value,
     ];
 
     /**
