@@ -138,4 +138,28 @@ return [
             'description' => 'Viewer users can read records but cannot create, update, or delete.',
         ],
     ],
+
+    'accept' => [
+        'joined' => 'You have joined the :team workspace.',
+        'already_member' => 'You are already a member of :team.',
+        'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
+        'ready' => [
+            'heading' => 'Join :team',
+            'body_with_inviter' => ':inviter invited you to join :team as a :role.',
+            'body' => 'You have been invited to join :team as a :role.',
+            'action' => 'Join :team',
+            'decline' => 'Not now',
+        ],
+        'wrong_account' => [
+            'heading' => 'This invitation is for a different account',
+            'body' => 'This invitation was sent to :invited, but you are signed in as :current.',
+            'switch' => 'Sign out and switch account',
+            'stay' => 'Go to my workspace',
+        ],
+        'expired' => [
+            'heading' => 'Invitation no longer valid',
+            'body' => 'This invitation has expired or has already been accepted.',
+            'action' => 'Go to my workspace',
+        ],
+    ],
 ];
