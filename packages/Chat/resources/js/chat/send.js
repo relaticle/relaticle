@@ -13,10 +13,11 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     // and auto-flush this on handleStreamEnd / cancel / failure.
     queuedSend: null,
 
-    // Active send-throttle window: {secondsLeft, timerId, document}. While set,
-    // the composer is soft-disabled with a countdown and the stashed message
-    // auto-sends the moment the window opens. Cancel keeps the text, drops the
-    // auto-send.
+    // Active send-throttle window: {secondsLeft, timerId, userMsg}. While set,
+    // the composer is soft-disabled with a countdown and the failed bubble
+    // (userMsg, already visible marked failed) auto-resends the moment the
+    // window opens. Cancel drops the auto-resend; the failed bubble stays put
+    // with its own resend control.
     rateLimit: null,
 
     // Scoped lookup of THIS chat-interface's TipTap editor. Avoids the
@@ -139,21 +140,69 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // approve/reject buttons disappear immediately.
         this.markPendingActionsSuperseded();
 
-        const isFirstMessage = !this.conversationId;
         const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
         // Captured once per send: the pill attaches to THIS message only. Both the
         // optimistic bubble below and the request payload further down must read
         // the SAME snapshot — re-reading activePageContext() after the consumed
         // flag flips would silently drop it from the outgoing request.
         const contextForSend = this.activePageContext();
+        const nowIso = new Date().toISOString();
+
+        this.messages.push(this.ensureClientKey({
+            role: 'user',
+            content: text,
+            document: payload,
+            editing: false,
+            editText: '',
+            copiedAt: 0,
+            created_at: nowIso,
+            page_context: contextForSend,
+            sendState: 'sending',
+        }));
+        this.pageContextConsumed = true;
+        this.localEditor()?.clear();
+        this.input = '';
+
+        // Re-read from the reactive array rather than mutating the object
+        // literal above directly: Alpine (like Vue3 reactivity) only tracks
+        // dependents through property access on the wrapped proxy it hands
+        // back from an array read. Mutating the pre-push object bypasses
+        // that proxy: later reads still see the new value, but the DOM
+        // binding is never notified to re-render.
+        const userMsg = this.messages[this.messages.length - 1];
+
+        await this.deliverMessage(userMsg, payload, contextForSend);
+    },
+
+    // Re-sends a FAILED optimistic bubble in place: same clientKey, same
+    // content, never mints a second bubble. This is the F2 fix: the old
+    // 429 handling popped the bubble and a later sendMessage() call minted a
+    // fresh one, which could transiently render as a duplicate.
+    async resendMessage(msg) {
+        if (this.isStreaming) return;
+        if (this.hasPendingProposal) return;
+        if (msg.sendState === 'sending') return;
+
+        // A manual resend overrides any auto-resend countdown still ticking
+        // for this bubble.
+        this.clearRateLimit();
+
+        msg.sendState = 'sending';
+        this.isStreaming = true;
+        this.markPendingActionsSuperseded();
+
+        const payload = this.plainDocument(msg.document) ?? this.documentFromInput(msg.content);
+        await this.deliverMessage(msg, payload, msg.page_context ?? null);
+    },
+
+    // The network round trip shared by a fresh sendMessage() and a
+    // resendMessage() retry. `userMsg` is mutated in place (sendState only,
+    // never re-pushed), so both callers converge on the exact same bubble.
+    async deliverMessage(userMsg, payload, contextForSend) {
+        const isFirstMessage = !this.conversationId;
 
         if (isFirstMessage) {
-            const nowIso = new Date().toISOString();
-            this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
-            this.pageContextConsumed = true;
             this.mintAssistantStub();
-            this.localEditor()?.clear();
-            this.input = '';
             this.currentToolStatus = null;
 
             let newId = null;
@@ -179,20 +228,21 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                     const body = await createRes.json().catch(() => ({}));
 
                     if (createRes.status === 429 && body?.error === 'rate_limited') {
-                        this.handleSendRateLimit(body, payload);
+                        this.handleSendRateLimit(userMsg, body);
                         return;
                     }
 
                     const assistantMsg = this.messages[this.messages.length - 1];
 
                     if (createRes.status === 401 || createRes.status === 419) {
-                        try { localStorage.setItem('chat:draft', text); } catch (_) { /* ignore */ }
+                        try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
                         assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
                         assistantMsg.sessionExpired = true;
                     } else {
                         assistantMsg.content = body?.errors?.document?.[0] ?? body?.message ?? `Error ${createRes.status}: ${createRes.statusText}`;
                     }
                     assistantMsg.rendered = true;
+                    userMsg.sendState = 'failed';
                     this.isStreaming = false;
                     this.restoreInputFocus();
                     return;
@@ -245,7 +295,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                     const body = await sendRes.json().catch(() => ({}));
 
                     if (sendRes.status === 429 && body?.error === 'rate_limited') {
-                        this.handleSendRateLimit(body, payload);
+                        this.handleSendRateLimit(userMsg, body);
                         return;
                     }
 
@@ -263,18 +313,25 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                         assistantMsg.content = body?.message || `Error ${sendRes.status}: ${sendRes.statusText}`;
                     }
                     assistantMsg.rendered = true;
+                    userMsg.sendState = 'failed';
                     this.isStreaming = false;
                     this.clearStreamTimeout();
                     this.restoreInputFocus();
                     return;
                 }
+
+                userMsg.sendState = 'sent';
             } catch (error) {
                 if (error?.name === 'AbortError') {
+                    // A deliberate cancel, not a delivery failure: the request
+                    // may already have landed server-side.
+                    userMsg.sendState = 'sent';
                     return;
                 }
                 const assistantMsg = this.messages[this.messages.length - 1];
                 assistantMsg.content = 'Network error. Please try again.';
                 assistantMsg.rendered = true;
+                userMsg.sendState = 'failed';
                 this.isStreaming = false;
                 this.clearStreamTimeout();
                 this.restoreInputFocus();
@@ -289,13 +346,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
             await this.channel.readyPromise;
         }
 
-        const nowIso = new Date().toISOString();
-        this.messages.push(this.ensureClientKey({ role: 'user', content: text, document: payload, editing: false, editText: '', copiedAt: 0, created_at: nowIso, page_context: contextForSend }));
-        this.pageContextConsumed = true;
-        this.localEditor()?.clear();
-        this.input = '';
         this.currentToolStatus = null;
-
         this.mintAssistantStub();
 
         const url = this.conversationId
@@ -327,17 +378,18 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 const body = await response.json().catch(() => ({}));
 
                 if (response.status === 429 && body?.error === 'rate_limited') {
-                    this.handleSendRateLimit(body, payload);
+                    this.handleSendRateLimit(userMsg, body);
                     return;
                 }
 
                 const assistantMsg = this.messages[this.messages.length - 1];
 
                 if (response.status === 401 || response.status === 419) {
-                    try { localStorage.setItem('chat:draft', text); } catch (_) { /* ignore */ }
+                    try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
                     assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
                     assistantMsg.sessionExpired = true;
                     assistantMsg.rendered = true;
+                    userMsg.sendState = 'failed';
                     this.isStreaming = false;
                     this.clearStreamTimeout();
                     this.restoreInputFocus();
@@ -357,6 +409,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 }
 
                 assistantMsg.rendered = true;
+                userMsg.sendState = 'failed';
                 this.isStreaming = false;
                 this.clearStreamTimeout();
                 this.restoreInputFocus();
@@ -368,14 +421,17 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 this.conversationId = body.conversation_id;
                 this.subscribeToConversation(body.conversation_id);
             }
+            userMsg.sendState = 'sent';
         } catch (error) {
             if (error?.name === 'AbortError') {
+                userMsg.sendState = 'sent';
                 return;
             }
 
             const assistantMsg = this.messages[this.messages.length - 1];
             assistantMsg.content = 'Network error. Please try again.';
             assistantMsg.rendered = true;
+            userMsg.sendState = 'failed';
             this.isStreaming = false;
             this.clearStreamTimeout();
             this.restoreInputFocus();
@@ -442,45 +498,41 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         this.$nextTick(() => this.sendMessage());
     },
 
-    // The send hit the per-plan throttle. Undo the optimistic bubbles, put the
-    // text back in the composer, and count down to an automatic re-send. The
-    // user keeps everything they typed; nothing fake lands in the transcript.
-    handleSendRateLimit(body, payload) {
+    // The send hit the per-plan throttle. Drop the empty assistant filler
+    // stub (nothing streamed into it), but KEEP the user's bubble, marked
+    // failed, and count down to an automatic resend of that SAME bubble.
+    // Popping and later re-minting a fresh one is exactly the F2 duplicate
+    // bug this replaced.
+    handleSendRateLimit(userMsg, body) {
         const stub = this.messages[this.messages.length - 1];
         if (stub?.role === 'assistant' && !stub.content && !stub.rendered && !(stub.pending_actions || []).length) {
             this.messages.pop();
         }
-        const userMsg = this.messages[this.messages.length - 1];
-        if (userMsg?.role === 'user' && !userMsg.editing) {
-            this.messages.pop();
-        }
 
-        this.localEditor()?.setDocument?.(payload);
+        userMsg.sendState = 'failed';
 
         this.isStreaming = false;
         this.clearStreamTimeout();
         // +1s margin: re-sending at the exact Retry-After boundary lands back
         // in the closing window and 429s again (observed live).
-        this.startRateLimitCountdown(Math.max(2, (Number(body?.retry_after_seconds) || 30) + 1), payload);
+        this.startRateLimitCountdown(Math.max(2, (Number(body?.retry_after_seconds) || 30) + 1), userMsg);
         this.restoreInputFocus();
     },
 
-    startRateLimitCountdown(seconds, document = null) {
+    startRateLimitCountdown(seconds, userMsg = null) {
         this.clearRateLimit();
-        this.rateLimit = { secondsLeft: seconds, timerId: null, document };
+        this.rateLimit = { secondsLeft: seconds, timerId: null, userMsg };
         this.rateLimit.timerId = setInterval(() => {
             if (!this.rateLimit) return;
             this.rateLimit.secondsLeft -= 1;
             if (this.rateLimit.secondsLeft > 0) return;
-            const doc = this.plainDocument(this.rateLimit.document);
+            const target = this.rateLimit.userMsg;
             this.clearRateLimit();
-            if (doc) {
-                this.localEditor()?.setDocument?.(doc);
-            }
+            if (!target) return;
             // setTimeout, NOT $nextTick: an exception in any effect sharing
             // Alpine's flush queue (e.g. the banner tearing down) would drop a
             // queued nextTick callback — observed live. A macrotask is isolated.
-            setTimeout(() => this.sendMessage(), 50);
+            setTimeout(() => this.resendMessage(target), 50);
         }, 1000);
     },
 
