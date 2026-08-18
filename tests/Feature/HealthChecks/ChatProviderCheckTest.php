@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Health\ChatProviderCheck;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Enums\Status;
@@ -32,23 +34,66 @@ function chatProviderCatalogueEntry(
     ];
 }
 
-function configuredAnthropicCheck(): ChatProviderCheck
+function configuredCheck(string $provider, string $model): ChatProviderCheck
 {
-    config()->set('chat.models', [chatProviderCatalogueEntry('anthropic', 'claude-sonnet-4-6')]);
-    config()->set('ai.providers.anthropic.key', 'test-key');
+    config()->set('chat.models', [chatProviderCatalogueEntry($provider, $model)]);
+    config()->set("ai.providers.{$provider}.key", 'test-key');
 
     return ChatProviderCheck::forConfiguredProviders()[0];
 }
 
-it('only warns when a provider is overloaded', function (): void {
+function configuredAnthropicCheck(): ChatProviderCheck
+{
+    return configuredCheck('anthropic', 'claude-sonnet-4-6');
+}
+
+it('retrieves the model from anthropic with the credentials a chat turn uses', function (): void {
+    Http::fake();
+
+    configuredAnthropicCheck()->run();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && $request->url() === 'https://api.anthropic.com/v1/models/claude-sonnet-4-6'
+        && $request->hasHeader('x-api-key', 'test-key')
+        && $request->hasHeader('anthropic-version', '2023-06-01'));
+});
+
+it('retrieves the model from openai with the credentials a chat turn uses', function (): void {
+    Http::fake();
+
+    configuredCheck('openai', 'gpt-5.5')->run();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && $request->url() === 'https://api.openai.com/v1/models/gpt-5.5'
+        && $request->hasHeader('Authorization', 'Bearer test-key'));
+});
+
+it('never sends a generation request', function (): void {
+    Http::fake();
+
+    configuredCheck('openai', 'gpt-5.5')->run();
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST'
+        || array_key_exists('max_output_tokens', $request->data())
+        || array_key_exists('max_tokens', $request->data()));
+});
+
+it('honours a provider base url override', function (): void {
+    Http::fake();
+
+    config()->set('ai.providers.openai.url', 'https://gateway.internal/openai/v1/');
+
+    configuredCheck('openai', 'gpt-5.5')->run();
+
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://gateway.internal/openai/v1/models/gpt-5.5');
+});
+
+it('passes when the provider serves the model', function (): void {
     Http::fake([
-        'api.anthropic.com/*' => Http::response([
-            'type' => 'error',
-            'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded'],
-        ], 529),
+        'api.openai.com/*' => Http::response(['id' => 'gpt-5.5', 'object' => 'model']),
     ]);
 
-    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::warning());
+    expect(configuredCheck('openai', 'gpt-5.5')->run()->status)->toBe(Status::ok());
 });
 
 it('only warns when a provider rate limits us', function (): void {
@@ -62,42 +107,74 @@ it('only warns when a provider rate limits us', function (): void {
     expect(configuredAnthropicCheck()->run()->status)->toBe(Status::warning());
 });
 
-it('fails when the model is no longer available', function (): void {
+it('only warns when a provider is overloaded', function (): void {
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'type' => 'error',
-            'error' => ['type' => 'not_found_error', 'message' => 'model: claude-sonnet-4-6'],
+            'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded'],
+        ], 529),
+    ]);
+
+    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::warning());
+});
+
+it('only warns when a provider cannot be reached', function (): void {
+    Http::fake(fn (): never => throw new ConnectionException('cURL error 28: Operation timed out'));
+
+    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::warning());
+});
+
+it('fails when the model is no longer available', function (): void {
+    Http::fake([
+        'api.openai.com/*' => Http::response([
+            'error' => ['type' => 'invalid_request_error', 'message' => "The model 'gpt-5.5' does not exist"],
         ], 404),
     ]);
 
-    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::failed());
+    $result = configuredCheck('openai', 'gpt-5.5')->run();
+
+    expect($result->status)->toBe(Status::failed())
+        ->and($result->notificationMessage)->toContain("The model 'gpt-5.5' does not exist");
 });
 
 it('fails when the api key is rejected', function (): void {
     Http::fake([
-        'api.anthropic.com/*' => Http::response([
-            'type' => 'error',
-            'error' => ['type' => 'authentication_error', 'message' => 'invalid x-api-key'],
+        'api.openai.com/*' => Http::response([
+            'error' => ['type' => 'invalid_request_error', 'message' => 'Incorrect API key provided'],
         ], 401),
     ]);
 
-    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::failed());
+    expect(configuredCheck('openai', 'gpt-5.5')->run()->status)->toBe(Status::failed());
 });
 
-it('passes when the provider responds', function (): void {
-    Http::fake([
-        'api.anthropic.com/*' => Http::response([
-            'id' => 'msg_test',
-            'type' => 'message',
-            'role' => 'assistant',
-            'model' => 'claude-sonnet-4-6',
-            'content' => [['type' => 'text', 'text' => 'Hi']],
-            'stop_reason' => 'max_tokens',
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 1],
-        ]),
-    ]);
+it('fails loudly rather than silently passing a provider it cannot probe', function (): void {
+    Http::fake();
 
-    expect(configuredAnthropicCheck()->run()->status)->toBe(Status::ok());
+    $result = configuredCheck('groq', 'llama-4-scout')->run();
+
+    expect($result->status)->toBe(Status::failed())
+        ->and($result->notificationMessage)->toContain('no health probe is defined');
+
+    Http::assertNothingSent();
+});
+
+it('can probe every provider the real catalogue is able to register', function (): void {
+    Http::fake();
+
+    /** @var array<int, array<string, mixed>> $catalogue */
+    $catalogue = config('chat.models', []);
+
+    foreach ($catalogue as $entry) {
+        config()->set("ai.providers.{$entry['provider']}.key", 'test-key');
+    }
+
+    $checks = ChatProviderCheck::forConfiguredProviders();
+
+    expect($checks)->not->toBeEmpty();
+
+    foreach ($checks as $check) {
+        expect($check->run()->status)->toBe(Status::ok());
+    }
 });
 
 it('registers one check per provider that has a key configured', function (): void {
