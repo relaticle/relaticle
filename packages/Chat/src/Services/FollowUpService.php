@@ -28,7 +28,7 @@ final readonly class FollowUpService
             }
         }
 
-        $last = $toolCalls[array_key_last($toolCalls)];
+        $last = array_last($toolCalls);
         $name = $this->normalizeToolName($last['name']);
 
         $chips = match ($name) {

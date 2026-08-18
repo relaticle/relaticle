@@ -25,7 +25,7 @@ Visit `http://localhost:8000` to access the application.
 
 | Component | Technology                            |
 |-----------|---------------------------------------|
-| Backend | PHP 8.4, Laravel 13                   |
+| Backend | PHP 8.5, Laravel 13                   |
 | Admin UI | Filament 5                            |
 | Frontend | Livewire 4, Alpine.js, Tailwind CSS 4 |
 | Database | PostgreSQL                             |
@@ -67,7 +67,7 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 
 ### Requirements
 
-- **PHP 8.4+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
+- **PHP 8.5+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
 - **PostgreSQL 17+**
 - **Node.js 20+**
 - **Composer 2+**

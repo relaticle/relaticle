@@ -7,7 +7,7 @@
         ['What AI agents can I connect from outside?', 'Any agent that speaks MCP (Model Context Protocol). Claude, ChatGPT, Gemini, open-source models, or your own custom agents. Relaticle\'s MCP server provides 32 tools for external AI agents to read, create, update, and delete CRM data — the same toolset the built-in chat uses internally.'],
         ['What is MCP?', 'MCP (Model Context Protocol) is an open standard that lets AI agents interact with tools and data sources. Relaticle\'s MCP server gives external agents 32 tools to work with your CRM data — listing companies, creating contacts, updating opportunities, and more.'],
         ['How is Relaticle different from HubSpot or Salesforce?', 'Relaticle is self-hosted (you own your data), open-source (AGPL-3.0), ships with both a built-in AI chat and 32 MCP tools for any external agent, and has no per-seat pricing. It\'s designed for teams who want AI built in and AI integration both — without vendor lock-in.'],
-        ['How do I deploy Relaticle?', 'Deploy with Docker Compose, Laravel Forge, or any PHP 8.4+ hosting with PostgreSQL. Self-hosted means your data never leaves your server. A managed hosting option is also available at app.relaticle.com.'],
+        ['How do I deploy Relaticle?', 'Deploy with Docker Compose, Laravel Forge, or any PHP 8.5+ hosting with PostgreSQL. Self-hosted means your data never leaves your server. A managed hosting option is also available at app.relaticle.com.'],
         ['Can I customize the data model?', 'Yes. Relaticle offers 22 custom field types including text, email, phone, currency, date, select, multiselect, entity relationships, conditional visibility, and per-field encryption. No migrations or code changes needed.'],
     ];
 @endphp
