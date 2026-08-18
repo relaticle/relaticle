@@ -11,6 +11,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class CompaniesRelationManager extends RelationManager
 {
@@ -33,11 +34,13 @@ final class CompaniesRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (Company $record): string => CompanyResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->url(fn (Company $record): ?string => $record->creator_id === null ? null : UserResource::getUrl('view', ['record' => $record->creator_id])),
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),

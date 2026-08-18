@@ -19,6 +19,7 @@ use Relaticle\ImportWizard\Models\Import;
 use Relaticle\SystemAdmin\Filament\Resources\ImportResource\Pages\ListImports;
 use Relaticle\SystemAdmin\Filament\Resources\ImportResource\Pages\ViewImport;
 use Relaticle\SystemAdmin\Filament\Resources\ImportResource\RelationManagers\FailedRowsRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class ImportResource extends Resource
 {
@@ -56,9 +57,13 @@ final class ImportResource extends Resource
                     ->badge()
                     ->color(self::statusColor(...)),
                 TextEntry::make('team.name')
-                    ->label('Team'),
+                    ->label('Team')
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextEntry::make('user.name')
-                    ->label('User'),
+                    ->label('User')
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'user')),
                 TextEntry::make('total_rows'),
                 TextEntry::make('created_rows'),
                 TextEntry::make('updated_rows'),
@@ -90,11 +95,15 @@ final class ImportResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'user')),
                 TextColumn::make('total_rows')
                     ->numeric()
                     ->toggleable(),
@@ -146,7 +155,7 @@ final class ImportResource extends Resource
         ];
     }
 
-    private static function statusColor(ImportStatus $state): string
+    public static function statusColor(ImportStatus $state): string
     {
         return match ($state) {
             ImportStatus::Completed => 'success',

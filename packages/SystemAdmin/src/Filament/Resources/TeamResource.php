@@ -31,11 +31,15 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ViewTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\CompaniesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ConversationsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ImportsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\MembersRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\NotesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\OpportunitiesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\PeopleRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\TasksRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class TeamResource extends Resource
 {
@@ -93,7 +97,8 @@ final class TeamResource extends Resource
                     TextEntry::make('slug'),
                     TextEntry::make('owner.name')
                         ->label('Owner')
-                        ->url(fn (Team $record): ?string => $record->user_id === null ? null : UserResource::getUrl('view', ['record' => $record->user_id])),
+                        ->color('primary')
+                        ->url(RecordLink::to(UserResource::class, 'owner')),
                     IconEntry::make('personal_team')
                         ->label('Personal')
                         ->boolean(),
@@ -134,7 +139,8 @@ final class TeamResource extends Resource
                     ->label('Owner')
                     ->searchable()
                     ->sortable()
-                    ->url(fn (Team $record): ?string => $record->user_id === null ? null : UserResource::getUrl('view', ['record' => $record->user_id])),
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'owner')),
                 IconColumn::make('personal_team')
                     ->label('Personal')
                     ->boolean(),
@@ -188,6 +194,9 @@ final class TeamResource extends Resource
             TasksRelationManager::class,
             OpportunitiesRelationManager::class,
             NotesRelationManager::class,
+            ConversationsRelationManager::class,
+            ImportsRelationManager::class,
+            SubscriptionsRelationManager::class,
         ];
     }
 

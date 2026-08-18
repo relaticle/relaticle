@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
-use App\Models\Note;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\SystemAdmin\Filament\Resources\NoteResource;
+use Relaticle\ImportWizard\Models\Import;
+use Relaticle\SystemAdmin\Filament\Resources\ImportResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
-final class NotesRelationManager extends RelationManager
+final class ImportsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'notes';
+    protected static string $relationship = 'imports';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-arrow-up-tray';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord->notes()->count();
+        $count = $ownerRecord->imports()->count();
 
         return $count > 0 ? (string) $count : null;
     }
@@ -29,22 +29,23 @@ final class NotesRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('title')
+            ->recordTitleAttribute('file_name')
             ->columns([
-                TextColumn::make('title')
+                TextColumn::make('file_name')
                     ->searchable()
                     ->sortable()
-                    ->limit(50)
                     ->color('primary')
-                    ->url(fn (Note $record): string => NoteResource::getUrl('view', ['record' => $record])),
-                TextColumn::make('creator.name')
-                    ->label('Created by')
+                    ->url(fn (Import $record): string => ImportResource::getUrl('view', ['record' => $record])),
+                TextColumn::make('entity_type')
+                    ->badge(),
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(ImportResource::statusColor(...)),
+                TextColumn::make('user.name')
+                    ->label('User')
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(UserResource::class, 'creator')),
-                TextColumn::make('creation_source')
-                    ->badge()
-                    ->label('Source'),
+                    ->url(RecordLink::to(UserResource::class, 'user')),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

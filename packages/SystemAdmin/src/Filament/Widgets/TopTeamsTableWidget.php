@@ -39,11 +39,13 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->searchable()
                     ->sortable()
                     ->weight('semibold')
+                    ->color('primary')
                     ->url(fn (Team $record): string => TeamResource::getUrl('view', ['record' => $record])),
 
                 TextColumn::make('owner.name')
                     ->label('Owner')
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (Team $record): ?string => $record->owner ? UserResource::getUrl('view', ['record' => $record->owner]) : null),
 
                 TextColumn::make('members_count')

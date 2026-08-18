@@ -23,9 +23,13 @@ use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\CreateOpp
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\EditOpportunity;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ResolvesTrashedRecords;
 
 final class OpportunityResource extends Resource
 {
+    use ResolvesTrashedRecords;
+
     protected static ?string $model = Opportunity::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
@@ -83,18 +87,26 @@ final class OpportunityResource extends Resource
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(CompanyResource::class, 'company')),
                 TextColumn::make('contact.name')
                     ->label('Contact')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(PeopleResource::class, 'contact')),
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source')

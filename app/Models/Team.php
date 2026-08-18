@@ -26,7 +26,9 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\ImportWizard\Models\Import;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -299,5 +301,21 @@ final class Team extends JetstreamTeam implements HasAvatar
     public function aiCreditBalance(): HasOne
     {
         return $this->hasOne(AiCreditBalance::class);
+    }
+
+    /**
+     * @return HasMany<AgentConversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(AgentConversation::class);
+    }
+
+    /**
+     * @return HasMany<Import, $this>
+     */
+    public function imports(): HasMany
+    {
+        return $this->hasMany(Import::class);
     }
 }

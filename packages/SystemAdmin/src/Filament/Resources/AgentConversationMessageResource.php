@@ -19,6 +19,7 @@ use Override;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationMessageResource\Pages\ListAgentConversationMessages;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationMessageResource\Pages\ViewAgentConversationMessage;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use UnitEnum;
 
 final class AgentConversationMessageResource extends Resource
@@ -50,9 +51,17 @@ final class AgentConversationMessageResource extends Resource
                 Section::make([
                     TextEntry::make('role')->badge()->color(fn (string $state): string => self::ROLE_COLORS[$state] ?? 'info'),
                     TextEntry::make('agent')->placeholder('—'),
-                    TextEntry::make('user.name')->label('User')->placeholder('—'),
+                    TextEntry::make('user.name')
+                        ->label('User')
+                        ->placeholder('—')
+                        ->color('primary')
+                        ->url(RecordLink::to(UserResource::class, 'user')),
                     TextEntry::make('superseded_at')->dateTime()->placeholder('Live'),
-                    TextEntry::make('conversation_id')->label('Conversation')->copyable(),
+                    TextEntry::make('conversation_id')
+                        ->label('Conversation')
+                        ->copyable()
+                        ->color('primary')
+                        ->url(RecordLink::to(AgentConversationResource::class, 'conversation')),
                     TextEntry::make('created_at')->dateTime(),
                     TextEntry::make('content')->placeholder('—')->columnSpanFull(),
                 ])->columnSpanFull()->columns(2),
@@ -83,7 +92,9 @@ final class AgentConversationMessageResource extends Resource
                     ->label('Conversation')
                     ->limit(8)
                     ->tooltip(fn (?string $state): ?string => $state)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->color('primary')
+                    ->url(RecordLink::to(AgentConversationResource::class, 'conversation')),
             ])
             ->filters([
                 SelectFilter::make('role')

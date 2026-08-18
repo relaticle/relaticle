@@ -37,6 +37,7 @@ final class TeamsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (Team $record): string => TeamResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('membership.role')
                     ->label('Role')

@@ -11,6 +11,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class TasksRelationManager extends RelationManager
 {
@@ -33,11 +34,13 @@ final class TasksRelationManager extends RelationManager
                 TextColumn::make('title')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->url(fn (Task $record): ?string => $record->creator_id === null ? null : UserResource::getUrl('view', ['record' => $record->creator_id])),
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),

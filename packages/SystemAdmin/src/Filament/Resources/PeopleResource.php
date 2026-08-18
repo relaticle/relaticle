@@ -23,9 +23,13 @@ use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\CreatePeople;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\EditPeople;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\ListPeople;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ResolvesTrashedRecords;
 
 final class PeopleResource extends Resource
 {
+    use ResolvesTrashedRecords;
+
     protected static ?string $model = People::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
@@ -80,15 +84,21 @@ final class PeopleResource extends Resource
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(CompanyResource::class, 'company')),
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source')

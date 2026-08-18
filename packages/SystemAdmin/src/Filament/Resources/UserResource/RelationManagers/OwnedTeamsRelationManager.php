@@ -35,6 +35,7 @@ final class OwnedTeamsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (Team $record): string => TeamResource::getUrl('view', ['record' => $record])),
                 IconColumn::make('personal_team')
                     ->label('Personal')

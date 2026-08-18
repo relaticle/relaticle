@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
+use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\SystemAdministratorResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class ActivityResource extends Resource
 {
@@ -62,6 +64,33 @@ final class ActivityResource extends Resource
         return false;
     }
 
+    /**
+     * @return array<string, class-string> Morph alias => Filament resource class
+     */
+    public static function causerResources(): array
+    {
+        return [
+            'user' => UserResource::class,
+            'system_administrator' => SystemAdministratorResource::class,
+        ];
+    }
+
+    /**
+     * @return array<string, class-string> Morph alias => Filament resource class
+     */
+    public static function subjectResources(): array
+    {
+        return [
+            'company' => CompanyResource::class,
+            'people' => PeopleResource::class,
+            'opportunity' => OpportunityResource::class,
+            'task' => TaskResource::class,
+            'note' => NoteResource::class,
+            'team' => TeamResource::class,
+            'user' => UserResource::class,
+        ];
+    }
+
     #[Override]
     public static function table(Table $table): Table
     {
@@ -75,15 +104,20 @@ final class ActivityResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->placeholder('—')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('causer.name')
                     ->label('User')
-                    ->placeholder('System'),
+                    ->placeholder('System')
+                    ->color('primary')
+                    ->url(RecordLink::toMorph(self::causerResources(), 'causer_type', 'causer_id')),
                 TextColumn::make('subject_type')
                     ->label('Subject')
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (?string $state): string => $state === null ? '—' : ucfirst($state)),
+                    ->formatStateUsing(fn (?string $state): string => $state === null ? '—' : ucfirst($state))
+                    ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                 TextColumn::make('event')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
@@ -159,13 +193,23 @@ final class ActivityResource extends Resource
                             'deleted' => 'danger',
                             default => 'gray',
                         }),
-                    TextEntry::make('team.name')->label('Team')->placeholder('—'),
-                    TextEntry::make('causer.name')->label('User')->placeholder('System'),
+                    TextEntry::make('team.name')
+                        ->label('Team')
+                        ->placeholder('—')
+                        ->color('primary')
+                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                    TextEntry::make('causer.name')
+                        ->label('User')
+                        ->placeholder('System')
+                        ->color('primary')
+                        ->url(RecordLink::toMorph(self::causerResources(), 'causer_type', 'causer_id')),
                     TextEntry::make('subject_type')
                         ->label('Subject')
                         ->formatStateUsing(fn (?string $state, Activity $record): string => $state === null
                             ? '—'
-                            : ucfirst($state).' #'.$record->subject_id),
+                            : ucfirst($state).' #'.$record->subject_id)
+                        ->color('primary')
+                        ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                     TextEntry::make('description')->columnSpanFull(),
                 ])->columns(2)->columnSpanFull(),
                 Section::make('Changes')

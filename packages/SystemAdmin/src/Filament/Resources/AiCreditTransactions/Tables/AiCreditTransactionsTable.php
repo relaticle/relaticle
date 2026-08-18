@@ -13,6 +13,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class AiCreditTransactionsTable
 {
@@ -27,13 +30,17 @@ final class AiCreditTransactionsTable
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->placeholder('—')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'user')),
                 TextColumn::make('type')
                     ->badge(),
                 TextColumn::make('model')

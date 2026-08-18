@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
+namespace Relaticle\SystemAdmin\Filament\Resources\CompanyResource\RelationManagers;
 
 use App\Models\Opportunity;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
@@ -38,12 +37,6 @@ final class OpportunitiesRelationManager extends RelationManager
                     ->sortable()
                     ->color('primary')
                     ->url(fn (Opportunity $record): string => OpportunityResource::getUrl('view', ['record' => $record])),
-                TextColumn::make('company.name')
-                    ->label('Company')
-                    ->searchable()
-                    ->sortable()
-                    ->color('primary')
-                    ->url(RecordLink::to(CompanyResource::class, 'company')),
                 TextColumn::make('contact.name')
                     ->label('Contact')
                     ->sortable()

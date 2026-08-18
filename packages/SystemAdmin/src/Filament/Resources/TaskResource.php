@@ -23,9 +23,13 @@ use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\CreateTask;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\EditTask;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\ListTasks;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\ViewTask;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ResolvesTrashedRecords;
 
 final class TaskResource extends Resource
 {
+    use ResolvesTrashedRecords;
+
     protected static ?string $model = Task::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -77,11 +81,15 @@ final class TaskResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source')
