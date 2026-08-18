@@ -75,6 +75,27 @@ test('admin invites by email and the invitation appears in the pending list', fu
     Mail::assertSent(TeamInvitationMail::class);
 });
 
+test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
+    Mail::fake();
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'invitee@example.com',
+            'role' => 'editor',
+        ])
+        ->call('addTeamMember', $this->team)
+        ->assertNoRedirect()
+        ->assertDispatched('teamInvitationSent')
+        ->assertSchemaStateSet([
+            'email' => null,
+            'role' => null,
+        ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+        ->dispatch('teamInvitationSent')
+        ->assertCanSeeTableRecords($this->team->fresh()->teamInvitations);
+});
+
 test('admin can resend a pending invitation', function () {
     Mail::fake();
 
