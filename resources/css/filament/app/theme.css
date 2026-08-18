@@ -22,6 +22,9 @@
 /* Activity Log */
 @source '../../../../vendor/relaticle/activity-log/resources/views/**/*';
 
+/* Comments */
+@source '../../../../vendor/relaticle/comments/resources/views/**/*.blade.php';
+
 /* ===================================
    Relaticle Brand Theme Customization
    Pure Tailwind CSS Classes Only
@@ -177,6 +180,12 @@
 /* Button Enhancements */
 .fi-btn {
     @apply relative overflow-hidden transition-shadow duration-200 rounded-xl;
+}
+
+/* Filament hangs action badges outside the button box (top-right corner);
+   the overflow clip above would swallow the count on badged buttons. */
+.fi-btn:has(> .fi-btn-badge-ctn) {
+    @apply overflow-visible;
 }
 
 /* Icon Buttons */

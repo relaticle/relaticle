@@ -42,6 +42,7 @@
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
+        "relaticle/comments": "^1.0",
         "relaticle/custom-fields": "^3.6.2",
         "relaticle/flowforge": "^4.0",
         "relaticle/ink": "^2.3",

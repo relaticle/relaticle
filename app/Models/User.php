@@ -39,6 +39,8 @@ use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
+use Relaticle\Comments\Concerns\CanComment;
+use Relaticle\Comments\Contracts\Commentator;
 
 /**
  * @property string $name
@@ -79,8 +81,9 @@ use Laravel\Sanctum\HasApiTokens;
     'subscriber_recency_bucket',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements Commentator, FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
 {
+    use CanComment;
     use HasApiTokens;
 
     /** @use HasFactory<UserFactory> */

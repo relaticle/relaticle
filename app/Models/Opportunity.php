@@ -23,6 +23,8 @@ use Illuminate\Support\Carbon;
 use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
+use Relaticle\Comments\Concerns\HasComments;
+use Relaticle\Comments\Contracts\Commentable;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -37,9 +39,10 @@ use Spatie\EloquentSortable\SortableTrait;
 #[Fillable([
     'creation_source',
 ])]
-final class Opportunity extends Model implements HasCustomFields, HasTimeline
+final class Opportunity extends Model implements Commentable, HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
+    use HasComments;
     use HasCreator;
 
     /** @use HasFactory<OpportunityFactory> */
