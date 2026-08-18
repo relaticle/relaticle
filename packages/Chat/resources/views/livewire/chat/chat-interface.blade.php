@@ -1409,6 +1409,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             .listen('.stream.failed', (e) => this.handleStreamFailed(e))
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
+            .listen('.conversation.title', (e) => this.handleConversationTitle(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
             .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
 
@@ -1990,19 +1991,19 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.maybeSyncTitle();
     },
 
-    // A brand-new chat is auto-titled server-side after its first turn, but the
-    // Filament page header (H1 + tab title) was rendered at mount and still reads
-    // "New chat". Pull the freshly generated title and reuse the existing
-    // chat:renamed handler to update the header without a reload.
+    // Pull fallback for the `.conversation.title` push. On a brand-new chat the
+    // Filament page header (H1 + tab title) was rendered at mount and still
+    // reads "New chat"; if the broadcast was dropped — or landed before this
+    // client finished subscribing — the header would stay generic until reload.
+    // Still reading "New chat" at turn end means no title ever arrived, so a
+    // pull here can never clobber a rename the user typed mid-turn.
     async maybeSyncTitle() {
         if (!this.conversationId) return;
         if (!document.title.startsWith('New chat')) return;
         try {
             const title = await this.$wire.conversationTitle(this.conversationId);
             if (title) {
-                window.dispatchEvent(new CustomEvent('chat:renamed', {
-                    detail: { conversationId: this.conversationId, title },
-                }));
+                this.applyTitle(this.conversationId, title);
             }
         } catch (_) { /* non-fatal: header just stays generic until reload */ }
     },
@@ -2143,6 +2144,27 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (!event?.conversationId) return;
         if (!this.conversationId) {
             this.conversationId = event.conversationId;
+        }
+    },
+
+    // The conversation was auto-titled mid-turn. Reuse the exact path a manual
+    // rename takes: the window event updates the H1 + browser tab, the Livewire
+    // event refreshes the sidebar and the all-chats panel.
+    handleConversationTitle(event) {
+        const title = event?.title;
+        if (!event?.conversationId || !title) return;
+        if (this.conversationId && event.conversationId !== this.conversationId) return;
+
+        this.applyTitle(event.conversationId, title);
+    },
+
+    applyTitle(conversationId, title) {
+        window.dispatchEvent(new CustomEvent('chat:renamed', {
+            detail: { conversationId, title },
+        }));
+
+        if (window.Livewire?.dispatch) {
+            window.Livewire.dispatch('chat:conversation-renamed', { conversationId, title });
         }
     },
 

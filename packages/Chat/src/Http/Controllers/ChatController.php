@@ -26,6 +26,7 @@ use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
+use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
@@ -178,6 +179,23 @@ final readonly class ChatController
         });
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
+
+        // Title the conversation from its opening message, racing the turn
+        // rather than waiting for it — a chat that streams for a minute should
+        // not sit in the sidebar under a truncated sentence for that whole
+        // minute. Only the first turn qualifies; later sends leave the title be.
+        $isFirstTurn = ! DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversation)
+            ->exists();
+
+        if ($isFirstTurn) {
+            dispatch(new GenerateConversationTitle(
+                conversationId: $conversation,
+                provisionalTitle: (string) $existing->title,
+                message: $parsed['text'],
+                provider: $resolved['provider'],
+            ));
+        }
 
         dispatch(new ProcessChatMessage(
             user: $user,

@@ -71,6 +71,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Conversation Title Generation
+    |--------------------------------------------------------------------------
+    |
+    | A new conversation is stored under its opening message, truncated. Once
+    | the first turn is dispatched, a queued job replaces that with a short
+    | model-written title and broadcasts it to the open chat page. Switch this
+    | off to keep the truncated message as the permanent title.
+    |
+    | The title runs on the cheapest model of whichever provider served the
+    | turn — override that per provider with
+    | `ai.providers.<name>.models.text.cheapest`.
+    */
+
+    'title_generation' => [
+        'enabled' => (bool) env('CHAT_TITLE_GENERATION', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Custom Field Schema Caps
     |--------------------------------------------------------------------------
     |
