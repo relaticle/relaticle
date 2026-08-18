@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Enums\TeamRole;
 use App\Models\Team;
+use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use Closure;
@@ -13,6 +14,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
@@ -20,7 +22,6 @@ use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
-use Laravel\Jetstream\TeamInvitation as TeamInvitationModel;
 
 final readonly class InviteTeamMember implements InvitesTeamMembers
 {
@@ -29,6 +30,8 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
      */
     public function invite(User $user, Team $team, string $email, ?string $role = null): void
     {
+        $email = Str::lower($email);
+
         Gate::forUser($user)->authorize('addTeamMember', $team);
 
         if ($role === TeamRole::Admin->value) {
@@ -39,16 +42,17 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         event(new InvitingTeamMember($team, $email, $role));
 
-        $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
-
-        $invitation = $team->teamInvitations()->create([
+        $invitation = $team->teamInvitations()->make([
             'email' => $email,
             'role' => $role,
-            'expires_at' => now()->addDays($expiryDays),
+            'inviter_id' => $user->id,
         ]);
 
         /** @var TeamInvitationModel $invitation */
-        Mail::to($email)->send(new TeamInvitation($invitation));
+        $invitation->issueToken();
+        $invitation->save();
+
+        Mail::to($invitation->email)->send(new TeamInvitation($invitation));
     }
 
     /**

@@ -156,3 +156,37 @@ test('viewer cannot manage members', function (): void {
         ->and($viewer->can('promoteToAdmin', $team))->toBeFalse()
         ->and($viewer->can('update', $team))->toBeFalse();
 });
+
+test('inviting records the inviter and mints a token', function (): void {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'new@example.test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->first();
+
+    expect($invitation->inviter_id)->toBe($this->user->id)
+        ->and($invitation->token)->not->toBeNull();
+});
+
+test('inviting lowercases a mixed-case email', function (): void {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'Mixed-Case@Example.Test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->first();
+
+    expect($invitation->email)->toBe('mixed-case@example.test');
+});
+
+test('inviting a case-variant of an already-invited email is rejected as a duplicate', function (): void {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'bob@example.test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team);
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm(['email' => 'Bob@Example.Test', 'role' => 'editor'])
+        ->call('addTeamMember', $this->team)
+        ->assertNotified(__('This user has already been invited to the team.'));
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
+});
