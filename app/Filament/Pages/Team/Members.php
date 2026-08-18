@@ -41,7 +41,7 @@ final class Members extends Page
         /** @var Team $tenant */
         $tenant = Filament::getTenant();
 
-        return auth()->user()?->can('update', $tenant) === true;
+        return auth()->user()?->can('manageMembers', $tenant) === true;
     }
 
     public static function getLabel(): string

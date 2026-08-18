@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TeamRole;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\EditTeam;
@@ -78,6 +79,24 @@ test('a user outside the workspace cannot open the members tab', function (): vo
     $this->actingAs(User::factory()->withTeam()->create())
         ->get($url)
         ->assertNotFound();
+});
+
+test('a team admin can open the members tab', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($admin)
+        ->get(Members::getUrl(tenant: $this->team))
+        ->assertSuccessful();
+});
+
+test('a team editor cannot open the members tab', function (): void {
+    $editor = User::factory()->create();
+    $this->team->users()->attach($editor, ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($editor)
+        ->get(Members::getUrl(tenant: $this->team))
+        ->assertForbidden();
 });
 
 test('the tab strip drops billing when the feature is off', function (): void {

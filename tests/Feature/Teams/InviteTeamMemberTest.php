@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TeamRole;
 use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Models\User;
@@ -79,4 +80,62 @@ test('team members cannot be invited with a disposable email address', function 
         ->assertNotified(__('validation.indisposable'));
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
+
+test('owner can manage members and promote to admin', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    expect($owner->can('manageMembers', $team))->toBeTrue()
+        ->and($owner->can('addTeamMember', $team))->toBeTrue()
+        ->and($owner->can('updateTeamMember', $team))->toBeTrue()
+        ->and($owner->can('removeTeamMember', $team))->toBeTrue()
+        ->and($owner->can('promoteToAdmin', $team))->toBeTrue()
+        ->and($owner->can('update', $team))->toBeTrue();
+});
+
+test('admin can manage members but cannot promote to admin', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $admin = User::factory()->create();
+    $team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    expect($admin->can('manageMembers', $team))->toBeTrue()
+        ->and($admin->can('addTeamMember', $team))->toBeTrue()
+        ->and($admin->can('updateTeamMember', $team))->toBeTrue()
+        ->and($admin->can('removeTeamMember', $team))->toBeTrue()
+        ->and($admin->can('promoteToAdmin', $team))->toBeFalse()
+        ->and($admin->can('update', $team))->toBeFalse()
+        ->and($admin->can('delete', $team))->toBeFalse();
+});
+
+test('editor cannot manage members', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $editor = User::factory()->create();
+    $team->users()->attach($editor, ['role' => TeamRole::Editor->value]);
+
+    expect($editor->can('manageMembers', $team))->toBeFalse()
+        ->and($editor->can('addTeamMember', $team))->toBeFalse()
+        ->and($editor->can('updateTeamMember', $team))->toBeFalse()
+        ->and($editor->can('removeTeamMember', $team))->toBeFalse()
+        ->and($editor->can('promoteToAdmin', $team))->toBeFalse()
+        ->and($editor->can('update', $team))->toBeFalse();
+});
+
+test('viewer cannot manage members', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $viewer = User::factory()->create();
+    $team->users()->attach($viewer, ['role' => TeamRole::Viewer->value]);
+
+    expect($viewer->can('manageMembers', $team))->toBeFalse()
+        ->and($viewer->can('addTeamMember', $team))->toBeFalse()
+        ->and($viewer->can('updateTeamMember', $team))->toBeFalse()
+        ->and($viewer->can('removeTeamMember', $team))->toBeFalse()
+        ->and($viewer->can('promoteToAdmin', $team))->toBeFalse()
+        ->and($viewer->can('update', $team))->toBeFalse();
 });
