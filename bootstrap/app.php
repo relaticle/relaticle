@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
@@ -118,6 +119,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'signed' => ValidateSignature::class,
+            'no-referrer' => NoReferrer::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
