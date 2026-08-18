@@ -263,3 +263,76 @@ it('can filter by an option added to an existing custom field', function (): voi
 
     expect($result)->not->toHaveKey('error');
 });
+
+it('restricts tasks to a named colleague when assignee_ids is set', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    $colleague = User::factory()->create();
+    $team->users()->attach($colleague, ['role' => 'editor']);
+
+    $theirs = Task::factory()->for($team)->create(['title' => 'Colleague task']);
+    $theirs->assignees()->attach($colleague);
+
+    $mine = Task::factory()->for($team)->create(['title' => 'My task']);
+    $mine->assignees()->attach($user);
+
+    Task::factory()->for($team)->create(['title' => 'Unassigned task']);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request([
+        'assignee_ids' => [(string) $colleague->getKey()],
+    ])));
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['attributes']['title'])->toBe('Colleague task');
+});
+
+it('matches tasks assigned to any of several people', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    $one = User::factory()->create();
+    $two = User::factory()->create();
+    $team->users()->attach($one, ['role' => 'editor']);
+    $team->users()->attach($two, ['role' => 'editor']);
+
+    Task::factory()->for($team)->create(['title' => 'First'])->assignees()->attach($one);
+    Task::factory()->for($team)->create(['title' => 'Second'])->assignees()->attach($two);
+    Task::factory()->for($team)->create(['title' => 'Third']);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request([
+        'assignee_ids' => [(string) $one->getKey(), (string) $two->getKey()],
+    ])));
+
+    expect($rows)->toHaveCount(2);
+});
+
+it('never leaks another workspace\'s tasks through assignee_ids', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $outsider = User::factory()->withPersonalTeam()->create();
+    $theirTask = Task::factory()->for($outsider->currentTeam)->create(['title' => 'Other workspace task']);
+    $theirTask->assignees()->attach($outsider);
+
+    Task::factory()->for($user->currentTeam)->create(['title' => 'Mine']);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request([
+        'assignee_ids' => [(string) $outsider->getKey()],
+    ])));
+
+    expect($rows)->toBeEmpty();
+});
+
+it('ignores an empty assignee_ids list rather than returning nothing', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    Task::factory()->for($user->currentTeam)->create(['title' => 'Alpha']);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request(['assignee_ids' => []])));
+
+    expect($rows)->toHaveCount(1);
+});
