@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\TeamRole;
 use App\Models\Company;
+use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 
@@ -22,16 +26,31 @@ beforeEach(function (): void {
     $this->editor->switchTeam($this->team);
 });
 
-test('viewer cannot create update or delete companies', function (): void {
+test('viewer cannot create, update, delete, or restore records, but can view them', function (string $modelClass): void {
     $this->actingAs($this->viewer);
     Filament::setTenant($this->team);
 
-    $company = Company::factory()->create(['team_id' => $this->team->id]);
+    $record = $modelClass::factory()->create(['team_id' => $this->team->id]);
 
-    expect($this->viewer->can('create', Company::class))->toBeFalse()
-        ->and($this->viewer->can('update', $company))->toBeFalse()
-        ->and($this->viewer->can('delete', $company))->toBeFalse()
-        ->and($this->viewer->can('view', $company))->toBeTrue();
+    expect($this->viewer->can('create', $modelClass))->toBeFalse()
+        ->and($this->viewer->can('update', $record))->toBeFalse()
+        ->and($this->viewer->can('delete', $record))->toBeFalse()
+        ->and($this->viewer->can('restore', $record))->toBeFalse()
+        ->and($this->viewer->can('view', $record))->toBeTrue();
+})->with([
+    'company' => [Company::class],
+    'people' => [People::class],
+    'task' => [Task::class],
+    'note' => [Note::class],
+    'opportunity' => [Opportunity::class],
+]);
+
+test('viewer cannot bulk delete or bulk restore companies', function (): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    expect($this->viewer->can('deleteAny', Company::class))->toBeFalse()
+        ->and($this->viewer->can('restoreAny', Company::class))->toBeFalse();
 });
 
 test('editor keeps write access to companies', function (): void {
