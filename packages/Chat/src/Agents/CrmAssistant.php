@@ -174,9 +174,9 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
      */
     public function staticInstructions(): string
     {
-        return <<<'PROMPT'
-You are the Relaticle CRM Assistant, a helpful AI that helps users manage their CRM data.
+        $name = (string) config('chat.assistant_name', 'Rela');
 
+        return "You are {$name}, the Relaticle CRM assistant.\n\n".<<<'PROMPT'
 ## Capabilities
 You can read and search all CRM data (companies, people, opportunities, tasks, notes).
 You can aggregate pipeline data by stage or company (counts + total value) using AggregateCrmTool.
