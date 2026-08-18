@@ -462,18 +462,18 @@ final readonly class PendingActionService
     }
 
     /**
-     * Actions on this conversation resolved AFTER the latest assistant message —
-     * i.e. decisions the replayed transcript does not yet reflect. Used to inject
-     * a <resolved_actions> block so the model's knowledge of approvals does not
-     * depend on the AI continuation having successfully journaled them.
+     * Every terminal proposal for the conversation (newest 20, presented
+     * oldest-first). Deliberately NOT windowed to "since the last assistant
+     * turn": resolutions write nothing into the replayed transcript, whose
+     * tool results keep claiming the proposal is pending — so the outcome must
+     * be re-injected on every turn or the model treats a rejected proposal as
+     * still awaiting approval.
      *
      * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>}>
      */
-    public function resolvedSinceLastAssistantMessage(string $conversationId): array
+    public function resolvedForConversation(string $conversationId): array
     {
-        $lastAssistantAt = $this->lastAssistantMessageAt($conversationId);
-
-        $query = PendingAction::query()
+        $actions = PendingAction::query()
             ->where('conversation_id', $conversationId)
             ->whereIn('status', [
                 PendingActionStatus::Approved->value,
@@ -481,13 +481,13 @@ final readonly class PendingActionService
                 PendingActionStatus::Expired->value,
                 PendingActionStatus::Superseded->value,
             ])
-            ->whereNotNull('resolved_at');
-
-        if ($lastAssistantAt !== null) {
-            $query->where('resolved_at', '>', $lastAssistantAt);
-        }
-
-        $actions = $query->oldest('resolved_at')->limit(20)->get();
+            ->whereNotNull('resolved_at')
+            ->latest('resolved_at')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->reverse()
+            ->values();
 
         return array_values(array_map(fn (PendingAction $action): array => [
             'operation' => $action->operation->value,
@@ -514,16 +514,6 @@ final readonly class PendingActionService
         }
 
         return null;
-    }
-
-    private function lastAssistantMessageAt(string $conversationId): ?string
-    {
-        return DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'assistant')
-            ->latest('created_at')
-            ->orderByDesc('id')
-            ->value('created_at');
     }
 
     private function resolveResultRecordId(PendingAction $action): ?string
