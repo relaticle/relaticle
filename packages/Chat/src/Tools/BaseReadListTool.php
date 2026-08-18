@@ -84,6 +84,8 @@ abstract class BaseReadListTool implements Tool
             ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
             $this->additionalSchema($schema),
             [
+                'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
+                'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
                 'custom_fields' => $schema->object()->description($customFieldsDescription),
                 'sort' => $schema->string()->description(
                     'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
@@ -157,7 +159,11 @@ abstract class BaseReadListTool implements Tool
         $input = [];
 
         $nativeFilters = $this->dropNull(array_merge(
-            [$this->searchFilterName() => $request['search'] ?? null],
+            [
+                $this->searchFilterName() => $request['search'] ?? null,
+                'created_after' => $request['created_after'] ?? null,
+                'created_before' => $request['created_before'] ?? null,
+            ],
             $this->additionalFilters($request),
         ));
 

@@ -7,10 +7,12 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
+use Relaticle\Chat\Tools\Note\ListNotesTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -336,3 +338,20 @@ it('ignores an empty assignee_ids list rather than returning nothing', function 
 
     expect($rows)->toHaveCount(1);
 });
+
+it('filters every list tool by creation date, including tasks and notes', function (string $toolClass, string $factory): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $factory::factory()->for($user->currentTeam)->create();
+
+    $tool = new $toolClass;
+
+    expect(listToolRows($tool->handle(new Request(['created_after' => now()->addDay()->toDateString()]))))->toBeEmpty()
+        ->and(listToolRows($tool->handle(new Request(['created_before' => now()->subYears(5)->toDateString()]))))->toBeEmpty()
+        ->and(listToolRows($tool->handle(new Request(['created_after' => now()->subYears(5)->toDateString()]))))->toHaveCount(1);
+})->with([
+    'companies' => [ListCompaniesTool::class, Company::class],
+    'tasks' => [ListTasksTool::class, Task::class],
+    'notes' => [ListNotesTool::class, Note::class],
+]);

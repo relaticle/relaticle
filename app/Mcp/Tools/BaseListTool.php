@@ -52,6 +52,8 @@ abstract class BaseListTool extends Tool
             ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
             $this->additionalSchema($schema),
             [
+                'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
+                'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
                 'filter' => $schema->object()->description('Filter by custom field values. Keys are field codes, values are operator objects (eq, gt, gte, lt, lte, contains, in, has_any).'),
                 'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
                 'include' => $schema->array()->description('Related records to expand in response.'),
@@ -138,7 +140,11 @@ abstract class BaseListTool extends Tool
         $input = [];
 
         $nativeFilters = array_filter(array_merge(
-            [$this->searchFilterName() => $mcpRequest->get('search')],
+            [
+                $this->searchFilterName() => $mcpRequest->get('search'),
+                'created_after' => $mcpRequest->get('created_after'),
+                'created_before' => $mcpRequest->get('created_before'),
+            ],
             $this->additionalFilters($mcpRequest),
         ));
 

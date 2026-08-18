@@ -65,6 +65,8 @@ final readonly class ListTasks
                 AllowedFilter::scope('company_id', 'forCompany'),
                 AllowedFilter::scope('people_id', 'forPerson'),
                 AllowedFilter::scope('opportunity_id', 'forOpportunity'),
+                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '>=', $value)),
+                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '<=', $value)),
                 AllowedFilter::custom('custom_fields', new CustomFieldFilter('task')),
             )
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')

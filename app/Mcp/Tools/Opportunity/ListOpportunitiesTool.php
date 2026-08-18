@@ -40,8 +40,6 @@ final class ListOpportunitiesTool extends BaseListTool
         return [
             'company_id' => $schema->string()->description('Filter by company ID.'),
             'contact_id' => $schema->string()->description('Filter by contact (person) ID.'),
-            'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
-            'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
             'stale_days' => $schema->integer()->description('Return only opportunities with no activity in the last N days. Use this to find deals that have gone quiet.'),
         ];
     }
@@ -51,8 +49,6 @@ final class ListOpportunitiesTool extends BaseListTool
         return [
             'company_id' => $request->get('company_id'),
             'contact_id' => $request->get('contact_id'),
-            'created_after' => $request->get('created_after'),
-            'created_before' => $request->get('created_before'),
             'stale_days' => $request->get('stale_days') !== null ? (string) $request->get('stale_days') : null,
         ];
     }
