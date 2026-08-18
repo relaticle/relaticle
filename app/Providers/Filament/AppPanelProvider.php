@@ -356,6 +356,10 @@ final class AppPanelProvider extends PanelProvider
 
                     return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
             );
 
         if (Features::hasApiFeatures()) {

@@ -151,6 +151,13 @@ return [
         ],
     ],
 
+    'pending_for_user' => [
+        'heading' => 'You have been invited to join :team',
+        'accept' => 'Join workspace',
+        'decline' => 'Decline',
+        'declined' => 'Invitation declined.',
+    ],
+
     'accept' => [
         'joined' => 'You have joined the :team workspace.',
         'already_member' => 'You are already a member of :team.',
