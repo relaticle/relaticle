@@ -99,6 +99,16 @@ final class GenerateConversationTitle implements ShouldQueue
                 return null;
             }
 
+            // A greeting or a stray character has nothing to name. Inventing a
+            // label for it ("Single Character Message") reads worse than the
+            // message itself, so keep the provisional and let a later, more
+            // substantive message in this conversation try instead.
+            if ($response->structured['has_topic'] !== true) {
+                ChatTelemetry::breadcrumb('title.no_topic', ['conversation_id' => $this->conversationId]);
+
+                return null;
+            }
+
             $title = $response->structured['title'] ?? null;
 
             return is_string($title) ? TitleSanitizer::generated($title) : null;

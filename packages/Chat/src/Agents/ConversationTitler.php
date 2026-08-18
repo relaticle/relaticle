@@ -35,9 +35,11 @@ final readonly class ConversationTitler implements Agent, HasStructuredOutput
     public function instructions(): string
     {
         return <<<'PROMPT'
-        You name conversations for a CRM assistant. You are given the first message a user sent. Reply with a title for that conversation.
+        You name conversations for a CRM assistant. You are given a message a user sent. Decide whether it can be named at all, and if so, name it.
 
-        Rules:
+        Set has_topic to false, and return an empty title, when the message carries no subject to name -- a greeting, a single character, a bare question mark, a test string, or a request so generic that any title would just paraphrase "user asked for help". Naming those produces a worse label than the message itself, so decline instead.
+
+        Set has_topic to true when the message names a subject, record, or task, however briefly, and write the title:
         - 3 to 6 words, never more than 60 characters.
         - Name what the user wants, not what an assistant would answer.
         - Write in the same language the message is written in.
@@ -55,6 +57,7 @@ final readonly class ConversationTitler implements Agent, HasStructuredOutput
     public function schema(JsonSchema $schema): array
     {
         return [
+            'has_topic' => $schema->boolean()->required(),
             'title' => $schema->string()
                 ->max(60)
                 ->required(),

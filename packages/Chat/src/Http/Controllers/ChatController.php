@@ -40,6 +40,13 @@ use Relaticle\Chat\Support\TitleSanitizer;
 
 final readonly class ChatController
 {
+    /**
+     * How many of a conversation's opening user messages may trigger a titling
+     * attempt. More than one because an opener like "hey" carries no topic to
+     * name — the titler declines it and the next message gets a turn.
+     */
+    private const int TITLE_ATTEMPT_TURNS = 3;
+
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
@@ -180,22 +187,7 @@ final readonly class ChatController
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
 
-        // Title the conversation from its opening message, racing the turn
-        // rather than waiting for it — a chat that streams for a minute should
-        // not sit in the sidebar under a truncated sentence for that whole
-        // minute. Only the first turn qualifies; later sends leave the title be.
-        $isFirstTurn = ! DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversation)
-            ->exists();
-
-        if ($isFirstTurn) {
-            dispatch(new GenerateConversationTitle(
-                conversationId: $conversation,
-                provisionalTitle: (string) $existing->title,
-                message: $parsed['text'],
-                provider: $resolved['provider'],
-            ));
-        }
+        $this->maybeTitleConversation($conversation, (string) $existing->title, $parsed['text'], $resolved['provider']);
 
         dispatch(new ProcessChatMessage(
             user: $user,
@@ -213,6 +205,45 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    /**
+     * Title the conversation from the message that just arrived, racing the turn
+     * rather than waiting for it — a chat that streams for a minute should not sit
+     * in the sidebar under a truncated sentence for that whole minute.
+     *
+     * The dispatch is gated on the stored title still being the provisional one
+     * (the opening message, sanitized). That single condition carries two rules:
+     * a chat the user has named is never re-titled — renaming BEFORE the first
+     * turn used to lose the name, because the current title was passed as the
+     * "provisional" and then matched its own compare-and-swap — and a chat whose
+     * opener carried no topic stays eligible, so the next few messages get a
+     * chance to name it instead of it being stuck on "hey" forever.
+     */
+    private function maybeTitleConversation(string $conversationId, string $currentTitle, string $message, ?string $provider): void
+    {
+        $userMessages = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'user')
+            ->orderBy('id')
+            ->pluck('content');
+
+        if ($userMessages->count() >= self::TITLE_ATTEMPT_TURNS) {
+            return;
+        }
+
+        $provisional = TitleSanitizer::clean((string) ($userMessages->first() ?? $message));
+
+        if ($currentTitle !== $provisional) {
+            return;
+        }
+
+        dispatch(new GenerateConversationTitle(
+            conversationId: $conversationId,
+            provisionalTitle: $provisional,
+            message: $message,
+            provider: $provider,
+        ));
     }
 
     /**

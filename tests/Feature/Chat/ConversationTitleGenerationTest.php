@@ -114,7 +114,7 @@ it('does not re-title a conversation that already has messages', function (): vo
 
 it('replaces the provisional title and broadcasts the new one', function (): void {
     Event::fake([ConversationTitleGenerated::class]);
-    ConversationTitler::fake([['title' => 'Follow Up With Acme']]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
 
     $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
 
@@ -140,7 +140,7 @@ it('replaces the provisional title and broadcasts the new one', function (): voi
 
 it('never overwrites a title the user renamed while the model was thinking', function (): void {
     Event::fake([ConversationTitleGenerated::class]);
-    ConversationTitler::fake([['title' => 'Follow Up With Acme']]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
 
     $conversationId = seedTitlingConversation('My own name for this');
 
@@ -178,7 +178,7 @@ it('leaves the title alone when generation is switched off', function (): void {
     config()->set('chat.title_generation.enabled', false);
 
     Event::fake([ConversationTitleGenerated::class]);
-    ConversationTitler::fake([['title' => 'Follow Up With Acme']]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
 
     $conversationId = seedTitlingConversation('Create a follow-up task for Sarah');
 
@@ -213,3 +213,73 @@ it('strips the decorations a titling model adds', function (string $raw, string 
     'quoted multibyte title' => ['„Cześć Zespole”', 'Cześć Zespole'],
     'over-long title is capped' => [str_repeat('a', 90), str_repeat('a', 60)],
 ]);
+
+it('does not dispatch titling for a chat the user already renamed', function (): void {
+    Queue::fake();
+
+    $conversationId = $this->postJson(route('chat.conversations.create'), [
+        'document' => ChatDocument::fromText('Prepare the Stark Industries quarterly business review deck'),
+    ])->assertOk()->json('conversation_id');
+
+    $this->postJson(route('chat.rename', ['conversationId' => $conversationId]), [
+        'title' => 'MY OWN NAME',
+    ])->assertOk();
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('Prepare the Stark Industries quarterly business review deck'),
+    ])->assertOk();
+
+    Queue::assertNotPushed(GenerateConversationTitle::class);
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('MY OWN NAME');
+});
+
+it('keeps the provisional title when the opener carries no topic to name', function (): void {
+    Event::fake([ConversationTitleGenerated::class]);
+    ConversationTitler::fake([['has_topic' => false, 'title' => '']]);
+
+    $conversationId = seedTitlingConversation('hey');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'hey',
+        message: 'hey',
+        provider: 'anthropic',
+    ))->handle();
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('hey');
+
+    Event::assertNotDispatched(ConversationTitleGenerated::class);
+});
+
+it('gives a later message a chance to title a chat whose opener had no topic', function (): void {
+    Queue::fake();
+
+    $conversationId = seedTitlingConversation('hey');
+    seedTitlingMessage($conversationId, 'user', 'hey');
+    seedTitlingMessage($conversationId, 'assistant', 'Hi! How can I help?');
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('Draft a renewal proposal for Globex'),
+    ])->assertOk();
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->provisionalTitle === 'hey'
+            && $job->message === 'Draft a renewal proposal for Globex',
+    );
+});
+
+it('stops attempting to title after the opening few messages', function (): void {
+    Queue::fake();
+
+    $conversationId = seedTitlingConversation('hey');
+    foreach (['hey', 'still there?', 'hello?'] as $content) {
+        seedTitlingMessage($conversationId, 'user', $content);
+    }
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('Draft a renewal proposal for Globex'),
+    ])->assertOk();
+
+    Queue::assertNotPushed(GenerateConversationTitle::class);
+});
