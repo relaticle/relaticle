@@ -56,28 +56,33 @@ final readonly class AcceptTeamInvitation
      * usually a *different* team than the one the caller is currently browsing,
      * so every User lookup AddsTeamMembers performs internally (the team owner,
      * hasUserWithEmail(), findUserByEmailOrFail()) would silently miss under that
-     * scope. Suspend it for the duration of the add, then restore it exactly as
-     * it was — including "not registered at all", for callers outside a panel
-     * request (the accept-flow controller, queued jobs, tests).
+     * scope.
+     *
+     * Suspend only that one named scope entry on User for the duration of the
+     * add, then restore that exact entry — a Closure or a Scope instance,
+     * whichever it was — afterward. No other scope on User, and no scope on any
+     * other model, is ever read or touched. When the scope was never registered
+     * in the first place (the accept-flow controller, queued jobs, tests — none
+     * of which run behind the panel's tenant middleware), skip the suspension
+     * entirely rather than registering a scope that didn't exist before.
      */
     private function addMember(User $invitee, Team $team, ?string $role): void
     {
         $scopeName = filament()->getTenancyScopeName();
+        $originalScope = $invitee->getGlobalScopes()[$scopeName] ?? null;
 
-        if (! User::hasGlobalScope($scopeName)) {
+        if ($originalScope === null) {
             $this->attachViaOwner($invitee, $team, $role);
 
             return;
         }
-
-        $originalScopes = User::getAllGlobalScopes();
 
         User::addGlobalScope($scopeName, fn (Builder $query): Builder => $query);
 
         try {
             $this->attachViaOwner($invitee, $team, $role);
         } finally {
-            User::setAllGlobalScopes($originalScopes);
+            User::addGlobalScope($scopeName, $originalScope);
         }
     }
 

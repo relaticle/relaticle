@@ -6,10 +6,15 @@ use App\Actions\Jetstream\AcceptTeamInvitation;
 use App\Actions\Jetstream\DeclineTeamInvitation;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Livewire\App\Teams\PendingInvitationsForUser;
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
+use Laravel\Jetstream\Events\TeamMemberAdded;
 
 mutates(PendingInvitationsForUser::class, AcceptTeamInvitation::class, DeclineTeamInvitation::class);
 
@@ -74,6 +79,44 @@ test('accepting still joins a team other than the ambient panel tenant', functio
         expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
     } finally {
         User::setAllGlobalScopes($originalScopes);
+    }
+});
+
+test('suspending the User tenancy scope during accept does not affect other models', function (): void {
+    // Regression: the scope suspension inside AcceptTeamInvitation must restore
+    // only the one named scope entry it touched on User, not wipe out a scope
+    // that some other model registered for the first time while it was
+    // suspended (e.g. a lazily-booted #[ScopedBy] model). TeamMemberAdded fires
+    // synchronously from inside AddTeamMember::add() -- squarely inside the
+    // suspended window -- so registering a scope on an unrelated model there
+    // proves the restore is class-scoped to User, not a global snapshot/restore.
+    $originalUserScopes = User::getAllGlobalScopes();
+    $markerScope = 'regression-marker-'.Str::random(8);
+
+    try {
+        $team = User::factory()->withTeam()->create()->currentTeam;
+        $invitation = $team->teamInvitations()->create([
+            'email' => 'later@example.test',
+            'role' => 'editor',
+            'expires_at' => now()->addDays(5),
+        ]);
+
+        $invitee = User::factory()->withTeam()->create(['email' => 'later@example.test']);
+        $this->actingAs($invitee);
+
+        Filament::setTenant($invitee->currentTeam, isQuiet: true);
+        (new ApplyTenantScopes)->handle(request(), fn (Request $request): Request => $request);
+
+        Event::listen(TeamMemberAdded::class, function () use ($markerScope): void {
+            Team::addGlobalScope($markerScope, fn (Builder $query): Builder => $query);
+        });
+
+        livewire(PendingInvitationsForUser::class)->call('accept', $invitation->id);
+
+        expect($invitee->fresh()->belongsToTeam($team))->toBeTrue()
+            ->and(Team::hasGlobalScope($markerScope))->toBeTrue();
+    } finally {
+        User::setAllGlobalScopes($originalUserScopes);
     }
 });
 
