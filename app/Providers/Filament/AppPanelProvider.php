@@ -78,13 +78,15 @@ final class AppPanelProvider extends PanelProvider
      * entries call `->dateTime()` with no argument so they resolve to this; a resource
      * that passes its own literal instead is drift, not a local preference.
      *
-     * The value matches what Filament defaults to, so naming it here changes nothing
-     * on screen today. What it changes is that there is now one line to edit.
+     * No seconds. Nobody reading a CRM list cares which second a note was written, and
+     * DateTimePicker offers minutes anyway, so keeping them made every value read back
+     * one field longer than it was entered. Sysadmin keeps its seconds on purpose: that
+     * panel exists to line rows up against Horizon and server logs.
      *
-     * No zone suffix, unlike sysadmin: every timestamp here is already in the reader's
-     * own zone, so there is nothing for them to correlate against.
+     * No zone suffix either, unlike sysadmin: every timestamp here is already in the
+     * reader's own zone, so there is nothing for them to correlate against.
      */
-    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s';
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i';
 
     /**
      * Perform post-registration booting of components.

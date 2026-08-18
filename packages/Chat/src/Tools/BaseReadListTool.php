@@ -14,12 +14,14 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseReadListTool implements Tool
 {
+    use LocalisesDatetimes;
     use NormalizesToolInput;
     use ReportsValidationFailures;
 
@@ -148,7 +150,7 @@ abstract class BaseReadListTool implements Tool
             return $item;
         }, $items);
 
-        return (string) json_encode($items, JSON_PRETTY_PRINT);
+        return (string) json_encode($this->localiseDatetimes($items, $user), JSON_PRETTY_PRINT);
     }
 
     /**

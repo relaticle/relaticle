@@ -77,14 +77,15 @@ it('renders a stored utc datetime in the user timezone in the app panel', functi
 
     livewire(ManageNotes::class)
         ->assertSuccessful()
-        ->assertSee('Aug 19, 2026 08:30:00')
-        ->assertDontSee('Aug 18, 2026 23:30:00');
+        ->assertSee('Aug 19, 2026 08:30')
+        ->assertDontSee('Aug 18, 2026 23:30');
 });
 
 /**
- * The panel names its datetime format in one place, so a resource that renders a
- * timestamp any other way is drift. Reading the format off the table rather than
- * asserting a literal keeps this true if the panel later picks a different one.
+ * Two separate things, both worth pinning. The panel declares one datetime format, so
+ * a resource that renders a timestamp any other way is drift: that half reads the
+ * format off the table rather than a literal, and keeps holding if the format changes.
+ * Which format it declares is a product decision, so that half names it.
  */
 it('renders every app panel datetime in the format the panel declares', function (): void {
     $user = actAsTokyoUser();
@@ -101,9 +102,12 @@ it('renders every app panel datetime in the format the panel declares', function
 
     $format = Table::make(new ManageNotes)->getDefaultDateTimeDisplayFormat();
 
+    expect($format)->toBe('M j, Y H:i');
+
     livewire(ManageNotes::class)
         ->assertSuccessful()
-        ->assertSee(knownInstant()->setTimezone('Asia/Tokyo')->translatedFormat($format));
+        ->assertSee(knownInstant()->setTimezone('Asia/Tokyo')->translatedFormat($format))
+        ->assertDontSee('Aug 19, 2026 08:30:00');
 });
 
 it('labels sysadmin datetimes as utc so an admin never has to assume', function (): void {

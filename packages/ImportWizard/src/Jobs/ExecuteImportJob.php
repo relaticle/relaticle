@@ -81,6 +81,13 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, array{field: CustomField, values: array<int, string>}> */
     private array $pendingTagOptions = [];
 
+    /**
+     * Zone the CSV's naive datetimes are interpreted in — the importer's own, so an
+     * imported value lands on the same instant as the same string typed into the form.
+     * Resolved once in handle() because the job runs on the queue with no session.
+     */
+    private string $importerTimezone = 'UTC';
+
     public function __construct(
         private readonly string $importId,
         private readonly string $teamId,
@@ -103,6 +110,8 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $store->ensureProcessedColumn();
+
+        $this->importerTimezone = $import->user?->effectiveTimezone() ?? (string) config('app.timezone');
 
         $importer = $import->getImporter();
         $mappings = $import->columnMappings();
@@ -656,7 +665,7 @@ final class ExecuteImportJob implements ShouldQueue
 
         if ($dataType === FieldDataType::DATE || $dataType === FieldDataType::DATE_TIME) {
             $format = $columnData instanceof ColumnData ? ($columnData->dateFormat ?? DateFormat::ISO) : DateFormat::ISO;
-            $parsed = $format->parse($value, $dataType->isTimestamp());
+            $parsed = $format->parse($value, $dataType->isTimestamp(), $this->importerTimezone);
 
             if (! $parsed instanceof Carbon) {
                 return $value;
