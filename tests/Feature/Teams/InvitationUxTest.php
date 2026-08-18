@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 mutates(Login::class);
 
@@ -34,6 +35,13 @@ test('guest clicking a team invitation link is redirected to the login page', fu
     'no existing account' => false,
     'existing account' => true,
 ]);
+
+test('guest with a validly-signed link for a since-deleted invitation is sent to login', function (): void {
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => (string) Str::ulid()]);
+
+    $this->get($acceptUrl)
+        ->assertRedirect(route('login'));
+});
 
 test('guest clicking invitation link sees the team name banner on the login page', function () {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
