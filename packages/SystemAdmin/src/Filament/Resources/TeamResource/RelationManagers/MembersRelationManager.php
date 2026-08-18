@@ -37,6 +37,7 @@ final class MembersRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (User $record): string => UserResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('email')
                     ->searchable()

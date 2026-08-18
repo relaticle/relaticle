@@ -23,9 +23,15 @@ use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\CreateCompany
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\EditCompany;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\RelationManagers\OpportunitiesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ResolvesTrashedRecords;
 
 final class CompanyResource extends Resource
 {
+    use ResolvesTrashedRecords;
+
     protected static ?string $model = Company::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
@@ -80,15 +86,21 @@ final class CompanyResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('accountOwner.name')
                     ->label('Account Owner')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'accountOwner')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source')
@@ -129,7 +141,10 @@ final class CompanyResource extends Resource
     #[Override]
     public static function getRelations(): array
     {
-        return [];
+        return [
+            PeopleRelationManager::class,
+            OpportunitiesRelationManager::class,
+        ];
     }
 
     #[Override]

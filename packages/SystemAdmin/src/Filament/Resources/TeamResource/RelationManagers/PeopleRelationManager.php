@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class PeopleRelationManager extends RelationManager
 {
@@ -36,16 +37,19 @@ final class PeopleRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
+                    ->color('primary')
                     ->url(fn (People $record): string => PeopleResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->searchable()
                     ->sortable()
-                    ->url(fn (People $record): ?string => $record->company_id === null ? null : CompanyResource::getUrl('view', ['record' => $record->company_id])),
+                    ->color('primary')
+                    ->url(RecordLink::to(CompanyResource::class, 'company')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->url(fn (People $record): ?string => $record->creator_id === null ? null : UserResource::getUrl('view', ['record' => $record->creator_id])),
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),
