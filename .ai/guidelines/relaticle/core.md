@@ -13,6 +13,12 @@ Treat every change like it's going through senior code review:
 
 - This project uses **PostgreSQL exclusively** — do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
 - Migrations must only have `up()` methods — do not write `down()` methods
+- Every datetime column is `timestamp without time zone` holding **UTC**. Never write one from
+  the database clock — no `DB::raw('now()')`, `CURRENT_TIMESTAMP`, or `->useCurrent()` /
+  `->useCurrentOnUpdate()` column defaults. Those resolve against the *session* timezone and
+  write local wall-clock into a UTC column. Pass a PHP-side `now()` instead:
+  `->update(['used_at' => now()])`. The pgsql connection pins `'timezone' => 'UTC'` so the two
+  agree today; do not rely on that — it is the safety net, not the contract.
 
 ## Pre-Commit Quality Checks
 

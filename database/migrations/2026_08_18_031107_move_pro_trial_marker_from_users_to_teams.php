@@ -21,7 +21,7 @@ return new class extends Migration
         // trial under the per-workspace policy.
         DB::table('teams')
             ->whereNotNull('trial_ends_at')
-            ->update(['pro_trial_used_at' => DB::raw('now()')]);
+            ->update(['pro_trial_used_at' => now()]);
 
         Schema::table('users', function (Blueprint $table): void {
             $table->dropColumn('pro_trial_used_at');
