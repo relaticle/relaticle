@@ -15,6 +15,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
@@ -32,6 +33,8 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
      */
     public function invite(User $user, Team $team, string $email, ?string $role = null): TeamInvitationModel
     {
+        $email = Str::lower($email);
+
         Gate::forUser($user)->authorize('addTeamMember', $team);
 
         if ($role === TeamRole::Admin->value) {
@@ -44,14 +47,15 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         event(new InvitingTeamMember($team, $email, $role));
 
-        $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
-
-        /** @var TeamInvitationModel $invitation */
-        $invitation = $team->teamInvitations()->create([
+        $invitation = $team->teamInvitations()->make([
             'email' => $email,
             'role' => $role,
-            'expires_at' => now()->addDays($expiryDays),
+            'inviter_id' => $user->id,
         ]);
+
+        /** @var TeamInvitationModel $invitation */
+        $invitation->issueToken();
+        $invitation->save();
 
         // Queued, and deferred to after the transaction commits. The chat
         // approval path runs this inside PendingActionService::approve()'s
@@ -60,7 +64,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
         // that row stayed locked. afterCommit() is what keeps the queue push
         // itself out of the transaction too: a rolled back approval must not
         // leave a real invitation email on its way.
-        Mail::to($email)->queue(new TeamInvitation($invitation)->afterCommit());
+        Mail::to($invitation->email)->queue(new TeamInvitation($invitation)->afterCommit());
 
         return $invitation;
     }

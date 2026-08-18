@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Models\TeamInvitation as TeamInvitationModel;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
-use Laravel\Jetstream\TeamInvitation as TeamInvitationModel;
 
 final readonly class ResendTeamInvitation
 {
     public function resend(TeamInvitationModel $invitation): void
     {
+        $invitation->issueToken();
+        $invitation->save();
+
         // Queued for the same reason the first send is (see InviteTeamMember):
         // the resend runs on a click in the members table, so a slow provider
         // otherwise holds the request open and surfaces its own transport error
