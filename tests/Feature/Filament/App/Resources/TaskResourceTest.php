@@ -8,7 +8,9 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
 mutates(TaskResource::class);
@@ -256,12 +258,6 @@ it('renders a custom-field datetime in the user timezone in the table', function
     $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
     Filament::setCurrentPanel(Filament::getPanel('app'));
 
-    $dueField = DB::table('custom_fields')
-        ->where('tenant_id', $this->team->getKey())
-        ->where('entity_type', 'task')
-        ->where('code', 'due_date')
-        ->value('id');
-
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('create'), [
             'title' => 'round trips through Tokyo',
@@ -273,4 +269,27 @@ it('renders a custom-field datetime in the user timezone in the table', function
         ->assertOk()
         ->assertSee('Aug 19, 2026 08:30')
         ->assertDontSee('Aug 18, 2026 23:30');
+});
+
+/**
+ * A custom-field datetime has to read like the `created_at` next to it, so the column
+ * takes the table's format rather than one of its own. The seconds are the tell: the
+ * table default carries them, and the literal this class used to hardcode did not.
+ */
+it('renders a custom-field datetime in the same format as the table default', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('create'), [
+            'title' => 'formatted like its neighbours',
+            'custom_fields' => ['due_date' => '2026-08-19 08:30:00'],
+        ])
+        ->assertHasNoActionErrors();
+
+    $format = Table::make(new ManageTasks)->getDefaultDateTimeDisplayFormat();
+
+    livewire(ManageTasks::class)
+        ->assertOk()
+        ->assertSee(Date::parse('2026-08-19 08:30:00', 'Asia/Tokyo')->translatedFormat($format));
 });

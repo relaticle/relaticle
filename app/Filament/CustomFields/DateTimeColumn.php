@@ -25,6 +25,11 @@ use Relaticle\CustomFields\Models\CustomField;
  * Registered for the `date-time` field type only (see AppServiceProvider). Date-only
  * fields must keep the package column: a bare date has no time of day to shift, so
  * converting one would move it a day for every viewer west of UTC.
+ *
+ * The format is passed straight through, null included. Filament resolves null to the
+ * table's own default, so a custom-field datetime reads the same as the `created_at`
+ * beside it instead of being pinned to a literal this class chose. That also means each
+ * panel's format applies without this class knowing which panels exist.
  */
 final class DateTimeColumn extends BaseDateTimeColumn
 {
@@ -38,6 +43,6 @@ final class DateTimeColumn extends BaseDateTimeColumn
 
         return $column
             ->getStateUsing(fn (HasCustomFields $record): mixed => $record->getCustomFieldValue($customField))
-            ->dateTime(CustomFields::dateTimeDisplayFormat() ?? 'M j, Y H:i');
+            ->dateTime(CustomFields::dateTimeDisplayFormat());
     }
 }
