@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\AddCustomFieldOptions;
+use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\CustomFields\UpdateCustomField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Task;
@@ -186,4 +189,77 @@ it('reports an unknown sort column instead of failing silently', function (): vo
     $result = json_decode((new ListCompaniesTool)->handle(new Request(['sort' => 'not_a_column'])), true);
 
     expect($result)->toHaveKey('error');
+});
+
+it('can filter by a custom field immediately after creating it', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    // Warm the filter schema the way any earlier turn in the conversation would.
+    (new ListCompaniesTool)->handle(new Request);
+
+    app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Segment',
+        'code' => 'segment',
+        'type' => 'select',
+        'options' => ['Enterprise', 'SMB'],
+    ]);
+
+    $result = json_decode((new ListCompaniesTool)->handle(new Request([
+        'custom_fields' => ['segment' => ['eq' => 'Enterprise']],
+    ])), true);
+
+    expect($result)->not->toHaveKey('error');
+});
+
+it('stops offering a custom field for filtering once it is deactivated', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $field = app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Segment',
+        'code' => 'segment',
+        'type' => 'select',
+        'options' => ['Enterprise'],
+    ]);
+
+    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['eq' => 'Enterprise']]]));
+
+    app(UpdateCustomField::class)->execute($user, $field, ['active' => false]);
+
+    $result = json_decode((new ListCompaniesTool)->handle(new Request([
+        'custom_fields' => ['segment' => ['eq' => 'Enterprise']],
+    ])), true);
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('not a filterable custom field');
+});
+
+it('can filter by an option added to an existing custom field', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $field = app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Segment',
+        'code' => 'segment',
+        'type' => 'select',
+        'options' => ['Enterprise'],
+    ]);
+
+    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['eq' => 'Enterprise']]]));
+
+    app(AddCustomFieldOptions::class)->execute($user, [
+        '_record_id' => $field->getKey(),
+        'options' => ['Mid-Market'],
+    ]);
+
+    $result = json_decode((new ListCompaniesTool)->handle(new Request([
+        'custom_fields' => ['segment' => ['eq' => 'Mid-Market']],
+    ])), true);
+
+    expect($result)->not->toHaveKey('error');
 });

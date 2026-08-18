@@ -15,6 +15,7 @@ use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -437,6 +438,29 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+
+        $this->configureCustomFieldSchemaInvalidation();
+    }
+
+    /**
+     * The AI list tools memoise which custom fields are filterable, per tenant and
+     * entity, for a minute. Hooking the model rather than the actions keeps the
+     * Filament management page — which writes definitions directly — from leaving
+     * the assistant insisting a field the user just added does not exist.
+     */
+    private function configureCustomFieldSchemaInvalidation(): void
+    {
+        $invalidate = function (CustomField $field): void {
+            $tenantId = $field->getAttribute('tenant_id');
+            $entityType = $field->getAttribute('entity_type');
+
+            if ((is_string($tenantId) || is_int($tenantId)) && is_string($entityType)) {
+                CustomFieldFilterSchema::forget($tenantId, $entityType);
+            }
+        };
+
+        CustomField::saved($invalidate);
+        CustomField::deleted($invalidate);
     }
 
     /**
