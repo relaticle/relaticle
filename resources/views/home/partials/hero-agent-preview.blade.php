@@ -27,7 +27,7 @@
 <div x-data="heroChat()"
      @hero-chat-reset.window="cancelInflight(); resetChat()"
      @hero-chat-animate.window="animateChat()"
-     class="hero-agent-preview relative bg-gray-50 dark:bg-gray-950 flex h-[520px] sm:h-[580px] md:h-[640px]">
+     class="hero-agent-preview relative bg-gray-50 dark:bg-zinc-950 flex h-[520px] sm:h-[580px] md:h-[640px]">
 
     {{-- Non-interactive overlay: blocks clicks, right-click, and drag.
          z-30 puts it above all panel content. --}}
@@ -48,11 +48,11 @@
              fades it out during the entry → conversation transition. Sits above
              the entry overlay (which starts at top-10) so it stays visible in
              both phases, exactly like the real shell. --}}
-        <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white px-3 dark:border-white/[0.06] dark:bg-gray-900">
-            <x-heroicon-o-bars-3 class="w-4 h-4 text-gray-400 md:hidden dark:text-gray-500"/>
-            <x-heroicon-o-chevron-left class="hidden w-4 h-4 text-gray-400 md:block dark:text-gray-500"/>
+        <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white px-3 dark:border-white/[0.06] dark:bg-zinc-900">
+            <x-heroicon-o-bars-3 class="w-4 h-4 text-gray-400 md:hidden dark:text-zinc-500"/>
+            <x-heroicon-o-chevron-left class="hidden w-4 h-4 text-gray-400 md:block dark:text-zinc-500"/>
             <div class="flex items-center gap-2">
-                <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-gray-200 dark:ring-white/10">
+                <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-zinc-200 dark:ring-white/10">
                     <x-heroicon-o-chat-bubble-left-ellipsis class="w-3.5 h-3.5" aria-hidden="true"/>
                     <span>Ask Relaticle</span>
                 </span>
@@ -136,10 +136,22 @@
                     el.style.opacity = '0';
                     el.style.transform = '';
                 });
-                var ask = this.$root.querySelector('.mcp-topbar-ask');
-                if (ask) ask.style.opacity = '';
-                this.setShellActive('home');
                 this.clearEntryComposer();
+            },
+
+            // Restore the shell chrome to its dashboard state (Home active,
+            // Ask pill back). Runs once the entry curtain is opaque over the
+            // chat column, so the sidebar/topbar change lands at the same
+            // moment the "page" changes — like a real navigation.
+            restoreShellToDashboard() {
+                this.setShellActive('home');
+                var ask = this.$root.querySelector('.mcp-topbar-ask');
+                if (!ask) return;
+                if (getComputedStyle(ask).opacity !== '1' && typeof animate === 'function') {
+                    animate(ask, { opacity: [0, 1] }, { duration: 0.3, ease: this.ease });
+                } else {
+                    ask.style.opacity = '';
+                }
             },
 
             // Swap the sidebar's active item between Home (dashboard phase) and
@@ -149,10 +161,10 @@
                 var home = this.$root.querySelector('#hero-shell-nav-home');
                 var chat = this.$root.querySelector('#hero-shell-nav-chat');
                 if (!home || !chat) return;
-                var itemOn = ['bg-gray-100', 'dark:bg-white/[0.06]', 'font-medium', 'text-primary-700', 'dark:text-primary-400'];
-                var itemOff = ['text-gray-700', 'dark:text-gray-300'];
+                var itemOn = ['bg-gray-100', 'dark:bg-zinc-800', 'font-medium', 'text-primary-700', 'dark:text-primary-400'];
+                var itemOff = ['text-gray-700', 'dark:text-zinc-200'];
                 var iconOn = ['text-primary-700', 'dark:text-primary-400'];
-                var iconOff = ['text-gray-400', 'dark:text-gray-500'];
+                var iconOff = ['text-gray-400', 'dark:text-zinc-500'];
                 var apply = function(el, active) {
                     el.classList.remove.apply(el.classList, active ? itemOff : itemOn);
                     el.classList.add.apply(el.classList, active ? itemOn : itemOff);
@@ -469,8 +481,10 @@
                 // Loop restart: the entry curtain (above) has now faded in over
                 // the previous conversation. Clear that conversation underneath
                 // once the curtain is opaque so the next cycle starts clean — no
-                // blank-panel flash. No-op on first load.
-                this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); }, 420));
+                // blank-panel flash — and flip the shell chrome back to its
+                // dashboard state at the same "navigation" moment. No-op on
+                // first load.
+                this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); self.restoreShellToDashboard(); }, 420));
 
                 // Type prompt 1 into the entry composer, then send.
                 var p1 = this.prompts[0];

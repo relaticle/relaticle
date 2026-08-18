@@ -5,7 +5,7 @@
      Visibility is driven by .mcp-el rule (opacity: 0 at rest) and the
      heroChat factory; no x-show so the markup is also visible to the SEO
      crawler and to no-JS users alongside the conversation. --}}
-<div class="hero-agent-entry mcp-el absolute inset-x-0 bottom-0 top-10 z-20 flex items-start justify-center bg-gray-50 dark:bg-gray-950 px-4 sm:px-6 md:px-8 overflow-hidden">
+<div class="hero-agent-entry mcp-el absolute inset-x-0 bottom-0 top-10 z-20 flex items-start justify-center bg-gray-50 dark:bg-zinc-950 px-4 sm:px-6 md:px-8 overflow-hidden">
     {{-- pt-12/pt-20 mirrors the real dashboard's `py-16` while leaving headroom
          on the shorter mobile panel (h-[520px]). max-w-2xl keeps the composer
          readable without dominating the panel. --}}
@@ -16,7 +16,7 @@
                 Good morning, Marcus.
             </h2>
 
-            <div class="mcp-el mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            <div class="mcp-el mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5"/>
                 <span>Recent chat · This week's pipeline review</span>
             </div>
@@ -25,17 +25,17 @@
         {{-- Composer twin — identical to hero-agent-composer.blade.php but
              with entry-scoped IDs so the JS factory can target it independently. --}}
         <div class="mcp-el mcp-entry-composer mt-8 sm:mt-10">
-            <div class="relative rounded-2xl border border-gray-200 bg-white transition-colors focus-within:border-primary-500 dark:border-gray-700 dark:bg-gray-800">
+            <div class="relative rounded-2xl border border-gray-200 bg-white transition-colors focus-within:border-primary-500 dark:border-zinc-700 dark:bg-zinc-800">
                 <div class="px-4 pt-3.5 pb-1.5 min-h-[60px] text-sm leading-snug">
-                    <span id="hero-entry-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">Ask anything…</span>
-                    <span id="hero-entry-typed" class="hero-composer-typed text-gray-900 dark:text-gray-100"></span>
+                    <span id="hero-entry-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-zinc-500">Ask anything…</span>
+                    <span id="hero-entry-typed" class="hero-composer-typed text-gray-900 dark:text-zinc-100"></span>
                     <span class="hero-composer-cursor inline-block w-px h-4 align-middle bg-primary/60 dark:bg-primary/80 ml-px" aria-hidden="true"></span>
                 </div>
 
                 <div class="flex items-center justify-between gap-2 px-3 pb-2.5">
                     <div class="flex-1"></div>
                     <div class="flex items-center gap-2">
-                        <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-pico font-medium text-gray-500 dark:text-gray-400">
+                        <button type="button" tabindex="-1" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-pico font-medium text-gray-500 dark:text-zinc-400">
                             <span>Auto</span>
                             <x-heroicon-o-chevron-down class="w-3 h-3"/>
                         </button>
@@ -51,7 +51,7 @@
              pill recipe as chat-interface's starters. --}}
         <div class="mcp-el mcp-entry-chips mt-5 flex flex-wrap justify-center gap-2 text-xs">
             @foreach (['CRM overview', 'Overdue tasks', 'Recent companies', 'Pipeline summary'] as $heroStarterChip)
-                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                     {{ $heroStarterChip }}
                 </span>
             @endforeach
@@ -62,16 +62,16 @@
              the whole preview is non-interactive. --}}
         <div class="mcp-el mcp-entry-tasks mt-10 text-start">
             <div class="mb-3 flex items-center justify-between">
-                <h3 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <h3 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-zinc-400">
                     <span>Tasks</span>
-                    <span class="text-gray-400 dark:text-gray-500">0</span>
+                    <span class="text-gray-400 dark:text-zinc-500">0</span>
                 </h3>
-                <span class="text-xs text-gray-500 dark:text-gray-400">View all</span>
+                <span class="text-xs text-gray-500 dark:text-zinc-400">View all</span>
             </div>
 
-            <div class="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center dark:border-gray-700 dark:bg-gray-800">
+            <div class="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center dark:border-zinc-700 dark:bg-zinc-800">
                 <p class="text-sm font-medium text-gray-900 dark:text-white">Stay on top of work</p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Create tasks for yourself or your team to track next steps</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Create tasks for yourself or your team to track next steps</p>
                 <div class="mt-4 flex justify-center">
                     <span class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white">
                         <x-heroicon-o-plus class="h-3.5 w-3.5"/>
