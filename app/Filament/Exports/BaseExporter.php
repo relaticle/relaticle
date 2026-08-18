@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Exports;
 
 use App\Models\Team;
+use App\Models\User;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,6 +31,34 @@ abstract class BaseExporter extends Exporter
             $currentTeam = Auth::guard('web')->user()->currentTeam;
             $export->team_id = $currentTeam->getKey();
         }
+    }
+
+    /**
+     * A CSV is opened by a human who thinks in local time, so datetimes are converted
+     * out of UTC before they are written.
+     *
+     * Values and headers resolve the same user from two different places because they
+     * are produced at two different moments: `formatStateUsing` runs inside the queued
+     * job, which has no session and reads the user off the export record, while
+     * `getColumns()` is static and only ever evaluated for labels during the interactive
+     * column-mapping step — Filament freezes those labels into the export's columnMap
+     * and writes the header row from that, never re-deriving it in the job.
+     */
+    public function timezone(): string
+    {
+        $user = $this->export->user;
+
+        return ($user instanceof User ? $user->timezone : null) ?? (string) config('app.timezone');
+    }
+
+    /**
+     * Header-row timezone, resolved from the session — see timezone() for why.
+     */
+    public static function requestTimezone(): string
+    {
+        $user = Auth::guard('web')->user();
+
+        return ($user instanceof User ? $user->timezone : null) ?? (string) config('app.timezone');
     }
 
     /**

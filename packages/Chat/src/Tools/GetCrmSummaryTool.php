@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Date;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
@@ -32,6 +33,14 @@ final class GetCrmSummaryTool implements Tool
         $user = auth()->user();
         $team = $user->currentTeam;
 
+        /**
+         * "This week" is the user's week, not the server's — bounded on UTC the counts
+         * shift by a day for anyone far enough east or west.
+         */
+        $startOfWeek = Date::now($user->timezone ?? (string) config('app.timezone'))
+            ->startOfWeek()
+            ->utc();
+
         $summary = [
             'record_counts' => [
                 'companies' => Company::query()->whereBelongsTo($team)->count(),
@@ -41,9 +50,9 @@ final class GetCrmSummaryTool implements Tool
                 'notes' => Note::query()->whereBelongsTo($team)->count(),
             ],
             'recent_activity' => [
-                'companies_this_week' => Company::query()->whereBelongsTo($team)->where('created_at', '>=', now()->startOfWeek())->count(),
-                'tasks_this_week' => Task::query()->whereBelongsTo($team)->where('created_at', '>=', now()->startOfWeek())->count(),
-                'opportunities_this_week' => Opportunity::query()->whereBelongsTo($team)->where('created_at', '>=', now()->startOfWeek())->count(),
+                'companies_this_week' => Company::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
+                'tasks_this_week' => Task::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
+                'opportunities_this_week' => Opportunity::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
             ],
         ];
 

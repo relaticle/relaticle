@@ -24,7 +24,14 @@ final readonly class MyTasksService
      */
     public function forUser(User $user, Team $team): Collection
     {
-        $startOfToday = Date::now()->startOfDay();
+        /**
+         * "Overdue" and "today" are claims about the user's calendar, not the server's:
+         * bounded on UTC midnight a task due 23:00 UTC reads as overdue to anyone east
+         * of London for most of their working day. Compute the boundaries in the user's
+         * zone, then compare in UTC where the stored values live.
+         */
+        $timezone = $user->timezone ?? (string) config('app.timezone');
+        $startOfToday = Date::now($timezone)->startOfDay()->utc();
         $startOfDayAfter = $startOfToday->copy()->addDay();
 
         $meta = $this->resolveFieldMetadata($team);

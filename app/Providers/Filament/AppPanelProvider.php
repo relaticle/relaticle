@@ -19,6 +19,7 @@ use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\TaskResource;
+use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
@@ -28,6 +29,7 @@ use App\Livewire\App\AppDatabaseNotifications;
 use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
+use App\Models\User;
 use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -46,6 +48,7 @@ use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -83,10 +86,34 @@ final class AppPanelProvider extends PanelProvider
             SwitchTeam::class,
         );
 
+        /**
+         * Datetimes are stored in UTC; the app panel renders and accepts them in the
+         * signed-in user's zone. Read by both table/infolist output and DateTimePicker
+         * input, so one closure keeps display and entry symmetrical.
+         *
+         * Guarded on the panel id because TimezoneManager is a global singleton — the
+         * sysadmin panel deliberately keeps rendering UTC (see SystemAdminPanelProvider),
+         * and returning null there falls back to config('app.timezone').
+         */
+        FilamentTimezone::set(fn (): ?string => Filament::getCurrentPanel()?->getId() === 'app'
+            ? $this->signedInUser()?->timezone
+            : null);
+
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
         Table::configureUsing(fn (Table $table): Table => $table);
+    }
+
+    /**
+     * The web guard is shared with the sysadmin panel's SystemAdministrator, which has
+     * no timezone of its own — narrow to the customer model rather than assuming.
+     */
+    private function signedInUser(): ?User
+    {
+        $user = Auth::user();
+
+        return $user instanceof User ? $user : null;
     }
 
     /**
@@ -172,6 +199,9 @@ final class AppPanelProvider extends PanelProvider
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
+                Route::post('/timezone', SyncUserTimezoneController::class)
+                    ->middleware('auth')
+                    ->name('timezone.sync');
 
                 Route::get('/{tenant}/tasks-board', fn (string $tenant) => redirect()->to(TaskResource::getUrl('board', ['tenant' => $tenant]), status: 301))
                     ->name('tasks-board.redirect');
@@ -237,6 +267,16 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            /**
+             * Only rendered until the user has a timezone; after that the hook returns
+             * nothing and no detection script reaches the browser at all.
+             */
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory|string => $this->signedInUser()?->timezone === null
+                    ? view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')])
+                    : '',
             );
 
         if (Features::hasApiFeatures()) {

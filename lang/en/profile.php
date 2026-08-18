@@ -13,6 +13,11 @@ return [
         'profile_photo' => [
             'label' => 'Photo',
         ],
+        'timezone' => [
+            'label' => 'Timezone',
+            'helper_text' => 'Dates and times across the app are shown in this timezone.',
+            'placeholder' => 'Select a timezone',
+        ],
         'current_password' => [
             'label' => 'Current Password',
         ],

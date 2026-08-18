@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 mutates(TaskResource::class);
 
@@ -205,4 +206,43 @@ it('denies non-team-member from viewing another team task', function (): void {
     expect($this->user->can('view', $record))->toBeFalse()
         ->and($this->user->can('update', $record))->toBeFalse()
         ->and($this->user->can('delete', $record))->toBeFalse();
+});
+
+/**
+ * The picker resolves its timezone from the same TimezoneManager the table columns read,
+ * so display and entry cannot drift apart — this asserts the *input* direction, where a
+ * regression would silently shift every datetime a user types.
+ */
+it('stores a datetime typed in the user timezone as utc', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    // A real request has the panel bound by Filament's middleware; the harness does not,
+    // and the conversion is deliberately scoped to the app panel.
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $dueField = DB::table('custom_fields')
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'due_date')
+        ->value('id');
+
+    expect($dueField)->not->toBeNull();
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('create'), [
+            'title' => 'typed in Tokyo',
+            'custom_fields' => ['due_date' => '2026-08-19 08:30:00'],
+        ])
+        ->assertHasNoActionErrors();
+
+    $task = Task::query()->where('title', 'typed in Tokyo')->sole();
+
+    $stored = DB::table('custom_field_values')
+        ->where('entity_id', $task->getKey())
+        ->where('entity_type', 'task')
+        ->where('custom_field_id', $dueField)
+        ->value('datetime_value');
+
+    // 08:30 on the 19th in Tokyo is 23:30 the previous evening in UTC.
+    expect($stored)->toBe('2026-08-18 23:30:00');
 });
