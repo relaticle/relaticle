@@ -74,7 +74,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->prepend(SubdomainRootResponse::class);
 
-        $middleware->append(DenyIndexingOnSecondaryHosts::class);
+        // Outermost (last prepend wins the front slot) so the noindex header
+        // also lands on responses SubdomainRootResponse short-circuits — the
+        // api/mcp root banners are exactly the crawlable secondary-host URLs.
+        $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
 
         $middleware->web(append: RedirectToPrimaryHost::class);
 
