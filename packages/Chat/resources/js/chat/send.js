@@ -61,7 +61,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     // fires, not when typing started, so a draft typed before the first send
     // naturally migrates from the 'new' bucket to the real conversation id
     // once one exists. An empty editor removes the key rather than writing an
-    // empty document — this also makes the explicit clearDraft() call in
+    // empty document: this also makes the explicit clearDraft() call in
     // deliverMessage's success path idempotent with whatever this debounce
     // independently does, regardless of which one lands first.
     saveDraft() {
@@ -91,7 +91,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     // switch. The document read back from localStorage is already plain JSON
     // (it round-tripped through JSON.stringify going in and JSON.parse coming
     // out), but it is explicitly re-run through plainDocument() anyway rather
-    // than relying on that implicitly — this restore path must never be the
+    // than relying on that implicitly: this restore path must never be the
     // one that regresses to handing TipTap a live Proxy.
     restoreDraft(conversationId) {
         let raw = null;
@@ -126,7 +126,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     // A conversation can be deleted from several independent client entry
     // points (side panel menu, sidebar nav, all-chats panel) plus a REST API
     // path with no client to notify at all. Rather than wire a cleanup call
-    // into every one of those, prune anything stale on mount instead —
+    // into every one of those, prune anything stale on mount instead:
     // bounded leakage (up to 30 days) rather than an exhaustive, fragile hook
     // list that a future deletion path can silently miss.
     pruneStaleDrafts() {
@@ -245,11 +245,13 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
 
         // Captured BEFORE editor.clear() below and before any await: this is the
         // bucket the draft debounce was writing to while the user was still
-        // typing this exact message. deliverMessage() clears it on success. If we
-        // instead resolved this key AFTER conversationId is assigned (isFirstMessage
-        // sets it mid-flight), a successful first send would clear the wrong
+        // typing this exact message. deliverMessage() clears it (via
+        // clearDraft(), which re-derives the key itself: this must stay a
+        // conversationId, not a pre-built key) on success. If we instead
+        // resolved this AFTER conversationId is assigned (isFirstMessage sets
+        // it mid-flight), a successful first send would clear the wrong
         // ('new') bucket and leave the real one orphaned.
-        const draftKey = this.draftKey(this.conversationId);
+        const draftConversationId = this.conversationId;
 
         // The user moved on without acting on any prior proposals. Server will
         // confirm via .pending_actions_superseded; we update locally so the
@@ -287,7 +289,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // binding is never notified to re-render.
         const userMsg = this.messages[this.messages.length - 1];
 
-        await this.deliverMessage(userMsg, payload, contextForSend, draftKey);
+        await this.deliverMessage(userMsg, payload, contextForSend, draftConversationId);
     },
 
     // Re-sends a FAILED optimistic bubble in place: same clientKey, same
@@ -303,7 +305,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // the very first message can still take the isFirstMessage branch (the
         // original attempt never got a conversationId), so this must be resolved
         // before deliverMessage has a chance to assign one.
-        const draftKey = this.draftKey(this.conversationId);
+        const draftConversationId = this.conversationId;
 
         // A manual resend overrides any auto-resend countdown still ticking
         // for this bubble.
@@ -314,16 +316,17 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         this.markPendingActionsSuperseded();
 
         const payload = this.plainDocument(msg.document) ?? this.documentFromInput(msg.content);
-        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftKey);
+        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId);
     },
 
     // The network round trip shared by a fresh sendMessage() and a
     // resendMessage() retry. `userMsg` is mutated in place (sendState only,
     // never re-pushed), so both callers converge on the exact same bubble.
-    // `draftKey` is the composer's draft bucket AT THE TIME this send started
-    // (see the capture comments in sendMessage()/resendMessage()) — cleared on
-    // every path below that lands sendState at 'sent'.
-    async deliverMessage(userMsg, payload, contextForSend, draftKey) {
+    // `draftConversationId` is this.conversationId AT THE TIME this send
+    // started (see the capture comments in sendMessage()/resendMessage()):
+    // clearDraft() re-derives the storage key from it, and is called on every
+    // path below that lands sendState at 'sent'.
+    async deliverMessage(userMsg, payload, contextForSend, draftConversationId) {
         const isFirstMessage = !this.conversationId;
 
         if (isFirstMessage) {
@@ -446,13 +449,13 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 }
 
                 userMsg.sendState = 'sent';
-                this.clearDraft(draftKey);
+                this.clearDraft(draftConversationId);
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     // A deliberate cancel, not a delivery failure: the request
                     // may already have landed server-side.
                     userMsg.sendState = 'sent';
-                    this.clearDraft(draftKey);
+                    this.clearDraft(draftConversationId);
                     return;
                 }
                 const assistantMsg = this.messages[this.messages.length - 1];
@@ -556,11 +559,11 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 this.subscribeToConversation(body.conversation_id);
             }
             userMsg.sendState = 'sent';
-            this.clearDraft(draftKey);
+            this.clearDraft(draftConversationId);
         } catch (error) {
             if (error?.name === 'AbortError') {
                 userMsg.sendState = 'sent';
-                this.clearDraft(draftKey);
+                this.clearDraft(draftConversationId);
                 return;
             }
 

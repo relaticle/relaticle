@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
-use Pest\Browser\Playwright\Playwright;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Tests\Helpers\ChatBrowser;
 
@@ -18,16 +17,22 @@ mutates(ChatInterface::class);
  * literal segment `new` for a composer that has not created a conversation
  * yet), debounced 400ms after the TipTap document changes.
  *
- * Every wait below polls inside a single script() call rather than looping
- * PHP-side calls, and every call that awaits a real network round trip
- * (sendMessage()) is wrapped in a widened Playwright::usingTimeout(): see
- * SendStateTest's docblock for why. The same reasoning extends to typing —
- * AwaitableWebpage retries any single method call that does not settle
- * within the (1s default) per-attempt budget, and a retried multi-keystroke
- * `keys()` call would replay every keystroke, not just resume it. `type()`
- * (a single fill() action) avoids that entirely, so it is used here instead
- * of MentionPickerTest's char-by-char keys() (that file needs per-keystroke
- * timing to drive the suggestion popup; this one does not).
+ * Two timing traps, both matching SendStateTest's own conventions:
+ *
+ * - Typing uses `type()` (a single fill() action), not MentionPickerTest's
+ *   char-by-char `keys()`: AwaitableWebpage retries any single method call
+ *   that does not settle within its ~1s per-attempt budget, and a retried
+ *   multi-keystroke `keys()` call would replay every keystroke, not resume
+ *   it. This file has no need for per-keystroke timing (no suggestion popup
+ *   to drive), so a single fill() sidesteps the risk entirely.
+ * - sendMessage() is fired WITHOUT awaiting it inside a script() call, then
+ *   polled for with independent short reads. Awaiting a real round trip
+ *   (conversation create + channel subscribe + send) inside a single
+ *   script() call hits the exact same per-attempt budget: confirmed live
+ *   that an awaited call gets silently abandoned mid-flight and the
+ *   optimistic bubble never leaves 'sending', even though the identical
+ *   request succeeds in under a second when driven directly. Firing and
+ *   polling avoids ever waiting for a slow operation through that bridge.
  */
 function chatInsertConversation(string $id, User $user, int|string $team, string $title = 'draft test'): void
 {
@@ -78,11 +83,18 @@ function chatPollDraftWritten(AwaitableWebpage $page, string $keyJson): ?string
     JS);
 }
 
-/** Polls the last user message's sendState until it matches $target or times out. */
+/**
+ * Polls the last user message's sendState until it matches $target or times
+ * out. Wider budget than SendStateTest's own poll (which resolves fast on a
+ * quick 429): a non-first-message send that inherits an already-subscribed
+ * channel from page init waits out an 8s bounded confirmation fallback
+ * (stream.js) before it ever reaches the fetch, observed live to take ~8-9s
+ * end to end even with Echo nulled for the send itself.
+ */
 function chatPollSendState(AwaitableWebpage $page, string $resolveInterface, string $target): ?string
 {
     $state = null;
-    for ($i = 0; $i < 60; $i++) {
+    for ($i = 0; $i < 80; $i++) {
         $state = $page->script(<<<JS
             (() => {
                 {$resolveInterface}
@@ -92,7 +104,7 @@ function chatPollSendState(AwaitableWebpage $page, string $resolveInterface, str
         if ($state === $target) {
             return $state;
         }
-        usleep(100_000);
+        usleep(200_000);
     }
 
     return $state;
@@ -198,16 +210,13 @@ it('clears the draft once the message is actually sent', function (): void {
     $saved = chatPollDraftWritten($page, $draftKeyJson);
     expect($saved)->not->toBeNull();
 
-    // Widened timeout: this fires the real /chat/send/{id} round trip through
-    // the in-process server, which the file docblock explains needs headroom
-    // above the 1s default per-attempt budget on this box.
-    Playwright::usingTimeout(60_000, fn (): mixed => $page->script(<<<JS
-        (async () => {
+    $page->script(<<<JS
+        (() => {
             {$resolveInterface}
-            await data.sendMessage();
+            data.sendMessage();
             return true;
         })();
-    JS));
+    JS);
 
     $finalState = chatPollSendState($page, $resolveInterface, 'sent');
     expect($finalState)->toBe('sent');
@@ -253,16 +262,13 @@ it('clears the new-conversation draft bucket once the first message creates the 
     $saved = chatPollDraftWritten($page, json_encode('chat.draft.new'));
     expect($saved)->not->toBeNull();
 
-    // Widened timeout: this chains a real create-conversation POST plus a
-    // real send POST through the in-process server (the isFirstMessage
-    // branch), well above the 1s default per-attempt budget on this box.
-    Playwright::usingTimeout(60_000, fn (): mixed => $page->script(<<<JS
-        (async () => {
+    $page->script(<<<JS
+        (() => {
             {$resolveInterface}
-            await data.sendMessage();
+            data.sendMessage();
             return true;
         })();
-    JS));
+    JS);
 
     // Poll all the way to the terminal 'sent' state before inspecting
     // localStorage: conversationId is assigned midway through deliverMessage,
