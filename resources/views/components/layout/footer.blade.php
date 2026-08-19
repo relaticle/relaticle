@@ -38,12 +38,17 @@
             @php($columns = app(\App\Support\MarketingNavigation::class)->footer())
 
             <nav aria-label="{{ __('Footer') }}" class="md:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-8">
+                {{-- The column labels are list labels, not document sections: as
+                     headings they appended four <h3>s to every page's outline,
+                     nested under whichever <h2> the page happened to end on.
+                     `aria-labelledby` keeps each list named without that. --}}
                 @foreach($columns as $column)
+                    @php($columnId = 'footer-'.\Illuminate\Support\Str::slug($column->label))
                     <div>
-                        <h3 class="font-medium text-xs text-black dark:text-white uppercase tracking-wider mb-4">
+                        <p id="{{ $columnId }}" class="font-medium text-xs text-black dark:text-white uppercase tracking-wider mb-4">
                             {{ $column->label }}
-                        </h3>
-                        <ul class="space-y-3">
+                        </p>
+                        <ul aria-labelledby="{{ $columnId }}" class="space-y-3">
                             @foreach($column->children as $item)
                                 <li>
                                     <a href="{{ $item->url }}"

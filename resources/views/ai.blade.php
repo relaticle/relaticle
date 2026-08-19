@@ -12,7 +12,7 @@
 
     $title = __(':name: AI Assistant for Relaticle CRM', ['name' => $assistantName]).' - Relaticle';
     $description = __(
-        ':name is the AI assistant built into Relaticle. It finds, creates, and updates your records, and proposes every change as a card you approve or reject before anything is saved.',
+        ":name is Relaticle's built-in AI assistant. It finds, creates, and updates your records, and proposes every change for you to approve or reject first.",
         ['name' => $assistantName]
     );
 
@@ -53,6 +53,7 @@
     :description="$description"
     :ogTitle="$title"
     :ogDescription="$description"
+    :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
 >
     {{-- Hero --}}
     <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
@@ -391,6 +392,10 @@
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())
+            ->webPage(fn ($page) => $page
+                ->name($title)
+                ->description($description)
+                ->url(url()->current()))
             ->fAQPage(fn ($page) => $page
                 ->mainEntity(collect($faqs)->map(fn (array $faq) => \Spatie\SchemaOrg\Schema::question()
                     ->name($faq[0])

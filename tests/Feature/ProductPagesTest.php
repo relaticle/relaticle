@@ -78,3 +78,15 @@ it('keeps the comment marker selectable so a select-and-copy stays runnable shel
     expect($html)->toContain('<span>#</span>')
         ->and($html)->not->toContain('<span class="select-none" aria-hidden="true">#</span>');
 });
+
+it('gives each product page its own social card instead of the sitewide one', function (string $path, string $image): void {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    expect($html)->toContain('content="'.url("/images/{$image}").'?v=1"')
+        ->and($html)->not->toContain('/images/open-graph.jpg');
+
+    expect(public_path("images/{$image}"))->toBeReadableFile();
+})->with([
+    ['/ai', 'open-graph-ai.jpg'],
+    ['/self-hosted', 'open-graph-self-hosted.jpg'],
+]);

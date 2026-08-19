@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Support\MarketingNavigation;
+use App\Support\NavItem;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
 
@@ -13,6 +15,18 @@ function extractNavRegion(string $html, string $ariaLabel): string
     preg_match('/<nav[^>]*aria-label="'.preg_quote($ariaLabel, '/').'"[^>]*>.*?<\/nav>/s', $html, $matches);
 
     return $matches[0] ?? '';
+}
+
+/** @return list<string> Icon names on this item and everything beneath it. */
+function navIconNames(NavItem $item): array
+{
+    $names = $item->icon === null ? [] : [$item->icon];
+
+    foreach ($item->children as $child) {
+        $names = [...$names, ...navIconNames($child)];
+    }
+
+    return $names;
 }
 
 it('links every declared comparison and alternatives page from the footer', function (): void {
@@ -83,9 +97,28 @@ it('renders product and resources dropdown groups with new page links', function
     $html = $this->get('/')->assertOk()->getContent();
 
     expect($html)->toContain('aria-expanded')
+        ->and($html)->toContain('aria-haspopup="true"')
         ->and($html)->toContain(route('ai'))
         ->and($html)->toContain(route('selfHosted'))
         ->and($html)->toContain(__('Compare'));
+});
+
+it('draws a distinct icon for every name the navigation declares', function (): void {
+    $icons = collect(app(MarketingNavigation::class)->header())
+        ->flatMap(fn (NavItem $item): array => navIconNames($item))
+        ->unique()
+        ->values();
+
+    // An unknown name falls back to the `features` glyph rather than blowing up,
+    // so a rename would silently draw the wrong figure. Distinct output is what
+    // proves each declared name still has its own drawing.
+    $drawings = $icons->map(fn (string $name): string => Blade::render(
+        '<x-brand.nav-icon :name="$name"/>',
+        ['name' => $name],
+    ));
+
+    expect($icons)->not->toBeEmpty()
+        ->and($drawings->unique())->toHaveCount($icons->count());
 });
 
 it('keeps the star count to the hero, not the header', function (): void {
@@ -113,3 +146,14 @@ it('drops nav groups that feature flags emptied instead of rendering a dead link
         }
     }
 });
+
+it('links the product pages from page copy, not only from the sitewide nav', function (string $path): void {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    // Header and footer links are boilerplate on every page. Strip both, so what
+    // is left is a link a reader could actually follow out of the copy.
+    $body = (string) preg_replace(['/<header[\s\S]*?<\/header>/', '/<footer[\s\S]*?<\/footer>/'], '', $html);
+
+    expect($body)->toContain('href="'.route('ai').'"')
+        ->and($body)->toContain('href="'.route('selfHosted').'"');
+})->with(['/', '/pricing', '/compare/relaticle-vs-twenty', '/alternatives/attio']);

@@ -2,7 +2,7 @@
     $assistantName = (string) config('chat.assistant_name');
 
     $title = __('Self-Hosted CRM: Deploy Relaticle on Your Own Server').' - Relaticle';
-    $description = __('Deploy Relaticle, the open-source AGPL-3.0 CRM, on your own server with two Docker commands. Unlimited users, no per-seat pricing, and your data never leaves your infrastructure.');
+    $description = __('Deploy Relaticle, the open-source AGPL-3.0 CRM, on your own server with two Docker commands. Unlimited users, no per-seat pricing, and your data stays yours.');
 
     $quickStartLines = [
         ['type' => 'comment', 'text' => __('Download the compose file')],
@@ -65,6 +65,7 @@
     :description="$description"
     :ogTitle="$title"
     :ogDescription="$description"
+    :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=1'"
 >
     {{-- Hero --}}
     <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
@@ -303,14 +304,22 @@
                     [__('AI models'), __('Bring your own provider key, or run a local model with Ollama'), __('Cloud-hosted models ready immediately, no provider key required')],
                     [__('Getting help'), __('Community support on Discord and GitHub issues'), __('Email support')],
                 ] as [$rowLabel, $selfHostedValue, $hostedValue])
+                    {{-- Two columns on desktop so the two options can be read against each
+                         other, one under the other on mobile. Text order and the inline
+                         "Self-Hosted:" / "Cloud:" prefixes are unchanged: they are what the
+                         markdown variant renders, and a grid class does not reach it. --}}
                     <li class="px-4 py-4 sm:px-6">
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $rowLabel }}</p>
-                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
-                            <span class="font-medium text-gray-500 dark:text-gray-400">{{ __('Self-Hosted') }}:</span> {{ $selfHostedValue }}
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            <span class="font-medium text-gray-500 dark:text-gray-400">{{ __('Cloud') }}:</span> {{ $hostedValue }}
-                        </p>
+                        <div class="mt-2 grid gap-2 sm:grid-cols-2 sm:gap-6">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 sm:border-l-2 sm:border-primary/30 sm:pl-3">
+                                <span class="block text-pico font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ __('Self-Hosted') }}:</span>
+                                {{ $selfHostedValue }}
+                            </p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 sm:border-l-2 sm:border-gray-200 dark:sm:border-white/10 sm:pl-3">
+                                <span class="block text-pico font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ __('Cloud') }}:</span>
+                                {{ $hostedValue }}
+                            </p>
+                        </div>
                     </li>
                 @endforeach
             </ul>
@@ -392,6 +401,10 @@
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())
+            ->webPage(fn ($page) => $page
+                ->name($title)
+                ->description($description)
+                ->url(url()->current()))
             ->fAQPage(fn ($page) => $page
                 ->mainEntity(collect($faqs)->map(fn (array $faq) => \Spatie\SchemaOrg\Schema::question()
                     ->name($faq[0])

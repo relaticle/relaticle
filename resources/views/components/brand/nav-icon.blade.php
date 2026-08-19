@@ -5,63 +5,76 @@
 {{-- Relaticle nav icons.
 
      Drawn in the brand's own grammar, taken from the logomark: filled circles
-     as nodes, joined by round-capped strokes as relationships. Every icon
-     here is built from those two primitives only, on a 24x24 grid with a
-     1.75 stroke, so the set reads as one family and sits beside the logo
-     without looking borrowed from a generic icon pack.
+     as nodes, joined by round-capped strokes as relationships.
+
+     The set holds to one geometry so it reads as a family at the 20px the mega
+     menu renders it at:
+
+     - 24x24 grid, every figure centred on (12,12) and sized to a ~15-16 unit
+       bounding box, so no icon looks larger than its neighbour in the same
+       column.
+     - One stroke weight, 1.75, round cap and join.
+     - Two node sizes: 2.3-2.4 for a primary node, 1.6-1.7 for a secondary one.
+       The assistant hub is the single exception, because it carries the
+       logomark's own proportions.
+     - Full opacity throughout. Half-opacity strokes silt up at this size,
+       especially in dark mode.
+
+     Edges are declared before nodes so the nodes paint over the stroke ends,
+     which is what keeps the joins clean without hand-tuned gaps.
 
      Nodes use `fill="currentColor"`; edges use `stroke="currentColor"`.
      Callers set size and color with utility classes. --}}
 
 @php
     $paths = [
-        // Rela: the logomark figure, a hub joined to three satellites. Edges are
-        // drawn first so the nodes sit on top of them.
-        'assistant' => '<path d="M12 12 6.6 7.4M12 12l6-2.6M12 12l4.4 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            <circle cx="12" cy="12" r="3.4" fill="currentColor"/>
-            <circle cx="5.6" cy="6.6" r="2.2" fill="currentColor"/>
-            <circle cx="18.8" cy="8.8" r="1.9" fill="currentColor"/>
-            <circle cx="17" cy="17.6" r="2.4" fill="currentColor"/>',
+        // Rela: the logomark's own figure, a hub and three satellites held at
+        // the master artwork's angles (up-left, up-right, down-right) so it
+        // reads as the same mark as the header lockup. The radii are pulled in
+        // from the logo's proportions on purpose: at 20px the logo's own short
+        // edges disappear under the circles and the mark silts into a blob,
+        // where the logo survives it on gradient and size.
+        'assistant' => '<path d="M12 12 6.25 7.67M12 12l6.13-3.77M12 12l5.57 4.56" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+            <circle cx="6.25" cy="7.67" r="1.9" fill="currentColor"/>
+            <circle cx="18.13" cy="8.23" r="1.5" fill="currentColor"/>
+            <circle cx="17.57" cy="16.56" r="2" fill="currentColor"/>',
 
-        // Features: a lattice of records. Nodes inset so nothing clips the grid.
-        'features' => '<path d="M8.4 7.5h7.2M7.5 8.4v7.2M16.5 8.4v7.2M8.4 16.5h7.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            <circle cx="7.5" cy="7.5" r="2.3" fill="currentColor"/>
-            <circle cx="16.5" cy="7.5" r="2.3" fill="currentColor"/>
-            <circle cx="7.5" cy="16.5" r="2.3" fill="currentColor"/>
-            <circle cx="16.5" cy="16.5" r="2.3" fill="currentColor"/>',
+        // Features: a lattice of records, four nodes on a closed circuit.
+        'features' => '<path d="M6.5 6.5h11v11h-11z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+            <circle cx="6.5" cy="6.5" r="2" fill="currentColor"/>
+            <circle cx="17.5" cy="6.5" r="2" fill="currentColor"/>
+            <circle cx="6.5" cy="17.5" r="2" fill="currentColor"/>
+            <circle cx="17.5" cy="17.5" r="2" fill="currentColor"/>',
 
-        // Self-hosted: one server rack, its nodes stacked on your own metal.
-        'self-hosted' => '<rect x="3.5" y="4.5" width="17" height="6" rx="2" stroke="currentColor" stroke-width="1.75"/>
-            <rect x="3.5" y="13.5" width="17" height="6" rx="2" stroke="currentColor" stroke-width="1.75"/>
-            <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor"/>
-            <circle cx="7.5" cy="16.5" r="1.3" fill="currentColor"/>',
+        // Self-hosted: a two-unit rack, its status nodes on your own metal.
+        'self-hosted' => '<rect x="4.5" y="4.75" width="15" height="6" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <rect x="4.5" y="13.25" width="15" height="6" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <circle cx="8.2" cy="7.75" r="1.6" fill="currentColor"/>
+            <circle cx="8.2" cy="16.25" r="1.6" fill="currentColor"/>',
 
-        // MCP and API: an outside client node wired into two of ours.
-        'api' => '<path d="M7.2 12h9.6M16.8 12l-3.4-3.6M16.8 12l-3.4 3.6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="5.2" cy="12" r="2.4" fill="currentColor"/>
-            <circle cx="18.6" cy="6.4" r="1.8" fill="currentColor"/>
-            <circle cx="18.6" cy="17.6" r="1.8" fill="currentColor"/>',
+        // MCP and API: our record and your system either side of an interface.
+        // Deliberately a flat horizontal pair, so it cannot be mistaken for the
+        // radial assistant mark two rows above it. The hollow circle is the
+        // only one in the set: hollow is yours, filled is ours, and the break
+        // in the edge is the contract between them.
+        'api' => '<path d="M7.9 12h3.1M13 12h2.7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="5.6" cy="12" r="2" fill="currentColor"/>
+            <circle cx="17.6" cy="12" r="2" stroke="currentColor" stroke-width="1.75"/>',
 
-        // Help centre: a node asking, an answer arriving.
-        'help' => '<circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.75"/>
-            <path d="M9.9 9.6a2.15 2.15 0 1 1 2.9 2.02c-.55.2-.8.62-.8 1.18v.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            <circle cx="12" cy="16.3" r="1.15" fill="currentColor"/>',
+        // Help center: a node asking, and the answer it is waiting on.
+        'help' => '<circle cx="12" cy="12" r="7.6" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M9.9 9.7a2.15 2.15 0 1 1 2.9 2.02c-.55.2-.8.62-.8 1.18v.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="12" cy="16.1" r="1.3" fill="currentColor"/>',
 
         // Developers: source, in the brand grammar rather than a stock glyph.
-        'developers' => '<path d="M8.4 8.2 4.2 12l4.2 3.8M15.6 8.2 19.8 12l-4.2 3.8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="12" r="1.6" fill="currentColor"/>',
+        'developers' => '<path d="M8.6 8.2 4.6 12l4 3.8M15.4 8.2l4 3.8-4 3.8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="2" fill="currentColor"/>',
 
-        // Blog: a published record, its lines trailing off.
-        'blog' => '<rect x="4" y="4.5" width="16" height="15" rx="2.5" stroke="currentColor" stroke-width="1.75"/>
-            <circle cx="8.2" cy="9" r="1.35" fill="currentColor"/>
-            <path d="M11.8 9h4M8 13.4h8M8 16.4h5.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" opacity="0.65"/>',
-
-        // Compare: two graphs weighed against each other.
-        'compare' => '<circle cx="7" cy="8" r="1.9" fill="currentColor"/>
-            <circle cx="17" cy="16" r="1.9" fill="currentColor" opacity="0.65"/>
-            <path d="M7 10.4v5.2M17 13.6V8.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-            <circle cx="7" cy="17" r="1.3" fill="currentColor" opacity="0.65"/>
-            <circle cx="17" cy="7" r="1.3" fill="currentColor"/>',
+        // Blog: a published record, its author node above the line.
+        'blog' => '<rect x="4.5" y="4.5" width="15" height="15" rx="3" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M12.6 9.4h3.1M8.3 14.6h7.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="8.9" cy="9.4" r="1.7" fill="currentColor"/>',
     ];
 @endphp
 

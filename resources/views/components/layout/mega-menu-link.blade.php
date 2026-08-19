@@ -14,7 +14,7 @@
    class="group flex items-start gap-3 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors">
 
     @if($item->icon)
-        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 group-hover:bg-primary/[0.08] group-hover:text-primary dark:bg-white/[0.05] dark:text-gray-400 dark:group-hover:bg-primary/[0.15] dark:group-hover:text-primary-400 transition-colors">
+        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-900/[0.04] group-hover:bg-primary/[0.1] group-hover:text-primary group-hover:ring-primary/20 dark:bg-white/[0.07] dark:text-gray-400 dark:ring-white/[0.07] dark:group-hover:bg-primary/25 dark:group-hover:text-primary-300 dark:group-hover:ring-primary/30 transition-colors">
             <x-brand.nav-icon :name="$item->icon" class="h-5 w-5"/>
         </span>
     @endif
