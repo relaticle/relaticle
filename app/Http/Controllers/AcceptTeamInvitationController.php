@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Jetstream\AcceptTeamInvitation;
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -46,8 +49,7 @@ final readonly class AcceptTeamInvitationController
 
         $team = $acceptTeamInvitation->execute($user, $invitation);
 
-        return redirect(config('fortify.home'))
-            ->banner(__('teams.accept.joined', ['team' => $team->name])); // @phpstan-ignore method.notFound
+        return $this->redirectToTeam($team, __('teams.accept.joined', ['team' => $team->name]));
     }
 
     private function resolve(string $token, Request $request): ?TeamInvitation
@@ -93,8 +95,7 @@ final readonly class AcceptTeamInvitationController
         if ($user->belongsToTeam($invitation->team)) {
             $user->switchTeam($invitation->team);
 
-            return redirect(config('fortify.home'))
-                ->banner(__('teams.accept.already_member', ['team' => $invitation->team->name])); // @phpstan-ignore method.notFound
+            return $this->redirectToTeam($invitation->team, __('teams.accept.already_member', ['team' => $invitation->team->name]));
         }
 
         return view('teams.accept-invitation', [
@@ -114,5 +115,24 @@ final readonly class AcceptTeamInvitationController
         $user = $request->user();
 
         return $user;
+    }
+
+    /**
+     * Filament's own home-URL closure (see AppPanelProvider) resolves the
+     * dashboard through the ambient Filament::getTenant(), not the request's
+     * authenticated user, so it must be primed before getHomeUrl() is called
+     * from outside panel middleware. isQuiet skips SwitchTeam, which already
+     * ran (or is irrelevant) by this point.
+     */
+    private function redirectToTeam(Team $team, string $message): RedirectResponse
+    {
+        Filament::setTenant($team, isQuiet: true);
+
+        Notification::make()
+            ->title($message)
+            ->success()
+            ->send();
+
+        return redirect(Filament::getHomeUrl() ?? url()->getAppUrl());
     }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\AcceptTeamInvitation;
+use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -32,11 +33,31 @@ test('valid invitation can be accepted', function () {
 
     $this->actingAs($this->user)
         ->post($joinUrl)
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
 
     expect($this->team->fresh()->hasUser($this->user))->toBeTrue();
     expect(TeamInvitation::find($invitation->id))->toBeNull();
     expect($this->user->fresh()->current_team_id)->toBe($this->team->id);
+});
+
+test('accepting an invitation lands the user in the app panel with a visible confirmation', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $redirect = $this->actingAs($invitee)
+        ->post(route('team-invitations.token.join', ['token' => $raw]));
+
+    $redirect->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
+
+    expect($redirect->headers->get('Location'))->not->toBe(config('fortify.home'))
+        ->and($redirect->headers->get('Location'))->not->toBe(url('/'));
+
+    $this->get($redirect->headers->get('Location'))
+        ->assertOk()
+        ->assertSee(__('teams.accept.joined', ['team' => $this->team->name]));
 });
 
 test('expired invitation shows the expired state', function () {
@@ -89,6 +110,44 @@ test('invitation with wrong email shows the wrong-account screen, not a 403', fu
         ->assertViewHas('state', 'wrong-account');
 
     expect($this->team->fresh()->hasUser($wrongUser))->toBeFalse();
+});
+
+test('every accept-invitation exit link points into the app panel, not the marketing homepage', function (): void {
+    $appUrl = url()->getAppUrl();
+
+    // ready state: the "not now" link
+    $readyInvitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $raw = $readyInvitation->issueToken();
+    $readyInvitation->save();
+    $readyInvitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($readyInvitee)
+        ->get(route('team-invitations.token.accept', ['token' => $raw]))
+        ->assertOk()
+        ->assertSee($appUrl, false);
+
+    // wrong-account state: the "go to my workspace" link
+    $wrongUser = User::factory()->withPersonalTeam()->create(['email' => 'wrong@example.com']);
+    $mismatchedInvitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'invited@example.com',
+    ]);
+
+    $this->actingAs($wrongUser)
+        ->get(URL::signedRoute('team-invitations.accept', ['invitation' => $mismatchedInvitation]))
+        ->assertOk()
+        ->assertSee($appUrl, false);
+
+    // expired state: the "go to my workspace" link
+    $expiredInvitation = TeamInvitation::factory()->expired()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(URL::signedRoute('team-invitations.accept', ['invitation' => $expiredInvitation]))
+        ->assertOk()
+        ->assertSee($appUrl, false);
 });
 
 test('invitation with invalid signature is rejected', function () {
@@ -276,7 +335,7 @@ test('a GET when the user already belongs to the team redirects without erroring
 
     $this->actingAs($invitee)
         ->get(route('team-invitations.token.accept', ['token' => $raw]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
 
     expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
 });

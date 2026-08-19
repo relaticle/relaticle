@@ -22,7 +22,7 @@
                     </button>
                 </form>
 
-                <a href="{{ config('fortify.home') }}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <a href="{{ url()->getAppUrl() }}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                     {{ __('teams.accept.ready.decline') }}
                 </a>
             @elseif ($state === 'wrong-account')
@@ -42,7 +42,7 @@
                     </button>
                 </form>
 
-                <a href="{{ config('fortify.home') }}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <a href="{{ url()->getAppUrl() }}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                     {{ __('teams.accept.wrong_account.stay') }}
                 </a>
             @else
@@ -55,7 +55,7 @@
                 </p>
 
                 <div class="mt-8">
-                    <a href="{{ config('fortify.home') }}"
+                    <a href="{{ url()->getAppUrl() }}"
                        class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
                         {{ __('teams.accept.expired.action') }}
                     </a>

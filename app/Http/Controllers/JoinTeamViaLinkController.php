@@ -6,6 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Team;
 use App\Models\User;
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,8 +29,7 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return redirect(config('fortify.home'))
-                ->banner(__('You are already a member of :team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+            return $this->redirectToTeam($team, __('teams.accept.already_member', ['team' => $team->name]));
         }
 
         return view('teams.join-via-link', ['team' => $team, 'token' => $token]);
@@ -48,8 +49,7 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return redirect(config('fortify.home'))
-                ->banner(__('You are already a member of :team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+            return $this->redirectToTeam($team, __('teams.accept.already_member', ['team' => $team->name]));
         }
 
         /** @var User $owner */
@@ -65,8 +65,7 @@ final readonly class JoinTeamViaLinkController
         $user->unsetRelation('teams');
         $user->switchTeam($team);
 
-        return redirect(config('fortify.home'))
-            ->banner(__('You have joined the :team team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+        return $this->redirectToTeam($team, __('teams.accept.joined', ['team' => $team->name]));
     }
 
     private function resolveTeam(string $token): Team|View
@@ -86,5 +85,24 @@ final readonly class JoinTeamViaLinkController
         abort_if($user instanceof User && $user->isScheduledForDeletion(), 403, __('You cannot join teams while your account is scheduled for deletion.'));
 
         return $team;
+    }
+
+    /**
+     * Filament's own home-URL closure (see AppPanelProvider) resolves the
+     * dashboard through the ambient Filament::getTenant(), not the request's
+     * authenticated user, so it must be primed before getHomeUrl() is called
+     * from outside panel middleware. isQuiet skips SwitchTeam, which already
+     * ran (or is irrelevant) by this point.
+     */
+    private function redirectToTeam(Team $team, string $message): RedirectResponse
+    {
+        Filament::setTenant($team, isQuiet: true);
+
+        Notification::make()
+            ->title($message)
+            ->success()
+            ->send();
+
+        return redirect(Filament::getHomeUrl() ?? url()->getAppUrl());
     }
 }
