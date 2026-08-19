@@ -1,0 +1,43 @@
+name: Publish to MCP Registry
+
+# Keeps the com.relaticle/crm listing on registry.modelcontextprotocol.io in
+# lockstep with product releases. The listing's version is taken from the
+# release tag, not from server.json, so the committed file never needs a bump.
+#
+# Auth is DNS-based (TXT record on the relaticle.com apex). MCP_PRIVATE_KEY is
+# an Environment secret on `mcp-registry-publish`, restricted to v* tags, so
+# only release refs can ever read it.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    if: github.repository == 'relaticle/relaticle'
+    runs-on: ubuntu-latest
+    environment: mcp-registry-publish
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Set version from release tag
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          echo "Publishing version ${VERSION}"
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login dns --domain relaticle.com --private-key "${{ secrets.MCP_PRIVATE_KEY }}"
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish

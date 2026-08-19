@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.relaticle/crm",
+  "title": "Relaticle",
+  "description": "Open-source CRM for AI agents: 32 MCP tools over companies, people, deals, tasks, and notes.",
+  "version": "3.4.9",
+  "remotes": [
+    { "type": "streamable-http", "url": "https://mcp.relaticle.com" }
+  ]
+}
