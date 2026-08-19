@@ -6,21 +6,19 @@ namespace App\Livewire\App\Teams;
 
 use App\Actions\Jetstream\InviteTeamMember;
 use App\Actions\Jetstream\RemoveTeamMember;
-use App\Actions\Jetstream\ResendTeamInvitation;
-use App\Actions\Jetstream\RevokeTeamInvitation;
 use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Jetstream\UpdateTeamMemberRole;
 use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
-use App\Models\TeamInvitation;
-use App\Models\TeamPerson;
 use App\Models\User;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -29,14 +27,20 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
 
-final class ManageMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
+/**
+ * The workspace's people directory. Pending invitations are a separate,
+ * unpaginated worklist rendered by PendingTeamInvitations — merging the two
+ * into one paginated table buried the actionable set behind pagination, which
+ * is why Twenty and Slack keep them apart too.
+ */
+final class TeamMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
 
@@ -68,62 +72,116 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => TeamPerson::forTeam($this->team))
+            ->query($this->membersQuery(...))
             ->searchable()
             ->paginated([10, 25, 50])
-            ->defaultSort('happened_at')
-            ->heading(__('teams.table.heading'))
-            ->description(fn (): string => __('teams.table.counts', [
-                'members' => $this->team->users()->count() + 1,
-                'pending' => $this->team->teamInvitations()->count(),
-            ]))
+            ->defaultSort('name')
+            ->heading(__('teams.table.members_heading'))
+            ->description(fn (): string => trans_choice('teams.table.members_count', $this->memberCount()))
             ->headerActions([
                 $this->invitePeopleAction(),
                 $this->manageInviteLinkAction(),
             ])
             ->columns([
+                Tables\Columns\ImageColumn::make('profile_photo_url')
+                    ->label(__('teams.table.photo'))
+                    // Shrink-to-content: without this the header word sets the
+                    // column width and a 32px avatar sits in a 150px cell.
+                    ->width('1%')
+                    // Decorative; dropping it on a phone keeps name, role, and
+                    // the actions menu on screen without horizontal scrolling.
+                    ->visibleFrom('md')
+                    ->circular()
+                    ->imageSize(32)
+                    ->defaultImageUrl(fn (User $record): string => Filament::getUserAvatarUrl($record))
+                    ->grow(false),
                 Tables\Columns\TextColumn::make('name')
-                    ->label(__('teams.table.person'))
-                    ->description(fn (TeamPerson $record): string => $record->email)
+                    ->label(__('teams.table.member'))
+                    ->description(fn (User $record): string => $record->email)
                     ->searchable(['name', 'email'])
-                    ->default(fn (TeamPerson $record): string => $record->email),
-                Tables\Columns\TextColumn::make('role')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('team_role')
                     ->label(__('teams.table.role'))
                     ->badge()
-                    ->formatStateUsing(fn (TeamPerson $record): string => $this->isOwner($record)
+                    ->color(fn (User $record): string => $this->isOwner($record) ? 'primary' : 'gray')
+                    // Resolved through state(), not formatStateUsing(): the owner
+                    // has no `team_user` row, so `team_role` is null and Filament
+                    // would skip formatting entirely and render an empty cell.
+                    ->state(fn (User $record): string => $this->isOwner($record)
                         ? __('teams.roles.owner.label')
-                        : $this->roleLabel($record->role)),
-                Tables\Columns\TextColumn::make('status')
-                    ->label(__('teams.table.status'))
-                    ->badge()
-                    ->color(fn (TeamPerson $record): string => $record->status === 'invited' ? 'warning' : 'success')
-                    ->formatStateUsing(fn (TeamPerson $record): string => $record->status === 'invited'
-                        ? __('teams.table.status_invited')
-                        : __('teams.table.status_member')),
-                Tables\Columns\TextColumn::make('happened_at')
-                    ->label(__('teams.table.since'))
+                        : $this->roleLabel($this->roleKey($record) ?? '')),
+                Tables\Columns\TextColumn::make('joined_at')
+                    ->label(__('teams.table.joined'))
+                    ->visibleFrom('md')
+                    ->state(fn (User $record): mixed => $record->getAttribute('joined_at') ?? $this->team->created_at)
                     ->date(),
-                Tables\Columns\TextColumn::make('expires_at')
-                    ->label(__('teams.table.expires'))
-                    ->formatStateUsing(fn (?Carbon $state): string => match (true) {
-                        ! $state instanceof Carbon => '',
-                        $state->isPast() => __('teams.table.expired'),
-                        default => $state->diffForHumans(),
-                    }),
             ])
             ->recordActions([
-                $this->updateTeamRoleAction(),
-                $this->removeTeamMemberAction(),
-                $this->leaveTeamAction(),
-                $this->resendTeamInvitationAction(),
-                $this->copyInviteLinkAction(),
-                $this->revokeTeamInvitationAction(),
+                ActionGroup::make([
+                    $this->updateTeamRoleAction(),
+                    $this->removeTeamMemberAction(),
+                    $this->leaveTeamAction(),
+                ]),
             ]);
     }
 
-    private function isOwner(TeamPerson $record): bool
+    /**
+     * Owner and members in one list, without the raw-SQL union the merged table
+     * needed: Jetstream tracks ownership on `teams.user_id` rather than the
+     * `team_user` pivot, so the owner is pulled in by a second `where` leg and
+     * carries a null `team_role`.
+     *
+     * Selecting through `users` also drops orphaned pivot rows structurally —
+     * production is missing the `team_user` foreign keys, so a deleted account
+     * can leave a row whose user is gone, and `Filament::getUserAvatarUrl()` is
+     * typed non-nullable and 500s on it.
+     *
+     * @return Builder<User>
+     */
+    private function membersQuery(): Builder
     {
-        return $record->user_id !== null && $record->user_id === $this->team->user_id;
+        $pivot = fn (string $column): QueryBuilder => DB::table('team_user')
+            ->select($column)
+            ->whereColumn('team_user.user_id', 'users.id')
+            ->where('team_user.team_id', $this->team->id)
+            ->limit(1);
+
+        return User::query()
+            ->select('users.*')
+            ->addSelect([
+                'team_role' => $pivot('role'),
+                'joined_at' => $pivot('created_at'),
+            ])
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereKey($this->team->user_id)
+                    ->orWhereExists(fn (QueryBuilder $exists): QueryBuilder => $exists
+                        ->from('team_user')
+                        ->whereColumn('team_user.user_id', 'users.id')
+                        ->where('team_user.team_id', $this->team->id));
+            });
+    }
+
+    private function memberCount(): int
+    {
+        return $this->membersQuery()->toBase()->count();
+    }
+
+    private function isOwner(User $record): bool
+    {
+        return $record->getKey() === $this->team->user_id;
+    }
+
+    /**
+     * `team_role` is a per-query select, not a column on `users`, so it is read
+     * through the attribute bag rather than declared on the model. It is null on
+     * the owner row, which has no `team_user` pivot to select from.
+     */
+    private function roleKey(User $record): ?string
+    {
+        $role = $record->getAttribute('team_role');
+
+        return is_string($role) ? $role : null;
     }
 
     /**
@@ -146,27 +204,34 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
     {
         return Action::make('invitePeople')
             ->label(__('teams.actions.invite_people'))
+            ->icon('heroicon-m-user-plus')
             ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
-            ->modalWidth('lg')
+            ->modalWidth('2xl')
+            ->modalSubmitActionLabel(__('teams.actions.send_invitations'))
             ->schema([
                 Repeater::make('invites')
                     ->hiddenLabel()
+                    ->table([
+                        TableColumn::make(__('teams.form.email.label'))->markAsRequired(),
+                        TableColumn::make(__('teams.table.role'))->markAsRequired()->width('12rem'),
+                    ])
                     ->defaultItems(1)
                     ->maxItems(self::MAX_INVITES_PER_SUBMISSION)
                     ->addActionLabel(__('teams.actions.add_another'))
                     ->schema([
                         TextInput::make('email')
-                            ->label(__('teams.form.email.label'))
+                            ->hiddenLabel()
+                            ->placeholder(__('teams.form.email.placeholder'))
                             ->email()
                             ->required(),
                         Select::make('role')
-                            ->label(__('teams.table.role'))
+                            ->hiddenLabel()
                             ->options(fn (): array => $this->assignableRoles())
                             ->in(fn (): array => array_keys($this->assignableRoles()))
                             ->default(TeamRole::Editor->value)
+                            ->selectablePlaceholder(false)
                             ->required(),
-                    ])
-                    ->columns(2),
+                    ]),
             ])
             ->action(function (array $data): void {
                 $this->sendInvitations($data['invites']);
@@ -227,6 +292,7 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
 
         if ($sent > 0) {
             $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
+            $this->dispatch('teamInvitationSent');
         }
 
         if ($failures !== []) {
@@ -236,14 +302,13 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
                 'warning',
             );
         }
-
-        $this->resetTable();
     }
 
     private function manageInviteLinkAction(): Action
     {
         return Action::make('manageInviteLink')
             ->label(__('teams.actions.invite_link'))
+            ->icon('heroicon-m-link')
             ->color('gray')
             ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
             ->schema([
@@ -284,9 +349,10 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
     {
         return Action::make('updateTeamRole')
             ->label(__('teams.actions.update_team_role'))
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'member'
-                && ! $this->isOwner($record)
+            ->icon('heroicon-m-adjustments-horizontal')
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
                 && Gate::check('updateTeamMember', $this->team))
+            ->modalWidth('lg')
             ->schema([
                 Radio::make('role')
                     ->hiddenLabel()
@@ -297,11 +363,11 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
                         ->only(array_keys($this->assignableRoles()))
                         ->pluck('description', 'key')
                         ->all())
-                    ->default(fn (TeamPerson $record): string => $record->role)
+                    ->default(fn (User $record): string => $this->roleKey($record) ?? '')
                     ->rules([
-                        fn (TeamPerson $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+                        fn (User $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
                             $touchesAdminStatus = $value === TeamRole::Admin->value
-                                || $record->role === TeamRole::Admin->value;
+                                || $this->roleKey($record) === TeamRole::Admin->value;
 
                             if ($touchesAdminStatus && ! Gate::check('promoteToAdmin', $this->team)) {
                                 $fail(__('teams.validation.only_owner_promotes_admins'));
@@ -309,20 +375,12 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
                         },
                     ]),
             ])
-            ->action(function (TeamPerson $record, array $data): void {
-                // `user_id` is nullable on TeamPerson (invitation rows carry none),
-                // so narrow before passing it to an action that requires a string.
-                $userId = $record->user_id;
-
-                if ($userId === null) {
-                    return;
-                }
-
+            ->action(function (User $record, array $data): void {
                 try {
                     resolve(UpdateTeamMemberRole::class)->update(
                         $this->authUser(),
                         $this->team,
-                        $userId,
+                        (string) $record->getKey(),
                         $data['role'],
                     );
 
@@ -356,21 +414,15 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
     {
         return Action::make('removeTeamMember')
             ->label(__('teams.actions.remove_team_member'))
+            ->icon('heroicon-m-user-minus')
             ->color('danger')
             ->requiresConfirmation()
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'member'
-                && ! $this->isOwner($record)
-                && $record->user_id !== $this->authUser()->id
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
+                && $record->getKey() !== $this->authUser()->getKey()
                 && Gate::check('removeTeamMember', $this->team))
-            ->action(function (TeamPerson $record): void {
-                $member = User::query()->find($record->user_id);
-
-                if ($member === null) {
-                    return;
-                }
-
+            ->action(function (User $record): void {
                 try {
-                    resolve(RemoveTeamMember::class)->remove($this->authUser(), $this->team, $member);
+                    resolve(RemoveTeamMember::class)->remove($this->authUser(), $this->team, $record);
                     $this->sendNotification(__('teams.notifications.team_member_removed.success'));
                 } catch (AuthorizationException) {
                     $this->sendNotification(__('teams.notifications.permission_denied.cannot_remove_team_member'), type: 'danger');
@@ -386,15 +438,14 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
     {
         return Action::make('leaveTeam')
             ->label(__('teams.actions.leave_team'))
-            ->icon('heroicon-o-arrow-right-start-on-rectangle')
+            ->icon('heroicon-m-arrow-right-start-on-rectangle')
             ->color('danger')
             ->modalDescription(__('teams.modals.leave_team.notice'))
             ->requiresConfirmation()
             // Hidden on the owner row: RemoveTeamMember always rejects the owner,
             // so showing it could only ever produce an error (defect A8).
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'member'
-                && ! $this->isOwner($record)
-                && $record->user_id === $this->authUser()->id)
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
+                && $record->getKey() === $this->authUser()->getKey())
             ->action(function (): void {
                 $user = $this->authUser();
 
@@ -408,101 +459,8 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
             });
     }
 
-    private function resendTeamInvitationAction(): Action
-    {
-        return Action::make('resendTeamInvitation')
-            ->label(__('teams.actions.resend_team_invitation'))
-            ->color('primary')
-            ->requiresConfirmation()
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'invited'
-                && Gate::check('updateTeamMember', $this->team))
-            ->action(function (TeamPerson $record): void {
-                $invitation = $this->invitationFor($record);
-
-                $key = "resend-invitation:{$invitation->getKey()}";
-
-                if (RateLimiter::tooManyAttempts($key, 1)) {
-                    $this->sendNotification(__('teams.notifications.resend_throttled', [
-                        'seconds' => RateLimiter::availableIn($key),
-                    ]), type: 'warning');
-
-                    return;
-                }
-
-                RateLimiter::hit($key, 60);
-
-                resolve(ResendTeamInvitation::class)->resend($invitation);
-
-                $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
-                $this->resetTable();
-            });
-    }
-
-    private function copyInviteLinkAction(): Action
-    {
-        return Action::make('copyInviteLink')
-            ->label(__('teams.actions.copy_invite_link'))
-            ->color('gray')
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'invited'
-                && Gate::check('updateTeamMember', $this->team))
-            ->action(function (TeamPerson $record): void {
-                $invitation = $this->invitationFor($record);
-
-                // Only a resend can mint a fresh raw token — the stored value is a
-                // hash — so legacy rows still hand out their signed URL.
-                $url = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-
-                $this->js('navigator.clipboard.writeText('.json_encode($url, JSON_THROW_ON_ERROR).')');
-
-                $this->sendNotification(__('teams.notifications.invite_link_copied.success'));
-            });
-    }
-
-    private function revokeTeamInvitationAction(): Action
-    {
-        return Action::make('revokeTeamInvitation')
-            ->label(__('teams.actions.revoke_team_invitation'))
-            ->color('danger')
-            ->requiresConfirmation()
-            ->visible(fn (TeamPerson $record): bool => $record->status === 'invited'
-                && Gate::check('removeTeamMember', $this->team))
-            ->action(function (TeamPerson $record): void {
-                $invitation = $this->invitationFor($record);
-
-                resolve(RevokeTeamInvitation::class)->revoke($invitation);
-
-                $this->sendNotification(__('teams.notifications.team_invitation_revoked.success'));
-                $this->resetTable();
-            });
-    }
-
-    /**
-     * Resolve an invitation row back to its model, re-asserting tenant ownership.
-     * The record key arrives from the client, so the team scope is the boundary.
-     *
-     * Aborts rather than returning null on a miss: the replaced
-     * PendingTeamInvitations component answered a foreign invitation with
-     * `abort_unless($invitation->team_id === $this->team->id, 403)`, and
-     * ManageMembersCrossTenantTest pins that contract. Returning null here
-     * would soften a 403 into a silent no-op — still safe, but a weaker
-     * guarantee than the one the suite already holds us to.
-     */
-    private function invitationFor(TeamPerson $record): TeamInvitation
-    {
-        Gate::authorize('updateTeamMember', $this->team);
-
-        $invitation = TeamInvitation::query()
-            ->whereKey($record->source_id)
-            ->where('team_id', $this->team->id)
-            ->first();
-
-        abort_if($invitation === null, 403);
-
-        return $invitation;
-    }
-
     public function render(): View
     {
-        return view('livewire.app.teams.manage-members');
+        return view('livewire.app.teams.team-members');
     }
 }

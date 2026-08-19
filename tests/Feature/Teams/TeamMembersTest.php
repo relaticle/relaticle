@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
-use App\Livewire\App\Teams\ManageMembers;
-use App\Models\Membership;
-use App\Models\Team;
+use App\Livewire\App\Teams\TeamMembers;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -13,7 +11,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
-mutates(ManageMembers::class);
+mutates(TeamMembers::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -22,55 +20,46 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
-/**
- * `Team::users()` never calls `withPivot('id')`, so the pivot accessor's `id`
- * attribute is always null — the team_user.id backing a `member:<id>` key must
- * be read from the Membership model directly instead.
- */
-function memberKey(Team $team, User $user): string
-{
-    return 'member:'.Membership::query()
-        ->where('team_id', $team->id)
-        ->where('user_id', $user->id)
-        ->firstOrFail()
-        ->id;
-}
+test('the owner appears in the members list even though they have no pivot row', function (): void {
+    expect($this->team->users()->count())->toBe(0);
 
-test('members and pending invitations appear in one list', function (): void {
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertSee($this->owner->email)
+        ->assertSee(__('teams.roles.owner.label'));
+});
+
+test('pending invitations are not listed in the members table', function (): void {
     $this->team->teamInvitations()->create([
         'email' => 'pending@example.test',
         'role' => 'editor',
         'expires_at' => now()->addDays(5),
     ]);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertSee($this->owner->email)
-        ->assertSee('pending@example.test');
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertDontSee('pending@example.test');
 });
 
 test('the owner row offers no leave action', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableActionHidden('leaveTeam', 'member:owner');
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionHidden('leaveTeam', $this->owner->id);
 });
 
 test('the owner row offers no remove action', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableActionHidden('removeTeamMember', 'member:owner');
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionHidden('removeTeamMember', $this->owner->id);
 });
 
 test('the owner row offers no role change action', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableActionHidden('updateTeamRole', 'member:owner');
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionHidden('updateTeamRole', $this->owner->id);
 });
 
 test('a member can be removed', function (): void {
     $member = User::factory()->create();
     $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
 
-    $key = memberKey($this->team, $member);
-
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('removeTeamMember')->table($key));
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('removeTeamMember')->table($member->id));
 
     expect($member->fresh()->belongsToTeam($this->team))->toBeFalse();
 });
@@ -84,16 +73,14 @@ test('an admin cannot promote another member to admin', function (): void {
 
     $this->actingAs($admin);
 
-    $key = memberKey($this->team, $member);
-
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('updateTeamRole')->table($key), ['role' => TeamRole::Admin->value])
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('updateTeamRole')->table($member->id), ['role' => TeamRole::Admin->value])
         ->assertHasActionErrors(['role']);
 
     expect($member->fresh()->teamRole($this->team)->key)->toBe(TeamRole::Editor->value);
 });
 
-test('an admin cannot demote a peer admin through the merged table', function (): void {
+test('an admin cannot demote a peer admin', function (): void {
     $adminA = User::factory()->create();
     $this->team->users()->attach($adminA, ['role' => TeamRole::Admin->value]);
 
@@ -102,59 +89,28 @@ test('an admin cannot demote a peer admin through the merged table', function ()
 
     $this->actingAs($adminA);
 
-    $key = memberKey($this->team, $adminB);
-
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('updateTeamRole')->table($key), ['role' => TeamRole::Editor->value])
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('updateTeamRole')->table($adminB->id), ['role' => TeamRole::Editor->value])
         ->assertHasActionErrors(['role']);
 
     expect($adminB->fresh()->teamRole($this->team)->key)->toBe(TeamRole::Admin->value);
 });
 
-test('an invitation row shows its expiry', function (): void {
-    $this->travelTo(now());
+test('the owner can change a member role', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
 
-    $invitation = $this->team->teamInvitations()->create([
-        'email' => 'pending@example.test',
-        'role' => 'editor',
-        'expires_at' => now()->addDays(3),
-    ]);
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('updateTeamRole')->table($member->id), ['role' => TeamRole::Viewer->value])
+        ->assertHasNoActionErrors();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet('expires_at', $invitation->expires_at->diffForHumans(), 'invite:'.$invitation->id);
-});
-
-test('an already-expired invitation shows an expired label, not a raw past date', function (): void {
-    $invitation = $this->team->teamInvitations()->create([
-        'email' => 'expired@example.test',
-        'role' => 'editor',
-        'expires_at' => now()->subDay(),
-    ]);
-
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet('expires_at', __('teams.table.expired'), 'invite:'.$invitation->id);
-});
-
-test('a member row does not show an expiry', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet('expires_at', '', 'member:owner');
-});
-
-test('a pending invitation can be revoked', function (): void {
-    $invitation = $this->team->teamInvitations()->create([
-        'email' => 'pending@example.test',
-        'role' => 'editor',
-        'expires_at' => now()->addDays(5),
-    ]);
-
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('revokeTeamInvitation')->table('invite:'.$invitation->id));
-
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($member->fresh()->teamRole($this->team)->key)->toBe(TeamRole::Viewer->value);
 });
 
 test('multiple people can be invited in one submission', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    Mail::fake();
+
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [
                 ['email' => 'one@example.test', 'role' => TeamRole::Editor->value],
@@ -171,7 +127,7 @@ test('invitePeople rejects an admin role for a non-owner actor', function (): vo
     $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
     $this->actingAs($admin);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'nope@example.test', 'role' => TeamRole::Admin->value]],
         ])
@@ -181,14 +137,13 @@ test('invitePeople rejects an admin role for a non-owner actor', function (): vo
 });
 
 /**
- * Ported from the deleted TeamMembersTest when the three member widgets merged
- * into this component (main #508). Production is missing the team_user foreign
- * keys, so a deleted account can leave an orphaned pivot row behind; the old
- * page 500'd on it because Filament::getUserAvatarUrl() is typed non-nullable.
- * TeamPerson inner-joins users, so orphans are excluded structurally rather
- * than by a whereHas filter — this pins that they stay excluded.
+ * Production is missing the team_user foreign keys, so a deleted account can
+ * leave an orphaned pivot row behind; the page 500s on it because
+ * Filament::getUserAvatarUrl() is typed non-nullable. Selecting through `users`
+ * excludes orphans structurally rather than by a whereHas filter — this pins
+ * that they stay excluded.
  */
-test('the unified list skips a membership row whose user no longer exists', function (): void {
+test('the members list skips a membership row whose user no longer exists', function (): void {
     Schema::table('team_user', function (Blueprint $table): void {
         $table->dropForeign(['user_id']);
     });
@@ -204,7 +159,7 @@ test('the unified list skips a membership row whose user no longer exists', func
     $deletedEmail = $deletedUser->email;
     $deletedUser->delete();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->assertSee($member->email)
         ->assertDontSee($deletedEmail);
 });
@@ -214,7 +169,7 @@ test('a crafted payload above the batch cap is rejected server-side', function (
         ->map(fn (int $i): array => ['email' => "batch{$i}@example.test", 'role' => TeamRole::Editor->value])
         ->all();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
         ->assertHasActionErrors();
 
@@ -228,7 +183,7 @@ test('a submission exactly at the batch cap succeeds', function (): void {
         ->map(fn (int $i): array => ['email' => "atcap{$i}@example.test", 'role' => TeamRole::Editor->value])
         ->all();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
         ->assertHasNoActionErrors();
 
@@ -245,15 +200,15 @@ test('cumulative invite volume beyond the window cap is throttled, not just the 
         ->map(fn (int $i): array => ['email' => "second{$i}@example.test", 'role' => TeamRole::Editor->value])
         ->all();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $firstBatch]);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $secondBatch]);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'onemore@example.test', 'role' => TeamRole::Editor->value]],
         ]);
@@ -262,7 +217,7 @@ test('cumulative invite volume beyond the window cap is throttled, not just the 
 });
 
 test('the owner can change the invite link default role', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('manageInviteLink')->table(), [
             'invite_link_default_role' => TeamRole::Viewer->value,
         ]);
@@ -275,7 +230,7 @@ test('an admin cannot set the invite link default role to admin', function (): v
     $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
     $this->actingAs($admin);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('manageInviteLink')->table(), [
             'invite_link_default_role' => TeamRole::Admin->value,
         ])
@@ -290,7 +245,7 @@ test('rotating the invite link changes the token', function (): void {
     // rotateInviteLink is an extra footer action nested inside manageInviteLink's
     // modal, not a standalone table action — Filament resolves it relative to
     // the mounted parent action, so the chain is expressed as an array.
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction([
             TestAction::make('manageInviteLink')->table(),
             TestAction::make('rotateInviteLink'),

@@ -13,6 +13,7 @@ return [
         ],
         'email' => [
             'label' => 'Email',
+            'placeholder' => 'name@company.com',
         ],
     ],
 
@@ -33,6 +34,7 @@ return [
         'save' => 'Save',
         'add_team_member' => 'Add',
         'invite_people' => 'Invite people',
+        'send_invitations' => 'Send invitations',
         'add_another' => 'Add another',
         'invite_link' => 'Invite link',
         'rotate_invite_link' => 'Generate a new link',
@@ -40,7 +42,6 @@ return [
         'remove_team_member' => 'Remove',
         'leave_team' => 'Leave',
         'resend_team_invitation' => 'Resend',
-        'copy_invite_link' => 'Copy Link',
         'revoke_team_invitation' => 'Revoke',
         'delete_team' => 'Delete Workspace',
         'cancel_deletion' => 'Cancel Deletion',
@@ -55,9 +56,6 @@ return [
         ],
         'team_invitation_revoked' => [
             'success' => 'Invitation revoked.',
-        ],
-        'invite_link_copied' => [
-            'success' => 'Invite link copied to clipboard.',
         ],
         'team_member_removed' => [
             'success' => 'You have removed this member.',
@@ -150,16 +148,17 @@ return [
     ],
 
     'table' => [
-        'heading' => 'People',
-        'counts' => ':members members, :pending pending',
-        'person' => 'Person',
+        'members_heading' => 'Members',
+        'members_count' => '{1} 1 person has access|[2,*] :count people have access',
+        'pending_heading' => 'Pending invitations',
+        'pending_count' => '{1} 1 person has been invited and has not joined yet|[2,*] :count people have been invited and have not joined yet',
+        'photo' => 'Photo',
+        'member' => 'Member',
+        'email' => 'Email',
         'role' => 'Role',
-        'status' => 'Status',
-        'since' => 'Since',
+        'joined' => 'Joined',
         'expires' => 'Expires',
         'expired' => 'Expired',
-        'status_member' => 'Member',
-        'status_invited' => 'Invitation pending',
     ],
 
     'invite_link' => [
