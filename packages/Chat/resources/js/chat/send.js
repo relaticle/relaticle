@@ -113,7 +113,21 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         if (!document) return;
 
         this.$nextTick(() => {
-            this.localEditor()?.setDocument?.(document);
+            // plainDocument() only guards against the Proxy/structuredClone
+            // throw; it does not validate ProseMirror schema shape. Drafts
+            // are pruned only after 30 days (pruneStaleDrafts()), so a stored
+            // document can easily outlive a TipTap/mention schema change
+            // across a deploy. setDocument() -> editor.commands.setContent()
+            // throws on a schema-invalid document, and an uncaught throw
+            // inside $nextTick can drop other callbacks queued in the same
+            // Alpine flush (see plainDocument()'s own comment above). Discard
+            // the bad draft on failure so it does not throw on every future
+            // mount of this conversation.
+            try {
+                this.localEditor()?.setDocument?.(document);
+            } catch (_) {
+                this.clearDraft(conversationId);
+            }
         });
     },
 

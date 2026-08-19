@@ -351,6 +351,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();
+        // Without this, a pending saveDraft() debounce outlives this instance
+        // (e.g. a fragment typed here, then the user switches conversations
+        // within 400ms via the side panel or a wire:navigate link). The
+        // orphaned timer still fires bound to this dead instance's `this`,
+        // calls localEditor(), which resolves by context name and finds the
+        // NEW live instance mounted under the same context: it reads and
+        // saves THAT instance's content under THIS instance's conversation
+        // id. Confirmed live: switching A -> B within the debounce window
+        // wrote B's private draft text into both chat.draft.<A> and
+        // chat.draft.<B>.
+        clearTimeout(this.draftDebounceTimer);
         this.unsubscribe();
         window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         window.removeEventListener('chat:renamed', this.renamedHandler);
