@@ -21,8 +21,8 @@
     {{-- Navigation --}}
     @php($mobileNavItems = app(\App\Support\MarketingNavigation::class)->mobile())
 
-    <nav class="flex-1 flex flex-col justify-center px-8 overflow-y-auto py-6">
-        <div class="space-y-1">
+    <nav class="flex-1 flex flex-col px-8 overflow-y-auto py-6">
+        <div class="space-y-1 my-auto">
             @foreach($mobileNavItems as $item)
                 @if($item->url === null && count($item->children) > 0)
                     @php($slug = \Illuminate\Support\Str::slug($item->label))
