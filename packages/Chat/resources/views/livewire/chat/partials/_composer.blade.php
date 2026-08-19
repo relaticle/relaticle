@@ -61,7 +61,7 @@
                     },
                 })"
                 x-on:chat:editor-submit.window="sendMessage()"
-                x-on:chat:editor-change.window="input = $event.detail.text"
+                x-on:chat:editor-change.window="input = $event.detail.text; saveDraft()"
                 {{-- No global setter needed — chatInterface uses localEditor() to scope-resolve. --}}
                 data-chat-context="{{ $context ?? 'conversation' }}"
                 class="relative rounded-2xl border border-gray-200 bg-white transition focus-within:border-primary-500 dark:border-gray-700 dark:bg-gray-800"

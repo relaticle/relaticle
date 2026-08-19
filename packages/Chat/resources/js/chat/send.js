@@ -45,6 +45,114 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         }
     },
 
+    draftDebounceTimer: null,
+
+    // A conversation that hasn't been created yet (composer works before the
+    // first message creates one) buckets its draft under the literal 'new'
+    // segment. There is exactly one composer worth persisting per browser tab
+    // in that state (the side panel or the full-page composer, never both
+    // meaningfully at once), so a flat key is sufficient.
+    draftKey(conversationId) {
+        return `chat.draft.${conversationId ?? 'new'}`;
+    },
+
+    // Debounced (400ms) persistence of the live editor document. The key is
+    // resolved from this.conversationId at the moment the timer actually
+    // fires, not when typing started, so a draft typed before the first send
+    // naturally migrates from the 'new' bucket to the real conversation id
+    // once one exists. An empty editor removes the key rather than writing an
+    // empty document — this also makes the explicit clearDraft() call in
+    // deliverMessage's success path idempotent with whatever this debounce
+    // independently does, regardless of which one lands first.
+    saveDraft() {
+        clearTimeout(this.draftDebounceTimer);
+        this.draftDebounceTimer = setTimeout(() => {
+            this.draftDebounceTimer = null;
+
+            const editor = this.localEditor();
+            if (!editor) return;
+
+            const key = this.draftKey(this.conversationId);
+            if (editor.isEmpty()) {
+                try { localStorage.removeItem(key); } catch (_) { /* ignore */ }
+                return;
+            }
+
+            const document = this.plainDocument(editor.getDocument());
+            if (!document) return;
+
+            try {
+                localStorage.setItem(key, JSON.stringify({ document, savedAt: Date.now() }));
+            } catch (_) { /* quota exceeded or private mode: draft safety is best-effort */ }
+        }, 400);
+    },
+
+    // Restores a persisted draft into the editor on mount / conversation
+    // switch. The document read back from localStorage is already plain JSON
+    // (it round-tripped through JSON.stringify going in and JSON.parse coming
+    // out), but it is explicitly re-run through plainDocument() anyway rather
+    // than relying on that implicitly — this restore path must never be the
+    // one that regresses to handing TipTap a live Proxy.
+    restoreDraft(conversationId) {
+        let raw = null;
+        try {
+            raw = localStorage.getItem(this.draftKey(conversationId));
+        } catch (_) {
+            return;
+        }
+        if (!raw) return;
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (_) {
+            return;
+        }
+
+        const document = this.plainDocument(parsed?.document);
+        if (!document) return;
+
+        this.$nextTick(() => {
+            this.localEditor()?.setDocument?.(document);
+        });
+    },
+
+    clearDraft(conversationId) {
+        try {
+            localStorage.removeItem(this.draftKey(conversationId));
+        } catch (_) { /* ignore */ }
+    },
+
+    // A conversation can be deleted from several independent client entry
+    // points (side panel menu, sidebar nav, all-chats panel) plus a REST API
+    // path with no client to notify at all. Rather than wire a cleanup call
+    // into every one of those, prune anything stale on mount instead —
+    // bounded leakage (up to 30 days) rather than an exhaustive, fragile hook
+    // list that a future deletion path can silently miss.
+    pruneStaleDrafts() {
+        const cutoffMs = 30 * 24 * 60 * 60 * 1000;
+        try {
+            const staleKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || !key.startsWith('chat.draft.')) continue;
+
+                let savedAt = 0;
+                try {
+                    savedAt = JSON.parse(localStorage.getItem(key))?.savedAt ?? 0;
+                } catch (_) {
+                    staleKeys.push(key);
+                    continue;
+                }
+
+                if (!savedAt || (Date.now() - savedAt) > cutoffMs) {
+                    staleKeys.push(key);
+                }
+            }
+            staleKeys.forEach((key) => localStorage.removeItem(key));
+        } catch (_) { /* localStorage unavailable */ }
+    },
+
     async regenerateMessage(index) {
         if (this.isStreaming) return;
 
@@ -135,6 +243,14 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // resets must keep that invariant.
         this.isStreaming = true;
 
+        // Captured BEFORE editor.clear() below and before any await: this is the
+        // bucket the draft debounce was writing to while the user was still
+        // typing this exact message. deliverMessage() clears it on success. If we
+        // instead resolved this key AFTER conversationId is assigned (isFirstMessage
+        // sets it mid-flight), a successful first send would clear the wrong
+        // ('new') bucket and leave the real one orphaned.
+        const draftKey = this.draftKey(this.conversationId);
+
         // The user moved on without acting on any prior proposals. Server will
         // confirm via .pending_actions_superseded; we update locally so the
         // approve/reject buttons disappear immediately.
@@ -171,7 +287,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // binding is never notified to re-render.
         const userMsg = this.messages[this.messages.length - 1];
 
-        await this.deliverMessage(userMsg, payload, contextForSend);
+        await this.deliverMessage(userMsg, payload, contextForSend, draftKey);
     },
 
     // Re-sends a FAILED optimistic bubble in place: same clientKey, same
@@ -183,6 +299,12 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         if (this.hasPendingProposal) return;
         if (msg.sendState === 'sending') return;
 
+        // Same capture-before-any-async reasoning as sendMessage(): a retry of
+        // the very first message can still take the isFirstMessage branch (the
+        // original attempt never got a conversationId), so this must be resolved
+        // before deliverMessage has a chance to assign one.
+        const draftKey = this.draftKey(this.conversationId);
+
         // A manual resend overrides any auto-resend countdown still ticking
         // for this bubble.
         this.clearRateLimit();
@@ -192,13 +314,16 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         this.markPendingActionsSuperseded();
 
         const payload = this.plainDocument(msg.document) ?? this.documentFromInput(msg.content);
-        await this.deliverMessage(msg, payload, msg.page_context ?? null);
+        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftKey);
     },
 
     // The network round trip shared by a fresh sendMessage() and a
     // resendMessage() retry. `userMsg` is mutated in place (sendState only,
     // never re-pushed), so both callers converge on the exact same bubble.
-    async deliverMessage(userMsg, payload, contextForSend) {
+    // `draftKey` is the composer's draft bucket AT THE TIME this send started
+    // (see the capture comments in sendMessage()/resendMessage()) — cleared on
+    // every path below that lands sendState at 'sent'.
+    async deliverMessage(userMsg, payload, contextForSend, draftKey) {
         const isFirstMessage = !this.conversationId;
 
         if (isFirstMessage) {
@@ -321,11 +446,13 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 }
 
                 userMsg.sendState = 'sent';
+                this.clearDraft(draftKey);
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     // A deliberate cancel, not a delivery failure: the request
                     // may already have landed server-side.
                     userMsg.sendState = 'sent';
+                    this.clearDraft(draftKey);
                     return;
                 }
                 const assistantMsg = this.messages[this.messages.length - 1];
@@ -429,9 +556,11 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 this.subscribeToConversation(body.conversation_id);
             }
             userMsg.sendState = 'sent';
+            this.clearDraft(draftKey);
         } catch (error) {
             if (error?.name === 'AbortError') {
                 userMsg.sendState = 'sent';
+                this.clearDraft(draftKey);
                 return;
             }
 
