@@ -111,6 +111,35 @@ test('an admin cannot demote a peer admin through the merged table', function ()
     expect($adminB->fresh()->teamRole($this->team)->key)->toBe(TeamRole::Admin->value);
 });
 
+test('an invitation row shows its expiry', function (): void {
+    $this->travelTo(now());
+
+    $invitation = $this->team->teamInvitations()->create([
+        'email' => 'pending@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(3),
+    ]);
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->assertTableColumnFormattedStateSet('expires_at', $invitation->expires_at->diffForHumans(), 'invite:'.$invitation->id);
+});
+
+test('an already-expired invitation shows an expired label, not a raw past date', function (): void {
+    $invitation = $this->team->teamInvitations()->create([
+        'email' => 'expired@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->subDay(),
+    ]);
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->assertTableColumnFormattedStateSet('expires_at', __('teams.table.expired'), 'invite:'.$invitation->id);
+});
+
+test('a member row does not show an expiry', function (): void {
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->assertTableColumnFormattedStateSet('expires_at', '', 'member:owner');
+});
+
 test('a pending invitation can be revoked', function (): void {
     $invitation = $this->team->teamInvitations()->create([
         'email' => 'pending@example.test',
