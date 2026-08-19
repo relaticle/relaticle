@@ -136,6 +136,12 @@ describe('Documentation', function (): void {
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
+        // refreshApplication() rebuilds the container, discarding the
+        // withoutVite() from TestCase::setUp(). These pages render the full
+        // marketing layout, so without this they need a built manifest, which
+        // CI does not have when it runs the suite.
+        $this->withoutVite();
+
         // The shared footer and both product pages link routes the Documentation
         // provider registers. Unguarded, a single route() call 500s the whole
         // marketing site the moment this flag is turned off.
