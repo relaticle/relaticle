@@ -182,17 +182,14 @@ it('falls back the source credit period to the calendar month, not the moved sub
         ->toBe(now()->startOfMonth()->toDateTimeString());
 });
 
-it('refuses to transfer when the source subscription is no longer valid', function (): void {
+it('hides the transfer action when the source subscription is no longer valid', function (): void {
     [$source, $target, $subscription] = transferPair([
         'stripe_status' => 'canceled',
         'ends_at' => now()->subDay(),
     ]);
 
     livewire(ListSubscriptions::class)
-        ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
-        ])
-        ->assertNotified('Transfer refused');
+        ->assertActionHidden(TestAction::make('transfer')->table($subscription));
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
@@ -321,10 +318,7 @@ it('throws when the target is scheduled for deletion, called directly', function
 });
 
 it('keeps the transfer modal open when the transfer is refused', function (): void {
-    [$source, $target, $subscription] = transferPair([
-        'stripe_status' => 'canceled',
-        'ends_at' => now()->subDay(),
-    ]);
+    [$source, $target, $subscription] = transferPair(['stripe_price' => 'price_not_in_config']);
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [

@@ -181,6 +181,7 @@ final class SubscriptionResource extends Resource
             ->icon('heroicon-o-arrows-right-left')
             ->color('warning')
             ->authorize('transfer')
+            ->visible(fn (Subscription $record): bool => $record->valid())
             ->modalHeading('Transfer billing to another workspace')
             ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. Nothing changes in Stripe: the same card is charged on the same date. Invoice history follows the customer, and the customer keeps its current name, so rename it in the Stripe dashboard if that matters. Only workspaces with the same owner, no Stripe customer of their own, and not scheduled for deletion are listed.')
             ->modalSubmitActionLabel('Transfer')
