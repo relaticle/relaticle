@@ -45,6 +45,28 @@
         </div>
     </template>
 
+    {{-- Sticky date pill: shows the calendar day the user has scrolled past
+         (updated via IntersectionObserver over the inline separators below).
+         The wrapper is `sticky` + zero-height so toggling the pill never
+         shifts scroll content; the pill itself overflows above/below that
+         0px box. Purely a supplementary visual aid: the inline separators
+         already carry the same information in reading order, so it stays
+         out of the accessibility tree. --}}
+    <div class="sticky top-2 z-20 flex h-0 justify-center" aria-hidden="true">
+        <span
+            x-show="stickyDateLabel"
+            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
+            x-transition:enter-start="motion-safe:opacity-0"
+            x-transition:enter-end="motion-safe:opacity-100"
+            x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-100"
+            x-transition:leave-start="motion-safe:opacity-100"
+            x-transition:leave-end="motion-safe:opacity-0"
+            x-text="stickyDateLabel"
+            style="display: none;"
+            class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+        ></span>
+    </div>
+
     <div class="mx-auto max-w-3xl space-y-6">
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">
@@ -62,10 +84,28 @@
              prepends (load earlier) and pops (continuation revert) must not
              re-bind DOM nodes across different logical messages. --}}
         <template x-for="(msg, index) in messages" :key="msg.clientKey || ('i-' + index)">
-            <div class="group/message">
+            <div
+                class="group/message"
+                {{-- Tightens the gap AFTER this message when the NEXT one groups
+                     with it (space-y-6 on the parent sets each item's own
+                     trailing margin, so the message being pulled closer to its
+                     successor is the one whose margin must shrink). --}}
+                :class="(index + 1 < messages.length && decorations(index + 1).grouped) ? 'mb-1' : ''"
+            >
+                {{-- Day separator: rendered above this message when its calendar
+                     day differs from the previous message's. --}}
+                <template x-if="decorations(index).daySeparator">
+                    <div data-day-separator class="mb-4 flex justify-center">
+                        <span
+                            x-text="decorations(index).daySeparator"
+                            class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                        ></span>
+                    </div>
+                </template>
+
                 {{-- User message --}}
                 <template x-if="msg.role === 'user'">
-                    <div class="flex justify-end" data-user-bubble :data-send-state="msg.sendState ?? 'sent'">
+                    <div class="flex justify-end" data-user-bubble :data-grouped="decorations(index).grouped" :data-send-state="msg.sendState ?? 'sent'">
                         <div class="flex max-w-[80%] flex-col items-end gap-1">
                             <template x-if="!msg.editing">
                                 <div
@@ -187,7 +227,7 @@
 
                 {{-- Assistant message --}}
                 <template x-if="msg.role === 'assistant' && (msg.rendered || msg.content || msg.streamError || (index === messages.length - 1 && isStreaming && currentToolStatus))">
-                    <div class="flex flex-col items-start">
+                    <div class="flex flex-col items-start" data-assistant-bubble :data-grouped="decorations(index).grouped">
                         <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
                                 :title="msg.created_at ? 'Completed ' + new Date(msg.created_at).toLocaleString() : ''"

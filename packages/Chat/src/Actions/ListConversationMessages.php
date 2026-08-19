@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -91,7 +92,16 @@ final readonly class ListConversationMessages
 
                 return is_array($decoded) ? $decoded : ['type' => 'doc', 'content' => []];
             })($msg->document ?? null),
-            'created_at' => $msg->created_at === null ? null : (string) $msg->created_at,
+            // Normalized to the same ISO 8601 UTC shape (`.toISOString()`) the
+            // client mints for optimistic/streamed messages, see send.js and
+            // stream.js. The raw DB column value is `Y-m-d H:i:s` with no
+            // timezone marker; browsers parse that non-ISO form as LOCAL time,
+            // not UTC (a real, silent divergence from the client-minted rows,
+            // which are true UTC), so leaving it as-is here would corrupt any
+            // client-side comparison across the two message shapes (grouping
+            // gaps, day separators, and the bubble tooltips, which were
+            // already reading the wrong time before this fix).
+            'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
             'pending_actions' => $this->extractPendingActions(
                 $msg->tool_results === null ? null : (string) $msg->tool_results,
                 $records,

@@ -38,7 +38,11 @@
 @script
 <script>
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
-    ...window.ChatModules.transcriptModule({ messagesUrl: @js(url('/chat/messages')) }),
+    ...window.ChatModules.transcriptModule({
+        messagesUrl: @js(url('/chat/messages')),
+        todayLabel: @js(__('Today')),
+        yesterdayLabel: @js(__('Yesterday')),
+    }),
     ...window.ChatModules.sendModule({
         sendUrl,
         createConversationUrl: @js(route('chat.conversations.create')),
@@ -161,6 +165,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     init() {
         this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
         this.installConversationSwitchWatch();
+        this.initDaySeparatorObserver();
 
         const validModels = this.modelOptions
             .map((o) => o.value)
@@ -352,6 +357,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     destroy() {
         this.stashConversationCache();
         this.uninstallConversationSwitchWatch();
+        this.teardownDaySeparatorObserver();
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();

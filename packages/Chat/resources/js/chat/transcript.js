@@ -7,6 +7,10 @@
 
 const CONVERSATION_CACHE_LIMIT = 5;
 
+// Consecutive same-role messages closer together than this render as one
+// visual group (no repeated timestamp/avatar chrome, tighter spacing).
+const GROUPING_GAP_MINUTES = 3;
+
 // Cache-first conversation switching (window-scoped Map, LRU-capped at 5).
 //
 // Confirmed empirically before writing this: clicking a `wire:navigate`
@@ -90,10 +94,18 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl }) => ({
+export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday' }) => ({
     prependScrollAnchor: null,
     now: Date.now(),
     copyTickerId: null,
+
+    // Floating sticky-date pill (see initDaySeparatorObserver): the label of
+    // the last inline day separator the user has scrolled past, or null when
+    // none has (single-day transcript, or still at the very top).
+    stickyDateLabel: null,
+    _daySeparatorObserver: null,
+    _daySeparatorEls: null,
+    _unwatchDaySeparatorCount: null,
 
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
@@ -111,6 +123,130 @@ export const transcriptModule = ({ messagesUrl }) => ({
             m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
         }
         return m;
+    },
+
+    // Calendar-day comparison uses the BROWSER's local timezone. No user
+    // timezone is threaded to any chat view today (users.timezone is only
+    // ever read server-side, to seed the agent's system prompt in
+    // ProcessChatMessage): adding a new server-to-client channel just for
+    // this would be new plumbing the task does not call for.
+    sameCalendarDay(a, b) {
+        if (!a || !b) return false;
+        const da = new Date(a);
+        const db = new Date(b);
+        if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
+        return da.getFullYear() === db.getFullYear()
+            && da.getMonth() === db.getMonth()
+            && da.getDate() === db.getDate();
+    },
+
+    minutesBetween(a, b) {
+        if (!a || !b) return Infinity;
+        const diff = new Date(b).getTime() - new Date(a).getTime();
+        return Number.isNaN(diff) ? Infinity : Math.abs(diff) / 60000;
+    },
+
+    formatDaySeparator(iso) {
+        const now = new Date();
+        if (this.sameCalendarDay(iso, now)) return todayLabel;
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (this.sameCalendarDay(iso, yesterday)) return yesterdayLabel;
+        return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+    },
+
+    // Per-message render decorations, keyed by position in `messages`.
+    //  - grouped: same role as the previous message, under the grouping gap,
+    //    and the previous message carries no pending action (a proposal card
+    //    must never be visually swallowed into a tight group).
+    //  - daySeparator: the formatted date to show above this message, when
+    //    its calendar day differs from the previous message's (null for the
+    //    very first message, since there is nothing to differ from yet).
+    decorations(index) {
+        const msg = this.messages[index];
+        if (!msg) return { grouped: false, daySeparator: null };
+        const prev = index > 0 ? this.messages[index - 1] : null;
+
+        const grouped = !!prev
+            && prev.role === msg.role
+            && this.minutesBetween(prev.created_at, msg.created_at) < GROUPING_GAP_MINUTES
+            && !(Array.isArray(prev.pending_actions) && prev.pending_actions.length > 0);
+
+        const daySeparator = (prev && !this.sameCalendarDay(prev.created_at, msg.created_at))
+            ? this.formatDaySeparator(msg.created_at)
+            : null;
+
+        return { grouped, daySeparator };
+    },
+
+    // Sticky date pill: a floating element (see chat-interface.blade.php)
+    // shows the label of whichever inline `[data-day-separator]` the user
+    // has most recently scrolled past. Re-wired on every change to the
+    // message COUNT (push, splice, prepend), not a deep watch on `messages`
+    // itself, which would also fire on every streamed token and rescan the
+    // DOM on each one.
+    initDaySeparatorObserver() {
+        this.$nextTick(() => this.refreshDaySeparatorObserver());
+        this._unwatchDaySeparatorCount = this.$watch('messages.length', () => {
+            this.$nextTick(() => this.refreshDaySeparatorObserver());
+        });
+    },
+
+    refreshDaySeparatorObserver() {
+        const container = this.$refs.messages;
+        if (!container || typeof IntersectionObserver === 'undefined') return;
+
+        if (this._daySeparatorObserver) {
+            this._daySeparatorObserver.disconnect();
+            this._daySeparatorObserver = null;
+        }
+
+        this._daySeparatorEls = Array.from(container.querySelectorAll('[data-day-separator]'));
+        if (this._daySeparatorEls.length === 0) {
+            this.stickyDateLabel = null;
+            return;
+        }
+
+        // The callback ignores individual entries and re-scans from scratch:
+        // isIntersecting alone can't tell which of several separators is the
+        // one the user last scrolled past (that needs their relative order),
+        // so the observer here is purely a cheap "something moved near the
+        // top, go recompute" signal rather than the source of truth itself.
+        this._daySeparatorObserver = new IntersectionObserver(
+            () => this.updateStickyDateLabel(),
+            { root: container, threshold: [0, 1] },
+        );
+        this._daySeparatorEls.forEach((el) => this._daySeparatorObserver.observe(el));
+        this.updateStickyDateLabel();
+    },
+
+    updateStickyDateLabel() {
+        const container = this.$refs.messages;
+        if (!container || !this._daySeparatorEls) return;
+
+        const containerTop = container.getBoundingClientRect().top;
+        let active = null;
+        for (const el of this._daySeparatorEls) {
+            if (el.getBoundingClientRect().top - containerTop <= 1) {
+                active = el;
+            } else {
+                break;
+            }
+        }
+
+        this.stickyDateLabel = active ? active.textContent.trim() : null;
+    },
+
+    teardownDaySeparatorObserver() {
+        if (this._daySeparatorObserver) {
+            this._daySeparatorObserver.disconnect();
+            this._daySeparatorObserver = null;
+        }
+        this._daySeparatorEls = null;
+        if (typeof this._unwatchDaySeparatorCount === 'function') {
+            this._unwatchDaySeparatorCount();
+            this._unwatchDaySeparatorCount = null;
+        }
     },
 
     // Stashes the CURRENT conversation's transcript so a later switch back to
