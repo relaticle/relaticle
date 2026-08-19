@@ -216,11 +216,13 @@
                 @endforeach
             </ol>
 
-            <div class="mt-8 text-center">
-                <x-marketing.button variant="secondary" href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
-                    {{ __('Read the full self-hosting guide') }}
-                </x-marketing.button>
-            </div>
+            @feature(App\Features\Documentation::class)
+                <div class="mt-8 text-center">
+                    <x-marketing.button variant="secondary" href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
+                        {{ __('Read the full self-hosting guide') }}
+                    </x-marketing.button>
+                </div>
+            @endfeature
         </div>
     </section>
 
@@ -326,11 +328,13 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                @foreach([
+                @foreach(array_filter([
                     ['url' => 'https://github.com/relaticle/relaticle', 'icon' => 'ri-github-fill', 'title' => __('GitHub'), 'desc' => __('Star the repo, browse the source, and open issues or pull requests directly against the codebase.'), 'cta' => __('View the repository'), 'external' => true],
                     ['url' => route('discord'), 'icon' => 'ri-discord-fill', 'title' => __('Discord'), 'desc' => __('Ask deployment questions and get help from other self-hosters and the maintainers.'), 'cta' => __('Join the Discord'), 'external' => true],
-                    ['url' => route('documentation.show', ['type' => 'contributing']), 'icon' => 'ri-git-repository-line', 'title' => __('Contributing'), 'desc' => __('Architecture overview, local setup, and coding conventions for anyone who wants to send a pull request.'), 'cta' => __('Read the contributing guide'), 'external' => false],
-                ] as $card)
+                    \Laravel\Pennant\Feature::active(App\Features\Documentation::class)
+                        ? ['url' => route('documentation.show', ['type' => 'contributing']), 'icon' => 'ri-git-repository-line', 'title' => __('Contributing'), 'desc' => __('Architecture overview, local setup, and coding conventions for anyone who wants to send a pull request.'), 'cta' => __('Read the contributing guide'), 'external' => false]
+                        : null,
+                ]) as $card)
                     <a href="{{ $card['url'] }}"
                        @if($card['external']) target="_blank" rel="noopener noreferrer" @endif
                        class="group rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6 transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm flex flex-col">

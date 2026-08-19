@@ -66,8 +66,13 @@
                 <p class="text-gray-500 dark:text-gray-400 text-xs">&copy; {{ date('Y') }} Relaticle. All rights
                     reserved.</p>
 
-                <a href="{{ route('llms-txt') }}"
-                   class="text-gray-500 dark:text-gray-400 text-xs hover:text-primary dark:hover:text-primary-400 transition-colors">llms.txt</a>
+                {{-- The Documentation provider registers this route, so it is absent
+                     when that feature is off. An unguarded route() here 500s every
+                     marketing page. --}}
+                @feature(App\Features\Documentation::class)
+                    <a href="{{ route('llms-txt') }}"
+                       class="text-gray-500 dark:text-gray-400 text-xs hover:text-primary dark:hover:text-primary-400 transition-colors">llms.txt</a>
+                @endfeature
             </div>
 
             <x-theme-switcher />

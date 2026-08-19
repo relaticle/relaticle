@@ -69,9 +69,9 @@ Shape (illustrative, final API decided in the plan):
 ### Header (Option C)
 
 - `Product ▾` (single column): Rela (`/ai`), Features (`/#features`), Self-hosted (`/self-hosted`), MCP & API (`/developers`)
-- `Resources ▾` (two-column panel): **Resources** — Help center, Developers, Blog | **Compare** — Relaticle vs Twenty, Relaticle vs EspoCRM, Attio alternative, HubSpot alternative
+- `Resources ▾` (two-column panel): **Resources**: Help center, Developers, Blog | **Compare**: Relaticle vs Twenty, Relaticle vs EspoCRM, Attio alternative, HubSpot alternative
 - Pricing
-- Discord ↗ (external, `rel="noopener noreferrer"` — currently missing)
+- Discord ↗ (external, `rel="noopener noreferrer"`: currently missing)
 - GitHub ★ with star count (see badge section)
 - Sign In, Start for free (unchanged)
 
@@ -119,7 +119,7 @@ call.
 - Dropdown triggers: `aria-expanded`, `aria-controls`; items reachable by keyboard
 - All user-facing strings wrapped in `__()` (i18n PHPStan rules apply)
 
-## Page: `/ai` — Meet Rela
+## Page: `/ai`: Meet Rela
 
 Route: `Route::get('/ai', ...)` name `ai` in the marketing middleware group
 (`ProvideMarkdownResponse`, `AddVaryAcceptHeader`). Feature-gate: none (page
@@ -170,7 +170,7 @@ Honesty rule: the catalog models are cloud (`self_hosted => false`); the page
 must not imply hosted models ship with self-hosted installs. Self-hosted AI =
 your key / your local models.
 
-## Page: `/self-hosted` — Own your CRM
+## Page: `/self-hosted`: Own your CRM
 
 Route: `Route::get('/self-hosted', ...)` name `selfHosted`, same middleware
 group.
@@ -202,7 +202,7 @@ Sections:
 - Motion communicates state, never decorates: dropdown open/close 150-200ms
   ease-out, transform+opacity only (compositor-friendly, no layout thrash)
 - Demo animations run on scroll-into-view, pause off-screen, respect
-  `prefers-reduced-motion` (existing hero already does this — reuse the pattern)
+  `prefers-reduced-motion` (existing hero already does this: reuse the pattern)
 - No layout shift: star badge and demo containers have reserved dimensions
 - Instant perceived nav: no artificial delays, no hover-intent timers
 - Use design tokens from `resources/css/theme.css`; no ad-hoc values
@@ -227,20 +227,20 @@ Sections:
 - Smoke: routes added to the existing smoke suite convention
 - Browser verification (not automated): agent-browser click-through of
   dropdowns (click-open, Escape, outside-click), mobile accordion, both
-  themes, per UI rules — evidence screenshots before "done"
+  themes, per UI rules: evidence screenshots before "done"
 - i18n: PHPStan rules pass with no new ignores
 
 ## Delivery: two stacked PRs
 
-**PR-1 — nav foundation (target: merge before launch 2026-08-21):**
+**PR-1: nav foundation (target: merge before launch 2026-08-21):**
 `MarketingNavigation` class, footer restructure (4 columns + llms.txt),
 mobile/desktop drift fix, a11y (landmarks, `aria-current`), full `__()`,
 `rel` fix on header Discord link, sitemap-reachability test. Header keeps
 its current flat shape in PR-1. PR-1's footer Product column ships without
-the Rela and Self-hosted links (those pages do not exist yet — no 404s);
+the Rela and Self-hosted links (those pages do not exist yet: no 404s);
 PR-2 adds them to the nav source.
 
-**PR-2 — pages + header C (after PR #506 merges):**
+**PR-2: pages + header C (after PR #506 merges):**
 `/ai`, `/self-hosted`, mega-menu header, mobile accordion, GitHub star
 badge. Stacked on PR-1.
 

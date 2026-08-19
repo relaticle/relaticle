@@ -42,13 +42,28 @@ final readonly class MarketingNavigation
                     description: __('Drive Relaticle from your own tools'),
                 ) : null,
             ])),
-            new NavItem(__('Resources'), children: [
+            new NavItem(__('Resources'), children: $this->groups([
                 new NavItem(__('Learn'), children: $this->resourceItems(withDetail: true)),
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
-            ]),
+            ])),
             new NavItem(__('Pricing'), route('pricing')),
             new NavItem(__('Discord'), route('discord'), external: true),
         ];
+    }
+
+    /**
+     * Drops groups that feature flags emptied. A childless group has no url
+     * either, so every surface would render it as a dead anchor.
+     *
+     * @param  list<NavItem>  $groups
+     * @return list<NavItem>
+     */
+    private function groups(array $groups): array
+    {
+        return array_values(array_filter(
+            $groups,
+            fn (NavItem $group): bool => $group->children !== [],
+        ));
     }
 
     /** @return list<NavItem> */

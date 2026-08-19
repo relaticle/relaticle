@@ -41,7 +41,7 @@
         [
             __('Is :name included in the free plan?', ['name' => $assistantName]),
             __(
-                'Yes. Every workspace, free or paid, self-hosted or hosted, gets :name with a :credits-credit monthly allowance on the free-tier model. Upgrading raises the allowance and unlocks the higher-tier models.',
+                'Yes. On Relaticle Cloud every workspace, free or paid, gets :name with a :credits-credit monthly allowance on the free-tier model, and upgrading raises the allowance and unlocks the higher-tier models. A self-hosted install ships with no provider configured, so you add your own key or point it at a local model, and you pay that provider directly.',
                 ['name' => $assistantName, 'credits' => $freeCredits]
             ),
         ],
@@ -321,11 +321,13 @@
                 {{ __('Relaticle ships a built-in MCP server, so your own AI client can read and write your CRM directly. It works with Claude, ChatGPT, and any other MCP-compatible client. MCP calls run against the same records, and because you authorized the client yourself, they apply straight away rather than waiting for an in-app approval.') }}
             </p>
 
-            <div class="mt-8">
-                <x-marketing.button variant="secondary" href="{{ route('documentation.index') }}">
-                    {{ __('Read the developer docs') }}
-                </x-marketing.button>
-            </div>
+            @feature(App\Features\Documentation::class)
+                <div class="mt-8">
+                    <x-marketing.button variant="secondary" href="{{ route('documentation.index') }}">
+                        {{ __('Read the developer docs') }}
+                    </x-marketing.button>
+                </div>
+            @endfeature
         </div>
     </section>
 

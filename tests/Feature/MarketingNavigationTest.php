@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Support\MarketingNavigation;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Pennant\Feature;
 
 mutates(MarketingNavigation::class);
 
@@ -86,4 +87,20 @@ it('keeps the star count to the hero, not the header', function (): void {
     // The hero carries the social proof. A second occurrence would mean the
     // header badge came back, which duplicates it in the sticky chrome.
     expect(substr_count($html, '1.5K'))->toBe(1);
+});
+
+it('drops nav groups that feature flags emptied instead of rendering a dead link', function (): void {
+    // With both content flags off, the Resources dropdown's "Learn" group has no
+    // children and no url of its own, so an unfiltered group renders <a href="">.
+    config()->set('relaticle.features.documentation', false);
+    config()->set('relaticle.features.blog', false);
+    Feature::purge();
+
+    $groups = app(MarketingNavigation::class)->header();
+
+    foreach ($groups as $group) {
+        foreach ($group->children as $child) {
+            expect($child->url !== null || $child->children !== [])->toBeTrue();
+        }
+    }
 });
