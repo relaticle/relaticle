@@ -8,6 +8,7 @@ use App\Actions\Jetstream\InviteTeamMember;
 use App\Actions\Jetstream\RemoveTeamMember;
 use App\Actions\Jetstream\ResendTeamInvitation;
 use App\Actions\Jetstream\RevokeTeamInvitation;
+use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Jetstream\UpdateTeamMemberRole;
 use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
@@ -16,13 +17,13 @@ use App\Models\TeamInvitation;
 use App\Models\TeamPerson;
 use App\Models\User;
 use Closure;
-use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -37,6 +38,24 @@ use Laravel\Jetstream\Jetstream;
 final class ManageMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
+
+    /**
+     * Bounds one invite submission — generous for real bulk-inviting a team,
+     * but stops a single authorized call from queuing an unbounded number of
+     * Mail sends (the onboarding wizard's invite step caps at 5 for the same
+     * reason; this screen is used long after onboarding, so it allows more).
+     */
+    private const int MAX_INVITES_PER_SUBMISSION = 10;
+
+    /**
+     * Bounds cumulative invite volume per actor within the window below,
+     * independent of how many separate submissions it takes to reach it —
+     * `rateLimit()` alone only throttles the number of calls, not the number
+     * of emails each call can queue.
+     */
+    private const int MAX_INVITES_PER_WINDOW = 20;
+
+    private const int INVITE_WINDOW_SECONDS = 60;
 
     public Team $team;
 
@@ -59,6 +78,7 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
             ]))
             ->headerActions([
                 $this->invitePeopleAction(),
+                $this->manageInviteLinkAction(),
             ])
             ->columns([
                 Tables\Columns\TextColumn::make('name')
@@ -124,6 +144,7 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
                 Repeater::make('invites')
                     ->hiddenLabel()
                     ->defaultItems(1)
+                    ->maxItems(self::MAX_INVITES_PER_SUBMISSION)
                     ->addActionLabel(__('teams.actions.add_another'))
                     ->schema([
                         TextInput::make('email')
@@ -149,22 +170,39 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
      */
     private function sendInvitations(array $invites): void
     {
-        try {
-            $this->rateLimit(5);
-        } catch (TooManyRequestsException $exception) {
-            $this->sendRateLimitedNotification($exception);
+        $invites = array_values(array_filter(
+            $invites,
+            fn (array $invite): bool => filled($invite['email'] ?? null),
+        ));
+
+        if ($invites === []) {
+            return;
+        }
+
+        // Volume-based, not call-based: `rateLimit()` would only throttle how
+        // often this method runs, not how many emails a single run queues —
+        // `maxItems()` on the repeater already bounds one submission, this
+        // bounds cumulative volume across submissions from the same actor.
+        $rateLimitKey = 'invite-team-members:'.$this->authUser()->id;
+
+        if (RateLimiter::tooManyAttempts($rateLimitKey, self::MAX_INVITES_PER_WINDOW)) {
+            $this->sendNotification(
+                __('teams.notifications.invite_rate_limited.title'),
+                __('teams.notifications.invite_rate_limited.body', [
+                    'seconds' => RateLimiter::availableIn($rateLimitKey),
+                ]),
+                'danger',
+            );
 
             return;
         }
+
+        RateLimiter::increment($rateLimitKey, self::INVITE_WINDOW_SECONDS, count($invites));
 
         $failures = [];
         $sent = 0;
 
         foreach ($invites as $invite) {
-            if (blank($invite['email'] ?? null)) {
-                continue;
-            }
-
             try {
                 resolve(InviteTeamMember::class)->invite(
                     $this->authUser(),
@@ -192,6 +230,46 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
         }
 
         $this->resetTable();
+    }
+
+    private function manageInviteLinkAction(): Action
+    {
+        return Action::make('manageInviteLink')
+            ->label(__('teams.actions.invite_link'))
+            ->color('gray')
+            ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
+            ->schema([
+                TextEntry::make('url')
+                    ->label(__('teams.invite_link.url'))
+                    ->state(fn (): string => route('teams.join', ['token' => $this->team->invite_link_token]))
+                    ->copyable(),
+                Select::make('invite_link_default_role')
+                    ->label(__('teams.invite_link.default_role'))
+                    ->options(fn (): array => $this->assignableRoles())
+                    ->in(fn (): array => array_keys($this->assignableRoles()))
+                    ->default(fn (): string => $this->team->invite_link_default_role)
+                    ->required(),
+            ])
+            ->extraModalFooterActions([
+                Action::make('rotateInviteLink')
+                    ->label(__('teams.actions.rotate_invite_link'))
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->action(function (): void {
+                        resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->team);
+
+                        $this->sendNotification(__('teams.notifications.invite_link_rotated.success'));
+                    }),
+            ])
+            ->action(function (array $data): void {
+                resolve(UpdateInviteLinkSettings::class)->update(
+                    $this->authUser(),
+                    $this->team,
+                    (string) $data['invite_link_default_role'],
+                );
+
+                $this->sendNotification();
+            });
     }
 
     private function updateTeamRoleAction(): Action

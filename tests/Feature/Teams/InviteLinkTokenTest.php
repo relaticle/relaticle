@@ -221,3 +221,32 @@ test('joining a team scheduled for deletion is blocked', function (): void {
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
+
+test('the join link grants the configured default role', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $team->update(['invite_link_default_role' => TeamRole::Viewer->value]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect();
+
+    expect($joiner->fresh()->teamRole($team->fresh())->key)
+        ->toBe(TeamRole::Viewer->value);
+});
+
+test('teams without a configured default still grant editor', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect();
+
+    expect($joiner->fresh()->teamRole($team->fresh())->key)
+        ->toBe(TeamRole::Editor->value);
+});
