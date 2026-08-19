@@ -78,13 +78,12 @@ it('renders product and resources dropdown groups with new page links', function
         ->and($html)->toContain(__('Compare'));
 });
 
-it('shows the cached github star count in the header', function (): void {
+it('keeps the star count to the hero, not the header', function (): void {
     Cache::put('github_stars_Relaticle_relaticle', 1517, 60);
 
     $html = $this->get('/')->assertOk()->getContent();
 
-    // The homepage hero already renders "1.5K+ stars" independently of the
-    // header badge, so a single occurrence would pass even without a header
-    // badge. Require a second occurrence to prove the header renders one too.
-    expect(substr_count($html, '1.5K'))->toBeGreaterThanOrEqual(2);
+    // The hero carries the social proof. A second occurrence would mean the
+    // header badge came back, which duplicates it in the sticky chrome.
+    expect(substr_count($html, '1.5K'))->toBe(1);
 });

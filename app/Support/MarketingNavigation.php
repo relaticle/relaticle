@@ -17,13 +17,33 @@ final readonly class MarketingNavigation
     {
         return [
             new NavItem(__('Product'), children: array_filter([
-                new NavItem(__('Rela'), route('ai')),
-                new NavItem(__('Features'), url('/#features')),
-                new NavItem(__('Self-hosted'), route('selfHosted')),
-                Feature::active(Documentation::class) ? new NavItem(__('MCP and API'), route('documentation.index')) : null,
+                new NavItem(
+                    (string) config('chat.assistant_name'),
+                    route('ai'),
+                    icon: 'assistant',
+                    description: __('The AI teammate that proposes every change'),
+                ),
+                new NavItem(
+                    __('Features'),
+                    url('/#features'),
+                    icon: 'features',
+                    description: __('Records, pipelines, and custom fields'),
+                ),
+                new NavItem(
+                    __('Self-hosted'),
+                    route('selfHosted'),
+                    icon: 'self-hosted',
+                    description: __('Run the whole CRM on your own server'),
+                ),
+                Feature::active(Documentation::class) ? new NavItem(
+                    __('MCP and API'),
+                    route('documentation.index'),
+                    icon: 'api',
+                    description: __('Drive Relaticle from your own tools'),
+                ) : null,
             ])),
             new NavItem(__('Resources'), children: [
-                new NavItem(__('Resources'), children: $this->resourceItems()),
+                new NavItem(__('Learn'), children: $this->resourceItems(withDetail: true)),
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
             ]),
             new NavItem(__('Pricing'), route('pricing')),
@@ -61,13 +81,32 @@ final readonly class MarketingNavigation
         ];
     }
 
-    /** @return list<NavItem> */
-    private function resourceItems(): array
+    /**
+     * @param  bool  $withDetail  Adds the icon and one-line description the mega menu renders.
+     * @return list<NavItem>
+     */
+    private function resourceItems(bool $withDetail = false): array
     {
+        $detail = fn (string $icon, string $description): array => $withDetail
+            ? ['icon' => $icon, 'description' => $description]
+            : [];
+
         return array_values(array_filter([
-            Feature::active(Documentation::class) ? new NavItem(__('Help center'), route('help.index')) : null,
-            Feature::active(Documentation::class) ? new NavItem(__('Developers'), route('documentation.index')) : null,
-            Feature::active(Blog::class) ? new NavItem(__('Blog'), route('blog.index')) : null,
+            Feature::active(Documentation::class) ? new NavItem(
+                __('Help center'),
+                route('help.index'),
+                ...$detail('help', __('Guides for every part of the product')),
+            ) : null,
+            Feature::active(Documentation::class) ? new NavItem(
+                __('Developers'),
+                route('documentation.index'),
+                ...$detail('developers', __('Self-hosting, MCP, and contributing')),
+            ) : null,
+            Feature::active(Blog::class) ? new NavItem(
+                __('Blog'),
+                route('blog.index'),
+                ...$detail('blog', __('How we build an open-source CRM')),
+            ) : null,
         ]));
     }
 

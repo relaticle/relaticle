@@ -41,33 +41,21 @@
                                      x-transition:leave-end="opacity-0"
                                      x-cloak
                                      id="menu-{{ $slug }}"
-                                     class="absolute left-0 top-full mt-2 rounded-xl border border-gray-200/60 dark:border-white/[0.06] bg-white dark:bg-gray-950 shadow-lg p-2 @if($isTwoColumn) grid grid-cols-2 gap-6 min-w-[26rem] p-4 @else min-w-56 @endif">
+                                     class="absolute left-0 top-full mt-2 rounded-2xl border border-gray-200/70 dark:border-white/[0.07] bg-white dark:bg-gray-950 shadow-xl shadow-gray-950/[0.06] dark:shadow-black/40 p-2 @if($isTwoColumn) grid grid-cols-2 min-w-[34rem] divide-x divide-gray-100 dark:divide-white/[0.06] @else min-w-[20rem] @endif">
                                     @foreach($item->children as $child)
                                         @if($child->url === null && count($child->children) > 0)
-                                            <div>
-                                                <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                                            <div class="px-2 first:pl-0 last:pr-0">
+                                                <p class="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                                     {{ $child->label }}
                                                 </p>
                                                 <div class="space-y-0.5">
                                                     @foreach($child->children as $grandchild)
-                                                        <a href="{{ $grandchild->url }}"
-                                                           @if($grandchild->external) target="_blank" rel="noopener noreferrer" @endif
-                                                           @if(url()->current() === $grandchild->url) aria-current="page" @endif
-                                                           @click="openDropdown = null"
-                                                           class="block rounded-lg px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white transition-colors">
-                                                            {{ $grandchild->label }}
-                                                        </a>
+                                                        <x-layout.mega-menu-link :item="$grandchild"/>
                                                     @endforeach
                                                 </div>
                                             </div>
                                         @else
-                                            <a href="{{ $child->url }}"
-                                               @if($child->external) target="_blank" rel="noopener noreferrer" @endif
-                                               @if(url()->current() === $child->url) aria-current="page" @endif
-                                               @click="openDropdown = null"
-                                               class="block rounded-lg px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white transition-colors">
-                                                {{ $child->label }}
-                                            </a>
+                                            <x-layout.mega-menu-link :item="$child"/>
                                         @endif
                                     @endforeach
                                 </div>
@@ -99,12 +87,6 @@
                             Start for free
                         </x-marketing.button>
 
-                        @if(($githubStars ?? 0) > 0)
-                            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener noreferrer"
-                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/[0.08] text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors min-w-[4.5rem] justify-center">
-                                <x-ri-github-fill class="w-4 h-4"/>{{ $formattedGithubStars }}
-                            </a>
-                        @endif
                     </div>
 
                     <button @click="mobileMenu = !mobileMenu"
