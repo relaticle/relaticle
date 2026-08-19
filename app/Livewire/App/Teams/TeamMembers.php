@@ -41,7 +41,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
         $teamForeignKeyColumn = 'team_id';
 
         return $table
-            ->query(fn (): Builder => $model::with('user')->where($teamForeignKeyColumn, $this->team->id))
+            ->query(fn (): Builder => $model::with('user')->whereHas('user')->where($teamForeignKeyColumn, $this->team->id))
             ->columns([
                 Tables\Columns\Layout\Split::make([
                     Tables\Columns\ImageColumn::make('profile_photo_url')

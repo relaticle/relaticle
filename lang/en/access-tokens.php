@@ -78,6 +78,7 @@ return [
 
     'connectors' => [
         'title' => 'AI Connectors',
+        'description' => 'Assistants such as Claude and ChatGPT that you connected through the consent screen. Revoking one immediately invalidates its access.',
         'columns' => [
             'name' => 'Connector',
             'team' => 'Workspace',
