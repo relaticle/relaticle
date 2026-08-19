@@ -1,6 +1,8 @@
 <div
     x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
+    x-on:keydown="onChatRootKeydown($event)"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
+    x-on:chat:editor-arrow-up.window="if ($event.detail?.context === @js($context ?? 'conversation')) maybeEditLastUserMessage()"
     x-on:chat:context-updated.window="
         pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
         pageContextLabel = $event.detail.label ?? null;
@@ -32,6 +34,15 @@
     </template>
 
     @include('chat::livewire.chat.partials._composer')
+
+    {{-- Full-page chat only: the switcher never opens on the side panel's own
+         nested chatInterface instance (see onChatRootKeydown's context guard),
+         and rendering the overlay markup there too would leave two identical
+         role="dialog" aria-label="Switch conversation" nodes on every page
+         that hosts the side panel, i.e. nearly every app page. --}}
+    @if (($context ?? 'conversation') === 'conversation')
+        @include('chat::livewire.chat.partials._switcher')
+    @endif
 </div>
 
 @script
@@ -41,6 +52,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         messagesUrl: @js(url('/chat/messages')),
         todayLabel: @js(__('Today')),
         yesterdayLabel: @js(__('Yesterday')),
+        feedbackDeleteConfirmText: @js(__('Remove this feedback? Your category and comment will be deleted.')),
     }),
     ...window.ChatModules.sendModule({
         sendUrl,
@@ -52,6 +64,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     conversationId: initialConversationId,
     userId,
     context: 'conversation',
+    // Conversation switcher (Cmd+O / Ctrl+O): the list itself is fetched fresh
+    // client-side from chat.conversations on open, but building the URL for a
+    // conversation the user picks needs a template resolved server-side:
+    // mirrors ChatSidePanel's own CONVERSATION_URL_PLACEHOLDER mechanism,
+    // including the null-tenant guard (this view also renders on tenant-less
+    // pages/tests, where ChatConversation::getUrl() would otherwise throw
+    // a UrlGenerationException for the missing {tenant} route parameter).
+    conversationsUrl: @js(url('/chat/conversations')),
+    switcherConversationUrlTemplate: @js(\Filament\Facades\Filament::getTenant() === null ? null : \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => '__CONVERSATION_ID__'])),
+    switcherConversationUrlPlaceholder: '__CONVERSATION_ID__',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     isStreaming: false,

@@ -142,7 +142,8 @@ export const streamModule = () => ({
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.conversation.title', (e) => this.handleConversationTitle(e))
             .listen('.follow_ups', (e) => this.handleFollowUps(e))
-            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e));
+            .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
+            .listen('.pending_action.resolved', (e) => this.handlePendingActionResolved(e));
 
         return readyPromise;
     },
@@ -170,6 +171,24 @@ export const streamModule = () => ({
         const ids = Array.isArray(event?.ids) ? new Set(event.ids) : null;
         if (!ids || ids.size === 0) return;
         this.markPendingActionsSuperseded(ids);
+    },
+
+    // F1: a proposal was approved/rejected, possibly in a DIFFERENT tab, or
+    // via approveItem()/rejectItem() for one item of a batch, via the
+    // `.pending_action.resolved` broadcast (see PendingActionService::
+    // broadcastResolution). Routed through the same applyProposalResolution()
+    // bridge the resolving tab's own Livewire dispatch uses, so both channels
+    // converge on identical reconcile logic and its idempotency guards (see
+    // the comment on applyProposalResolution in transcript.js).
+    handlePendingActionResolved(event) {
+        if (!event?.pending_action_id) return;
+        this.applyProposalResolution({
+            pendingActionId: event.pending_action_id,
+            index: event.index ?? null,
+            decision: event.status === 'approved' ? 'approved' : 'rejected',
+            finalized: !!event.finalized,
+            record: null,
+        });
     },
 
     friendlyToolStatus(toolName) {

@@ -59,6 +59,7 @@
                     onChange: ({ document, text }) => {
                         $root.dispatchEvent(new CustomEvent('chat:editor-change', { bubbles: true, detail: { document, text } }));
                     },
+                    onArrowUp: () => $root.dispatchEvent(new CustomEvent('chat:editor-arrow-up', { bubbles: true, detail: { context: @js($context ?? 'conversation') } })),
                 })"
                 x-on:chat:editor-submit.window="sendMessage()"
                 x-on:chat:editor-change.window="input = $event.detail.text; saveDraft()"

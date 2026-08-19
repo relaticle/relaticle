@@ -94,7 +94,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday' }) => ({
+export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.' }) => ({
     prependScrollAnchor: null,
     // Guards loadEarlier() against re-entry: the top-sentinel observer
     // (see initLoadEarlierObserver) re-checks on every qualifying layout
@@ -116,6 +116,18 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
     // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
     // dedupes proposal:set-active dispatches.
     _lastActiveProposalId: null,
+
+    // Conversation switcher overlay (Cmd+O / Ctrl+O, see onChatRootKeydown()).
+    // Full-page chat only (see the guard in onChatRootKeydown); the side panel
+    // has its own history dropdown. The item list is fetched fresh on every
+    // open, matching the side panel's own loadHistory()/filteredHistory()
+    // fetch-and-substring-filter pattern rather than something new.
+    switcherOpen: false,
+    switcherQuery: '',
+    switcherLoading: false,
+    switcherError: false,
+    switcherItems: [],
+    switcherActiveIndex: 0,
 
     // Scroll ownership (see scrollToBottom): streaming only autoscrolls while
     // the user is pinned near the bottom; otherwise the jump pill shows.
@@ -540,16 +552,30 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         return null;
     },
 
+    // Bridges BOTH resolution channels into one place: the resolving tab's own
+    // synchronous Livewire `proposal:resolved` dispatch, AND the `.pending_
+    // action.resolved` Reverb broadcast every subscribed tab (including the
+    // resolving one, a moment later) receives (see stream.js's
+    // handlePendingActionResolved and PendingActionService::broadcastResolution
+    // server-side). The resolving tab therefore gets this call TWICE for the
+    // same resolution; the "already applied" guards below make the second
+    // call a no-op rather than double-firing the ai-write-completed refresh.
+    // There is no socket-id-based toOthers() filter to lean on instead: this
+    // app never wires Echo's socket id onto outgoing Livewire requests.
     applyProposalResolution(payload) {
         const action = this.findPendingAction(payload.pendingActionId);
         if (!action) return;
 
         if (payload.index === null || payload.index === undefined) {
-            // Single proposal.
+            // Single proposal. Already resolved (by the other channel, or a
+            // stale/duplicate broadcast): nothing left to apply.
+            if (action.status !== 'pending') return;
             action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
             if (payload.record) action.record = payload.record;
         } else {
             // Batch item: the transcript renders per-item status 'approved'/'skipped'.
+            // Already resolved, same idempotency guard as above, per item.
+            if (action.itemResults && action.itemResults[payload.index]) return;
             action.itemResults = {
                 ...action.itemResults,
                 [payload.index]: {
@@ -623,6 +649,15 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         if (!msg.id) return;
 
         if (msg.feedback?.rating === rating) {
+            // A saved category survives reload (msg.feedback.category comes back
+            // from the server); a saved comment only survives within this same
+            // session (feedbackComment resets to '' on load, the server never
+            // sends it back, see ListConversationMessages). Either one means the
+            // user typed real detail that a silent toggle-off would discard.
+            const hasSavedDetail = rating === 'down'
+                && (msg.feedback?.category || (msg.feedbackComment || '').trim() !== '');
+            if (hasSavedDetail && !window.confirm(feedbackDeleteConfirmText)) return;
+
             msg.feedback = null;
             msg.feedbackPanelOpen = false;
             await this.postFeedback(msg, null);
@@ -855,5 +890,132 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
 
     jumpToLatest() {
         this.scrollToBottom(true);
+    },
+
+    // Keyboard layer. Bound via `x-on:keydown` directly on the chat root
+    // element (see chat-interface.blade.php), NOT `window`/`document`: Alpine
+    // tears the listener down with the component for free, and it only fires
+    // for a keydown whose target is inside this chat instance, so it can never
+    // hijack a key while the user is focused elsewhere in the panel (e.g. the
+    // Filament top-nav search, which already owns Cmd+K, or the sidebar's own
+    // Cmd+J side-panel toggle (both confirmed live app-wide before picking
+    // Cmd+O for the switcher; see the PR description for the full trail).
+    onChatRootKeydown(e) {
+        // The side panel renders its own chatInterface instance on every page
+        // (including this one); the switcher is a full-page-only feature, and
+        // the side panel already has its own history dropdown.
+        if (this.context !== 'conversation') return;
+
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'o') {
+            e.preventDefault();
+            this.switcherOpen ? this.closeSwitcher() : this.openSwitcher();
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            if (!this.switcherOpen) return;
+            e.preventDefault();
+            // Stops the side panel's own window-level Escape handler from also
+            // acting on this same keypress (it closes the panel/its dropdowns
+            // when open): the two must not both react to one Esc.
+            e.stopPropagation();
+            this.closeSwitcher();
+            return;
+        }
+
+        if (!this.switcherOpen) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.switcherMoveActive(1);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.switcherMoveActive(-1);
+            return;
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this.switcherOpenActive();
+        }
+    },
+
+    // ArrowUp-to-edit: wired from chat-editor.js's handleKeyDown (which only
+    // calls this when the composer doc is empty) via the chat:editor-arrow-up
+    // bridge event on the chatInterface root, see chat-interface.blade.php.
+    // Reuses canEdit()/startEdit() so this behaves exactly like clicking the
+    // edit pencil on the last user message (isStreaming and a pending-approval
+    // block are already covered by canEdit()).
+    maybeEditLastUserMessage() {
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role !== 'user') continue;
+            if (this.canEdit(i)) this.startEdit(this.messages[i], i);
+            return;
+        }
+    },
+
+    filteredSwitcherItems() {
+        const needle = this.switcherQuery.trim().toLowerCase();
+        if (!needle) return this.switcherItems;
+        return this.switcherItems.filter((item) => (item.title || '').toLowerCase().includes(needle));
+    },
+
+    openSwitcher() {
+        if (this.switcherOpen) return;
+        this.switcherOpen = true;
+        this.switcherQuery = '';
+        this.switcherActiveIndex = 0;
+        this.$nextTick(() => this.$refs.switcherSearch?.focus());
+        this.loadSwitcherConversations();
+    },
+
+    closeSwitcher() {
+        if (!this.switcherOpen) return;
+        this.switcherOpen = false;
+        this.restoreInputFocus();
+    },
+
+    async loadSwitcherConversations() {
+        this.switcherLoading = true;
+        this.switcherError = false;
+        try {
+            const res = await fetch(this.conversationsUrl, { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error('failed');
+            this.switcherItems = (await res.json()).data ?? [];
+        } catch (_) {
+            this.switcherItems = [];
+            this.switcherError = true;
+        } finally {
+            this.switcherLoading = false;
+        }
+    },
+
+    switcherMoveActive(delta) {
+        const items = this.filteredSwitcherItems();
+        if (items.length === 0) return;
+        this.switcherActiveIndex = (this.switcherActiveIndex + delta + items.length) % items.length;
+    },
+
+    switcherOpenActive() {
+        const item = this.filteredSwitcherItems()[this.switcherActiveIndex];
+        if (item) this.openSwitcherItem(item);
+    },
+
+    // Navigates via Alpine's SPA transition (the same mechanism a real
+    // `wire:navigate` link click drives) rather than a hard `location.href`
+    // assignment, so the existing cache-first switchConversation() instant
+    // paint (installConversationSwitchWatch(), fired off the resulting
+    // `livewire:navigate` event) applies here for free.
+    openSwitcherItem(item) {
+        if (!item?.id || !this.switcherConversationUrlTemplate) return;
+        this.closeSwitcher();
+        if (item.id === this.conversationId) return;
+        const url = this.switcherConversationUrlTemplate.replace(this.switcherConversationUrlPlaceholder, item.id);
+        if (window.Alpine?.navigate) {
+            window.Alpine.navigate(url);
+        } else {
+            window.location.href = url;
+        }
     },
 });

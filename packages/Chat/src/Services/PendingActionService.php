@@ -34,10 +34,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
+use Throwable;
 
 final readonly class PendingActionService
 {
@@ -182,12 +184,14 @@ final readonly class PendingActionService
             TenantContextService::setTenantId($previousTenantId);
         }
 
+        $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
+
         return $resolved;
     }
 
     public function reject(PendingAction $pendingAction): PendingAction
     {
-        return DB::transaction(function () use ($pendingAction): PendingAction {
+        $resolved = DB::transaction(function () use ($pendingAction): PendingAction {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()
                 ->lockForUpdate()
@@ -202,6 +206,10 @@ final readonly class PendingActionService
 
             return $locked->refresh();
         });
+
+        $this->broadcastResolution($resolved, PendingActionStatus::Rejected->value, null, true);
+
+        return $resolved;
     }
 
     /**
@@ -218,7 +226,7 @@ final readonly class PendingActionService
         TenantContextService::setTenantId($pendingAction->team_id);
 
         try {
-            [$finalized, $record] = DB::transaction(function () use ($pendingAction, $user, $index): array {
+            [$finalized, $record, $itemStatus] = DB::transaction(function () use ($pendingAction, $user, $index): array {
                 /** @var PendingAction $locked */
                 $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -229,9 +237,14 @@ final readonly class PendingActionService
                 $resultData = is_array($locked->result_data) ? $locked->result_data : [];
                 $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
 
-                // Idempotent: an already-resolved item is a no-op (no re-execute).
+                // Idempotent: an already-resolved item is a no-op (no re-execute). Report
+                // the item's REAL stored status, not an assumed 'approved': it may have
+                // been rejected by an earlier call.
                 if (isset($items[(string) $index])) {
-                    return [$this->isComplete($items, $records), null];
+                    $existing = $items[(string) $index];
+                    $existingStatus = is_array($existing) ? (string) ($existing['status'] ?? 'approved') : 'approved';
+
+                    return [$this->isComplete($items, $records), null, $existingStatus];
                 }
 
                 $model = $this->executeBatchItem($locked, $user, $records[$index]);
@@ -245,11 +258,13 @@ final readonly class PendingActionService
 
                 $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
 
-                return [$finalized, $model];
+                return [$finalized, $model, 'approved'];
             });
         } finally {
             TenantContextService::setTenantId($previousTenantId);
         }
+
+        $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
 
         return ['finalized' => $finalized, 'record' => $record];
     }
@@ -261,7 +276,7 @@ final readonly class PendingActionService
      */
     public function rejectItem(PendingAction $pendingAction, int $index): array
     {
-        $finalized = DB::transaction(function () use ($pendingAction, $index): bool {
+        [$finalized, $itemStatus] = DB::transaction(function () use ($pendingAction, $index): array {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -272,17 +287,50 @@ final readonly class PendingActionService
             $resultData = is_array($locked->result_data) ? $locked->result_data : [];
             $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
 
+            // Idempotent: an already-resolved item is a no-op. Report the item's REAL
+            // stored status, not an assumed 'rejected': it may have been approved.
             if (isset($items[(string) $index])) {
-                return $this->isComplete($items, $records);
+                $existing = $items[(string) $index];
+                $existingStatus = is_array($existing) ? (string) ($existing['status'] ?? 'rejected') : 'rejected';
+
+                return [$this->isComplete($items, $records), $existingStatus];
             }
 
             $items[(string) $index] = ['status' => 'rejected'];
             $resultData['items'] = $items;
 
-            return $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
+            return [$this->finalizeBatchIfComplete($locked, $items, $records, $resultData), 'rejected'];
         });
 
+        $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
+
         return ['finalized' => $finalized];
+    }
+
+    /**
+     * Best-effort broadcast: a dropped Reverb frame or connection hiccup must
+     * never fail the approve/reject request itself, since the underlying CRM
+     * write already committed. A proposal with no conversation_id (a
+     * synthetic test fixture, or a legacy row created before conversations
+     * were mandatory) has no channel to broadcast on.
+     */
+    private function broadcastResolution(PendingAction $pendingAction, string $status, ?int $index, bool $finalized): void
+    {
+        if ($pendingAction->conversation_id === null) {
+            return;
+        }
+
+        try {
+            broadcast(new PendingActionResolved(
+                conversationId: $pendingAction->conversation_id,
+                pendingActionId: $pendingAction->getKey(),
+                status: $status,
+                index: $index,
+                finalized: $finalized,
+            ));
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**
