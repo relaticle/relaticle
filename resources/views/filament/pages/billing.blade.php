@@ -310,6 +310,10 @@
                         <div x-show="confirming" x-cloak class="rounded-xl border border-primary/25 bg-primary/[0.03] p-4 dark:border-primary/20">
                             <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.confirm_title') }}</p>
                             <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $team->name]) }}</p>
+                            <p class="mt-2 text-sm font-medium text-gray-900 dark:text-white"
+                                x-text="yearly ? '{{ __('billing.pro_plan.billed_yearly') }}' : '{{ __('billing.pro_plan.billed_monthly') }}'">
+                                {{ __('billing.pro_plan.billed_yearly') }}
+                            </p>
                             <div class="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
                                 <x-filament::button type="button" class="justify-center"
                                     x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">

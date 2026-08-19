@@ -181,9 +181,9 @@ final class SubscriptionResource extends Resource
             ->icon('heroicon-o-arrows-right-left')
             ->color('warning')
             ->authorize('transfer')
-            ->visible(fn (Subscription $record): bool => $record->valid())
+            ->visible(fn (Subscription $record): bool => $record->valid() && self::transferTargets($record) !== [])
             ->modalHeading('Transfer billing to another workspace')
-            ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. Nothing changes in Stripe: the same card is charged on the same date. Invoice history follows the customer, and the customer keeps its current name, so rename it in the Stripe dashboard if that matters. Only workspaces with the same owner, no Stripe customer of their own, and not scheduled for deletion are listed.')
+            ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. The subscription is not touched in Stripe: the same card is charged on the same date, and invoice history follows the customer. The customer is renamed to the target workspace so future invoices name the right one. Only workspaces with the same owner, no Stripe customer of their own, and not scheduled for deletion are listed.')
             ->modalSubmitActionLabel('Transfer')
             ->schema([
                 Select::make('target_team_id')
@@ -191,7 +191,13 @@ final class SubscriptionResource extends Resource
                     ->options(fn (Subscription $record): array => self::transferTargets($record))
                     ->required()
                     ->searchable()
-                    ->native(false),
+                    ->native(false)
+                    // The options are re-read on submit, so a workspace that became
+                    // ineligible while this modal was open fails here rather than in
+                    // the action. Say why, since the generic message reads as a bug.
+                    ->validationMessages([
+                        'in' => 'That workspace is no longer eligible: it may have started its own subscription, been scheduled for deletion, or already received this billing. Close this dialog and reopen it to see the current list.',
+                    ]),
             ])
             ->action(function (array $data, Subscription $record, TransferWorkspaceBilling $transfer, Action $action): void {
                 /** @var Team $source */

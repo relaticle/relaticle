@@ -14,6 +14,8 @@ use Relaticle\SystemAdmin\Exceptions\TransferRefused;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Stripe\ApiRequestor;
+use Stripe\HttpClient\ClientInterface;
 
 mutates(TransferWorkspaceBilling::class);
 
@@ -22,7 +24,42 @@ beforeEach(function (): void {
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+    config()->set('cashier.secret', 'sk_test_fake');
+
+    $this->stripeCalls = new ArrayObject;
+    fakeStripeCustomerApi($this->stripeCalls);
 });
+
+afterEach(function (): void {
+    ApiRequestor::setHttpClient(null);
+});
+
+/**
+ * Stripe's SDK talks HTTP directly, so the customer rename is only observable
+ * by handing it a client that records what went out. Everything above it,
+ * Cashier included, runs for real.
+ *
+ * @param  ArrayObject<int, array{url: string, params: array<string, mixed>}>  $calls
+ */
+function fakeStripeCustomerApi(ArrayObject $calls, bool $fails = false): void
+{
+    ApiRequestor::setHttpClient(new class($calls, $fails) implements ClientInterface
+    {
+        /** @param  ArrayObject<int, array{url: string, params: array<string, mixed>}>  $calls */
+        public function __construct(private readonly ArrayObject $calls, private readonly bool $fails) {}
+
+        public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null): array
+        {
+            $this->calls[] = ['url' => (string) $absUrl, 'params' => (array) $params];
+
+            if ($this->fails) {
+                throw new RuntimeException('Stripe is unreachable');
+            }
+
+            return [json_encode(['id' => 'cus_transfer_source', 'object' => 'customer']), 200, []];
+        }
+    });
+}
 
 /**
  * A workspace pair owned by one person: the source holds the Stripe customer
@@ -227,7 +264,11 @@ it('refuses to transfer when the subscription price maps to no plan', function (
 it('rejects a target that already has its own stripe customer because the option list excludes it', function (): void {
     [$source, $target, $subscription] = transferPair();
 
+    // A workspace that subscribed on its own while the modal was open. Another
+    // workspace stays eligible, so the action is still offered and the refusal
+    // has to come from the submit, which is the race a sysadmin actually hits.
     $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
+    Team::factory()->create(['user_id' => $source->user_id, 'plan' => Plan::Free]);
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
@@ -343,5 +384,54 @@ it('keeps the transfer modal open when the transfer is refused', function (): vo
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('renames the stripe customer to the workspace that now owns it', function (): void {
+    [, $target, $subscription] = transferPair();
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertHasNoActionErrors();
+
+    /** @var array<int, array{url: string, params: array<string, mixed>}> $calls */
+    $calls = $this->stripeCalls->getArrayCopy();
+
+    expect($calls)->toHaveCount(1)
+        ->and($calls[0]['url'])->toContain('/v1/customers/cus_transfer_source')
+        ->and($calls[0]['params'])->toBe(['name' => $target->name]);
+});
+
+it('keeps a committed transfer when the stripe rename fails', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    fakeStripeCustomerApi($this->stripeCalls, fails: true);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Billing transferred');
+
+    expect($this->stripeCalls)->toHaveCount(1)
+        ->and($target->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->plan)->toBe(Plan::Pro)
+        ->and($source->refresh()->stripe_id)->toBeNull()
+        ->and($source->plan)->toBe(Plan::Free)
+        ->and($subscription->refresh()->team_id)->toBe($target->getKey());
+});
+
+it('hides the transfer action when the owner has no workspace the billing can move to', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
+
+    livewire(ListSubscriptions::class)
+        ->assertActionHidden(TestAction::make('transfer')->table($subscription));
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($subscription->refresh()->team_id)->toBe($source->getKey());
 });

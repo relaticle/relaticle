@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\SystemAdmin\Exceptions\TransferRefused;
+use Throwable;
 
 final readonly class TransferWorkspaceBilling
 {
@@ -20,16 +21,17 @@ final readonly class TransferWorkspaceBilling
      * Move a workspace's Stripe customer and every subscription it owns to
      * another workspace of the same owner.
      *
-     * Nothing is sent to Stripe. A subscription cannot change customer there,
-     * and it does not need to: the customer itself changes hands, so the same
-     * card keeps being charged on the same date. `subscription_items` has no
-     * team column, so items follow their parent row.
+     * The subscription itself is never sent to Stripe. It cannot change
+     * customer there, and it does not need to: the customer itself changes
+     * hands, so the same card keeps being charged on the same date.
+     * `subscription_items` has no team column, so items follow their parent
+     * row. The only Stripe write is the customer rename below.
      *
      * @throws TransferRefused when the pair fails a transfer precondition
      */
     public function execute(Team $source, Team $target, string $sysadminId): void
     {
-        $logContext = DB::transaction(function () use ($source, $target, $sysadminId): array {
+        DB::transaction(function () use ($source, $target, $sysadminId): void {
             /** @var Team $lockedSource */
             $lockedSource = Team::query()->whereKey($source->getKey())->lockForUpdate()->firstOrFail();
 
@@ -69,20 +71,33 @@ final readonly class TransferWorkspaceBilling
 
             $this->credits->resetPeriod($lockedTarget, $sysadminId);
             $this->credits->resetPeriod($lockedSource, $sysadminId);
-
-            return [
-                'source_team_id' => $lockedSource->getKey(),
-                'target_team_id' => $lockedTarget->getKey(),
-                'stripe_customer' => $lockedTarget->stripe_id,
-                'plan' => $plan->value,
-                'sysadmin_id' => $sysadminId,
-            ];
         });
-
-        Log::info('Workspace billing transferred', $logContext);
 
         $source->refresh();
         $target->refresh();
+
+        $this->renameStripeCustomer($target);
+    }
+
+    /**
+     * Point the Stripe customer at the workspace that now owns it, so the
+     * billing portal and every future invoice stop naming the old workspace.
+     *
+     * Runs after the transaction commits and swallows its failure: the money
+     * has already moved correctly, and a Stripe outage must not undo that or
+     * show the operator a refusal for a transfer that succeeded.
+     */
+    private function renameStripeCustomer(Team $target): void
+    {
+        try {
+            $target->updateStripeCustomer(['name' => $target->stripeName()]);
+        } catch (Throwable $exception) {
+            Log::warning('Workspace billing transferred, but the Stripe customer kept its previous name', [
+                'team_id' => $target->getKey(),
+                'stripe_customer' => $target->stripe_id,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /** @throws TransferRefused */
