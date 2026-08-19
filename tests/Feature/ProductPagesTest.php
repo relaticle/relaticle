@@ -31,12 +31,3 @@ it('names the assistant from config rather than a hardcoded literal', function (
 
     $this->get('/ai')->assertOk()->assertSee('Testbot');
 });
-
-it('renders the animated demo at the #demo anchor the hero CTA points to', function (): void {
-    $html = $this->get('/ai')->assertOk()->getContent();
-
-    expect($html)->toContain('id="demo"')
-        ->and($html)->toContain('hero-chat-animate')
-        ->and($html)->toContain('hero-agent-preview')
-        ->and($html)->toContain('IntersectionObserver');
-});

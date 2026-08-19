@@ -54,10 +54,6 @@
     :ogTitle="$title"
     :ogDescription="$description"
 >
-    @push('header')
-        @vite('resources/js/motion.js')
-    @endpush
-
     {{-- Hero --}}
     <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
@@ -91,36 +87,8 @@
         </div>
     </section>
 
-    {{-- Interactive demo --}}
-    <section id="demo" class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center mb-14">
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('See how a request becomes a change') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __(':name proposes every write as a card before anything saves. Here is what that looks like.', ['name' => $assistantName]) }}
-            </p>
-        </div>
-
-        <div class="max-w-4xl mx-auto px-6 lg:px-8">
-            <div
-                x-data
-                x-init="
-                    const observer = new IntersectionObserver((entries) => {
-                        if (entries[0].isIntersecting) {
-                            window.dispatchEvent(new CustomEvent('hero-chat-animate'));
-                            observer.disconnect();
-                        }
-                    }, { threshold: 0.4 });
-                    observer.observe($el);
-                "
-                aria-hidden="true"
-                class="relative rounded-2xl overflow-hidden border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-neutral-950 min-h-[520px] sm:min-h-[580px] md:min-h-[640px]"
-            >
-                @include('home.partials.hero-agent-preview')
-            </div>
-        </div>
-    </section>
+    {{-- Demo placeholder: filled in by a later task --}}
+    <div id="demo"></div>
 
     {{-- Capabilities --}}
     <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
