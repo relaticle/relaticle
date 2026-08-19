@@ -196,6 +196,20 @@ it('hides the transfer action when the source subscription is no longer valid', 
         ->and($subscription->refresh()->team_id)->toBe($source->getKey());
 });
 
+it('throws when the source subscription is no longer valid, called directly', function (): void {
+    [$source, $target, $subscription] = transferPair([
+        'stripe_status' => 'canceled',
+        'ends_at' => now()->subDay(),
+    ]);
+
+    expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey()))
+        ->toThrow(TransferRefused::class);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
 it('refuses to transfer when the subscription price maps to no plan', function (): void {
     [$source, $target, $subscription] = transferPair(['stripe_price' => 'price_not_in_config']);
 
