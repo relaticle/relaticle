@@ -34,3 +34,23 @@ it('links llms.txt and the GitHub repository from the footer', function (): void
     expect($html)->toContain(route('llms-txt'))
         ->and($html)->toContain('https://github.com/relaticle/relaticle');
 });
+
+it('renders the same items in desktop and mobile navigation', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect($html)->toContain('aria-label="'.__('Main').'"')
+        ->and($html)->toContain('aria-label="'.__('Mobile menu').'"')
+        ->and(substr_count($html, route('discord')))->toBeGreaterThanOrEqual(3);
+});
+
+it('marks external header links with rel noopener', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect($html)->toContain('rel="noopener noreferrer"');
+});
+
+it('marks the current page in the navigation', function (): void {
+    $html = $this->get('/pricing')->assertOk()->getContent();
+
+    expect($html)->toContain('aria-current="page"');
+});

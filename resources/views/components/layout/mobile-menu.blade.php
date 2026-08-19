@@ -19,34 +19,18 @@
     </div>
 
     {{-- Navigation --}}
+    @php($mobileNavItems = app(\App\Support\MarketingNavigation::class)->mobile())
+
     <nav class="flex-1 flex flex-col justify-center px-8">
         <div class="space-y-1">
-            @foreach([
-                ['url' => url('/#features'), 'label' => 'Features'],
-                ['url' => route('pricing'), 'label' => 'Pricing'],
-                ['url' => route('contact'), 'label' => 'Contact'],
-            ] as $link)
-                <a href="{{ $link['url'] }}" @click="mobileMenu = false"
+            @foreach($mobileNavItems as $item)
+                <a href="{{ $item->url }}" @click="mobileMenu = false"
+                   @if($item->external) target="_blank" rel="noopener noreferrer" @endif
+                   @if(url()->current() === $item->url) aria-current="page" @endif
                    class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">
-                    {{ $link['label'] }}
+                    {{ $item->label }}
                 </a>
             @endforeach
-            @feature(App\Features\Blog::class)
-                <a href="{{ route('blog.index') }}" @click="mobileMenu = false"
-                   class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">
-                    Blog
-                </a>
-            @endfeature
-            @feature(App\Features\Documentation::class)
-                <a href="{{ route('help.index') }}" @click="mobileMenu = false"
-                   class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">
-                    {{ __('Help') }}
-                </a>
-                <a href="{{ route('documentation.index') }}" @click="mobileMenu = false"
-                   class="block text-[2rem] font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 transition-colors py-2">
-                    {{ __('Developers') }}
-                </a>
-            @endfeature
         </div>
     </nav>
 

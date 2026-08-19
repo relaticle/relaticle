@@ -11,37 +11,23 @@
                     </a>
                 </div>
 
-                <nav class="hidden md:flex items-center gap-1">
-                    <a href="{{ url('/#features') }}"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        Features
-                    </a>
-                    <a href="{{ route('pricing') }}"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        Pricing
-                    </a>
-                    @feature(App\Features\Documentation::class)
-                    <a href="{{ route('help.index') }}"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        {{ __('Help') }}
-                    </a>
-                    <a href="{{ route('documentation.index') }}"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        {{ __('Developers') }}
-                    </a>
-                    @endfeature
-                    @feature(App\Features\Blog::class)
-                    <a href="{{ route('blog.index') }}"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors">
-                        Blog
-                    </a>
-                    @endfeature
-                    <a href="{{ route('discord') }}" target="_blank"
-                       class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors flex items-center gap-1.5">
-                        <x-ri-discord-fill class="w-4 h-4"/>
-                        <span>Discord</span>
-                        <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
-                    </a>
+                @php($navItems = app(\App\Support\MarketingNavigation::class)->header())
+
+                <nav aria-label="{{ __('Main') }}" class="hidden md:flex items-center gap-1">
+                    @foreach($navItems as $item)
+                        <a href="{{ $item->url }}"
+                           @if($item->external) target="_blank" rel="noopener noreferrer" @endif
+                           @if(url()->current() === $item->url) aria-current="page" @endif
+                           class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors @if($item->external) flex items-center gap-1.5 @endif">
+                            @if($item->external)
+                                <x-ri-discord-fill class="w-4 h-4"/>
+                                <span>{{ $item->label }}</span>
+                                <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
+                            @else
+                                {{ $item->label }}
+                            @endif
+                        </a>
+                    @endforeach
                 </nav>
 
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
