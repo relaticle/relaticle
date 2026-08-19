@@ -1,6 +1,5 @@
 <div
     x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
-    x-init="init()"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     x-on:chat:context-updated.window="
         pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
@@ -304,64 +303,56 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         };
         window.addEventListener('chat:renamed', this.renamedHandler);
 
-        // init() is confirmed (empirically) to run more than once for the
-        // same live component without a matching destroy() in between.
-        // $wire.$on(), unlike window.Livewire.on(), returns no unsubscribe
-        // function (it wraps the callback in its own internal listener on
-        // the component's root element), so there is no way to remove a
-        // stale registration from destroy() the way the other handlers in
-        // this file do. Guarding the registration itself, once per live
-        // instance, is what actually stops it: without this, a second
-        // init() stacks a second listener on the same element, and a single
-        // real chat:messages-prepended dispatch then gets applied twice,
-        // duplicating whichever message was just loaded.
-        if (!this._messagesPrependedRegistered) {
-            this._messagesPrependedRegistered = true;
-            this.$wire.$on('chat:messages-prepended', (payload) => {
-                const earlier = (payload && payload.messages) || [];
-                const hasMore = payload ? !!payload.hasMore : false;
-                if (earlier.length > 0) {
-                    earlier.forEach((m) => {
-                        this.ensureClientKey(m);
-                        if (m.role === 'assistant') {
-                            m.rendered = true;
-                            m.prerendered = true;
-                            if (!Array.isArray(m.follow_ups)) {
-                                m.follow_ups = [];
-                            }
-                            m.feedback = m.feedback ?? null;
-                            m.feedbackPanelOpen = false;
-                            m.feedbackCategory = m.feedback?.category ?? null;
-                            m.feedbackComment = '';
+        // Registered exactly once: init() itself now runs exactly once per
+        // mount (the root element's x-data auto-invokes init() on its own;
+        // this file used to ALSO carry x-init="init()", which double-called
+        // it, doubling every registration below including this one). See the
+        // removed x-init attribute's git history for the fix and how it was
+        // confirmed.
+        this.$wire.$on('chat:messages-prepended', (payload) => {
+            const earlier = (payload && payload.messages) || [];
+            const hasMore = payload ? !!payload.hasMore : false;
+            if (earlier.length > 0) {
+                earlier.forEach((m) => {
+                    this.ensureClientKey(m);
+                    if (m.role === 'assistant') {
+                        m.rendered = true;
+                        m.prerendered = true;
+                        if (!Array.isArray(m.follow_ups)) {
+                            m.follow_ups = [];
                         }
-                        if (m.role === 'user') {
-                            m.editing = false;
-                            m.editText = '';
-                        }
-                        if (typeof m.copiedAt === 'undefined') {
-                            m.copiedAt = 0;
-                        }
-                    });
-                    this.messages = [...earlier, ...this.messages];
-                }
-                this.hasMoreMessages = hasMore;
-
-                this.$nextTick(() => {
-                    const el = this.$refs.messages;
-                    if (el && this.prependScrollAnchor !== null) {
-                        el.scrollTop = el.scrollHeight - this.prependScrollAnchor;
-                        this.prependScrollAnchor = null;
+                        m.feedback = m.feedback ?? null;
+                        m.feedbackPanelOpen = false;
+                        m.feedbackCategory = m.feedback?.category ?? null;
+                        m.feedbackComment = '';
                     }
-                    // Cleared here, after the restore above, not any earlier (e.g.
-                    // not from loadEarlier()'s own $wire promise settling): see
-                    // the comment on loadEarlier() in transcript.js for why that
-                    // ordering matters. Unconditional (outside the `if` above) so
-                    // a missing ref or an already-null anchor can never leave this
-                    // stuck true and permanently disable further history loading.
-                    this.loadingEarlier = false;
+                    if (m.role === 'user') {
+                        m.editing = false;
+                        m.editText = '';
+                    }
+                    if (typeof m.copiedAt === 'undefined') {
+                        m.copiedAt = 0;
+                    }
                 });
+                this.messages = [...earlier, ...this.messages];
+            }
+            this.hasMoreMessages = hasMore;
+
+            this.$nextTick(() => {
+                const el = this.$refs.messages;
+                if (el && this.prependScrollAnchor !== null) {
+                    el.scrollTop = el.scrollHeight - this.prependScrollAnchor;
+                    this.prependScrollAnchor = null;
+                }
+                // Cleared here, after the restore above, not any earlier (e.g.
+                // not from loadEarlier()'s own $wire promise settling): see
+                // the comment on loadEarlier() in transcript.js for why that
+                // ordering matters. Unconditional (outside the `if` above) so
+                // a missing ref or an already-null anchor can never leave this
+                // stuck true and permanently disable further history loading.
+                this.loadingEarlier = false;
             });
-        }
+        });
 
         // Bridge the docked livewire proposal-card's resolution lifecycle back
         // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
