@@ -240,7 +240,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.pruneStaleDrafts();
 
         // A message is about to be sent automatically (bootstrap handoff or a
-        // ?prompt= deep link) — restoring a leftover draft on top of that would
+        // ?prompt= deep link): restoring a leftover draft on top of that would
         // just get overwritten by sendMessage()'s own clear() a moment later,
         // so skip it entirely rather than race the two setDocument calls.
         if (!ranBootstrapSend && !initialMessage) {
