@@ -46,7 +46,7 @@ final readonly class TransferWorkspaceBilling
                 'stripe_id' => null,
                 'pm_type' => null,
                 'pm_last_four' => null,
-                'plan' => Plan::default(),
+                'plan' => $lockedSource->plan === $plan ? Plan::default() : $lockedSource->plan,
                 'trial_ends_at' => null,
             ])->save();
 
@@ -92,6 +92,7 @@ final readonly class TransferWorkspaceBilling
         throw_if($source->stripe_id === null, TransferRefused::class, 'The source workspace has no Stripe customer.');
         throw_if($target->stripe_id !== null, TransferRefused::class, 'The target workspace already has its own Stripe customer. Cancel and re-subscribe manually instead.');
         throw_if($source->user_id !== $target->user_id, TransferRefused::class, 'Both workspaces must have the same owner.');
+        throw_if($target->isScheduledForDeletion(), TransferRefused::class, 'The target workspace is scheduled for deletion.');
 
         $source->loadMissing('subscriptions');
         $subscription = $source->subscription();

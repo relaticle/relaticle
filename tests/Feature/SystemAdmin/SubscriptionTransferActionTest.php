@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
+use Relaticle\SystemAdmin\Exceptions\TransferRefused;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -83,6 +84,21 @@ it('moves the stripe customer, the subscription and both plans to the target wor
         ->and($source->pm_last_four)->toBeNull()
         ->and($source->plan)->toBe(Plan::Free)
         ->and($subscription->refresh()->team_id)->toBe($target->getKey());
+});
+
+it('keeps the source on its sysadmin-assigned plan when it differs from the transferred subscription plan', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    $source->forceFill(['plan' => Plan::Enterprise])->save();
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($source->refresh()->plan)->toBe(Plan::Enterprise)
+        ->and($target->refresh()->plan)->toBe(Plan::Pro);
 });
 
 it('grants the target the Pro allowance, drops the source to Free and keeps purchased credits', function (): void {
@@ -221,6 +237,35 @@ it('does not offer a workspace that already has its own stripe customer as a tar
     expect(array_keys($targets))
         ->toContain($target->getKey())
         ->not->toContain($subscribedSibling->getKey());
+});
+
+it('does not offer a workspace scheduled for deletion as a target', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    /** @var Team $scheduledSibling */
+    $scheduledSibling = Team::factory()->create([
+        'user_id' => $source->user_id,
+        'scheduled_deletion_at' => now()->addDays(7),
+    ]);
+
+    $targets = SubscriptionResource::transferTargets($subscription);
+
+    expect(array_keys($targets))
+        ->toContain($target->getKey())
+        ->not->toContain($scheduledSibling->getKey());
+});
+
+it('throws when the target is scheduled for deletion, called directly', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    $target->forceFill(['scheduled_deletion_at' => now()->addDays(7)])->save();
+
+    expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey()))
+        ->toThrow(TransferRefused::class);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
 });
 
 it('keeps the transfer modal open when the transfer is refused', function (): void {

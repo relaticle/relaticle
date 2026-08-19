@@ -182,7 +182,7 @@ final class SubscriptionResource extends Resource
             ->color('warning')
             ->authorize('transfer')
             ->modalHeading('Transfer billing to another workspace')
-            ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. Nothing changes in Stripe: the same card is charged on the same date. Invoice history follows the customer, and the customer keeps its current name, so rename it in the Stripe dashboard if that matters. Only workspaces with the same owner and no Stripe customer of their own are listed.')
+            ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. Nothing changes in Stripe: the same card is charged on the same date. Invoice history follows the customer, and the customer keeps its current name, so rename it in the Stripe dashboard if that matters. Only workspaces with the same owner, no Stripe customer of their own, and not scheduled for deletion are listed.')
             ->modalSubmitActionLabel('Transfer')
             ->schema([
                 Select::make('target_team_id')
@@ -220,8 +220,9 @@ final class SubscriptionResource extends Resource
     }
 
     /**
-     * Workspaces this subscription can move to: same owner, and no Stripe
-     * customer of their own to be orphaned by the move.
+     * Workspaces this subscription can move to: same owner, no Stripe
+     * customer of their own to be orphaned by the move, and not scheduled
+     * for deletion.
      *
      * @return array<string, string>
      */
@@ -234,6 +235,7 @@ final class SubscriptionResource extends Resource
             ->where('user_id', $source->user_id)
             ->whereKeyNot($source->getKey())
             ->whereNull('stripe_id')
+            ->whereNull('scheduled_deletion_at')
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
