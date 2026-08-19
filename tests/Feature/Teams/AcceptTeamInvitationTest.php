@@ -7,7 +7,7 @@ use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 mutates(TeamInvitation::class, AcceptTeamInvitation::class);
@@ -17,6 +17,19 @@ beforeEach(function (): void {
     $this->team = Team::factory()->create();
 });
 
+/**
+ * Mint and persist a raw token for an existing invitation. issueToken() also
+ * renews expires_at, so any test asserting an expiry state must set it after
+ * calling this, not before.
+ */
+function rawTokenFor(TeamInvitation $invitation): string
+{
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    return $rawToken;
+}
+
 test('valid invitation can be accepted', function () {
     $invitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
@@ -24,8 +37,9 @@ test('valid invitation can be accepted', function () {
         'role' => 'editor',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
+    $raw = rawTokenFor($invitation);
+    $acceptUrl = route('team-invitations.token.accept', ['token' => $raw]);
+    $joinUrl = route('team-invitations.token.join', ['token' => $raw]);
 
     $this->actingAs($this->user)->get($acceptUrl)->assertOk();
 
@@ -61,12 +75,15 @@ test('accepting an invitation lands the user in the app panel with a visible con
 });
 
 test('expired invitation shows the expired state', function () {
-    $invitation = TeamInvitation::factory()->expired()->create([
+    $invitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
         'email' => $this->user->email,
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $raw = rawTokenFor($invitation);
+    $invitation->forceFill(['expires_at' => now()->subDay()])->save();
+
+    $acceptUrl = route('team-invitations.token.accept', ['token' => $raw]);
 
     $this->actingAs($this->user)
         ->get($acceptUrl)
@@ -78,12 +95,15 @@ test('expired invitation shows the expired state', function () {
 });
 
 test('null expires_at is treated as expired', function () {
-    $invitation = TeamInvitation::factory()->withoutExpiry()->create([
+    $invitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
         'email' => $this->user->email,
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $raw = rawTokenFor($invitation);
+    $invitation->forceFill(['expires_at' => null])->save();
+
+    $acceptUrl = route('team-invitations.token.accept', ['token' => $raw]);
 
     $this->actingAs($this->user)
         ->get($acceptUrl)
@@ -101,7 +121,7 @@ test('invitation with wrong email shows the wrong-account screen, not a 403', fu
         'email' => 'invited@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = route('team-invitations.token.accept', ['token' => rawTokenFor($invitation)]);
 
     $this->actingAs($wrongUser)
         ->get($acceptUrl)
@@ -134,31 +154,35 @@ test('every accept-invitation exit link points into the app panel, not the marke
     ]);
 
     $this->actingAs($wrongUser)
-        ->get(URL::signedRoute('team-invitations.accept', ['invitation' => $mismatchedInvitation]))
+        ->get(route('team-invitations.token.accept', ['token' => rawTokenFor($mismatchedInvitation)]))
         ->assertOk()
         ->assertSee($appUrl, false);
 
     // expired state: the "go to my workspace" link
-    $expiredInvitation = TeamInvitation::factory()->expired()->create([
+    $expiredInvitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
         'email' => $this->user->email,
     ]);
+    $expiredRaw = rawTokenFor($expiredInvitation);
+    $expiredInvitation->forceFill(['expires_at' => now()->subDay()])->save();
 
     $this->actingAs($this->user)
-        ->get(URL::signedRoute('team-invitations.accept', ['invitation' => $expiredInvitation]))
+        ->get(route('team-invitations.token.accept', ['token' => $expiredRaw]))
         ->assertOk()
         ->assertSee($appUrl, false);
 });
 
-test('invitation with invalid signature is rejected', function () {
-    $invitation = TeamInvitation::factory()->create([
+test('an unknown token shows the expired state rather than leaking whether it exists', function () {
+    TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
         'email' => $this->user->email,
     ]);
 
     $this->actingAs($this->user)
-        ->get("/team-invitations/{$invitation->id}?signature=invalid")
-        ->assertForbidden();
+        ->get(route('team-invitations.token.accept', ['token' => Str::random(40)]))
+        ->assertOk()
+        ->assertViewIs('teams.accept-invitation')
+        ->assertViewHas('state', 'expired');
 });
 
 test('accepting invitation deletes the invitation record', function () {
@@ -168,7 +192,7 @@ test('accepting invitation deletes the invitation record', function () {
         'role' => 'admin',
     ]);
 
-    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
+    $joinUrl = route('team-invitations.token.join', ['token' => rawTokenFor($invitation)]);
 
     $this->actingAs($this->user)->post($joinUrl);
 
@@ -179,13 +203,14 @@ test('user with scheduled deletion cannot accept invitation', function () {
     $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
 
     $team = Team::factory()->create();
+    /** @var TeamInvitation $invitation */
     $invitation = $team->teamInvitations()->create([
         'email' => $user->email,
         'role' => 'editor',
         'expires_at' => now()->addDays(7),
     ]);
 
-    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
+    $joinUrl = route('team-invitations.token.join', ['token' => rawTokenFor($invitation)]);
 
     $this->actingAs($user)
         ->post($joinUrl)
@@ -194,17 +219,18 @@ test('user with scheduled deletion cannot accept invitation', function () {
     expect($team->fresh()->hasUser($user))->toBeFalse();
 });
 
-test('a team scheduled for deletion cannot be joined via the legacy accept flow', function (): void {
+test('a team scheduled for deletion cannot be joined', function (): void {
     $team = Team::factory()->create();
     $team->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
 
+    /** @var TeamInvitation $invitation */
     $invitation = $team->teamInvitations()->create([
         'email' => $this->user->email,
         'role' => 'editor',
         'expires_at' => now()->addDays(7),
     ]);
 
-    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
+    $joinUrl = route('team-invitations.token.join', ['token' => rawTokenFor($invitation)]);
 
     $this->actingAs($this->user)
         ->post($joinUrl)
@@ -325,7 +351,7 @@ test('two concurrent accepts attach exactly one membership', function (): void {
     expect($this->team->users()->where('users.id', $invitee->id)->count())->toBe(1);
 });
 
-test('a legacy signed link still resolves and its POST still joins', function (): void {
+test('the legacy signed-URL routes are gone', function (): void {
     $invitation = $this->team->teamInvitations()->create([
         'email' => 'legacy@example.test',
         'role' => 'editor',
@@ -334,15 +360,13 @@ test('a legacy signed link still resolves and its POST still joins', function ()
 
     $invitee = User::factory()->create(['email' => 'legacy@example.test']);
 
-    $showUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-    $this->actingAs($invitee)->get($showUrl)->assertOk();
+    expect(Route::has('team-invitations.accept'))->toBeFalse()
+        ->and(Route::has('team-invitations.join'))->toBeFalse();
+
+    $this->actingAs($invitee)->get("/team-invitations/{$invitation->id}")->assertNotFound();
+    $this->actingAs($invitee)->post("/team-invitations/{$invitation->id}")->assertNotFound();
 
     expect($invitee->fresh()->belongsToTeam($this->team))->toBeFalse();
-
-    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
-    $this->actingAs($invitee)->post($joinUrl)->assertRedirect();
-
-    expect($invitee->fresh()->belongsToTeam($this->team))->toBeTrue();
 });
 
 test('a GET when the user already belongs to the team redirects without erroring', function (): void {

@@ -9,10 +9,22 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 mutates(Login::class);
+
+/**
+ * Mint and persist a raw token, then return the guest-facing accept URL. The
+ * guest flow reads the invitation back out of `url.intended`, so the URL has to
+ * be the real token route.
+ */
+function acceptUrlFor(TeamInvitation $invitation): string
+{
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    return route('team-invitations.token.accept', ['token' => $rawToken]);
+}
 
 test('guest clicking a team invitation link is redirected to the login page', function (bool $accountExists): void {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
@@ -27,7 +39,7 @@ test('guest clicking a team invitation link is redirected to the login page', fu
         'email' => $email,
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getLoginUrl());
@@ -36,8 +48,8 @@ test('guest clicking a team invitation link is redirected to the login page', fu
     'existing account' => true,
 ]);
 
-test('guest with a validly-signed link for a since-deleted invitation is sent to login', function (): void {
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => (string) Str::ulid()]);
+test('guest with a well-formed token for a since-deleted invitation is sent to login', function (): void {
+    $acceptUrl = route('team-invitations.token.accept', ['token' => Str::random(40)]);
 
     $this->get($acceptUrl)
         ->assertRedirect(route('login'));
@@ -51,7 +63,7 @@ test('guest clicking invitation link sees the team name banner on the login page
         'email' => 'newuser@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -72,7 +84,7 @@ test('signing up with a different email than the invitation does not get auto-ve
         'email' => 'invited@gmail.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -99,7 +111,7 @@ test('a mixed-case invitation still auto-verifies the signup for that mailbox', 
 
     expect($invitation->refresh()->email)->toBe('invited-case@gmail.com');
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -128,7 +140,7 @@ test('signing up via an invitation link gets a mailcoach subscriber synced', fun
         'email' => 'invited@gmail.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -175,7 +187,7 @@ test('login page prefills the invited email address', function (): void {
         'email' => 'invited.person@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)->assertRedirect(Filament::getLoginUrl());
 

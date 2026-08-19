@@ -55,11 +55,13 @@ describe('app plumbing on secondary hosts', function () {
         expect($secondary->status())->toBe($primaryStatus)->not->toBe(301);
     });
 
+    // Sampled on email verification rather than the old signed invitation route,
+    // which is gone: invitations now address an opaque token and carry no signature.
     it('leaves signed routes untouched so host-bound signatures fail loudly instead of silently breaking', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withPersonalTeam()->unverified()->create();
 
         $this->actingAs($user)
-            ->get('http://app.relaticle.test/team-invitations/01hxxxxxxxxxxxxxxxxxxxxxxx?signature=invalid')
+            ->get('http://app.relaticle.test/email/verify/'.$user->getKey().'/invalid-hash?signature=invalid')
             ->assertForbidden();
     });
 

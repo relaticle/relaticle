@@ -880,7 +880,7 @@ git commit -m "feat: name the inviter and role in the invitation email"
 
 **Interfaces:**
 - Consumes: `TeamInvitation::findByRawToken()` (Task 4).
-- Produces: routes `team-invitations.token.accept` (GET `/invitations/{token}`), `team-invitations.token.join` (POST `/invitations/{token}`), and the legacy pair `team-invitations.accept` / `team-invitations.join`. Controller methods `show()` and `store()`. View states: `ready`, `wrong-account`, `expired`, `already-member`.
+- Produces: routes `team-invitations.token.accept` (GET `/invitations/{token}`) and `team-invitations.token.join` (POST `/invitations/{token}`). The legacy signed pair `team-invitations.accept` / `team-invitations.join` was removed before merge (no live invitations existed in production), so the token route is the only shape. Controller methods `show()` and `store()`. View states: `ready`, `wrong-account`, `expired`, `already-member`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1162,7 +1162,7 @@ final readonly class AcceptTeamInvitationController
 }
 ```
 
-The legacy `show` renders a form posting to a signed `team-invitations.join` URL, because legacy rows have `token = null` and cannot address the token route.
+Superseded: the legacy signed route was removed before merge. `show` always renders a form posting to `team-invitations.token.join`, and a row without a token simply resolves to the `expired` state until it is resent.
 
 - [ ] **Step 5: Register the routes**
 
@@ -3016,7 +3016,7 @@ git diff origin/main
 
 - [ ] **Step 7: Open the PR**
 
-Body must state that existing non-owner Admins gain member-management ability on deploy — a user-visible privilege change — and that the legacy `/team-invitations/{invitation}` route can be deleted once all pre-deploy invitations have expired (7 days).
+Body must state that existing non-owner Admins gain member-management ability on deploy — a user-visible privilege change — The legacy `/team-invitations/{invitation}` route is already deleted: production held no live invitations at the time, so no grace period was needed.
 
 ```bash
 gh pr create --base main --title "feat: overhaul team invitations and membership"

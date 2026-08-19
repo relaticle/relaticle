@@ -13,14 +13,6 @@ trait DetectsTeamInvitation
 {
     protected function getTeamInvitationFromSession(): ?TeamInvitation
     {
-        $legacySegment = $this->getIntendedUrlSegmentAfter('team-invitations');
-
-        if ($legacySegment !== null) {
-            return TeamInvitation::query()
-                ->whereKey($legacySegment)
-                ->first();
-        }
-
         $token = $this->getIntendedUrlSegmentAfter('invitations');
 
         if ($token === null) {

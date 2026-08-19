@@ -13,28 +13,26 @@ use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Jetstream\Jetstream;
 
 /**
  * GET always renders a confirm page and never mutates membership; POST is the
- * only action that joins. Two invitation shapes resolve here: the opaque
- * token minted by `TeamInvitation::issueToken()` (Task 4) for new invitations,
- * and the legacy signed-URL-over-ULID shape for rows created before it. Every
- * downstream decision (expiry, email match, states) is shared between them.
+ * only action that joins. An invitation resolves solely by the opaque token
+ * minted in `TeamInvitation::issueToken()`; the signed-URL-over-ULID shape that
+ * predated it is gone, along with the routes that served it.
  */
 final readonly class AcceptTeamInvitationController
 {
     public function show(Request $request, string $token): View|RedirectResponse
     {
-        return $this->render($request, $this->resolve($token, $request));
+        return $this->render($request, TeamInvitation::findByRawToken($token));
     }
 
     public function store(Request $request, string $token, AcceptTeamInvitation $acceptTeamInvitation): RedirectResponse|View
     {
-        $invitation = $this->resolve($token, $request);
+        $invitation = TeamInvitation::findByRawToken($token);
         $user = $this->user($request);
 
         if (! $invitation instanceof TeamInvitation || $invitation->isExpired()) {
@@ -48,15 +46,6 @@ final readonly class AcceptTeamInvitationController
         $team = $acceptTeamInvitation->execute($user, $invitation);
 
         return $this->redirectToTeam($team, __('teams.accept.joined', ['team' => $team->name]));
-    }
-
-    private function resolve(string $token, Request $request): ?TeamInvitation
-    {
-        if ($request->routeIs('team-invitations.token.*')) {
-            return TeamInvitation::findByRawToken($token);
-        }
-
-        return TeamInvitation::query()->whereKey($token)->first();
     }
 
     private function emailMatches(User $user, TeamInvitation $invitation): bool
@@ -101,9 +90,7 @@ final readonly class AcceptTeamInvitationController
             'teamName' => $invitation->team->name,
             'inviterName' => $invitation->inviter?->name,
             'roleName' => Jetstream::findRole($invitation->role)?->name,
-            'joinUrl' => $request->routeIs('team-invitations.token.*')
-                ? route('team-invitations.token.join', ['token' => $request->route('token')])
-                : URL::signedRoute('team-invitations.join', ['invitation' => $invitation]),
+            'joinUrl' => route('team-invitations.token.join', ['token' => $request->route('token')]),
         ]);
     }
 

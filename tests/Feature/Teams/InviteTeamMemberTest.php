@@ -5,7 +5,8 @@ declare(strict_types=1);
 use App\Actions\Jetstream\InviteTeamMember;
 use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\TeamRole;
-use App\Livewire\App\Teams\ManageMembers;
+use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Livewire\App\Teams\TeamMembers;
 use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -40,7 +41,7 @@ test('an invite with only an email defaults to the editor role', function () {
 });
 
 test('team members can be invited to team', function () {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'test@example.com', 'role' => 'admin']],
         ]);
@@ -57,7 +58,7 @@ test('team members can be invited to team', function () {
 test('invitation expires_at is set based on config', function () {
     config(['jetstream.invitation_expiry_days' => 14]);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'test@example.com', 'role' => 'editor']],
         ]);
@@ -67,7 +68,7 @@ test('invitation expires_at is set based on config', function () {
 });
 
 test('team member invitations can be revoked', function () {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'test@example.com', 'role' => 'admin']],
         ]);
@@ -76,14 +77,14 @@ test('team member invitations can be revoked', function () {
 
     $invitation = $this->team->fresh()->teamInvitations->first();
 
-    livewire(ManageMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('revokeTeamInvitation')->table('invite:'.$invitation->id));
+    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation->id));
 
     expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 test('team members cannot be invited with a disposable email address', function () {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'burner@mailinator.com', 'role' => 'admin']],
         ])
@@ -141,7 +142,7 @@ test('admin cannot invite a new member as admin', function (): void {
 
     $this->actingAs($admin);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'newadmin@example.com', 'role' => 'admin']],
         ])
@@ -243,7 +244,7 @@ test('viewer cannot manage members', function (): void {
 });
 
 test('inviting records the inviter and mints a token', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'new@example.test', 'role' => 'editor']],
         ]);
@@ -255,7 +256,7 @@ test('inviting records the inviter and mints a token', function (): void {
 });
 
 test('inviting lowercases a mixed-case email', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'Mixed-Case@Example.Test', 'role' => 'editor']],
         ]);
@@ -266,12 +267,12 @@ test('inviting lowercases a mixed-case email', function (): void {
 });
 
 test('inviting a case-variant of an already-invited email is rejected as a duplicate', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'bob@example.test', 'role' => 'editor']],
         ]);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'Bob@Example.Test', 'role' => 'editor']],
         ])
@@ -283,7 +284,7 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
 test('invitation email names the inviter and the role', function (): void {
     $this->user->update(['name' => 'Ana Reyes']);
 
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'new@example.test', 'role' => 'editor']],
         ]);
@@ -296,7 +297,7 @@ test('invitation email names the inviter and the role', function (): void {
 });
 
 test('invitation email accept URL resolves to the token route and carries the raw token, not the hash', function (): void {
-    livewire(ManageMembers::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
             'invites' => [['email' => 'new@example.test', 'role' => 'editor']],
         ]);
