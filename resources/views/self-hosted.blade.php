@@ -18,6 +18,13 @@
         ['type' => 'command', 'text' => 'docker compose up -d'],
     ];
 
+    // What the copy button puts on the clipboard: commands only, no prompt glyphs
+    // and no comment lines, so a paste into a real shell runs as-is.
+    $quickStartClipboard = collect($quickStartLines)
+        ->filter(fn (array $line): bool => ($line['type'] ?? null) === 'command')
+        ->pluck('text')
+        ->implode("\n");
+
     $faqs = [
         [
             __('What license is Relaticle released under?'),
@@ -95,6 +102,26 @@
                     <span class="h-2.5 w-2.5 rounded-full bg-yellow-500/70"></span>
                     <span class="h-2.5 w-2.5 rounded-full bg-green-500/70"></span>
                     <span class="ml-3 font-mono text-xs text-gray-500">{{ __('Terminal') }}</span>
+
+                    <button
+                        type="button"
+                        x-data="{ copied: false }"
+                        @click="navigator.clipboard.writeText(@js($quickStartClipboard)).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
+                        class="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-100 transition-colors cursor-pointer"
+                    >
+                        <template x-if="! copied">
+                            <span class="inline-flex items-center gap-1.5">
+                                <x-ri-file-copy-line class="h-3.5 w-3.5"/>
+                                {{ __('Copy') }}
+                            </span>
+                        </template>
+                        <template x-if="copied">
+                            <span class="inline-flex items-center gap-1.5 text-emerald-400">
+                                <x-ri-check-line class="h-3.5 w-3.5"/>
+                                {{ __('Copied') }}
+                            </span>
+                        </template>
+                    </button>
                 </div>
                 <div class="px-5 py-5 font-mono text-[12px] sm:text-[13px] leading-relaxed">
                     @foreach($quickStartLines as $line)
@@ -102,11 +129,13 @@
                             <div class="h-3" aria-hidden="true"></div>
                         @elseif(($line['type'] ?? null) === 'comment')
                             <p class="text-gray-500">
-                                <span aria-hidden="true">#</span> {{ $line['text'] }}
+                                <span class="select-none" aria-hidden="true">#</span> {{ $line['text'] }}
                             </p>
                         @else
+                            {{-- Prompt glyphs carry `select-none` so a select-and-copy of the
+                                 block yields runnable shell input, not stray `$`/`>` lines. --}}
                             <p class="flex gap-2 whitespace-pre-wrap break-all text-gray-100">
-                                <span class="shrink-0 {{ ($line['continuation'] ?? false) ? 'text-gray-600' : 'text-emerald-400' }}" aria-hidden="true">{{ ($line['continuation'] ?? false) ? '>' : '$' }}</span>
+                                <span class="shrink-0 select-none {{ ($line['continuation'] ?? false) ? 'text-gray-600' : 'text-emerald-400' }}" aria-hidden="true">{{ ($line['continuation'] ?? false) ? '>' : '$' }}</span>
                                 <span>{{ $line['text'] }}</span>
                             </p>
                         @endif

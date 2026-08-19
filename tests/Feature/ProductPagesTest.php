@@ -60,3 +60,11 @@ it('renders the self-hosted page with the real quick start', function (): void {
 it('links the full self-hosting guide', function (): void {
     $this->get('/self-hosted')->assertOk()->assertSee('/developers/self-hosting');
 });
+
+it('offers a copy control whose payload is runnable shell without prompt glyphs', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Copy'))
+        ->and($html)->toContain('navigator.clipboard.writeText')
+        ->and($html)->toContain('select-none');
+});
