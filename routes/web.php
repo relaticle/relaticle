@@ -68,14 +68,6 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
-Route::middleware(['signed', 'auth', 'verified', AuthenticateSession::class])->group(function (): void {
-    Route::get('/team-invitations/{invitation}', [AcceptTeamInvitationController::class, 'show'])
-        ->name('team-invitations.accept');
-
-    Route::post('/team-invitations/{invitation}', [AcceptTeamInvitationController::class, 'store'])
-        ->name('team-invitations.join');
-});
-
 Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
     Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')

@@ -10,8 +10,20 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+
+/**
+ * Mint and persist a raw token, then return the guest-facing accept URL. The
+ * guest flow reads the invitation back out of `url.intended`, so the URL has to
+ * be the real token route.
+ */
+function acceptUrlFor(TeamInvitation $invitation): string
+{
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    return route('team-invitations.token.accept', ['token' => $rawToken]);
+}
 
 test('guest with no account clicking invitation link is redirected to register page', function () {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
@@ -21,7 +33,7 @@ test('guest with no account clicking invitation link is redirected to register p
         'email' => 'newuser@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getRegistrationUrl());
@@ -37,14 +49,14 @@ test('guest with existing account clicking invitation link is redirected to logi
         'email' => 'existing@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getLoginUrl());
 });
 
 test('guest with a validly-signed link for a since-deleted invitation is sent to login', function (): void {
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => (string) Str::ulid()]);
+    $acceptUrl = route('team-invitations.token.accept', ['token' => Str::random(40)]);
 
     $this->get($acceptUrl)
         ->assertRedirect(route('login'));
@@ -58,7 +70,7 @@ test('guest clicking invitation link sees team name and sign-up link on login pa
         'email' => 'newuser@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -81,7 +93,7 @@ test('guest clicking invitation link sees team name and sign-in link on register
         'email' => 'newuser@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getRegistrationUrl());
@@ -105,7 +117,7 @@ test('user registering via invitation link gets auto-verified email', function (
         'email' => 'newuser@gmail.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     // Simulate guest hitting invite link (sets url.intended in session)
     $this->get($acceptUrl);
@@ -150,7 +162,7 @@ test('user registering with different email than invitation does not get auto-ve
         'email' => 'invited@gmail.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
@@ -181,7 +193,7 @@ test('user registering via invitation link gets mailcoach subscriber synced', fu
         'email' => 'invited@gmail.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl);
 
