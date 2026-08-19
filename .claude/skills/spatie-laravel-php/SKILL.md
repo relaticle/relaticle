@@ -38,6 +38,7 @@ Apply Spatie's Laravel and PHP guidelines to keep code style consistent and Lara
 - Use short nullable syntax like `?string`.
 - Use constructor property promotion when all properties can be promoted.
 - One trait per line with separate `use` statements.
+- Once a method chain breaks across lines, put every subsequent `->` on a new line; never mix single-line and multi-line chaining.
 - Prefer early returns and avoid `else` when possible.
 - Always use curly braces for control structures.
 - Use string interpolation over concatenation.
@@ -53,7 +54,7 @@ Do:
 - Use `config()` helper and avoid `env()` outside config files.
 - Add service configs to `config/services.php`, not new files.
 - Use `__()` for translations instead of `@lang`.
-- Use PascalCase for enum values.
+- Use PascalCase for enum values and class constants.
 
 Don't:
 - Add docblocks when full type hints already exist.
@@ -61,7 +62,6 @@ Don't:
 - Use `final` or `readonly` by default.
 - Use `else` when early returns work.
 - Add spaces after Blade control structures.
-- Write down methods in migrations, only up methods.
 
 ## Examples
 

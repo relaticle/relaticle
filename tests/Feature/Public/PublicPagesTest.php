@@ -662,7 +662,7 @@ describe('Hero AI tab — animation timeline', function () {
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // Hovering between the preview and the Ask Relaticle tab must not
+        // Hovering between the preview and the Ask Rela tab must not
         // cancel timers and call animateChat(), because that restarts the demo.
         expect($body)
             ->not->toContain('@mouseenter="pause()"')

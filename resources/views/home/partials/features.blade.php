@@ -15,7 +15,7 @@
                 One CRM. Three ways to work: UI, chat, and agents.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                Manage records by hand, ask Relaticle in the app, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
+                Manage records by hand, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask Relaticle in the app</a>, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
             </p>
         </div>
 
@@ -161,6 +161,14 @@
                     </div>
                     <div class="ml-6 ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] w-1/2 overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
                 </div>
+
+                {{-- A text link, not a clickable card: no other card in this grid is an
+                     anchor, and making one of them one breaks the grid's contract. --}}
+                <a href="{{ route('ai') }}"
+                   class="group mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
+                    Meet Rela
+                    <x-ri-arrow-right-line class="w-3 h-3"/>
+                </a>
             </div>
 
             {{-- Customizable Data Model --}}

@@ -6,6 +6,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Assistant Name
+    |--------------------------------------------------------------------------
+    |
+    | The name the assistant introduces itself by, in the system prompt and
+    | across the chat UI. Override with CHAT_ASSISTANT_NAME in .env.
+    */
+
+    'assistant_name' => env('CHAT_ASSISTANT_NAME', 'Rela'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Batch Write Cap
     |--------------------------------------------------------------------------
     |

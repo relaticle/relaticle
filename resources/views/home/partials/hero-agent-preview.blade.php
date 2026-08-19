@@ -43,7 +43,7 @@
     <div class="relative flex-1 flex flex-col min-w-0">
 
         {{-- Topbar — mirrors the real fi-topbar: sidebar toggle on the left,
-             "Ask Relaticle" outlined trigger + user avatar on the right. The Ask
+             "Ask <assistant>" outlined trigger + user avatar on the right. The Ask
              pill only exists on the dashboard in the real app, so the script
              fades it out during the entry → conversation transition. Sits above
              the entry overlay (which starts at top-10) so it stays visible in
@@ -54,7 +54,7 @@
             <div class="flex items-center gap-2">
                 <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-zinc-200 dark:ring-white/10">
                     <x-heroicon-o-chat-bubble-left-ellipsis class="w-3.5 h-3.5" aria-hidden="true"/>
-                    <span>Ask Relaticle</span>
+                    <span>{{ __('Ask :name', ['name' => (string) config('chat.assistant_name')]) }}</span>
                 </span>
                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
             </div>
@@ -408,7 +408,7 @@
                     }, { duration: d * 0.85, delay: d * 0.15, ease: ease });
                 }
 
-                // The real app only shows the "Ask Relaticle" trigger on the
+                // The real app only shows the "Ask <assistant>" trigger on the
                 // dashboard; the sidebar highlight moves to the conversation.
                 var ask = this.$root.querySelector('.mcp-topbar-ask');
                 if (ask && typeof animate === 'function') {

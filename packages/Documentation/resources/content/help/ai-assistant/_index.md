@@ -1,6 +1,6 @@
 ---
 title: AI assistant
-description: Ask Relaticle questions about your CRM, and let it create and update records with your approval.
+description: Ask Rela questions about your CRM, and let it create and update records with your approval.
 order: 3
 ---
 

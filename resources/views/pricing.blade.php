@@ -219,6 +219,13 @@
                         </div>
                     @endforeach
                 </div>
+
+                {{-- Two of the tiles above are the whole subject of a page each. --}}
+                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('What the AI assistant and MCP server do') }}</a>
+                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
+                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Run it free on your own server') }}</a>
+                </p>
             </div>
 
             {{-- Help CTA --}}

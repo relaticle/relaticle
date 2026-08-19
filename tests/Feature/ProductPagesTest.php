@@ -1,0 +1,92 @@
+<?php
+
+declare(strict_types=1);
+
+it('renders the Rela page with verified capability claims', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(config('chat.assistant_name'))
+        ->and($html)->toContain(__('Nothing writes without your approval'))
+        ->and($html)->toContain(__('MCP server'))
+        ->and($html)->toContain('"FAQPage"')
+        ->and($html)->toContain('"BreadcrumbList"');
+});
+
+it('does not claim hosted models ship with self-hosted installs', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('bring your own API key'));
+});
+
+it('describes batch approval as per record, matching how the service resolves batches', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Batches are reviewed record by record'))
+        ->and($html)->not->toContain('all-or-nothing')
+        ->and($html)->not->toContain('no partial approval');
+});
+
+it('names the assistant from config rather than a hardcoded literal', function (): void {
+    config()->set('chat.assistant_name', 'Testbot');
+
+    $this->get('/ai')->assertOk()->assertSee('Testbot');
+});
+
+it('renders the three-step approval walkthrough at the #demo anchor the hero points to', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain('id="demo"')
+        ->and($html)->toContain(__('Anatomy of a change'))
+        ->and($html)->toContain(__('Step 1: you ask'))
+        ->and($html)->toContain(__('Step 3: you decide'));
+});
+
+it('builds its own walkthrough instead of replaying the homepage mockup', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->not->toContain('heroChat()')
+        ->and($html)->not->toContain('hero-chat-animate');
+});
+
+it('renders the self-hosted page with the real quick start', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain('docker compose up -d')
+        ->and($html)->toContain('AGPL')
+        ->and($html)->toContain(__('Ollama'))
+        ->and($html)->toContain('"FAQPage"');
+});
+
+it('links the full self-hosting guide', function (): void {
+    $this->get('/self-hosted')->assertOk()->assertSee('/developers/self-hosting');
+});
+
+it('offers a copy control whose payload is runnable shell without prompt glyphs', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Copy'))
+        ->and($html)->toContain('navigator.clipboard.writeText')
+        ->and($html)->toContain('select-none');
+});
+
+it('keeps the comment marker selectable so a select-and-copy stays runnable shell', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    // The `$`/`>` prompts are select-none because they are not part of the command.
+    // The `#` is the opposite: drop it from the selection and the comment text
+    // pastes into a shell as a bare command.
+    expect($html)->toContain('<span>#</span>')
+        ->and($html)->not->toContain('<span class="select-none" aria-hidden="true">#</span>');
+});
+
+it('gives each product page its own social card instead of the sitewide one', function (string $path, string $image): void {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    expect($html)->toContain('content="'.url("/images/{$image}").'?v=1"')
+        ->and($html)->not->toContain('/images/open-graph.jpg');
+
+    expect(public_path("images/{$image}"))->toBeReadableFile();
+})->with([
+    ['/ai', 'open-graph-ai.jpg'],
+    ['/self-hosted', 'open-graph-self-hosted.jpg'],
+]);

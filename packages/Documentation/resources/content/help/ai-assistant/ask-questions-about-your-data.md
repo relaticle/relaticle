@@ -14,7 +14,7 @@ and notes, so you can ask questions instead of clicking through lists —
 There are three ways to start:
 
 - The **Home** page is a chat — type into **Ask anything...** and send.
-- Click **Ask Relaticle** in the top bar to open the chat panel over whatever
+- Click **Ask Rela** in the top bar to open the chat panel over whatever
   page you're on.
 - Pick any past conversation from **Chats** in the sidebar, or press `n`
   for a new one.

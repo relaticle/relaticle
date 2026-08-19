@@ -7,7 +7,7 @@
                 Built in the Open
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-lg mx-auto leading-relaxed">
-                Relaticle is AGPL-3.0 open source. Star the repo, join Discord, and help shape the future of agent-native CRM.
+                Relaticle is AGPL-3.0 open source, so you can <a href="{{ route('selfHosted') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">run it on your own server</a>. Star the repo, join Discord, and help shape the future of agent-native CRM.
             </p>
         </div>
 

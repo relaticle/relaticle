@@ -143,6 +143,14 @@ it('serves an llms.txt indexing help and docs', function (): void {
         ->and($body)->toContain('/press');
 });
 
+it('lists the product pages in llms.txt', function (): void {
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    expect($body)->toContain(route('ai'))
+        ->and($body)->toContain(route('selfHosted'))
+        ->and($body)->toContain(config('chat.assistant_name'));
+});
+
 it('gives the search index anchors that equal the real heading ids the renderer emits', function (): void {
     $fixturePath = storage_path('framework/testing/search-index-anchors-'.Str::random(8));
 
