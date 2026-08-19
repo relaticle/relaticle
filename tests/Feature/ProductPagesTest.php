@@ -47,3 +47,16 @@ it('builds its own walkthrough instead of replaying the homepage mockup', functi
     expect($html)->not->toContain('heroChat()')
         ->and($html)->not->toContain('hero-chat-animate');
 });
+
+it('renders the self-hosted page with the real quick start', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain('docker compose up -d')
+        ->and($html)->toContain('AGPL')
+        ->and($html)->toContain(__('Ollama'))
+        ->and($html)->toContain('"FAQPage"');
+});
+
+it('links the full self-hosting guide', function (): void {
+    $this->get('/self-hosted')->assertOk()->assertSee('/developers/self-hosting');
+});
