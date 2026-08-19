@@ -177,6 +177,84 @@ it('keeps drafts scoped per conversation when switching between chats', function
     expect($restoredInA)->toBe('draft for chat a');
 });
 
+/**
+ * Regression test for a leaked saveDraft() debounce timer surviving a real
+ * SPA transition (Livewire's wire:navigate, not a hard page load).
+ *
+ * $page->navigate() in the tests above is Playwright's page.goto(): a hard
+ * reload that tears down and rebuilds the whole JS realm, which trivially
+ * prevents any leaked timer regardless of whether destroy() cleans it up.
+ * That never exercises the path real users take, and where the bug lived:
+ * clicking a different chat in the sidebar (wire:navigate) destroys the old
+ * chatInterface instance in place while the page itself stays alive. Before
+ * destroy() cleared draftDebounceTimer, a fragment typed in A with the timer
+ * still pending when the user clicked away would fire ~400ms later bound to
+ * the DEAD A instance. That callback calls localEditor(), which resolves by
+ * data-chat-context STRING rather than by DOM subtree, so it found the NEW
+ * live B instance mounted under the same "conversation" context, read B's
+ * private composer content, and saved it under chat.draft.<A>: the id
+ * survives on the dead instance's `this.conversationId`, the CONTENT read is
+ * whichever instance the global query happens to resolve to.
+ */
+it('does not leak a pending draft timer across a real SPA conversation switch', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationA = (string) Str::uuid7();
+    $conversationB = (string) Str::uuid7();
+    chatInsertConversation($conversationA, $user, $team->getKey(), 'chat a');
+    chatInsertConversation($conversationB, $user, $team->getKey(), 'chat b');
+
+    $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
+    $draftAKeyJson = json_encode("chat.draft.{$conversationA}");
+    $draftBKeyJson = json_encode("chat.draft.{$conversationB}");
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    // Type in A, then switch to B via the real sidebar wire:navigate link
+    // with no deliberate wait in between: landing well inside the 400ms
+    // debounce window is the whole point of this repro.
+    $page->click($editor)->type($editor, 'fragment from conversation a');
+    // Scoped to the persistent sidebar nav: an unscoped href match also hits
+    // the topbar's "recent chats" menu link for the same conversation.
+    $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
+        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}");
+
+    // A fresh, distinct fragment in B: this is the exact content a leaked
+    // A-bound timer would read (via localEditor()'s global-by-context
+    // resolution) and misfile under chat.draft.<A>.
+    $page->click($editor)->type($editor, 'fragment from conversation b');
+
+    // Give both B's own legitimate debounce AND any leaked A-bound timer
+    // (pre-fix) time to fire.
+    $page->script(<<<'JS'
+        (() => new Promise((resolve) => setTimeout(resolve, 800)))();
+    JS);
+
+    $draftA = $page->script(<<<JS
+        (() => localStorage.getItem({$draftAKeyJson}))();
+    JS);
+    $draftB = $page->script(<<<JS
+        (() => localStorage.getItem({$draftBKeyJson}))();
+    JS);
+
+    // The assertion that matters: A's draft key must never carry B's private
+    // text. Post-fix, A's pending timer is cancelled at destroy() before it
+    // ever fires, so this key is typically absent (null): but the check
+    // must hold either way, since A's own debounce firing just before the
+    // switch (legitimately saving A's own fragment) is also a valid outcome.
+    $draftALeakedBContent = $draftA !== null && str_contains($draftA, 'fragment from conversation b');
+    expect($draftALeakedBContent)->toBeFalse();
+
+    expect($draftB)->not->toBeNull();
+    expect(str_contains((string) $draftB, 'fragment from conversation b'))->toBeTrue();
+});
+
 it('clears the draft once the message is actually sent', function (): void {
     Queue::fake();
 
