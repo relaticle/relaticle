@@ -47,6 +47,19 @@ it('decodes html entities instead of leaking double-escaped ampersands', functio
         ->and($markdown)->not->toContain('Import &amp; Export');
 });
 
+it('declares Vary: Accept on both variants of a content-negotiated route', function (): void {
+    $htmlVary = $this->get('/compare/relaticle-vs-twenty')
+        ->assertOk()
+        ->headers->get('Vary', '');
+
+    $markdownVary = $this->get('/compare/relaticle-vs-twenty', ['Accept' => 'text/markdown'])
+        ->assertOk()
+        ->headers->get('Vary', '');
+
+    expect($htmlVary)->toContain('Accept')
+        ->and($markdownVary)->toContain('Accept');
+});
+
 it('converts a real html table to pipe-table markdown', function (): void {
     Route::middleware(ProvideMarkdownResponse::class)->get('/__markdown-table-fixture', fn () => response(<<<'HTML'
         <html>

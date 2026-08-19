@@ -7,23 +7,23 @@
     $copy = [
         'twenty' => [
             'badge' => __('Comparison'),
-            'opening' => __('Relaticle and Twenty are both AGPL-3.0, self-hostable CRMs, so the choice comes down to what you\'re optimizing for. Pick Relaticle if you want AI tooling — chat and MCP — that runs fully self-hosted and flat pricing that doesn\'t grow with headcount. Pick Twenty if you want the larger open-source community or prefer a Node/NestJS stack over Laravel and PHP.'),
+            'opening' => __('Relaticle and Twenty CRM are both AGPL-3.0, self-hostable CRMs, so the choice comes down to what you\'re optimizing for. Pick Relaticle if you want AI tooling — chat and MCP — that runs fully self-hosted and flat pricing that doesn\'t grow with headcount. Pick Twenty if you want the larger open-source community or prefer a Node/NestJS stack over Laravel and PHP.'),
             'sections' => [
                 [
-                    'heading' => __('License & pricing'),
-                    'body' => __('Both projects publish under AGPL-3.0 — Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo. Relaticle charges a flat :relaticlePricing. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
+                    'heading' => __('How do Relaticle and Twenty pricing compare?'),
+                    'body' => __('Relaticle charges :relaticlePricing — the bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle has no equivalent carve-out: the self-hosted and hosted versions run the same codebase with no feature gating.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
                 ],
                 [
-                    'heading' => __('AI and MCP tooling'),
-                    'body' => __('Relaticle ships :relaticleAi. Twenty\'s offering is :twentyAi — self-hosters get the core CRM, but the AI tooling itself is Cloud-oriented.', ['relaticleAi' => $relaticle['ai'], 'twentyAi' => $competitor['ai']]),
+                    'heading' => __('Which one runs AI and MCP self-hosted?'),
+                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes renders as an approval card — old value to new value, per field — and executes only when a human accepts it, so the AI layer is safe to point at real customer data. Twenty\'s offering is :twentyAi — self-hosters get the core CRM, but the AI tooling itself is Cloud-oriented, and its public self-hosting documentation does not describe an equivalent out-of-the-box MCP setup. If self-hosted AI is the requirement, this is the sharpest difference between the two products.', ['relaticleAi' => $relaticle['ai'], 'twentyAi' => $competitor['ai']]),
                 ],
                 [
-                    'heading' => __('Tech stack & deployment'),
-                    'body' => __('Relaticle runs on :relaticleStack. Twenty runs on :twentyStack — more moving parts to operate yourself if you self-host.', ['relaticleStack' => $relaticle['stack'], 'twentyStack' => $competitor['stack']]),
+                    'heading' => __('What does self-hosting each one take?'),
+                    'body' => __('Relaticle runs on :relaticleStack — one process to operate, and :relaticleSelfHost. Twenty runs on :twentyStack, which means more moving parts to provision, monitor, and upgrade yourself. Twenty\'s position is :twentySelfHost. If you want the smallest possible operational footprint, a single Laravel server is hard to beat; if you already operate Node services with Redis and Postgres, Twenty\'s stack will feel familiar.', ['relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => lcfirst($relaticle['self_host']), 'twentyStack' => $competitor['stack'], 'twentySelfHost' => lcfirst($competitor['self_host'])]),
                 ],
                 [
-                    'heading' => __('Community & extensibility'),
-                    'body' => __('Twenty has the bigger open-source footprint — :twentyStars GitHub stars and :twentyContributors contributors, against Relaticle\'s :relaticleStars stars and :relaticleContributors. Twenty also ships :twentyExtensibility. Relaticle\'s extensibility is :relaticleExtensibility.', [
+                    'heading' => __('Who has the bigger community and ecosystem?'),
+                    'body' => __('Twenty CRM has the bigger open-source footprint — :twentyStars GitHub stars and :twentyContributors contributors on the twentyhq/twenty repository, against Relaticle\'s :relaticleStars stars and :relaticleContributors. Twenty also ships :twentyExtensibility. Relaticle\'s extensibility is :relaticleExtensibility. If community size, third-party extensions, or the confidence of a large existing user base decides it for you, that point goes to Twenty; if you want a smaller codebase you can read end to end and extend directly, that favors Relaticle.', [
                         'twentyStars' => number_format($competitor['stars']),
                         'twentyContributors' => $competitor['contributors'],
                         'relaticleStars' => number_format($relaticle['stars']),
@@ -39,19 +39,19 @@
             'opening' => __('Relaticle and EspoCRM are both open-source, AGPL-3.0, self-hosted-first CRMs built to run on a single PHP server. Pick Relaticle if built-in AI — a chat assistant plus a 32-tool MCP server — matters to you, since EspoCRM ships neither today. Pick EspoCRM if you want a more established codebase and its paid extension ecosystem for specific integrations.'),
             'sections' => [
                 [
-                    'heading' => __('License & pricing'),
-                    'body' => __('Both are AGPL-3.0. Relaticle charges a flat :relaticlePricing. EspoCRM prices per user with seat minimums (:espocrmPricing).', ['relaticlePricing' => $relaticle['pricing'], 'espocrmPricing' => $competitor['pricing']]),
+                    'heading' => __('How do Relaticle and EspoCRM pricing compare?'),
+                    'body' => __('Both are AGPL-3.0, and both can be self-hosted for free. On the hosted side the models split: Relaticle charges :relaticlePricing, while EspoCRM prices per user with seat minimums (:espocrmPricing), so a small team pays for seats it may not fill. Self-hosters should also note the difference in what "free" covers — Relaticle ships one codebase with no feature gating, while EspoCRM sells paid extensions on top of its free core.', ['relaticlePricing' => $relaticle['pricing'], 'espocrmPricing' => $competitor['pricing']]),
                 ],
                 [
-                    'heading' => __('AI and MCP tooling'),
-                    'body' => __('Relaticle ships :relaticleAi. EspoCRM\'s AI: :espocrmAi.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => $competitor['ai']]),
+                    'heading' => __('Which one has built-in AI and MCP support?'),
+                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes is a human-approved card, so the AI can work real customer data without acting unilaterally. EspoCRM\'s AI: :espocrmAi. If AI tooling matters to your evaluation, this is the deciding dimension — EspoCRM simply does not compete on it today.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => $competitor['ai']]),
                 ],
                 [
-                    'heading' => __('Tech stack & deployment'),
-                    'body' => __('Relaticle runs on :relaticleStack. EspoCRM runs on :espocrmStack — both are single-server-friendly PHP deployments.', ['relaticleStack' => $relaticle['stack'], 'espocrmStack' => $competitor['stack']]),
+                    'heading' => __('What does self-hosting each one take?'),
+                    'body' => __('Relaticle runs on :relaticleStack. EspoCRM runs on :espocrmStack — both are single-server-friendly PHP deployments, so neither demands a heavy operations setup. On hosting economics the split is :relaticleSelfHost for Relaticle versus :espocrmSelfHost for EspoCRM.', ['relaticleStack' => $relaticle['stack'], 'espocrmStack' => $competitor['stack'], 'relaticleSelfHost' => lcfirst($relaticle['self_host']), 'espocrmSelfHost' => lcfirst($competitor['self_host'])]),
                 ],
                 [
-                    'heading' => __('Community & extensibility'),
+                    'heading' => __('Who has the bigger community and ecosystem?'),
                     'body' => __('EspoCRM has the longer track record — :espocrmStars GitHub stars and :espocrmContributors contributors, against Relaticle\'s :relaticleStars stars and :relaticleContributors. EspoCRM\'s extensibility is :espocrmExtensibility. Relaticle\'s is :relaticleExtensibility.', [
                         'espocrmStars' => number_format($competitor['stars']),
                         'espocrmContributors' => $competitor['contributors'],
@@ -77,7 +77,16 @@
 
     $title = $titles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
-    $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->format('F j, Y');
+    $factsVerifiedDate = \Carbon\CarbonImmutable::parse($relaticle['verified']);
+    $factsVerifiedAt = $factsVerifiedDate->format('F j, Y');
+
+    $primarySources = collect([$relaticle, $competitor])
+        ->flatMap(fn (array $facts): array => array_filter([
+            ['label' => __(':name pricing', ['name' => $facts['name']]), 'url' => $facts['source_urls']['pricing']],
+            isset($facts['source_urls']['repository'])
+                ? ['label' => __(':name on GitHub', ['name' => $facts['name']]), 'url' => $facts['source_urls']['repository']]
+                : null,
+        ]));
 @endphp
 
 <x-guest-layout
@@ -132,8 +141,15 @@
                 @endforeach
             </div>
 
-            <p class="text-xs text-gray-400 dark:text-gray-500 mb-16">
+            <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 {{ __('Facts verified :date. Sources are dated in the underlying facts file — see :repo.', ['date' => $factsVerifiedAt, 'repo' => 'github.com/relaticle/relaticle']) }}
+            </p>
+
+            <p class="text-xs text-gray-400 dark:text-gray-500 mb-16">
+                {{ __('Primary sources:') }}
+                @foreach ($primarySources as $source)
+                    <a href="{{ $source['url'] }}" rel="nofollow noopener" target="_blank" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300">{{ $source['label'] }}</a>{{ $loop->last ? '.' : ',' }}
+                @endforeach
             </p>
 
             {{-- CTA --}}
@@ -158,11 +174,26 @@
     </section>
 
     @php
+        $aboutEntity = function (array $facts): \Spatie\SchemaOrg\SoftwareApplication {
+            $application = \Spatie\SchemaOrg\Schema::softwareApplication()
+                ->name($facts['name'])
+                ->url($facts['source_urls']['website'])
+                ->applicationCategory('BusinessApplication');
+
+            if (isset($facts['source_urls']['repository'])) {
+                $application->sameAs([$facts['source_urls']['repository']]);
+            }
+
+            return $application;
+        };
+
         $schema = (new \Spatie\SchemaOrg\Graph())
             ->webPage(fn ($page) => $page
                 ->name($title)
                 ->description($description)
-                ->url(url()->current()))
+                ->url(url()->current())
+                ->dateModified($factsVerifiedDate)
+                ->about([$aboutEntity($relaticle), $aboutEntity($competitor)]))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
                     \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),

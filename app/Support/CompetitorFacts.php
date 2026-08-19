@@ -27,6 +27,7 @@ final readonly class CompetitorFacts
      *     self_host: string,
      *     ai: string,
      *     extensibility: string,
+     *     source_urls: array{website: string, pricing: string, repository?: string},
      *     verified: string,
      * }>
      */
@@ -46,6 +47,7 @@ final readonly class CompetitorFacts
          *     self_host: string,
          *     ai: string,
          *     extensibility: string,
+         *     source_urls: array{website: string, pricing: string, repository?: string},
          *     verified: string,
          * }> $facts
          */
