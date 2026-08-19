@@ -47,6 +47,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     ...window.ChatModules.streamModule(),
 
     conversationId: initialConversationId,
+    userId,
     context: 'conversation',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
@@ -159,6 +160,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     init() {
         this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
+        this.installConversationSwitchWatch();
 
         const validModels = this.modelOptions
             .map((o) => o.value)
@@ -348,6 +350,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     destroy() {
+        this.stashConversationCache();
+        this.uninstallConversationSwitchWatch();
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();
