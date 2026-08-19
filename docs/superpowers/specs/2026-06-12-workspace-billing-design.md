@@ -24,7 +24,7 @@ Relaticle Cloud bills **per workspace, never per seat** — flat plan tiers gate
 | 12 | Team deletion | Auto-cancel: `cancel()` at scheduling, `cancelNow()` at purge |
 | 13 | Observability | Sentry + Horizon + Stripe dashboard; no new alerting |
 | 14 | Cancel/payment UX | Stripe Billing Portal only |
-| 15 | Sysadmin | Read-only Subscriptions resource (full visibility) |
+| 15 | Sysadmin | Subscriptions resource is read-only except for the workspace-billing transfer action (see §11) |
 | 16 | Provider | **Stripe Atlas LLC + Cashier + Managed Payments** (Polar dropped — see `.context/research/billing-provider-research.md` §11) |
 | 17 | Managed Cloud Free | **Removed for new workspaces**; existing workspaces grandfathered |
 | 18 | Trial expiry / cancellation | Managed access pauses; no usable Cloud Free downgrade |
@@ -196,6 +196,7 @@ No seat counting, proration, or billable-member logic is added in this launch. C
 ## 11. Sysadmin
 
 - New **read-only `SubscriptionResource`** (Cashier `subscriptions` table): team, price→plan, status badge, interval, current period end, origin column, status filters, deep links to the Stripe dashboard customer + subscription. No mutations. Origin derivation: valid subscription → `subscription`; else `trial_ends_at` in future → `trial`; else plan ≠ Free → `manual`; else `—`.
+- **Transfer to workspace** record action (added 2026-08-19). Moves `teams.stripe_id`, `pm_type`, `pm_last_four` and every `subscriptions` row from the source workspace to a target workspace with the same owner and no Stripe customer of its own, then sets the target to the subscription's plan and the source to Free, resetting both credit periods. No Stripe API call is made: a subscription cannot change customer in Stripe, and it does not need to, because the customer itself changes hands. Fixes the "subscribed the wrong workspace" support case without a refund or a new card. Refuses when the target already has its own Stripe customer, raising `TransferRefused` (a narrow `RuntimeException` subtype) so infrastructure errors still reach error tracking instead of being reported as a business refusal; that case falls back to cancel and re-subscribe in the Stripe dashboard.
 - `AiCreditBalanceResource` "Reset billing period" action: inline warning when the team has a valid subscription ("webhook sync will re-assert the subscribed plan — cancel in Stripe first").
 
 ## 12. Observability
