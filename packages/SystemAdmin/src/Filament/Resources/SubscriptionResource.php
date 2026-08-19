@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Models\Team;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -17,9 +20,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Cashier\Subscription;
 use Override;
+use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use RuntimeException;
 use UnitEnum;
 
 final class SubscriptionResource extends Resource
@@ -150,6 +155,7 @@ final class SubscriptionResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+                self::transferAction(),
                 Action::make('stripe')
                     ->label('Open in Stripe')
                     ->icon('heroicon-o-arrow-top-right-on-square')
@@ -166,5 +172,70 @@ final class SubscriptionResource extends Resource
             'index' => ListSubscriptions::route('/'),
             'view' => ViewSubscription::route('/{record}'),
         ];
+    }
+
+    private static function transferAction(): Action
+    {
+        return Action::make('transfer')
+            ->label('Transfer to workspace')
+            ->icon('heroicon-o-arrows-right-left')
+            ->color('warning')
+            ->authorize('transfer')
+            ->modalHeading('Transfer billing to another workspace')
+            ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. Nothing changes in Stripe: the same card is charged on the same date. Invoice history follows the customer, and the customer keeps its current name, so rename it in the Stripe dashboard if that matters. Only workspaces with the same owner and no Stripe customer of their own are listed.')
+            ->modalSubmitActionLabel('Transfer')
+            ->schema([
+                Select::make('target_team_id')
+                    ->label('Target workspace')
+                    ->options(fn (Subscription $record): array => self::transferTargets($record))
+                    ->required()
+                    ->searchable()
+                    ->native(false),
+            ])
+            ->action(function (array $data, Subscription $record, TransferWorkspaceBilling $transfer): void {
+                /** @var Team $source */
+                $source = $record->owner;
+
+                /** @var Team $target */
+                $target = Team::query()->findOrFail((string) $data['target_team_id']);
+
+                try {
+                    $transfer->execute($source, $target, (string) auth('sysadmin')->id());
+                } catch (RuntimeException $exception) {
+                    Notification::make()
+                        ->title('Transfer refused')
+                        ->body($exception->getMessage())
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                Notification::make()
+                    ->title('Billing transferred')
+                    ->body("{$source->name} to {$target->name}")
+                    ->success()
+                    ->send();
+            });
+    }
+
+    /**
+     * Workspaces this subscription can move to: same owner, and no Stripe
+     * customer of their own to be orphaned by the move.
+     *
+     * @return array<string, string>
+     */
+    private static function transferTargets(Subscription $record): array
+    {
+        /** @var Team $source */
+        $source = $record->owner;
+
+        return Team::query()
+            ->where('user_id', $source->user_id)
+            ->whereKeyNot($source->getKey())
+            ->whereNull('stripe_id')
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
     }
 }

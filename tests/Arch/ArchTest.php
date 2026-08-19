@@ -178,6 +178,7 @@ $packageServiceLayers = [
     'Relaticle\Documentation\Support',
     'Relaticle\ImportWizard\Support',
     'Relaticle\OnboardSeed\Support',
+    'Relaticle\SystemAdmin\Actions',
 ];
 
 arch('package service layers avoid mutation')
