@@ -194,6 +194,26 @@ test('user with scheduled deletion cannot accept invitation', function () {
     expect($team->fresh()->hasUser($user))->toBeFalse();
 });
 
+test('a team scheduled for deletion cannot be joined via the legacy accept flow', function (): void {
+    $team = Team::factory()->create();
+    $team->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    $invitation = $team->teamInvitations()->create([
+        'email' => $this->user->email,
+        'role' => 'editor',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $joinUrl = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
+
+    $this->actingAs($this->user)
+        ->post($joinUrl)
+        ->assertStatus(410);
+
+    expect($team->fresh()->hasUser($this->user))->toBeFalse();
+    expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
 test('a GET on the accept link never joins the team', function (): void {
     $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
     $raw = $invitation->issueToken();

@@ -18,7 +18,13 @@ use Laravel\Jetstream\Contracts\AddsTeamMembers;
  * response and does not touch the view layer.
  *
  * Every caller is expected to have already confirmed the invitation is valid
- * and that the user's email matches it — this action only handles the write.
+ * and that the user's email matches it — those checks stay caller-specific
+ * because each surface renders a different UX for a mismatch. Deletion state
+ * has no such reason to vary, so both the user's and the team's scheduled-
+ * deletion status are enforced here, where every caller inherits them. On a
+ * refusal this throws Laravel's HttpException (403 or 410, matching the
+ * abort() the accept-flow controller used to perform inline); callers that
+ * need a renderable response rather than a raw HTTP error must catch it.
  */
 final readonly class AcceptTeamInvitation
 {
@@ -29,6 +35,9 @@ final readonly class AcceptTeamInvitation
     public function execute(User $user, TeamInvitation $invitation): Team
     {
         $team = $invitation->team;
+
+        abort_if($user->isScheduledForDeletion(), 403, __('teams.accept.account_deleting'));
+        abort_if($team->isScheduledForDeletion(), 410, __('teams.accept.team_deleting'));
 
         DB::transaction(function () use ($user, $team, $invitation): void {
             $locked = TeamInvitation::query()->lockForUpdate()->find($invitation->id);
