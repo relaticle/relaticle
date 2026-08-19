@@ -156,6 +156,8 @@ return [
         'role' => 'Role',
         'status' => 'Status',
         'since' => 'Since',
+        'expires' => 'Expires',
+        'expired' => 'Expired',
         'status_member' => 'Member',
         'status_invited' => 'Invitation pending',
     ],

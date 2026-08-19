@@ -29,6 +29,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -102,6 +103,13 @@ final class ManageMembers extends BaseLivewireComponent implements Tables\Contra
                 Tables\Columns\TextColumn::make('happened_at')
                     ->label(__('teams.table.since'))
                     ->date(),
+                Tables\Columns\TextColumn::make('expires_at')
+                    ->label(__('teams.table.expires'))
+                    ->formatStateUsing(fn (?Carbon $state): string => match (true) {
+                        ! $state instanceof Carbon => '',
+                        $state->isPast() => __('teams.table.expired'),
+                        default => $state->diffForHumans(),
+                    }),
             ])
             ->recordActions([
                 $this->updateTeamRoleAction(),
