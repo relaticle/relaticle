@@ -31,3 +31,19 @@ it('names the assistant from config rather than a hardcoded literal', function (
 
     $this->get('/ai')->assertOk()->assertSee('Testbot');
 });
+
+it('renders the three-step approval walkthrough at the #demo anchor the hero points to', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain('id="demo"')
+        ->and($html)->toContain(__('Anatomy of a change'))
+        ->and($html)->toContain(__('Step 1: you ask'))
+        ->and($html)->toContain(__('Step 3: you decide'));
+});
+
+it('builds its own walkthrough instead of replaying the homepage mockup', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->not->toContain('heroChat()')
+        ->and($html)->not->toContain('hero-chat-animate');
+});

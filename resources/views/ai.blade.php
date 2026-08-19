@@ -87,11 +87,130 @@
         </div>
     </section>
 
-    {{-- Demo placeholder: filled in by a later task --}}
-    <div id="demo"></div>
+    {{-- Anatomy of a change: three stills of the real approval flow, revealed on
+         scroll. Deliberately NOT the homepage hero mockup, which replays the same
+         animation a visitor has already seen. Each step is a purpose-built
+         fragment mirroring the real proposal card in
+         packages/Chat/resources/views/livewire/chat/partials/_proposal-card.blade.php --}}
+    <section id="demo" class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950 overflow-hidden">
+        <div class="max-w-5xl mx-auto px-6 lg:px-8">
+            <div class="max-w-2xl mx-auto text-center mb-14">
+                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
+                    {{ __('Anatomy of a change') }}
+                </h2>
+                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {{ __('You ask. :name proposes. Nothing is written until you say so.', ['name' => $assistantName]) }}
+                </p>
+            </div>
+
+            <ol
+                x-data="{ shown: false }"
+                x-init="
+                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        shown = true;
+                    } else {
+                        const observer = new IntersectionObserver((entries) => {
+                            if (entries[0].isIntersecting) {
+                                shown = true;
+                                observer.disconnect();
+                            }
+                        }, { threshold: 0.25 });
+                        observer.observe($el);
+                    }
+                "
+                class="grid grid-cols-1 md:grid-cols-3 gap-5"
+            >
+                {{-- Step 1: the ask --}}
+                <li class="flex flex-col transition duration-500 ease-out motion-reduce:transition-none"
+                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+                        {{ __('Step 1: you ask') }}
+                    </p>
+                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
+                        <div class="rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] px-3.5 py-2.5">
+                            <p class="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
+                                {{ __('Mark the Northwind renewal as won and set the close date to today') }}
+                            </p>
+                        </div>
+                        <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                            {{ __('Plain language. No commands to memorize.') }}
+                        </p>
+                    </div>
+                </li>
+
+                {{-- Step 2: the proposal card --}}
+                <li class="flex flex-col transition delay-150 duration-500 ease-out motion-reduce:transition-none motion-reduce:delay-0"
+                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+                        {{ __('Step 2: :name proposes', ['name' => $assistantName]) }}
+                    </p>
+                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
+                                <x-ri-pencil-line class="h-4 w-4"/>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                    {{ __('Update Northwind renewal') }}
+                                </p>
+                                <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('Opportunity') }}</p>
+                            </div>
+                        </div>
+
+                        <dl class="mt-3 space-y-1.5">
+                            @foreach([
+                                [__('Stage'), __('Negotiation'), __('Won')],
+                                [__('Close date'), __('Not set'), __('Today')],
+                            ] as [$field, $before, $after])
+                                <div class="flex items-center gap-2 text-xs">
+                                    <dt class="w-20 shrink-0 text-gray-400 dark:text-gray-500">{{ $field }}</dt>
+                                    <dd class="flex items-center gap-1.5 min-w-0">
+                                        <span class="text-gray-400 dark:text-gray-500 line-through truncate">{{ $before }}</span>
+                                        <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
+                                        <span class="font-medium text-gray-900 dark:text-white truncate">{{ $after }}</span>
+                                    </dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </div>
+                </li>
+
+                {{-- Step 3: the approval --}}
+                <li class="flex flex-col transition delay-300 duration-500 ease-out motion-reduce:transition-none motion-reduce:delay-0"
+                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+                        {{ __('Step 3: you decide') }}
+                    </p>
+                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
+                                <x-ri-check-line class="h-3.5 w-3.5"/>
+                                {{ __('Approve') }}
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                {{ __('Reject') }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 flex items-center gap-1.5 text-xs">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
+                                <x-ri-check-line class="h-3 w-3"/>
+                                {{ __('Updated') }}
+                            </span>
+                            <span class="text-gray-400 dark:text-gray-500 truncate">{{ __('Northwind renewal') }}</span>
+                        </div>
+
+                        <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                            {{ __('Reject and nothing is written. The proposal expires on its own after :minutes minutes.', ['minutes' => $pendingActionExpiry]) }}
+                        </p>
+                    </div>
+                </li>
+            </ol>
+        </div>
+    </section>
 
     {{-- Capabilities --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
+    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
         <div class="max-w-5xl mx-auto px-6 lg:px-8">
             <div class="max-w-2xl mx-auto text-center mb-14">
                 <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
@@ -128,7 +247,7 @@
     </section>
 
     {{-- Control / trust --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
+    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
         <div class="max-w-3xl mx-auto px-6 lg:px-8">
             <div class="text-center mb-14">
                 <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
