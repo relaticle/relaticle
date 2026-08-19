@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\AcceptTeamInvitation;
 use App\Actions\Jetstream\DeclineTeamInvitation;
+use App\Filament\Pages\Dashboard;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Livewire\App\Teams\PendingInvitationsForUser;
 use App\Models\Team;
@@ -30,6 +31,45 @@ test('an independently registered invitee sees their pending invitation', functi
     $this->actingAs($invitee);
 
     livewire(PendingInvitationsForUser::class)->assertSee($team->name);
+});
+
+test('a teamless invitee sees the card on the tenant-registration page', function (): void {
+    // CreateTeam extends RegisterTenant, which uses a custom onboarding view that
+    // bypasses the standard page component the card's PAGE_START hook fires from.
+    // A user with current_team_id = null lands here (/app/new) first -- exactly
+    // the case this card exists to catch someone before they build a throwaway
+    // personal workspace instead of accepting the invitation waiting for them.
+    $team = User::factory()->withTeam()->create()->currentTeam;
+    $team->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    $response = $this->get(route('filament.app.tenant.registration'))->assertOk();
+    $response->assertSee($team->name);
+
+    expect(substr_count($response->getContent(), __('teams.pending_for_user.accept')))->toBe(1);
+});
+
+test('the card still renders exactly once on an ordinary panel page', function (): void {
+    $inviter = User::factory()->withTeam()->create();
+    $inviter->currentTeam->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->withTeam()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+    Filament::setTenant($invitee->currentTeam);
+
+    $html = $this->get(Dashboard::getUrl(['tenant' => $invitee->currentTeam]))->assertOk()->getContent();
+
+    expect(substr_count($html, __('teams.pending_for_user.accept')))->toBe(1);
 });
 
 test('accepting from the card joins the team', function (): void {
