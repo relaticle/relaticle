@@ -350,8 +350,17 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         // server-side conversationId and land its response in the array now
         // painted for a different conversation. False is always safe here:
         // the destroy()-then-remount that always follows repaints with the
-        // real value moments later.
+        // real value moments later. loadingEarlier and prependScrollAnchor
+        // reset alongside it for the same reason: left stale (inherited from
+        // whichever loadEarlier() call, if any, was in flight for the OLD
+        // conversation), a late response landing after this paint would
+        // apply its scroll-restore math against THIS conversation's now
+        // totally unrelated scrollHeight, and a stale loadingEarlier=true
+        // would wedge this freshly-painted conversation's own sentinel from
+        // ever loading its real history.
         this.hasMoreMessages = false;
+        this.loadingEarlier = false;
+        this.prependScrollAnchor = null;
 
         this.scrollToBottom(true);
 
