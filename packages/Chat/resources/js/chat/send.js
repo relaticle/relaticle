@@ -340,24 +340,31 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
             return;
         }
 
-        if (!this.channel) {
-            await this.subscribeToConversation(this.conversationId);
-        } else if (this.channel.readyPromise) {
-            await this.channel.readyPromise;
-        }
-
         this.currentToolStatus = null;
-        this.mintAssistantStub();
 
         const url = this.conversationId
             ? sendUrl.replace(/\/$/, '') + '/' + this.conversationId
             : sendUrl;
 
-        this.startStreamTimeout();
-
-        this.streamAbortController = new AbortController();
-
+        // The channel-subscribe await used to run before the optimistic bubble
+        // even existed, so a throw here was silently swallowed (nothing shown,
+        // nothing stuck). Now the bubble is pushed and marked 'sending' before
+        // this runs, so it MUST live inside the same try/catch as the fetch:
+        // otherwise an uncaught throw here leaves sendState at 'sending'
+        // forever (no Resend ever appears, gated on 'failed') and isStreaming
+        // never resets to false, which soft-locks every later send into
+        // queuedSend with nothing to flush it.
         try {
+            if (!this.channel) {
+                await this.subscribeToConversation(this.conversationId);
+            } else if (this.channel.readyPromise) {
+                await this.channel.readyPromise;
+            }
+
+            this.mintAssistantStub();
+            this.startStreamTimeout();
+            this.streamAbortController = new AbortController();
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -428,9 +435,16 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 return;
             }
 
+            // No assistant stub exists yet when the throw comes from the
+            // channel-subscribe step above (it runs before mintAssistantStub());
+            // the last message in that case is userMsg itself. Only touch a
+            // REAL assistant bubble, never write assistant-only fields onto
+            // the user message.
             const assistantMsg = this.messages[this.messages.length - 1];
-            assistantMsg.content = 'Network error. Please try again.';
-            assistantMsg.rendered = true;
+            if (assistantMsg?.role === 'assistant') {
+                assistantMsg.content = 'Network error. Please try again.';
+                assistantMsg.rendered = true;
+            }
             userMsg.sendState = 'failed';
             this.isStreaming = false;
             this.clearStreamTimeout();

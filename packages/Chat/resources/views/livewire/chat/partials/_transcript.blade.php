@@ -108,6 +108,7 @@
                                             <span>{{ __('Not sent') }}</span>
                                             <button
                                                 type="button"
+                                                data-resend-button
                                                 x-on:click="resendMessage(msg)"
                                                 :disabled="isStreaming"
                                                 class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"

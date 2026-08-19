@@ -3,7 +3,11 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Pest\Browser\Api\AwaitableWebpage;
+use Pest\Browser\Playwright\Playwright;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Tests\Helpers\ChatBrowser;
 
@@ -18,19 +22,82 @@ mutates(ChatInterface::class);
  * So the 429 here is forced with real warmup requests, not facade manipulation.
  * $this->travel() IS honored (Carbon's test-now is a shared class static), so
  * it fast-forwards past the one-minute decay window instead of sleeping for it.
+ *
+ * Every individual $page->script() call below stays short (a single fetch, or
+ * a single synchronous state read) rather than looping internally: $page is an
+ * AwaitableWebpage, and each of its calls is retried by Pest under its own
+ * short internal timeout if it does not settle quickly. A script that runs a
+ * 10-request warmup loop AND a multi-second poll loop in one call risks a
+ * retry re-invoking (not resuming) that same slow script, firing a second,
+ * overlapping burst of real requests underneath it (found live: exactly this
+ * shape 429'd on a request nothing in this file intended to send). Splitting
+ * warmup into 10 one-request calls, and polling into repeated one-read calls
+ * with the wait living in PHP (usleep), keeps each individual call fast and
+ * side-effect-free-on-retry.
+ *
+ * None of these tests navigate to the dedicated `/chats` page. Visiting it
+ * directly (no conversation id, no `?prompt=` param, no `chat:bootstrap`
+ * sessionStorage handoff from the dashboard) trips the page's own "No Dead
+ * Ends" guard (`chat-conversation.blade.php`), which client-side redirects
+ * straight back to the dashboard. That redirect is deliberate product
+ * behavior, not a bug: chats are meant to start from the dashboard composer.
+ * So every test below drives the dashboard's own `chatInterface` Alpine
+ * component directly (the same one that backs the side panel drawer) rather
+ * than fighting that redirect. It starts visually collapsed, but its Alpine
+ * state and DOM are fully live, so script-driven reads and writes work
+ * exactly as they would on an expanded page.
  */
-const CHAT_WARM_UP_LIMITER_JS = <<<'JS'
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const warmUpLimiter = async () => {
-        for (let i = 0; i < 10; i++) {
-            await fetch('/chat/conversations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body: JSON.stringify({ document: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'warmup ' + i }] }] } }),
-            });
+function chatWarmUpRateLimiter(AwaitableWebpage $page): void
+{
+    // 10 real sequential HTTP round trips through the in-process server, each
+    // sharing this dev box's CPU with every other Horizon/Reverb worker across
+    // sibling checkouts (chronic load average well above core count here). The
+    // default 30s Playwright action timeout is occasionally too tight for a
+    // single round trip under that contention; widen it just for this loop
+    // rather than for the whole file, so a genuine hang elsewhere still fails
+    // fast.
+    Playwright::usingTimeout(60_000, function () use ($page): void {
+        for ($i = 0; $i < 10; $i++) {
+            $page->script(<<<'JS'
+                (async () => {
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                    await fetch('/chat/conversations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                        body: JSON.stringify({ document: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'warmup' }] }] } }),
+                    });
+                    return true;
+                })();
+            JS);
         }
-    };
-    JS;
+    });
+}
+
+/**
+ * Polls the last user message's sendState via short, independent reads (no
+ * side effects, so a Pest-level retry of any single read is harmless) until
+ * it matches $targetState or attempts run out. Returns null on timeout.
+ */
+function chatPollUserSendState(AwaitableWebpage $page, string $resolveInterface, string $targetState): ?string
+{
+    for ($i = 0; $i < 60; $i++) {
+        $state = $page->script(<<<JS
+            (() => {
+                {$resolveInterface}
+                const msg = data.messages.find((m) => m.role === 'user');
+                return msg?.sendState ?? null;
+            })();
+        JS);
+
+        if ($state === $targetState) {
+            return $state;
+        }
+
+        usleep(100_000);
+    }
+
+    return null;
+}
 
 it('carries the optimistic bubble through sending then sent on a real send', function (): void {
     Queue::fake();
@@ -43,49 +110,93 @@ it('carries the optimistic bubble through sending then sent on a real send', fun
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
     // Echo is stubbed out so the round trip does not wait on a real Reverb
     // channel subscription: this test is only about the fetch-driven
-    // sendState transition, not the streaming pipeline.
-    $result = $page->script(<<<JS
-        (async () => {
+    // sendState transition, not the streaming pipeline. sendMessage() is
+    // fired without being awaited inside the script (see file docblock).
+    $sendingState = $page->script(<<<JS
+        (() => {
             {$resolveInterface}
 
             window.Echo = null;
             data.localEditor().setText('hello state machine');
             data.sendMessage();
 
-            const sendingState = data.messages.find((m) => m.role === 'user')?.sendState;
-
-            let finalState = null;
-            for (let i = 0; i < 100; i++) {
-                await new Promise((r) => setTimeout(r, 50));
-                const msg = data.messages.find((m) => m.role === 'user');
-                if (msg && msg.sendState === 'sent') { finalState = msg.sendState; break; }
-            }
-
-            // One more tick so Alpine's reactive :data-send-state binding has
-            // flushed into the DOM before we query it.
-            await new Promise((r) => setTimeout(r, 100));
-
-            return {
-                sendingState,
-                finalState,
-                domSentBubbles: document.querySelectorAll('[data-user-bubble][data-send-state="sent"]').length,
-            };
+            return data.messages.find((m) => m.role === 'user')?.sendState ?? null;
         })();
     JS);
 
-    expect($result['sendingState'])->toBe('sending');
-    expect($result['finalState'])->toBe('sent');
-    expect($result['domSentBubbles'])->toBe(1);
+    expect($sendingState)->toBe('sending');
+
+    $finalState = chatPollUserSendState($page, $resolveInterface, 'sent');
+
+    expect($finalState)->toBe('sent');
+
+    $domSentBubbles = $page->script(<<<'JS'
+        (() => document.querySelectorAll('[data-user-bubble][data-send-state="sent"]').length)();
+    JS);
+
+    expect($domSentBubbles)->toBe(1);
 });
 
-it('marks an optimistic bubble failed on rate limit without duplicating it, and resend recovers', function (): void {
+/**
+ * Sends a message on an already-loaded chat page after exhausting the rate
+ * limiter, returning the failure snapshot once sendState settles to 'failed'.
+ *
+ * @return array{userCount: int, domUserBubbles: int, domFailedBubbles: int, clientKey: string|null}
+ */
+function chatTriggerRateLimitedFailure(AwaitableWebpage $page, string $resolveInterface): array
+{
+    $page->script(<<<'JS'
+        (() => { window.Echo = null; return true; })();
+    JS);
+
+    chatWarmUpRateLimiter($page);
+
+    // sendMessage() is awaited HERE, not fired-and-forgotten: it resolves fast
+    // on a 429 (handleSendRateLimit runs synchronously once the single fetch
+    // settles, no streaming wait involved), so sendState is already final by
+    // the time this call returns and no poll is needed. A dangling unawaited
+    // promise for THIS specific call was found to race the server's handling
+    // of its own 429 response against whatever the next $page->script() call
+    // did (observed live: an unrelated later script() call surfaced the 429's
+    // HttpResponseException raw instead of it having been rendered into a
+    // normal JSON response).
+    //
+    // Widened timeout for the same reason as chatWarmUpRateLimiter above: this
+    // is the single call in the file that chains a real create+send round trip
+    // through the throttle middleware, so it is the most exposed to this box's
+    // background CPU load.
+    $failedState = Playwright::usingTimeout(60_000, fn (): mixed => $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+            data.localEditor().setText('rate limited message');
+            await data.sendMessage();
+            return data.messages.find((m) => m.role === 'user')?.sendState ?? null;
+        })();
+    JS));
+
+    expect($failedState)->toBe('failed');
+
+    return $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            const failedMsg = data.messages.find((m) => m.role === 'user');
+            return {
+                userCount: data.messages.filter((m) => m.role === 'user').length,
+                domUserBubbles: document.querySelectorAll('[data-user-bubble]').length,
+                domFailedBubbles: document.querySelectorAll('[data-user-bubble][data-send-state="failed"]').length,
+                clientKey: failedMsg?.clientKey ?? null,
+            };
+        })();
+    JS);
+}
+
+it('marks an optimistic bubble failed on rate limit, and a real click resend does not duplicate it', function (): void {
     Queue::fake();
 
     $user = User::factory()->withTeam()->create();
@@ -96,90 +207,119 @@ it('marks an optimistic bubble failed on rate limit without duplicating it, and 
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
-    $warmUp = CHAT_WARM_UP_LIMITER_JS;
 
-    $afterFailure = $page->script(<<<JS
-        (async () => {
+    $afterFailure = chatTriggerRateLimitedFailure($page, $resolveInterface);
+
+    expect($afterFailure['userCount'])->toBe(1);
+    expect($afterFailure['domUserBubbles'])->toBe(1);
+    expect($afterFailure['domFailedBubbles'])->toBe(1);
+    expect($afterFailure['clientKey'])->not->toBeNull();
+
+    // The failed bubble above lives in the dashboard's side-panel chatInterface
+    // (see file docblock), which renders collapsed (x-show="open", open=false)
+    // until the drawer is opened. A real Playwright click() requires the
+    // target to be visible, so open the drawer directly through its own
+    // Alpine state before clicking: this is a state change on the panel
+    // wrapper, not on the chat message data under test.
+    $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('[data-chat-side-panel]');
+            Alpine.$data(panel).open = true;
+            return true;
+        })();
+    JS);
+
+    // A real click on the template's own <button x-on:click="resendMessage(msg)">
+    // (via data-resend-button), not a script-invoked data.resendMessage() call:
+    // this is the only check that exercises Alpine's `msg` scope resolution and
+    // the `:disabled="isStreaming"` binding on the actual bound element. Unlike
+    // the scripted sends above, nothing here awaits resendMessage()'s promise:
+    // Alpine's x-on:click handler fires it and returns immediately, so the
+    // click itself settles before the network round trip does. Poll for the
+    // terminal state instead of reading it right after the click.
+    $page->click('[data-resend-button]');
+
+    $sendStateAfterClick = chatPollUserSendState($page, $resolveInterface, 'failed');
+
+    expect($sendStateAfterClick)->toBe('failed');
+
+    $stillFailed = $page->script(<<<JS
+        (() => {
             {$resolveInterface}
-            {$warmUp}
-
-            window.Echo = null;
-            await warmUpLimiter();
-
-            data.localEditor().setText('rate limited message');
-            data.sendMessage();
-
-            let sawFailed = false;
-            for (let i = 0; i < 100; i++) {
-                await new Promise((r) => setTimeout(r, 50));
-                const msg = data.messages.find((m) => m.role === 'user');
-                if (msg && msg.sendState === 'failed') { sawFailed = true; break; }
-            }
-
-            // One more tick so Alpine's reactive :data-send-state binding has
-            // flushed into the DOM before we query it.
-            await new Promise((r) => setTimeout(r, 100));
-
-            const failedMsg = data.messages.find((m) => m.role === 'user');
-
+            const msg = data.messages.find((m) => m.role === 'user');
             return {
-                sawFailed,
+                sendState: msg?.sendState ?? null,
+                clientKey: msg?.clientKey ?? null,
                 userCount: data.messages.filter((m) => m.role === 'user').length,
                 domUserBubbles: document.querySelectorAll('[data-user-bubble]').length,
-                domFailedBubbles: document.querySelectorAll('[data-user-bubble][data-send-state="failed"]').length,
-                clientKey: failedMsg?.clientKey ?? null,
             };
         })();
     JS);
 
-    expect($afterFailure['sawFailed'])->toBeTrue();
-    expect($afterFailure['userCount'])->toBe(1);
-    expect($afterFailure['domUserBubbles'])->toBe(1);
-    expect($afterFailure['domFailedBubbles'])->toBe(1);
+    // Still rate-limited, so the click's resend attempt also 429s: same bubble,
+    // same clientKey, still failed, never duplicated.
+    expect($stillFailed['sendState'])->toBe('failed');
+    expect($stillFailed['clientKey'])->toBe($afterFailure['clientKey']);
+    expect($stillFailed['userCount'])->toBe(1);
+    expect($stillFailed['domUserBubbles'])->toBe(1);
+});
+
+it('recovers a failed bubble to sent once the rate limit window clears, reusing the same clientKey', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $afterFailure = chatTriggerRateLimitedFailure($page, $resolveInterface);
+
     expect($afterFailure['clientKey'])->not->toBeNull();
 
     // Fast-forward past the one-minute decay window instead of sleeping:
     // Carbon's test-now is visible to the browser-serving execution context.
     $this->travel(61)->seconds();
 
-    $afterResend = $page->script(<<<JS
-        (async () => {
+    $page->script(<<<JS
+        (() => {
             {$resolveInterface}
-
-            const failedMsg = data.messages.find((m) => m.role === 'user' && m.sendState === 'failed');
-            const clientKeyBeforeResend = failedMsg.clientKey;
+            const failedMsg = data.messages.find((m) => m.role === 'user');
             data.resendMessage(failedMsg);
+            return true;
+        })();
+    JS);
 
-            let finalState = null;
-            for (let i = 0; i < 100; i++) {
-                await new Promise((r) => setTimeout(r, 50));
-                const msg = data.messages.find((m) => m.role === 'user');
-                if (msg && msg.sendState === 'sent') { finalState = msg.sendState; break; }
-            }
+    $finalState = chatPollUserSendState($page, $resolveInterface, 'sent');
 
-            // One more tick so Alpine's reactive :data-send-state binding has
-            // flushed into the DOM before we query it.
-            await new Promise((r) => setTimeout(r, 100));
+    expect($finalState)->toBe('sent');
 
+    $afterResend = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
             const resentMsg = data.messages.find((m) => m.role === 'user');
-
             return {
-                finalState,
                 userCount: data.messages.filter((m) => m.role === 'user').length,
                 domUserBubbles: document.querySelectorAll('[data-user-bubble]').length,
-                sameClientKey: resentMsg?.clientKey === clientKeyBeforeResend,
+                clientKey: resentMsg?.clientKey ?? null,
             };
         })();
     JS);
 
-    expect($afterResend['finalState'])->toBe('sent');
     expect($afterResend['userCount'])->toBe(1);
     expect($afterResend['domUserBubbles'])->toBe(1);
-    expect($afterResend['sameClientKey'])->toBeTrue();
+    // Same clientKey as the failed bubble: resend reused it in place rather
+    // than minting a second bubble (the F2 fix).
+    expect($afterResend['clientKey'])->toBe($afterFailure['clientKey']);
 });
 
 it('keeps the transcript non-empty when a regenerate resend hits the rate limit (issue #499)', function (): void {
@@ -188,23 +328,39 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
+    // A real regenerate always happens inside an EXISTING conversation, so the
+    // resend it triggers goes through /chat/{id} (deliverMessage's non-first-
+    // message branch), never /chat/conversations. A real row (no messages
+    // persisted yet, matching the client's still-optimistic turn) makes the
+    // repro faithful: without conversationId set, regenerateMessage's resend
+    // would take the wrong branch and 429 on conversation creation instead.
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
         ->click('button.fi-btn')
         ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
-    $warmUp = CHAT_WARM_UP_LIMITER_JS;
+    $conversationIdJson = json_encode($conversationId);
 
-    $result = $page->script(<<<JS
-        (async () => {
+    $page->script(<<<JS
+        (() => {
             {$resolveInterface}
-            {$warmUp}
 
             window.Echo = null;
+            data.conversationId = {$conversationIdJson};
 
             // Fabricate an existing turn (user + rendered assistant reply) as the
             // regenerate target, so regenerateMessage(1) has a real preceding
@@ -213,22 +369,35 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
                 data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
                 data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
             ];
+            return true;
+        })();
+    JS);
 
-            await warmUpLimiter();
+    chatWarmUpRateLimiter($page);
 
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
             data.regenerateMessage(1);
+            return true;
+        })();
+    JS);
 
-            let done = false;
-            for (let i = 0; i < 100 && !done; i++) {
-                await new Promise((r) => setTimeout(r, 50));
-                const msg = data.messages.find((m) => m.role === 'user');
-                done = !!(msg && msg.sendState === 'failed');
-            }
+    $failedState = chatPollUserSendState($page, $resolveInterface, 'failed');
 
+    expect($failedState)->toBe('failed');
+
+    $result = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
             return {
                 totalCount: data.messages.length,
                 userCount: data.messages.filter((m) => m.role === 'user').length,
                 failedCount: data.messages.filter((m) => m.sendState === 'failed').length,
+                // Unchanged conversationId proves the resend took the non-first-
+                // message branch (/chat/{id}) rather than creating a second
+                // conversation via /chat/conversations.
+                conversationIdUnchanged: data.conversationId === {$conversationIdJson},
             };
         })();
     JS);
@@ -236,4 +405,78 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
     expect($result['totalCount'])->toBe(1);
     expect($result['userCount'])->toBe(1);
     expect($result['failedCount'])->toBe(1);
+    expect($result['conversationIdUnchanged'])->toBeTrue();
+});
+
+it('does not soft-lock the composer when subscribeToConversation throws on a non-first message', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    // A real, already-existing conversation so deliverMessage() takes the
+    // non-first-message branch (the one whose channel-subscribe await used to
+    // sit outside the try/catch).
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.conversationId = {$conversationIdJson};
+
+            // Simulates any synchronous throw inside subscribeToConversation
+            // (window.Echo.private() throwing is a real-world example). Before
+            // this fix, that await sat outside deliverMessage's try/catch on
+            // this branch: the bubble would be stuck at 'sending' forever (no
+            // Resend ever appears, gated on 'failed') and isStreaming would
+            // never reset, silently queueing every later send.
+            window.Echo = { private: () => { throw new Error('channel boom'); } };
+
+            data.localEditor().setText('this must not soft-lock the composer');
+            data.sendMessage();
+            return true;
+        })();
+    JS);
+
+    $failedState = chatPollUserSendState($page, $resolveInterface, 'failed');
+
+    expect($failedState)->toBe('failed');
+
+    $result = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            return {
+                // The soft-lock: without the fix this stays true forever, and
+                // every later sendMessage() call silently stashes into
+                // queuedSend instead of actually sending.
+                isStreaming: data.isStreaming,
+                userCount: data.messages.filter((m) => m.role === 'user').length,
+                domResendButtons: document.querySelectorAll('[data-user-bubble][data-send-state="failed"] [data-resend-button]').length,
+            };
+        })();
+    JS);
+
+    expect($result['isStreaming'])->toBeFalse();
+    expect($result['userCount'])->toBe(1);
+    expect($result['domResendButtons'])->toBe(1);
 });
