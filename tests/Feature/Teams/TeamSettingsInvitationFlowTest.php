@@ -5,9 +5,7 @@ declare(strict_types=1);
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\Members;
-use App\Livewire\App\Teams\AddTeamMember;
-use App\Livewire\App\Teams\PendingTeamInvitations;
-use App\Livewire\App\Teams\TeamMembers;
+use App\Livewire\App\Teams\ManageMembers;
 use App\Livewire\App\Teams\UpdateTeamName;
 use App\Mail\TeamInvitationMail;
 use App\Models\Team;
@@ -36,12 +34,10 @@ test('the general tab owns workspace name and deletion', function () {
         ->all();
 
     expect($components)->toContain(UpdateTeamName::class)
-        ->and($components)->not->toContain(AddTeamMember::class)
-        ->and($components)->not->toContain(PendingTeamInvitations::class)
-        ->and($components)->not->toContain(TeamMembers::class);
+        ->and($components)->not->toContain(ManageMembers::class);
 });
 
-test('the members tab owns invitations and membership, and does not render ManageInviteLink', function () {
+test('the members tab owns invitations and membership', function () {
     $page = app(Members::class);
 
     $components = collect($page->form(Schema::make($page))->getComponents())
@@ -49,29 +45,24 @@ test('the members tab owns invitations and membership, and does not render Manag
         ->map(fn (LivewireComponent $c): string => $c->getComponent())
         ->all();
 
-    expect($components)->toContain(AddTeamMember::class)
-        ->and($components)->toContain(PendingTeamInvitations::class)
-        ->and($components)->toContain(TeamMembers::class)
-        ->and($components)->not->toContain('App\\Livewire\\App\\Teams\\ManageInviteLink');
+    expect($components)->toContain(ManageMembers::class);
 });
 
 test('admin invites by email and the invitation appears in the pending list', function () {
     Mail::fake();
 
-    livewire(AddTeamMember::class, ['team' => $this->team])
-        ->fillForm([
-            'email' => 'invitee@example.com',
-            'role' => 'editor',
-        ])
-        ->call('addTeamMember', $this->team);
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), [
+            'invites' => [['email' => 'invitee@example.com', 'role' => 'editor']],
+        ]);
 
     $invitation = $this->team->fresh()->teamInvitations->sole();
 
     expect($invitation->email)->toBe('invitee@example.com')
         ->and($invitation->role)->toBe('editor');
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertCanSeeTableRecords([$invitation]);
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->assertSee('invitee@example.com');
 
     Mail::assertQueued(TeamInvitationMail::class);
 });
@@ -79,22 +70,15 @@ test('admin invites by email and the invitation appears in the pending list', fu
 test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
     Mail::fake();
 
-    livewire(AddTeamMember::class, ['team' => $this->team])
-        ->fillForm([
-            'email' => 'invitee@example.com',
-            'role' => 'editor',
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), [
+            'invites' => [['email' => 'invitee@example.com', 'role' => 'editor']],
         ])
-        ->call('addTeamMember', $this->team)
         ->assertNoRedirect()
-        ->assertDispatched('teamInvitationSent')
-        ->assertSchemaStateSet([
-            'email' => null,
-            'role' => null,
-        ]);
+        ->assertSee('invitee@example.com');
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->dispatch('teamInvitationSent')
-        ->assertCanSeeTableRecords($this->team->fresh()->teamInvitations);
+    expect($this->team->fresh()->teamInvitations->pluck('email')->all())
+        ->toBe(['invitee@example.com']);
 });
 
 test('admin can resend a pending invitation', function () {
@@ -105,8 +89,8 @@ test('admin can resend a pending invitation', function () {
         'email' => 'pending@example.com',
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->callAction(TestAction::make('resendTeamInvitation')->table($invitation))
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('resendTeamInvitation')->table('invite:'.$invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
     Mail::assertQueued(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
@@ -117,8 +101,8 @@ test('admin can revoke a pending invitation', function () {
         'team_id' => $this->team->id,
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation))
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('revokeTeamInvitation')->table('invite:'.$invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_revoked.success'));
 
     expect(TeamInvitation::query()->whereKey($invitation->getKey())->exists())->toBeFalse();
@@ -129,8 +113,8 @@ test('extend action is removed from pending invitations', function () {
         'team_id' => $this->team->id,
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertActionDoesNotExist(TestAction::make('extendTeamInvitation')->table($invitation));
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->assertActionDoesNotExist(TestAction::make('extendTeamInvitation')->table('invite:'.$invitation->id));
 });
 
 test('onboarding-generated invite link still works for an authenticated user', function () {

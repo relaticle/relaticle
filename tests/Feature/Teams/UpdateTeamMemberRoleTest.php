@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
-use App\Livewire\App\Teams\TeamMembers;
+use App\Livewire\App\Teams\ManageMembers;
 use App\Models\Membership;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -12,7 +12,7 @@ use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Livewire;
 
-mutates(User::class, TeamMembers::class);
+mutates(User::class, ManageMembers::class);
 
 test('team member roles can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
@@ -69,11 +69,11 @@ test('admin cannot promote another member to admin', function (): void {
         ->where('user_id', $editor->id)
         ->firstOrFail();
 
-    livewire(TeamMembers::class, ['team' => $team])
-        ->callAction(TestAction::make('updateTeamRole')->table($editorMembership), data: [
+    livewire(ManageMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table('member:'.$editorMembership->id), data: [
             'role' => TeamRole::Admin->value,
         ])
-        ->assertNotified(__('teams.notifications.permission_denied.cannot_promote_to_admin'));
+        ->assertHasActionErrors(['role']);
 
     expect($editor->fresh()->hasTeamRole($team->fresh(), TeamRole::Editor->value))->toBeTrue();
 });
@@ -96,11 +96,11 @@ test('admin cannot demote another admin', function (): void {
         ->where('user_id', $adminB->id)
         ->firstOrFail();
 
-    livewire(TeamMembers::class, ['team' => $team])
-        ->callAction(TestAction::make('updateTeamRole')->table($adminBMembership), data: [
+    livewire(ManageMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table('member:'.$adminBMembership->id), data: [
             'role' => TeamRole::Editor->value,
         ])
-        ->assertNotified(__('teams.notifications.permission_denied.cannot_promote_to_admin'));
+        ->assertHasActionErrors(['role']);
 
     expect($adminB->fresh()->hasTeamRole($team->fresh(), TeamRole::Admin->value))->toBeTrue();
 });

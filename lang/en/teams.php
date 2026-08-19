@@ -21,19 +21,6 @@ return [
             'title' => 'Workspace Name',
             'description' => 'The workspace\'s name and owner information.',
         ],
-        'add_team_member' => [
-            'title' => 'Add Member',
-            'description' => 'Add a new member to your workspace, allowing them to collaborate with you.',
-            'notice' => 'Please provide the email address of the person you would like to add to this workspace.',
-        ],
-        'team_members' => [
-            'title' => 'Members',
-            'description' => 'All of the people that are part of this workspace.',
-        ],
-        'pending_team_invitations' => [
-            'title' => 'Pending Invitations',
-            'description' => 'These people have been invited to your workspace and have been sent an invitation email. They may join the workspace by accepting the email invitation.',
-        ],
         'delete_team' => [
             'title' => 'Delete Workspace',
             'description' => 'Schedule this workspace for deletion.',
@@ -45,6 +32,10 @@ return [
     'actions' => [
         'save' => 'Save',
         'add_team_member' => 'Add',
+        'invite_people' => 'Invite people',
+        'add_another' => 'Add another',
+        'invite_link' => 'Invite link',
+        'rotate_invite_link' => 'Generate a new link',
         'update_team_role' => 'Manage Role',
         'remove_team_member' => 'Remove',
         'leave_team' => 'Leave',
@@ -85,10 +76,21 @@ return [
             'cannot_delete_team' => 'You do not have permission to delete this workspace.',
             'cannot_cancel_team_deletion' => 'You do not have permission to cancel this workspace\'s deletion.',
         ],
+        'role_updated' => [
+            'success' => 'Role updated.',
+        ],
+        'invite_link_rotated' => [
+            'success' => 'A new invite link was generated. The previous link no longer works.',
+        ],
+        'resend_throttled' => 'Please wait :seconds seconds before resending.',
+        'some_invites_failed' => [
+            'title' => 'Some invitations could not be sent',
+        ],
     ],
 
     'validation' => [
         'email_already_invited' => 'This user has already been invited to the workspace.',
+        'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
     ],
 
     'modals' => [
@@ -128,6 +130,9 @@ return [
     ],
 
     'roles' => [
+        'owner' => [
+            'label' => 'Owner',
+        ],
         'admin' => [
             'description' => 'Administrator users can perform any action.',
         ],
@@ -137,6 +142,22 @@ return [
         'viewer' => [
             'description' => 'Viewer users can read records but cannot create, update, or delete.',
         ],
+    ],
+
+    'table' => [
+        'heading' => 'People',
+        'counts' => ':members members, :pending pending',
+        'person' => 'Person',
+        'role' => 'Role',
+        'status' => 'Status',
+        'since' => 'Since',
+        'status_member' => 'Member',
+        'status_invited' => 'Invitation pending',
+    ],
+
+    'invite_link' => [
+        'url' => 'Anyone with this link can join',
+        'default_role' => 'Role for people who join with this link',
     ],
 
     'mail' => [
