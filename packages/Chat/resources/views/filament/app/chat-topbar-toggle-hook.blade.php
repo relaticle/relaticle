@@ -16,15 +16,17 @@
     x-cloak
     class="me-2"
 >
+    @php($askLabel = __('Ask :name', ['name' => (string) config('chat.assistant_name')]))
+
     <x-filament::button
         outlined
         color="gray"
         size="sm"
         icon="heroicon-o-chat-bubble-left-right"
         x-on:click="window.Livewire.dispatch('chat:toggle-panel')"
-        aria-label="Ask Relaticle"
-        title="Ask Relaticle"
+        :aria-label="$askLabel"
+        :title="$askLabel"
     >
-        <span class="hidden sm:inline">Ask Relaticle</span>
+        <span class="hidden sm:inline">{{ $askLabel }}</span>
     </x-filament::button>
 </div>
