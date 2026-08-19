@@ -15,6 +15,14 @@ return [
             'label' => 'Email',
             'placeholder' => 'name@company.com',
         ],
+        'emails' => [
+            'label' => 'Send invite to',
+            'placeholder' => 'example@email.com',
+            'helper' => 'Separate multiple addresses with a comma, a space, or a new line.',
+        ],
+        'invite_as' => [
+            'label' => 'Invite as',
+        ],
     ],
 
     'sections' => [
@@ -93,10 +101,15 @@ return [
     'validation' => [
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
+        'no_valid_emails' => 'Enter at least one email address.',
+        'too_many_invites' => 'You can invite up to :max people at a time.',
         'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :teams',
     ],
 
     'modals' => [
+        'invite_people' => [
+            'heading' => 'Invite team members',
+        ],
         'leave_team' => [
             'notice' => 'Are you sure you would like to leave this workspace?',
         ],
@@ -148,15 +161,11 @@ return [
     ],
 
     'table' => [
+        'expires_in' => 'Expires in :time',
         'members_heading' => 'Members',
         'members_count' => '{1} 1 person has access|[2,*] :count people have access',
         'pending_heading' => 'Pending invitations',
         'pending_count' => '{1} 1 person has been invited and has not joined yet|[2,*] :count people have been invited and have not joined yet',
-        'photo' => 'Photo',
-        'member' => 'Member',
-        'email' => 'Email',
-        'role' => 'Role',
-        'joined' => 'Joined',
         'expires' => 'Expires',
         'expired' => 'Expired',
     ],

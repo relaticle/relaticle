@@ -14,13 +14,10 @@ use App\Models\Team;
 use App\Models\User;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -73,8 +70,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     {
         return $table
             ->query($this->membersQuery(...))
-            ->searchable()
-            ->paginated([10, 25, 50])
+            ->paginated(false)
             ->defaultSort('name')
             ->heading(__('teams.table.members_heading'))
             ->description(fn (): string => trans_choice('teams.table.members_count', $this->memberCount()))
@@ -82,46 +78,35 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                 $this->invitePeopleAction(),
                 $this->manageInviteLinkAction(),
             ])
+            // Split rather than discrete columns: this is a short roster, and a
+            // header row over two fields reads as table chrome around a list.
             ->columns([
-                Tables\Columns\ImageColumn::make('profile_photo_url')
-                    ->label(__('teams.table.photo'))
-                    // Shrink-to-content: without this the header word sets the
-                    // column width and a 32px avatar sits in a 150px cell.
-                    ->width('1%')
-                    // Decorative; dropping it on a phone keeps name, role, and
-                    // the actions menu on screen without horizontal scrolling.
-                    ->visibleFrom('md')
-                    ->circular()
-                    ->imageSize(32)
-                    ->defaultImageUrl(fn (User $record): string => Filament::getUserAvatarUrl($record))
-                    ->grow(false),
-                Tables\Columns\TextColumn::make('name')
-                    ->label(__('teams.table.member'))
-                    ->description(fn (User $record): string => $record->email)
-                    ->searchable(['name', 'email'])
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('team_role')
-                    ->label(__('teams.table.role'))
-                    ->badge()
-                    ->color(fn (User $record): string => $this->isOwner($record) ? 'primary' : 'gray')
-                    // Resolved through state(), not formatStateUsing(): the owner
-                    // has no `team_user` row, so `team_role` is null and Filament
-                    // would skip formatting entirely and render an empty cell.
-                    ->state(fn (User $record): string => $this->isOwner($record)
-                        ? __('teams.roles.owner.label')
-                        : $this->roleLabel($this->roleKey($record) ?? '')),
-                Tables\Columns\TextColumn::make('joined_at')
-                    ->label(__('teams.table.joined'))
-                    ->visibleFrom('md')
-                    ->state(fn (User $record): mixed => $record->getAttribute('joined_at') ?? $this->team->created_at)
-                    ->date(),
+                Tables\Columns\Layout\Split::make([
+                    Tables\Columns\ImageColumn::make('profile_photo_url')
+                        ->circular()
+                        ->imageSize(32)
+                        ->defaultImageUrl(fn (User $record): string => Filament::getUserAvatarUrl($record))
+                        ->grow(false),
+                    Tables\Columns\TextColumn::make('name')
+                        ->description(fn (User $record): string => $record->email),
+                    // Every other row wears its role on the updateTeamRole button,
+                    // which the owner never gets — this keeps their row labelled
+                    // without opening a role-change surface on it.
+                    Tables\Columns\TextColumn::make('owner_label')
+                        ->badge()
+                        ->color('primary')
+                        ->grow(false)
+                        // Empty string, not null: Filament renders no badge for a
+                        // blank state, so non-owner rows stay clean.
+                        ->state(fn (User $record): string => $this->isOwner($record)
+                            ? __('teams.roles.owner.label')
+                            : ''),
+                ]),
             ])
             ->recordActions([
-                ActionGroup::make([
-                    $this->updateTeamRoleAction(),
-                    $this->removeTeamMemberAction(),
-                    $this->leaveTeamAction(),
-                ]),
+                $this->updateTeamRoleAction(),
+                $this->removeTeamMemberAction(),
+                $this->leaveTeamAction(),
             ]);
     }
 
@@ -206,49 +191,69 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             ->label(__('teams.actions.invite_people'))
             ->icon('heroicon-m-user-plus')
             ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
-            ->modalWidth('2xl')
+            ->modalHeading(__('teams.modals.invite_people.heading'))
+            ->modalWidth('lg')
             ->modalSubmitActionLabel(__('teams.actions.send_invitations'))
             ->schema([
-                Repeater::make('invites')
-                    ->hiddenLabel()
-                    ->table([
-                        TableColumn::make(__('teams.form.email.label'))->markAsRequired(),
-                        TableColumn::make(__('teams.table.role'))->markAsRequired()->width('12rem'),
-                    ])
-                    ->defaultItems(1)
-                    ->maxItems(self::MAX_INVITES_PER_SUBMISSION)
-                    ->addActionLabel(__('teams.actions.add_another'))
-                    ->schema([
-                        TextInput::make('email')
-                            ->hiddenLabel()
-                            ->placeholder(__('teams.form.email.placeholder'))
-                            ->email()
-                            ->required(),
-                        Select::make('role')
-                            ->hiddenLabel()
-                            ->options(fn (): array => $this->assignableRoles())
-                            ->in(fn (): array => array_keys($this->assignableRoles()))
-                            ->default(TeamRole::Editor->value)
-                            ->selectablePlaceholder(false)
-                            ->required(),
-                    ]),
+                Textarea::make('emails')
+                    ->label(__('teams.form.emails.label'))
+                    ->placeholder(__('teams.form.emails.placeholder'))
+                    ->helperText(__('teams.form.emails.helper'))
+                    ->rows(4)
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        $emails = $this->parseEmails(is_string($value) ? $value : '');
+
+                        if ($emails === []) {
+                            $fail(__('teams.validation.no_valid_emails'));
+
+                            return;
+                        }
+
+                        if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
+                            $fail(__('teams.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
+                        }
+                    }),
+                Select::make('role')
+                    ->label(__('teams.form.invite_as.label'))
+                    ->options(fn (): array => $this->assignableRoles())
+                    ->in(fn (): array => array_keys($this->assignableRoles()))
+                    ->default(TeamRole::Editor->value)
+                    ->selectablePlaceholder(false)
+                    ->required(),
             ])
             ->action(function (array $data): void {
-                $this->sendInvitations($data['invites']);
+                $this->sendInvitations(
+                    $this->parseEmails((string) $data['emails']),
+                    (string) $data['role'],
+                );
             });
     }
 
     /**
-     * @param  array<int, array{email: ?string, role: ?string}>  $invites
+     * Split a pasted block into addresses. Attio accepts one textarea and lets
+     * people paste from a spreadsheet or a mail client, so anything that can
+     * separate addresses in those sources counts: commas, semicolons, and any
+     * whitespace including newlines.
+     *
+     * @return list<string>
      */
-    private function sendInvitations(array $invites): void
+    private function parseEmails(string $input): array
     {
-        $invites = array_values(array_filter(
-            $invites,
-            fn (array $invite): bool => filled($invite['email'] ?? null),
-        ));
+        $parts = preg_split('/[\s,;]+/', trim($input)) ?: [];
 
-        if ($invites === []) {
+        return array_values(array_unique(array_filter(
+            array_map(trim(...), $parts),
+            fn (string $email): bool => $email !== '',
+        )));
+    }
+
+    /**
+     * @param  list<string>  $emails
+     */
+    private function sendInvitations(array $emails, string $role): void
+    {
+        if ($emails === []) {
             return;
         }
 
@@ -270,23 +275,18 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             return;
         }
 
-        RateLimiter::increment($rateLimitKey, self::INVITE_WINDOW_SECONDS, count($invites));
+        RateLimiter::increment($rateLimitKey, self::INVITE_WINDOW_SECONDS, count($emails));
 
         $failures = [];
         $sent = 0;
 
-        foreach ($invites as $invite) {
+        foreach ($emails as $email) {
             try {
-                resolve(InviteTeamMember::class)->invite(
-                    $this->authUser(),
-                    $this->team,
-                    (string) $invite['email'],
-                    $invite['role'] ?? TeamRole::Editor->value,
-                );
+                resolve(InviteTeamMember::class)->invite($this->authUser(), $this->team, $email, $role);
 
                 $sent++;
             } catch (ValidationException $exception) {
-                $failures[] = "{$invite['email']}: {$exception->validator->errors()->first()}";
+                $failures[] = "{$email}: {$exception->validator->errors()->first()}";
             }
         }
 
@@ -348,10 +348,15 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     private function updateTeamRoleAction(): Action
     {
         return Action::make('updateTeamRole')
-            ->label(__('teams.actions.update_team_role'))
-            ->icon('heroicon-m-adjustments-horizontal')
+            // The button reads as the member's current role, so the row shows the
+            // role without a column for it and the click target is the thing you
+            // would change. This is how the page worked before the rewrite.
+            ->label(fn (User $record): string => $this->roleLabel($this->roleKey($record) ?? ''))
+            ->badge()
+            ->color('gray')
             ->visible(fn (User $record): bool => ! $this->isOwner($record)
                 && Gate::check('updateTeamMember', $this->team))
+            ->modalHeading(__('teams.actions.update_team_role'))
             ->modalWidth('lg')
             ->schema([
                 Radio::make('role')
@@ -414,7 +419,6 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     {
         return Action::make('removeTeamMember')
             ->label(__('teams.actions.remove_team_member'))
-            ->icon('heroicon-m-user-minus')
             ->color('danger')
             ->requiresConfirmation()
             ->visible(fn (User $record): bool => ! $this->isOwner($record)
@@ -438,7 +442,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     {
         return Action::make('leaveTeam')
             ->label(__('teams.actions.leave_team'))
-            ->icon('heroicon-m-arrow-right-start-on-rectangle')
+            ->icon('heroicon-o-arrow-right-start-on-rectangle')
             ->color('danger')
             ->modalDescription(__('teams.modals.leave_team.notice'))
             ->requiresConfirmation()

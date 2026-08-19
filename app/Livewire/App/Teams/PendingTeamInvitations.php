@@ -9,8 +9,8 @@ use App\Actions\Jetstream\RevokeTeamInvitation;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
@@ -69,38 +69,33 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
                 'teams.table.pending_count',
                 $this->team->teamInvitations()->count(),
             ))
+            // Split rather than discrete columns, matching the members list: a
+            // header row over two fields reads as table chrome around a list.
             ->columns([
-                Tables\Columns\TextColumn::make('email')
-                    ->label(__('teams.table.email'))
-                    ->icon('heroicon-m-envelope')
-                    ->iconColor('gray')
-                    // Wrapped rather than truncated: a long address is the whole
-                    // identity of an invitation row, and on a phone the untruncated
-                    // column is what pushes the actions menu off screen.
-                    ->wrap(),
-                Tables\Columns\TextColumn::make('role')
-                    ->label(__('teams.table.role'))
-                    ->badge()
-                    ->color('gray')
-                    // On a phone the expiry drives the decision (resend or not),
-                    // so the role yields the space to keep it on screen.
-                    ->visibleFrom('md')
-                    ->formatStateUsing(fn (string $state): string => $this->roleLabel($state)),
-                Tables\Columns\TextColumn::make('expires_at')
-                    ->label(__('teams.table.expires'))
-                    ->badge()
-                    ->color(fn (TeamInvitation $record): string => $record->isExpired() ? 'danger' : 'warning')
-                    ->formatStateUsing(fn (?Carbon $state): string => match (true) {
-                        ! $state instanceof Carbon => __('teams.table.expired'),
-                        $state->isPast() => __('teams.table.expired'),
-                        default => $state->diffForHumans(),
-                    }),
+                Tables\Columns\Layout\Split::make([
+                    Tables\Columns\TextColumn::make('email')
+                        ->icon('heroicon-m-envelope')
+                        ->iconColor('gray')
+                        ->wrap(),
+                    Tables\Columns\TextColumn::make('role')
+                        ->badge()
+                        ->color('gray')
+                        ->grow(false)
+                        ->formatStateUsing(fn (string $state): string => $this->roleLabel($state)),
+                    Tables\Columns\TextColumn::make('expires_at')
+                        ->badge()
+                        ->grow(false)
+                        ->color(fn (TeamInvitation $record): string => $record->isExpired() ? 'danger' : 'warning')
+                        ->formatStateUsing(fn (?Carbon $state): string => match (true) {
+                            ! $state instanceof Carbon => __('teams.table.expired'),
+                            $state->isPast() => __('teams.table.expired'),
+                            default => __('teams.table.expires_in', ['time' => $state->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE)]),
+                        }),
+                ]),
             ])
             ->recordActions([
-                ActionGroup::make([
-                    $this->resendTeamInvitationAction(),
-                    $this->revokeTeamInvitationAction(),
-                ]),
+                $this->resendTeamInvitationAction(),
+                $this->revokeTeamInvitationAction(),
             ]);
     }
 
@@ -124,7 +119,6 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
     {
         return Action::make('resendTeamInvitation')
             ->label(__('teams.actions.resend_team_invitation'))
-            ->icon('heroicon-m-arrow-path')
             ->requiresConfirmation()
             ->visible(fn (): bool => Gate::check('updateTeamMember', $this->team))
             ->action(function (TeamInvitation $record): void {
@@ -153,7 +147,6 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
     {
         return Action::make('revokeTeamInvitation')
             ->label(__('teams.actions.revoke_team_invitation'))
-            ->icon('heroicon-m-x-mark')
             ->color('danger')
             ->requiresConfirmation()
             ->visible(fn (): bool => Gate::check('removeTeamMember', $this->team))

@@ -58,7 +58,11 @@ test('an invitation row shows its expiry', function (): void {
     $invitation = pendingInvitation($this->team, expiresAt: now()->addDays(3));
 
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet('expires_at', $invitation->expires_at->diffForHumans(), $invitation->id);
+        ->assertTableColumnFormattedStateSet(
+            'expires_at',
+            __('teams.table.expires_in', ['time' => $invitation->expires_at->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE)]),
+            $invitation->id,
+        );
 });
 
 test('an already-expired invitation shows an expired label, not a raw past date', function (): void {
