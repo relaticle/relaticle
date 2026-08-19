@@ -192,7 +192,7 @@ final class SubscriptionResource extends Resource
                     ->searchable()
                     ->native(false),
             ])
-            ->action(function (array $data, Subscription $record, TransferWorkspaceBilling $transfer): void {
+            ->action(function (array $data, Subscription $record, TransferWorkspaceBilling $transfer, Action $action): void {
                 /** @var Team $source */
                 $source = $record->owner;
 
@@ -208,7 +208,7 @@ final class SubscriptionResource extends Resource
                         ->danger()
                         ->send();
 
-                    return;
+                    $action->halt();
                 }
 
                 Notification::make()

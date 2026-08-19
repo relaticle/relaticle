@@ -222,3 +222,21 @@ it('does not offer a workspace that already has its own stripe customer as a tar
         ->toContain($target->getKey())
         ->not->toContain($subscribedSibling->getKey());
 });
+
+it('keeps the transfer modal open when the transfer is refused', function (): void {
+    [$source, $target, $subscription] = transferPair([
+        'stripe_status' => 'canceled',
+        'ends_at' => now()->subDay(),
+    ]);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertNotified('Transfer refused')
+        ->assertActionHalted(TestAction::make('transfer')->table($subscription));
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
