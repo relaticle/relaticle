@@ -225,7 +225,7 @@ final class SubscriptionResource extends Resource
      *
      * @return array<string, string>
      */
-    private static function transferTargets(Subscription $record): array
+    public static function transferTargets(Subscription $record): array
     {
         /** @var Team $source */
         $source = $record->owner;

@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
+use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -122,4 +123,102 @@ it('anchors the target credit period on the original subscription start date', f
 
     expect($balance->period_starts_at->toDateTimeString())
         ->toBe($anchor->copy()->addMonthNoOverflow()->toDateTimeString());
+});
+
+it('falls back the source credit period to the calendar month, not the moved subscription anchor', function (): void {
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+
+    [$source, $target, $subscription] = transferPair();
+
+    $subscription->forceFill(['created_at' => now()->subMonths(6)])->save();
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertHasNoActionErrors();
+
+    $sourceBalance = AiCreditBalance::query()->where('team_id', $source->getKey())->sole();
+
+    expect($sourceBalance->period_starts_at->toDateTimeString())
+        ->toBe(now()->startOfMonth()->toDateTimeString());
+});
+
+it('refuses to transfer when the source subscription is no longer valid', function (): void {
+    [$source, $target, $subscription] = transferPair([
+        'stripe_status' => 'canceled',
+        'ends_at' => now()->subDay(),
+    ]);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertNotified('Transfer refused');
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('refuses to transfer when the subscription price maps to no plan', function (): void {
+    [$source, $target, $subscription] = transferPair(['stripe_price' => 'price_not_in_config']);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertNotified('Transfer refused');
+
+    expect($target->refresh()->stripe_id)->toBeNull()
+        ->and($target->refresh()->plan)->toBe(Plan::Free)
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('leaves everything untouched when the target already has its own stripe customer', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ]);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBe('cus_target_own')
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('leaves everything untouched when the target belongs to a different owner', function (): void {
+    [$source, , $subscription] = transferPair();
+
+    /** @var Team $stranger */
+    $stranger = Team::factory()->create(['plan' => Plan::Free]);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $stranger->getKey(),
+        ]);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($stranger->refresh()->stripe_id)->toBeNull()
+        ->and($stranger->plan)->toBe(Plan::Free)
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('does not offer a workspace that already has its own stripe customer as a target', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    /** @var Team $subscribedSibling */
+    $subscribedSibling = Team::factory()->create([
+        'user_id' => $source->user_id,
+        'stripe_id' => 'cus_sibling_own',
+    ]);
+
+    $targets = SubscriptionResource::transferTargets($subscription);
+
+    expect(array_keys($targets))
+        ->toContain($target->getKey())
+        ->not->toContain($subscribedSibling->getKey());
 });
