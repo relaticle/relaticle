@@ -4,6 +4,92 @@
 // chat-interface.blade.php for the composition and the two accessors
 // (`hasPendingProposal`, `pendingLabel`) that stay inline there because a
 // `get` property cannot survive an object spread.
+
+const CONVERSATION_CACHE_LIMIT = 5;
+
+// Cache-first conversation switching (window-scoped Map, LRU-capped at 5).
+//
+// Confirmed empirically before writing this: clicking a `wire:navigate`
+// sidebar link destroys the whole Alpine tree, not just the swapped content
+// region (a marker written onto `this` before switching was gone on the new
+// instance after the transition; a marker written onto `window` survived;
+// the SAME main-page click also wiped a marker on the side panel's own
+// nested chatInterface instance, even though the side panel itself was
+// never clicked). The side panel's OWN `openConversation()` was not driven
+// directly, but it changes the `@livewire(...)` component key, and a keyed
+// Livewire remount is a destroy-then-mount by definition, so it is expected
+// to behave the same way. Either way, an in-memory `this.conversationCache`
+// property would be destroyed on every switch and buy nothing: only
+// `window` outlives the switch, hence the cache lives there instead.
+//
+// Scoped to the authenticated user via an "owner" tag: whenever the tag does
+// not match the current user, the whole cache is discarded before use. This
+// is a defense-in-depth measure (in normal operation login/logout are hard
+// navigations that already wipe `window`), not the only thing keeping
+// conversations apart: conversation ids are unique per row regardless of
+// team, so there is no id collision vector between two different teams'
+// conversations to begin with.
+function conversationCacheEntries(userId) {
+    const existing = window.__chatConversationCache;
+    if (existing && existing.owner === userId) {
+        return existing.entries;
+    }
+    const entries = new Map();
+    window.__chatConversationCache = { owner: userId, entries };
+    return entries;
+}
+
+function cacheConversationMessages(userId, conversationId, messages) {
+    if (!conversationId) return;
+    const entries = conversationCacheEntries(userId);
+    entries.delete(conversationId);
+    entries.set(conversationId, messages);
+    while (entries.size > CONVERSATION_CACHE_LIMIT) {
+        const oldestKey = entries.keys().next().value;
+        entries.delete(oldestKey);
+    }
+}
+
+// Bumps recency (moves the entry to the end of Map's insertion order) so the
+// cap above evicts the conversation that was viewed longest ago, not merely
+// the one cached first.
+function readCachedConversationMessages(userId, conversationId) {
+    const entries = conversationCacheEntries(userId);
+    if (!entries.has(conversationId)) return null;
+    const messages = entries.get(conversationId);
+    entries.delete(conversationId);
+    entries.set(conversationId, messages);
+    return messages;
+}
+
+// Alpine's navigate plugin hands the destination as a real URL object (see
+// vendor/livewire/livewire's forwarded `alpine:navigate` -> `livewire:navigate`
+// event), but this also accepts a bare string defensively.
+function conversationIdFromNavigateUrl(url) {
+    if (!url) return null;
+    try {
+        const href = typeof url === 'string' ? url : url.href;
+        const { pathname } = new URL(href, window.location.origin);
+        const match = pathname.match(/\/chats\/([^/?#]+)\/?$/);
+        return match ? match[1] : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Alpine's `messages` array is reactive (Proxy-wrapped); JSON round-tripping
+// it before it goes into the cache both strips the Proxy (structuredClone
+// throws on one, see plainDocument() in send.js for the same trap) and
+// deep-clones so a later edit to the live array can never silently mutate
+// what is sitting in the cache.
+function snapshotMessages(messages) {
+    try {
+        return JSON.parse(JSON.stringify(messages));
+    } catch (_) {
+        return null;
+    }
+}
+
 export const transcriptModule = ({ messagesUrl }) => ({
     prependScrollAnchor: null,
     now: Date.now(),
@@ -25,6 +111,84 @@ export const transcriptModule = ({ messagesUrl }) => ({
             m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
         }
         return m;
+    },
+
+    // Stashes the CURRENT conversation's transcript so a later switch back to
+    // it can paint instantly. Called from destroy() (every teardown path:
+    // wire:navigate, the side panel's keyed remount) and also from the start
+    // of switchConversation() itself: see the comment there for why leaving
+    // it to destroy() alone would lose data on a rapid switch.
+    stashConversationCache() {
+        if (!this.conversationId) return;
+        const snapshot = snapshotMessages(this.messages);
+        if (!snapshot) return;
+        cacheConversationMessages(this.userId, this.conversationId, snapshot);
+    },
+
+    // Paints a cached transcript for `targetConversationId` into THIS
+    // still-alive instance the moment a switch begins, well before the real
+    // wire:navigate round trip resolves. Server truth always wins: whatever
+    // this paints is provisional only, because the navigation that follows
+    // always finishes by destroying this instance and mounting a fresh one
+    // from ChatInterface::mount() -> fetchMessages(), which wholesale
+    // replaces it regardless of whether the cache was right, stale, or
+    // (via the ownership tag) refused outright. Returns true on a cache hit.
+    switchConversation(targetConversationId) {
+        if (!targetConversationId || targetConversationId === this.conversationId) return false;
+
+        const cached = readCachedConversationMessages(this.userId, targetConversationId);
+        if (!cached) return false;
+
+        // Capture THIS conversation's true current state before it gets
+        // overwritten below. Without this, a rapid switch (A -> C, cache
+        // miss, immediately -> B, cache hit) would have already clobbered
+        // this.messages/conversationId by the time destroy() runs, and
+        // destroy()'s own stash would redundantly re-cache the wrong
+        // (already-overwritten) content instead of A's real last state.
+        this.stashConversationCache();
+
+        // A pending draft-save debounce reads this.conversationId at fire
+        // time (see send.js saveDraft()/destroy()'s own comment on this
+        // exact bug): cancel it now that conversationId is about to change
+        // out from under it, rather than let it fire later against the
+        // wrong bucket.
+        clearTimeout(this.draftDebounceTimer);
+
+        this.messages = snapshotMessages(cached) ?? cached;
+        this.conversationId = targetConversationId;
+        this.scrollToBottom(true);
+
+        this.$nextTick(() => {
+            window.dispatchEvent(new CustomEvent('chat:cache-painted', {
+                detail: { conversationId: targetConversationId },
+            }));
+        });
+
+        return true;
+    },
+
+    // Only the full-page chat reacts to sidebar navigation: the side panel is
+    // a different conversation entirely and must not have its transcript
+    // hijacked just because the user navigated the main page elsewhere.
+    // Guarded against mid-stream state (isStreaming / an active rate-limit
+    // countdown) because both hold live references into this.messages
+    // (the streaming target bubble, the countdown's userMsg) that a swap out
+    // from under them would silently misfile onto the new conversation.
+    installConversationSwitchWatch() {
+        if (this.context !== 'conversation') return;
+        this._conversationSwitchHandler = (event) => {
+            if (this.isStreaming || this.rateLimit) return;
+            const targetId = conversationIdFromNavigateUrl(event?.detail?.url);
+            if (targetId) this.switchConversation(targetId);
+        };
+        document.addEventListener('livewire:navigate', this._conversationSwitchHandler);
+    },
+
+    uninstallConversationSwitchWatch() {
+        if (this._conversationSwitchHandler) {
+            document.removeEventListener('livewire:navigate', this._conversationSwitchHandler);
+            this._conversationSwitchHandler = null;
+        }
     },
 
     autosize(el) {
