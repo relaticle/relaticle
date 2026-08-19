@@ -17,3 +17,17 @@ it('does not claim hosted models ship with self-hosted installs', function (): v
 
     expect($html)->toContain(__('bring your own API key'));
 });
+
+it('describes batch approval as per record, matching how the service resolves batches', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Batches are reviewed record by record'))
+        ->and($html)->not->toContain('all-or-nothing')
+        ->and($html)->not->toContain('no partial approval');
+});
+
+it('names the assistant from config rather than a hardcoded literal', function (): void {
+    config()->set('chat.assistant_name', 'Testbot');
+
+    $this->get('/ai')->assertOk()->assertSee('Testbot');
+});

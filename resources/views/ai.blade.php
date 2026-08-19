@@ -34,7 +34,7 @@
         [
             __('Which models power :name?', ['name' => $assistantName]),
             __(
-                ':freeModels on every plan, including self-hosted. A paid plan additionally unlocks :paidModels, which cost more credits per reply. Self-hosted installs can also bring their own key or run a local model instead of any of these.',
+                ':freeModels on every plan. A paid plan additionally unlocks :paidModels, which cost more credits per reply. A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.',
                 ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels]
             ),
         ],
@@ -105,11 +105,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach([
                     ['ri-edit-2-line', __('Creates and updates any record'), __('Companies, people, opportunities, tasks, and notes. Ask for a field to change and it proposes the edit.')],
-                    ['ri-checkbox-multiple-line', __('Batches changes into one approval'), __('Update or delete many records at once. You approve the whole batch in a single click, not one at a time.')],
+                    ['ri-checkbox-multiple-line', __('Proposes many records at once'), __('Ask for a batch of up to :max records. You review them one at a time and keep the ones you want.', ['max' => $maxBatchSize])],
                     ['ri-stack-line', __('Knows your custom fields'), __('Every active custom field your team has defined works out of the box, with option labels shown as text, not raw IDs.')],
                     ['ri-book-open-line', __('Answers questions from the docs'), __('Ask how something works and it searches Relaticle\'s own documentation for the answer, with a link to the source.')],
                     ['ri-search-line', __('Finds and summarizes your data'), __('Look up a record, list your team, or get a rollup of your pipeline without opening a single page.')],
-                    ['ri-guide-line', __('Guides you to the right page'), __('For the few things it cannot do itself, like editing a field definition, it links you straight to where you can.')],
+                    ['ri-guide-line', __('Guides you to the right page'), __('For the few things it cannot do itself, like importing a file or changing a field type, it links you straight to where you can.')],
                 ] as [$icon, $cardTitle, $cardDesc])
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
                         <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
@@ -160,10 +160,10 @@
                     </div>
                     <div>
                         <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ __('Batches are all-or-nothing') }}
+                            {{ __('Batches are reviewed record by record') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __('Approving a batch of up to :max records approves all of them together. There is no partial approval to leave your data half-changed.', ['max' => $maxBatchSize]) }}
+                            {{ __('A batch of up to :max records is stepped through one at a time. Keep the ones you want, reject the rest, and nothing you skipped is written.', ['max' => $maxBatchSize]) }}
                         </p>
                     </div>
                 </div>
@@ -199,7 +199,7 @@
                 {{ __('Use Relaticle from Claude or ChatGPT') }}
             </h2>
             <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('Relaticle ships a built-in MCP server, so your own AI client can read and write your CRM directly. It works with Claude, ChatGPT, and any other MCP-compatible client, using the same tools :name uses internally.', ['name' => $assistantName]) }}
+                {{ __('Relaticle ships a built-in MCP server, so your own AI client can read and write your CRM directly. It works with Claude, ChatGPT, and any other MCP-compatible client. MCP calls run against the same records, and because you authorized the client yourself, they apply straight away rather than waiting for an in-app approval.') }}
             </p>
 
             <div class="mt-8">
