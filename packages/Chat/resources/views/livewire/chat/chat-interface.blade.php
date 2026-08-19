@@ -206,6 +206,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         // and navigate immediately. Restore the document (preserves mentions)
         // and fire sendMessage() so this page does the actual POST without a
         // server round-trip blocking the navigation.
+        let ranBootstrapSend = false;
         try {
             const raw = sessionStorage.getItem('chat:bootstrap');
             if (raw && !this.conversationId) {
@@ -219,6 +220,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 }
 
                 if (bootstrapDoc) {
+                    ranBootstrapSend = true;
                     this.$nextTick(() => {
                         this.localEditor()?.setDocument?.(bootstrapDoc);
                         this.sendMessage();
@@ -235,14 +237,24 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             });
         }
 
-        try {
-            const draft = localStorage.getItem('chat:draft');
-            if (draft) {
-                this.input = draft;
-                this.$nextTick(() => this.localEditor()?.setText(draft));
-                localStorage.removeItem('chat:draft');
-            }
-        } catch (_) { /* ignore */ }
+        this.pruneStaleDrafts();
+
+        // A message is about to be sent automatically (bootstrap handoff or a
+        // ?prompt= deep link) — restoring a leftover draft on top of that would
+        // just get overwritten by sendMessage()'s own clear() a moment later,
+        // so skip it entirely rather than race the two setDocument calls.
+        if (!ranBootstrapSend && !initialMessage) {
+            try {
+                const legacyDraft = localStorage.getItem('chat:draft');
+                if (legacyDraft) {
+                    this.input = legacyDraft;
+                    this.$nextTick(() => this.localEditor()?.setText(legacyDraft));
+                    localStorage.removeItem('chat:draft');
+                } else {
+                    this.restoreDraft(this.conversationId);
+                }
+            } catch (_) { /* ignore */ }
+        }
 
         this.beforeUnloadHandler = (e) => {
             if (!this.isStreaming) return;
