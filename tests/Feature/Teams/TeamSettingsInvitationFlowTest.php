@@ -69,7 +69,8 @@ test('admin invites by email and the invitation appears in the pending list', fu
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [['email' => 'invitee@example.com', 'role' => 'editor']],
+            'emails' => 'invitee@example.com',
+            'role' => 'editor',
         ]);
 
     $invitation = $this->team->fresh()->teamInvitations->sole();
@@ -88,7 +89,8 @@ test('inviting keeps the admin on the members tab and announces the new invitati
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [['email' => 'invitee@example.com', 'role' => 'editor']],
+            'emails' => 'invitee@example.com',
+            'role' => 'editor',
         ])
         ->assertNoRedirect()
         ->assertDispatched('teamInvitationSent');
@@ -106,7 +108,8 @@ test('the pending card picks up an invitation announced by the members table', f
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [['email' => 'invitee@example.com', 'role' => 'editor']],
+            'emails' => 'invitee@example.com',
+            'role' => 'editor',
         ]);
 
     $pendingCard->call('refreshInvitations')

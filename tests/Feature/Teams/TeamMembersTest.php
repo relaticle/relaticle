@@ -112,10 +112,8 @@ test('multiple people can be invited in one submission', function (): void {
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [
-                ['email' => 'one@example.test', 'role' => TeamRole::Editor->value],
-                ['email' => 'two@example.test', 'role' => TeamRole::Viewer->value],
-            ],
+            'emails' => "one@example.test\ntwo@example.test",
+            'role' => TeamRole::Editor->value,
         ]);
 
     expect($this->team->fresh()->teamInvitations->pluck('email')->all())
@@ -129,7 +127,8 @@ test('invitePeople rejects an admin role for a non-owner actor', function (): vo
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [['email' => 'nope@example.test', 'role' => TeamRole::Admin->value]],
+            'emails' => 'nope@example.test',
+            'role' => TeamRole::Admin->value,
         ])
         ->assertHasActionErrors();
 
@@ -165,12 +164,10 @@ test('the members list skips a membership row whose user no longer exists', func
 });
 
 test('a crafted payload above the batch cap is rejected server-side', function (): void {
-    $invites = collect(range(1, 11))
-        ->map(fn (int $i): array => ['email' => "batch{$i}@example.test", 'role' => TeamRole::Editor->value])
-        ->all();
+    $emails = collect(range(1, 11))->map(fn (int $i): string => "batch{$i}@example.test")->implode("\n");
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
+        ->callAction(TestAction::make('invitePeople')->table(), ['emails' => $emails, 'role' => TeamRole::Editor->value])
         ->assertHasActionErrors();
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
@@ -179,12 +176,10 @@ test('a crafted payload above the batch cap is rejected server-side', function (
 test('a submission exactly at the batch cap succeeds', function (): void {
     Mail::fake();
 
-    $invites = collect(range(1, 10))
-        ->map(fn (int $i): array => ['email' => "atcap{$i}@example.test", 'role' => TeamRole::Editor->value])
-        ->all();
+    $emails = collect(range(1, 10))->map(fn (int $i): string => "atcap{$i}@example.test")->implode("\n");
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
+        ->callAction(TestAction::make('invitePeople')->table(), ['emails' => $emails, 'role' => TeamRole::Editor->value])
         ->assertHasNoActionErrors();
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(10);
@@ -193,24 +188,21 @@ test('a submission exactly at the batch cap succeeds', function (): void {
 test('cumulative invite volume beyond the window cap is throttled, not just the call count', function (): void {
     Mail::fake();
 
-    $firstBatch = collect(range(1, 10))
-        ->map(fn (int $i): array => ['email' => "first{$i}@example.test", 'role' => TeamRole::Editor->value])
-        ->all();
-    $secondBatch = collect(range(1, 10))
-        ->map(fn (int $i): array => ['email' => "second{$i}@example.test", 'role' => TeamRole::Editor->value])
-        ->all();
+    $firstBatch = collect(range(1, 10))->map(fn (int $i): string => "first{$i}@example.test")->implode("\n");
+    $secondBatch = collect(range(1, 10))->map(fn (int $i): string => "second{$i}@example.test")->implode("\n");
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $firstBatch]);
+        ->callAction(TestAction::make('invitePeople')->table(), ['emails' => $firstBatch, 'role' => TeamRole::Editor->value]);
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $secondBatch]);
+        ->callAction(TestAction::make('invitePeople')->table(), ['emails' => $secondBatch, 'role' => TeamRole::Editor->value]);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [
-            'invites' => [['email' => 'onemore@example.test', 'role' => TeamRole::Editor->value]],
+            'emails' => 'onemore@example.test',
+            'role' => TeamRole::Editor->value,
         ]);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
