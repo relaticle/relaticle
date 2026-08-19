@@ -21,10 +21,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Laravel\Cashier\Subscription;
 use Override;
 use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
+use Relaticle\SystemAdmin\Exceptions\TransferRefused;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
-use RuntimeException;
 use UnitEnum;
 
 final class SubscriptionResource extends Resource
@@ -201,7 +201,7 @@ final class SubscriptionResource extends Resource
 
                 try {
                     $transfer->execute($source, $target, (string) auth('sysadmin')->id());
-                } catch (RuntimeException $exception) {
+                } catch (TransferRefused $exception) {
                     Notification::make()
                         ->title('Transfer refused')
                         ->body($exception->getMessage())

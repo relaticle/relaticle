@@ -67,7 +67,7 @@ it('moves the stripe customer, the subscription and both plans to the target wor
             'target_team_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors()
-        ->assertNotified();
+        ->assertNotified('Billing transferred');
 
     $source->refresh();
     $target->refresh();
