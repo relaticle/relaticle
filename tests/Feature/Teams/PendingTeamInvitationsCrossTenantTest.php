@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
-use Filament\Actions\Testing\TestAction as Action;
 use Illuminate\Support\Facades\Mail;
 
 mutates(PendingTeamInvitations::class);
@@ -52,7 +51,7 @@ it('prevents an admin of team A from resending an invitation belonging to team B
     $this->actingAs($attacker);
 
     rescue(fn () => livewire(PendingTeamInvitations::class, ['team' => $attackerTeam])
-        ->callAction(Action::make('resendTeamInvitation')->table($victimInvitation->id)));
+        ->callAction(TestAction::make('resendTeamInvitation')->table($victimInvitation->id)));
 
     Mail::assertNothingSent();
     Mail::assertNothingQueued();

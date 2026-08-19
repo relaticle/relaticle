@@ -57,8 +57,17 @@ components (`AddTeamMember`, `PendingTeamInvitations`, `TeamMembers`) collapse
 into one component with one table.
 
 Members and pending invitations become rows in the **same list**, which is what
-makes the page read as a team roster rather than three widgets. This needs a
-common row shape, so the table queries a `fromSub()` union:
+**Superseded during implementation.** The unified table shipped, then came back
+out: with 16 members and 6 invitations at a page size of 10, an outstanding
+invitation could land on page three, and a single row shape forced a STATUS
+column that only repeated ROLE plus an EXPIRES column null on every member row.
+Twenty and Slack keep the two surfaces apart for the same reason. The page is
+now a `PendingTeamInvitations` card (unpaginated, hidden when empty) above a
+`TeamMembers` card (searchable, paginated), and `TeamPerson` is deleted — the
+owner is pulled into a plain `User` query by a second `where` leg instead. The
+union design below is kept as the record of what was tried and why it lost.
+
+This needed a common row shape, so the table queried a `fromSub()` union:
 
 - `team_user` joined to `users` → id, name, email, role, `status = 'member'`, `joined_at`
 - `team_invitations` → id, null name, email, role, `status = 'invited'`, `created_at`
@@ -185,10 +194,13 @@ invite and resend paths, mirroring how maxforms avoids drift between them.
 Both under a `no-referrer` response header so the token stays out of the
 `Referer` chain.
 
-`GET /team-invitations/{invitation}` **stays**, still `signed`, but renders the
-confirm page instead of joining (A1). Invitations already sitting in inboxes
-keep working; the route can be deleted once the longest live invitation has
-expired (7 days).
+**Superseded during implementation.** `GET /team-invitations/{invitation}` was
+kept during the build, then removed before merge: production held no live
+invitations, so no grace period was needed. The token route is the only shape,
+and the legacy paths 404. The paragraphs below describe the interim state.
+
+`GET /team-invitations/{invitation}` stayed, still `signed`, rendering the
+confirm page instead of joining (A1).
 
 Legacy rows have `token = null`, so their confirm page cannot post to
 `/invitations/{token}`. A matching `POST /team-invitations/{invitation}` is
@@ -288,7 +300,8 @@ New coverage:
 - Viewer is denied through the API and an MCP tool — proves the policy path
   covers non-panel surfaces
 - owner row exposes no Leave action (A8)
-- unified table lists members and invitations with correct status
+- members and pending invitations render as separate cards, and the pending
+  card disappears entirely when there are none
 - invite link rotate/disable from settings (A5)
 - concurrent accepts attach exactly one membership
 
