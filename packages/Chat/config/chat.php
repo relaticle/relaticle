@@ -49,10 +49,13 @@ return [
     | Anthropic Prompt Caching
     |--------------------------------------------------------------------------
     |
-    | Marks the static system prompt with a cache_control breakpoint, which
-    | caches the whole request prefix (all tool schemas + instructions) on
-    | Anthropic's side. Cuts per-turn input tokens dramatically for multi-turn
-    | conversations. Disable if a model/provider combination misbehaves.
+    | Places two cache_control breakpoints on every Anthropic request. One marks
+    | the static system prompt, caching the whole prefix (tool schemas plus
+    | instructions) so a new conversation never rewrites it. The other is
+    | Anthropic's automatic caching, which follows the last block of the request,
+    | so each step of the agent loop reads the transcript the previous step
+    | wrote. Cuts per-turn input tokens dramatically. Disable if a
+    | model/provider combination misbehaves.
     */
 
     'anthropic_prompt_caching' => (bool) env('CHAT_ANTHROPIC_PROMPT_CACHING', true),
