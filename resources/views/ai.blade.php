@@ -345,11 +345,11 @@
                 {{ __('Run the assistant on your own server') }}
             </h2>
             <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, :bringYourOwnKey for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.', ['bringYourOwnKey' => __('bring your own API key')]) }}
+                {{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, bring your own API key for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.') }}
             </p>
 
             <div class="mt-8">
-                <x-marketing.button variant="secondary" href="/self-hosted">
+                <x-marketing.button variant="secondary" href="{{ route('selfHosted') }}">
                     {{ __('See self-hosting options') }}
                 </x-marketing.button>
             </div>
@@ -397,7 +397,7 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Home')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name($assistantName)->item(route('ai')),
                 ]));
     @endphp

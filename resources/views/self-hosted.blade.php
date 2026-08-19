@@ -6,7 +6,7 @@
 
     $quickStartLines = [
         ['type' => 'comment', 'text' => __('Download the compose file')],
-        ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/Relaticle/relaticle/main/compose.yml'],
+        ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/relaticle/relaticle/main/compose.yml'],
         ['type' => 'blank'],
         ['type' => 'comment', 'text' => __('Add the two required secrets')],
         ['type' => 'command', 'text' => 'cat > .env << EOF'],
@@ -128,8 +128,10 @@
                         @if(($line['type'] ?? null) === 'blank')
                             <div class="h-3" aria-hidden="true"></div>
                         @elseif(($line['type'] ?? null) === 'comment')
+                            {{-- The `#` stays selectable, unlike the `$`/`>` prompts below: it is
+                                 what keeps the line a shell comment once it is copied. --}}
                             <p class="text-gray-500">
-                                <span class="select-none" aria-hidden="true">#</span> {{ $line['text'] }}
+                                <span>#</span> {{ $line['text'] }}
                             </p>
                         @else
                             {{-- Prompt glyphs carry `select-none` so a select-and-copy of the
@@ -396,7 +398,7 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Home')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Self-hosted'))->item(route('selfHosted')),
                 ]));
     @endphp

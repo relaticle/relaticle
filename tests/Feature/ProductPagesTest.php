@@ -68,3 +68,13 @@ it('offers a copy control whose payload is runnable shell without prompt glyphs'
         ->and($html)->toContain('navigator.clipboard.writeText')
         ->and($html)->toContain('select-none');
 });
+
+it('keeps the comment marker selectable so a select-and-copy stays runnable shell', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    // The `$`/`>` prompts are select-none because they are not part of the command.
+    // The `#` is the opposite: drop it from the selection and the comment text
+    // pastes into a shell as a bare command.
+    expect($html)->toContain('<span>#</span>')
+        ->and($html)->not->toContain('<span class="select-none" aria-hidden="true">#</span>');
+});

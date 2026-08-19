@@ -27,6 +27,15 @@ it('links every declared comparison and alternatives page from the footer', func
     }
 });
 
+it('names the assistant from config in both the header and the footer', function (): void {
+    config()->set('chat.assistant_name', 'Testbot');
+
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect(substr_count($html, 'Testbot'))->toBeGreaterThanOrEqual(3)
+        ->and($html)->not->toContain('>Rela<');
+});
+
 it('renders the four footer columns with labelled navigation', function (): void {
     $html = $this->get('/')->assertOk()->getContent();
 

@@ -86,7 +86,6 @@
                         <x-marketing.button size="sm" href="{{ route('register') }}">
                             Start for free
                         </x-marketing.button>
-
                     </div>
 
                     <button @click="mobileMenu = !mobileMenu"

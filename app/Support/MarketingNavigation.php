@@ -77,7 +77,7 @@ final readonly class MarketingNavigation
     {
         return [
             new NavItem(__('Product'), children: [
-                new NavItem(__('Rela'), route('ai')),
+                new NavItem((string) config('chat.assistant_name'), route('ai')),
                 new NavItem(__('Features'), url('/#features')),
                 new NavItem(__('Pricing'), route('pricing')),
                 new NavItem(__('Self-hosted'), route('selfHosted')),
