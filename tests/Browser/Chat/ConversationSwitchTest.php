@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
 mutates(ChatInterface::class);
@@ -297,4 +298,73 @@ it('never paints a transcript cached under a different user', function (): void 
         (() => window.__chatConversationCache?.owner ?? null)();
     JS);
     expect($ownerAfter)->not->toBe('someone-else-entirely');
+});
+
+it('caps the conversation cache at 5 entries, evicting the least recently used', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationSeed = (string) Str::uuid7();
+    switchTestInsertConversation($conversationSeed, $user, $team->getKey(), 'chat seed');
+    switchTestInsertMessage($conversationSeed, $user, 'user', 'Seed message');
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationSeed}")
+        ->assertSourceHas('Seed message');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    // The cache is pure client-side Map bookkeeping (see
+    // conversationCacheEntries() / cacheConversationMessages() in
+    // transcript.js): stashConversationCache() only reads whatever is
+    // currently on `this.conversationId` / `this.messages`, so driving it
+    // through 6 distinct ids needs no real conversation rows or wire:navigate
+    // round trips per id, only the one real mount above to get a live
+    // `chatInterface` instance to call it on.
+    $afterSixthStash = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            const ids = ['lru-1', 'lru-2', 'lru-3', 'lru-4', 'lru-5', 'lru-6'];
+            for (const id of ids) {
+                data.conversationId = id;
+                data.messages = [{ role: 'user', content: 'msg for ' + id, clientKey: id }];
+                data.stashConversationCache();
+            }
+            const cache = window.__chatConversationCache;
+            return { size: cache.entries.size, keys: Array.from(cache.entries.keys()) };
+        })();
+    JS);
+
+    // A 6th entry evicts the least recently used (lru-1, cached first and
+    // never touched again), not merely the "first" one by some other rule.
+    expect($afterSixthStash['size'])->toBe(5);
+    expect($afterSixthStash['keys'])->toBe(['lru-2', 'lru-3', 'lru-4', 'lru-5', 'lru-6']);
+
+    // lru-2 is now the oldest surviving entry. Read it back through
+    // switchConversation() (the exact path a real switch takes) so its
+    // recency bumps, then stash one more conversation: this is the same
+    // stash-before-overwrite switchConversation() already does for the
+    // outgoing conversation on every real switch, so it doubles as the "7th
+    // write" that forces another eviction. If the recency bump is a no-op,
+    // lru-2 (inserted before lru-3/4/5/6) is the next one evicted; if the
+    // bump works, lru-3 (never re-read) is evicted instead and lru-2
+    // survives despite being the chronologically older entry.
+    $afterRecencyBump = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            data.conversationId = 'scratch-outgoing';
+            data.messages = [{ role: 'user', content: 'scratch', clientKey: 'scratch-outgoing' }];
+            const switched = data.switchConversation('lru-2');
+            const cache = window.__chatConversationCache;
+            return { switched, keys: Array.from(cache.entries.keys()) };
+        })();
+    JS);
+
+    expect($afterRecencyBump['switched'])->toBeTrue();
+    expect($afterRecencyBump['keys'])->toHaveCount(5);
+    expect($afterRecencyBump['keys'])->toContain('lru-2');
+    expect($afterRecencyBump['keys'])->not->toContain('lru-3');
 });
