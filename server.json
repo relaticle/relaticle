@@ -3,7 +3,7 @@
   "name": "com.relaticle/crm",
   "title": "Relaticle",
   "description": "Open-source CRM your AI agents can write to: 32 MCP tools for companies, people, deals, and tasks.",
-  "version": "3.4.10-1",
+  "version": "${VERSION}",
   "remotes": [
     {
       "type": "streamable-http",

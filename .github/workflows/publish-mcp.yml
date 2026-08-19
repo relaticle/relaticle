@@ -1,8 +1,9 @@
 name: Publish to MCP Registry
 
 # Keeps the com.relaticle/crm listing on registry.modelcontextprotocol.io in
-# lockstep with product releases. The listing's version is taken from the
-# release tag, not from server.json, so the committed file never needs a bump.
+# lockstep with product releases. server.json is fully static: its version
+# field is the literal placeholder ${VERSION}, substituted from the release
+# tag here at publish time (the same pattern github/github-mcp-server uses).
 #
 # Auth is DNS-based (TXT record on the relaticle.com apex). MCP_PRIVATE_KEY is
 # an Environment secret on `mcp-registry-publish`, restricted to v* tags, so
@@ -34,6 +35,7 @@ jobs:
         run: |
           VERSION="${TAG_NAME#v}"
           jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")' server.json > /dev/null
           echo "Publishing version ${VERSION}"
 
       - name: Authenticate to MCP Registry
