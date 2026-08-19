@@ -72,6 +72,10 @@ return [
         'activating' => 'Payment received — activating Pro…',
         'activation_delayed_title' => 'Activation is taking longer than usual',
         'activation_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if Pro still is not active.',
+        'confirm_title' => 'Confirm your workspace',
+        'confirm_body' => 'You are subscribing :workspace. Switch workspaces first if that is not the one you meant.',
+        'confirm_button' => 'Yes, subscribe :workspace',
+        'confirm_cancel' => 'Cancel',
     ],
     'subscribe' => [
         'button' => 'Subscribe now',

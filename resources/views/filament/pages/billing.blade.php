@@ -247,7 +247,7 @@
             @endif
 
             <div
-                x-data="{ yearly: true }"
+                x-data="{ yearly: true, confirming: false }"
                 class="relative flex w-full flex-col rounded-2xl border border-primary/25 bg-white p-7 shadow-[0_6px_36px_-14px_rgba(124,58,237,0.18)] sm:p-8 dark:border-primary/20 dark:bg-primary/[0.03] dark:shadow-none"
             >
                 <div class="flex flex-1 flex-col">
@@ -284,26 +284,43 @@
                     </ul>
 
                     <div class="mt-7">
-                        @if($trialAvailable)
-                            <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
-                                {{ __('billing.trial.start_button') }}
-                            </x-filament::button>
-                            <button type="button" x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')"
-                                class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
-                                {{ __('billing.upgrade.now') }}
-                            </button>
-                        @else
-                            <x-filament::button type="button" size="lg" class="w-full justify-center"
-                                x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
-                                {{ $onTrial
-                                    ? __('billing.subscribe.button')
-                                    : ($isPaused ? __('billing.upgrade.unlock') : __('billing.upgrade.button')) }}
-                            </x-filament::button>
-                        @endif
-                        <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
-                            x-text="yearly ? '{{ __('billing.pro_plan.billed_yearly') }}' : '{{ __('billing.pro_plan.billed_monthly') }}'">
-                            {{ __('billing.pro_plan.billed_yearly') }}
-                        </p>
+                        <div x-show="! confirming">
+                            @if($trialAvailable)
+                                <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
+                                    {{ __('billing.trial.start_button') }}
+                                </x-filament::button>
+                                <button type="button" x-on:click="confirming = true"
+                                    class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
+                                    {{ __('billing.upgrade.now') }}
+                                </button>
+                            @else
+                                <x-filament::button type="button" size="lg" class="w-full justify-center"
+                                    x-on:click="confirming = true">
+                                    {{ $onTrial
+                                        ? __('billing.subscribe.button')
+                                        : ($isPaused ? __('billing.upgrade.unlock') : __('billing.upgrade.button')) }}
+                                </x-filament::button>
+                            @endif
+                            <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
+                                x-text="yearly ? '{{ __('billing.pro_plan.billed_yearly') }}' : '{{ __('billing.pro_plan.billed_monthly') }}'">
+                                {{ __('billing.pro_plan.billed_yearly') }}
+                            </p>
+                        </div>
+
+                        <div x-show="confirming" x-cloak class="rounded-xl border border-primary/25 bg-primary/[0.03] p-4 dark:border-primary/20">
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.confirm_title') }}</p>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $team->name]) }}</p>
+                            <div class="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
+                                <x-filament::button type="button" class="justify-center"
+                                    x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
+                                    {{ __('billing.upgrade.confirm_button', ['workspace' => $team->name]) }}
+                                </x-filament::button>
+                                <x-filament::button type="button" color="gray" class="justify-center"
+                                    x-on:click="confirming = false">
+                                    {{ __('billing.upgrade.confirm_cancel') }}
+                                </x-filament::button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
