@@ -86,11 +86,16 @@ return [
         'some_invites_failed' => [
             'title' => 'Some invitations could not be sent',
         ],
+        'invite_rate_limited' => [
+            'title' => 'Too many invitations sent',
+            'body' => 'Please wait :seconds seconds before sending more invitations.',
+        ],
     ],
 
     'validation' => [
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
+        'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :teams',
     ],
 
     'modals' => [

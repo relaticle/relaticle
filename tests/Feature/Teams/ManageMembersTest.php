@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 mutates(ManageMembers::class);
@@ -177,4 +178,94 @@ test('the unified list skips a membership row whose user no longer exists', func
     livewire(ManageMembers::class, ['team' => $this->team])
         ->assertSee($member->email)
         ->assertDontSee($deletedEmail);
+});
+
+test('a crafted payload above the batch cap is rejected server-side', function (): void {
+    $invites = collect(range(1, 11))
+        ->map(fn (int $i): array => ['email' => "batch{$i}@example.test", 'role' => TeamRole::Editor->value])
+        ->all();
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
+        ->assertHasActionErrors();
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+});
+
+test('a submission exactly at the batch cap succeeds', function (): void {
+    Mail::fake();
+
+    $invites = collect(range(1, 10))
+        ->map(fn (int $i): array => ['email' => "atcap{$i}@example.test", 'role' => TeamRole::Editor->value])
+        ->all();
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $invites])
+        ->assertHasNoActionErrors();
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(10);
+});
+
+test('cumulative invite volume beyond the window cap is throttled, not just the call count', function (): void {
+    Mail::fake();
+
+    $firstBatch = collect(range(1, 10))
+        ->map(fn (int $i): array => ['email' => "first{$i}@example.test", 'role' => TeamRole::Editor->value])
+        ->all();
+    $secondBatch = collect(range(1, 10))
+        ->map(fn (int $i): array => ['email' => "second{$i}@example.test", 'role' => TeamRole::Editor->value])
+        ->all();
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $firstBatch]);
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), ['invites' => $secondBatch]);
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), [
+            'invites' => [['email' => 'onemore@example.test', 'role' => TeamRole::Editor->value]],
+        ]);
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
+});
+
+test('the owner can change the invite link default role', function (): void {
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('manageInviteLink')->table(), [
+            'invite_link_default_role' => TeamRole::Viewer->value,
+        ]);
+
+    expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Viewer->value);
+});
+
+test('an admin cannot set the invite link default role to admin', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $this->actingAs($admin);
+
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('manageInviteLink')->table(), [
+            'invite_link_default_role' => TeamRole::Admin->value,
+        ])
+        ->assertHasActionErrors();
+
+    expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
+test('rotating the invite link changes the token', function (): void {
+    $originalToken = $this->team->invite_link_token;
+
+    // rotateInviteLink is an extra footer action nested inside manageInviteLink's
+    // modal, not a standalone table action — Filament resolves it relative to
+    // the mounted parent action, so the chain is expressed as an array.
+    livewire(ManageMembers::class, ['team' => $this->team])
+        ->callAction([
+            TestAction::make('manageInviteLink')->table(),
+            TestAction::make('rotateInviteLink'),
+        ]);
+
+    expect($this->team->fresh()->invite_link_token)->not->toBe($originalToken);
 });
