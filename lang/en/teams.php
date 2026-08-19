@@ -188,6 +188,7 @@ return [
         'joined' => 'You have joined the :team workspace.',
         'already_member' => 'You are already a member of :team.',
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
+        'team_deleting' => 'This workspace is scheduled for deletion and is not accepting new members.',
         'ready' => [
             'heading' => 'Join :team',
             'body_with_inviter' => ':inviter invited you to join :team with :role access.',

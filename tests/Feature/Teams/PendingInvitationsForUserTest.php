@@ -267,6 +267,46 @@ test('an invitation with a null expiry is neither listed nor acceptable', functi
     expect($invitee->fresh()->belongsToTeam($team))->toBeFalse();
 });
 
+test('a user scheduled for deletion cannot accept from the card', function (): void {
+    $team = User::factory()->withTeam()->create()->currentTeam;
+    $invitation = $team->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->scheduledForDeletion()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    livewire(PendingInvitationsForUser::class)
+        ->call('accept', $invitation->id)
+        ->assertNotified(__('teams.accept.account_deleting'));
+
+    expect($invitee->fresh()->belongsToTeam($team))->toBeFalse();
+    expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
+test('a team scheduled for deletion cannot be joined from the card', function (): void {
+    $team = User::factory()->withTeam()->create()->currentTeam;
+    $team->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    $invitation = $team->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    livewire(PendingInvitationsForUser::class)
+        ->call('accept', $invitation->id)
+        ->assertNotified(__('teams.accept.team_deleting'));
+
+    expect($invitee->fresh()->belongsToTeam($team))->toBeFalse();
+    expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
 test('a user with no pending invitations sees an empty card', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);

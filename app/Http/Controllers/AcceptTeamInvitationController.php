@@ -45,8 +45,6 @@ final readonly class AcceptTeamInvitationController
             return $this->render($request, $invitation);
         }
 
-        abort_if($user->isScheduledForDeletion(), 403, __('teams.accept.account_deleting'));
-
         $team = $acceptTeamInvitation->execute($user, $invitation);
 
         return $this->redirectToTeam($team, __('teams.accept.joined', ['team' => $team->name]));

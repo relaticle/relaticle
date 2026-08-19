@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Surfaces invitations for the signed-in user's email, even when they registered
@@ -49,7 +50,13 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
 
         abort_unless(Str::lower($user->email) === Str::lower($invitation->email), 403);
 
-        $team = resolve(AcceptTeamInvitation::class)->execute($user, $invitation);
+        try {
+            $team = resolve(AcceptTeamInvitation::class)->execute($user, $invitation);
+        } catch (HttpException $exception) {
+            $this->sendNotification($exception->getMessage(), type: 'danger');
+
+            return;
+        }
 
         unset($this->invitations);
 
