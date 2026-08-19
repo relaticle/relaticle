@@ -491,6 +491,12 @@ PROMPT;
      * static instructions (~10k+ tokens) — per-turn context rides in a second,
      * uncached block. Measured pre-caching waste: 96:1 input:output tokens.
      *
+     * The top-level `cache_control` is Anthropic's automatic caching: it places a
+     * second breakpoint after the last block of the request, which moves forward
+     * as the conversation grows. Without it every step of the agent loop re-reads
+     * the whole transcript at full price: the static prefix is cached, but the
+     * replayed messages and each new tool result are not.
+     *
      * @return array<string, mixed>
      */
     private function anthropicCachedSystemBlocks(): array
@@ -514,7 +520,10 @@ PROMPT;
             ];
         }
 
-        return ['system' => $blocks];
+        return [
+            'system' => $blocks,
+            'cache_control' => ['type' => 'ephemeral'],
+        ];
     }
 
     /**
