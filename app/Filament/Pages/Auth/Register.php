@@ -45,6 +45,10 @@ final class Register extends BaseRegister
             ->rules(RegistrableEmail::rules())
             ->required()
             ->maxLength(255)
+            // An invitation is bound to one address, and handleRegistration() only
+            // auto-verifies on an exact match. Making the user retype it from memory
+            // costs them that, and lands them on the verification prompt instead.
+            ->default(fn (): ?string => $this->getTeamInvitationFromSession()?->email)
             ->unique($this->getUserModel());
     }
 

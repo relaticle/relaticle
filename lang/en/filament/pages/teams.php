@@ -18,6 +18,24 @@ return [
             'copy_invite_link' => 'Copy invite link',
             'add_more' => 'Add more',
             'cancel' => 'Cancel',
+            'skip' => 'Skip',
+            'skip_for_now' => 'Skip for now',
+            'back' => 'Back',
+            'go_to_workspace' => 'Go to workspace',
+        ],
+
+        'step_indicator' => 'Step :current of :total',
+
+        'headings' => [
+            'workspace' => 'Create your workspace',
+            'attribution' => 'How did you hear about us?',
+            'attribution_description' => 'Please select below where you found out about Relaticle. This step is optional.',
+            'use_case' => 'Help us customize your workspace',
+            'use_case_description' => 'Relaticle is all about empowering you to build the exact CRM you need, no matter how complex.',
+            'use_case_hint' => 'Tell us about your use case to get started with templates, or start with a blank canvas.',
+            'invite' => 'Collaborate with your team',
+            'invite_description' => 'The more your teammates use Relaticle, the more powerful it becomes.',
+            'invite_subheading' => 'Invite your team to collaborate',
         ],
         'form' => [
             'company_name' => [
@@ -30,6 +48,8 @@ return [
             ],
             'use_case_label' => 'What will you be using Relaticle for?',
             'use_case_context_label' => 'Please tell us more about your use case.',
+            'use_case_validation_attribute' => 'use case',
+            'use_case_context_validation_attribute' => 'use case details',
             'invite_email_placeholder' => 'colleague@company.com',
             'invite_role_member' => 'Member',
             'invite_role_admin' => 'Admin',
@@ -51,6 +71,8 @@ return [
             ],
             'some_invites_failed' => [
                 'title' => 'Some invites could not be sent',
+                'invalid_email' => 'This is not a valid email address.',
+                'generic' => 'Validation failed.',
             ],
         ],
     ],

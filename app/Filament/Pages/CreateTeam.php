@@ -79,6 +79,13 @@ final class CreateTeam extends RegisterTenant
      */
     public function getCancelUrl(): ?string
     {
+        // "Copy invite link" pre-creates the workspace, so from that point there is
+        // nothing left to cancel. Point at the workspace that now exists rather than
+        // at whichever tenant happens to be the default.
+        if ($this->tenant instanceof Team) {
+            return Dashboard::getUrl(['tenant' => $this->tenant]);
+        }
+
         /** @var User $user */
         $user = auth('web')->user();
 
@@ -87,6 +94,17 @@ final class CreateTeam extends RegisterTenant
         return $tenant instanceof Team
             ? Dashboard::getUrl(['tenant' => $tenant])
             : null;
+    }
+
+    /**
+     * Once the workspace has been pre-created, "Cancel" would be a lie: the link
+     * leads into a workspace that already exists and cannot be discarded here.
+     */
+    public function getCancelLabel(): string
+    {
+        return $this->tenant instanceof Team
+            ? __('filament/pages/teams.create_team.actions.go_to_workspace')
+            : __('filament/pages/teams.create_team.actions.cancel');
     }
 
     #[Override]
@@ -125,9 +143,7 @@ final class CreateTeam extends RegisterTenant
             ->schema([
                 Placeholder::make('workspace_heading')
                     ->hiddenLabel()
-                    ->content(new HtmlString(
-                        '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">Create your workspace</h3>'
-                    ))
+                    ->content($this->stepHeading(__('filament/pages/teams.create_team.headings.workspace')))
                     ->dehydrated(false),
                 ...$this->getWorkspaceFormComponents(),
             ]);
@@ -139,9 +155,9 @@ final class CreateTeam extends RegisterTenant
             ->schema([
                 Placeholder::make('attribution_heading')
                     ->hiddenLabel()
-                    ->content(new HtmlString(
-                        '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">How did you hear about us?</h3>'
-                        .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Please select below where you found out about Relaticle. This step is optional.</p>'
+                    ->content($this->stepHeading(
+                        __('filament/pages/teams.create_team.headings.attribution'),
+                        __('filament/pages/teams.create_team.headings.attribution_description'),
                     ))
                     ->dehydrated(false),
 
@@ -172,15 +188,16 @@ final class CreateTeam extends RegisterTenant
             ->schema([
                 Placeholder::make('use_case_heading')
                     ->hiddenLabel()
-                    ->content(new HtmlString(
-                        '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">Help us customize your workspace</h3>'
-                        .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Relaticle is all about empowering you to build the exact CRM you need, no matter how complex.</p>'
-                        .'<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Tell us about your use case to get started with templates, or start with a blank canvas.</p>'
+                    ->content($this->stepHeading(
+                        __('filament/pages/teams.create_team.headings.use_case'),
+                        __('filament/pages/teams.create_team.headings.use_case_description'),
+                        __('filament/pages/teams.create_team.headings.use_case_hint'),
                     ))
                     ->dehydrated(false),
 
                 ToggleButtons::make('onboarding_use_case')
                     ->label(__('filament/pages/teams.create_team.form.use_case_label'))
+                    ->validationAttribute(__('filament/pages/teams.create_team.form.use_case_validation_attribute'))
                     ->required()
                     ->options(
                         collect(OnboardingUseCase::cases())
@@ -201,6 +218,7 @@ final class CreateTeam extends RegisterTenant
 
                 ToggleButtons::make('onboarding_context')
                     ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
+                    ->validationAttribute(__('filament/pages/teams.create_team.form.use_case_context_validation_attribute'))
                     ->required()
                     ->options(function (Get $get): array {
                         $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
@@ -227,16 +245,18 @@ final class CreateTeam extends RegisterTenant
             ->schema([
                 Placeholder::make('invite_heading')
                     ->hiddenLabel()
-                    ->content(new HtmlString(
-                        '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">Collaborate with your team</h3>'
-                        .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">The more your teammates use Relaticle, the more powerful it becomes.</p>'
+                    ->content($this->stepHeading(
+                        __('filament/pages/teams.create_team.headings.invite'),
+                        __('filament/pages/teams.create_team.headings.invite_description'),
                     ))
                     ->dehydrated(false),
 
                 Placeholder::make('invite_subheading')
                     ->hiddenLabel()
                     ->content(new HtmlString(
-                        '<p class="text-sm font-medium text-gray-700 dark:text-gray-300">Invite your team to collaborate</p>'
+                        '<p class="text-sm font-medium text-gray-700 dark:text-gray-300">'
+                        .e(__('filament/pages/teams.create_team.headings.invite_subheading'))
+                        .'</p>'
                     ))
                     ->dehydrated(false),
 
@@ -312,6 +332,35 @@ final class CreateTeam extends RegisterTenant
     }
 
     /**
+     * Mirrors the fallback in Team::getSlugOptions(). Names that transliterate to
+     * nothing — CJK, Hebrew, Thai, emoji — otherwise leave the handle blank, and the
+     * user is blocked by a bare "required" error on a field they never touched.
+     */
+    private function generateHandleFrom(?string $name): string
+    {
+        if (blank($name)) {
+            return '';
+        }
+
+        $slug = Str::slug($name);
+
+        return $slug === '' ? Str::lower(Str::random(8)) : $slug;
+    }
+
+    private function stepHeading(string $title, string ...$paragraphs): HtmlString
+    {
+        $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
+
+        foreach ($paragraphs as $index => $paragraph) {
+            $spacing = $index === 0 ? 'mt-1' : 'mt-2';
+
+            $html .= '<p class="'.$spacing.' text-sm text-gray-500 dark:text-gray-400">'.e($paragraph).'</p>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    /**
      * @return array<Component>
      */
     private function getWorkspaceFormComponents(): array
@@ -327,10 +376,12 @@ final class CreateTeam extends RegisterTenant
                 ->autofocus()
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
-                    if ($get('slug_auto_generated') === true || blank($get('slug'))) {
-                        $set('slug', Str::slug($state ?? ''));
-                        $set('slug_auto_generated', true);
+                    if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
+                        return;
                     }
+
+                    $set('slug', $this->generateHandleFrom($state));
+                    $set('slug_auto_generated', true);
                 }),
 
             TextInput::make('slug')
@@ -354,6 +405,18 @@ final class CreateTeam extends RegisterTenant
                 ->default(true)
                 ->dehydrated(false),
         ];
+    }
+
+    /**
+     * "Skip for now" on the invite step must not send the invites the user just
+     * decided to skip. Both footer buttons used to call register() directly, so a
+     * filled-in address went out regardless of which one was clicked.
+     */
+    public function skipInvites(): void
+    {
+        $this->data['invites'] = [];
+
+        $this->register();
     }
 
     protected function afterRegister(): void
@@ -417,29 +480,43 @@ final class CreateTeam extends RegisterTenant
         /** @var array<int, array{email: string|null, role: string|null}> $rawInvites */
         $rawInvites = $data['invites'] ?? [];
 
-        $invites = array_filter(
-            $rawInvites,
-            fn (array $invite): bool => filled($invite['email'] ?? null)
-                && filter_var($invite['email'], FILTER_VALIDATE_EMAIL) !== false,
-        );
-
         /** @var list<array{email: string, reason: string}> $failed */
         $failed = [];
 
-        foreach ($invites as $invite) {
+        foreach ($rawInvites as $invite) {
+            $email = $invite['email'] ?? null;
+
+            if (blank($email)) {
+                continue;
+            }
+
+            // The field's `email` rule is looser than filter_var (it accepts
+            // `user@example`), so an address can clear the form and still be
+            // unusable here. Report it rather than dropping it silently.
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                $failed[] = [
+                    'email' => $email,
+                    'reason' => __('filament/pages/teams.create_team.notifications.some_invites_failed.invalid_email'),
+                ];
+
+                continue;
+            }
+
             try {
                 resolve(InviteTeamMember::class)->invite(
                     $user,
                     $team,
-                    $invite['email'],
+                    $email,
                     $invite['role'] ?? TeamRole::Editor->value,
                 );
             } catch (ValidationException $exception) {
                 $firstError = collect($exception->errors())->flatten()->first();
 
                 $failed[] = [
-                    'email' => (string) $invite['email'],
-                    'reason' => is_string($firstError) ? $firstError : 'Validation failed',
+                    'email' => $email,
+                    'reason' => is_string($firstError)
+                        ? $firstError
+                        : __('filament/pages/teams.create_team.notifications.some_invites_failed.generic'),
                 ];
             }
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\AddTeamMember;
 use App\Actions\Jetstream\CreateTeam;
 use App\Enums\TeamRole;
+use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ test('POST on a valid token attaches the user and redirects', function (): void 
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
         ->and($joiner->fresh()->current_team_id)->toBe($team->id);
@@ -95,7 +96,7 @@ test('a join request racing an identical concurrent request does not duplicate t
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect(DB::table('team_user')->where('team_id', $team->id)->where('user_id', $joiner->id)->count())->toBe(1)
         ->and($joiner->fresh()->current_team_id)->toBe($team->id);

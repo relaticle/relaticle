@@ -5,6 +5,17 @@
     $nextAction = $getAction('next');
     $steps = $getChildSchema()->getComponents();
     $isHeaderHidden = $isHeaderHidden();
+
+    // Filament prefixes a step's key with its schema path at runtime
+    // ("onboarding-use-case" becomes "form.onboarding-use-case"), so the key must be
+    // read back off the live step rather than written as a literal here.
+    $requiredStepKey = collect($steps)
+        ->map(static fn (\Filament\Schemas\Components\Wizard\Step $step): ?string => $step->getKey())
+        ->first(static fn (?string $stepKey): bool => $stepKey !== null && str_ends_with($stepKey, 'onboarding-use-case'));
+
+    $stepCount = collect($steps)
+        ->filter(static fn (\Filament\Schemas\Components\Wizard\Step $step): bool => $step->isVisible())
+        ->count();
 @endphp
 {{-- Custom wizard view for onboarding. Removes the previous/cancel action
      divs from the footer that Filament's default view hardcodes.
@@ -152,6 +163,32 @@
         </ol>
     @endif
 
+    {{-- Stands in for the step header this wizard hides, so the user can still tell
+         how much of onboarding is left. --}}
+    @if ($isHeaderHidden && $stepCount > 1)
+        <div x-cloak class="mb-6">
+            <p
+                class="text-xs font-medium text-gray-500 dark:text-gray-400"
+                x-text="@js(__('filament/pages/teams.create_team.step_indicator'))
+                    .replace(':current', getStepIndex(step) + 1)
+                    .replace(':total', @js($stepCount))"
+            ></p>
+
+            <div
+                class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10"
+                role="progressbar"
+                x-bind:aria-valuenow="getStepIndex(step) + 1"
+                aria-valuemin="1"
+                aria-valuemax="{{ $stepCount }}"
+            >
+                <div
+                    class="h-full rounded-full bg-primary-600 transition-all duration-300 dark:bg-primary-500"
+                    x-bind:style="`width: ${((getStepIndex(step) + 1) / @js($stepCount)) * 100}%`"
+                ></div>
+            </div>
+        </div>
+    @endif
+
     @foreach ($steps as $step)
         {{ $step }}
     @endforeach
@@ -171,12 +208,22 @@
             {{ $getSubmitAction() }}
         </div>
 
-        <div x-show="! isFirstStep() && step !== 'onboarding-use-case'" x-cloak class="mt-3 text-center">
+        <div x-cloak class="mt-3 flex items-center justify-center gap-x-6">
             <button
+                x-show="! isFirstStep()"
                 type="button"
-                x-on:click="isLastStep() ? $wire.register() : goToNextStep()"
+                x-on:click="goToPreviousStep()"
                 class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                x-text="isLastStep() ? 'Skip for now' : 'Skip'"
+            >
+                {{ __('filament/pages/teams.create_team.actions.back') }}
+            </button>
+
+            <button
+                x-show="! isFirstStep() && step !== @js($requiredStepKey)"
+                type="button"
+                x-on:click="isLastStep() ? $wire.skipInvites() : goToNextStep()"
+                class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                x-text="isLastStep() ? @js(__('filament/pages/teams.create_team.actions.skip_for_now')) : @js(__('filament/pages/teams.create_team.actions.skip'))"
             ></button>
         </div>
     </div>

@@ -21,6 +21,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
@@ -43,6 +44,27 @@ it('renders the create team page with wizard for teamless users', function (): v
     livewire(CreateTeam::class)
         ->assertSuccessful()
         ->assertSee('Create your workspace');
+});
+
+it('resolves every wizard heading from translations', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    // Every step's placeholders are in the DOM at once, so one render covers all four.
+    // A mistyped key would surface here as the raw dotted key instead of the copy.
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.headings.workspace'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.attribution'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.attribution_description'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.use_case'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.use_case_description'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.use_case_hint'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.invite'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.invite_description'))
+        ->assertSee(__('filament/pages/teams.create_team.headings.invite_subheading'))
+        ->assertDontSee('filament/pages/teams.create_team.headings');
 });
 
 it('renders wizard for users who already have a team', function (): void {
@@ -790,4 +812,180 @@ it('allows empty onboarding context for use cases without sub-options', function
 
     expect($team->slug)->toBe('other-use-case')
         ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Other);
+});
+
+it('generates a fallback handle for names that transliterate to nothing', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $state = livewire(CreateTeam::class)
+        ->fillForm(['name' => '株式会社テスト'])
+        ->get('data');
+
+    expect($state['slug'] ?? null)->toBeString()
+        ->not->toBe('')
+        ->toMatch(Team::SLUG_REGEX);
+});
+
+it('warns about invites the form accepted but that are not deliverable', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Invite Reporting',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'invites' => [
+                ['email' => 'user@example', 'role' => 'editor'],
+                ['email' => 'real.person@gmail.com', 'role' => 'editor'],
+            ],
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertNotified(__('filament/pages/teams.create_team.notifications.some_invites_failed.title'));
+
+    $team = Team::query()->where('name', 'Invite Reporting')->firstOrFail();
+
+    expect($team->teamInvitations()->pluck('email')->all())->toBe(['real.person@gmail.com']);
+});
+
+it('assigns seeded demo tasks to the workspace owner so the dashboard is not empty', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['product_led'],
+            'name' => 'Assigned Tasks Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $tasks = Task::where('team_id', $team->id)->get();
+
+    expect($tasks)->not->toBeEmpty();
+
+    $tasks->each(function (Task $task) use ($user): void {
+        expect($task->assignees()->whereKey($user->getKey())->exists())->toBeTrue();
+    });
+});
+
+it('does not send invites when the user skips the invite step', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Skipped Invites',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'invites' => [
+                ['email' => 'not.invited@gmail.com', 'role' => 'editor'],
+            ],
+        ])
+        ->call('skipInvites')
+        ->assertHasNoFormErrors();
+
+    $team = Team::query()->where('name', 'Skipped Invites')->firstOrFail();
+
+    expect($team->teamInvitations()->count())->toBe(0);
+});
+
+it('still sends invites when the user confirms them', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Confirmed Invites',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'invites' => [
+                ['email' => 'really.invited@gmail.com', 'role' => 'editor'],
+            ],
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = Team::query()->where('name', 'Confirmed Invites')->firstOrFail();
+
+    expect($team->teamInvitations()->pluck('email')->all())->toBe(['really.invited@gmail.com']);
+});
+
+it('shows a step indicator and a back affordance in the wizard', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.actions.back'))
+        ->assertSee('Step :current of :total');
+});
+
+it('relabels cancel once copying the invite link has created the workspace', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Pre Created',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ]);
+
+    expect($component->instance()->getCancelLabel())
+        ->toBe(__('filament/pages/teams.create_team.actions.cancel'));
+
+    $component->callAction(TestAction::make('copyInviteLink')->schemaComponent());
+
+    $team = Team::query()->where('name', 'Pre Created')->firstOrFail();
+
+    expect($component->instance()->getCancelLabel())
+        ->toBe(__('filament/pages/teams.create_team.actions.go_to_workspace'))
+        ->and($component->instance()->getCancelUrl())
+        ->toBe(Dashboard::getUrl(['tenant' => $team]));
+});
+
+it('reconciles name and slug edited after the invite link pre-created the workspace', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'First Name',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ]);
+
+    $component->callAction(TestAction::make('copyInviteLink')->schemaComponent());
+
+    $team = Team::query()->where('name', 'First Name')->firstOrFail();
+
+    // The Back button makes this reachable: the user returns to step 1 and renames the
+    // workspace after it has already been created.
+    $component
+        ->fillForm([
+            'name' => 'Renamed Later',
+            'slug' => 'renamed-later',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($team->fresh())
+        ->name->toBe('Renamed Later')
+        ->slug->toBe('renamed-later')
+        ->and(Team::query()->count())->toBe(1);
 });
