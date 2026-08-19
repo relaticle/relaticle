@@ -32,7 +32,7 @@ function hasContent(doc) {
     return true;
 }
 
-export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, autofocus } = {}) {
+export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, onArrowUp, autofocus } = {}) {
     return {
         editorEl: null,
         // Reactive mirror of the editor's plain text. Alpine bindings depending
@@ -108,6 +108,15 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
                             }
                             event.preventDefault();
                             onSubmit?.();
+                            return true;
+                        }
+                        // ArrowUp-to-edit: only when the doc is empty (a single empty
+                        // paragraph has nothing meaningful for the browser's default
+                        // ArrowUp to do anyway, so intercepting unconditionally here
+                        // is safe (a non-empty composer keeps normal cursor movement).
+                        if (event.key === 'ArrowUp' && editor.isEmpty) {
+                            event.preventDefault();
+                            onArrowUp?.();
                             return true;
                         }
                         return false;
