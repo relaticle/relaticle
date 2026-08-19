@@ -158,8 +158,11 @@ final readonly class AvatarService
         $normalizedName = Str::ascii($name);
         $nameParts = array_values(array_filter(preg_split('/[\s\-_\.]+/', $normalizedName) ?: []));
 
+        // Str::ascii() empties names written entirely in a non-transliterable script
+        // (CJK, Hebrew, Thai), which used to leave every such workspace showing "?".
+        // Fall back to the name's own leading characters, read multibyte-safely.
         if ($nameParts === []) {
-            return '?';
+            return $this->initialsFromRawName($name, $count);
         }
 
         // For single initial mode, just return the first letter of the first name part
@@ -214,6 +217,25 @@ final readonly class AvatarService
 
         // Standard case: first and last parts
         return Str::upper(substr($nameParts[0], 0, 1).substr($lastPart, 0, 1));
+    }
+
+    /**
+     * Initials for names the ASCII transliterator cannot represent at all.
+     */
+    private function initialsFromRawName(string $name, int $count): string
+    {
+        /** @var list<string> $parts */
+        $parts = array_values(array_filter(preg_split('/[\s\-_\.]+/u', $name) ?: []));
+
+        if ($parts === []) {
+            return '?';
+        }
+
+        if ($count === 1 || count($parts) === 1) {
+            return mb_substr($parts[0], 0, $count);
+        }
+
+        return mb_substr($parts[0], 0, 1).mb_substr(end($parts), 0, 1);
     }
 
     /**

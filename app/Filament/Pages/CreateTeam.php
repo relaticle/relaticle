@@ -43,6 +43,12 @@ use Override;
 
 final class CreateTeam extends RegisterTenant
 {
+    /**
+     * Marks a wizard run whose workspace already exists because the user copied the
+     * invite link. Scoped to that run: mount() clears it whenever the wizard restarts.
+     */
+    private const string COMPLETING_SESSION_KEY = 'onboarding.completing_workspace';
+
     protected string $view = 'filament.pages.create-team';
 
     protected array $extraBodyAttributes = [
@@ -52,6 +58,46 @@ final class CreateTeam extends RegisterTenant
     public function getMaxContentWidth(): Width
     {
         return Width::FiveExtraLarge;
+    }
+
+    #[Override]
+    public function mount(): void
+    {
+        // A pre-created workspace belongs to the wizard run that made it, so a fresh
+        // visit always starts from the real cap.
+        session()->forget(self::COMPLETING_SESSION_KEY);
+
+        // Filament answers an over-cap visit with a bare 404, which reads as a broken
+        // link rather than a limit the user can act on.
+        if (! self::canView()) {
+            Notification::make()
+                ->title(__('filament/pages/teams.create_team.notifications.workspace_limit_reached.title'))
+                ->body(__('filament/pages/teams.create_team.notifications.workspace_limit_reached.body'))
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getCancelUrl() ?? Filament::getUrl());
+
+            return;
+        }
+
+        parent::mount();
+    }
+
+    /**
+     * Filament re-checks this on every hydrate() and again inside register(). Once
+     * "Copy invite link" has created the workspace, the user sits at the cap *because
+     * of this wizard*, so without this exemption the page 404s on its own next request
+     * and Livewire has nowhere to surface it: the form simply stops responding.
+     */
+    #[Override]
+    public static function canView(): bool
+    {
+        if (session()->has(self::COMPLETING_SESSION_KEY)) {
+            return true;
+        }
+
+        return parent::canView();
     }
 
     #[Override]
@@ -129,7 +175,9 @@ final class CreateTeam extends RegisterTenant
                     )
                     ->submitAction(
                         Action::make('register')
-                            ->label(__('filament/pages/teams.create_team.actions.send_invites'))
+                            ->label(fn (): string => $this->hasPendingInvites()
+                                ? __('filament/pages/teams.create_team.actions.send_invites')
+                                : __('filament/pages/teams.create_team.actions.get_started'))
                             ->size(Size::Large)
                             ->submit('register')
                             ->extraAttributes(['class' => 'w-full'])
@@ -270,7 +318,10 @@ final class CreateTeam extends RegisterTenant
                     ->schema([
                         TextInput::make('email')
                             ->email()
-                            ->placeholder(__('filament/pages/teams.create_team.form.invite_email_placeholder')),
+                            ->placeholder(__('filament/pages/teams.create_team.form.invite_email_placeholder'))
+                            // Drives the submit label below: "Send invites" only once
+                            // there is actually something to send.
+                            ->live(onBlur: true),
 
                         Select::make('role')
                             ->options([
@@ -284,6 +335,9 @@ final class CreateTeam extends RegisterTenant
                     ->maxItems(5)
                     ->reorderable(false)
                     ->compact()
+                    // Removing an empty row is not a destructive act; full danger red
+                    // gave two blank rows more visual weight than the primary CTA.
+                    ->deleteAction(fn (Action $action): Action => $action->color('gray'))
                     ->addActionLabel(__('filament/pages/teams.create_team.actions.add_more')),
 
                 Actions::make([
@@ -310,6 +364,10 @@ final class CreateTeam extends RegisterTenant
                                 $user = auth('web')->user();
 
                                 $this->tenant = resolve(CreateTeamAction::class)->create($user, $data);
+
+                                // The workspace now counts against the user's cap. Keep
+                                // the wizard usable so they can finish the run.
+                                session()->put(self::COMPLETING_SESSION_KEY, $this->tenant->getKey());
                             }
 
                             /** @var Team $team */
@@ -408,6 +466,21 @@ final class CreateTeam extends RegisterTenant
     }
 
     /**
+     * Whether the invite step currently holds an address worth sending, which decides
+     * between the "Send invites" and "Get started" submit labels.
+     */
+    public function hasPendingInvites(): bool
+    {
+        $invites = $this->data['invites'] ?? [];
+
+        if (! is_array($invites)) {
+            return false;
+        }
+
+        return array_any($invites, fn (mixed $invite): bool => is_array($invite) && filled($invite['email'] ?? null));
+    }
+
+    /**
      * "Skip for now" on the invite step must not send the invites the user just
      * decided to skip. Both footer buttons used to call register() directly, so a
      * filled-in address went out regardless of which one was clicked.
@@ -421,6 +494,8 @@ final class CreateTeam extends RegisterTenant
 
     protected function afterRegister(): void
     {
+        session()->forget(self::COMPLETING_SESSION_KEY);
+
         /** @var Team $tenant */
         $tenant = $this->tenant;
 

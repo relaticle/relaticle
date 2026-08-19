@@ -50,7 +50,7 @@ return [
             'use_case_context_label' => 'Please tell us more about your use case.',
             'use_case_validation_attribute' => 'use case',
             'use_case_context_validation_attribute' => 'use case details',
-            'invite_email_placeholder' => 'colleague@company.com',
+            'invite_email_placeholder' => 'name@company.com',
             'invite_role_member' => 'Member',
             'invite_role_admin' => 'Admin',
             'invite_table_column_email' => 'Email',
@@ -69,6 +69,11 @@ return [
                 'title' => 'Complete the previous steps first',
                 'body' => 'Fill in your workspace details and use case before generating an invite link.',
             ],
+            'workspace_limit_reached' => [
+                'title' => 'Workspace limit reached',
+                'body' => 'You already own the maximum number of workspaces. Delete one, or ask to be invited to an existing workspace.',
+            ],
+
             'some_invites_failed' => [
                 'title' => 'Some invites could not be sent',
                 'invalid_email' => 'This is not a valid email address.',

@@ -989,3 +989,82 @@ it('reconciles name and slug edited after the invite link pre-created the worksp
         ->slug->toBe('renamed-later')
         ->and(Team::query()->count())->toBe(1);
 });
+
+it('labels the submit button for what it will actually do', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Label Check', 'onboarding_use_case' => OnboardingUseCase::Other->value]);
+
+    expect($component->instance()->hasPendingInvites())->toBeFalse();
+
+    $component->assertSee(__('filament/pages/teams.create_team.actions.get_started'));
+
+    $component->fillForm([
+        'invites' => [['email' => 'someone@gmail.com', 'role' => 'editor']],
+    ]);
+
+    expect($component->instance()->hasPendingInvites())->toBeTrue();
+
+    $component->assertSee(__('filament/pages/teams.create_team.actions.send_invites'));
+});
+
+it('explains the workspace limit instead of returning a bare 404', function (): void {
+    $user = User::factory()->create();
+
+    Team::factory()->count(3)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    expect($user->refresh()->ownedTeams()->count())->toBe(3);
+
+    $this->get(route('filament.app.tenant.registration'))
+        ->assertRedirect()
+        ->assertSessionHas('filament.notifications');
+});
+
+it('lets a user finish a wizard run whose workspace pushed them to the limit', function (): void {
+    $user = User::factory()->create();
+
+    // Two existing workspaces: creating this one takes them to the cap of three.
+    Team::factory()->count(2)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Third Workspace',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ]);
+
+    // Pre-creates the team, which takes the user to the cap.
+    $component->callAction(TestAction::make('copyInviteLink')->schemaComponent());
+
+    expect($user->refresh()->ownedTeams()->count())->toBe(3);
+
+    // Without the in-flight exemption Filament would 404 this request, and Livewire
+    // would swallow it: the form would simply stop responding.
+    $component
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Team::query()->where('name', 'Third Workspace')->count())->toBe(1)
+        ->and($user->refresh()->ownedTeams()->count())->toBe(3);
+});
+
+it('still refuses a brand new wizard once the user is at the limit', function (): void {
+    $user = User::factory()->create();
+
+    Team::factory()->count(3)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    // A stale in-flight marker must not survive into a fresh visit.
+    session()->put('onboarding.completing_workspace', 'stale');
+
+    $this->get(route('filament.app.tenant.registration'))->assertRedirect();
+
+    expect($user->refresh()->ownedTeams()->count())->toBe(3);
+});

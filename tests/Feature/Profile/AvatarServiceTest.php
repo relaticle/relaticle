@@ -92,3 +92,16 @@ it('validates colors properly', function () {
     expect($this->avatarService->validateColor('invalid'))->toBeFalse();
     expect($this->avatarService->validateColor(null))->toBeFalse();
 });
+
+it('falls back to the raw name for scripts ascii cannot transliterate', function () {
+    // Str::ascii() empties these entirely, which used to render every such workspace
+    // avatar as "?".
+    expect(extractInitialsFromSvg($this->avatarService->generate('株式会社テスト')))->toBe('株式');
+    expect(extractInitialsFromSvg($this->avatarService->generate('北京科技')))->toBe('北京');
+    expect(extractInitialsFromSvg($this->avatarService->generate('테스트 주식회사')))->toBe('테주');
+    expect(extractInitialsFromSvg($this->avatarService->generate('חברת בדיקה')))->toBe('חב');
+});
+
+it('still returns a placeholder when a name carries no usable characters', function () {
+    expect(extractInitialsFromSvg($this->avatarService->generate('...')))->toBe('?');
+});
