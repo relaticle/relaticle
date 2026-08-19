@@ -67,6 +67,13 @@
         ></span>
     </div>
 
+    {{-- Top sentinel: intersecting drives loadEarlier() automatically (see
+         initLoadEarlierObserver() in transcript.js). Kept outside the
+         max-w-3xl/space-y-6 list below so it is a single persistent node,
+         never recreated by the x-for over messages, and never disturbs that
+         list's own spacing. --}}
+    <div x-ref="topSentinel" aria-hidden="true" class="h-px"></div>
+
     <div class="mx-auto max-w-3xl space-y-6">
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">

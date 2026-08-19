@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Livewire\Chat;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -90,6 +91,21 @@ final class ChatInterface extends BaseLivewireComponent
         );
     }
 
+    /**
+     * Renderless: the client already applies the delta from the dispatched
+     * chat:messages-prepended event (prepending `messages`, restoring scroll
+     * by anchoring to the pre-prepend scrollHeight). A normal render here
+     * would re-serialize the now-larger $this->messages back into the root
+     * element's `x-data="chatInterface(..., @js($messages), ...)"` attribute
+     * and morph it in, which (confirmed empirically) does not merely patch
+     * that attribute string but tears down and remounts the whole Alpine
+     * component (destroy() then a fresh init()), discarding the very
+     * prependScrollAnchor/loadingEarlier state this method's own client-side
+     * counterpart depends on, and unconditionally re-running init()'s own
+     * scrollToBottom(true), silently overwriting the scroll-restore with a
+     * jump to the bottom on every call.
+     */
+    #[Renderless]
     public function loadEarlierMessages(): void
     {
         if ($this->conversationId === null || $this->oldestMessageId === null) {

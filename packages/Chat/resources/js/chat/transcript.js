@@ -96,6 +96,12 @@ function snapshotMessages(messages) {
 
 export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday' }) => ({
     prependScrollAnchor: null,
+    // Guards loadEarlier() against re-entry: the top-sentinel observer
+    // (see initLoadEarlierObserver) re-checks on every qualifying layout
+    // change, so without this a single scroll-to-top would fire the Livewire
+    // call repeatedly before the first request even lands.
+    loadingEarlier: false,
+    _loadEarlierObserver: null,
     now: Date.now(),
     copyTickerId: null,
 
@@ -249,6 +255,47 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         }
     },
 
+    // Auto-loads earlier history when the top sentinel (see topSentinel ref in
+    // _transcript.blade.php, a single node placed above the message list,
+    // OUTSIDE the x-for loop) scrolls into view. Unlike the day-separator
+    // observer above, this is created exactly once and never needs
+    // re-observing on a message.length change: the sentinel is a persistent
+    // DOM node rather than one recreated per message, so array replacement
+    // (conversation switch, regenerate/edit splices) never detaches it and
+    // never leaves this observer watching a stale element.
+    initLoadEarlierObserver() {
+        const container = this.$refs.messages;
+        const sentinel = this.$refs.topSentinel;
+        if (!container || !sentinel || typeof IntersectionObserver === 'undefined') return;
+
+        // init() (and so this, deferred off it) can run more than once for
+        // the same live component (confirmed empirically), and already
+        // guarded the same way by refreshDaySeparatorObserver() above.
+        // Without disconnecting a prior instance first, each extra call
+        // leaves its OWN IntersectionObserver alive watching the same
+        // sentinel, and since they fire independently (not synchronously
+        // back to back), more than one can slip past the loadingEarlier
+        // guard and each pull a real page, duplicating messages.
+        if (this._loadEarlierObserver) {
+            this._loadEarlierObserver.disconnect();
+            this._loadEarlierObserver = null;
+        }
+
+        this._loadEarlierObserver = new IntersectionObserver((entries) => {
+            const visible = entries.some((entry) => entry.isIntersecting);
+            if (visible) this.loadEarlier();
+        }, { root: container });
+
+        this._loadEarlierObserver.observe(sentinel);
+    },
+
+    teardownLoadEarlierObserver() {
+        if (this._loadEarlierObserver) {
+            this._loadEarlierObserver.disconnect();
+            this._loadEarlierObserver = null;
+        }
+    },
+
     // Stashes the CURRENT conversation's transcript so a later switch back to
     // it can paint instantly. Called from destroy() (every teardown path:
     // wire:navigate, the side panel's keyed remount) and also from the start
@@ -292,6 +339,20 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
 
         this.messages = snapshotMessages(cached) ?? cached;
         this.conversationId = targetConversationId;
+
+        // The cache stores messages only (see cacheConversationMessages()),
+        // not whether more history exists, so this cannot know the real
+        // answer for targetConversationId. Left stale (true, inherited from
+        // whichever conversation was open before), the top-sentinel observer
+        // could fire loadEarlierMessages() during this transitional window,
+        // before the real wire:navigate swap replaces this instance: that
+        // call would run against the Livewire component's STILL-OLD
+        // server-side conversationId and land its response in the array now
+        // painted for a different conversation. False is always safe here:
+        // the destroy()-then-remount that always follows repaints with the
+        // real value moments later.
+        this.hasMoreMessages = false;
+
         this.scrollToBottom(true);
 
         this.$nextTick(() => {
@@ -421,10 +482,25 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         return this.escapeHtml(str);
     },
 
+    // Shared by the manual "Load earlier messages" button and the top-sentinel
+    // observer. loadingEarlier is cleared in two places, deliberately NOT
+    // symmetrically: chat-interface.blade.php's chat:messages-prepended
+    // handler clears it only AFTER the scroll-restore has moved the sentinel
+    // out of view (confirmed empirically: clearing it any earlier, e.g. as
+    // soon as the $wire promise settles, races that restore: the sentinel
+    // is still geometrically visible for one more frame, the observer sees
+    // that and fires a second real request before the first one's restore
+    // has run). .catch() here only covers the request actually failing.
     loadEarlier() {
+        if (this.loadingEarlier || !this.hasMoreMessages) return;
+        this.loadingEarlier = true;
+
         const el = this.$refs.messages;
         this.prependScrollAnchor = el ? el.scrollHeight : 0;
-        this.$wire.loadEarlierMessages();
+
+        this.$wire.loadEarlierMessages().catch(() => {
+            this.loadingEarlier = false;
+        });
     },
 
     visiblePendingActions() {
