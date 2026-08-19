@@ -303,3 +303,12 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
         ->assertSee('/ '.number_format(Plan::Pro->credits()))
         ->assertDontSee('/ '.number_format(2050));
 });
+
+it('names the workspace in the upgrade confirmation step', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['name' => 'Acme Manufacturing'])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.upgrade.confirm_title'))
+        ->assertSee(__('billing.upgrade.confirm_button', ['workspace' => 'Acme Manufacturing']));
+});

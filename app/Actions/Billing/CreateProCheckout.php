@@ -48,6 +48,7 @@ final readonly class CreateProCheckout
         $options = [
             'success_url' => "{$billingUrl}?checkout=success",
             'cancel_url' => $billingUrl,
+            'client_reference_id' => (string) $team->getKey(),
         ];
 
         if (config('services.stripe.managed_payments')) {
