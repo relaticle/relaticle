@@ -86,6 +86,28 @@ it('moves the stripe customer, the subscription and both plans to the target wor
         ->and($subscription->refresh()->team_id)->toBe($target->getKey());
 });
 
+it('moves every subscription on the source workspace, not just the one the action was called from', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    /** @var Subscription $secondSubscription */
+    $secondSubscription = $source->subscriptions()->create([
+        'type' => 'secondary',
+        'stripe_id' => 'sub_transfer_2',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    livewire(ListSubscriptions::class)
+        ->callAction(TestAction::make('transfer')->table($subscription), [
+            'target_team_id' => $target->getKey(),
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($subscription->refresh()->team_id)->toBe($target->getKey())
+        ->and($secondSubscription->refresh()->team_id)->toBe($target->getKey());
+});
+
 it('keeps the source on its sysadmin-assigned plan when it differs from the transferred subscription plan', function (): void {
     [$source, $target, $subscription] = transferPair();
 
@@ -191,7 +213,7 @@ it('refuses to transfer when the subscription price maps to no plan', function (
         ->and($subscription->refresh()->team_id)->toBe($source->getKey());
 });
 
-it('leaves everything untouched when the target already has its own stripe customer', function (): void {
+it('rejects a target that already has its own stripe customer because the option list excludes it', function (): void {
     [$source, $target, $subscription] = transferPair();
 
     $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
@@ -199,14 +221,15 @@ it('leaves everything untouched when the target already has its own stripe custo
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
             'target_team_id' => $target->getKey(),
-        ]);
+        ])
+        ->assertHasActionErrors(['target_team_id']);
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBe('cus_target_own')
         ->and($subscription->refresh()->team_id)->toBe($source->getKey());
 });
 
-it('leaves everything untouched when the target belongs to a different owner', function (): void {
+it('rejects a target with a different owner because the option list excludes it', function (): void {
     [$source, , $subscription] = transferPair();
 
     /** @var Team $stranger */
@@ -215,7 +238,36 @@ it('leaves everything untouched when the target belongs to a different owner', f
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
             'target_team_id' => $stranger->getKey(),
-        ]);
+        ])
+        ->assertHasActionErrors(['target_team_id']);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($stranger->refresh()->stripe_id)->toBeNull()
+        ->and($stranger->plan)->toBe(Plan::Free)
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('throws when the target already has its own stripe customer, called directly', function (): void {
+    [$source, $target, $subscription] = transferPair();
+
+    $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
+
+    expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey()))
+        ->toThrow(TransferRefused::class);
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBe('cus_target_own')
+        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+});
+
+it('throws when the target belongs to a different owner, called directly', function (): void {
+    [$source, , $subscription] = transferPair();
+
+    /** @var Team $stranger */
+    $stranger = Team::factory()->create(['plan' => Plan::Free]);
+
+    expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $stranger, (string) $this->admin->getKey()))
+        ->toThrow(TransferRefused::class);
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($stranger->refresh()->stripe_id)->toBeNull()
