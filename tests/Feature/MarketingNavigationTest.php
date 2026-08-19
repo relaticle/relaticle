@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Support\MarketingNavigation;
+use Illuminate\Support\Facades\Cache;
 
 mutates(MarketingNavigation::class);
 
@@ -66,4 +67,24 @@ it('marks the current page in the navigation', function (): void {
 
     expect($header)->not->toBe('')
         ->and($header)->toContain('aria-current="page"');
+});
+
+it('renders product and resources dropdown groups with new page links', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect($html)->toContain('aria-expanded')
+        ->and($html)->toContain(route('ai'))
+        ->and($html)->toContain(route('selfHosted'))
+        ->and($html)->toContain(__('Compare'));
+});
+
+it('shows the cached github star count in the header', function (): void {
+    Cache::put('github_stars_Relaticle_relaticle', 1517, 60);
+
+    $html = $this->get('/')->assertOk()->getContent();
+
+    // The homepage hero already renders "1.5K+ stars" independently of the
+    // header badge, so a single occurrence would pass even without a header
+    // badge. Require a second occurrence to prove the header renders one too.
+    expect(substr_count($html, '1.5K'))->toBeGreaterThanOrEqual(2);
 });

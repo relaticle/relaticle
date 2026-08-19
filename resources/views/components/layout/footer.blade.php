@@ -14,7 +14,7 @@
 
                 <!-- Social links - Simplified -->
                 <div class="flex space-x-4">
-                    <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener noreferrer"
+                    <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener noreferrer"
                        class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
                        aria-label="GitHub">
                         <x-ri-github-fill class="h-5 w-5" />

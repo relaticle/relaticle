@@ -13,20 +13,79 @@
 
                 @php($navItems = app(\App\Support\MarketingNavigation::class)->header())
 
-                <nav aria-label="{{ __('Main') }}" class="hidden md:flex items-center gap-1">
+                <nav aria-label="{{ __('Main') }}" class="hidden md:flex items-center gap-1"
+                     x-data="{ openDropdown: null }"
+                     @keydown.escape.window="openDropdown = null"
+                     @click.outside="openDropdown = null">
                     @foreach($navItems as $item)
-                        <a href="{{ $item->url }}"
-                           @if($item->external) target="_blank" rel="noopener noreferrer" @endif
-                           @if(url()->current() === $item->url) aria-current="page" @endif
-                           class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors @if($item->external) flex items-center gap-1.5 @endif">
-                            @if($item->external)
-                                <x-ri-discord-fill class="w-4 h-4"/>
-                                <span>{{ $item->label }}</span>
-                                <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
-                            @else
-                                {{ $item->label }}
-                            @endif
-                        </a>
+                        @if($item->url === null && count($item->children) > 0)
+                            @php($slug = \Illuminate\Support\Str::slug($item->label))
+                            @php($isTwoColumn = collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0))
+                            <div class="relative" x-data="{ slug: '{{ $slug }}' }"
+                                 @keydown.escape="if (openDropdown === slug) { openDropdown = null; $refs.trigger.focus(); }">
+                                <button type="button" x-ref="trigger"
+                                        @click="openDropdown = openDropdown === slug ? null : slug"
+                                        :aria-expanded="openDropdown === slug"
+                                        aria-controls="menu-{{ $slug }}"
+                                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors flex items-center gap-1 cursor-pointer">
+                                    {{ $item->label }}
+                                    <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-150"
+                                                             ::class="openDropdown === slug && 'rotate-180'"/>
+                                </button>
+                                <div x-show="openDropdown === slug"
+                                     x-transition:enter="transition ease-out duration-150"
+                                     x-transition:enter-start="opacity-0"
+                                     x-transition:enter-end="opacity-100"
+                                     x-transition:leave="transition ease-in duration-150"
+                                     x-transition:leave-start="opacity-100"
+                                     x-transition:leave-end="opacity-0"
+                                     x-cloak
+                                     id="menu-{{ $slug }}"
+                                     class="absolute left-0 top-full mt-2 rounded-xl border border-gray-200/60 dark:border-white/[0.06] bg-white dark:bg-gray-950 shadow-lg p-2 @if($isTwoColumn) grid grid-cols-2 gap-6 min-w-[26rem] p-4 @else min-w-56 @endif">
+                                    @foreach($item->children as $child)
+                                        @if($child->url === null && count($child->children) > 0)
+                                            <div>
+                                                <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                                                    {{ $child->label }}
+                                                </p>
+                                                <div class="space-y-0.5">
+                                                    @foreach($child->children as $grandchild)
+                                                        <a href="{{ $grandchild->url }}"
+                                                           @if($grandchild->external) target="_blank" rel="noopener noreferrer" @endif
+                                                           @if(url()->current() === $grandchild->url) aria-current="page" @endif
+                                                           @click="openDropdown = null"
+                                                           class="block rounded-lg px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white transition-colors">
+                                                            {{ $grandchild->label }}
+                                                        </a>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @else
+                                            <a href="{{ $child->url }}"
+                                               @if($child->external) target="_blank" rel="noopener noreferrer" @endif
+                                               @if(url()->current() === $child->url) aria-current="page" @endif
+                                               @click="openDropdown = null"
+                                               class="block rounded-lg px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white transition-colors">
+                                                {{ $child->label }}
+                                            </a>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @else
+                            <a href="{{ $item->url }}"
+                               @if($item->external) target="_blank" rel="noopener noreferrer" @endif
+                               @if(url()->current() === $item->url) aria-current="page" @endif
+                               class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors @if($item->external) flex items-center gap-1.5 @endif">
+                                @if($item->external)
+                                    <x-ri-discord-fill class="w-4 h-4"/>
+                                    <span>{{ $item->label }}</span>
+                                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
+                                @else
+                                    {{ $item->label }}
+                                @endif
+                            </a>
+                        @endif
                     @endforeach
                 </nav>
 
@@ -39,6 +98,13 @@
                         <x-marketing.button size="sm" href="{{ route('register') }}">
                             Start for free
                         </x-marketing.button>
+
+                        @if(($githubStars ?? 0) > 0)
+                            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/[0.08] text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors min-w-[4.5rem] justify-center">
+                                <x-ri-github-fill class="w-4 h-4"/>{{ $formattedGithubStars }}
+                            </a>
+                        @endif
                     </div>
 
                     <button @click="mobileMenu = !mobileMenu"
