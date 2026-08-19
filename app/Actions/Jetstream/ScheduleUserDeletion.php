@@ -37,7 +37,9 @@ final readonly class ScheduleUserDeletion
 
         if ($teamsWithMembers->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'team' => ["Transfer ownership of these workspaces before deleting your account: {$teamsWithMembers->implode(', ')}"],
+                'team' => [__('teams.validation.remove_members_before_deleting', [
+                    'teams' => $teamsWithMembers->implode(', '),
+                ])],
             ]);
         }
     }
