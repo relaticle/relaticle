@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
-use App\Livewire\App\Teams\ManageMembers;
-use App\Models\Membership;
+use App\Livewire\App\Teams\TeamMembers;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -12,7 +11,7 @@ use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Livewire;
 
-mutates(User::class, ManageMembers::class);
+mutates(User::class, TeamMembers::class);
 
 test('team member roles can be updated', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
@@ -64,13 +63,8 @@ test('admin cannot promote another member to admin', function (): void {
     $this->actingAs($admin);
     Filament::setTenant($team);
 
-    $editorMembership = Membership::query()
-        ->where('team_id', $team->id)
-        ->where('user_id', $editor->id)
-        ->firstOrFail();
-
-    livewire(ManageMembers::class, ['team' => $team])
-        ->callAction(TestAction::make('updateTeamRole')->table('member:'.$editorMembership->id), data: [
+    livewire(TeamMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table($editor->id), data: [
             'role' => TeamRole::Admin->value,
         ])
         ->assertHasActionErrors(['role']);
@@ -91,13 +85,8 @@ test('admin cannot demote another admin', function (): void {
     $this->actingAs($adminA);
     Filament::setTenant($team);
 
-    $adminBMembership = Membership::query()
-        ->where('team_id', $team->id)
-        ->where('user_id', $adminB->id)
-        ->firstOrFail();
-
-    livewire(ManageMembers::class, ['team' => $team])
-        ->callAction(TestAction::make('updateTeamRole')->table('member:'.$adminBMembership->id), data: [
+    livewire(TeamMembers::class, ['team' => $team])
+        ->callAction(TestAction::make('updateTeamRole')->table($adminB->id), data: [
             'role' => TeamRole::Editor->value,
         ])
         ->assertHasActionErrors(['role']);
