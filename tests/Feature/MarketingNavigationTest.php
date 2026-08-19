@@ -6,6 +6,13 @@ use App\Support\MarketingNavigation;
 
 mutates(MarketingNavigation::class);
 
+function extractNavRegion(string $html, string $ariaLabel): string
+{
+    preg_match('/<nav[^>]*aria-label="'.preg_quote($ariaLabel, '/').'"[^>]*>.*?<\/nav>/s', $html, $matches);
+
+    return $matches[0] ?? '';
+}
+
 it('links every declared comparison and alternatives page from the footer', function (): void {
     $html = $this->get('/pricing')->assertOk()->getContent();
 
@@ -45,12 +52,18 @@ it('renders the same items in desktop and mobile navigation', function (): void 
 
 it('marks external header links with rel noopener', function (): void {
     $html = $this->get('/')->assertOk()->getContent();
+    $header = extractNavRegion($html, __('Main'));
 
-    expect($html)->toContain('rel="noopener noreferrer"');
+    preg_match('/<a[^>]*href="'.preg_quote(route('discord'), '/').'"[^>]*>/s', $header, $discordAnchor);
+
+    expect($header)->not->toBe('')
+        ->and($discordAnchor[0] ?? '')->toContain('rel="noopener noreferrer"');
 });
 
 it('marks the current page in the navigation', function (): void {
     $html = $this->get('/pricing')->assertOk()->getContent();
+    $header = extractNavRegion($html, __('Main'));
 
-    expect($html)->toContain('aria-current="page"');
+    expect($header)->not->toBe('')
+        ->and($header)->toContain('aria-current="page"');
 });
