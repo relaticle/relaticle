@@ -28,6 +28,7 @@ final class DeleteAccount extends BaseLivewireComponent
         return $schema
             ->schema([
                 Section::make(__('profile.sections.delete_account.title'))
+                    ->description(__('profile.sections.delete_account.description'))
                     ->aside()
                     ->schema([
                         TextEntry::make('deleteAccountNotice')

@@ -35,15 +35,19 @@ return [
     'sections' => [
         'update_profile_information' => [
             'title' => 'Profile Information',
+            'description' => 'Update your account\'s profile information and email address.',
         ],
         'update_password' => [
             'title' => 'Update Password',
+            'description' => 'Ensure your account is using a long, random password to stay secure.',
         ],
         'set_password' => [
             'title' => 'Set Password',
+            'description' => 'Add a password to your account so you can also sign in with your email and password.',
         ],
         'browser_sessions' => [
             'title' => 'Browser Sessions',
+            'description' => 'Manage and log out your active sessions on other browsers and devices.',
             'notice' => 'If necessary, you may log out of all of your other browser sessions across all of your devices. Some of your recent sessions are listed below; however, this list may not be exhaustive. If you feel your account has been compromised, you should also update your password.',
             'labels' => [
                 'current_device' => 'This device',
@@ -53,6 +57,7 @@ return [
         ],
         'delete_account' => [
             'title' => 'Delete Account',
+            'description' => 'Schedule your account for deletion.',
             'notice' => 'Deleting your account will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion by logging back in at any time before that. After the grace period, all your data will be permanently deleted.',
         ],
     ],

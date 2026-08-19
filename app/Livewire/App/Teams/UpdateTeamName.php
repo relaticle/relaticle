@@ -41,6 +41,7 @@ final class UpdateTeamName extends BaseLivewireComponent
             ->schema([
                 Section::make(__('teams.sections.update_team_name.title'))
                     ->aside()
+                    ->description(__('teams.sections.update_team_name.description'))
                     ->schema([
                         TextInput::make('name')
                             ->label(__('teams.form.team_name.label'))
