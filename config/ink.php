@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\AddVaryAcceptHeader;
 use App\Models\User;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
@@ -38,7 +39,7 @@ return [
         'feed' => 'blog.feed',
     ],
 
-    'middleware' => ['web', ProvideMarkdownResponse::class],
+    'middleware' => ['web', ProvideMarkdownResponse::class, AddVaryAcceptHeader::class],
 
     /*
      * ink's Mcp::web() route already carries ReorderJsonAccept and

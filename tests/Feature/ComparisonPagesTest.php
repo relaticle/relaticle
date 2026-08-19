@@ -27,6 +27,26 @@ it('serves comparison pages as clean markdown without nav chrome', function (): 
         ->and($markdown)->not->toContain('Skip to');
 });
 
+it('renders question-shaped headings and primary source links on comparison pages', function (): void {
+    $html = $this->get('/compare/relaticle-vs-twenty')->assertOk()->getContent();
+
+    expect($html)->toContain('How do Relaticle and Twenty pricing compare?')
+        ->and($html)->toContain('Which one runs AI and MCP self-hosted?')
+        ->and($html)->toContain('Twenty CRM')
+        ->and($html)->toContain(__('Primary sources:'))
+        ->and($html)->toContain('https://twenty.com/pricing')
+        ->and($html)->toContain('https://github.com/twentyhq/twenty');
+});
+
+it('marks comparison pages with dateModified and about entities in the JSON-LD graph', function (): void {
+    $html = $this->get('/compare/relaticle-vs-espocrm')->assertOk()->getContent();
+
+    expect($html)->toContain('"dateModified"')
+        ->and($html)->toContain('"about"')
+        ->and($html)->toContain('"SoftwareApplication"')
+        ->and($html)->toContain('https://github.com/espocrm/espocrm');
+});
+
 it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {
     $html = $this->get('/alternatives/attio')->assertOk()->getContent();
 

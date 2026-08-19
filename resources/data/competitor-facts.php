@@ -17,6 +17,10 @@ declare(strict_types=1);
  * `contributors` is the total contributor count from the GitHub API
  * (`contributors_url`, unauthenticated commits only, no `anon=true`).
  *
+ * `source_urls` carries the primary sources behind the claims: `website` and
+ * `pricing` always, `repository` only where a public repository exists. The
+ * comparison pages render them so every fact is one click from its origin.
+ *
  * @return array<string, array{
  *     name: string,
  *     license: string,
@@ -30,6 +34,7 @@ declare(strict_types=1);
  *     self_host: string,
  *     ai: string,
  *     extensibility: string,
+ *     source_urls: array{website: string, pricing: string, repository?: string},
  *     verified: string,
  * }>
  */
@@ -47,6 +52,11 @@ return [
         'self_host' => 'Self-host free under AGPL-3.0, no feature gating',
         'ai' => '32 first-party MCP tools plus a built-in AI chat assistant; MCP, chat, and Ollama all work self-hosted',
         'extensibility' => 'REST API plus a 32-tool MCP server; the entire codebase is AGPL-3.0, so any part can be forked and extended directly',
+        'source_urls' => [
+            'website' => 'https://relaticle.com',
+            'pricing' => 'https://relaticle.com/pricing',
+            'repository' => 'https://github.com/relaticle/relaticle',
+        ],
         'verified' => '2026-08-13',
     ],
     'twenty' => [
@@ -62,6 +72,11 @@ return [
         'self_host' => 'Self-hostable core; enterprise-tagged files are license-restricted',
         'ai' => 'First-party MCP server marketed for Cloud workspaces',
         'extensibility' => 'MIT-licensed apps SDK (twenty-sdk, create-twenty-app) for building custom objects, server logic, and UI components as TypeScript packages, per docs.twenty.com/developers — the core CRM repo itself stays AGPL-3.0 + Twenty Application Exception',
+        'source_urls' => [
+            'website' => 'https://twenty.com',
+            'pricing' => 'https://twenty.com/pricing',
+            'repository' => 'https://github.com/twentyhq/twenty',
+        ],
         'verified' => '2026-08-13',
     ],
     'espocrm' => [
@@ -77,6 +92,11 @@ return [
         'self_host' => 'Free self-hosted core; paid extensions for self-hosters',
         'ai' => 'No first-party AI or MCP tooling',
         'extensibility' => 'No official first-party app store; paid extensions come from third-party marketplaces (e.g. OSOM, devcrm.it)',
+        'source_urls' => [
+            'website' => 'https://www.espocrm.com',
+            'pricing' => 'https://www.espocrm.com/pricing/',
+            'repository' => 'https://github.com/espocrm/espocrm',
+        ],
         'verified' => '2026-08-13',
     ],
     'attio' => [
@@ -92,6 +112,10 @@ return [
         'self_host' => 'No self-hosting option',
         'ai' => 'Proprietary AI research and enrichment features',
         'extensibility' => 'REST API and a small set of native integrations (Slack, Calendly, DocuSign, email/calendar) plus Zapier/Make for everything else; no first-party app marketplace',
+        'source_urls' => [
+            'website' => 'https://attio.com',
+            'pricing' => 'https://attio.com/pricing',
+        ],
         'verified' => '2026-08-13',
     ],
     'hubspot' => [
@@ -107,6 +131,10 @@ return [
         'self_host' => 'No self-hosting option',
         'ai' => 'Proprietary AI features bundled into paid Hubs',
         'extensibility' => 'Official App Marketplace for third-party integrations, agents, and templates',
+        'source_urls' => [
+            'website' => 'https://www.hubspot.com',
+            'pricing' => 'https://www.hubspot.com/pricing/crm',
+        ],
         'verified' => '2026-08-13',
     ],
 ];
