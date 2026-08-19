@@ -208,6 +208,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.scrollToBottom(true);
         }
 
+        // Deferred behind its own $nextTick, queued after scrollToBottom's
+        // above, so the observer's first intersection check runs against the
+        // settled post-scroll layout rather than a mid-render one.
+        this.$nextTick(() => this.initLoadEarlierObserver());
+
         // Bootstrap payload from the dashboard: when the user submits their
         // first message there, we stash the editor document in sessionStorage
         // and navigate immediately. Restore the document (preserves mentions)
@@ -299,42 +304,64 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         };
         window.addEventListener('chat:renamed', this.renamedHandler);
 
-        this.$wire.$on('chat:messages-prepended', (payload) => {
-            const earlier = (payload && payload.messages) || [];
-            const hasMore = payload ? !!payload.hasMore : false;
-            if (earlier.length > 0) {
-                earlier.forEach((m) => {
-                    this.ensureClientKey(m);
-                    if (m.role === 'assistant') {
-                        m.rendered = true;
-                        m.prerendered = true;
-                        if (!Array.isArray(m.follow_ups)) {
-                            m.follow_ups = [];
+        // init() is confirmed (empirically) to run more than once for the
+        // same live component without a matching destroy() in between.
+        // $wire.$on(), unlike window.Livewire.on(), returns no unsubscribe
+        // function (it wraps the callback in its own internal listener on
+        // the component's root element), so there is no way to remove a
+        // stale registration from destroy() the way the other handlers in
+        // this file do. Guarding the registration itself, once per live
+        // instance, is what actually stops it: without this, a second
+        // init() stacks a second listener on the same element, and a single
+        // real chat:messages-prepended dispatch then gets applied twice,
+        // duplicating whichever message was just loaded.
+        if (!this._messagesPrependedRegistered) {
+            this._messagesPrependedRegistered = true;
+            this.$wire.$on('chat:messages-prepended', (payload) => {
+                const earlier = (payload && payload.messages) || [];
+                const hasMore = payload ? !!payload.hasMore : false;
+                if (earlier.length > 0) {
+                    earlier.forEach((m) => {
+                        this.ensureClientKey(m);
+                        if (m.role === 'assistant') {
+                            m.rendered = true;
+                            m.prerendered = true;
+                            if (!Array.isArray(m.follow_ups)) {
+                                m.follow_ups = [];
+                            }
+                            m.feedback = m.feedback ?? null;
+                            m.feedbackPanelOpen = false;
+                            m.feedbackCategory = m.feedback?.category ?? null;
+                            m.feedbackComment = '';
                         }
-                        m.feedback = m.feedback ?? null;
-                        m.feedbackPanelOpen = false;
-                        m.feedbackCategory = m.feedback?.category ?? null;
-                        m.feedbackComment = '';
-                    }
-                    if (m.role === 'user') {
-                        m.editing = false;
-                        m.editText = '';
-                    }
-                    if (typeof m.copiedAt === 'undefined') {
-                        m.copiedAt = 0;
-                    }
-                });
-                this.messages = [...earlier, ...this.messages];
-            }
-            this.hasMoreMessages = hasMore;
+                        if (m.role === 'user') {
+                            m.editing = false;
+                            m.editText = '';
+                        }
+                        if (typeof m.copiedAt === 'undefined') {
+                            m.copiedAt = 0;
+                        }
+                    });
+                    this.messages = [...earlier, ...this.messages];
+                }
+                this.hasMoreMessages = hasMore;
 
-            this.$nextTick(() => {
-                const el = this.$refs.messages;
-                if (!el || this.prependScrollAnchor === null) return;
-                el.scrollTop = el.scrollHeight - this.prependScrollAnchor;
-                this.prependScrollAnchor = null;
+                this.$nextTick(() => {
+                    const el = this.$refs.messages;
+                    if (el && this.prependScrollAnchor !== null) {
+                        el.scrollTop = el.scrollHeight - this.prependScrollAnchor;
+                        this.prependScrollAnchor = null;
+                    }
+                    // Cleared here, after the restore above, not any earlier (e.g.
+                    // not from loadEarlier()'s own $wire promise settling): see
+                    // the comment on loadEarlier() in transcript.js for why that
+                    // ordering matters. Unconditional (outside the `if` above) so
+                    // a missing ref or an already-null anchor can never leave this
+                    // stuck true and permanently disable further history loading.
+                    this.loadingEarlier = false;
+                });
             });
-        });
+        }
 
         // Bridge the docked livewire proposal-card's resolution lifecycle back
         // into Alpine state. window.Livewire.on returns an unsubscribe fn (v4);
@@ -358,6 +385,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.stashConversationCache();
         this.uninstallConversationSwitchWatch();
         this.teardownDaySeparatorObserver();
+        this.teardownLoadEarlierObserver();
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();
