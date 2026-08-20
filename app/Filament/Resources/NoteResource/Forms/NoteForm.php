@@ -31,8 +31,7 @@ final class NoteForm
             $components[] = Select::make('companies')
                 ->label(__('filament/resources/note.fields.companies.label'))
                 ->multiple()
-                ->relationship('companies', 'name')
-                ->searchable();
+                ->relationship('companies', 'name');
         }
 
         if (! in_array('people', $excludeFields)) {
@@ -40,7 +39,6 @@ final class NoteForm
                 ->label(__('filament/resources/note.fields.people.label'))
                 ->multiple()
                 ->relationship('people', 'name')
-                ->searchable()
                 ->nullable();
         }
 
