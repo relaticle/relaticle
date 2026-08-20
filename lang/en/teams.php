@@ -11,10 +11,6 @@ return [
             'label' => 'Workspace Slug',
             'helper_text' => 'Only lowercase letters, numbers, and hyphens. This appears in your workspace URL.',
         ],
-        'email' => [
-            'label' => 'Email',
-            'placeholder' => 'name@company.com',
-        ],
         'emails' => [
             'label' => 'Send invite to',
             'placeholder' => 'example@email.com',
@@ -40,10 +36,8 @@ return [
 
     'actions' => [
         'save' => 'Save',
-        'add_team_member' => 'Add',
         'invite_people' => 'Invite people',
         'send_invitations' => 'Send invitations',
-        'add_another' => 'Add another',
         'invite_link' => 'Invite link',
         'rotate_invite_link' => 'Generate a new link',
         'update_team_role' => 'Manage Role',
@@ -56,9 +50,6 @@ return [
     ],
 
     'notifications' => [
-        'save' => [
-            'success' => 'Saved.',
-        ],
         'team_invitation_sent' => [
             'success' => 'Invitation sent.',
         ],
@@ -71,13 +62,8 @@ return [
         'leave_team' => [
             'success' => 'You have left the workspace.',
         ],
-        'team_deleted' => [
-            'success' => 'Workspace deleted!',
-        ],
         'permission_denied' => [
-            'cannot_update_team_member' => 'You do not have permission to update this member.',
             'cannot_promote_to_admin' => 'Only the workspace owner can grant or revoke Administrator access.',
-            'cannot_leave_team' => 'You may not leave a workspace that you created.',
             'cannot_remove_team_member' => 'You do not have permission to remove this member.',
             'cannot_delete_team' => 'You do not have permission to delete this workspace.',
             'cannot_cancel_team_deletion' => 'You do not have permission to cancel this workspace\'s deletion.',
@@ -99,7 +85,6 @@ return [
     ],
 
     'validation' => [
-        'email_already_invited' => 'This user has already been invited to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
@@ -152,7 +137,6 @@ return [
         'members_count' => '{1} 1 person has access|[2,*] :count people have access',
         'pending_heading' => 'Pending invitations',
         'pending_count' => '{1} 1 person has been invited and has not joined yet|[2,*] :count people have been invited and have not joined yet',
-        'expires' => 'Expires',
         'expired' => 'Expired',
     ],
 
