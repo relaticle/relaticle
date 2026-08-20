@@ -553,38 +553,55 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
     },
 
     // Bridges BOTH resolution channels into one place: the resolving tab's own
-    // synchronous Livewire `proposal:resolved` dispatch, AND the `.pending_
-    // action.resolved` Reverb broadcast every subscribed tab (including the
-    // resolving one, a moment later) receives (see stream.js's
+    // synchronous Livewire `proposal:resolved` dispatch (which CARRIES the
+    // created record), AND the `.pending_action.resolved` Reverb broadcast
+    // every subscribed tab (including the resolving one, a moment later)
+    // receives with `record` always null (see stream.js's
     // handlePendingActionResolved and PendingActionService::broadcastResolution
     // server-side). The resolving tab therefore gets this call TWICE for the
-    // same resolution; the "already applied" guards below make the second
-    // call a no-op rather than double-firing the ai-write-completed refresh.
-    // There is no socket-id-based toOthers() filter to lean on instead: this
-    // app never wires Echo's socket id onto outgoing Livewire requests.
+    // same resolution, and `ShouldBroadcastNow` typically delivers the
+    // record-less broadcast FIRST (mid-request, before the Livewire response
+    // finishes rendering). Whichever payload carries a record must still win
+    // on the record, regardless of arrival order, so the "already applied"
+    // guard below only gates the one-time ai-write-completed refresh, not the
+    // record merge. There is no socket-id-based toOthers() filter to lean on
+    // instead: this app never wires Echo's socket id onto outgoing Livewire
+    // requests.
     applyProposalResolution(payload) {
         const action = this.findPendingAction(payload.pendingActionId);
         if (!action) return;
 
+        let isNewResolution = false;
+
         if (payload.index === null || payload.index === undefined) {
-            // Single proposal. Already resolved (by the other channel, or a
-            // stale/duplicate broadcast): nothing left to apply.
-            if (action.status !== 'pending') return;
-            action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
-            if (payload.record) action.record = payload.record;
+            // Single proposal.
+            if (action.status === 'pending') {
+                action.status = payload.decision === 'approved' ? 'approved' : 'rejected';
+                isNewResolution = true;
+            }
+            if (payload.record && !action.record) action.record = payload.record;
         } else {
             // Batch item: the transcript renders per-item status 'approved'/'skipped'.
-            // Already resolved, same idempotency guard as above, per item.
-            if (action.itemResults && action.itemResults[payload.index]) return;
-            action.itemResults = {
-                ...action.itemResults,
-                [payload.index]: {
-                    status: payload.decision === 'approved' ? 'approved' : 'skipped',
-                    record: payload.record || null,
-                },
-            };
-            if (payload.finalized) action.status = 'approved';
+            const existing = action.itemResults && action.itemResults[payload.index];
+            if (!existing) {
+                action.itemResults = {
+                    ...action.itemResults,
+                    [payload.index]: {
+                        status: payload.decision === 'approved' ? 'approved' : 'skipped',
+                        record: payload.record || null,
+                    },
+                };
+                if (payload.finalized) action.status = 'approved';
+                isNewResolution = true;
+            } else if (payload.record && !existing.record) {
+                action.itemResults = {
+                    ...action.itemResults,
+                    [payload.index]: { ...existing, record: payload.record },
+                };
+            }
         }
+
+        if (!isNewResolution) return;
 
         if (payload.decision === 'approved' && window.Livewire?.dispatch) {
             window.Livewire.dispatch('ai-write-completed', {
@@ -1008,8 +1025,8 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
     // paint (installConversationSwitchWatch(), fired off the resulting
     // `livewire:navigate` event) applies here for free.
     openSwitcherItem(item) {
-        if (!item?.id || !this.switcherConversationUrlTemplate) return;
         this.closeSwitcher();
+        if (!item?.id || !this.switcherConversationUrlTemplate) return;
         if (item.id === this.conversationId) return;
         const url = this.switcherConversationUrlTemplate.replace(this.switcherConversationUrlPlaceholder, item.id);
         if (window.Alpine?.navigate) {

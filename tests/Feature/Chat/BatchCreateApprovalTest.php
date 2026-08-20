@@ -307,7 +307,9 @@ it('broadcasts pending_action.resolved on a single approve', function (): void {
         && $event->pendingActionId === $action->getKey()
         && $event->status === 'approved'
         && $event->index === null
-        && $event->finalized);
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
 });
 
 it('broadcasts pending_action.resolved on a single reject', function (): void {
@@ -331,7 +333,9 @@ it('broadcasts pending_action.resolved on a single reject', function (): void {
         && $event->pendingActionId === $action->getKey()
         && $event->status === 'rejected'
         && $event->index === null
-        && $event->finalized);
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
 });
 
 it('broadcasts pending_action.resolved with the item index on a batch approveItem, unfinalized', function (): void {
@@ -344,7 +348,9 @@ it('broadcasts pending_action.resolved with the item index on a batch approveIte
         && $event->pendingActionId === $action->getKey()
         && $event->status === 'approved'
         && $event->index === 0
-        && $event->finalized === false);
+        && $event->finalized === false
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
 });
 
 it('broadcasts pending_action.resolved as finalized on the batch\'s last item', function (): void {
@@ -359,7 +365,9 @@ it('broadcasts pending_action.resolved as finalized on the batch\'s last item', 
         && $event->pendingActionId === $action->getKey()
         && $event->status === 'approved'
         && $event->index === 1
-        && $event->finalized);
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
 });
 
 it('broadcasts pending_action.resolved with status rejected on a batch rejectItem', function (): void {
@@ -372,7 +380,9 @@ it('broadcasts pending_action.resolved with status rejected on a batch rejectIte
         && $event->pendingActionId === $action->getKey()
         && $event->status === 'rejected'
         && $event->index === 0
-        && $event->finalized === false);
+        && $event->finalized === false
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
 });
 
 it('reports the item\'s real stored status when approveItem is called again on an already-rejected item', function (): void {
@@ -385,11 +395,20 @@ it('reports the item\'s real stored status when approveItem is called again on a
 
     // The idempotent no-op path must report the item's REAL status ('rejected',
     // set by the first call) rather than assuming 'approved' just because
-    // approveItem() is the method that was called the second time.
+    // approveItem() is the method that was called the second time. Both
+    // dispatched events share pendingActionId/index/status = 0/'rejected';
+    // assertDispatched alone would pass on the FIRST event no matter what the
+    // second (the no-op path under test) reports, so assertNotDispatched is
+    // the assertion that actually discriminates.
     Event::assertDispatchedTimes(PendingActionResolved::class, 2);
     Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->pendingActionId === $action->getKey()
         && $event->index === 0
-        && $event->status === 'rejected');
+        && $event->status === 'rejected'
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+    Event::assertNotDispatched(fn (PendingActionResolved $event): bool => $event->pendingActionId === $action->getKey()
+        && $event->index === 0
+        && $event->status === 'approved');
     expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
 });
 
