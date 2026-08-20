@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -65,6 +70,26 @@ test('editor keeps write access to companies', function (): void {
 
 test('owner is never treated as a viewer', function (): void {
     expect($this->owner->isViewerOnTeamId($this->team->id))->toBeFalse();
+});
+
+test('viewer is not offered an import action it would be refused', function (string $page): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    livewire($page)->assertActionHidden('import');
+})->with([
+    'companies' => [ListCompanies::class],
+    'people' => [ListPeople::class],
+    'opportunities' => [ListOpportunities::class],
+    'tasks' => [ManageTasks::class],
+    'notes' => [ManageNotes::class],
+]);
+
+test('editor is still offered the import action', function (): void {
+    $this->actingAs($this->editor);
+    Filament::setTenant($this->team);
+
+    livewire(ListCompanies::class)->assertActionVisible('import');
 });
 
 test('viewer is read-only through the API too', function (): void {

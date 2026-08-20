@@ -33,7 +33,8 @@ final class ManageNotes extends ManageRecords
                 Action::make('import')
                     ->label(__('filament/resources/note.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportNotes::getUrl()),
+                    ->url(ImportNotes::getUrl())
+                    ->visible(ImportNotes::canAccess(...)),
                 ExportAction::make()->exporter(NoteExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
