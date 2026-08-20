@@ -77,7 +77,20 @@ final readonly class RecordChipRenderer implements NodeRendererInterface
             $type,
             $node->getUrl(),
             $icon,
-            $childRenderer->renderNodes($node->children()),
+            $this->flattenLabel($childRenderer->renderNodes($node->children())),
         );
+    }
+
+    /**
+     * A chip is a single-line pill, so a line break inside the label would split
+     * it in two. The pipelines also spell a break differently (`<br />` plus a
+     * newline here, `<br>` from marked on the client), so both collapse to one
+     * space. Mirrors flattenChipLabel() in chat.js.
+     */
+    private function flattenLabel(string $label): string
+    {
+        $withoutBreaks = preg_replace('#<br\s*/?>#', "\n", $label) ?? $label;
+
+        return preg_replace('#[\r\n]+#', ' ', $withoutBreaks) ?? $withoutBreaks;
     }
 }

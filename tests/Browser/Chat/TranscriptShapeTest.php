@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Support\MarkdownRenderer;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
@@ -565,4 +566,86 @@ it('copies a cited record as an absolute url from both message shapes', function
         ->and($result['copied'][1])->toContain("href=\"{$origin}/r/company/01ABCDEF\"")
         ->and($result['copied'][0])->not->toContain('](/r/')
         ->and($result['copied'][1])->not->toContain('href="/r/');
+});
+
+/** The chip anchor inside a rendered reply, or null when nothing was chipped. */
+function transcriptShapeExtractChip(string $html): ?string
+{
+    return preg_match('#<a class="chat-chip".+?</a>#s', $html, $matches) === 1
+        ? $matches[0]
+        : null;
+}
+
+/**
+ * The drift guard for the CLIENT half of the contract. The PHP suite can only
+ * reach `RecordChipRenderer::ICONS`; nothing but this case can see
+ * `RECORD_CHIP_ICONS` in chat.js, so without it a sixth citable type could be
+ * added server-side and the suite would stay green while streamed replies
+ * showed a plain link and reloads showed a chip.
+ *
+ * Every type in `RecordReferenceResolver::CHIP_TYPES` must round-trip to
+ * markup identical to the server's, and the negatives must chip on NEITHER
+ * side: `custom_field` is a real reference type with no per-record route, and
+ * `__proto__`/`constructor` both satisfy the client's `[a-z_]+` type grammar
+ * and resolve through `Object.prototype` on a plain object literal.
+ *
+ * The label carries a soft line break so the same case also pins the two
+ * spellings of a break (`<br />` plus a newline server-side, `<br>` from
+ * marked) to one flattened label on both sides.
+ */
+it('emits chip markup identical to the server for every citable type, and chips nothing else', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $renderer = new MarkdownRenderer;
+    $neverChipped = ['custom_field', '__proto__', 'constructor'];
+    $cases = [];
+    $expected = [];
+
+    foreach ([...RecordReferenceResolver::CHIP_TYPES, ...$neverChipped] as $type) {
+        $markdown = "See [Acme\nCorporation](/r/{$type}/01ABCDEF) now.";
+
+        // A list of pairs, never an object keyed by type: `{"__proto__": ...}`
+        // as a JS object literal sets the prototype instead of an own property,
+        // which would quietly neuter the case that matters most here.
+        $cases[] = [$type, $markdown];
+        $expected[] = [$type, transcriptShapeExtractChip($renderer->render($markdown))];
+    }
+
+    $casesJson = json_encode($cases, JSON_THROW_ON_ERROR);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $actual = json_decode((string) $page->script(<<<JS
+        (() => {
+            const cases = {$casesJson};
+
+            return JSON.stringify(cases.map(([type, markdown]) => {
+                const chip = window.renderMarkdown(markdown).match(/<a class="chat-chip"[\\s\\S]+?<\\/a>/);
+
+                return [type, chip ? chip[0] : null];
+            }));
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($actual)->toBe($expected);
+
+    // Guards the guard: agreeing on "no chip everywhere" would satisfy the
+    // comparison above, so pin which side of the line each type falls on.
+    $serverChipByType = array_column($expected, 1, 0);
+
+    foreach (RecordReferenceResolver::CHIP_TYPES as $type) {
+        expect($serverChipByType[$type])->toContain('class="chat-chip"')
+            ->toContain('<span class="chat-chip-label">Acme Corporation</span>');
+    }
+
+    foreach ($neverChipped as $type) {
+        expect($serverChipByType[$type])->toBeNull();
+    }
 });
