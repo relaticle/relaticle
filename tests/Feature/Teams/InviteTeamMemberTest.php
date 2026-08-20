@@ -10,6 +10,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
 
 mutates(User::class);
@@ -191,9 +192,33 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
             'emails' => 'Bob@Example.Test',
             'role' => 'editor',
         ])
-        ->assertNotified(__('teams.notifications.some_invites_failed.title'));
+        ->assertNotified(
+            Notification::make()
+                ->title(__('teams.notifications.some_invites_failed.title'))
+                ->body('Bob@Example.Test: '.__('teams.validation.email_already_invited'))
+                ->warning()
+        );
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
+});
+
+test('inviting someone who already belongs to the workspace names the workspace, not the team', function (): void {
+    $member = User::factory()->create(['email' => 'member@example.test']);
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->callAction(TestAction::make('invitePeople')->table(), [
+            'emails' => 'member@example.test',
+            'role' => 'editor',
+        ])
+        ->assertNotified(
+            Notification::make()
+                ->title(__('teams.notifications.some_invites_failed.title'))
+                ->body('member@example.test: '.__('teams.validation.email_already_member'))
+                ->warning()
+        );
+
+    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
 
 test('invitation email names the inviter and the role', function (): void {
