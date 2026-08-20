@@ -31,8 +31,9 @@ it('can create a new team through the browser', function (): void {
         ->click('[for$="onboarding_use_case-other"]')
         ->press('Continue')
         ->waitForText('Collaborate with your team')
-        // Step 4: Invite (submit) — redirects to workspace home (dashboard root)
-        ->press('Send invites')
+        // Step 4: Invite (submit), redirects to workspace home (dashboard root).
+        // No address entered, so the button reads "Get started".
+        ->press('Get started')
         ->assertPathIs('/app/second-workspace');
 
     expect(Team::where('name', 'Second Workspace')->where('user_id', $user->id)->exists())->toBeTrue();

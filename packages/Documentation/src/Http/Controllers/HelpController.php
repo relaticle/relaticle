@@ -128,6 +128,8 @@ final readonly class HelpController
             array_push($lines, '', '## '.__('Developer Documentation'), '', ...$docs);
         }
 
+        array_push($lines, '', '## '.__('Product'), '', ...$this->llmsTxtProductEntries());
+
         $comparisons = $this->llmsTxtComparisonEntries();
 
         if ($comparisons !== []) {
@@ -150,6 +152,27 @@ final readonly class HelpController
         }
 
         return implode("\n", $lines)."\n";
+    }
+
+    /** @return list<string> */
+    private function llmsTxtProductEntries(): array
+    {
+        $assistantName = (string) config('chat.assistant_name');
+
+        return [
+            sprintf(
+                '- [%s](%s): %s',
+                __(':name, the AI Assistant', ['name' => $assistantName]),
+                route('ai'),
+                __('What the built-in AI assistant does, the approval flow, model choice, and MCP access.'),
+            ),
+            sprintf(
+                '- [%s](%s): %s',
+                __('Self-Hosted CRM'),
+                route('selfHosted'),
+                __('Run Relaticle on your own server with Docker Compose, AGPL-3.0, and local AI via Ollama.'),
+            ),
+        ];
     }
 
     /** @return list<string> */

@@ -230,6 +230,8 @@ final class ProcessChatMessage implements ShouldQueue
                 ChatTelemetry::breadcrumb('stream.completed', [
                     'input_tokens' => $streamedResponse->usage->promptTokens,
                     'output_tokens' => $streamedResponse->usage->completionTokens,
+                    'cache_read_tokens' => $streamedResponse->usage->cacheReadInputTokens,
+                    'cache_write_tokens' => $streamedResponse->usage->cacheWriteInputTokens,
                 ]);
 
                 $this->broadcastSafely(new ConversationResolved(

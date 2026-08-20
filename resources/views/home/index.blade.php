@@ -14,7 +14,7 @@
 
 <x-guest-layout
     :title="config('app.name') . ' - ' . __('CRM Built for People and AI-Powered Work')"
-    description="Open-source, self-hosted CRM with built-in AI chat and 32 MCP tools for external agents. @-mention records, safe approvals, voice input, persistent history, REST API, and team isolation."
+    description="Open-source, self-hosted CRM with a built-in AI chat and 32 MCP tools for external agents. Safe approvals, custom fields, and a REST API. Free forever."
     :ogTitle="config('app.name') . ' - Human-First CRM with Agent-Native Infrastructure'"
     ogDescription="Open-source CRM for teams and AI-powered work. Use the app, ask the built-in chat, or connect external agents through 32 MCP tools. Self-hosted, you own your data.">
     @push('header')

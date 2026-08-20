@@ -57,6 +57,8 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
     Route::get('/pricing', fn () => view('pricing'))->name('pricing');
     Route::get('/press', fn () => view('press'))->name('press');
+    Route::get('/ai', fn () => view('ai'))->name('ai');
+    Route::get('/self-hosted', fn () => view('self-hosted'))->name('selfHosted');
     Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
     Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');

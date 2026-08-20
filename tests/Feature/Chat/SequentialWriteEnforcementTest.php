@@ -57,6 +57,61 @@ it('returns provider-specific options for parallel-tool-call control', function 
     expect($agent->providerOptions(Lab::Anthropic))->toHaveKey('tool_choice');
 });
 
+it('caches both the static prefix and the growing transcript on Anthropic', function (): void {
+    $options = resolve(CrmAssistant::class)->providerOptions(Lab::Anthropic);
+
+    expect($options['system'][0]['cache_control'])->toBe(['type' => 'ephemeral'])
+        ->and($options['cache_control'])->toBe(['type' => 'ephemeral']);
+});
+
+it('sends both cache breakpoints in the Anthropic request body', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    Http::fake([
+        'https://api.anthropic.com/*' => Http::response([
+            'id' => 'msg_test',
+            'type' => 'message',
+            'role' => 'assistant',
+            'content' => [['type' => 'text', 'text' => 'Hello!']],
+            'model' => 'claude-sonnet-4-6',
+            'stop_reason' => 'end_turn',
+            'usage' => ['input_tokens' => 5, 'output_tokens' => 3],
+        ]),
+    ]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => '019df800-0000-7000-8000-000000000002',
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $agent = resolve(CrmAssistant::class);
+    $agent->withConversationId('019df800-0000-7000-8000-000000000002');
+    $agent->prompt('hi', provider: 'anthropic', model: 'claude-sonnet-4-6');
+
+    Http::assertSent(function ($request): bool {
+        $body = $request->data();
+
+        return ($body['system'][0]['cache_control']['type'] ?? null) === 'ephemeral'
+            && ($body['cache_control']['type'] ?? null) === 'ephemeral';
+    });
+});
+
+it('omits every cache breakpoint when prompt caching is disabled', function (): void {
+    config()->set('chat.anthropic_prompt_caching', false);
+
+    $options = resolve(CrmAssistant::class)->providerOptions(Lab::Anthropic);
+
+    expect($options)->not->toHaveKey('cache_control')
+        ->and($options)->not->toHaveKey('system')
+        ->and($options)->toHaveKey('tool_choice');
+});
+
 it('write tool result includes agent_should_stop=true in meta', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     Auth::guard('web')->setUser($user);

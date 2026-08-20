@@ -35,7 +35,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\GitHubService;
-use App\Services\TurnstileClient;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\Markdown\TableAwareLeagueDriver;
@@ -77,7 +76,6 @@ use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
-use RyanChandler\LaravelCloudflareTurnstile\Contracts\ClientInterface;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 
 final class AppServiceProvider extends ServiceProvider
@@ -110,12 +108,6 @@ final class AppServiceProvider extends ServiceProvider
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them — the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
-
-        // The turnstile package's own client discards Cloudflare's `success`
-        // flag and sets no timeout — see App\Services\TurnstileClient. Our
-        // provider registers after the package's, so this binding wins;
-        // Turnstile::fake() still swaps it, as it goes through the facade.
-        $this->app->scoped(ClientInterface::class, fn (): TurnstileClient => new TurnstileClient);
 
         // Spatie's LeagueDriver never registers TableConverter, so <table>
         // markup collapses to a run-on line in the markdown-response channel.

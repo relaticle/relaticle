@@ -4,19 +4,11 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Register;
 use App\Models\User;
-use App\Rules\TurnstileChallenge;
-use App\Services\TurnstileClient;
-use GuzzleHttp\Promise\PromiseInterface;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
-use Psr\Http\Message\RequestInterface;
-use RyanChandler\LaravelCloudflareTurnstile\Facades\Turnstile;
 
-mutates(Register::class, TurnstileChallenge::class, TurnstileClient::class);
+mutates(Register::class);
 
 it('registers a new user without creating a team', function (): void {
     livewire(Register::class)
@@ -155,326 +147,69 @@ it('never treats a whitelisted domain as disposable, even when the upstream list
     'jane-whitelisted@relaticle.com',
 ]);
 
-it('requires a passing turnstile challenge when a site key is configured', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Turnstile::fake()->fail();
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'invalid-token',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response']);
-
-    expect(User::where('email', 'jane-turnstile@gmail.com')->exists())->toBeFalse();
-});
-
-it('rejects registration when the turnstile challenge was never solved', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Turnstile::fake();
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-missing@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response' => 'required']);
-
-    expect(User::where('email', 'jane-turnstile-missing@gmail.com')->exists())->toBeFalse();
-});
-
-it('registers successfully when the turnstile challenge passes', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Turnstile::fake();
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-ok@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => Turnstile::dummy(),
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    expect(User::where('email', 'jane-turnstile-ok@gmail.com')->exists())->toBeTrue();
-});
-
-it('clears the spent turnstile token when another field fails validation', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Turnstile::fake();
-
-    User::factory()->create(['email' => 'jane-taken@gmail.com']);
+it('rejects registration when the honeypot field is filled', function (): void {
+    config(['honeypot.enabled' => true]);
 
     $component = livewire(Register::class)
         ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-taken@gmail.com',
+            'name' => 'Bot User',
+            'email' => 'bot-honeypot@gmail.com',
             'password' => 'Password123!',
             'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => Turnstile::dummy(),
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['email' => 'unique'])
-        ->assertHasNoFormErrors(['cf_turnstile_response']);
-
-    expect($component->get('data.cf_turnstile_response'))->toBeNull();
-});
-
-it('clears the turnstile token when the challenge itself fails', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Turnstile::fake()->fail();
-
-    $component = livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-reset@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'spent-token',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response']);
-
-    expect($component->get('data.cf_turnstile_response'))->toBeNull();
-});
-
-it('degrades to a readable error when cloudflare siteverify is unreachable', function (callable $stub): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Http::fake(['challenges.cloudflare.com/*' => $stub]);
-    Log::spy();
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-outage@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-perfectly-good-token',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response' => __('auth.turnstile.unavailable')]);
-
-    expect(User::where('email', 'jane-turnstile-outage@gmail.com')->exists())->toBeFalse();
-
-    Log::shouldHaveReceived('warning')->once();
-})->with([
-    'server error' => [fn (): PromiseInterface => Http::response('', 500)],
-    'connection failure' => [fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')],
-]);
-
-it('rejects a siteverify verdict that is not explicitly successful', function (mixed $body): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Http::fake(['challenges.cloudflare.com/*' => Http::response($body)]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-siteverify-bypass@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-token-cloudflare-refused',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response' => __('auth.turnstile.failed')]);
-
-    expect(User::where('email', 'jane-siteverify-bypass@gmail.com')->exists())->toBeFalse();
-})->with([
-    'unsuccessful with an empty error-codes array' => [['success' => false, 'error-codes' => []]],
-    'unsuccessful with no error-codes key' => [['success' => false]],
-    'no success key at all' => [[]],
-    'not json' => ['<html>we are down</html>'],
-]);
-
-it('reports the error code cloudflare returned', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Http::fake(['challenges.cloudflare.com/*' => Http::response([
-        'success' => false,
-        'error-codes' => ['timeout-or-duplicate'],
-    ])]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-siteverify-replay@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-spent-token',
-        ])
-        ->call('register')
-        ->assertHasFormErrors([
-            'cf_turnstile_response' => __('cloudflare-turnstile::errors.timeout-or-duplicate'),
         ]);
+
+    $this->travel(2)->seconds();
+
+    $component
+        ->set('extraFields.my_name', 'I fill every field I see')
+        ->call('register')
+        ->assertForbidden();
+
+    expect(User::where('email', 'bot-honeypot@gmail.com')->exists())->toBeFalse();
 });
 
-it('accepts a genuine siteverify success', function (mixed $body): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Http::fake(['challenges.cloudflare.com/*' => Http::response($body)]);
+it('rejects a registration submitted faster than a human could', function (): void {
+    config(['honeypot.enabled' => true]);
 
     livewire(Register::class)
         ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-siteverify-ok@gmail.com',
+            'name' => 'Fast Bot',
+            'email' => 'bot-instant@gmail.com',
             'password' => 'Password123!',
             'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-token-cloudflare-accepted',
         ])
+        ->call('register')
+        ->assertForbidden();
+
+    expect(User::where('email', 'bot-instant@gmail.com')->exists())->toBeFalse();
+});
+
+it('registers normally when the honeypot stays empty and enough time has passed', function (): void {
+    config(['honeypot.enabled' => true]);
+
+    $component = livewire(Register::class)
+        ->fillForm([
+            'name' => 'Jane Doe',
+            'email' => 'jane-honeypot-ok@gmail.com',
+            'password' => 'Password123!',
+            'passwordConfirmation' => 'Password123!',
+        ]);
+
+    $this->travel(2)->seconds();
+
+    $component
         ->call('register')
         ->assertHasNoFormErrors();
 
-    expect(User::where('email', 'jane-siteverify-ok@gmail.com')->exists())->toBeTrue();
-})->with([
-    'with an empty error-codes array' => [['success' => true, 'error-codes' => []]],
-    'without an error-codes key' => [['success' => true]],
-]);
-
-it('bounds the siteverify call with a connect and a request timeout', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-
-    $sentOptions = [];
-
-    Http::globalMiddleware(function (callable $handler) use (&$sentOptions): Closure {
-        return function (RequestInterface $request, array $options) use ($handler, &$sentOptions): mixed {
-            $sentOptions = $options;
-
-            return $handler($request, $options);
-        };
-    });
-    Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true, 'error-codes' => []])]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-siteverify-timeout@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-token-cloudflare-accepted',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    expect($sentOptions['connect_timeout'])->toBeGreaterThan(0)->toBeLessThanOrEqual(5)
-        ->and($sentOptions['timeout'])->toBeGreaterThan(0)->toBeLessThanOrEqual(10);
+    expect(User::where('email', 'jane-honeypot-ok@gmail.com')->exists())->toBeTrue();
 });
 
-it('renders the turnstile challenge prompt in the active locale', function (): void {
-    app()->setLocale('fr');
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
+it('renders the honeypot fields inside the registration page', function (): void {
+    config(['honeypot.enabled' => true]);
 
     livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-fr@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response' => 'Veuillez compléter la vérification de sécurité.']);
-});
-
-it('reports a turnstile failure in the active locale', function (callable $stub, string $expected): void {
-    app()->setLocale('fr');
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => 'test-secret-key',
-    ]);
-    Http::fake(['challenges.cloudflare.com/*' => $stub]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-fr-failure@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-            'cf_turnstile_response' => 'a-token',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['cf_turnstile_response' => $expected]);
-})->with([
-    'unsuccessful verdict' => [
-        fn (): PromiseInterface => Http::response(['success' => false, 'error-codes' => []]),
-        'La vérification a échoué. Veuillez réessayer.',
-    ],
-    'siteverify unreachable' => [
-        fn (): PromiseInterface => Http::response('', 500),
-        'La vérification est temporairement indisponible. Veuillez réessayer dans un instant.',
-    ],
-]);
-
-it('skips the turnstile challenge when no site key is configured', function (): void {
-    config(['services.turnstile.key' => null]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-no-turnstile@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    expect(User::where('email', 'jane-no-turnstile@gmail.com')->exists())->toBeTrue();
-});
-
-it('skips the turnstile challenge when the site key is configured but the secret is missing', function (): void {
-    config([
-        'services.turnstile.key' => 'test-site-key',
-        'services.turnstile.secret' => null,
-    ]);
-
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-turnstile-no-secret@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    expect(User::where('email', 'jane-turnstile-no-secret@gmail.com')->exists())->toBeTrue();
+        ->assertSee('name="my_name', escape: false)
+        ->assertSee('name="valid_from"', escape: false);
 });
 
 it('does not expose a fortify registration endpoint', function (): void {

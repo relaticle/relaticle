@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\Members;
 use App\Livewire\App\Teams\AddTeamMember;
@@ -144,7 +145,7 @@ test('onboarding-generated invite link still works for an authenticated user', f
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
         ->and($joiner->fresh()->current_team_id)->toBe($team->id);

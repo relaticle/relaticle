@@ -139,6 +139,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 return Filament::getRegistrationUrl();
             }
 
+            // A shared join link carries no email, so we cannot tell whether the
+            // visitor has an account. Most people opening one do not, and the
+            // register page links back to sign-in for the rest.
+            if ($request->routeIs('teams.join')) {
+                return Filament::getRegistrationUrl();
+            }
+
             return route('login');
         });
     })

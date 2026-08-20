@@ -1,7 +1,7 @@
 <x-guest-layout
-    title="Pricing - Relaticle"
-    description="Relaticle pricing. No per-seat pricing — flat workspace plans. Unlimited users and records. Self-host free forever."
-    ogTitle="Pricing - Relaticle"
+    title="Pricing - $19/mo flat, unlimited users - Relaticle"
+    description="No per-seat pricing. One flat workspace plan at $19/mo billed yearly, with unlimited users and records. 14-day trial, no card. Self-host free forever."
+    ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
@@ -219,6 +219,13 @@
                         </div>
                     @endforeach
                 </div>
+
+                {{-- Two of the tiles above are the whole subject of a page each. --}}
+                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('What the AI assistant and MCP server do') }}</a>
+                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
+                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Run it free on your own server') }}</a>
+                </p>
             </div>
 
             {{-- Help CTA --}}
