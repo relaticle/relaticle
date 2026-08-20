@@ -817,6 +817,36 @@ it('rejects attachments over the per-file and total size caps', function (): voi
     expect($email->attachments->pluck('filename')->all())->toEqualCanonicalizing(['small.pdf', 'big-a.pdf']);
 });
 
+it('counts saved draft attachments against the total size cap', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Saved plus pending')
+        ->set('attachments', [UploadedFile::fake()->create('saved.pdf', 9 * 1024)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Saved plus pending')->sole();
+    $draft->attachments()->firstOrFail()->update(['size' => 9 * 1024 * 1024]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->set('to', ['lead@example.com'])
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [UploadedFile::fake()->create('too-much.pdf', 9 * 1024)])
+        ->assertSee('saved.pdf')
+        ->assertDontSee('too-much.pdf')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Saved plus pending')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments->pluck('filename')->all())->toBe(['saved.pdf']);
+});
+
 it('drops a pending attachment when it is removed before sending', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
