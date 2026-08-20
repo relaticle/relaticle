@@ -189,10 +189,14 @@ final class OpportunitiesBoard extends BoardResourcePage
                 SelectFilter::make('companies')
                     ->label(__('filament/pages/boards.opportunities.filters.company'))
                     ->relationship('company', 'name')
+                    ->searchable()
+                    ->preload()
                     ->multiple(),
                 SelectFilter::make('contacts')
                     ->label(__('filament/pages/boards.opportunities.filters.contact'))
                     ->relationship('contact', 'name')
+                    ->searchable()
+                    ->preload()
                     ->multiple(),
             ])
             ->filtersFormWidth(Width::Medium)
