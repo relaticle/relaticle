@@ -65,7 +65,14 @@ final readonly class RecordReferenceResolver
         ];
     }
 
-    public function urlFor(string $entityType, string $recordId): ?string
+    /**
+     * @param  Team|null  $team  The tenant to build the panel URL against. Defaults to the
+     *                           authenticated user's current team. Pass the record's own team
+     *                           explicitly when the caller already resolved a specific record
+     *                           (e.g. the `/r/{type}/{id}` redirect) so a citation for a record
+     *                           in a non-current team still lands on that team's panel.
+     */
+    public function urlFor(string $entityType, string $recordId, ?Team $team = null): ?string
     {
         $authUser = auth()->user();
 
@@ -73,7 +80,7 @@ final readonly class RecordReferenceResolver
             return null;
         }
 
-        $team = $authUser->currentTeam;
+        $team ??= $authUser->currentTeam;
 
         if ($team === null) {
             return null;
