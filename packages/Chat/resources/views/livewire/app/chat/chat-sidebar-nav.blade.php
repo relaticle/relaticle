@@ -70,7 +70,7 @@
                 class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"
                 role="status"
             >
-                No chats yet. Start one from the dashboard.
+                {{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}
             </li>
         @else
             @foreach($conversations as $conversation)

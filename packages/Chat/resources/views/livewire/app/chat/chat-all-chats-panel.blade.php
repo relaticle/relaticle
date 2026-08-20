@@ -98,9 +98,9 @@
                 @if($conversations->isEmpty())
                     <li class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">
                         @if($isSearching)
-                            No matches.
+                            {{ __('No matches.') }}
                         @else
-                            No chats yet. Start one with the + button above.
+                            {{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}
                         @endif
                     </li>
                 @else

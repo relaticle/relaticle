@@ -298,8 +298,8 @@
 
                                 <template x-if="!historyLoading && !historyError && filteredHistory.length === 0">
                                     <p class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" role="status">
-                                        <span x-show="historySearch.trim()">No matches.</span>
-                                        <span x-show="!historySearch.trim()">No chats yet.</span>
+                                        <span x-show="historySearch.trim()">{{ __('No matches.') }}</span>
+                                        <span x-show="!historySearch.trim()">{{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}</span>
                                     </p>
                                 </template>
 
