@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
+use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
@@ -117,7 +118,7 @@ final class TaskResource extends Resource
                     ->toggle(),
                 SelectFilter::make('assignees')
                     ->multiple()
-                    ->relationship('assignees', 'name')
+                    ->relationship('assignees', 'name', TeamMemberSelect::currentUserFirst())
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('creation_source')

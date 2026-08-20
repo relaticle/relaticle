@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -171,7 +172,9 @@ final class TasksBoard extends BoardResourcePage
             ->filters([
                 SelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
-                    ->relationship('assignees', 'name')
+                    ->relationship('assignees', 'name', TeamMemberSelect::currentUserFirst())
+                    ->searchable()
+                    ->preload()
                     ->multiple(),
             ])
             ->filtersFormWidth(Width::Medium)

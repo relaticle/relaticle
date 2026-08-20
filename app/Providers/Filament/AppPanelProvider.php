@@ -40,6 +40,7 @@ use Filament\Enums\GlobalSearchPosition;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -107,6 +108,12 @@ final class AppPanelProvider extends PanelProvider
         Action::configureUsing(fn (Action $action): Action => $action->size(Size::Small)->iconPosition('before'));
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
         Section::configureUsing(fn (Section $section): Section => $section->compact());
+
+        // Filament defaults searchDebounce to 1000ms, which reads as a hung field.
+        // configureUsing is global across panels, so this is guarded like the callbacks below.
+        Select::configureUsing(fn (Select $select): Select => $this->isCurrentPanel()
+            ? $select->searchDebounce(250)
+            : $select);
 
         // Table and Schema configuration is global, so both callbacks have to check
         // which panel is actually serving the request before they touch the format.
