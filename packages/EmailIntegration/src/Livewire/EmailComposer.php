@@ -548,7 +548,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         $kept = [];
         $rejected = [];
-        $total = 0;
+        $total = array_sum(array_column($this->savedAttachments, 'size'));
 
         foreach ($this->attachments as $file) {
             if (! $file instanceof TemporaryUploadedFile) {
