@@ -251,7 +251,7 @@ test('register page prefills the invited email address', function (): void {
         'email' => 'invited.person@example.com',
     ]);
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    $acceptUrl = acceptUrlFor($invitation);
 
     $this->get($acceptUrl)->assertRedirect(Filament::getRegistrationUrl());
 
