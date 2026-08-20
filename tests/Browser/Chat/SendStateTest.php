@@ -408,6 +408,152 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
     expect($result['conversationIdUnchanged'])->toBeTrue();
 });
 
+it('leaves the transcript untouched when regenerate is triggered while an earlier send is still rate-limited (issue #499)', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    // Same reasoning as the fixture above: regenerate always happens inside
+    // an EXISTING conversation.
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+
+    // Fabricates the exact state issue #499 describes: a countdown from a
+    // PRIOR failed send is already ticking (this.rateLimit is set) when the
+    // user clicks Regenerate on an EARLIER assistant reply. No real 429 round
+    // trip is needed: the defect is entirely in what regenerateMessage() does
+    // to this.messages before sendMessage() is ever reached, so this
+    // simulates the client-side rate-limited state directly instead of
+    // warming up the real throttle middleware for it.
+    $result = $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            window.Echo = null;
+            data.conversationId = {$conversationIdJson};
+
+            data.messages = [
+                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+            ];
+
+            const failedMsg = data.messages[data.messages.length - 1];
+            data.rateLimit = { secondsLeft: 30, timerId: null, userMsg: failedMsg };
+
+            await data.regenerateMessage(1);
+
+            return {
+                totalCount: data.messages.length,
+                roles: data.messages.map((m) => m.role),
+                contents: data.messages.map((m) => m.content),
+                rateLimitStillActive: data.rateLimit !== null,
+                rateLimitSecondsLeft: data.rateLimit?.secondsLeft ?? null,
+            };
+        })();
+    JS);
+
+    // Before the fix: regenerateMessage() spliced from userIndex(0) onward,
+    // removing all 3 messages (including the unrelated failed/rate-limited
+    // one), then sendMessage() silently bailed on `if (this.rateLimit)
+    // return`, leaving nothing behind. totalCount would be 0.
+    expect($result['totalCount'])->toBe(3);
+    expect($result['roles'])->toBe(['user', 'assistant', 'user']);
+    expect($result['contents'])->toBe(['first attempt', 'first reply', 'second attempt']);
+    expect($result['rateLimitStillActive'])->toBeTrue();
+    expect($result['rateLimitSecondsLeft'])->toBe(30);
+});
+
+it('leaves the transcript untouched when retryTurn is triggered while an earlier send is still rate-limited (issue #499 sibling)', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+
+    // retryTurn() is the sibling of regenerateMessage() flagged in the #499
+    // review: the same unconditional splice into a sendMessage() call that
+    // silently no-ops while this.rateLimit is set. Its splice window is
+    // narrower (just the retried turn), but the failed/rate-limited message
+    // at the tail is never touched by that splice either way, so the same
+    // guard is required to stop the retried turn itself from being lost.
+    $result = $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            window.Echo = null;
+            data.conversationId = {$conversationIdJson};
+
+            data.messages = [
+                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+            ];
+
+            const streamErrorMsg = data.messages[1];
+            const failedMsg = data.messages[2];
+            data.rateLimit = { secondsLeft: 30, timerId: null, userMsg: failedMsg };
+
+            await data.retryTurn(streamErrorMsg);
+
+            return {
+                totalCount: data.messages.length,
+                roles: data.messages.map((m) => m.role),
+                contents: data.messages.map((m) => m.content),
+                rateLimitStillActive: data.rateLimit !== null,
+            };
+        })();
+    JS);
+
+    // Before the fix: retryTurn() spliced out the user+streamError pair
+    // (removeCount 2), then sendMessage() bailed on the active rate limit,
+    // leaving only the unrelated failed message behind: totalCount would
+    // drop from 3 to 1.
+    expect($result['totalCount'])->toBe(3);
+    expect($result['roles'])->toBe(['user', 'assistant', 'user']);
+    expect($result['contents'])->toBe(['first attempt', '', 'second attempt']);
+    expect($result['rateLimitStillActive'])->toBeTrue();
+});
+
 it('does not soft-lock the composer when subscribeToConversation throws on a non-first message', function (): void {
     Queue::fake();
 
