@@ -75,7 +75,8 @@ final class PeopleResource extends Resource
                                         TeamMemberSelect::make('account_owner_id')
                                             ->model(Company::class)
                                             ->relationship('accountOwner', 'name')
-                                            ->label(__('filament/resources/person.fields.account_owner_id.label')),
+                                            ->label(__('filament/resources/person.fields.account_owner_id.label'))
+                                            ->default(fn (): ?string => auth()->user()?->id),
                                         CustomFields::form()->forModel(Company::class)->build()->columns(1),
                                     ]))
                                     ->modalWidth(Width::Large)

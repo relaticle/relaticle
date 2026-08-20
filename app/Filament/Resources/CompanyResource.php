@@ -51,6 +51,7 @@ final class CompanyResource extends Resource
                 TeamMemberSelect::make('account_owner_id')
                     ->relationship('accountOwner', 'name')
                     ->label(__('filament/resources/company.fields.account_owner_id.label'))
+                    ->default(fn (): ?string => auth()->user()?->id)
                     ->nullable(),
 
                 CustomFields::form()->build()->columnSpanFull()->columns(1),
