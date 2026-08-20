@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Support\MarkdownRenderer;
 use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
@@ -416,4 +417,152 @@ it('auto-loads on mount when a short first page leaves the sentinel visible with
     // user ever moving the scrollbar.
     expect(transcriptShapeWaitForBubbles($page, 51))->toBe(51);
     expect(transcriptShapeTopBubbleText($page))->toBe('Seeded message 0001');
+});
+
+/** Polls the transcript for the expected number of painted record chips. */
+function transcriptShapeWaitForChips(AwaitableWebpage $page, int $expected): int
+{
+    $count = 0;
+
+    for ($i = 0; $i < 50; $i++) {
+        $count = $page->script(<<<'JS'
+            (() => document.querySelectorAll('.chat-chip').length)();
+        JS);
+
+        if ($count === $expected) {
+            return $count;
+        }
+
+        usleep(100_000);
+    }
+
+    return $count;
+}
+
+/**
+ * A `/r/{type}/{id}` citation inside an assistant reply paints as a chip on
+ * BOTH render pipelines, and the two agree.
+ *
+ * `rendered && !prerendered` is the client pipeline: a reply that just finished
+ * streaming, put through `window.renderMarkdown` (marked + DOMPurify + the
+ * post-sanitize chip sweep). `rendered && prerendered` is the server pipeline:
+ * the same reply rehydrated on reload, already HTML from `MarkdownRenderer`.
+ * Both bubbles are mounted in one transcript here and their chip markup is
+ * compared against the server's own output character for character, so the two
+ * implementations cannot drift apart unnoticed.
+ */
+it('paints a cited record as the same chip on the streamed and the reloaded pipeline', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $markdown = 'Closed [Acme Corporation](/r/company/01ABCDEF) this morning.';
+    $serverHtml = (new MarkdownRenderer)->render($markdown);
+
+    expect(preg_match('#<a class="chat-chip".+?</a>#s', $serverHtml, $chipMatch))->toBe(1);
+    $expectedChip = $chipMatch[0];
+
+    $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
+    $serverHtmlJson = json_encode($serverHtml, JSON_THROW_ON_ERROR);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '', copiedAt: 0, follow_ups: [] };
+
+            data.messages.push({ ...base, content: {$markdownJson}, prerendered: false });
+            data.messages.push({ ...base, content: {$serverHtmlJson}, prerendered: true });
+
+            return true;
+        })();
+    JS);
+
+    expect(transcriptShapeWaitForChips($page, 2))->toBe(2);
+
+    $chips = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const chips = Array.from(document.querySelectorAll('.chat-chip'));
+
+            return JSON.stringify({
+                markup: chips.map((c) => c.outerHTML),
+                labels: chips.map((c) => c.textContent.trim()),
+                hrefs: chips.map((c) => c.getAttribute('href')),
+                types: chips.map((c) => c.getAttribute('data-record-type')),
+                navigating: chips.some((c) => c.hasAttribute('wire:navigate')),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($chips['markup'])->toBe([$expectedChip, $expectedChip])
+        ->and($chips['labels'])->toBe(['Acme Corporation', 'Acme Corporation'])
+        ->and($chips['hrefs'])->toBe(['/r/company/01ABCDEF', '/r/company/01ABCDEF'])
+        ->and($chips['types'])->toBe(['company', 'company'])
+        // `/r/` is a server redirect, so the chip must be a plain navigation.
+        ->and($chips['navigating'])->toBeFalse();
+});
+
+/**
+ * Copying a reply has to hand over links someone can paste anywhere, so the
+ * root-relative `/r/` citations are absolutized against the current origin.
+ * Both message shapes are covered because `msg.content` is markdown for a reply
+ * rendered in this session and server HTML for one rehydrated on reload.
+ */
+it('copies a cited record as an absolute url from both message shapes', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $markdown = 'Closed [Acme Corporation](/r/company/01ABCDEF) this morning.';
+    $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
+    $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = json_decode((string) $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            const copied = [];
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } },
+            });
+
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '', copiedAt: 0, follow_ups: [] };
+            const streamed = { ...base, content: {$markdownJson}, prerendered: false };
+            const reloaded = { ...base, content: {$serverHtmlJson}, prerendered: true };
+
+            data.messages.push(streamed, reloaded);
+
+            await data.copyMessage(streamed);
+            await data.copyMessage(reloaded);
+
+            return JSON.stringify({ origin: window.location.origin, copied });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    $origin = $result['origin'];
+
+    expect($result['copied'])->toHaveCount(2)
+        ->and($result['copied'][0])->toContain("]({$origin}/r/company/01ABCDEF)")
+        ->and($result['copied'][1])->toContain("href=\"{$origin}/r/company/01ABCDEF\"")
+        ->and($result['copied'][0])->not->toContain('](/r/')
+        ->and($result['copied'][1])->not->toContain('href="/r/');
 });

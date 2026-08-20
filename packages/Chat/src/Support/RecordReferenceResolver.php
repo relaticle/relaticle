@@ -29,9 +29,13 @@ final readonly class RecordReferenceResolver
      * (e.g. custom_field, which has no per-record route) keeps the
      * absolute panel URL from `urlFor()`.
      *
+     * Public because it is the list both render pipelines are held to: every
+     * type here needs an icon in `RecordChipRenderer` and in the matching JS
+     * map, and ChipRenderingTest asserts exactly that.
+     *
      * @var list<string>
      */
-    private const array CHIP_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
+    public const array CHIP_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
 
     /**
      * @param  array<int|string, mixed>  $ids

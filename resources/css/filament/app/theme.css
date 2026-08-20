@@ -645,3 +645,47 @@
         color: #9ca3af;
     }
 }
+
+/* Chat record chips: a `[Label](/r/{type}/{id})` citation inside an assistant
+   reply. Both render pipelines emit the same markup (RecordChipRenderer on the
+   server, applyRecordChips in chat.js on the client), so this single rule
+   dresses the streamed reply and the reloaded one alike. Same surface tokens
+   as the follow-up chips in _transcript.blade.php, at the density of an
+   @mention chip: the transcript carries two chip families, not three. */
+.chat-chip {
+    @apply inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 no-underline transition;
+
+    /* Prose gives the surrounding text a 14px line box; middle keeps the
+       shorter pill optically centred on it (an inline-flex box takes its
+       baseline from its first item, which here is the icon, and would ride
+       high). */
+    vertical-align: middle;
+}
+
+.chat-chip:hover {
+    @apply border-primary-300 bg-primary-50 text-primary-700;
+}
+
+.chat-chip:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-500;
+}
+
+.dark .chat-chip {
+    @apply text-gray-200;
+}
+
+.dark .chat-chip:hover {
+    @apply border-primary-700 bg-primary-900/20 text-primary-300;
+}
+
+.chat-chip > svg {
+    @apply h-3 w-3 shrink-0 text-gray-400;
+}
+
+.dark .chat-chip > svg {
+    @apply text-gray-500;
+}
+
+.chat-chip-label {
+    @apply max-w-[24ch] truncate;
+}
