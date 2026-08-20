@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
 
@@ -72,7 +73,7 @@ it('the join controller still works when the token is within expiry', function (
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue();
 });

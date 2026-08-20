@@ -14,14 +14,27 @@
 
                 @php($cancelUrl = $this->getCancelUrl())
 
+                {{-- Leaving the wizard belongs to the first step. From step two onward
+                     "Back" is the way out, and a third stacked link only competes with it. --}}
                 @if (filled($cancelUrl))
-                    <div class="mt-3 text-center">
+                    {{-- "Copy invite link" gives a first-run user a workspace, and with it
+                         this link, several steps in. Mounting that late means missing every
+                         step change the wizard has already announced, so ask for the current
+                         one instead of assuming step zero. --}}
+                    <div
+                        x-data="{ wizardStep: 0 }"
+                        x-init="$nextTick(() => window.dispatchEvent(new CustomEvent('onboarding-step-request')))"
+                        x-on:onboarding-step-changed.window="wizardStep = $event.detail.index"
+                        x-show="wizardStep === 0"
+                        x-cloak
+                        class="mt-3 text-center"
+                    >
                         <a
                             href="{{ $cancelUrl }}"
                             wire:navigate
                             class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         >
-                            {{ __('filament/pages/teams.create_team.actions.cancel') }}
+                            {{ $this->getCancelLabel() }}
                         </a>
                     </div>
                 @endif

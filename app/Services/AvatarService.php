@@ -158,8 +158,11 @@ final readonly class AvatarService
         $normalizedName = Str::ascii($name);
         $nameParts = array_values(array_filter(preg_split('/[\s\-_\.]+/', $normalizedName) ?: []));
 
+        // Str::ascii() empties names written entirely in a non-transliterable script
+        // (CJK, Hebrew, Thai), which used to leave every such workspace showing "?".
+        // Fall back to the name's own leading characters, read multibyte-safely.
         if ($nameParts === []) {
-            return '?';
+            return $this->initialsFromRawName($name, $count);
         }
 
         // For single initial mode, just return the first letter of the first name part
@@ -217,6 +220,25 @@ final readonly class AvatarService
     }
 
     /**
+     * Initials for names the ASCII transliterator cannot represent at all.
+     */
+    private function initialsFromRawName(string $name, int $count): string
+    {
+        /** @var list<string> $parts */
+        $parts = array_values(array_filter(preg_split('/[\s\-_\.]+/u', $name) ?: []));
+
+        if ($parts === []) {
+            return '?';
+        }
+
+        if ($count === 1 || count($parts) === 1) {
+            return mb_substr($parts[0], 0, $count);
+        }
+
+        return mb_substr($parts[0], 0, 1).mb_substr(end($parts), 0, 1);
+    }
+
+    /**
      * Get a deterministic background color based on the name.
      */
     private function getBackgroundColor(string $name): string
@@ -243,8 +265,13 @@ final readonly class AvatarService
      */
     private function generateSvg(string $initials, string $bgColor, string $textColor, int $size): string
     {
-        // Adjust font size based on initials length
-        $fontSize = strlen($initials) > 1 ? 44 : 48;
+        // Byte length would read a single CJK glyph as 3 characters and shrink it.
+        $fontSize = mb_strlen($initials) > 1 ? 44 : 48;
+
+        // Initials derive from a user-supplied name, so they can carry characters that
+        // are markup here. Unescaped, a workspace named "<script>x" produced initials
+        // of "<S" and an SVG that no longer parsed, leaving a broken avatar.
+        $initials = e($initials);
 
         return <<<SVG
         <svg xmlns="http://www.w3.org/2000/svg" width="{$size}" height="{$size}" viewBox="0 0 100 100">

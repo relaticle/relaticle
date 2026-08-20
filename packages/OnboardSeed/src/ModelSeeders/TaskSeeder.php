@@ -35,6 +35,11 @@ final class TaskSeeder extends BaseModelSeeder
         foreach ($fixtures as $key => $data) {
             $task = $this->createTaskFromFixture($team, $user, $key, $data);
 
+            // The dashboard's "My tasks" panel reads task_user, so seeded tasks must be
+            // assigned to the new owner. Attaching CRM people alone leaves a brand-new
+            // workspace showing an empty task list on its very first screen.
+            $task->assignees()->syncWithoutDetaching([$user->getAuthIdentifier()]);
+
             if (isset($data['assigned_people']) && is_array($data['assigned_people'])) {
                 $this->assignPeopleToTask($task, $data['assigned_people']);
             }
