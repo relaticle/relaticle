@@ -33,7 +33,7 @@ final readonly class TeamPolicy
      */
     public function create(User $user): bool
     {
-        return $user->ownedTeams()->count() < 3;
+        return $user->ownedTeams()->count() < (int) config('relaticle.workspaces.max_owned_per_user');
     }
 
     /**

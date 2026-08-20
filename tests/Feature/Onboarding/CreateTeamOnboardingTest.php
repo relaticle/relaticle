@@ -21,6 +21,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use App\Policies\TeamPolicy;
 use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
@@ -34,7 +35,7 @@ use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\RawMessage;
 
-mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class, OnboardSeedManager::class, CreateTeamCustomFields::class, TeamPolicy::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.
@@ -1069,7 +1070,21 @@ it('labels the submit button for what it will actually do', function (): void {
         ->assertDontSee(__('filament/pages/teams.create_team.actions.get_started'));
 });
 
+it('allows a fourth workspace under the default cap', function (): void {
+    $user = User::factory()->create();
+
+    Team::factory()->count(3)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    $this->get(route('filament.app.tenant.registration'))->assertSuccessful();
+});
+
 it('explains the workspace limit instead of returning a bare 404', function (): void {
+    // A low cap keeps the fixture small; the point is the behavior at the cap,
+    // whatever the configured number happens to be.
+    config()->set('relaticle.workspaces.max_owned_per_user', 3);
+
     $user = User::factory()->create();
 
     Team::factory()->count(3)->create(['user_id' => $user->id]);
@@ -1084,6 +1099,8 @@ it('explains the workspace limit instead of returning a bare 404', function (): 
 });
 
 it('lets a user finish a wizard run whose workspace pushed them to the limit', function (): void {
+    config()->set('relaticle.workspaces.max_owned_per_user', 3);
+
     $user = User::factory()->create();
 
     // Two existing workspaces: creating this one takes them to the cap of three.
@@ -1113,6 +1130,8 @@ it('lets a user finish a wizard run whose workspace pushed them to the limit', f
 });
 
 it('still refuses a brand new wizard once the user is at the limit', function (): void {
+    config()->set('relaticle.workspaces.max_owned_per_user', 3);
+
     $user = User::factory()->create();
 
     Team::factory()->count(3)->create(['user_id' => $user->id]);
