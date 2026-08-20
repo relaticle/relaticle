@@ -265,8 +265,13 @@ final readonly class AvatarService
      */
     private function generateSvg(string $initials, string $bgColor, string $textColor, int $size): string
     {
-        // Adjust font size based on initials length
-        $fontSize = strlen($initials) > 1 ? 44 : 48;
+        // Byte length would read a single CJK glyph as 3 characters and shrink it.
+        $fontSize = mb_strlen($initials) > 1 ? 44 : 48;
+
+        // Initials derive from a user-supplied name, so they can carry characters that
+        // are markup here. Unescaped, a workspace named "<script>x" produced initials
+        // of "<S" and an SVG that no longer parsed, leaving a broken avatar.
+        $initials = e($initials);
 
         return <<<SVG
         <svg xmlns="http://www.w3.org/2000/svg" width="{$size}" height="{$size}" viewBox="0 0 100 100">

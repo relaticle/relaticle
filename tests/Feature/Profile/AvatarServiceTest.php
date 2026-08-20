@@ -105,3 +105,31 @@ it('falls back to the raw name for scripts ascii cannot transliterate', function
 it('still returns a placeholder when a name carries no usable characters', function () {
     expect(extractInitialsFromSvg($this->avatarService->generate('...')))->toBe('?');
 });
+
+function extractSvgFromDataUrl(string $dataUrl): string
+{
+    return (string) base64_decode(str_replace('data:image/svg+xml;base64,', '', $dataUrl), true);
+}
+
+it('escapes initials so a hostile name cannot break the svg', function () {
+    // A workspace named "<script>x" used to yield initials of "<S", which made the
+    // SVG unparseable and rendered a broken avatar.
+    foreach (['<script>x', '"><b>', "A'B", 'A&B Corp'] as $name) {
+        $svg = extractSvgFromDataUrl($this->avatarService->generate($name));
+
+        libxml_use_internal_errors(true);
+        libxml_clear_errors();
+
+        expect(simplexml_load_string($svg))->not->toBeFalse("SVG for [{$name}] must parse")
+            ->and($svg)->not->toContain('<script>');
+    }
+});
+
+it('sizes the font by character count, not byte length', function () {
+    // A single CJK glyph is three bytes; strlen() read it as multiple characters and
+    // shrank the text to the two-initial size.
+    expect(extractSvgFromDataUrl($this->avatarService->generate('株', initialCount: 1)))
+        ->toContain('font-size="48"')
+        ->and(extractSvgFromDataUrl($this->avatarService->generate('株式会社テスト')))
+        ->toContain('font-size="44"');
+});
