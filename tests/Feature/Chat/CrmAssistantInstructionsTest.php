@@ -21,6 +21,17 @@ it('no longer instructs the model to hand-write a table of read results', functi
         ->not->toContain('Use tables ONLY for read/search results');
 });
 
+/**
+ * Without a Capabilities line naming it, the change-history tool is a schema
+ * the model never reaches for: it answers "what changed last week" out of the
+ * list tools, which carry no history at all.
+ */
+it('tells the model it can read a record\'s change history', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('ListActivityTool');
+});
+
 it('tells the model its read results are rendered as a block under the reply', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 

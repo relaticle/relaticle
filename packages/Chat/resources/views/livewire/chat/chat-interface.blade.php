@@ -46,10 +46,20 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'opportunity' => __('Opportunities'),
             'task' => __('Tasks'),
             'note' => __('Notes'),
+            'activity' => __('Activity'),
         ]),
-        blockCoreLabels: @js([
-            'name' => __('Name'),
-            'title' => __('Title'),
+        blockColumnLabels: @js([
+            'company' => ['name' => __('Name')],
+            'people' => ['name' => __('Name')],
+            'opportunity' => ['name' => __('Name')],
+            'task' => ['title' => __('Title')],
+            'note' => ['title' => __('Title')],
+            'activity' => [
+                'when' => __('When'),
+                'record' => __('Record'),
+                'who' => __('Who'),
+                'what' => __('What changed'),
+            ],
         ]),
         blockFooterTemplate: @js(__('Showing :showing of :total')),
     }),
