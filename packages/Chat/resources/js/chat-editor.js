@@ -6,6 +6,7 @@ import HardBreak from '@tiptap/extension-hard-break';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
 import { createMentionSuggestion } from './chat-mention-suggestion';
+import { MENTION_CHIP_CLASS } from './chat/mention-chip';
 
 // Editors live outside Alpine's reactive proxy. Wrapping a TipTap editor in a
 // Proxy breaks ProseMirror's identity checks ("Applying a mismatched
@@ -63,7 +64,7 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, o
                     return ['span', {
                         'data-mention-id': node.attrs.id,
                         'data-mention-type': node.attrs.type,
-                        'class': 'inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200',
+                        'class': MENTION_CHIP_CLASS,
                         ...HTMLAttributes,
                     }, '@' + (node.attrs.label ?? '')];
                 },

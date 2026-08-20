@@ -14,6 +14,7 @@ import { transcriptModule } from './chat/transcript';
 import { sendModule } from './chat/send';
 import { streamModule } from './chat/stream';
 import { registerBlock, blockTemplate } from './chat/blocks';
+import { modelPickerModule } from './chat/model-picker';
 
 const registerChatEditor = () => {
     if (!window.Alpine) {
@@ -35,4 +36,4 @@ if (!registerChatEditor()) {
 // registerBlock/blockTemplate are plain functions, not module factories:
 // exposed alongside so the transcript partial (also inline, unbundled) can
 // call window.ChatModules.blockTemplate() directly.
-window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate };
+window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate, modelPickerModule };

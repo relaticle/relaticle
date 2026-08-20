@@ -36,7 +36,7 @@
                                 type="button"
                                 x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
                                 x-text="starter.label"
-                                class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                             ></button>
                         </template>
                     </div>
@@ -63,7 +63,7 @@
             x-transition:leave-end="motion-safe:opacity-0"
             x-text="stickyDateLabel"
             style="display: none;"
-            class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            class="rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:text-gray-200"
         ></span>
     </div>
 
@@ -80,9 +80,9 @@
                 <button
                     type="button"
                     x-on:click="loadEarlier()"
-                    class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    class="rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5"
                 >
-                    Load earlier messages
+                    {{ __('Load earlier messages') }}
                 </button>
             </div>
         </template>
@@ -105,7 +105,7 @@
                     <div data-day-separator class="mb-4 flex justify-center">
                         <span
                             x-text="decorations(index).daySeparator"
-                            class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                            class="rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300"
                         ></span>
                     </div>
                 </template>
@@ -128,7 +128,7 @@
                                 <a
                                     :href="msg.page_context.url || '#'"
                                     :class="msg.page_context.url ? '' : 'pointer-events-none'"
-                                    class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 ring-1 ring-primary-600/20 transition hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20"
+                                    class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-primary-700 ring-1 ring-primary-600/20 transition hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20"
                                 >
                                     <x-heroicon-m-at-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     <span class="truncate" x-text="msg.page_context.label"></span>
@@ -284,7 +284,7 @@
                                         type="button"
                                         x-on:click="input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())"
                                         x-text="chip.label"
-                                        class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                        class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                                     ></button>
                                 </template>
                             </div>
@@ -367,10 +367,10 @@
                                             type="button"
                                             x-on:click="msg.feedbackCategory = (msg.feedbackCategory === cat.value ? null : cat.value)"
                                             x-text="cat.label"
-                                            class="rounded-full border px-2.5 py-1 text-xs font-medium transition"
+                                            class="rounded-full border px-3 py-1.5 text-xs font-medium transition"
                                             :class="msg.feedbackCategory === cat.value
                                                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'"
+                                                : 'border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] text-gray-600 hover:border-gray-300 dark:text-gray-300'"
                                         ></button>
                                     </template>
                                 </div>

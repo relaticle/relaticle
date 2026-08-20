@@ -5,6 +5,8 @@
 // (`hasPendingProposal`, `pendingLabel`) that stay inline there because a
 // `get` property cannot survive an object spread.
 
+import { MENTION_CHIP_CLASS } from './mention-chip';
+
 const CONVERSATION_CACHE_LIMIT = 5;
 
 // Consecutive same-role messages closer together than this render as one
@@ -461,7 +463,7 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         const idAttr = this.escapeAttr(id);
         const type = this.escapeAttr(node.attrs?.type ?? '');
         const label = this.escapeHtml(node.attrs?.label ?? '');
-        const baseClass = 'inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200';
+        const baseClass = MENTION_CHIP_CLASS;
 
         let url = ctx.mentionUrls?.[String(id)] ?? null;
         if (!url && ctx.allowNodeUrl) {

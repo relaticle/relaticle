@@ -19,6 +19,10 @@
     --color-primary-950: oklch(0.283 0.135 291.089);
     --color-primary: oklch(0.541 0.247 293.009); /* DEFAULT: primary-600 */
 
+    /* Third-party brand marks: kept out of the primary scale since they
+       represent an external provider's identity, not our own UI color. */
+    --color-anthropic: #D4763C;
+
     /* Off-step typography for compact UI surfaces */
     --text-pico: 0.625rem;     /* 10px */
     --text-pico--line-height: 0.875rem;

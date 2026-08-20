@@ -25,7 +25,7 @@
             <div
                 x-data="chatEditor({
                     initialDocument: { type: 'doc', content: [] },
-                    placeholder: 'Ask anything...',
+                    placeholder: @js(__('Ask anything...')),
                     autofocus: true,
                     onSubmit: () => $root.dispatchEvent(new CustomEvent('dashboard:editor-submit', { bubbles: true })),
                     onChange: ({ document, text }) => {
@@ -35,38 +35,11 @@
                 x-on:dashboard:editor-submit.window="submit()"
                 x-on:dashboard:editor-change.window="input = $event.detail.text"
                 data-chat-context="dashboard"
-                class="relative rounded-2xl border border-gray-200 bg-white transition focus-within:border-primary-500 dark:border-gray-700 dark:bg-gray-800"
             >
-                <div x-ref="editor" wire:ignore class="relative"></div>
-
-                <div class="flex items-center justify-between gap-2 px-3 pb-2">
-                    <span
-                        x-show="text.length > 4000"
-                        x-cloak
-                        x-text="`${text.length.toLocaleString()} / 5,000`"
-                        :class="{
-                            'text-gray-500 dark:text-gray-400': text.length <= 4900,
-                            'text-amber-600 dark:text-amber-400': text.length > 4900 && text.length <= 5000,
-                            'text-red-600 dark:text-red-400': text.length > 5000,
-                        }"
-                        class="text-[11px]"
-                        aria-live="polite"
-                    ></span>
-                    <div x-show="text.length <= 4000" class="flex-1"></div>
-
-                    <div class="flex items-center gap-2">
-                        @include('chat::livewire.chat.partials._model-picker')
-
-                        <button
-                            type="submit"
-                            class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 disabled:bg-primary-200 disabled:text-white dark:disabled:bg-primary-900/40 dark:disabled:text-primary-300"
-                            :disabled="text.trim().length === 0 || text.length > 5000 || submitting"
-                            aria-label="Send message"
-                        >
-                            <x-heroicon-s-arrow-up class="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
+                @include('chat::livewire.chat.partials._composer-bar', [
+                    'showStopButton' => false,
+                    'sendDisabled' => 'text.trim().length === 0 || text.length > 5000 || submitting',
+                ])
             </div>
 
             <div
@@ -86,7 +59,7 @@
                         type="button"
                         x-on:click="useStarter(starter.prompt)"
                         x-text="starter.label"
-                        class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                        class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                     ></button>
                 </template>
             </div>
@@ -107,35 +80,14 @@
             allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
             selectedModel: 'auto',
             modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
-            providerIcons: @js([
-                'anthropic' => svg('ri-claude-fill')->toHtml(),
-                'openai' => svg('ri-openai-fill')->toHtml(),
-                'ollama' => svg('ri-server-line')->toHtml(),
-                'selfhosted' => svg('ri-server-line')->toHtml(),
-            ]),
-
-            providerIconHtml(provider) {
-                return provider ? (this.providerIcons[provider] || '') : '';
-            },
-
-            providerIconColor(provider) {
-                return ({
-                    anthropic: 'text-[#D4763C]',
-                    openai: 'text-gray-900 dark:text-gray-200',
-                    ollama: 'text-gray-500 dark:text-gray-400',
-                    selfhosted: 'text-gray-500 dark:text-gray-400',
-                })[provider] || '';
-            },
-
-            modelLabel(value) {
-                const found = this.modelOptions.find((o) => o.value === value);
-                return (found || this.modelOptions[0]).label;
-            },
-
-            modelProvider(value) {
-                const found = this.modelOptions.find((o) => o.value === value);
-                return found?.provider ?? null;
-            },
+            ...window.ChatModules.modelPickerModule({
+                providerIcons: @js([
+                    'anthropic' => svg('ri-claude-fill')->toHtml(),
+                    'openai' => svg('ri-openai-fill')->toHtml(),
+                    'ollama' => svg('ri-server-line')->toHtml(),
+                    'selfhosted' => svg('ri-server-line')->toHtml(),
+                ]),
+            }),
 
             init() {
                 const candidate = defaultModel || 'auto';

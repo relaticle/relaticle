@@ -17,6 +17,6 @@
     $badge = $badges[$type] ?? $badges['note'];
 @endphp
 
-<span {{ $attributes->merge(['class' => "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium {$badge['class']}"]) }}>
+<span {{ $attributes->merge(['class' => "inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium {$badge['class']}"]) }}>
     {{ $badge['label'] }}
 </span>
