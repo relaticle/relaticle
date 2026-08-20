@@ -631,8 +631,21 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         }
     },
 
+    // Record citations are stored root-relative (`/r/{type}/{id}`) so a
+    // transcript renders on whatever host serves it. Pasted anywhere else they
+    // have to carry the origin. Both forms are rewritten because `msg.content`
+    // is markdown for a message rendered in this session and server HTML for
+    // one rehydrated on reload (see `prerendered` in chat-interface.blade.php).
+    absolutizeRecordLinks(text) {
+        const origin = window.location.origin;
+
+        return text
+            .replaceAll('](/r/', `](${origin}/r/`)
+            .replaceAll('href="/r/', `href="${origin}/r/`);
+    },
+
     async copyMessage(msg) {
-        const text = msg?.content || '';
+        const text = this.absolutizeRecordLinks(msg?.content || '');
         if (!text) return;
 
         try {
