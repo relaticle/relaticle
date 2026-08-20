@@ -122,20 +122,6 @@ return [
         ],
     ],
 
-    'join' => [
-        'accepted' => [
-            'title' => 'Invitation accepted',
-            'body' => 'You have joined :team.',
-        ],
-        'joined' => [
-            'title' => 'Welcome aboard',
-            'body' => 'You have joined :team.',
-        ],
-        'already_member' => [
-            'title' => 'You are already a member of this workspace.',
-        ],
-    ],
-
     'edit_team' => 'Workspace Settings',
 
     'tabs' => [
