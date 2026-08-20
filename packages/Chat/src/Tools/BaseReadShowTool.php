@@ -149,14 +149,16 @@ abstract class BaseReadShowTool implements Tool
         $payload = $this->flattenResource(new $resourceClass($model));
 
         $id = (string) $model->getKey();
-        $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
+        $resolver = resolve(RecordReferenceResolver::class);
+        $ref = $resolver->resolve($this->citationType(), $id);
+        $url = $ref !== null ? $resolver->referenceUrl($this->citationType(), $id) : null;
 
         return (string) json_encode(
             $this->localiseDatetimes(
                 array_merge(
                     $payload,
                     $this->extraPayload($model),
-                    ['url' => $ref['url'] ?? null],
+                    ['url' => $url],
                     $this->buildIncluded($model, $requestedIncludes, $user),
                 ),
                 $user,
