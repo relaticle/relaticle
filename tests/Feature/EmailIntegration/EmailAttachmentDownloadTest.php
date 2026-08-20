@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -87,13 +88,41 @@ it('aborts 403 when viewer has no body access (private privacy tier)', function 
         ->assertForbidden();
 });
 
-it('aborts 404 when provider_attachment_id is missing', function (): void {
+it('aborts 404 when there is neither a provider id nor a stored file', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
     $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
         'provider_attachment_id' => null,
     ]);
 
     $this->get(route('email-attachments.download', ['attachment' => $attachment->id]))
         ->assertNotFound();
+});
+
+it('aborts 404 when a file the user attached has no stored path', function (): void {
+    $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => null,
+    ]);
+
+    $this->get(route('email-attachments.download', ['attachment' => $attachment->id]))
+        ->assertNotFound();
+});
+
+it('streams a file the user attached here, which never went through a provider', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/draft.pdf', 'locally stored bytes');
+
+    $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/draft.pdf',
+        'filename' => 'draft.pdf',
+    ]);
+
+    $response = $this->get(route('email-attachments.download', ['attachment' => $attachment->id]));
+
+    $response->assertOk();
+    expect($response->streamedContent())->toBe('locally stored bytes');
 });
 
 it('aborts 404 when the connected account is missing', function (): void {

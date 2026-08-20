@@ -132,33 +132,12 @@ trait HasEmailComposeActions
             });
     }
 
-    /**
-     * Build a reply/reply-all/forward action with its mode baked in, for use as a
-     * child of the native `<x-filament-actions::group>` dropdown. Grouped-action
-     * triggers cannot carry per-action arguments, so callers supply the target
-     * email id (the one currently open in the detail pane).
-     */
-    protected function replyForwardModeAction(string $name, string $mode, ?string $emailId): Action
-    {
-        return Action::make($name)
-            ->label($this->replyForwardLabel($mode))
-            ->icon($this->replyForwardIcon($mode))
-            ->modalHeading($this->replyForwardLabel($mode))
-            ->slideOver()
-            ->modalWidth(Width::SevenExtraLarge)
-            ->fillForm(fn (): array => $this->replyForwardFormData($emailId, $mode))
-            ->schema($this->replyFormSchema())
-            ->action(function (array $data) use ($mode): void {
-                $this->submitReplyForward($data, $mode);
-            });
-    }
-
     private function replyForwardIcon(string $mode): string
     {
         return match ($mode) {
-            'reply_all' => 'heroicon-o-arrow-uturn-right',
-            'forward' => 'heroicon-o-arrow-right',
-            default => 'heroicon-o-arrow-uturn-left',
+            'reply_all' => 'ri-reply-all-line',
+            'forward' => 'ri-share-forward-line',
+            default => 'ri-reply-line',
         };
     }
 

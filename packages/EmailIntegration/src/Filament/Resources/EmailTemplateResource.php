@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -108,11 +109,22 @@ final class EmailTemplateResource extends Resource
                     ->sortable(),
             ])
             ->recordActions([
+                // The edit schema is set explicitly rather than inferred from the
+                // resource: this table is also rendered outside a resource page
+                // (the Templates tab hosted by TemplatesTable), where there is no
+                // resource context to infer it from.
                 EditAction::make()
+                    ->schema(fn (Schema $schema): Schema => self::form($schema))
+                    ->hiddenLabel()
+                    ->tooltip(__('filament/resources/email-template.actions.edit.label'))
+                    ->icon(Heroicon::OutlinedPencilSquare)
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
 
                 DeleteAction::make()
                     ->label(__('filament/resources/email-template.actions.delete.label'))
+                    ->hiddenLabel()
+                    ->tooltip(__('filament/resources/email-template.actions.delete.label'))
+                    ->icon(Heroicon::OutlinedTrash)
                     ->visible(fn (EmailTemplate $record): bool => $record->created_by === auth()->id()),
             ])
             ->toolbarActions([

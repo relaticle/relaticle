@@ -47,3 +47,69 @@
         }
     }
 }
+
+/*
+ * The signature is a Filament custom block, so the editor wraps it in editing
+ * chrome: a bordered card with a "Signature" heading, an edit button and a
+ * delete button. None of that is sent to the recipient, and in a composer it
+ * competes with the message being written — so inside the composer the block is
+ * rendered as what it actually is: plain signature text under a hairline.
+ * Swapping or clearing it stays available in the bottom bar's signature menu.
+ */
+/*
+ * `mt-auto` on the signature (inside a flex-column document) keeps it pinned to
+ * the bottom of the message area the way a real signature sits at the end of the
+ * mail, instead of floating right under the cursor line in a tall empty editor.
+ */
+.email-composer-body .ProseMirror {
+    @apply flex flex-col;
+}
+
+.email-composer-body [data-id='signature'][data-type='customBlock'] {
+    @apply mt-auto rounded-none border-0 border-t border-gray-200 pt-3 shadow-none ring-0 dark:border-white/10;
+
+    & .fi-fo-rich-editor-custom-block-header {
+        @apply hidden;
+    }
+
+    & .fi-fo-rich-editor-custom-block-preview {
+        @apply border-0 p-0;
+    }
+}
+
+/*
+ * The composer body must fill whatever height the window has (36rem docked,
+ * near-viewport when expanded) so the click target for "start typing" is the
+ * whole empty area, not a 150px box floating above it.
+ *
+ * RichEditor exposes no height option, and its schema wrapper chain
+ * (fi-sc > fi-grid-col > fi-sc-component > fi-fo-field > fi-fo-field-content-col)
+ * is auto-height at every level, so the height has to be pushed down the chain
+ * explicitly — one `h-full` anywhere in it is not enough.
+ */
+.email-composer-body-ctn {
+    & > .fi-sc,
+    & .fi-grid-col,
+    & .fi-sc-component,
+    & .fi-fo-field,
+    & .fi-fo-field-content-col {
+        @apply h-full;
+    }
+}
+
+.email-composer-body {
+    @apply flex h-full flex-col;
+
+    /* The unclassed div is the editor's own Alpine root — without it in the
+       chain the height stops one level above the ProseMirror surface. */
+    & .fi-input-wrp-content-ctn,
+    & .fi-input-wrp-content-ctn > div:not([class]),
+    & .fi-fo-rich-editor-main,
+    & .fi-fo-rich-editor-content {
+        @apply flex min-h-0 flex-1 flex-col;
+    }
+
+    & .ProseMirror {
+        @apply min-h-0 flex-1;
+    }
+}

@@ -3,16 +3,23 @@
 
     $statePath = $getStatePath();
 
-    /** Leading card: fall back to whatever the workspace has set. */
-    $options = [
-        ['value' => '', 'icon' => \Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2, 'label' => $workspaceDefaultLabel, 'description' => $workspaceDefaultDescription],
-        ...array_map(fn (EmailPrivacyTier $tier): array => [
-            'value' => $tier->value,
-            'icon' => $tier->getIcon(),
-            'label' => $tier->getLabel(),
-            'description' => $tier->getDescription(),
-        ], EmailPrivacyTier::cases()),
-    ];
+    $tierOptions = array_map(fn (EmailPrivacyTier $tier): array => [
+        'value' => $tier->value,
+        'icon' => $tier->getIcon(),
+        'label' => $tier->getLabel(),
+        'description' => $tier->getDescription(),
+    ], EmailPrivacyTier::cases());
+
+    /**
+     * The settings page leads with a "whatever the workspace has set" card; a single
+     * email is always at one explicit tier, so there it is nothing to fall back to.
+     */
+    $options = ($workspaceDefaultLabel ?? null) === null
+        ? $tierOptions
+        : [
+            ['value' => '', 'icon' => \Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2, 'label' => $workspaceDefaultLabel, 'description' => $workspaceDefaultDescription],
+            ...$tierOptions,
+        ];
 @endphp
 
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">

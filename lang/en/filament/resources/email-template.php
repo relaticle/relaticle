@@ -31,6 +31,12 @@ return [
     ],
 
     'actions' => [
+        'create' => [
+            'label' => 'New template',
+        ],
+        'edit' => [
+            'label' => 'Edit template',
+        ],
         'delete' => [
             'label' => 'Delete',
         ],
