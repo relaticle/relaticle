@@ -18,6 +18,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Relaticle\Chat\Support\PromptText;
+use Relaticle\Chat\Tools\Activity\ListActivityTool;
 use Relaticle\Chat\Tools\AggregateCrmTool;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
@@ -182,6 +183,7 @@ You can read and search all CRM data (companies, people, opportunities, tasks, n
 You can aggregate pipeline data by stage or company (counts + total value) using AggregateCrmTool.
 You can list the workspace's custom field definitions (ListCustomFieldsTool) — use it to answer "what custom fields do I have" and to look up a field's entity_type + code.
 You can search Relaticle's own product documentation (SearchDocsTool) to answer questions about how the product works — connecting external AI assistants and MCP clients, access tokens, the API, self-hosting, billing, credits, imports, exports.
+You can read the change history of records -- who changed what and when, up to 30 days back (ListActivityTool) -- to answer "what changed on this deal last week" or "who updated this company".
 You can propose creating, updating, or deleting CRM records -- but these require user approval.
 
 ## Rules
@@ -567,6 +569,7 @@ PROMPT;
             GetCrmSummaryTool::class,
             ListTeamMembersTool::class,
             ListCustomFieldsTool::class,
+            ListActivityTool::class,
             GuideToPageTool::class,
             SearchDocsTool::class,
             AggregateCrmTool::class,

@@ -96,7 +96,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockCoreLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
+export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
     prependScrollAnchor: null,
     // Guards loadEarlier() against re-entry: the top-sentinel observer
     // (see initLoadEarlierObserver) re-checks on every qualifying layout
@@ -219,12 +219,20 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         return blockTitles[block?.type] ?? (block?.title || '');
     },
 
-    // Only the core column is ours to translate: every other column is named
-    // by a custom field the team itself created, in the team's own words.
+    // Only columns THIS build named are ours to translate, and the map is
+    // keyed by block type so a team's own custom field can share a key with
+    // one of ours without inheriting our label: a records_table's non-core
+    // columns are custom fields, named by the team in the team's own words,
+    // while an activity table's columns are all ours.
     blockColumnLabel(block, column) {
-        return column?.key === block?.core
-            ? (blockCoreLabels[column?.key] ?? (column?.label || ''))
-            : (column?.label || '');
+        return blockColumnLabels[block?.type]?.[column?.key] ?? (column?.label || '');
+    },
+
+    // A row may name its own record type: an activity table's rows point at a
+    // mix of companies, tasks and notes, while a records_table's rows all share
+    // the block's type.
+    blockRowType(block, row) {
+        return row?.type ?? block?.type;
     },
 
     // `cells` is sparse: formatStored() emits nothing for a field the record
