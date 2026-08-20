@@ -40,6 +40,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Override;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 final class CreateTeam extends RegisterTenant
 {
@@ -558,6 +559,10 @@ final class CreateTeam extends RegisterTenant
         /** @var list<array{email: string, reason: string}> $failed */
         $failed = [];
 
+        // Retrying a dead mail server once per address means waiting out the socket
+        // timeout up to five times inside this request. One refusal is enough.
+        $transportIsDown = false;
+
         foreach ($rawInvites as $invite) {
             $email = $invite['email'] ?? null;
 
@@ -572,6 +577,17 @@ final class CreateTeam extends RegisterTenant
                 $failed[] = [
                     'email' => $email,
                     'reason' => __('filament/pages/teams.create_team.notifications.some_invites_failed.invalid_email'),
+                ];
+
+                continue;
+            }
+
+            // Never attempted, so there is no invitation to resend: this address has to
+            // be invited from scratch once mail is working again.
+            if ($transportIsDown) {
+                $failed[] = [
+                    'email' => $email,
+                    'reason' => __('filament/pages/teams.create_team.notifications.some_invites_failed.send_skipped'),
                 ];
 
                 continue;
@@ -592,6 +608,18 @@ final class CreateTeam extends RegisterTenant
                     'reason' => is_string($firstError)
                         ? $firstError
                         : __('filament/pages/teams.create_team.notifications.some_invites_failed.generic'),
+                ];
+            } catch (TransportExceptionInterface $exception) {
+                // The workspace already exists by now, and the invitation row is written
+                // before the send, so the owner can resend from settings. Letting this
+                // escape would strand the user on a half-finished registration.
+                report($exception);
+
+                $transportIsDown = true;
+
+                $failed[] = [
+                    'email' => $email,
+                    'reason' => __('filament/pages/teams.create_team.notifications.some_invites_failed.send_failed'),
                 ];
             }
         }

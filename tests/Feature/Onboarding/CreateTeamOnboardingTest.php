@@ -22,11 +22,17 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\OnboardSeed\OnboardSeedManager;
+use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\TransportInterface;
+use Symfony\Component\Mime\RawMessage;
 
 mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
 
@@ -851,6 +857,58 @@ it('warns about invites the form accepted but that are not deliverable', functio
     $team = Team::query()->where('name', 'Invite Reporting')->firstOrFail();
 
     expect($team->teamInvitations()->pluck('email')->all())->toBe(['real.person@gmail.com']);
+});
+
+it('finishes onboarding when the mail transport is down', function (): void {
+    config()->set('mail.mailers.failing', ['transport' => 'failing']);
+    config()->set('mail.default', 'failing');
+
+    Mail::extend('failing', fn (array $config): TransportInterface => new class implements TransportInterface
+    {
+        public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
+        {
+            throw new TransportException('Connection could not be established.');
+        }
+
+        public function __toString(): string
+        {
+            return 'failing';
+        }
+    });
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Mail Transport Down',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'invites' => [
+                ['email' => 'first.person@gmail.com', 'role' => 'editor'],
+                ['email' => 'second.person@gmail.com', 'role' => 'editor'],
+            ],
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertNotified(
+            Notification::make()
+                ->title(__('filament/pages/teams.create_team.notifications.some_invites_failed.title'))
+                ->body(
+                    'first.person@gmail.com: '.__('filament/pages/teams.create_team.notifications.some_invites_failed.send_failed')
+                    ."\n".'second.person@gmail.com: '.__('filament/pages/teams.create_team.notifications.some_invites_failed.send_skipped')
+                )
+                ->warning()
+        )
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $user->fresh()->currentTeam]));
+
+    $team = Team::query()->where('name', 'Mail Transport Down')->firstOrFail();
+
+    // The row is written before the send, so the first invitation survives and the owner
+    // can resend it. The second address is never attempted: one dead connection is enough
+    // to know the rest would only wait out the same socket timeout. The two addresses
+    // therefore need different advice, which is what the notification body asserts above.
+    expect($team->teamInvitations()->pluck('email')->all())->toBe(['first.person@gmail.com']);
 });
 
 it('assigns seeded demo tasks to the workspace owner so the dashboard is not empty', function (): void {

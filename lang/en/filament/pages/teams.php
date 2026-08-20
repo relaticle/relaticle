@@ -78,6 +78,8 @@ return [
                 'title' => 'Some invites could not be sent',
                 'invalid_email' => 'This is not a valid email address.',
                 'generic' => 'Validation failed.',
+                'send_failed' => 'The invitation was saved but the email could not be delivered. Resend it from workspace settings.',
+                'send_skipped' => 'Not sent, because the mail service is unavailable. Invite this person from workspace settings once it is back.',
             ],
         ],
     ],
