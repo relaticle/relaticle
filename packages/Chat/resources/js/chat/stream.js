@@ -57,7 +57,7 @@ export const streamModule = () => ({
         // dependents through property access on the wrapped proxy handed back
         // from an array read. Callers such as targetBubbleFor()'s resume
         // fallback hand this return value straight to handleTextDelta, which
-        // mutates `.content` on it — mutating the raw object bypasses the
+        // mutates `.content` on it. Mutating the raw object bypasses the
         // proxy's set trap, so an already-mounted x-text effect never
         // re-renders. Same fix as send.js's optimistic user bubble.
         return this.messages[this.messages.length - 1];
