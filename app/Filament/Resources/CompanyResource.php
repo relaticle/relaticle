@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -20,7 +21,6 @@ use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -48,12 +48,10 @@ final class CompanyResource extends Resource
             ->components([
                 TextInput::make('name')
                     ->required(),
-                Select::make('account_owner_id')
+                TeamMemberSelect::make('account_owner_id')
                     ->relationship('accountOwner', 'name')
                     ->label(__('filament/resources/company.fields.account_owner_id.label'))
-                    ->nullable()
-                    ->preload()
-                    ->searchable(),
+                    ->nullable(),
 
                 CustomFields::form()->build()->columnSpanFull()->columns(1),
             ]);
