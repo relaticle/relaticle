@@ -32,7 +32,7 @@ should look like the product, not like markdown.
 | 2 | Rendering content: `display_block` cards + inline record chips | 1 |
 | 3 | Capability completeness: comments, activity, email drafts, search | 2 |
 | 4 | Voice input (transcription into composer) | 1 |
-| 5 | Team display templates + retrieval interface pin | 2 |
+| 5 | Retrieval interface pin (display templates folded into Phase 2) | 2 |
 
 ## Phase 0: naming
 
@@ -199,12 +199,25 @@ Config flag `chat.voice_enabled` for self-hosters without an OpenAI key.
 
 ## Phase 5: team display templates + retrieval pin
 
-**Templates** (the Discord "pretty printing" request, Jav 2026-08-18): team-level
-config of which fields represent each entity in chat. One `DisplayFieldSelector`
-service consumed by both the `record_card` block builder and the chip hover
-card. Settings UI lives with the team settings pages; stored per team,
-per entity type, ordered field codes (core + custom). Defaults ship sensible
-(name, stage/status, owner, amount).
+**Templates** (the Discord "pretty printing" request, Jav 2026-08-18) are
+answered WITHOUT a new config surface, decided 2026-08-20. Which fields
+represent an entity in chat is DERIVED from what the team already configured
+on its custom fields: `visible_in_list` minus `list_toggleable_hidden` for the
+`records_table` block (what the Filament table shows), `visible_in_view` for
+the `record_card` block (what the record view page shows), both ordered by
+`sort_order`. A sampled tenant already has `{amount, close_date, stage}`
+marked visible on `opportunity`, which is Jav's ask, already stored.
+
+On top of that, fields the tool call filtered or sorted on are promoted to the
+front and included even when hidden, so relevance follows the question rather
+than a static per-team template.
+
+No `chat_display_templates` table, no settings UI: a chat-only template would
+be a second source of truth for a fact the custom-field settings already own.
+The selector lives in `DisplayFieldSelector` and is consumed by the block
+builders (and later the chip hover card). Accepted trade: no chat-only
+override; if that demand appears, extend the existing custom-field form with a
+"show in chat" toggle rather than adding a second config surface.
 
 **Retrieval pin**: `CrmAssistant` reserves a `RetrieveContextTool` slot: input
 `{query: string, entity_types?: string[], record_id?: string}`, output chunks
