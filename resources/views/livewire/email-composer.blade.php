@@ -10,7 +10,7 @@
     @class(['shrink-0' => $dock === 'inline'])
     x-data="{
         insertVariable(id) {
-            const editor = document.querySelector('.email-composer-body [x-data^=\'richEditorFormComponent\']')
+            const editor = this.$root.querySelector('.email-composer-body [x-data^=\'richEditorFormComponent\']')
 
             if (editor) {
                 Alpine.$data(editor).insertMergeTag(id)
