@@ -30,7 +30,7 @@
                 aria-label="{{ __('Search conversations') }}"
                 class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 dark:text-white"
             />
-            <kbd class="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:border-gray-600">Esc</kbd>
+            <kbd class="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium text-gray-400 sm:inline dark:border-gray-600">Esc</kbd>
         </div>
 
         <div class="max-h-80 overflow-y-auto py-1" role="listbox" aria-label="{{ __('Conversations') }}">
@@ -47,7 +47,7 @@
             <template x-if="!switcherLoading && !switcherError && filteredSwitcherItems().length === 0">
                 <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">
                     <span x-show="switcherQuery.trim()">{{ __('No matches.') }}</span>
-                    <span x-show="!switcherQuery.trim()">{{ __('No chats yet.') }}</span>
+                    <span x-show="!switcherQuery.trim()">{{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}</span>
                 </p>
             </template>
 
