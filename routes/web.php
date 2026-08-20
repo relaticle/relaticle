@@ -93,7 +93,7 @@ Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verifie
         ->name('team-invitations.token.join');
 });
 
-Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', AuthenticateSession::class])
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])
     ->group(function (): void {
         // Separate buckets: a shared one lets repeated views of the invite page
         // spend the allowance the accept POST needs.
