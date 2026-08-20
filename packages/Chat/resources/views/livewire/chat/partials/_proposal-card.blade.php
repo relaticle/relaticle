@@ -18,13 +18,13 @@
                         <div class="flex items-center gap-2 text-xs">
                             <span class="text-gray-600 dark:text-gray-300" x-text="item.summary"></span>
                             <template x-if="itemResult(action, itemIdx).status === 'approved'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
                                     <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
                                 </span>
                             </template>
                             <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                    Skipped
+                                <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                                    {{ __('Skipped') }}
                                 </span>
                             </template>
                             <template x-if="itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
@@ -115,8 +115,8 @@
                                             </span>
                                         </template>
                                         <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                                Skipped
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                                                {{ __('Skipped') }}
                                             </span>
                                         </template>
                                     </span>

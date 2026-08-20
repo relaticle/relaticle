@@ -45,7 +45,7 @@
                         {{ $name }}
                     </span>
                 @endif
-                <span class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium capitalize text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium capitalize text-gray-600 dark:bg-gray-700 dark:text-gray-400">
                     {{ $type }}
                 </span>
             </div>

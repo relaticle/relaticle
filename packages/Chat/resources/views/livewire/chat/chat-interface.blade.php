@@ -132,36 +132,14 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
     modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 
-    providerIcons: @js([
-        'anthropic' => svg('ri-claude-fill')->toHtml(),
-        'openai' => svg('ri-openai-fill')->toHtml(),
-        'ollama' => svg('ri-server-line')->toHtml(),
-        'selfhosted' => svg('ri-server-line')->toHtml(),
-    ]),
-
-    providerIconHtml(provider) {
-        if (!provider) return '';
-        return this.providerIcons[provider] || '';
-    },
-
-    providerIconColor(provider) {
-        return ({
-            anthropic: 'text-[#D4763C]',
-            openai: 'text-gray-900 dark:text-gray-200',
-            ollama: 'text-gray-500 dark:text-gray-400',
-            selfhosted: 'text-gray-500 dark:text-gray-400',
-        })[provider] || '';
-    },
-
-    modelLabel(value) {
-        const found = this.modelOptions.find((o) => o.value === value);
-        return (found || this.modelOptions[0]).label;
-    },
-
-    modelProvider(value) {
-        const found = this.modelOptions.find((o) => o.value === value);
-        return found?.provider ?? null;
-    },
+    ...window.ChatModules.modelPickerModule({
+        providerIcons: @js([
+            'anthropic' => svg('ri-claude-fill')->toHtml(),
+            'openai' => svg('ri-openai-fill')->toHtml(),
+            'ollama' => svg('ri-server-line')->toHtml(),
+            'selfhosted' => svg('ri-server-line')->toHtml(),
+        ]),
+    }),
 
     selectModel(value) {
         if (! this.allowedModels.includes(value)) {
