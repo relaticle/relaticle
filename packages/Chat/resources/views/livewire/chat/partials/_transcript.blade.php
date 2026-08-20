@@ -17,18 +17,18 @@
                     <x-heroicon-o-sparkles class="h-6 w-6" />
                 </div>
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                    How can I help?
+                    {{ __('What do you need to know?') }}
                 </h3>
                 {{-- The side panel keeps its empty state to the greeting: the record
                      it is bound to already frames what to ask, so the starter chips
                      are noise there. --}}
                 @if (($context ?? 'conversation') === 'side-panel')
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Ask about your CRM data.
+                        {{ __('Ask about this record, or anything else in your CRM.') }}
                     </p>
                 @else
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Ask about your CRM data, or try one of these:
+                        {{ __("Ask about a deal, a contact, or what's overdue. Try one of these:") }}
                     </p>
                     <div class="mt-4 flex flex-wrap justify-center gap-2">
                         <template x-for="starter in starterPrompts" :key="starter.label">
@@ -140,7 +140,7 @@
                                  silent rather than showing a permanent checkmark on every past message. --}}
                             <template x-if="msg.sendState && !msg.editing">
                                 <div
-                                    class="flex items-center gap-1 px-1 text-[11px]"
+                                    class="flex items-center gap-1 px-1 text-[length:var(--text-micro)]"
                                     :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-primary-100/70 dark:text-gray-500'"
                                 >
                                     <template x-if="msg.sendState === 'sending'">
@@ -185,7 +185,7 @@
                                     ></textarea>
                                     <div class="mt-2 flex items-center justify-between gap-2 px-1">
                                         <span
-                                            class="text-[11px]"
+                                            class="text-[length:var(--text-micro)]"
                                             :class="{
                                                 'text-primary-100/80': (msg.editText || '').length <= 4900,
                                                 'text-amber-200': (msg.editText || '').length > 4900 && (msg.editText || '').length <= 5000,

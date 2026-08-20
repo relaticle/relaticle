@@ -12,8 +12,9 @@
      concept: it navigates to the conversation page instead, so it passes
      false and the send button never hides behind a stop control.
      $sendDisabled (string, default below): the Alpine boolean expression fed
-     to the send button's :disabled, unescaped since it is an
-     author-supplied expression, never request data. --}}
+     to the send button's :disabled through an escaped echo. Blade escaping
+     round-trips safely here: the browser decodes `&gt;` back to `>` when it
+     reads the attribute, so Alpine still gets the original expression. --}}
 @php
     $showStopButton ??= true;
     $sendDisabled ??= 'text.trim().length === 0 || text.length > 5000';
@@ -60,7 +61,7 @@
                 @if ($showStopButton) x-show="!isStreaming" @endif
                 type="submit"
                 class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 disabled:bg-primary-200 disabled:text-white dark:disabled:bg-primary-900/40 dark:disabled:text-primary-300"
-                :disabled="{!! $sendDisabled !!}"
+                :disabled="{{ $sendDisabled }}"
                 aria-label="{{ __('Send message') }}"
             >
                 <x-heroicon-s-arrow-up class="h-4 w-4" />
