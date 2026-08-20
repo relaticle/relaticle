@@ -22,6 +22,14 @@ final readonly class EnsureHostedWorkspaceAccess
         'filament.app.tenant.profile',
     ];
 
+    /**
+     * `chat.*` otherwise matches every route in this group with an XHR/JSON
+     * response, but this one is a full-page browser navigation (a transcript
+     * citation link), so a paused workspace must redirect it to billing like
+     * any other page route instead of returning a raw JSON body.
+     */
+    private const string BROWSER_NAVIGATION_ROUTE = 'chat.record-redirect';
+
     public function __construct(private HostedWorkspaceAccess $access) {}
 
     /**
@@ -43,7 +51,9 @@ final readonly class EnsureHostedWorkspaceAccess
 
         $billingUrl = route('filament.app.pages.billing', ['tenant' => $team->slug]);
 
-        if ($request->expectsJson() || $request->routeIs('chat.*')) {
+        $isXhrChatRoute = $request->routeIs('chat.*') && ! $request->routeIs(self::BROWSER_NAVIGATION_ROUTE);
+
+        if ($request->expectsJson() || $isXhrChatRoute) {
             return response()->json([
                 'error' => 'workspace_subscription_required',
                 'message' => __('billing.access.paused_api'),

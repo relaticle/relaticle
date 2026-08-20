@@ -9,7 +9,9 @@ use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
 
 Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(function (): void {
-    Route::get('/r/{type}/{id}', RecordRedirectController::class)->name('chat.record-redirect');
+    Route::get('/r/{type}/{id}', RecordRedirectController::class)
+        ->middleware('throttle:60,1')
+        ->name('chat.record-redirect');
 
     Route::get('/chat/mentions', [ChatController::class, 'mentions'])
         ->middleware('throttle:60,1')

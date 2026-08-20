@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Models\Company;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Support\Facades\Queue;
@@ -130,6 +131,13 @@ it('returns payment required from the MCP transport for a paused workspace', fun
         ])
         ->assertStatus(402)
         ->assertJsonPath('error', 'workspace_subscription_required');
+});
+
+it('redirects a paused workspace to billing on the record-redirect route instead of returning raw json', function (): void {
+    $company = Company::factory()->for($this->team)->create();
+
+    $this->get("/r/company/{$company->getKey()}")
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->team->slug]));
 });
 
 it('blocks chat before reserving credits or dispatching a queued turn', function (): void {
