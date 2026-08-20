@@ -96,7 +96,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.' }) => ({
+export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockCoreLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
     prependScrollAnchor: null,
     // Guards loadEarlier() against re-entry: the top-sentinel observer
     // (see initLoadEarlierObserver) re-checks on every qualifying layout
@@ -197,6 +197,62 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
             : null;
 
         return { grouped, daySeparator };
+    },
+
+    // --- Read-tool display blocks -------------------------------------------
+    //
+    // A block is built inside the queued chat job, whose locale is whoever
+    // happened to send that turn, and it is then persisted and re-read by
+    // every later reader of the conversation. So its chrome (the table
+    // heading, the core column's label) is generated in English and
+    // translated HERE, at render time, against the reader's own locale. The
+    // server strings stay as the fallback for anything these maps miss.
+
+    // Blocks this build knows how to paint, in payload order. Filtering here
+    // rather than in the template means an unregistered type leaves no empty
+    // frame or stray margin behind.
+    displayBlocks(msg) {
+        return (msg?.display_blocks || []).filter((block) => window.ChatModules.blockTemplate(block?.block));
+    },
+
+    blockTitle(block) {
+        return blockTitles[block?.type] ?? (block?.title || '');
+    },
+
+    // Only the core column is ours to translate: every other column is named
+    // by a custom field the team itself created, in the team's own words.
+    blockColumnLabel(block, column) {
+        return column?.key === block?.core
+            ? (blockCoreLabels[column?.key] ?? (column?.label || ''))
+            : (column?.label || '');
+    },
+
+    // `cells` is sparse: formatStored() emits nothing for a field the record
+    // holds no value for, so any column key can be missing from any row.
+    blockCell(row, column) {
+        return row?.cells?.[column?.key] ?? '';
+    },
+
+    // The record's own name cell links to the record; a promoted filter/sort
+    // column sits in front of it and must not steal the link.
+    blockCellLinksRecord(block, row, column) {
+        return column?.key === block?.core && !!row?.url && this.blockCell(row, column) !== '';
+    },
+
+    blockChipIcon(type) {
+        return window.ChatModules.recordChipIcon(type) ?? '';
+    },
+
+    blockFooter(block) {
+        const showing = (block?.rows || []).length;
+
+        return blockFooterTemplate
+            .replace(':showing', String(showing))
+            .replace(':total', String(block?.total ?? showing));
+    },
+
+    blockHasMore(block) {
+        return (block?.total ?? 0) > (block?.rows || []).length;
     },
 
     // Sticky date pill: a floating element (see chat-interface.blade.php)

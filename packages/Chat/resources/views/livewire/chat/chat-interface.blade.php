@@ -36,6 +36,22 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         todayLabel: @js(__('Today')),
         yesterdayLabel: @js(__('Yesterday')),
         feedbackDeleteConfirmText: @js(__('Remove this feedback? Your category and comment will be deleted.')),
+        {{-- Display-block chrome. The block itself is generated inside the queued
+             chat job in whatever locale sent that turn, then persisted and re-read
+             by everyone else, so the heading and the core column label are
+             translated here against the reader's locale instead. --}}
+        blockTitles: @js([
+            'company' => __('Companies'),
+            'people' => __('People'),
+            'opportunity' => __('Opportunities'),
+            'task' => __('Tasks'),
+            'note' => __('Notes'),
+        ]),
+        blockCoreLabels: @js([
+            'name' => __('Name'),
+            'title' => __('Title'),
+        ]),
+        blockFooterTemplate: @js(__('Showing :showing of :total')),
     }),
     ...window.ChatModules.sendModule({
         sendUrl,

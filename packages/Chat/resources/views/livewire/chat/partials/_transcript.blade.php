@@ -279,6 +279,21 @@
                             </div>
                         </template>
 
+                        {{-- Read-tool display blocks: the real table/card that replaces the
+                             markdown table the model used to hand-write. Dispatched through the
+                             same registry as the proposal card above (see chat/blocks.js);
+                             displayBlocks() has already dropped anything unregistered. --}}
+                        <template x-for="(block, blockIdx) in displayBlocks(msg)" :key="blockIdx">
+                            <div class="mt-3 w-full max-w-[85%]">
+                                <template x-if="window.ChatModules.blockTemplate(block.block) === 'chat-block-records-table'">
+                                    @include('chat::livewire.chat.partials._block-records-table')
+                                </template>
+                                <template x-if="window.ChatModules.blockTemplate(block.block) === 'chat-block-record-card'">
+                                    @include('chat::livewire.chat.partials._block-record-card')
+                                </template>
+                            </div>
+                        </template>
+
                         <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                             <div class="mt-2 flex flex-wrap gap-2">
                                 <template x-for="chip in msg.follow_ups" :key="chip.prompt">

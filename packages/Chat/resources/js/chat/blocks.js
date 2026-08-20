@@ -2,13 +2,18 @@
 // template id that renders it. The transcript consults this before rendering
 // a block; unregistered types render nothing, silently.
 //
-// Seeded here with the one block type that exists today ('pending_action',
-// the existing proposal card). A later phase adds the `display_block`
-// envelope server-side and registers 'record_card' / 'records_table' by
-// calling registerBlock() again here, with no further transcript changes.
+// 'pending_action' is the proposal card. 'records_table' and 'record_card' are
+// the read-tool `display_block` envelopes, carried on a message as
+// `display_blocks` (derived on reload by ListConversationMessages and at
+// stream end by ChatInterface::latestAssistantMessage()). A block whose type
+// this file does not know is dropped by displayBlocks() in transcript.js,
+// which is what makes an older conversation carrying a retired block type
+// render nothing rather than an empty frame.
 const registry = new Map();
 
 export const registerBlock = (type, templateRefId) => registry.set(type, templateRefId);
 export const blockTemplate = (type) => registry.get(type) ?? null;
 
 registerBlock('pending_action', 'chat-block-pending-action');
+registerBlock('records_table', 'chat-block-records-table');
+registerBlock('record_card', 'chat-block-record-card');

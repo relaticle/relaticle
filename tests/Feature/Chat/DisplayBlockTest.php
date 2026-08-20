@@ -6,6 +6,7 @@ use App\Actions\Company\CreateCompany;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Models\CustomField;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,7 +21,9 @@ use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
+use Relaticle\Chat\Tools\Opportunity\GetOpportunityTool;
 use Relaticle\Chat\Tools\Opportunity\ListOpportunitiesTool;
+use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\ChatDocument;
@@ -31,6 +34,8 @@ mutates(DisplayBlocks::class);
 mutates(ListCompaniesTool::class);
 mutates(GetCompanyTool::class);
 mutates(ListOpportunitiesTool::class);
+mutates(GetOpportunityTool::class);
+mutates(ListTasksTool::class);
 mutates(ListConversationMessages::class);
 mutates(SupersededAwareConversationStore::class);
 
@@ -111,6 +116,51 @@ function blockFieldValue(array $block, string $label): ?string
     }
 
     return null;
+}
+
+/**
+ * The chip/link list a typed card field carries alongside its joined string.
+ *
+ * @param  array<string, mixed>  $block
+ * @return list<string>|null
+ */
+function blockFieldValues(array $block, string $label): ?array
+{
+    /** @var list<array{label: string, value: string, type: string, values?: list<string>}> $fields */
+    $fields = $block['fields'] ?? [];
+
+    foreach ($fields as $field) {
+        if ($field['label'] === $label) {
+            return $field['values'] ?? null;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Force the display settings of a field the team already has, which no action
+ * exposes. Sibling of seedDisplayField() for the system-defined fields.
+ *
+ * @param  array<string, mixed>  $settings
+ */
+function forceDisplaySettings(User $user, string $entityType, string $code, array $settings = []): CustomField
+{
+    $field = CustomField::query()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->firstOrFail();
+
+    $field->settings = CustomFieldSettingsData::from([
+        'visible_in_list' => true,
+        'list_toggleable_hidden' => false,
+        'visible_in_view' => true,
+        ...$settings,
+    ]);
+    $field->save();
+
+    return $field->refresh();
 }
 
 /**
@@ -331,6 +381,89 @@ it('keeps the core column single when a same-coded custom field is promoted', fu
 
     expect(array_count_values(blockColumnKeys($table))['name'])->toBe(1)
         ->and($table['rows'][0]['cells']['name'])->toBe('Acme');
+});
+
+// --- the row links from the core column, wherever promotion moved it ---
+
+it('names the core column even when a promoted field leads the table', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'opportunity', 'deal_source', 'Deal Source', ['visible_in_list' => false]);
+
+    app(CreateOpportunity::class)->execute($user, [
+        'name' => 'Big deal',
+        'custom_fields' => ['deal_source' => 'Referral'],
+    ]);
+
+    $block = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request(['sort' => '-deal_source'])));
+
+    expect(blockColumnKeys($block)[0])->toBe('deal_source')
+        ->and($block['core'])->toBe('name')
+        ->and($block['rows'][0]['cells'][$block['core']])->toBe('Big deal');
+});
+
+it('names title as the core column on an entity that has no name', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    Task::factory()->for($user->currentTeam)->create(['title' => 'Call Acme']);
+
+    $block = displayBlockOf(app(ListTasksTool::class)->handle(new Request([])));
+
+    expect($block['core'])->toBe('title')
+        ->and($block['rows'][0]['cells']['title'])->toBe('Call Acme');
+});
+
+// --- an empty result must not paint a headless table ---
+
+it('emits no block when the list matches no records', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($decoded['data'])->toBe([])
+        ->and($decoded)->not->toHaveKey('display_block');
+});
+
+// --- the cap is for free-form prose, not for values a card renders as links ---
+
+it('keeps a long link value whole so a card href cannot break', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    forceDisplaySettings($user, 'company', 'domains');
+
+    $long = 'https://example.com/?ref='.str_repeat('a', 600);
+
+    $company = app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['domains' => [$long]],
+    ]);
+
+    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
+
+    expect(blockFieldValue($card, 'Domains'))->toBe($long)
+        ->and(blockFieldValues($card, 'Domains'))->toBe([$long]);
+});
+
+it('carries choice option names as a values list so the card renders chips', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $stage = forceDisplaySettings($user, 'opportunity', 'stage');
+    $option = $stage->options->first();
+
+    $opportunity = app(CreateOpportunity::class)->execute($user, [
+        'name' => 'Big deal',
+        'custom_fields' => ['stage' => (string) $option->getKey()],
+    ]);
+
+    $card = displayBlockOf(app(GetOpportunityTool::class)->handle(new Request(['id' => (string) $opportunity->getKey()])));
+
+    expect(blockFieldValue($card, $stage->name))->toBe($option->name)
+        ->and(blockFieldValues($card, $stage->name))->toBe([$option->name]);
 });
 
 // --- (c) blocks are re-derived from persisted tool_results on reload ---
